@@ -1,0 +1,43 @@
+= roda-sequel-stack
+
+This is an application skeleton for an app using Roda as the web framework,
+and Sequel as the database library.  It's setup so you can clone this
+repository and base your application on it:
+
+  git clone https://github.com/jeremyevans/roda-sequel-stack.git
+  mv roda-sequel-stack my_app
+  cd my_app
+  rake setup[MyApp]
+
+== Database Setup
+
+The default DATABASE_URL uses a PostgreSQL database, with an application
+specific PostgreSQL database account.  You can create this via:
+
+  createuser -U postgres my_app
+  createdb -U postgres -O my_app my_app_production
+  createdb -U postgres -O my_app my_app_test
+  createdb -U postgres -O my_app my_app_development
+
+Using an application specific, regular database user account (not a
+database superuser account), is recommended for security reasons.
+
+== Libraries Used
+
+roda :: web framework
+sequel :: database library
+rack-unreloader :: development code reloader
+minitest :: testing framework
+minitest-hooks :: around/around(:all) hooks for minitest
+capybara :: web application testing helpers
+
+== Environment Variables Used
+
+DATABASE_URL :: database connection URL to give to Sequel, default is to
+                create one based on the application's name and RACK_ENV.
+RACK_ENV :: environment to use (production, development, or test), defaults
+            to development.
+
+== Author
+
+Jeremy Evans <code@jeremyevans.net>
