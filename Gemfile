@@ -1,7 +1,11 @@
 source 'https://rubygems.org'
 
+gem 'rack_csrf'
+gem 'tilt', '>= 2'
+gem 'erubis'
 gem 'roda'
 gem 'sequel'
+gem 'sequel_pg'
 gem 'rack-unreloader'
 
 gem 'capybara'

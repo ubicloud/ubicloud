@@ -1,5 +1,6 @@
 require_relative 'models'
 
+require 'tilt/erubis'
 require 'roda'
 
 class App < Roda
