@@ -64,8 +64,7 @@ task :dev_irb do
   irb.call('development')
 end
 
-
-desc "Open irb shell in development mode"
+desc "Open irb shell in production mode"
 task :prod_irb do 
   irb.call('production')
 end
