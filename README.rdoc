@@ -22,6 +22,35 @@ specific PostgreSQL database account.  You can create this via:
 Using an application specific, regular database user account (not a
 database superuser account), is recommended for security reasons.
 
+== Next Steps
+
+First, you'll want to edit the default migration file (+migrate/001_tables.rb+)
+to define the database schema for your application.  After modifying the
+migration file, and optionally adding additional migration files, you can run
+the migrations:
+
+  rake dev_up  # Migrate the development database up
+  rake test_up # Migrate the test database up
+  rake prod_up # Migrate the production database up
+
+After editing the default migration file, you'll probably want to rename and
+edit the default model file (+models/model1.rb+), as well as add other model
+files as appropriate.  After the models have been setup, you can get an irb
+shell with your models loaded:
+
+  rake dev_irb  # IRB shell with models connected to the development database
+  rake test_irb # IRB shell with models connected to the test database
+  rake prod_irb # IRB shell with models connected to the production database
+
+After editing the model files, you'll probably want to edit the
+application file (+app.rb+).  You'll also want to rename and edit the default
+routing substree (+routes/prefix1.rb+).  After that, you'll probably want to
+edit the layout (+views/layout.erb+) and index page (+views/index.erb+), as
+well as adding any other views.
+
+After making those changes, you can start your application using +rackup+
+or similar program.
+
 == Libraries Used
 
 roda :: web framework
