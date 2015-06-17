@@ -101,7 +101,7 @@ task :setup, [:name] do |t, args|
   require 'securerandom'
   File.write('.session_secret', SecureRandom.random_bytes(40))
 
-  lower_name = name.gsub(/([a-z\d])([A-Z])/, '\1_\2')
+  lower_name = name.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
   File.write('.env.rb', <<END)
 ENV['RACK_ENV'] ||= 'development'
 
