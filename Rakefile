@@ -30,7 +30,7 @@ task :dev_up do
   migrate.call('development', nil)
 end
 
-desc "Migrate development database to latest version"
+desc "Migrate development database to all the way down"
 task :dev_down do
   migrate.call('development', 0)
 end
