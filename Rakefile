@@ -51,7 +51,7 @@ end
 irb = proc do |env|
   ENV['RACK_ENV'] = env
   trap('INT', "IGNORE")
-  sh "#{FileUtils::RUBY.sub('ruby', 'irb')} -r ./models"
+  sh "#{File.join(File.dirname(FileUtils::RUBY), 'irb')} -r ./models"
 end
 
 desc "Open irb shell in test mode"
