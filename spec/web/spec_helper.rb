@@ -11,4 +11,7 @@ require_relative '../minitest_helper'
 
 Capybara.app = App.freeze
 
-include Capybara::DSL
+class Minitest::Spec
+  include Rack::Test::Methods
+  include Capybara::DSL
+end
