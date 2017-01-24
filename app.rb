@@ -4,6 +4,10 @@ require 'tilt/erubis'
 require 'roda'
 
 class App < Roda
+  opts[:unsupported_block_result] = :raise
+  opts[:unsupported_matcher] = :raise
+  opts[:verbatim_string_matcher] = true
+
   plugin :default_headers,
     'Content-Type'=>'text/html',
     'Content-Security-Policy'=>"default-src 'self' https://oss.maxcdn.com/ https://maxcdn.bootstrapcdn.com https://ajax.googleapis.com",
