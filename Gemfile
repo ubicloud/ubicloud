@@ -2,7 +2,7 @@ source 'https://rubygems.org'
 
 gem 'rack_csrf'
 gem 'tilt', '>= 2'
-gem 'erubis'
+gem 'erubi'
 gem 'roda'
 gem 'sequel'
 gem 'sequel_pg'

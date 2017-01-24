@@ -1,6 +1,5 @@
 require_relative 'models'
 
-require 'tilt/erubis'
 require 'roda'
 
 class App < Roda
@@ -22,7 +21,7 @@ class App < Roda
     :secret=>File.read('.session_secret')
 
   plugin :csrf
-  plugin :render, :escape=>true
+  plugin :render, :escape=>:erubi
   plugin :multi_route
 
   Unreloader.require('routes'){}
