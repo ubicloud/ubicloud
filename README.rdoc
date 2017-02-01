@@ -1,7 +1,7 @@
 = roda-sequel-stack
 
 This is an application skeleton for an app using Roda as the web framework,
-and Sequel as the database library.  It's setup so you can clone this
+and Sequel as the database library.  It's set up so you can clone this
 repository and base your application on it:
 
   git clone https://github.com/jeremyevans/roda-sequel-stack.git
@@ -35,7 +35,7 @@ the migrations:
 
 After editing the default migration file, you'll probably want to rename and
 edit the default model file (+models/model1.rb+), as well as add other model
-files as appropriate.  After the models have been setup, you can get an irb
+files as appropriate.  After the models have been set up, you can get an irb
 shell with your models loaded:
 
   rake dev_irb  # IRB shell with models connected to the development database
@@ -44,9 +44,9 @@ shell with your models loaded:
 
 After editing the model files, you'll probably want to edit the
 application file (+app.rb+).  You'll also want to rename and edit the default
-routing substree (+routes/prefix1.rb+).  After that, you'll probably want to
+routing subtree (+routes/prefix1.rb+).  After that, you'll probably want to
 edit the layout (+views/layout.erb+) and index page (+views/index.erb+), as
-well as adding any other views.
+well as add any other views.
 
 After making those changes, you can start your application using +rackup+
 or similar program.
