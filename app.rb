@@ -17,12 +17,14 @@ class App < Roda
     :secret=>(ENV.delete('APP_SESSION_SECRET') || SecureRandom.hex(40))
 
   plugin :csrf
+  plugin :assets, :css=>'app.scss', :css_opts=>{:style=>:compressed, :cache=>false}
   plugin :render, :escape=>true
   plugin :multi_route
 
   Unreloader.require('routes'){}
 
   route do |r|
+    r.assets
     r.multi_route
 
     r.root do
