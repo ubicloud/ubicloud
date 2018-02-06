@@ -11,7 +11,7 @@ repository and base your application on it:
 
 == Database Setup
 
-The default DATABASE_URL uses a PostgreSQL database, with an application
+By default roda-sequel-stack assumes a PostgreSQL database, with an application
 specific PostgreSQL database account.  You can create this via:
 
   createuser -U postgres my_app
@@ -62,8 +62,9 @@ capybara :: web application testing helpers
 
 == Environment Variables Used
 
-DATABASE_URL :: database connection URL to give to Sequel, default is to
-                create one based on the application's name and RACK_ENV.
+#{APP}_DATABASE_URL :: database connection URL to give to Sequel, default is to
+                       create one based on the application's name and RACK_ENV.
+#{APP}_SESSION_SECRET :: secret to use for the rack cookie sessions
 RACK_ENV :: environment to use (production, development, or test), defaults
             to development.
 

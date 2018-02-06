@@ -105,13 +105,14 @@ task :setup, [:name] do |t, args|
   end
 
   require 'securerandom'
-  File.write('.session_secret', SecureRandom.random_bytes(40))
-
   lower_name = name.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
+  upper_name = lower_name.upcase
+
   File.write('.env.rb', <<END)
 ENV['RACK_ENV'] ||= 'development'
+ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
 
-ENV['DATABASE_URL'] ||= case ENV['RACK_ENV']
+ENV['#{upper_name}_DATABASE_URL'] ||= case ENV['RACK_ENV']
 when 'test'
   "postgres:///#{lower_name}_test?user=#{lower_name}"
 when 'production'
@@ -121,8 +122,8 @@ else
 end
 END
 
-  %w'views/layout.erb routes/prefix1.rb config.ru app.rb spec/web/spec_helper.rb'.each do |f|
-    File.write(f, File.read(f).gsub('App', name))
+  %w'views/layout.erb routes/prefix1.rb config.ru app.rb db.rb spec/web/spec_helper.rb'.each do |f|
+    File.write(f, File.read(f).gsub('App', name).gsub('APP', upper_name))
   end
 
   File.write(__FILE__, File.read(__FILE__).split("\n")[0...(last_line-2)].join("\n") << "\n")

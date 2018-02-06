@@ -14,7 +14,7 @@ class App < Roda
   use Rack::Session::Cookie,
     :key => '_App_session',
     #:secure=>!TEST_MODE, # Uncomment if only allowing https:// access
-    :secret=>File.read('.session_secret')
+    :secret=>(ENV.delete('APP_SESSION_SECRET') || SecureRandom.hex(40))
 
   plugin :csrf
   plugin :render, :escape=>true
