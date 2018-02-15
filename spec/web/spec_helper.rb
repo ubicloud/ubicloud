@@ -8,11 +8,15 @@ require 'rack/test'
 
 require_relative '../minitest_helper'
 
-Capybara.app = App.freeze
+Capybara.app = App.freeze.app
 
 class Minitest::HooksSpec
   include Rack::Test::Methods
   include Capybara::DSL
+
+  def app
+    Capybara.app
+  end
 
   after do
     Capybara.reset_sessions!
