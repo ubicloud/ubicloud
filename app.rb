@@ -11,10 +11,12 @@ class App < Roda
     'X-Content-Type-Options'=>'nosniff',
     'X-XSS-Protection'=>'1; mode=block'
 
+  # Don't delete session secret from environment in development mode as it breaks reloading
+  session_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_SECRET'] : ENV.delete('APP_SESSION_SECRET')
   use Rack::Session::Cookie,
     :key => '_App_session',
     #:secure=>!TEST_MODE, # Uncomment if only allowing https:// access
-    :secret=>(ENV.delete('APP_SESSION_SECRET') || SecureRandom.hex(40))
+    :secret=>(session_secret || SecureRandom.hex(40))
 
   plugin :csrf
   plugin :assets, :css=>'app.scss', :css_opts=>{:style=>:compressed, :cache=>false}
