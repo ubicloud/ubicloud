@@ -110,15 +110,17 @@ task :setup, [:name] do |t, args|
 
   File.write('.env.rb', <<END)
 ENV['RACK_ENV'] ||= 'development'
-ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
 
 ENV['#{upper_name}_DATABASE_URL'] ||= case ENV['RACK_ENV']
 when 'test'
-  "postgres:///#{lower_name}_test?user=#{lower_name}"
+  ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
+  ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_test?user=#{lower_name}"
 when 'production'
-  "postgres:///#{lower_name}_production?user=#{lower_name}"
+  ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
+  ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_production?user=#{lower_name}"
 else
-  "postgres:///#{lower_name}_development?user=#{lower_name}"
+  ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
+  ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_development?user=#{lower_name}"
 end
 END
 
