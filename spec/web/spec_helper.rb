@@ -10,7 +10,12 @@ require_relative '../minitest_helper'
 
 Capybara.app = App.freeze
 
-class Minitest::Spec
+class Minitest::HooksSpec
   include Rack::Test::Methods
   include Capybara::DSL
+
+  after do
+    Capybara.reset_sessions!
+    Capybara.use_default_driver
+  end
 end
