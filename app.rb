@@ -19,6 +19,7 @@ class App < Roda
     :secret=>(session_secret || SecureRandom.hex(40))
 
   plugin :csrf
+  plugin :flash
   plugin :assets, :css=>'app.scss', :css_opts=>{:style=>:compressed, :cache=>false}
   plugin :render, :escape=>true
   plugin :multi_route
