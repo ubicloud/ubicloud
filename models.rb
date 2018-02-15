@@ -1,4 +1,5 @@
 require_relative 'db'
+require 'sequel/model'
 
 if ENV['RACK_ENV'] == 'development'
   Sequel::Model.cache_associations = false
