@@ -15,7 +15,7 @@ class App < Roda
   session_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_SECRET'] : ENV.delete('APP_SESSION_SECRET')
   use Rack::Session::Cookie,
     key: '_App_session',
-    #secure: !TEST_MODE, # Uncomment if only allowing https:// access
+    #secure: ENV['RACK_ENV'] != 'test', # Uncomment if only allowing https:// access
     secret: (session_secret || SecureRandom.hex(40))
 
   plugin :csrf
