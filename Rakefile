@@ -82,7 +82,7 @@ spec = proc do |pattern|
 end
 
 desc "Run all specs"
-task :default => [:model_spec, :web_spec]
+task default: [:model_spec, :web_spec]
 
 desc "Run model specs"
 task :model_spec do

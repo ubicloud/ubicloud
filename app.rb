@@ -14,14 +14,14 @@ class App < Roda
   # Don't delete session secret from environment in development mode as it breaks reloading
   session_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_SECRET'] : ENV.delete('APP_SESSION_SECRET')
   use Rack::Session::Cookie,
-    :key => '_App_session',
-    #:secure=>!TEST_MODE, # Uncomment if only allowing https:// access
-    :secret=>(session_secret || SecureRandom.hex(40))
+    key: '_App_session',
+    #secure: !TEST_MODE, # Uncomment if only allowing https:// access
+    secret: (session_secret || SecureRandom.hex(40))
 
   plugin :csrf
   plugin :flash
-  plugin :assets, :css=>'app.scss', :css_opts=>{:style=>:compressed, :cache=>false}, :timestamp_paths=>true
-  plugin :render, :escape=>true
+  plugin :assets, css: 'app.scss', css_opts: {style: :compressed, cache: false}, timestamp_paths: true
+  plugin :render, escape: true
   plugin :multi_route
 
   Unreloader.require('routes'){}
