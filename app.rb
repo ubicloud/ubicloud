@@ -20,7 +20,7 @@ class App < Roda
 
   plugin :csrf
   plugin :flash
-  plugin :assets, :css=>'app.scss', :css_opts=>{:style=>:compressed, :cache=>false}
+  plugin :assets, :css=>'app.scss', :css_opts=>{:style=>:compressed, :cache=>false}, :timestamp_paths=>true
   plugin :render, :escape=>true
   plugin :multi_route
 
