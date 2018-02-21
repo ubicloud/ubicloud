@@ -17,6 +17,7 @@ class App < Roda
   use Rack::Session::Cookie,
     key: '_App_session',
     #secure: ENV['RACK_ENV'] != 'test', # Uncomment if only allowing https:// access
+    :same_site=>:lax, # or :strict if you want to disallow linking into the site
     secret: (session_secret || SecureRandom.hex(40))
 
   plugin :csrf
