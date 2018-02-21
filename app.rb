@@ -1,6 +1,7 @@
 require_relative 'models'
 
 require 'roda'
+require 'tilt/sass'
 
 class App < Roda
   plugin :default_headers,
