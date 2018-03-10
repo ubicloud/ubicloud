@@ -1,4 +1,7 @@
-require_relative '.env.rb'
+begin
+  require_relative '.env.rb'
+rescue LoadError
+end
 
 require 'sequel/core'
 
