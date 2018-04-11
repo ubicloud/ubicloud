@@ -1,6 +1,7 @@
 source 'https://rubygems.org'
 
 gem 'rack_csrf'
+gem 'sass'
 gem 'tilt', '>= 2'
 gem 'erubi'
 gem 'roda', '>= 3'
