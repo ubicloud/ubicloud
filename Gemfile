@@ -1,12 +1,11 @@
 source 'https://rubygems.org'
 
-gem 'rack_csrf'
-gem 'sass'
-gem 'tilt', '>= 2'
-gem 'erubi'
-gem 'roda', '>= 3'
+gem 'sass', '>= 3'
+gem 'tilt', '>= 2.0.6'
+gem 'erubi', '>= 1.5'
+gem 'roda', '>= 3.9'
 gem 'sequel', '>= 5'
-gem 'sequel_pg'
+gem 'sequel_pg', '>= 1.8'
 gem 'rack-unreloader'
 
 gem 'capybara'

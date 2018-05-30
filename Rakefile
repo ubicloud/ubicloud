@@ -129,4 +129,5 @@ END
   end
 
   File.write(__FILE__, File.read(__FILE__).split("\n")[0...(last_line-2)].join("\n") << "\n")
+  File.delete('public/.gitkeep')
 end
