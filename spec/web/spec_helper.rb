@@ -6,7 +6,16 @@ require 'capybara'
 require 'capybara/dsl'
 require 'rack/test'
 
+Gem.suffix_pattern
+
 require_relative '../minitest_helper'
+
+begin
+  require 'refrigerator'
+rescue LoadError
+else
+  Refrigerator.freeze_core
+end
 
 Capybara.app = App.freeze.app
 

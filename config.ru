@@ -10,3 +10,13 @@ Unreloader = Rack::Unreloader.new(subclasses: %w'Roda Sequel::Model', logger: lo
 require_relative 'models'
 Unreloader.require('app.rb'){'App'}
 run(dev ? Unreloader : App.freeze.app)
+
+unless dev
+  begin
+    require 'refrigerator'
+  rescue LoadError
+  else
+    require 'tilt/sass' unless File.exist?(File.expand_path('../compiled_assets.json', __FILE__))
+    Refrigerator.freeze_core
+  end
+end
