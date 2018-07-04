@@ -28,6 +28,25 @@ class App < Roda
   plugin :public
   plugin :multi_route
 
+  plugin :not_found do
+    @page_title = "File Not Found"
+    view(:content=>"")
+  end
+
+  plugin :error_handler do |e|
+    case e
+    when Roda::RodaPlugins::RouteCsrf::InvalidToken
+      @page_title = "Internal Security Token"
+      response.status = 400
+      view(:content=>"<p>An invalid security token was submitted with this request, and this request could not be processed.</p>")
+    else
+      @page_title = "Internal Server Error"
+      $stderr.print "#{e.class}: #{e.message}\n"
+      $stderr.puts e.backtrace
+      view(:content=>"")
+    end
+  end
+
   # Don't delete session secrets from environment in development mode as it breaks reloading
   cipher_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_CIPHER_SECRET'] : ENV.delete('APP_SESSION_CIPHER_SECRET')
   hmac_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_HMAC_SECRET'] : ENV.delete('APP_SESSION_HMAC_SECRET')
