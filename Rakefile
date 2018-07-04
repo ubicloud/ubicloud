@@ -109,17 +109,18 @@ task :setup, [:name] do |t, args|
   upper_name = lower_name.upcase
 
   File.write('.env.rb', <<END)
-ENV['RACK_ENV'] ||= 'development'
-
-ENV['#{upper_name}_DATABASE_URL'] ||= case ENV['RACK_ENV']
+case ENV['RACK_ENV'] ||= 'development'
 when 'test'
-  ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
+  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
+  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
   ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_test?user=#{lower_name}"
 when 'production'
-  ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
+  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
+  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
   ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_production?user=#{lower_name}"
 else
-  ENV['#{upper_name}_SESSION_SECRET'] ||= #{SecureRandom.urlsafe_base64(40).inspect}
+  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
+  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
   ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_development?user=#{lower_name}"
 end
 END

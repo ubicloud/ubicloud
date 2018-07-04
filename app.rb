@@ -21,20 +21,22 @@ class App < Roda
     csp.frame_ancestors :none
   end
 
-  # Don't delete session secret from environment in development mode as it breaks reloading
-  session_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_SECRET'] : ENV.delete('APP_SESSION_SECRET')
-  use Rack::Session::Cookie,
-    key: '_App_session',
-    #secure: ENV['RACK_ENV'] != 'test', # Uncomment if only allowing https:// access
-    :same_site=>:lax, # or :strict if you want to disallow linking into the site
-    secret: (session_secret || SecureRandom.hex(40))
-
   plugin :route_csrf
   plugin :flash
   plugin :assets, css: 'app.scss', css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :render, escape: true
   plugin :public
   plugin :multi_route
+
+  # Don't delete session secrets from environment in development mode as it breaks reloading
+  cipher_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_CIPHER_SECRET'] : ENV.delete('APP_SESSION_CIPHER_SECRET')
+  hmac_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_HMAC_SECRET'] : ENV.delete('APP_SESSION_HMAC_SECRET')
+
+  plugin :sessions,
+    key: '_App.session',
+    #cookie_options: {secure: ENV['RACK_ENV'] != 'test'}, # Uncomment if only allowing https:// access
+    cipher_secret: cipher_secret,
+    hmac_secret: hmac_secret
 
   Unreloader.require('routes'){}
 

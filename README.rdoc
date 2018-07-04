@@ -64,7 +64,8 @@ capybara :: web application testing helpers
 
 #{APP}_DATABASE_URL :: database connection URL to give to Sequel, default is to
                        create one based on the application's name and RACK_ENV.
-#{APP}_SESSION_SECRET :: secret to use for the rack cookie sessions
+#{APP}_SESSION_CIPHER_SECRET :: cipher secret to use for the cookie sessions
+#{APP}_SESSION_HMAC_SECRET :: HMAC secret to use for the cookie sessions
 RACK_ENV :: environment to use (production, development, or test), defaults
             to development.
 
