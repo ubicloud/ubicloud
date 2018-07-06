@@ -107,20 +107,21 @@ task :setup, [:name] do |t, args|
   require 'securerandom'
   lower_name = name.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
   upper_name = lower_name.upcase
+  random_bytes = lambda{[SecureRandom.random_bytes(32).gsub("\x00"){((rand*255).to_i+1).chr}].pack('m').inspect}
 
   File.write('.env.rb', <<END)
 case ENV['RACK_ENV'] ||= 'development'
 when 'test'
-  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
-  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
+  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{random_bytes.call}.unpack('m')[0]
+  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{random_bytes.call}.unpack('m')[0]
   ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_test?user=#{lower_name}"
 when 'production'
-  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
-  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
+  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{random_bytes.call}.unpack('m')[0]
+  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{random_bytes.call}.unpack('m')[0]
   ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_production?user=#{lower_name}"
 else
-  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
-  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{SecureRandom.urlsafe_base64(24).inspect}
+  ENV['#{upper_name}_SESSION_CIPHER_SECRET'] ||= #{random_bytes.call}.unpack('m')[0]
+  ENV['#{upper_name}_SESSION_HMAC_SECRET'] ||= #{random_bytes.call}.unpack('m')[0]
   ENV['#{upper_name}_DATABASE_URL'] ||= "postgres:///#{lower_name}_development?user=#{lower_name}"
 end
 END
