@@ -47,15 +47,10 @@ class App < Roda
     end
   end
 
-  # Don't delete session secrets from environment in development mode as it breaks reloading
-  cipher_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_CIPHER_SECRET'] : ENV.delete('APP_SESSION_CIPHER_SECRET')
-  hmac_secret = ENV['RACK_ENV'] == 'development' ? ENV['APP_SESSION_HMAC_SECRET'] : ENV.delete('APP_SESSION_HMAC_SECRET')
-
   plugin :sessions,
     key: '_App.session',
     #cookie_options: {secure: ENV['RACK_ENV'] != 'test'}, # Uncomment if only allowing https:// access
-    cipher_secret: cipher_secret,
-    hmac_secret: hmac_secret
+    secret: ENV.send((ENV['RACK_ENV'] == 'development' ? :[] : :delete), 'APP_SESSION_SECRET')
 
   Unreloader.require('routes'){}
 
