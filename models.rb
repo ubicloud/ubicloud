@@ -16,10 +16,14 @@ end
 
 Unreloader.require('models'){|f| Sequel::Model.send(:camelize, File.basename(f).sub(/\.rb\z/, ''))}
 
-if ENV['RACK_ENV'] == 'development'
+if ENV['RACK_ENV'] == 'development' || ENV['RACK_ENV'] == 'test'
   require 'logger'
-  DB.loggers << Logger.new($stdout)
-else
+  LOGGER = Logger.new($stdout)
+  LOGGER.level = Logger::FATAL if ENV['RACK_ENV'] == 'test'
+  DB.loggers << LOGGER
+end
+
+unless ENV['RACK_ENV'] == 'development'
   Sequel::Model.freeze_descendents
   DB.freeze
 end

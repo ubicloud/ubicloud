@@ -5,7 +5,7 @@ migrate = lambda do |env, version|
   require_relative 'db'
   require 'logger'
   Sequel.extension :migration
-  DB.loggers << Logger.new($stdout)
+  DB.loggers << Logger.new($stdout) if DB.loggers.empty?
   Sequel::Migrator.apply(DB, 'migrate', version)
 end
 
