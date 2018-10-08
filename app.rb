@@ -28,9 +28,26 @@ class App < Roda
   plugin :public
   plugin :multi_route
 
+  logger = if ENV['RACK_ENV'] == 'test'
+    Class.new{def write(_) end}.new
+  else
+    $stderr
+  end
+  plugin :common_logger, logger
+
   plugin :not_found do
     @page_title = "File Not Found"
     view(:content=>"")
+  end
+
+  if ENV['RACK_ENV'] == 'development'
+    plugin :exception_page
+    class RodaRequest
+      def assets
+        exception_page_assets
+        super
+      end
+    end
   end
 
   plugin :error_handler do |e|
@@ -40,9 +57,10 @@ class App < Roda
       response.status = 400
       view(:content=>"<p>An invalid security token was submitted with this request, and this request could not be processed.</p>")
     else
-      @page_title = "Internal Server Error"
       $stderr.print "#{e.class}: #{e.message}\n"
       $stderr.puts e.backtrace
+      next exception_page(e, :assets=>true) if ENV['RACK_ENV'] == 'development'
+      @page_title = "Internal Server Error"
       view(:content=>"")
     end
   end
