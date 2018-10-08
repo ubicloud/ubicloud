@@ -94,6 +94,17 @@ task :web_spec do
   spec.call('./spec/web/*_spec.rb')
 end
 
+# Other
+
+desc "Annotate Sequel models"
+task "annotate" do
+  ENV['RACK_ENV'] = 'development'
+  require_relative 'models'
+  DB.loggers.clear
+  require 'sequel/annotate'
+  Sequel::Annotate.annotate(Dir['models/*.rb'])
+end
+
 last_line = __LINE__
 # Utils
 
