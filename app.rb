@@ -53,7 +53,7 @@ class App < Roda
   plugin :error_handler do |e|
     case e
     when Roda::RodaPlugins::RouteCsrf::InvalidToken
-      @page_title = "Internal Security Token"
+      @page_title = "Invalid Security Token"
       response.status = 400
       view(:content=>"<p>An invalid security token was submitted with this request, and this request could not be processed.</p>")
     else
