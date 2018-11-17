@@ -111,7 +111,7 @@ last_line = __LINE__
 desc "give the application an appropriate name"
 task :setup, [:name] do |t, args|
   unless name = args[:name]
-    $stderr.puts "ERROR: Must provide a name argument: example: rake setup[AppName]"
+    $stderr.puts "ERROR: Must provide a name argument: example: rake \"setup[AppName]\""
     exit(1)
   end
 

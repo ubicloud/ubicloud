@@ -7,7 +7,7 @@ repository and base your application on it:
   git clone https://github.com/jeremyevans/roda-sequel-stack.git
   mv roda-sequel-stack my_app
   cd my_app
-  rake setup[MyApp]
+  rake "setup[MyApp]"
 
 == Database Setup
 
