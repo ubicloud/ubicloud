@@ -4,6 +4,9 @@ require 'roda'
 require 'tilt/sass'
 
 class App < Roda
+  opts[:check_dynamic_arity] = false
+  opts[:check_arity] = :warn
+
   plugin :default_headers,
     'Content-Type'=>'text/html',
     #'Strict-Transport-Security'=>'max-age=16070400;', # Uncomment if only allowing https:// access
