@@ -56,6 +56,8 @@ or similar program.
 roda :: web framework
 sequel :: database library
 rack-unreloader :: development code reloader
+refrigerator :: freezes ruby environment in production (not enabled by default,
+                modify config.ru to enable)
 minitest :: testing framework
 minitest-hooks :: around/around(:all) hooks for minitest
 capybara :: web application testing helpers

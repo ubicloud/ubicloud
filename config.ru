@@ -11,12 +11,31 @@ require_relative 'models'
 Unreloader.require('app.rb'){'App'}
 run(dev ? Unreloader : App.freeze.app)
 
-unless dev
+unless dev && false # Remove && false to enable refrigerator
   begin
     require 'refrigerator'
   rescue LoadError
   else
     require 'tilt/sass' unless File.exist?(File.expand_path('../compiled_assets.json', __FILE__))
+
+    # When enabling refrigerator, you may need to load additional
+    # libraries before freezing the core to work correctly.  You'll
+    # want to uncomment the appropriate lines below if you run into
+    # problems after enabling refrigerator.
+
+    # rackup -s webrick
+    #require 'forwardable'
+    #require 'webrick'
+
+    # rackup -s Puma
+    #require 'yaml' 
+    #Gem.ruby
+
+    # Puma (needed for state file)
+    #require 'yaml'
+
+    # Unicorn (no changes needed)
+
     Refrigerator.freeze_core
   end
 end
