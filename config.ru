@@ -11,7 +11,9 @@ require_relative 'models'
 Unreloader.require('app.rb'){'App'}
 run(dev ? Unreloader : App.freeze.app)
 
-unless dev && false # Remove && false to enable refrigerator
+freeze_core = false
+#freeze_core = !dev # Uncomment to enable refrigerator
+if freeze_core
   begin
     require 'refrigerator'
   rescue LoadError
