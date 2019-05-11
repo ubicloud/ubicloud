@@ -29,7 +29,7 @@ class App < Roda
   plugin :assets, css: 'app.scss', css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :render, escape: true
   plugin :public
-  plugin :multi_route
+  plugin :hash_routes
 
   logger = if ENV['RACK_ENV'] == 'test'
     Class.new{def write(_) end}.new
@@ -75,14 +75,14 @@ class App < Roda
 
   Unreloader.require('routes'){}
 
+  hash_routes do
+    view '', 'index'
+  end
+
   route do |r|
     r.public
     r.assets
     check_csrf!
-    r.multi_route
-
-    r.root do
-      view 'index'
-    end
+    r.hash_routes('')
   end
 end
