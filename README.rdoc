@@ -70,6 +70,12 @@ capybara :: web application testing helpers
 RACK_ENV :: environment to use (production, development, or test), defaults
             to development.
 
+== Specs
+
+To run the specs for the application after running <tt>rake setup</tt>,
+run +rake+.  To run specs for the stack itself (to test if the stack itself
+is functioning as expected), run +rake+ before running <tt>rake setup</tt>.
+
 == Author
 
 Jeremy Evans <code@jeremyevans.net>

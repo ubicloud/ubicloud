@@ -116,6 +116,7 @@ task :setup, [:name] do |t, args|
   end
 
   require 'securerandom'
+  require 'fileutils'
   lower_name = name.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
   upper_name = lower_name.upcase
   random_bytes = lambda{[SecureRandom.random_bytes(64).gsub("\x00"){((rand*255).to_i+1).chr}].pack('m').inspect}
@@ -140,4 +141,11 @@ END
 
   File.write(__FILE__, File.read(__FILE__).split("\n")[0...(last_line-2)].join("\n") << "\n")
   File.delete('public/.gitkeep')
+  FileUtils.remove_dir('stack_spec')
+end
+
+Rake::Task["default"].clear
+desc "Run specs to make sure stack works properly"
+task :default do
+  spec.call('./stack-spec/*_spec.rb')
 end
