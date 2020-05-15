@@ -27,7 +27,8 @@ class App < Roda
   plugin :route_csrf
   plugin :flash
   plugin :assets, css: 'app.scss', css_opts: {style: :compressed, cache: false}, timestamp_paths: true
-  plugin :render, escape: true
+  plugin :render, escape: true, layout: './layout'
+  plugin :view_options
   plugin :public
   plugin :hash_routes
 
