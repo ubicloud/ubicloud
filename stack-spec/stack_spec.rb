@@ -26,7 +26,10 @@ describe 'roda-sequel-stack' do
     Net::HTTP.get(URI('http://127.0.0.1:9292/')).must_include 'Hello World!'
     Net::HTTP.get(URI('http://127.0.0.1:9292/prefix1')).must_include 'Model1: M1'
   ensure
-    Process.kill(:INT, pid) if pid
+    if pid
+      Process.kill(:INT, pid)
+      Process.wait(pid)
+    end
     read.close if read
     write.close if write
   end
