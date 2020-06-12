@@ -1,4 +1,5 @@
 ENV['MT_NO_PLUGINS'] = '1' # Work around stupid autoloading of plugins
+require_relative '../spec/warnings_helper'
 require 'minitest/global_expectations/autorun'
 
 require 'fileutils'
@@ -38,7 +39,7 @@ describe 'roda-sequel-stack' do
   def run_cmd(*cmds)
     print '.'
     read, write = IO.pipe
-    system(*cmds, out: write, err: write).must_equal true
+    system(*cmds, out: write, err: write).tap{|x| unless x; write.close; p cmds; puts read.read; end}.must_equal true
     write.close
     read.read
     read.close
