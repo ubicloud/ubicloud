@@ -61,6 +61,7 @@ refrigerator :: freezes ruby environment in production (not enabled by default,
 minitest :: testing framework
 minitest-hooks :: around/around(:all) hooks for minitest
 capybara :: web application testing helpers
+warning :: warning filtering during tests
 
 == Environment Variables Used
 
