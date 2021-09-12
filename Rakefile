@@ -102,7 +102,7 @@ task "annotate" do
   require_relative 'models'
   DB.loggers.clear
   require 'sequel/annotate'
-  Sequel::Annotate.annotate(Dir['models/*.rb'])
+  Sequel::Annotate.annotate(Dir['models/**/*.rb'])
 end
 
 last_line = __LINE__
