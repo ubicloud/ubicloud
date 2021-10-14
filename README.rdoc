@@ -4,8 +4,7 @@ This is an application skeleton for an app using Roda as the web framework,
 and Sequel as the database library.  It's set up so you can clone this
 repository and base your application on it:
 
-  git clone https://github.com/jeremyevans/roda-sequel-stack.git
-  mv roda-sequel-stack my_app
+  git clone https://github.com/jeremyevans/roda-sequel-stack.git my_app
   cd my_app
   rake "setup[MyApp]"
 
