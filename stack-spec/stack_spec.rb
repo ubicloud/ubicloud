@@ -1,5 +1,4 @@
 ENV['MT_NO_PLUGINS'] = '1' # Work around stupid autoloading of plugins
-require_relative '../spec/warnings_helper'
 require 'minitest/global_expectations/autorun'
 
 require 'fileutils'

@@ -78,7 +78,7 @@ end
 # Specs
 
 spec = proc do |pattern|
-  sh "#{FileUtils::RUBY} -e 'ARGV.each{|f| require f}' #{pattern}"
+  sh "#{FileUtils::RUBY} #{"-w" if RUBY_VERSION >= '3'} -e 'ARGV.each{|f| require f}' #{pattern}"
 end
 
 desc "Run all specs"
