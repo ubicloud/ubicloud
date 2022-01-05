@@ -8,6 +8,7 @@ gem 'refrigerator', '>= 1'
 gem 'sequel', '>= 5'
 gem 'sequel_pg', '>= 1.8'
 gem 'rack-unreloader', '>= 1.8'
+gem 'rake'
 
 group :development do
   gem 'sequel-annotate'
