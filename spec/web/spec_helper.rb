@@ -25,6 +25,7 @@ App.plugin :error_handler do |e|
 end
 
 Capybara.app = App.freeze.app
+Capybara.exact = true
 
 class Minitest::HooksSpec
   include Rack::Test::Methods
