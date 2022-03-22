@@ -6,7 +6,7 @@ gem 'erubi', '>= 1.5'
 gem 'roda', '>= 3.50'
 gem 'refrigerator', '>= 1'
 gem 'sequel', '>= 5'
-gem 'sequel_pg', '>= 1.8'
+gem 'sequel_pg', '>= 1.8', require: 'sequel'
 gem 'rack-unreloader', '>= 1.8'
 gem 'rake'
 
