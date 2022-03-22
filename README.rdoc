@@ -50,17 +50,48 @@ well as add any other views.
 After making those changes, you can start your application using +rackup+
 or similar program.
 
-== Libraries Used
+== Main Libraries Used
 
 roda :: web framework
 sequel :: database library
+tilt :: template library
+erubi :: ERB template implementation
+sassc :: SCSS to CSS compiler
 rack-unreloader :: development code reloader
-refrigerator :: freezes ruby environment in production (not enabled by default,
-                modify config.ru to enable)
 minitest :: testing framework
 minitest-hooks :: around/around(:all) hooks for minitest
+minitest-global_expectations :: minitest expectation methods for all objects
 capybara :: web application testing helpers
-warning :: warning filtering during tests
+
+== Optional Libraries Used
+
+sequel_pg :: optimization for using Sequel with pg
+sequel-annotate :: Provides annotations for models
+refrigerator :: freezes ruby environment in production and when testing (not
+                enabled by default, modify config.ru to enable)
+
+== Roda Plugins Used
+
+default_headers :: Add security related headers for older browers
+content_security_policy :: Add Content-Security-Policy header
+route_csrf :: Add CSRF protection
+flash :: Support flash messages (available in next request)
+assets :: Allow use of SCSS for styling, automatically converting to CSS
+render :: Allow use of ERB templates, with HTML escaping by default
+view_options :: Use a separate view subdirectory per route branch
+public :: Serve files in public directory
+hash_routes :: Split routing tree by top-level branch
+common_logger :: Log received requests
+not_found :: Show nice 404 error page
+exception_page :: Show detailed debugging page for internal errors in development
+error_handler :: Show appropriate error page for internal errors
+sessions :: Use encrypted cookie sessions
+
+== Sequel Plugins Used
+
+auto_validations :: Automatically validate model objects based on database schema
+prepared_statements :: Use prepared statements for inserts/updates for model objects
+subclasses :: Freeze model classes in production and during testing
 
 == Environment Variables Used
 
