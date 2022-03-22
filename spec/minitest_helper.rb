@@ -19,3 +19,11 @@ class Minitest::HooksSpec
     LOGGER.level = Logger::FATAL
   end
 end
+
+freeze_core = false # change to true to enable refrigerator
+if freeze_core
+  at_exit do
+    require 'refrigerator'
+    Refrigerator.freeze_core
+  end
+end
