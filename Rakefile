@@ -135,7 +135,7 @@ else
 end
 END
 
-  %w'views/layout.erb routes/prefix1.rb config.ru app.rb db.rb spec/web/spec_helper.rb'.each do |f|
+  %w'views/layout.erb routes/prefix1.rb config.ru app.rb db.rb spec/web/spec_helper.rb spec/web/prefix1_spec.rb'.each do |f|
     File.write(f, File.read(f).gsub('App', name).gsub('APP', upper_name))
   end
 
