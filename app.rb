@@ -52,6 +52,12 @@ class App < Roda
         super
       end
     end
+  else
+    def self.freeze
+      Sequel::Model.freeze_descendents
+      DB.freeze
+      super
+    end
   end
 
   plugin :error_handler do |e|
