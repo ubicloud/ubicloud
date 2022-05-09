@@ -9,6 +9,12 @@ require 'rack/unreloader'
 Unreloader = Rack::Unreloader.new(subclasses: %w'Roda Sequel::Model', logger: logger, reload: dev){App}
 require_relative 'models'
 Unreloader.require('app.rb'){'App'}
+
+unless dev
+  Sequel::Model.freeze_descendents
+  DB.freeze
+end
+
 run(dev ? Unreloader : App.freeze.app)
 
 freeze_core = false
