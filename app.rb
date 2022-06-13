@@ -28,9 +28,8 @@ class App < Roda
   plugin :flash
   plugin :assets, css: 'app.scss', css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :render, escape: true, layout: './layout'
-  plugin :view_options
   plugin :public
-  plugin :hash_routes
+  plugin :hash_branch_view_subdir
 
   logger = if ENV['RACK_ENV'] == 'test'
     Class.new{def write(_) end}.new
@@ -82,14 +81,15 @@ class App < Roda
 
   Unreloader.require('routes', :delete_hook=>proc{|f| hash_branch(File.basename(f).delete_suffix('.rb'))}){}
 
-  hash_routes do
-    view '', 'index'
-  end
-
   route do |r|
     r.public
     r.assets
     check_csrf!
-    r.hash_routes('')
+
+    r.hash_branches('')
+
+    r.root do
+      view 'index'
+    end
   end
 end
