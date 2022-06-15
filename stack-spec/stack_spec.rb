@@ -70,7 +70,7 @@ describe 'roda-sequel-stack' do
       
       Dir.mkdir('views/prefix1')
       File.binwrite('views/prefix1/p1.erb', "<p>Model1: <%= Model1.first.name %></p>")
-      rewrite('routes/prefix1.rb'){|s| s.sub("set_view_subdir 'prefix1'", "set_view_subdir 'prefix1'\nr.get{view 'p1'}")}
+      rewrite('routes/prefix1.rb'){|s| s.sub("# /prefix1 branch handling", "r.get{view 'p1'}")}
       run_cmd(SEQUEL, db_url, '-c', "DB[:model1s].insert(name: 'M1')")
 
       # Test basic running
