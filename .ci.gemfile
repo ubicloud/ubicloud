@@ -1,0 +1,11 @@
+require_relative 'Gemfile'
+
+# MRI Adapter Dependencies
+platforms :ruby do
+  gem "sqlite3"
+end
+
+# JRuby Adapter Dependencies
+platforms :jruby do
+  gem 'jdbc-sqlite3'
+end
