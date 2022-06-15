@@ -1,7 +1,7 @@
 require_relative '../coverage_helper'
 ENV["RACK_ENV"] = "test"
 require_relative '../../app'
-raise "test database doesn't end with test" unless DB.opts[:database] =~ /test\z/
+raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?('test')
 
 require 'capybara'
 require 'capybara/dsl'
