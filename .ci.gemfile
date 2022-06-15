@@ -1,4 +1,4 @@
-require_relative 'Gemfile'
+require './Gemfile'
 
 # MRI Adapter Dependencies
 platforms :ruby do
