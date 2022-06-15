@@ -15,11 +15,19 @@ describe 'roda-sequel-stack' do
     FileUtils.remove_dir(TEST_STACK_DIR) if File.directory?(TEST_STACK_DIR)
   end
 
+  def progress(object)
+    if ENV['DEBUG']
+      p object
+    else
+      print '.'
+    end
+  end
+
   def run_rackup
-    print '.'
     read, write = IO.pipe
     pid = Process.spawn(RACKUP, '-e', '$stderr.sync = $stdout.sync = true', out: write, err: write)
     read.each_line do |line|
+      progress(line)
       break if line =~ /Use Ctrl-C to stop|WEBrick::HTTPServer#start/
     end
 
@@ -36,7 +44,7 @@ describe 'roda-sequel-stack' do
 
   # Run command capturing stderr/stdout
   def run_cmd(*cmds)
-    print '.'
+    progress(cmds)
     read, write = IO.pipe
     system(*cmds, out: write, err: write).tap{|x| unless x; write.close; p cmds; puts read.read; end}.must_equal true
     write.close
