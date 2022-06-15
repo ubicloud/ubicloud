@@ -12,6 +12,7 @@ gem 'rake'
 
 group :development do
   gem 'sequel-annotate'
+  gem 'simplecov'
 end
 
 group :test do

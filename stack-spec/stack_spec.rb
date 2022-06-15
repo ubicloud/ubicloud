@@ -93,6 +93,14 @@ describe 'roda-sequel-stack' do
       run_cmd(RAKE)
       run_cmd(RAKE, 'model_spec')
       run_cmd(RAKE, 'web_spec')
+
+      # Test running coverage
+      run_cmd(RAKE, 'spec_cov')
+      coverage = File.binread('coverage/index.html')
+      coverage.must_include('lines covered')
+      coverage.must_include('lines missed')
+      coverage.must_include('branches covered')
+      coverage.must_include('branches missed')
     end
   end
 end

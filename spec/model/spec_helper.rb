@@ -1,3 +1,4 @@
+require_relative '../coverage_helper'
 ENV["RACK_ENV"] = "test"
 require_relative '../../models'
 raise "test database doesn't end with test" unless DB.opts[:database] =~ /test\z/

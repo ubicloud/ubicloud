@@ -77,22 +77,27 @@ end
 
 # Specs
 
-spec = proc do |pattern|
-  sh "#{FileUtils::RUBY} #{"-w" if RUBY_VERSION >= '3'} -e 'ARGV.each{|f| require f}' #{pattern}"
+spec = proc do |type|
+  desc "Run #{type} specs"
+  task :"#{type}_spec" do
+    sh "#{FileUtils::RUBY} -w spec/#{type}.rb"
+  end
+
+  desc "Run #{type} specs with coverage"
+  task :"#{type}_spec_cov" do
+    ENV['COVERAGE'] = type
+    sh "#{FileUtils::RUBY} spec/#{type}.rb"
+    ENV.delete('COVERAGE')
+  end
 end
+spec.call('model')
+spec.call('web')
 
 desc "Run all specs"
 task default: [:model_spec, :web_spec]
 
-desc "Run model specs"
-task :model_spec do
-  spec.call('./spec/model/*_spec.rb')
-end
-
-desc "Run web specs"
-task :web_spec do
-  spec.call('./spec/web/*_spec.rb')
-end
+desc "Run all specs with coverage"
+task spec_cov: [:model_spec_cov, :web_spec_cov]
 
 # Other
 
@@ -147,5 +152,5 @@ end
 Rake::Task["default"].clear
 desc "Run specs to make sure stack works properly"
 task :default do
-  spec.call('./stack-spec/*_spec.rb')
+  sh "#{FileUtils::RUBY} -w stack-spec/stack_spec.rb"
 end
