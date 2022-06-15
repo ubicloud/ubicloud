@@ -23,9 +23,30 @@ describe 'roda-sequel-stack' do
     end
   end
 
+  if RUBY_ENGINE == 'jruby'
+    JRUBY = ENV['JRUBY'] || 'jruby'
+    db_url = 'jdbc:sqlite:db.sqlite3_test'
+    def command(args)
+      unless args[0] == 'git'
+        args.unshift('-S')
+        args.unshift(JRUBY)
+      end
+      progress(args)
+      args
+    end
+  else
+    db_url = 'sqlite://db.sqlite3_test'
+    def command(args)
+      progress(args)
+      args
+    end
+  end
+
   def run_rackup
     read, write = IO.pipe
-    pid = Process.spawn(RACKUP, '-e', '$stderr.sync = $stdout.sync = true', out: write, err: write)
+    args = [RACKUP, '-e', '$stderr.sync = $stdout.sync = true']
+    command(args)
+    pid = Process.spawn(*args, out: write, err: write)
     read.each_line do |line|
       progress(line)
       break if line =~ /Use Ctrl-C to stop|WEBrick::HTTPServer#start/
@@ -44,11 +65,11 @@ describe 'roda-sequel-stack' do
 
   # Run command capturing stderr/stdout
   def run_cmd(*cmds)
-    progress(cmds)
+    command(cmds)
     read, write = IO.pipe
     system(*cmds, out: write, err: write).tap{|x| unless x; write.close; p cmds; puts read.read; end}.must_equal true
     write.close
-    read.read
+    progress(read.read)
     read.close
   end
 
@@ -60,8 +81,8 @@ describe 'roda-sequel-stack' do
     run_cmd("git", "clone", ".", TEST_STACK_DIR)
 
     Dir.chdir(TEST_STACK_DIR) do
-      system(RAKE, 'setup[FooBarApp]')
-      db_url = ENV['FOO_BAR_APP_DATABASE_URL'] = 'sqlite://db.sqlite3'
+      run_cmd(RAKE, 'setup[FooBarApp]')
+      ENV['FOO_BAR_APP_DATABASE_URL'] = db_url
 
       rewrite('migrate/001_tables.rb') do |s|
         s.sub("primary_key :id", "primary_key :id; String :name")
@@ -96,19 +117,19 @@ describe 'roda-sequel-stack' do
       run_rackup
 
       # Test running specs
-      File.link('db.sqlite3', 'db.sqlite3_test')
-      ENV['FOO_BAR_APP_DATABASE_URL'] +=  '_test'
       run_cmd(RAKE)
       run_cmd(RAKE, 'model_spec')
       run_cmd(RAKE, 'web_spec')
 
-      # Test running coverage
-      run_cmd(RAKE, 'spec_cov')
-      coverage = File.binread('coverage/index.html')
-      coverage.must_include('lines covered')
-      coverage.must_include('lines missed')
-      coverage.must_include('branches covered')
-      coverage.must_include('branches missed')
+      unless RUBY_ENGINE == 'jruby'
+        # Test running coverage
+        run_cmd(RAKE, 'spec_cov')
+        coverage = File.binread('coverage/index.html')
+        coverage.must_include('lines covered')
+        coverage.must_include('lines missed')
+        coverage.must_include('branches covered')
+        coverage.must_include('branches missed')
+      end
     end
   end
 end
