@@ -145,8 +145,11 @@ END
   end
 
   File.write(__FILE__, File.read(__FILE__).split("\n")[0...(last_line-2)].join("\n") << "\n")
+  File.write('.gitignore', "/.env.rb\n/coverage\n")
   File.delete('public/.gitkeep')
+  File.delete('.ci.gemfile')
   FileUtils.remove_dir('stack-spec')
+  FileUtils.remove_dir('.github')
 end
 
 Rake::Task["default"].clear

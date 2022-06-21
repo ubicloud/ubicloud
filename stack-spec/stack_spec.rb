@@ -4,6 +4,7 @@ require 'minitest/global_expectations/autorun'
 require 'fileutils'
 require 'net/http'
 require 'uri'
+require 'find'
 
 TEST_STACK_DIR = 'test-stack'.freeze
 RAKE = ENV['RAKE'] || 'rake'
@@ -83,6 +84,30 @@ describe 'roda-sequel-stack' do
     Dir.chdir(TEST_STACK_DIR) do
       run_cmd(RAKE, 'setup[FooBarApp]')
       ENV['FOO_BAR_APP_DATABASE_URL'] = db_url
+
+      files = []
+      directories = []
+      Find.find('.').each do |f|
+        if File.directory?(f)
+          Find.prune if f == './.git'
+          directories << f
+        else
+          files << f
+        end
+      end
+
+      directories.sort.must_equal  [
+        ".", "./assets", "./assets/css", "./migrate", "./models", "./public", "./routes",
+        "./spec", "./spec/model", "./spec/web", "./views"
+      ]
+      files.sort.must_equal [
+        "./.env.rb", "./.gitignore", "./Gemfile", "./README.rdoc", "./Rakefile", "./app.rb",
+        "./assets/css/app.scss", "./config.ru", "./db.rb", "./migrate/001_tables.rb",
+        "./models.rb", "./models/model1.rb", "./routes/prefix1.rb", "./spec/coverage_helper.rb",
+        "./spec/minitest_helper.rb", "./spec/model.rb", "./spec/model/model1_spec.rb",
+        "./spec/model/spec_helper.rb", "./spec/web.rb", "./spec/web/prefix1_spec.rb",
+        "./spec/web/spec_helper.rb", "./views/index.erb", "./views/layout.erb"
+      ]
 
       rewrite('migrate/001_tables.rb') do |s|
         s.sub("primary_key :id", "primary_key :id; String :name")
