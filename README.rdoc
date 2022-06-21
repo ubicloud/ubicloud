@@ -33,7 +33,7 @@ the migrations:
   rake prod_up # Migrate the production database up
 
 After editing the default migration file, you'll probably want to rename and
-edit the default model file (+models/model1.rb+), as well as add other model
+edit the example model file (+models/model1.rb+), as well as add other model
 files as appropriate.  After the models have been set up, you can get an irb
 shell with your models loaded:
 
@@ -42,7 +42,7 @@ shell with your models loaded:
   rake prod_irb # IRB shell with models connected to the production database
 
 After editing the model files, you'll probably want to edit the
-application file (+app.rb+).  You'll also want to rename and edit the default
+application file (+app.rb+).  You'll also want to rename and edit the example
 routing subtree (+routes/prefix1.rb+).  After that, you'll probably want to
 edit the layout (+views/layout.erb+) and index page (+views/index.erb+), as
 well as add any other views.
@@ -69,6 +69,7 @@ sequel_pg :: optimization for using Sequel with pg
 sequel-annotate :: Provides annotations for models
 refrigerator :: freezes ruby environment in production and when testing (not
                 enabled by default, modify config.ru to enable)
+simplecov :: Test line/branch coverage
 
 == Roda Plugins Used
 
@@ -78,9 +79,9 @@ route_csrf :: Add CSRF protection
 flash :: Support flash messages (available in next request)
 assets :: Allow use of SCSS for styling, automatically converting to CSS
 render :: Allow use of ERB templates, with HTML escaping by default
-view_options :: Use a separate view subdirectory per route branch
 public :: Serve files in public directory
-hash_routes :: Split routing tree by top-level branch
+hash_branch_view_subdir :: Split routing tree by top-level branch, with a separate
+                           view subdirectory per route branch
 common_logger :: Log received requests
 not_found :: Show nice 404 error page
 exception_page :: Show detailed debugging page for internal errors in development
