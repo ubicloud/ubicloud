@@ -29,6 +29,8 @@ class App < Roda
   plugin :assets, css: 'app.scss', css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :render, escape: true, layout: './layout'
   plugin :public
+  plugin :Integer_matcher_max
+  plugin :typecast_params_sized_integers, :sizes=>[64], :default_size=>64
   plugin :hash_branch_view_subdir
 
   logger = if ENV['RACK_ENV'] == 'test'
