@@ -6,7 +6,6 @@ if ENV['RACK_ENV'] == 'development'
 end
 
 Sequel::Model.plugin :auto_validations
-Sequel::Model.plugin :prepared_statements
 Sequel::Model.plugin :require_valid_schema
 Sequel::Model.plugin :subclasses unless ENV['RACK_ENV'] == 'development'
 
