@@ -9,7 +9,7 @@ require "rack/test"
 
 Gem.suffix_pattern
 
-require_relative "../minitest_helper"
+require_relative "../spec_helper"
 
 begin
   require "refrigerator"
