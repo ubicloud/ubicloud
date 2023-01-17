@@ -1,18 +1,18 @@
-require_relative '../coverage_helper'
+require_relative "../coverage_helper"
 ENV["RACK_ENV"] = "test"
-require_relative '../../app'
-raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?('test')
+require_relative "../../app"
+raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
 
-require 'capybara'
-require 'capybara/dsl'
-require 'rack/test'
+require "capybara"
+require "capybara/dsl"
+require "rack/test"
 
 Gem.suffix_pattern
 
-require_relative '../minitest_helper'
+require_relative "../minitest_helper"
 
 begin
-  require 'refrigerator'
+  require "refrigerator"
 rescue LoadError
 else
   Refrigerator.freeze_core
