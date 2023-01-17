@@ -1,9 +1,9 @@
-require_relative 'spec_helper'
+require_relative "spec_helper"
 
-describe '/prefix1' do
+describe "/prefix1" do
   it "should " do
-    visit '/prefix1'
-    page.title.must_equal 'Clover'
+    visit "/prefix1"
+    page.title.must_equal "Clover"
     # ...
   end
 end
