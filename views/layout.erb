@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <%== assets(:css) %>
+    <title>Clover<% if @page_title %> - <%= @page_title %><% end %></title>
+  </head>
+  <body>
+    <nav class="navbar navbar-default" role="navigation">
+      <div class="container">
+        <a class="navbar-brand" href="/">Clover</a>
+      </div>
+    </nav>
+
+    <div class="container" id="content">
+      <% if flash['notice'] %>
+        <div class="alert alert-success" role="alert"><%= flash['notice'] %></div>
+      <% end %>
+      <% if flash['error'] %>
+        <div class="alert alert-danger" role="alert"><%= flash['error'] %></div>
+      <% end %>
+      <% if @page_title %>
+        <h1><%= @page_title %></h1>
+      <% end %>
+      <%== yield %>
+    </div>
+  </body>
+</html>
