@@ -6,4 +6,4 @@ raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:d
 Sequel::Model.freeze_descendents
 DB.freeze
 
-require_relative "../minitest_helper"
+require_relative "../spec_helper"
