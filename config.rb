@@ -14,7 +14,7 @@ module Config
   extend CastingConfigHelpers
 
   # Mandatory -- exception is raised for these variables when missing.
-  mandatory :database_url, string
+  mandatory :clover_database_url, string, clear: true
 
   # Optional -- value is returned or `nil` if it wasn't present.
   optional :app_name, string
@@ -33,7 +33,7 @@ module Config
   override :puma_min_threads, 1, int
   override :puma_workers, 3, int
   override :raise_errors, false, bool
-  override :root, File.expand_path("../../", __FILE__), string
+  override :root, File.expand_path(__dir__), string
   override :timeout, 10, int
   override :versioning, false, bool
 end
