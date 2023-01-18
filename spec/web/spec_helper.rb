@@ -1,22 +1,13 @@
 require_relative "../coverage_helper"
 ENV["RACK_ENV"] = "test"
-require_relative "../../app"
+require_relative "../spec_helper"
 raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
 
 require "capybara"
-require "capybara/dsl"
+require "capybara/rspec"
 require "rack/test"
 
 Gem.suffix_pattern
-
-require_relative "../spec_helper"
-
-begin
-  require "refrigerator"
-rescue LoadError
-else
-  Refrigerator.freeze_core
-end
 
 Clover.plugin :not_found do
   raise "404 - File Not Found"
@@ -28,16 +19,25 @@ end
 Capybara.app = Clover.freeze.app
 Capybara.exact = true
 
-class Minitest::HooksSpec
+module RackTestPlus
   include Rack::Test::Methods
-  include Capybara::DSL
 
   def app
     Capybara.app
   end
+end
 
-  after do
+RSpec.configure do |config|
+  config.include RackTestPlus
+  config.after(:each) do
     Capybara.reset_sessions!
     Capybara.use_default_driver
   end
+end
+
+begin
+  require "refrigerator"
+rescue LoadError
+else
+  Refrigerator.freeze_core
 end
