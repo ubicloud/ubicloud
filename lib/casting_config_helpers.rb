@@ -2,9 +2,11 @@
 #
 # It is MIT licensed.
 module CastingConfigHelpers
-  def mandatory(name, method = nil)
-    value = cast(ENV.fetch(name.to_s.upcase), method)
+  def mandatory(name, method = nil, clear: false)
+    env_name = name.to_s.upcase
+    value = cast(ENV.fetch(env_name), method)
     create(name, value)
+    ENV.delete(env_name) if clear
   end
 
   def optional(name, method = nil)
