@@ -1,3 +1,4 @@
+require_relative ".env"
 require "zeitwerk"
 LOADER = Zeitwerk::Loader.new
 LOADER.push_dir("#{__dir__}/")
