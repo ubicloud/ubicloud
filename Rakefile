@@ -57,7 +57,7 @@ irb = proc do |env|
   else
     "#{FileUtils::RUBY} -S irb"
   end
-  sh "#{cmd} -r ./models"
+  sh "#{cmd} -r ./loader"
 end
 
 desc "Open irb shell in test mode"
