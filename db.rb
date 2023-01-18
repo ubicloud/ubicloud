@@ -5,8 +5,6 @@ end
 
 require "sequel/core"
 
-# Delete CLOVER_DATABASE_URL from the environment, so it isn't accidently
-# passed to subprocesses.  CLOVER_DATABASE_URL may contain passwords.
 DB = Sequel.connect(Config.clover_database_url)
 
 # Load Sequel Database/Global extensions here
