@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 source "https://rubygems.org"
 
 gem "sassc", ">= 2"
@@ -11,10 +13,13 @@ gem "rack-unreloader", ">= 1.8"
 gem "rake"
 gem "zeitwerk"
 
-gem "standard", group: [:development, :test]
-
 group :development do
   gem "sequel-annotate"
+  gem "rubocop-performance"
+  gem "rubocop-rake"
+  gem "rubocop-rspec"
+  gem "rubocop-sequel"
+  gem "standard"
   gem "simplecov"
 end
 

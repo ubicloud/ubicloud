@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 if (suite = ENV.delete("COVERAGE"))
   require "simplecov"
 

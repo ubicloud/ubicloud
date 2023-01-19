@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require_relative "spec_helper"
 
-RSpec.describe "/prefix1" do
-  it "should " do
+RSpec.describe Clover, "/prefix1" do
+  it "has a page title" do
     visit "/prefix1"
-    page.title.must_equal "Clover"
+    expect(page.title).to eq "Clover"
     # ...
   end
 end

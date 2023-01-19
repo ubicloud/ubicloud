@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Adapted from https://github.com/interagent/pliny/blob/fcc8f3b103ec5296bd754898fdefeb2fda2ab292/lib/pliny/config_helpers.rb
 #
 # It is MIT licensed.
