@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "loader"
 # Adapted from
 # https://github.com/interagent/pliny/blob/fcc8f3b103ec5296bd754898fdefeb2fda2ab292/lib/template/config/config.rb.

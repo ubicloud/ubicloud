@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../coverage_helper"
 ENV["RACK_ENV"] = "test"
 require_relative "../spec_helper"
@@ -30,7 +32,7 @@ end
 RSpec.configure do |config|
   config.include RackTestPlus
   config.include Capybara::DSL
-  config.after(:each) do
+  config.after do
     Capybara.reset_sessions!
     Capybara.use_default_driver
   end
