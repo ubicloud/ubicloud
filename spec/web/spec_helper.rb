@@ -35,10 +35,3 @@ RSpec.configure do |config|
     Capybara.use_default_driver
   end
 end
-
-begin
-  require "refrigerator"
-rescue LoadError
-else
-  Refrigerator.freeze_core
-end
