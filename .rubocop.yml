@@ -31,3 +31,6 @@ RSpec/DescribeMethod:
 
 Style/FrozenStringLiteralComment:
   Enabled: true
+
+Layout/HeredocIndentation:
+  Enabled: false
