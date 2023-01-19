@@ -29,6 +29,7 @@ end
 
 RSpec.configure do |config|
   config.include RackTestPlus
+  config.include Capybara::DSL
   config.after(:each) do
     Capybara.reset_sessions!
     Capybara.use_default_driver
