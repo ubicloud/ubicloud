@@ -7,6 +7,8 @@ if dev
   logger = Logger.new($stdout)
 end
 
+require_relative "loader"
+
 require "rack/unreloader"
 Unreloader = Rack::Unreloader.new(subclasses: %w[Roda Sequel::Model], logger: logger, reload: dev) { Clover }
 require_relative "models"
