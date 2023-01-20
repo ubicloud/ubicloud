@@ -37,3 +37,13 @@ RSpec.configure do |config|
     Capybara.use_default_driver
   end
 end
+
+begin
+  require "refrigerator"
+rescue LoadError
+else
+  # See https://github.com/rspec/rspec-support/issues/564
+  require "stringio"
+  require "ripper"
+  Refrigerator.freeze_core
+end
