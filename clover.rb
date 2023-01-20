@@ -81,14 +81,24 @@ class Clover < Roda
     end
   end
 
+  secret = ENV.send(((ENV["RACK_ENV"] == "development") ? :[] : :delete), "CLOVER_SESSION_SECRET")
   plugin :sessions,
     key: "_Clover.session",
     # cookie_options: {secure: ENV['RACK_ENV'] != 'test'}, # Uncomment if only allowing https:// access
-    secret: ENV.send(((ENV["RACK_ENV"] == "development") ? :[] : :delete), "CLOVER_SESSION_SECRET")
+    secret: secret
 
   Unreloader.require("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
 
+  plugin :rodauth do
+    enable :login, :logout, :verify_account
+    enable :otp, :recovery_codes
+    hmac_secret secret
+    require_bcrypt? false
+  end
+
   route do |r|
+    r.rodauth
+    rodauth.require_authentication
     r.public
     r.assets
     check_csrf!
