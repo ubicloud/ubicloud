@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "loader"
 # Migrate
 
 migrate = lambda do |env, version|
