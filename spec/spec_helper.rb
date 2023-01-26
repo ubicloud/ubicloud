@@ -17,7 +17,29 @@
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 require_relative "../loader"
 require "rspec"
+require "database_cleaner/sequel"
+
+# DatabaseCleaner assumes the usual DATABASE_URL, but the
+# "roda-sequel-stack" way names each environment *and* application
+# variable differently, e.g. "clover_test" and "clover_dev,"
+# presumably to work with multiple applications and environments at
+# the same time.  While it perhaps overkill for us, I don't feel like
+# changing things right now.
+DatabaseCleaner.url_allowlist = [
+  nil
+]
+
 RSpec.configure do |config|
+  config.before(:suite) do
+    DatabaseCleaner.strategy = :transaction
+  end
+
+  config.around do |example|
+    DatabaseCleaner.cleaning do
+      example.run
+    end
+  end
+
   # rspec-expectations config goes here. You can use an alternate
   # assertion/expectation library such as wrong or the stdlib/minitest
   # assertions if you prefer.
