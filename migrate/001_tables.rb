@@ -3,7 +3,7 @@
 Sequel.migration do
   change do
     create_table(:strand) do
-      column :id, :uuid, primary_key: true
+      column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
       foreign_key :parent, :strand, type: :uuid
       column :schedule, :timestamptz, null: false
       column :lease, :timestamptz
@@ -14,7 +14,7 @@ Sequel.migration do
     end
 
     create_table(:semaphore) do
-      column :id, :uuid, primary_key: true
+      column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
       foreign_key :consumer, :strand, type: :uuid, null: false
       column :name, :text, collate: '"C"', null: false
     end
