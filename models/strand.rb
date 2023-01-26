@@ -32,4 +32,10 @@ SQL
   def load
     Object.const_get("CProg::" + cprog).new(self)
   end
+
+  def run
+    lease do
+      load.public_send(label)
+    end
+  end
 end
