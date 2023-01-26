@@ -28,4 +28,8 @@ SQL
     fail "BUG: lease violated" unless num_updated == 1
     true
   end
+
+  def load
+    Object.const_get("CProg::" + cprog).new(self)
+  end
 end
