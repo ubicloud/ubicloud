@@ -15,6 +15,5 @@ Loader.on_dir_autoloaded(model_dir) do
   require_relative "model"
 end
 Loader.inflector.inflect("db" => "DB")
-Loader.inflector.inflect("cprog" => "CProg")
 Loader.enable_reloading
 Loader.setup

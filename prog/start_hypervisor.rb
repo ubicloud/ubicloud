@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CProg::StartHypervisor
+class Prog::StartHypervisor
   attr_reader :strand
 
   def initialize(strand)
