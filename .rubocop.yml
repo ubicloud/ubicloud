@@ -15,7 +15,7 @@ AllCops:
     - public/**/*
 
 RSpec:
-  Enabled: true # enable rubocop-rspec cops
+  Enabled: true
 
 Performance:
   Enabled: true
