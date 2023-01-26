@@ -30,7 +30,7 @@ SQL
   end
 
   def load
-    Object.const_get("CProg::" + cprog).new(self)
+    Object.const_get("::Prog::" + prog).new(self)
   end
 
   def run
