@@ -8,4 +8,9 @@ RSpec.describe Strand do
     did_it = st.lease {}
     expect(did_it).to be true
   end
+
+  it "can load a cprog" do
+    st = described_class.create(schedule: Time.now, cprog: "StartHypervisor", label: "start")
+    expect(st.load).to be_instance_of CProg::StartHypervisor
+  end
 end
