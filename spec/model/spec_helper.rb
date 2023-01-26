@@ -2,7 +2,7 @@
 
 require_relative "../coverage_helper"
 ENV["RACK_ENV"] = "test"
-require_relative "../../models"
+require_relative "../../model"
 raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
 
 Sequel::Model.freeze_descendents
