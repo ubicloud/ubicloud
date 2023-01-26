@@ -34,3 +34,7 @@ Style/FrozenStringLiteralComment:
 
 Layout/HeredocIndentation:
   Enabled: false
+
+RSpec/ExampleLength:
+  Enabled: false
+
