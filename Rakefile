@@ -107,8 +107,8 @@ task spec_cov: [:model_spec_cov, :web_spec_cov]
 desc "Annotate Sequel models"
 task "annotate" do
   ENV["RACK_ENV"] = "development"
-  require_relative "models"
+  require_relative "model"
   DB.loggers.clear
   require "sequel/annotate"
-  Sequel::Annotate.annotate(Dir["models/**/*.rb"])
+  Sequel::Annotate.annotate(Dir["model/**/*.rb"])
 end

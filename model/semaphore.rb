@@ -1,4 +1,4 @@
 # frozen_string_literal: true
 
-class Semaphore < Model
+class Semaphore < Sequel::Model
 end
