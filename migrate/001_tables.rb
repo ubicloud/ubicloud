@@ -7,7 +7,7 @@ Sequel.migration do
       foreign_key :parent, :strand, type: :uuid
       column :schedule, :timestamptz, null: false
       column :lease, :timestamptz
-      column :cprog, :text, collate: '"C"', null: false
+      column :prog, :text, collate: '"C"', null: false
       column :label, :text, collate: '"C"', null: false
       column :stack, :jsonb, null: false, default: "[]"
       column :retval, :jsonb, null: false, default: "{}"
