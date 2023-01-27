@@ -9,11 +9,7 @@ Loader.push_dir("#{__dir__}/lib")
 Loader.ignore("#{__dir__}/routes")
 Loader.ignore("#{__dir__}/migrate")
 Loader.ignore("#{__dir__}/spec")
-model_dir = "#{__dir__}/model"
-Loader.ignore(model_dir + "/model.rb")
-Loader.on_dir_autoloaded(model_dir) do
-  require_relative "model"
-end
+Loader.ignore("#{__dir__}/model.rb")
 Loader.inflector.inflect("db" => "DB")
 Loader.enable_reloading
 Loader.setup
