@@ -12,12 +12,14 @@ Sequel::Model.plugin :require_valid_schema
 Sequel::Model.plugin :singular_table_names
 Sequel::Model.plugin :subclasses unless ENV["RACK_ENV"] == "development"
 
-unless defined?(Unreloader)
-  require "rack/unreloader"
-  Unreloader = Rack::Unreloader.new(reload: false)
-end
+if ENV["RACK_ENV"] == "development"
+  unless defined?(Unreloader)
+    require "rack/unreloader"
+    Unreloader = Rack::Unreloader.new(reload: false)
+  end
 
-Unreloader.require("model") { |f| Sequel::Model.send(:camelize, File.basename(f).sub(/\.rb\z/, "")) }
+  Unreloader.require("model") { |f| Sequel::Model.send(:camelize, File.basename(f).sub(/\.rb\z/, "")) }
+end
 
 if ENV["RACK_ENV"] == "development" || ENV["RACK_ENV"] == "test"
   require "logger"
