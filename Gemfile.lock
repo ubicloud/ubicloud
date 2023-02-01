@@ -111,7 +111,7 @@ GEM
     ruby-progressbar (1.11.0)
     sassc (2.4.0)
       ffi (~> 1.9)
-    sequel (5.64.0)
+    sequel (5.65.0)
     sequel-annotate (1.7.0)
       sequel (>= 4)
     sequel_pg (1.17.1)
