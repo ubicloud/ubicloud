@@ -25,7 +25,7 @@ GEM
     ffi (1.15.5)
     json (2.6.3)
     language_server-protocol (3.17.0.3)
-    mail (2.8.0.1)
+    mail (2.8.1)
       mini_mime (>= 0.1.1)
       net-imap
       net-pop
@@ -128,7 +128,7 @@ GEM
       rubocop (= 1.44.1)
       rubocop-performance (= 1.15.2)
     tilt (2.0.11)
-    timeout (0.3.1)
+    timeout (0.3.2)
     unicode-display_width (2.4.2)
     webrick (1.7.0)
     xpath (3.2.0)
