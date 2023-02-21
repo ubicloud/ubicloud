@@ -41,6 +41,7 @@ GEM
       timeout
     net-smtp (0.3.3)
       net-protocol
+    net-ssh (7.0.1)
     nokogiri (1.14.2-x86_64-linux)
       racc (~> 1.4)
     parallel (1.22.1)
@@ -143,6 +144,7 @@ DEPENDENCIES
   database_cleaner-sequel
   erubi (>= 1.5)
   mail
+  net-ssh
   rack-unreloader (>= 1.8)
   rackup
   rake
