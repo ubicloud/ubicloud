@@ -17,6 +17,7 @@ module Config
 
   # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
+  mandatory :rack_env, string
 
   # Optional -- value is returned or `nil` if it wasn't present.
   optional :app_name, string
@@ -38,4 +39,12 @@ module Config
   override :root, File.expand_path(__dir__), string
   override :timeout, 10, int
   override :versioning, false, bool
+
+  def self.development?
+    Config.rack_env == "development"
+  end
+
+  def self.test?
+    Config.rack_env == "test"
+  end
 end
