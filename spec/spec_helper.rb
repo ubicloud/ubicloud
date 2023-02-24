@@ -15,6 +15,7 @@
 # it.
 #
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
+ENV["RACK_ENV"] = "test"
 require_relative "../loader"
 require "rspec"
 require "database_cleaner/sequel"
