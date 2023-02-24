@@ -19,6 +19,7 @@ gem "rake"
 gem "zeitwerk"
 
 group :development do
+  gem "pry"
   gem "rackup"
   gem "sequel-annotate"
   gem "rubocop-performance"
