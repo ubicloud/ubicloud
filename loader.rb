@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative ".env"
+require "bundler/setup"
+Bundler.setup
 require "zeitwerk"
 Loader = Zeitwerk::Loader.new
 Loader.push_dir("#{__dir__}/")
