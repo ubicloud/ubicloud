@@ -6,6 +6,5 @@ require_relative "../../model"
 raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
 
 Sequel::Model.freeze_descendents
-DB.freeze
 
 require_relative "../spec_helper"
