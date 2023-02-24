@@ -87,7 +87,9 @@ class Clover < Roda
     # cookie_options: {secure: ENV['RACK_ENV'] != 'test'}, # Uncomment if only allowing https:// access
     secret: secret
 
-  Unreloader.require("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
+  if Config.development?
+    Unreloader.require("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
+  end
 
   plugin :rodauth do
     enable :login, :logout, :verify_account

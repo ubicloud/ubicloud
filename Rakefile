@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require_relative "loader"
 # Migrate
 
 migrate = lambda do |env, version|
   ENV["RACK_ENV"] = env
-  require_relative "db"
+  require_relative "loader"
   require "logger"
+  require "sequel"
   Sequel.extension :migration
   DB.loggers << Logger.new($stdout) if DB.loggers.empty?
   Sequel::Migrator.apply(DB, "migrate", version)
@@ -50,34 +50,20 @@ task :prod_up do
 end
 
 # Specs
-
-spec = proc do |type|
-  desc "Run #{type} specs"
-  task :"#{type}_spec" do
-    sh "rspec spec/#{type}"
-  end
-
-  desc "Run #{type} specs with coverage"
-  task :"#{type}_spec_cov" do
-    ENV["COVERAGE"] = type
-    sh "rspec spec/#{type}"
-    ENV.delete("COVERAGE")
-  end
+begin
+  require "rspec/core/rake_task"
+  ENV["RACK_ENV"] = "test"
+  RSpec::Core::RakeTask.new(:spec)
+  task default: :spec
+rescue LoadError
 end
-spec.call("model")
-spec.call("web")
-
-desc "Run all specs"
-task default: [:model_spec, :web_spec]
-
-desc "Run all specs with coverage"
-task spec_cov: [:model_spec_cov, :web_spec_cov]
 
 # Other
 
 desc "Annotate Sequel models"
 task "annotate" do
   ENV["RACK_ENV"] = "development"
+  require_relative "loader"
   require_relative "model"
   DB.loggers.clear
   require "sequel/annotate"
