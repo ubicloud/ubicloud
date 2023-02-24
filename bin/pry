@@ -1,0 +1,11 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+
+require "pry"
+
+$0 = "clover-#{ENV["RACK_ENV"]}"
+opts = Pry::CLI.parse_options
+Pry.config.prompt_name = $0
+Pry::CLI.start(opts)

@@ -3,6 +3,7 @@
 source "https://rubygems.org"
 
 gem "net-ssh"
+gem "pry"
 gem "sassc", ">= 2"
 gem "tilt", ">= 2.0.9"
 gem "erubi", ">= 1.5"
