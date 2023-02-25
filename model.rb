@@ -11,6 +11,9 @@ Sequel::Model.plugin :auto_validations
 Sequel::Model.plugin :require_valid_schema
 Sequel::Model.plugin :singular_table_names
 Sequel::Model.plugin :subclasses unless ENV["RACK_ENV"] == "development"
+Sequel::Model.plugin :column_encryption do |enc|
+  enc.key 0, ENV["CLOVER_COLUMN_ENCRYPTION_KEY"]
+end
 
 if ENV["RACK_ENV"] == "development"
   unless defined?(Unreloader)
