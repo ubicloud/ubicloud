@@ -15,12 +15,10 @@ class Scheduling::Dispatcher
 
   def start_cohort
     scan.each do |strand|
-      th = Thread.new do
+      @threads << Thread.new do
+        Thread.current.name = strand.id
         strand.run
       end
-      th.name = strand.id
-
-      @threads << th
     end
   end
 
