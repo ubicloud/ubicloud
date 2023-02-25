@@ -1,0 +1,11 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+
+d = Scheduling::Dispatcher.new
+loop do
+  d.wait_cohort
+  d.start_cohort
+  sleep 5
+end
