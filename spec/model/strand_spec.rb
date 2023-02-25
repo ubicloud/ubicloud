@@ -7,7 +7,9 @@ RSpec.describe Strand do
 
   it "can take leases" do
     st.save_changes
-    did_it = st.lease {}
+    did_it = st.lease {
+      next Prog::StartHypervisor.new st.id
+    }
     expect(did_it).to be true
   end
 

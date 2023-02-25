@@ -20,7 +20,11 @@ RETURNING lease
 SQL
     return false unless affected
     lease = affected.fetch(:lease)
-    yield
+    prog = yield
+
+    # Avoid leasing integrity check error if the record disappears
+    # entirely.
+    return if prog.deleted?
 
     num_updated = DB[<<SQL, id, lease].update
 UPDATE strand
@@ -37,7 +41,11 @@ SQL
 
   def run
     lease do
-      load.public_send(label)
+      prog = load
+      puts "running " + prog.class.to_s
+      prog.public_send(label)
+      puts "ran " + prog.class.to_s
+      next prog
     end
   end
 end
