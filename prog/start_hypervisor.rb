@@ -1,12 +1,6 @@
 # frozen_string_literal: true
 
-class Prog::StartHypervisor
-  attr_reader :strand
-
-  def initialize(strand)
-    @strand = strand
-  end
-
+class Prog::StartHypervisor < Prog::Base
   def start
   end
 end
