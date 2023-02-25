@@ -2,6 +2,8 @@
 
 source "https://rubygems.org"
 
+gem "bcrypt_pbkdf"
+gem "ed25519"
 gem "net-ssh"
 gem "sassc", ">= 2"
 gem "tilt", ">= 2.0.9"
