@@ -29,7 +29,7 @@ group :development do
   gem "rubocop-rake"
   gem "rubocop-rspec"
   gem "rubocop-sequel"
-  gem "standard"
+  gem "standard", ">= 1.24.3"
   gem "simplecov"
 end
 
