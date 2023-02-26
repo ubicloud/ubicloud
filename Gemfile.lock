@@ -173,7 +173,7 @@ DEPENDENCIES
   sequel-annotate
   sequel_pg (>= 1.8)
   simplecov
-  standard
+  standard (>= 1.24.3)
   tilt (>= 2.0.9)
   zeitwerk
 
