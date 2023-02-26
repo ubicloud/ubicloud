@@ -12,7 +12,7 @@ Sequel::Model.plugin :require_valid_schema
 Sequel::Model.plugin :singular_table_names
 Sequel::Model.plugin :subclasses unless ENV["RACK_ENV"] == "development"
 Sequel::Model.plugin :column_encryption do |enc|
-  enc.key 0, Base64.decode64(ENV["CLOVER_COLUMN_ENCRYPTION_KEY"])
+  enc.key 0, Base64.decode64(Config.clover_column_encryption_key)
 end
 
 if ENV["RACK_ENV"] == "development"
