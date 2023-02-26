@@ -17,14 +17,14 @@ module Config
 
   # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
-  mandatory :clover_session_secret, string, clear: true
-  mandatory :clover_column_encryption_key, string, clear: true
   mandatory :rack_env, string
 
   # Optional -- value is returned or `nil` if it wasn't present.
   optional :app_name, string
   optional :versioning_default, string
   optional :versioning_app_name, string
+  optional :clover_session_secret, base64, clear: true
+  optional :clover_column_encryption_key, base64, clear: true
 
   # Override -- value is returned or the set default.
   override :database_timeout, 10, int
