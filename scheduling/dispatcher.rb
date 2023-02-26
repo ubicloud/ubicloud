@@ -16,9 +16,8 @@ class Scheduling::Dispatcher
   def start_cohort
     scan.each do |strand|
       @threads << Thread.new do
-        Thread.current.name = strand.id
         strand.run
-      end
+      end.tap { _1.name = strand.id }
     end
   end
 
