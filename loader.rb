@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
-require_relative ".env"
+begin
+  require_relative ".env"
+rescue LoadError
+  # .env.rb is optional, if the environment variables have been set
+  # some other way.
+end
+
 require "bundler/setup"
 Bundler.setup
 require "zeitwerk"
