@@ -1,19 +1,28 @@
 # frozen_string_literal: true
 
+require "base64"
+
 # Adapted from https://github.com/interagent/pliny/blob/fcc8f3b103ec5296bd754898fdefeb2fda2ab292/lib/pliny/config_helpers.rb
 #
 # It is MIT licensed.
 module CastingConfigHelpers
-  def mandatory(name, method = nil, clear: false)
+  def assign_cast_clear(name, method, clear)
     env_name = name.to_s.upcase
-    value = cast(ENV.fetch(env_name), method)
-    create(name, value)
+    uncast_value = yield env_name
+    create(name, cast(uncast_value, method))
     ENV.delete(env_name) if clear
   end
 
-  def optional(name, method = nil)
-    value = cast(ENV[name.to_s.upcase], method)
-    create(name, value)
+  def mandatory(name, method = nil, clear: false)
+    assign_cast_clear name, method, clear do |env_name|
+      ENV.fetch(env_name)
+    end
+  end
+
+  def optional(name, method = nil, clear: false)
+    assign_cast_clear name, method, clear do |env_name|
+      ENV[env_name]
+    end
   end
 
   def override(name, default, method = nil)
@@ -35,6 +44,10 @@ module CastingConfigHelpers
 
   def string
     nil
+  end
+
+  def base64
+    ->(v) { v && Base64.decode64(v) }
   end
 
   def symbol
