@@ -1,0 +1,44 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: clover
+          POSTGRES_PASSWORD: 'nonempty'
+          POSTGRES_DB: clover_test
+        ports:
+        - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+    - name: Remove superuser access
+      run: psql "postgres://clover:nonempty@localhost:5432/clover_test" -c "ALTER ROLE clover NOSUPERUSER"
+
+    - uses: actions/checkout@v3
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.2.1
+        bundler-cache: true
+
+    - name: Run rubocop
+      run: bundle exec rubocop
+
+    - name: Apply migrations
+      env:
+        CLOVER_DATABASE_URL: postgres://clover:nonempty@localhost:5432/clover_test
+      run: rake test_up
+
+    - name: Run tests
+      env:
+        CLOVER_DATABASE_URL: postgres://clover:nonempty@localhost:5432/clover_test
+        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
+        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
+      run: bundle exec rspec
