@@ -13,6 +13,7 @@ AllCops:
   NewCops: enable
   Exclude:
     - public/**/*
+    - vendor/**/*
 
 RSpec:
   Enabled: true
