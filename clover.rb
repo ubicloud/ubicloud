@@ -81,7 +81,7 @@ class Clover < Roda
     end
   end
 
-  secret = ENV.send(((ENV["RACK_ENV"] == "development") ? :[] : :delete), "CLOVER_SESSION_SECRET")
+  secret = Base64.decode64(Config.clover_session_secret)
   plugin :sessions,
     key: "_Clover.session",
     # cookie_options: {secure: ENV['RACK_ENV'] != 'test'}, # Uncomment if only allowing https:// access
