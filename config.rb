@@ -17,6 +17,8 @@ module Config
 
   # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
+  mandatory :clover_session_secret, string, clear: true
+  mandatory :clover_column_encryption_key, string, clear: true
   mandatory :rack_env, string
 
   # Optional -- value is returned or `nil` if it wasn't present.
