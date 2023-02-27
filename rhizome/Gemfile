@@ -1,0 +1,20 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+gem "netaddr"
+
+group :development do
+  gem "rackup"
+  gem "sequel-annotate"
+  gem "rubocop-performance"
+  gem "rubocop-rake"
+  gem "rubocop-rspec"
+  gem "rubocop-sequel"
+  gem "standard"
+  gem "simplecov"
+end
+
+group :test do
+  gem "rspec"
+end
