@@ -63,5 +63,23 @@ RSpec.describe Scheduling::Dispatcher do
         Strand.truncate(cascade: true)
       end.join
     end
+
+    it "can trigger thread dumps and exit if the Prog takes too long" do
+      Thread.new do
+        th = Thread.current
+        r, w = IO.pipe
+        th.name = "clover_test"
+        th[:clover_test_in] = r
+
+        di.instance_variable_set(:@apoptosis_timeout, 0)
+        di.instance_variable_set(:@dump_timeout, 0)
+        Strand.create(schedule: Time.now, prog: "Test", label: "wait_exit")
+        di.start_cohort
+        expect(Ractor.receive).to eq :thread_dump
+        w.close
+      ensure
+        Strand.truncate(cascade: true)
+      end.join
+    end
   end
 end
