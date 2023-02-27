@@ -20,6 +20,7 @@ gem "sequel_pg", ">= 1.8", require: "sequel"
 gem "rack-unreloader", ">= 1.8"
 gem "rake"
 gem "zeitwerk"
+gem "warning"
 
 group :development do
   gem "pry"
