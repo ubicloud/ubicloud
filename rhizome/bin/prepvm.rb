@@ -104,8 +104,8 @@ r "mcopy -oi /home/#{q_vm}/ubuntu-cloudinit.img -s /home/#{q_vm}/meta-data ::"
 r "mcopy -oi /home/#{q_vm}/ubuntu-cloudinit.img -s /home/#{q_vm}/network-config ::"
 r "chown #{q_vm}:#{q_vm} /home/#{q_vm}/ubuntu-cloudinit.img"
 
-r "qemu-img convert -p -f qcow2 -O raw /opt/cloud-hypervisor/focal-server-cloudimg-amd64.img /home/#{q_vm}/focal-server-cloudimg-amd64.raw"
-r "chown #{q_vm}:#{q_vm} /home/#{q_vm}/focal-server-cloudimg-amd64.raw"
+r "qemu-img convert -p -f qcow2 -O raw /opt/jammy-server-cloudimg-amd64.img /home/#{q_vm}/boot.raw"
+r "chown #{q_vm}:#{q_vm} /home/#{q_vm}/boot.raw"
 
 # All systems go.
 r("ip netns exec #{q_vm} sysctl -w net.ipv6.conf.all.forwarding=1")
