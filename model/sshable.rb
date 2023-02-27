@@ -17,8 +17,8 @@ class Sshable < Sequel::Model
     end
 
     # Cache miss.
-    # key_data: [private_key]
-    sess = Net::SSH.start(host, "rhizome", non_interactive: true, timeout: 30, use_agent: false)
+    sess = Net::SSH.start(host, "rhizome", non_interactive: true, timeout: 30,
+      key_data: [private_key].compact, use_agent: Config.development?)
     Thread.current[:clover_ssh_cache][host] = sess
     sess
   end
