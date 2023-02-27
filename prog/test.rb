@@ -8,4 +8,10 @@ class Prog::Test < Prog::Base
     th.thread_variable_set(:clover_test_out, Thread.current)
     w.close
   end
+
+  def wait_exit
+    th = Thread.list.find { _1.name == "clover_test" }
+    r = th[:clover_test_in]
+    r.read
+  end
 end
