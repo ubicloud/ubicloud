@@ -1,0 +1,22 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+# When retrieving a fresh machine, run:
+#
+#   apt update && apt -y install ruby-bundler
+#
+# Then paste this into `irb`.
+#
+# After it runs, you should be able to log into the `rhizome` user and
+# run `sudo -s`.
+require "fileutils"
+
+def r(commandline)
+  out = `#{commandline}`
+  fail "command failed" unless $?.success?
+  out
+end
+
+r "adduser --disabled-password --gecos '' rhizome"
+File.write("/etc/sudoers.d/98-rhizome", "rhizome ALL=(ALL) NOPASSWD:ALL\n")
+r "install -D -o rhizome -g rhizome -m 0600 /root/.ssh/authorized_keys /home/rhizome/.ssh/authorized_keys"
