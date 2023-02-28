@@ -1,12 +1,16 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
+require "fileutils"
 require_relative "../lib/common"
+require_relative "../lib/vm_path"
 
 unless (vm_name = ARGV.shift)
   puts "need vm name as argument"
   exit 1
 end
+
+vp = VmPath.new(vm_name)
 
 # "Global Unicast" subnet, i.e. a subnet for exchanging packets with
 # the internet.
@@ -47,28 +51,28 @@ def gen_mac
 end
 
 guest_mac = gen_mac
-File.write("/home/#{q_vm}/guest_mac", guest_mac + "\n")
+vp.write_guest_mac(guest_mac)
 
 # Write out ephemeral public IP and IPsec addresses.
 require "ipaddr"
 ephemeral = IPAddr.new(gua).succ
 ipsec = ephemeral.succ.to_s
 ephemeral = ephemeral.to_s
-File.write("/home/#{q_vm}/ephemeral", ephemeral + "\n")
-File.write("/home/#{q_vm}/ipsec", ipsec + "\n")
+vp.write_ephemeral(ephemeral)
+vp.write_ephemeral(ipsec)
 
 # Route ephemeral address to tap.
 r "ip -n #{q_vm} link set dev tap#{q_vm} up"
 r "ip -n #{q_vm} route add #{ephemeral} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
 
 # Prepare cloudinit data.
-File.write("/home/#{q_vm}/meta-data", <<EOS)
+vp.write_meta_data(<<EOS)
 instance-id: #{q_vm}
 local-hostname: #{q_vm}
 EOS
 
 tap_mac = r("ip netns exec #{q_vm} cat /sys/class/net/tap#{q_vm}/address")
-File.write("/home/#{q_vm}/network-config", <<EOS)
+vp.write_network_config(<<EOS)
 version: 2
 ethernets:
   id0:
@@ -80,7 +84,7 @@ ethernets:
       addresses: [2a01:4ff:ff00::add:1, 2a01:4ff:ff00::add:2]
 EOS
 
-File.write("/home/#{q_vm}/user-data", <<EOS)
+vp.write_user_data(<<EOS)
 #cloud-config
 users:
   - name: cloud
@@ -98,14 +102,14 @@ runcmd:
   - [ systemctl, start, --no-block, notify-booted.service ]
 EOS
 
-r "mkdosfs -n CIDATA -C /home/#{q_vm}/ubuntu-cloudinit.img 8192"
-r "mcopy -oi /home/#{q_vm}/ubuntu-cloudinit.img -s /home/#{q_vm}/user-data ::"
-r "mcopy -oi /home/#{q_vm}/ubuntu-cloudinit.img -s /home/#{q_vm}/meta-data ::"
-r "mcopy -oi /home/#{q_vm}/ubuntu-cloudinit.img -s /home/#{q_vm}/network-config ::"
-r "chown #{q_vm}:#{q_vm} /home/#{q_vm}/ubuntu-cloudinit.img"
+r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
+r "mcopy -oi #{vp.q_cloudinit_img} -s #{vm.q_user_data} ::"
+r "mcopy -oi #{vp.q_cloudinit_img} -s #{vm.q_meta_data} ::"
+r "mcopy -oi #{vp.q_cloudinit_img} -s #{vm.q_network_config} ::"
+FileUtils.chown vm_name, vm_name, vp.cloudinit_img
 
-r "qemu-img convert -p -f qcow2 -O raw /opt/jammy-server-cloudimg-amd64.img /home/#{q_vm}/boot.raw"
-r "chown #{q_vm}:#{q_vm} /home/#{q_vm}/boot.raw"
+r "qemu-img convert -p -f qcow2 -O raw /opt/jammy-server-cloudimg-amd64.img #{vp.q_boot_raw}"
+r "chown #{q_vm}:#{q_vm} #{vp.q_boot_raw}"
 
 # All systems go.
 r("ip netns exec #{q_vm} sysctl -w net.ipv6.conf.all.forwarding=1")
