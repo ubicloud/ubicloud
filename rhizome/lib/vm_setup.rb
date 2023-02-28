@@ -160,14 +160,28 @@ EOS
 
   # Does not return, replaces process with cloud-hypervisor running the guest.
   def exec_cloud_hypervisor
+    require "etc"
     serial_device = if $stdout.tty?
-      " tty "
+      "tty"
     else
-      " file=serial.log "
+      "file=serial.log"
     end
-    exec <<EOS
-ip netns exec #{q_vm} sudo -u #{q_vm} -i -- /opt/cloud-hypervisor/v30.0/cloud-hypervisor --kernel /opt/fw/v0.4.2/hypervisor-fw --disk path=boot.raw --disk path=cloudinit.img --console off --serial #{serial_device} --cpus boot=4 --memory size=1024M --net "mac=#{guest_mac.shellescape},tap=tap#{q_vm},ip=,mask="
-EOS
+    u = Etc.getpwnam(@vm_name)
+    Dir.chdir(u.dir)
+    exec(
+      "/usr/sbin/ip", "netns", "exec", @vm_name,
+      "/usr/bin/setpriv", "--reuid=#{u.uid}", "--regid=#{u.gid}", "--init-groups", "--reset-env",
+      "--",
+      "/opt/cloud-hypervisor/v30.0/cloud-hypervisor",
+      "--kernel", "/opt/fw/v0.4.2/hypervisor-fw",
+      "--disk", "path=#{vp.boot_raw}",
+      "--disk", "path=#{vp.cloudinit_img}",
+      "--console", "off", "--serial", serial_device,
+      "--cpus", "boot=4",
+      "--memory", "size=1024M",
+      "--net", "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask=",
+      close_others: true
+    )
   end
 
   def guest_mac
