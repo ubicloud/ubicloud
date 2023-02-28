@@ -7,9 +7,6 @@ unless (vm_name = ARGV.shift)
 end
 
 require_relative "../lib/common"
+require_relative "../lib/vm_setup"
 
-q_vm = vm_name.shellescape
-r "deluser --remove-home #{q_vm}"
-r "ip netns del #{q_vm}"
-
-# TODO: find routing table entry and delete
+VmSetup.new(vm_name).purge
