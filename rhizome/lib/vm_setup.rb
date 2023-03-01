@@ -158,13 +158,46 @@ EOS
     r("ip netns exec #{q_vm} sysctl -w net.ipv6.conf.all.forwarding=1")
   end
 
+  def install_systemd_unit
+    # YYY: Do something about systemd escaping, i.e. research the
+    # rules and write a routine for it.  Banning suspicious strings
+    # from VmPath is also a good idea.
+
+    # YYY: Write helpers to select ch-remote and cloud-hypervisor
+    # binaries.  The `/opt/cloud-hypervisor/#{version}` paths are
+    # strewn around, and unmanable once there are multiple versions.
+    vp.write_systemd_service <<SERVICE
+[Unit]
+Description=#{@vm_name}
+After=network.target
+
+[Service]
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
+ExecStart=/opt/cloud-hypervisor/v30.0/cloud-hypervisor \
+      --api-socket path=#{vp.ch_api_sock}              \
+      --kernel /opt/fw/v0.4.2/hypervisor-fw            \
+      --disk path=#{vp.boot_raw}                       \
+      --disk path=#{vp.cloudinit_img}                  \
+      --console off --serial file=#{vp.serial_log}     \
+      --cpus boot=4                                    \
+      --memory size=1024M                              \
+      --net "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask="
+ExecStop=/opt/cloud-hypervisor/v30.0/ch-remote --api-socket #{vp.ch_api_sock} shutdown-vmm
+Restart=no
+User=#{@vm_name}
+Group=#{@vm_name}
+SERVICE
+    r "systemctl daemon-reload"
+  end
+
   # Does not return, replaces process with cloud-hypervisor running the guest.
   def exec_cloud_hypervisor
     require "etc"
     serial_device = if $stdout.tty?
       "tty"
     else
-      "file=serial.log"
+      "file=#{vp.serial_log}"
     end
     u = Etc.getpwnam(@vm_name)
     Dir.chdir(u.dir)
@@ -173,6 +206,7 @@ EOS
       "/usr/bin/setpriv", "--reuid=#{u.uid}", "--regid=#{u.gid}", "--init-groups", "--reset-env",
       "--",
       "/opt/cloud-hypervisor/v30.0/cloud-hypervisor",
+      "--api-socket", "path=#{vp.ch_api_sock}",
       "--kernel", "/opt/fw/v0.4.2/hypervisor-fw",
       "--disk", "path=#{vp.boot_raw}",
       "--disk", "path=#{vp.cloudinit_img}",
