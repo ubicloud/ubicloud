@@ -49,6 +49,24 @@ task :prod_up do
   migrate.call("production", nil)
 end
 
+desc "Generate a new .env.rb"
+task :overwrite_envrb do
+  require "securerandom"
+
+  File.write(".env.rb", <<ENVRB)
+case ENV["RACK_ENV"] ||= "development"
+when "test"
+  ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
+  ENV["CLOVER_DATABASE_URL"] ||= "postgres:///clover_test?user=clover"
+  ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
+else
+  ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
+  ENV["CLOVER_DATABASE_URL"] ||= "postgres:///clover_development?user=clover"
+  ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
+end
+ENVRB
+end
+
 # Specs
 begin
   require "rspec/core/rake_task"
