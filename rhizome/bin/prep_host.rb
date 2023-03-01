@@ -13,6 +13,8 @@ ch_v = "30.0"
 ch_dir = "/opt/cloud-hypervisor/v#{ch_v}"
 FileUtils.mkdir_p(ch_dir)
 FileUtils.cd ch_dir do
+  r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{ch_v}/ch-remote"
+  FileUtils.chmod "a+x", "ch-remote"
   r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{ch_v}/cloud-hypervisor"
   FileUtils.chmod "a+x", "cloud-hypervisor"
 end

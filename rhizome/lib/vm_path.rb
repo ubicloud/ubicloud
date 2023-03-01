@@ -7,10 +7,32 @@ class VmPath
     @vm_name = vm_name
   end
 
+  # Read from a path, removing a trailing newline if present.
+  def read(path)
+    File.read(path).chomp
+  end
+
+  # Write to a path, adding a trailing newline if not already present.
+  def write(path, s)
+    s += "\n" unless s.end_with?("\n")
+    File.write(path, s)
+  end
+
+  def systemd_service
+    File.join("/etc/systemd/system",
+      IO.popen(["systemd-escape", @vm_name + ".service"]) { _1.read.chomp })
+  end
+
+  def write_systemd_service(s)
+    write(systemd_service, s)
+  end
+
   def home(n)
     File.join("", "home", @vm_name, n)
   end
 
+  # Define path, q_path, read, write methods for files in
+  # `/home/#{vm_name}`
   %w[
     guest_mac
     ephemeral
@@ -20,6 +42,8 @@ class VmPath
     network-config
     user-data
     cloudinit.img
+    ch-api.sock
+    serial.log
   ].each do |file_name|
     method_name = file_name.tr(".-", "_")
     fail "BUG" if method_defined?(method_name)
@@ -42,15 +66,14 @@ class VmPath
     read_method_name = "read_" + method_name
     fail "BUG" if method_defined?(read_method_name)
     define_method read_method_name do
-      File.read(home(file_name)).chomp
+      read(home(file_name))
     end
 
     # Method overwriting the file's contents, e.g. #write_user_data
     write_method_name = "write_" + method_name
     fail "BUG" if method_defined?(write_method_name)
-    define_method write_method_name do |content|
-      content += "\n" unless content.end_with?("\n")
-      File.write(home(file_name), content)
+    define_method write_method_name do |s|
+      write(home(file_name), s)
     end
   end
 end
