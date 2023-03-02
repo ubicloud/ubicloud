@@ -39,6 +39,7 @@ class VmSetup
     routes(gua)
     cloudinit
     boot_disk
+    install_systemd_unit
     forwarding
   end
 
@@ -51,8 +52,10 @@ class VmSetup
 
   # Delete all traces of the VM.
   def purge
-    r "deluser --remove-home #{q_vm}"
     r "ip netns del #{q_vm}"
+    FileUtils.rm_f(vp.systemd_service)
+    r "systemctl daemon-reload"
+    r "deluser --remove-home #{q_vm}"
   end
 
   def unix_user
