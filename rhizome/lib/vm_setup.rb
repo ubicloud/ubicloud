@@ -65,7 +65,15 @@ class VmSetup
 
   def interfaces
     r "ip netns add #{q_vm}"
-    r "ip link add vetho#{q_vm} type veth peer name vethi#{q_vm} netns #{q_vm}"
+
+    # Generate MAC addresses rather than letting Linux do it to avoid
+    # a vexing bug whereby a freshly created link will, at least once,
+    # spontaneously change its MAC address sometime soon after
+    # creation, as caught by instrumenting reads of
+    # /sys/class/net/vethi#{q_vm}/address at two points in time.  The
+    # result is a race condition that *sometimes* worked.
+    r "ip link add vetho#{q_vm} addr #{gen_mac.shellescape} type veth peer name vethi#{q_vm} addr #{gen_mac.shellescape} netns #{q_vm}"
+
     r "ip -n #{q_vm} tuntap add dev tap#{q_vm} mode tap user #{q_vm}"
   end
 
@@ -221,26 +229,27 @@ SERVICE
     )
   end
 
+  # Generate a MAC with the "local" (generated, non-manufacturer) bit
+  # set and the multicast bit cleared in the first octet.
+  #
+  # Accuracy here are is not a formality: otherwise assigning a ipv6
+  # link local address errors out.
+  def gen_mac
+    ([rand(256) & 0xFE | 0x02] + 5.times.map { rand(256) }).map {
+      "%0.2X" % _1
+    }.join(":").downcase
+  end
+
   def guest_mac
+    # YYY: Should make this static and saved by control plane, it's
+    # not that hard to do, can spare licensed software users some
+    # issues:
+    # https://stackoverflow.com/questions/55686021/static-mac-addresses-for-ec2-instance
+    # https://techcommunity.microsoft.com/t5/itops-talk-blog/understanding-static-mac-address-licensing-in-azure/ba-p/1386187
     @guest_mac ||= begin
       vp.read_guest_mac
     rescue Errno::ENOENT
-      # Generate a MAC with the "local" (generated, non-manufacturer)
-      # bit set and the multicast bit cleared in the first octet.
-      #
-      # Accuracy here are is not a formality: otherwise assigning a
-      # ipv6 link local address errors out.
-      #
-      # YYY: Should make this static and saved by control plane, it's
-      # not that hard to do, can spare licensed software users some
-      # issues:
-      # https://stackoverflow.com/questions/55686021/static-mac-addresses-for-ec2-instance
-      # https://techcommunity.microsoft.com/t5/itops-talk-blog/understanding-static-mac-address-licensing-in-azure/ba-p/1386187
-      ([rand(256) & 0xFE | 0x02] + 5.times.map { rand(256) }).map {
-        "%0.2X" % _1
-      }.join(":").downcase.tap {
-        vp.write_guest_mac(_1)
-      }
+      gen_mac.tap { vp.write_guest_mac(_1) }
     end
   end
 
