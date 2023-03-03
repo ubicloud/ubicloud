@@ -2,6 +2,9 @@
 
 # A no-operation prog for testing.
 class Prog::Test < Prog::Base
+  def start
+  end
+
   def synchronized
     th = Thread.list.find { _1.name == "clover_test" }
     w = th[:clover_test_in]
