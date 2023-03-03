@@ -40,13 +40,22 @@ SQL
     Object.const_get("Prog::" + prog).new(self)
   end
 
+  def unsynchronized_run
+    prog = load
+    puts "running " + prog.class.to_s
+    begin
+      prog.public_send(label)
+    rescue Prog::Base::Hop => e
+      puts e.to_s
+    end
+    puts "ran " + prog.class.to_s
+
+    prog
+  end
+
   def run
     lease do
-      prog = load
-      puts "running " + prog.class.to_s
-      prog.public_send(label)
-      puts "ran " + prog.class.to_s
-      next prog
+      next unsynchronized_run
     end
   end
 end

@@ -25,4 +25,23 @@ class Prog::Base
       update(retval: Sequel.pg_jsonb(o))
     end
   end
+
+  class Hop < RuntimeError
+    def initialize(old_label, strand)
+      @old_label = old_label
+      @strand = strand
+    end
+
+    def to_s
+      "hop #{@strand.prog}: #{@old_label} -> #{@strand.label}"
+    end
+  end
+
+  # A hop is a kind of jump, as in, like a jump instruction.
+  def hop(label)
+    label = label.to_s if label.is_a?(Symbol)
+    old_label = @strand.label
+    @strand.update(label: label)
+    fail Hop.new(old_label, @strand)
+  end
 end

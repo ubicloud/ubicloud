@@ -24,4 +24,12 @@ RSpec.describe Strand do
     st.run
     expect(sh).to have_received(:start)
   end
+
+  it "can hop" do
+    st.label = "hop_entry"
+    expect(st).to receive(:load).and_return Prog::Test.new(st)
+    expect {
+      st.unsynchronized_run
+    }.to change(st, :label).from("hop_entry").to("hop_exit")
+  end
 end
