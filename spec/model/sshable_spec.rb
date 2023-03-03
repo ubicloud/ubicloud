@@ -22,4 +22,26 @@ RSpec.describe Sshable do
 
     expect(sa.clear_cache).to eq []
   end
+
+  describe "#cmd" do
+    let(:session) { instance_double(Net::SSH::Connection::Session) }
+
+    before do
+      expect(sa).to receive(:connect).and_return(session)
+    end
+
+    it "can run a command" do
+      expect(session).to receive(:exec!).with("echo hello").and_return(
+        Net::SSH::Connection::Session::StringWithExitstatus.new("hello", 0)
+      )
+      expect(sa.cmd("echo hello")).to eq("hello")
+    end
+
+    it "raises an error with a non-zeo exit status" do
+      expect(session).to receive(:exec!).with("exit 1").and_return(
+        Net::SSH::Connection::Session::StringWithExitstatus.new("", 1)
+      )
+      expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, ""
+    end
+  end
 end
