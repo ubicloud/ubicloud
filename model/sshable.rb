@@ -8,6 +8,14 @@ class Sshable < Sequel::Model
     enc.column :private_key
   end
 
+  class SshError < StandardError; end
+
+  def cmd(cmd)
+    ret = connect.exec!(cmd)
+    fail SshError.new(ret) unless ret.exitstatus == 0
+    ret
+  end
+
   def connect
     Thread.current[:clover_ssh_cache] ||= {}
 
