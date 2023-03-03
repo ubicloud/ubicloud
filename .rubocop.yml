@@ -48,3 +48,9 @@ RSpec/StubbedMock:
 
 RSpec/MessageSpies:
   Enabled: false
+
+RSpec/SubjectStub:
+  Enabled: false
+
+RSpec/ExpectInHook:
+  Enabled: false
