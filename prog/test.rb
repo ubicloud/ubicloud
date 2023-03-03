@@ -17,4 +17,8 @@ class Prog::Test < Prog::Base
     r = th[:clover_test_in]
     r.read
   end
+
+  def hop_entry
+    hop :hop_exit
+  end
 end
