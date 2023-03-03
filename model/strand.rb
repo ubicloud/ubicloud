@@ -20,19 +20,20 @@ RETURNING lease
 SQL
     return false unless affected
     lease = affected.fetch(:lease)
-    prog = yield
 
-    # Avoid leasing integrity check error if the record disappears
-    # entirely.
-    return if prog.deleted?
-
-    num_updated = DB[<<SQL, id, lease].update
+    begin
+      prog = yield
+      true
+    ensure
+      num_updated = DB[<<SQL, id, lease].update
 UPDATE strand
 SET lease = NULL
 WHERE id = ? AND lease = ?
 SQL
-    fail "BUG: lease violated" unless num_updated == 1
-    true
+      # Avoid leasing integrity check error if the record disappears
+      # entirely.
+      fail "BUG: lease violated" unless num_updated == 1 || prog&.deleted?
+    end
   end
 
   def load
