@@ -13,7 +13,7 @@ class Prog::Base
   end
 
   def pop(o)
-    if @strand.parent.nil?
+    if @strand.parent_id.nil?
       # Should log `o`: there's no supervising strand to collect the
       # result. There's no logging idiom at time of writing this
       # message, though.
