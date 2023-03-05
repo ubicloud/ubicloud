@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Strand do
-  let(:st) { described_class.new(schedule: Time.now, prog: "Test", label: "start") }
+  let(:st) { described_class.new(prog: "Test", label: "start") }
 
   it "can take leases" do
     st.save_changes
