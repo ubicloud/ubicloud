@@ -43,7 +43,7 @@ SQL
   def unsynchronized_run
     prog = load
     puts "running " + prog.class.to_s
-    begin
+    DB.transaction do
       prog.public_send(label)
     rescue Prog::Base::Hop => e
       puts e.to_s
