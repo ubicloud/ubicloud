@@ -25,6 +25,7 @@ gem "zeitwerk"
 gem "warning"
 
 group :development do
+  gem "pry-byebug"
   gem "rackup"
   gem "sequel-annotate"
   gem "rubocop-performance"
