@@ -5,6 +5,7 @@ GEM
       public_suffix (>= 2.0.2, < 6.0)
     ast (2.4.2)
     bcrypt_pbkdf (1.1.0)
+    byebug (11.1.3)
     capybara (3.38.0)
       addressable
       matrix
@@ -56,6 +57,9 @@ GEM
     pry (0.14.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
+    pry-byebug (3.10.1)
+      byebug (~> 11.0)
+      pry (>= 0.13, < 0.15)
     public_suffix (5.0.1)
     racc (1.6.2)
     rack (3.0.4.1)
@@ -158,6 +162,7 @@ DEPENDENCIES
   net-ssh
   netaddr
   pry
+  pry-byebug
   rack-unreloader (>= 1.8)
   rackup
   rake
