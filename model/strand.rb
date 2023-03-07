@@ -4,10 +4,21 @@ require_relative "../model"
 
 class Strand < Sequel::Model
   LEASE_EXPIRATION = 120
+  many_to_one :parent, key: :parent_id, class: self
+  one_to_many :children, key: :parent_id, class: self
 
   def lease
     self.class.lease(id) do
       yield self
+    end
+  end
+
+  def self.prog_verify(prog)
+    case prog.name
+    when /\AProg::(.*)\z/
+      $1
+    else
+      fail "BUG"
     end
   end
 
@@ -22,7 +33,7 @@ SQL
     lease = affected.fetch(:lease)
 
     begin
-      prog = yield
+      yield
       true
     ensure
       num_updated = DB[<<SQL, id, lease].update
@@ -32,7 +43,7 @@ WHERE id = ? AND lease = ?
 SQL
       # Avoid leasing integrity check error if the record disappears
       # entirely.
-      fail "BUG: lease violated" unless num_updated == 1 || prog&.deleted?
+      fail "BUG: lease violated" unless num_updated == 1 || !@deleted
     end
   end
 
@@ -47,6 +58,10 @@ SQL
       prog.public_send(label)
     rescue Prog::Base::Hop => e
       puts e.to_s
+    rescue Prog::Base::Exit => e
+      puts e.to_s
+      delete
+      @deleted = true
     end
     puts "ran " + prog.class.to_s
 
@@ -54,6 +69,7 @@ SQL
   end
 
   def run
+    fail "already deleted" if @deleted
     lease do
       next unsynchronized_run
     end
