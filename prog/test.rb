@@ -5,6 +5,20 @@ class Prog::Test < Prog::Base
   def start
   end
 
+  def pusher1
+    pop 1 if retval
+    push Prog::Test, {test_level: 2}, :pusher2
+  end
+
+  def pusher2
+    pop frame[:test_level] if retval
+    push Prog::Test, {test_level: 3}, :pusher3
+  end
+
+  def pusher3
+    pop frame[:test_level]
+  end
+
   def synchronized
     th = Thread.list.find { _1.name == "clover_test" }
     w = th[:clover_test_in]
@@ -20,5 +34,9 @@ class Prog::Test < Prog::Base
 
   def hop_entry
     hop :hop_exit
+  end
+
+  def reaper
+    reap
   end
 end
