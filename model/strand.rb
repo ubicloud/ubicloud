@@ -4,10 +4,21 @@ require_relative "../model"
 
 class Strand < Sequel::Model
   LEASE_EXPIRATION = 120
+  many_to_one :parent, key: :parent_id, class: self
+  one_to_many :children, key: :parent_id, class: self
 
   def lease
     self.class.lease(id) do
       yield self
+    end
+  end
+
+  def self.prog_verify(prog)
+    case prog.name
+    when /\AProg::(.*)\z/
+      $1
+    else
+      fail "BUG"
     end
   end
 

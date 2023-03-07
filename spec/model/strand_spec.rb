@@ -17,19 +17,12 @@ RSpec.describe Strand do
     expect(st.load).to be_instance_of Prog::Test
   end
 
-  it "can run a label" do
-    st.save_changes
-    sh = instance_spy(Prog::Test)
-    expect(st).to receive(:load).and_return sh
-    st.run
-    expect(sh).to have_received(:start)
-  end
-
   it "can hop" do
+    st.save_changes
     st.label = "hop_entry"
     expect(st).to receive(:load).and_return Prog::Test.new(st)
     expect {
-      st.unsynchronized_run
+      st.run
     }.to change(st, :label).from("hop_entry").to("hop_exit")
   end
 end

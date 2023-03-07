@@ -25,5 +25,11 @@ Sequel.migration do
       column :host, :text, collate: '"C"', null: false, unique: true
       column :private_key, :text, collate: '"C"', null: false
     end
+
+    create_table(:vm_host) do
+      foreign_key :id, :sshable, type: :uuid, primary_key: true
+      column :ip6, :inet, unique: true
+      column :net6, :cidr, unique: true
+    end
   end
 end
