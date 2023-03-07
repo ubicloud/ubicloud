@@ -2,7 +2,7 @@
 
 class Prog::InstallRhizome < Prog::Base
   def sshable
-    @sshable ||= Sshable[strand.id]
+    @sshable ||= Sshable[frame["sshable_id"]]
   end
 
   def start

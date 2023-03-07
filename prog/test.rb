@@ -21,4 +21,8 @@ class Prog::Test < Prog::Base
   def hop_entry
     hop :hop_exit
   end
+
+  def reaper
+    reap
+  end
 end
