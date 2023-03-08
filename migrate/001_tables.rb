@@ -16,7 +16,7 @@ Sequel.migration do
 
     create_table(:semaphore) do
       column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
-      foreign_key :consumer, :strand, type: :uuid, null: false
+      foreign_key :strand_id, :strand, type: :uuid, null: false
       column :name, :text, collate: '"C"', null: false
     end
 
