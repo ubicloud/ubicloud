@@ -62,7 +62,7 @@ GEM
       pry (>= 0.13, < 0.15)
     public_suffix (5.0.1)
     racc (1.6.2)
-    rack (3.0.4.1)
+    rack (3.0.4.2)
     rack-test (2.0.2)
       rack (>= 1.3)
     rack-unreloader (2.1.0)
