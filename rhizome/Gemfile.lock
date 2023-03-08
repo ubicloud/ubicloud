@@ -10,7 +10,7 @@ GEM
     parallel (1.22.1)
     parser (3.2.1.0)
       ast (~> 2.4.1)
-    rack (3.0.4.1)
+    rack (3.0.4.2)
     rackup (2.1.0)
       rack (>= 3)
       webrick (~> 1.8)
