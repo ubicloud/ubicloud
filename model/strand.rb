@@ -48,7 +48,7 @@ SQL
   end
 
   def load
-    Object.const_get("Prog::" + prog).new(self)
+    Object.const_get("::Prog::" + prog).new(self)
   end
 
   def unsynchronized_run
