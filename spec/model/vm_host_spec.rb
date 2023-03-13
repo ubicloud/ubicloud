@@ -9,4 +9,12 @@ RSpec.describe VmHost do
       described_class.create { _1.id = sa.id }
     }.not_to raise_error
   end
+
+  it "can generate random ipv6 subnets" do
+    vh = described_class.new(
+      net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
+      ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
+    )
+    expect(vh.ip6_random_vm_network.contains(vh.ip6)).to be false
+  end
 end

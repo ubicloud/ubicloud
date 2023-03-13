@@ -122,6 +122,7 @@ GEM
     rubocop-sequel (0.3.4)
       rubocop (~> 1.0)
     ruby-progressbar (1.11.0)
+    ruby-ulid (0.8.0)
     sassc (2.4.0)
       ffi (~> 1.9)
     sequel (5.65.0)
@@ -176,6 +177,7 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
+  ruby-ulid
   sassc (>= 2)
   sequel (>= 5.62)
   sequel-annotate
