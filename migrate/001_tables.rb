@@ -31,5 +31,12 @@ Sequel.migration do
       column :ip6, :inet, unique: true
       column :net6, :cidr, unique: true
     end
+
+    create_table(:vm) do
+      column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
+      column :ephemeral_net6, :cidr, unique: true
+
+      foreign_key :vm_host_id, :vm_host, type: :uuid
+    end
   end
 end
