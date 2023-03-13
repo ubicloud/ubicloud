@@ -51,6 +51,12 @@ class Prog::InstallRhizome < Prog::Base
       channel.wait
     end.wait
 
+    hop :install_gems
+  end
+
+  def install_gems
+    sshable.cmd("bundle config set --local path vendor/bundle")
+    sshable.cmd("bundle install")
     pop "installed rhizome"
   end
 end
