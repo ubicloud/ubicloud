@@ -1,8 +1,10 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-require "fileutils"
 require_relative "common"
+
+require "fileutils"
+require "netaddr"
 require_relative "vm_path"
 
 class VmSetup
@@ -77,6 +79,12 @@ class VmSetup
     r "ip -n #{q_vm} tuntap add dev tap#{q_vm} mode tap user #{q_vm}"
   end
 
+  def subdivide_network(net)
+    prefix = net.netmask.prefix_len + 1
+    halved = net.resize(prefix)
+    [halved, halved.next_sib]
+  end
+
   def routes(gua)
     # Routing: from host to subordinate.
     vethi_ll = mac_to_ipv6_link_local(r("ip netns exec #{q_vm} cat /sys/class/net/vethi#{q_vm}/address").chomp)
@@ -88,27 +96,16 @@ class VmSetup
     r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
     r "ip -n #{q_vm} route add default via #{vetho_ll.shellescape} dev vethi#{q_vm}"
 
-    # Write out ephemeral public IP and IPsec addresses.
-    require "ipaddr"
-    ephemeral = IPAddr.new(gua).succ
-
-    # YYY: Would be better to figure out what subnet size we wish to
-    # delegate to the namespace, and then slice off half of it for our
-    # own use, and the other half for the customer.  Effectively,
-    # there'd be a bit that would separate our internal use from the
-    # customer.
-    #
-    # As-is, the gua subnet just needs two addresses, and this code
-    # allocates two consecutive addresses: one for ipsec, one for
-    # ephemeral internet access.
-    ipsec = ephemeral.succ.to_s
-    ephemeral = ephemeral.to_s
-    vp.write_ephemeral(ephemeral)
-    vp.write_ipsec(ipsec)
+    # Write out guest-delegated and clover infrastructure address
+    # ranges, designed around non-floating IPv6 networks bound to the
+    # host.
+    guest_ephemeral, clover_ephemeral = subdivide_network(NetAddr.parse_net(gua))
+    vp.write_guest_ephemeral(guest_ephemeral.to_s)
+    vp.write_clover_ephemeral(clover_ephemeral.to_s)
 
     # Route ephemeral address to tap.
     r "ip -n #{q_vm} link set dev tap#{q_vm} up"
-    r "ip -n #{q_vm} route add #{ephemeral} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
+    r "ip -n #{q_vm} route add #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
   end
 
   def cloudinit
@@ -127,7 +124,7 @@ ethernets:
   id0:
     match:
       macaddress: #{yq(guest_mac)}
-    addresses: [#{yq(vp.read_ephemeral + "/128")}]
+    addresses: [#{yq(vp.read_guest_ephemeral)}]
     gateway6: #{yq(mac_to_ipv6_link_local(tap_mac))}
     nameservers:
       addresses: [2a01:4ff:ff00::add:1, 2a01:4ff:ff00::add:2]

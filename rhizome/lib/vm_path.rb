@@ -35,8 +35,8 @@ class VmPath
   # `/home/#{vm_name}`
   %w[
     guest_mac
-    ephemeral
-    ipsec
+    guest_ephemeral
+    clover_ephemeral
     boot.raw
     meta-data
     network-config
