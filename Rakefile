@@ -8,8 +8,37 @@ migrate = lambda do |env, version|
   require "logger"
   require "sequel"
   Sequel.extension :migration
+
   DB.loggers << Logger.new($stdout) if DB.loggers.empty?
   Sequel::Migrator.apply(DB, "migrate", version)
+
+  # Check if the alternate-user password hash user needs to run
+  # migrations.  It's desirable to avoid always connecting to run
+  # migrations, since, almost always, there will be nothing to do and
+  # it gluts output.
+  case DB[<<SQL].get
+SELECT count(*)
+FROM pg_class
+WHERE relnamespace = 'public'::regnamespace AND relname = 'account_password_hashes'
+SQL
+  when 0
+    dbname = DB.opts.fetch(:database)
+    ph_user = DB.get(Sequel.lit("current_user")) + "_password"
+
+    # NB: this grant/revoke cannot be transaction-isolated, so, in
+    # sensitive settings, it would be good to check role access.
+    DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
+    Sequel.postgres(dbname, user: ph_user) do |db|
+      db.loggers << Logger.new($stdout) if db.loggers.empty?
+      Sequel::Migrator.run(db, "migrate/ph", table: "schema_info_password")
+    end
+    DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
+  when 1
+    # Already ran the "ph" migration as the alternate user.  This
+    # branch is taken nearly all the time in a production situation.
+  else
+    fail "BUG: account_password_hashes table probing query should return 0 or 1"
+  end
 end
 
 desc "Migrate test database to latest version"
