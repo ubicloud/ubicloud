@@ -1,6 +1,15 @@
 # frozen_string_literal: true
 
 class Prog::Vm::HostNexus < Prog::Base
+  def self.assemble(sshable_hostname)
+    DB.transaction do
+      sa = Sshable.create(host: sshable_hostname)
+      VmHost.create { _1.id = sa.id }
+
+      Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = sa.id }
+    end
+  end
+
   def vm_host
     @vm_host ||= VmHost[strand.id]
   end
@@ -35,7 +44,10 @@ class Prog::Vm::HostNexus < Prog::Base
 
   def wait_prep
     reap
-    hop :wait if leaf?
+    if leaf?
+      vm_host.update(allocation_state: "accepting")
+      hop :wait
+    end
     donate
   end
 

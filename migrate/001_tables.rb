@@ -2,6 +2,10 @@
 
 Sequel.migration do
   change do
+    extension :pg_enum
+
+    create_enum(:allocation_state, %w[unprepared accepting draining])
+
     create_table(:strand) do
       column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
       foreign_key :parent_id, :strand, type: :uuid
@@ -28,6 +32,7 @@ Sequel.migration do
 
     create_table(:vm_host) do
       foreign_key :id, :sshable, type: :uuid, primary_key: true
+      column :allocation_state, :allocation_state, default: "unprepared", null: false
       column :ip6, :inet, unique: true
       column :net6, :cidr, unique: true
     end
