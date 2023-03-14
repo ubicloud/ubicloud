@@ -3,6 +3,13 @@
 require "ulid"
 
 class Prog::Vm::Nexus < Prog::Base
+  def self.assemble
+    DB.transaction do
+      vm = Vm.create
+      Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
+    end
+  end
+
   def q_vm
     # YYY: various names in linux, like interface names, are obliged
     # to be short, so alas, probably can't reproduce entropy from
@@ -26,16 +33,16 @@ class Prog::Vm::Nexus < Prog::Base
     # like round-robin in a non-concurrent allocation-only
     # demonstration.
     #
-    # YYY: Lacks many necessary features, like host draining,
-    # supporting different VM sizes, and preventing over-allocation.
-    # The allocator should also run in the strand of the host or do
-    # some other interlock to avoid overbooking in concurrent
-    # scenarios, but that requires more inter-strand synchronization
-    # than I want to do right now.
+    # YYY: Lacks many necessary features like supporting different VM
+    # sizes and preventing over-allocation.  The allocator should also
+    # run in the strand of the host or do some other interlock to
+    # avoid overbooking in concurrent scenarios, but that requires
+    # more inter-strand synchronization than I want to do right now.
     vm_host_id = DB[<<SQL].first[:id]
 SELECT id
 FROM (SELECT vm_host.id, count(*)
-      FROM vm_host LEFT JOIN vm ON vm.vm_host_id = vm.id 
+      FROM vm_host LEFT JOIN vm ON
+      vm.vm_host_id = vm.id AND vm_host.allocation_state = 'accepting'
       GROUP BY vm_host.id) AS counts
 ORDER BY count
 LIMIT 1
