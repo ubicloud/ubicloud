@@ -46,7 +46,7 @@ GEM
       timeout
     net-smtp (0.3.3)
       net-protocol
-    net-ssh (7.0.1)
+    net-ssh (7.1.0)
     netaddr (2.0.6)
     nokogiri (1.14.2-x86_64-linux)
       racc (~> 1.4)
