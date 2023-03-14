@@ -3,7 +3,7 @@
 source "https://rubygems.org"
 ruby "3.2.1"
 
-gem "bcrypt_pbkdf"
+gem "argon2"
 gem "ed25519"
 gem "net-ssh"
 gem "netaddr"

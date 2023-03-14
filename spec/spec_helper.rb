@@ -33,7 +33,17 @@ DatabaseCleaner.url_allowlist = [
 RSpec.configure do |config|
   config.before(:suite) do
     DatabaseCleaner.strategy = :transaction
-    DatabaseCleaner.clean_with(:truncation)
+    DB.loggers << Logger.new($stdout) if DB.loggers.empty?
+    DatabaseCleaner.clean_with(:truncation,
+      # Skip tables that are part of RodAuth and can't be truncated on
+      # account of `ph` user separation.
+      except: %w[
+        account_previous_password_hashes
+        schema_info_password
+        account_password_hashes
+        accounts
+        account_statuses
+      ])
   end
 
   config.around do |example|

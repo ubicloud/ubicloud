@@ -181,8 +181,11 @@ dedicated terminal window with `postgres -D $PGDATA` set aside, and
 then create the user and databases:
 
     createuser -U postgres clover
+    createuser -U postgres clover_password
     createdb -U postgres -O clover clover_test
+    psql -U postgres -c 'CREATE EXTENSION citext;' clover_test
     createdb -U postgres -O clover clover_development
+    psql -U postgres -c 'CREATE EXTENSION citext;' clover_development
 
 The `clover_test` database is used by automated tests, and is prone to
 automatic truncation and the like.  `clover_development` is the
