@@ -50,7 +50,12 @@ class Clover < Roda
     view(content: "")
   end
 
-  if ENV["RACK_ENV"] == "development"
+  if Config.development?
+    require "mail"
+    ::Mail.defaults do
+      delivery_method :logger
+    end
+
     plugin :exception_page
     class RodaRequest
       def assets
