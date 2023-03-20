@@ -1,31 +1,67 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-    <%== assets(:css) %>
-    <title>Clover<% if @page_title %> - <%= @page_title %><% end %></title>
-  </head>
-  <body>
-    <nav class="navbar navbar-default" role="navigation">
-      <div class="container">
-        <a class="navbar-brand" href="/">Clover</a>
-      </div>
-    </nav>
+<html>
+    <head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+	<title>Rodauth Demo - <%= @page_title %></title>
+	<style nonce="<%= @request_nonce %>">
+	 .error {border: 1px #a00 solid;}
+	 span.error_message {
+	     color: #a00;
+	     background-color: #ffffe0;
+	     border-color: 1px solid #eeeed0;
+	     padding: 5px 2px;
+	     display: inline-block; 
+	 }
+	 span.error_message:before {
+	     content: "(!) "
+	 }
+	 input.rodauth_hidden {
+	     display: none;
+	 }
+	</style>
+    </head>
 
-    <div class="container" id="content">
-      <% if flash['notice'] %>
-        <div class="alert alert-success" role="alert"><%= flash['notice'] %></div>
-      <% end %>
-      <% if flash['error'] %>
-        <div class="alert alert-danger" role="alert"><%= flash['error'] %></div>
-      <% end %>
-      <% if @page_title %>
-        <h1><%= @page_title %></h1>
-      <% end %>
-      <%== yield %>
-    </div>
-  </body>
+    <body>
+
+	<nav class="navbar navbar-default" role="navigation">
+	    <div class="container">
+		<a class="navbar-brand" href="/">Rodauth Demo</a>
+
+		<% if rodauth.logged_in? %>
+		    <form action="/logout" class="navbar-form pull-right" method="post">
+			<%== csrf_tag("/logout") %>
+			<input class="btn btn-primary form-control auth-button" type="submit" value="Logout" />
+		    </form>
+		<% end %>
+	    </div>
+	    </div>
+	</nav>
+
+	<div class="container">
+	    <% if sms = last_sms_sent %>
+		<div class="alert alert-success"><p><%= sms %></p></div>
+	    <% end %>
+	    <% if flash['notice'] %>
+		<div class="alert alert-success"><p><%= flash['notice'] %></p></div>
+	    <% end %>
+	    <% if flash['error'] %>
+		<div class="alert alert-danger"><p><%= flash['error'] %></p></div>
+	    <% end %>
+	    <h1><%= @page_title %></h1>
+
+	    <%== yield %>
+
+	    <% if mail = last_mail_sent %>
+		<h2>Last Email Sent</h2>
+		<pre>From: <%= mail.from.join %>
+To: <%= mail.to.join %>
+Subject: <%= mail.subject %>
+
+		    <%= mail.body %></pre>
+	    <% end %>
+	</div>
+
+    </body>
 </html>

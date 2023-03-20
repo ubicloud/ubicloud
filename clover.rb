@@ -18,7 +18,7 @@ class Clover < Roda
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
-    csp.style_src :self, "https://maxcdn.bootstrapcdn.com"
+    csp.style_src :self, "https://stackpath.bootstrapcdn.com"
     csp.form_action :self
     csp.script_src :self
     csp.connect_src :self
@@ -27,6 +27,7 @@ class Clover < Roda
   end
 
   plugin :route_csrf
+  plugin :disallow_file_uploads
   plugin :flash
   plugin :assets, css: "app.scss", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :render, escape: true, layout: "./layout"
@@ -96,13 +97,20 @@ class Clover < Roda
   end
 
   plugin :rodauth do
-    enable :login, :logout, :verify_account
-    enable :otp, :recovery_codes
-    hmac_secret Config.clover_session_secret
-    enable :argon2, :login, :create_account, :logout
+    enable :argon2, :change_login, :change_password, :close_account, :create_account,
+      :lockout, :login, :logout, :remember, :reset_password, :verify_account,
+      :otp, :recovery_codes, :sms_codes,
+      :disallow_password_reuse, :password_grace_period, :active_sessions,
+      :verify_login_change, :change_password_notify, :confirm_password
 
-    # YYY: Should password secret and session secret be the same? I think
-    # probably not and there are rotation issues. See also:
+    unless Config.development?
+      enable :disallow_common_passwords
+    end
+
+    hmac_secret Config.clover_session_secret
+
+    # YYY: Should password secret and session secret be the same? Are
+    # there rotation issues? See also:
     #
     # https://github.com/jeremyevans/rodauth/commit/6cbf61090a355a20ab92e3420d5e17ec702f3328
     # https://github.com/jeremyevans/rodauth/commit/d8568a325749c643c9a5c9d6d780e287f8c59c31
@@ -110,7 +118,22 @@ class Clover < Roda
     require_bcrypt? false
   end
 
+  def last_sms_sent
+    nil
+  end
+
+  def last_mail_sent
+    nil
+  end
+
   route do |r|
+    check_csrf! unless /application\/json/.match?(r.env["CONTENT_TYPE"])
+
+    @request_nonce = SecureRandom.alphanumeric
+    content_security_policy.style_src :self, "https://stackpath.bootstrapcdn.com", [:nonce, @request_nonce]
+
+    rodauth.load_memory
+    rodauth.check_active_session
     r.rodauth
     rodauth.require_authentication
     r.public
@@ -118,7 +141,6 @@ class Clover < Roda
     check_csrf!
 
     r.hash_branches("")
-
     r.root do
       view "index"
     end
