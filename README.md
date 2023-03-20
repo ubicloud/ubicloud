@@ -25,7 +25,7 @@ Code is automatically linted and formatted using
 
 ## Development Environment
 
-I suggest using [asdf-vm](https://github.com/asdf-vm) to manage
+I suggest using [asdf-vm](https://github.com/asdf-vm/asdf) to manage
 software versions.  There is a [.tool-versions file](.tool-versions)
 that `asdf-vm` reads, and it is kept up to date.
 
