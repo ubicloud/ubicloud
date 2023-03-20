@@ -19,7 +19,7 @@ jobs:
 
     steps:
     - name: Perform superuser-only actions, then remove superuser
-      run: psql "postgres://clover:nonempty@localhost:5432/clover_test" -c "CREATE EXTENSION citext; CREATE ROLE clover_password; ALTER ROLE clover NOSUPERUSER"
+      run: psql "postgres://clover:nonempty@localhost:5432/clover_test" -c "CREATE EXTENSION citext; CREATE ROLE clover_password PASSWORD 'nonempty' LOGIN; ALTER ROLE clover NOSUPERUSER"
 
     - uses: actions/checkout@v3
     - name: Set up Ruby
