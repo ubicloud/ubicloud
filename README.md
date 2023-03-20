@@ -243,7 +243,7 @@ the program [bundler](https://bundler.io/), which itself we get
 through the low-level `gem` command:
 
     $ which gem
-    $ /home/fdr/.asdf/installs/ruby/3.2.1/bin/gem
+    /home/fdr/.asdf/installs/ruby/3.2.1/bin/gem
     $ gem install bundler
     Fetching bundler-2.4.7.gem
     [...]
