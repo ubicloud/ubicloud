@@ -28,7 +28,7 @@ SQL
     # NB: this grant/revoke cannot be transaction-isolated, so, in
     # sensitive settings, it would be good to check role access.
     DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
-    Sequel.postgres(dbname, user: ph_user) do |db|
+    Sequel.postgres(**DB.opts.merge(user: ph_user)) do |db|
       db.loggers << Logger.new($stdout) if db.loggers.empty?
       Sequel::Migrator.run(db, "migrate/ph", table: "schema_info_password")
     end
