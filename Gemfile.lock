@@ -143,7 +143,7 @@ GEM
       simplecov_json_formatter (~> 0.1)
     simplecov-html (0.12.3)
     simplecov_json_formatter (0.1.4)
-    standard (1.25.0)
+    standard (1.25.2)
       language_server-protocol (~> 3.17.0.2)
       rubocop (= 1.48.1)
       rubocop-performance (= 1.16.0)
