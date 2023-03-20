@@ -3,9 +3,9 @@
 require "ulid"
 
 class Prog::Vm::Nexus < Prog::Base
-  def self.assemble
+  def self.assemble(public_key, unix_user: "ubi")
     DB.transaction do
-      vm = Vm.create
+      vm = Vm.create(public_key: public_key, unix_user: unix_user)
       Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
     end
   end
@@ -25,6 +25,14 @@ class Prog::Vm::Nexus < Prog::Base
 
   def host
     @host ||= vm.vm_host
+  end
+
+  def unix_user
+    @unix_user ||= vm.unix_user
+  end
+
+  def public_key
+    @public_key ||= vm.public_key
   end
 
   def start
@@ -54,7 +62,7 @@ SQL
 
   def prep
     q_net = vm.ephemeral_net6.to_s.shellescape
-    host.sshable.cmd("sudo bin/prepvm.rb #{q_vm} #{q_net}")
+    host.sshable.cmd("sudo bin/prepvm.rb #{q_vm} #{q_net} #{unix_user.shellescape} #{public_key.shellescape}")
     hop :run
   end
 

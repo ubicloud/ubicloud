@@ -13,8 +13,18 @@ unless (gua = ARGV.shift)
   exit 1
 end
 
+unless (unix_user = ARGV.shift)
+  puts "need unix user as argument"
+  exit 1
+end
+
+unless (ssh_public_key = ARGV.shift)
+  puts "need ssh public key as argument"
+  exit 1
+end
+
 require "fileutils"
 require_relative "../lib/common"
 require_relative "../lib/vm_setup"
 
-VmSetup.new(vm_name).prep(gua)
+VmSetup.new(vm_name).prep(unix_user, ssh_public_key, gua)
