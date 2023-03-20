@@ -18,8 +18,8 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-    - name: Remove superuser access
-      run: psql "postgres://clover:nonempty@localhost:5432/clover_test" -c "ALTER ROLE clover NOSUPERUSER"
+    - name: Perform superuser-only actions, then remove superuser
+      run: psql "postgres://clover:nonempty@localhost:5432/clover_test" -c "CREATE EXTENSION citext; CREATE ROLE clover_password; ALTER ROLE clover NOSUPERUSER"
 
     - uses: actions/checkout@v3
     - name: Set up Ruby
