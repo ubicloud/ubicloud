@@ -102,6 +102,7 @@ class Clover < Roda
       :otp, :recovery_codes, :sms_codes,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password
+    title_instance_variable :@page_title
 
     unless Config.development?
       enable :disallow_common_passwords
