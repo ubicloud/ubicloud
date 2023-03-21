@@ -1,11 +1,13 @@
 <% if rodauth.logged_in? %>
-  <h1>You are logged in as <%= DB[:accounts].where(:id=>rodauth.session_value).get(:email) %></h1>
+  <h1>You are logged in as
+    <%= DB[:accounts].where(id: rodauth.session_value).get(:email) %></h1>
   <% if rodauth.two_factor_authenticated? %>
-    <p>You have authenticated using multifactor authentication (<%= rodauth.authenticated_by.join(' and ') %>).</p>
+    <p>You have authenticated using multifactor authentication (<%= rodauth.authenticated_by.join(" and ") %>).</p>
   <% elsif rodauth.uses_two_factor_authentication? %>
     <p>You have logged in via single factor authentication (<%= rodauth.authenticated_by.first %>), but have not authenticated using multifactor authentication.</p>
   <% else %>
-    <p>You have authenticated via <%= rodauth.authenticated_by.first %></p>
+    <p>You have authenticated via
+      <%= rodauth.authenticated_by.first %></p>
   <% end %>
 
   <ul>
@@ -25,7 +27,9 @@
 <% else %>
   <h1>Overview</h1>
 
-  <p>This is the demo site for <a href="https://github.com/jeremyevans/rodauth">Rodauth</a>.  Rodauth is an authentication and account management framework for rack applications, with the following design goals:</p>
+  <p>This is the demo site for
+    <a href="https://github.com/jeremyevans/rodauth">Rodauth</a>. Rodauth is an authentication and account management framework for rack
+    applications, with the following design goals:</p>
 
   <ol>
     <li>Security: Ship in a maximum security by default configuration</li>
@@ -33,7 +37,10 @@
     <li>Flexibility: Allow for easy overriding of any part of the framework</li>
   </ol>
 
-  <p>It's easiest to get started by going to the <a href="/login">login page</a>.</p>
+  <p>It's easiest to get started by going to the
+    <a href="/login">login page</a>.</p>
 
-  <p>This demo site is part of the Rodauth repository, so if you want to know how it works, you can <a href="https://github.com/jeremyevans/rodauth/tree/master/demo-site">review the source</a>.</p>
+  <p>This demo site is part of the Rodauth repository, so if you want to know
+    how it works, you can
+    <a href="https://github.com/jeremyevans/rodauth/tree/master/demo-site">review the source</a>.</p>
 <% end %>
