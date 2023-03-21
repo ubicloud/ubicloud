@@ -1,6 +1,17 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    actionview (7.0.4.3)
+      activesupport (= 7.0.4.3)
+      builder (~> 3.1)
+      erubi (~> 1.4)
+      rails-dom-testing (~> 2.0)
+      rails-html-sanitizer (~> 1.1, >= 1.2.0)
+    activesupport (7.0.4.3)
+      concurrent-ruby (~> 1.0, >= 1.0.2)
+      i18n (>= 1.6, < 2)
+      minitest (>= 5.1)
+      tzinfo (~> 2.0)
     addressable (2.8.1)
       public_suffix (>= 2.0.2, < 6.0)
     argon2 (2.2.0)
@@ -8,6 +19,14 @@ GEM
       ffi-compiler (~> 1.0)
     ast (2.4.2)
     bcrypt_pbkdf (1.1.0)
+    better_html (2.0.1)
+      actionview (>= 6.0)
+      activesupport (>= 6.0)
+      ast (~> 2.0)
+      erubi (~> 1.4)
+      parser (>= 2.4)
+      smart_properties
+    builder (3.2.4)
     byebug (11.1.3)
     capybara (3.38.0)
       addressable
@@ -20,6 +39,8 @@ GEM
       xpath (~> 3.2)
     chunky_png (1.4.0)
     coderay (1.1.3)
+    concurrent-ruby (1.2.2)
+    crass (1.0.6)
     database_cleaner-core (2.0.1)
     database_cleaner-sequel (2.0.2)
       database_cleaner-core (~> 2.0.0)
@@ -28,13 +49,20 @@ GEM
     diff-lcs (1.5.0)
     docile (1.4.0)
     ed25519 (1.3.0)
+    erb-formatter (0.4.2)
+      syntax_tree (~> 5.0)
     erubi (1.12.0)
     ffi (1.15.5)
     ffi-compiler (1.0.1)
       ffi (>= 1.0.0)
       rake
+    i18n (1.12.0)
+      concurrent-ruby (~> 1.0)
     json (2.6.3)
     language_server-protocol (3.17.0.3)
+    loofah (2.19.1)
+      crass (~> 1.0.2)
+      nokogiri (>= 1.5.9)
     mail (2.8.1)
       mini_mime (>= 0.1.1)
       net-imap
@@ -43,6 +71,7 @@ GEM
     matrix (0.4.2)
     method_source (1.0.0)
     mini_mime (1.1.2)
+    minitest (5.18.0)
     net-imap (0.3.4)
       date
       net-protocol
@@ -60,6 +89,7 @@ GEM
     parser (3.2.1.1)
       ast (~> 2.4.1)
     pg (1.4.5)
+    prettier_print (1.2.1)
     pry (0.14.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
@@ -75,6 +105,11 @@ GEM
     rackup (2.1.0)
       rack (>= 3)
       webrick (~> 1.8)
+    rails-dom-testing (2.0.3)
+      activesupport (>= 4.2.0)
+      nokogiri (>= 1.6)
+    rails-html-sanitizer (1.5.0)
+      loofah (~> 2.19, >= 2.19.1)
     rainbow (3.1.1)
     rake (13.0.6)
     refrigerator (1.5.1)
@@ -117,6 +152,9 @@ GEM
       parser (>= 3.2.1.0)
     rubocop-capybara (2.17.1)
       rubocop (~> 1.41)
+    rubocop-erb (0.2.4)
+      better_html
+      rubocop (~> 1.45)
     rubocop-performance (1.16.0)
       rubocop (>= 1.7.0, < 2.0)
       rubocop-ast (>= 0.4.0)
@@ -143,12 +181,17 @@ GEM
       simplecov_json_formatter (~> 0.1)
     simplecov-html (0.12.3)
     simplecov_json_formatter (0.1.4)
+    smart_properties (1.17.0)
     standard (1.25.3)
       language_server-protocol (~> 3.17.0.2)
       rubocop (~> 1.48.1)
       rubocop-performance (~> 1.16.0)
+    syntax_tree (5.3.0)
+      prettier_print (>= 1.2.0)
     tilt (2.1.0)
     timeout (0.3.2)
+    tzinfo (2.0.6)
+      concurrent-ruby (~> 1.0)
     unicode-display_width (2.4.2)
     warning (1.3.0)
     webrick (1.8.1)
@@ -165,6 +208,7 @@ DEPENDENCIES
   capybara
   database_cleaner-sequel
   ed25519
+  erb-formatter
   erubi (>= 1.5)
   mail
   net-ssh
@@ -180,6 +224,7 @@ DEPENDENCIES
   rotp
   rqrcode
   rspec
+  rubocop-erb
   rubocop-performance
   rubocop-rake
   rubocop-rspec

@@ -26,10 +26,12 @@ gem "zeitwerk"
 gem "warning"
 
 group :development do
+  gem "erb-formatter"
   gem "pry"
   gem "pry-byebug"
   gem "rackup"
   gem "sequel-annotate"
+  gem "rubocop-erb"
   gem "rubocop-performance"
   gem "rubocop-rake"
   gem "rubocop-rspec"
