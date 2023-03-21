@@ -9,8 +9,7 @@
       integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh"
       crossorigin="anonymous"
     >
-    <title>Rodauth Demo -
-      <%= @page_title %></title>
+    <title><%= ["UbiCloud", @page_title].compact.join("/") %></title>
     <style nonce="<%= @request_nonce %>">
 	 .error {border: 1px #a00 solid;}
 	 span.error_message {
