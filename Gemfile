@@ -31,6 +31,7 @@ group :development do
   gem "pry-byebug"
   gem "rackup"
   gem "sequel-annotate"
+  gem "rubocop-capybara"
   gem "rubocop-erb"
   gem "rubocop-performance"
   gem "rubocop-rake"
