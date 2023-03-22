@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 class Prog::Vm::HostNexus < Prog::Base
-  def self.assemble(sshable_hostname)
+  def self.assemble(sshable_hostname, location: "hetzner-hel1")
     DB.transaction do
       sa = Sshable.create(host: sshable_hostname)
-      VmHost.create { _1.id = sa.id }
+      VmHost.create(location: location) { _1.id = sa.id }
 
       Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = sa.id }
     end

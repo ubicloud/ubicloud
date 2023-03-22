@@ -40,15 +40,15 @@ class Prog::LearnNetwork < Prog::Base
     case JSON.parse(s)
     in [iface]
       case iface.fetch("addr_info").filter_map { |info|
-             if (local = info["local"]) && (prefixlen = info["prefixlen"])
-               p Ip6.new(local, prefixlen)
+             if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 64
+               Ip6.new(local, prefixlen)
              end
            }
-      in [net6]
-        net6
-      else
-        fail "only one global unique address prefix supported on interface"
-      end
+        in [net6]
+          net6
+        else
+          fail "only one global unique address prefix supported on interface"
+        end
     else
       fail "only one one interface supported"
     end

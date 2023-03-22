@@ -1,0 +1,59 @@
+<form action="create" method="POST">
+  <!-- YYY: need a better way to manage coupling of routes and erbs -->
+  <%== csrf_tag("/vm/create") %>
+  <div class="form-group">
+    <label for="name">Name</label>
+    <input
+      type="text"
+      class="form-control"
+      id="name"
+      name="name"
+      placeholder="Enter name"
+    >
+  </div>
+  <div class="form-group">
+    <label for="size">Size</label>
+    <select class="form-control" id="size" name="size">
+      <option value="standard-1">standard-1</option>
+      <option value="standard-2">standard-2</option>
+      <option value="standard-4">standard-4</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="location">Location</label>
+    <select class="form-control" id="location" name="location">
+      <option value="hetzner-hel1">Hetzner Helsinki</option>
+      <option value="hetzner-nbg1">Hetzner Nuremberg</option>
+      <option value="equinix-da11">Equinix Dallas 11</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="user">User</label>
+    <input
+      type="text"
+      class="form-control"
+      id="user"
+      name="user"
+      placeholder="unix user"
+      value="ubi"
+    >
+  </div>
+  <div class="form-group">
+    <label for="public-key">SSH Public Key</label>
+    <input
+      type="text"
+      class="form-control"
+      id="public-key"
+      name="public-key"
+      placeholder="ssh-ed25519 AAAA..."
+    >
+  </div>
+  <div class="form-group">
+    <label for="size">Boot Image</label>
+    <select class="form-control" id="boot-image" name="boot-image">
+      <option value="ubuntu-jammy">Ubuntu Jammy 22.04 LTS</option>
+      <option value="almalinux-9.1">AlmaLinux 9.1</option>
+    </select>
+  </div>
+  <button type="submit" class="btn btn-primary">Create Virtual Machine</button>
+</form>
