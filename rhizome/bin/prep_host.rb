@@ -39,7 +39,3 @@ r "sysctl --system"
 # For qemu-image convert and mcopy for cloud-init with the nocloud
 # driver.
 r "apt-get -y install qemu-utils mtools"
-
-FileUtils.cd "/opt" do
-  r "curl -O https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
-end

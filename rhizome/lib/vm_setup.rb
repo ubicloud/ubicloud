@@ -36,12 +36,12 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, gua)
+  def prep(unix_user, public_key, gua, boot_image)
     add_vm_user
     interfaces
     routes(gua)
     cloudinit(unix_user, public_key)
-    boot_disk
+    boot_disk(boot_image)
     install_systemd_unit
     forwarding
   end
@@ -171,9 +171,34 @@ runcmd:
 EOS
   end
 
-  def boot_disk
-    r "qemu-img convert -p -f qcow2 -O raw /opt/jammy-server-cloudimg-amd64.img #{vp.q_boot_raw}"
-    r "chown #{q_vm}:#{q_vm} #{vp.q_boot_raw}"
+  def boot_disk(boot_image)
+    urls = {
+      "ubuntu-jammy" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
+      "almalinux-9.1" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.1-20221118.x86_64.qcow2"
+    }
+
+    download = urls.fetch(boot_image)
+    image_path = "/opt/" + boot_image + ".qcow2"
+    unless File.exist?(image_path)
+      # Use of File::EXCL provokes a crash rather than a race
+      # condition if two VMs are lazily getting their images at the
+      # same time.
+      #
+      # YYY: Need to replace this with something that can handle
+      # customer images.  As-is, it does not have all the
+      # synchronization features we might want if we were to keep this
+      # code longer term, but, that's not the plan.
+      temp_path = image_path + ".tmp"
+      File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
+        r "curl -o #{temp_path.shellescape} #{download.shellescape}"
+      end
+      FileUtils.mv(temp_path, image_path)
+    end
+
+    # Images are presumed to be atomically renamed into the path,
+    # i.e. no partial images will be passed to qemu-image.
+    r "qemu-img convert -p -f qcow2 -O raw #{image_path.shellescape} #{vp.q_boot_raw}"
+    FileUtils.chown @vm_name, @vm_name, vp.boot_raw
   end
 
   # Unnecessary if host has this set before creating the netns, but

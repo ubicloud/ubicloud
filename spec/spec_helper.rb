@@ -31,6 +31,14 @@ DatabaseCleaner.url_allowlist = [
 ]
 
 RSpec.configure do |config|
+  config.define_derived_metadata(file_path: %r{/spec/}) do |metadata|
+    # Extract the name of the subdirectory that the test file is in
+    subdirectory = metadata[:file_path].split("/")[-2]
+
+    # Set the :subdirectory metadata tag to the extracted value
+    metadata[:subdirectory] = subdirectory
+  end
+
   config.before(:suite) do
     DatabaseCleaner.strategy = :transaction
     DB.loggers << Logger.new($stdout) if DB.loggers.empty?
