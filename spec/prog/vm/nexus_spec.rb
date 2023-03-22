@@ -15,7 +15,7 @@ RSpec.describe Prog::Vm::Nexus do
     sshable = instance_double(Sshable)
     vmh = instance_double(VmHost, sshable: sshable)
 
-    expect(sshable).to receive(:cmd).with("sudo bin/prepvm.rb #{prog.q_vm} fe80::/64 ubi some_ssh_key")
+    expect(sshable).to receive(:cmd).with("sudo bin/prepvm.rb #{prog.q_vm} fe80::/64 ubi some_ssh_key ubuntu-jammy")
     expect(st).to receive(:load).and_return(prog)
     expect(prog).to receive(:host).and_return(vmh)
 

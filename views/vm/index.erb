@@ -1,0 +1,18 @@
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">id</th>
+      <th scope="col">name</th>
+      <th scope="col">state</th>
+      <th scope="col">IPv6</th>
+    </tr>
+  </thead>
+  <tbody><% @data.each do |item| %>
+      <tr>
+        <th scope="row"><%= item.id %></th>
+        <td><%= item.name %></td>
+        <td><%= item.state %></td>
+        <td><%= item.ip6 %></td>
+      </tr>
+    <% end %></tbody>
+</table>
