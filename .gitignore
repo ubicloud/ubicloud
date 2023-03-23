@@ -1,2 +1,3 @@
 /.env.rb
 /coverage
+spec/examples.txt
