@@ -10,4 +10,14 @@ RSpec.describe VmSetup do
     expect(lower.to_s).to eq("2a01:4f9:2b:35b:7e40:e918::/96")
     expect(upper.to_s).to eq("2a01:4f9:2b:35b:7e40:e919::/96")
   end
+
+  it "templates user YAML" do
+    vps = instance_spy(VmPath)
+    expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+    vs.write_user_data("some_user", "some_ssh_key")
+    expect(vps).to have_received(:write_user_data) {
+      expect(_1).to match(/some_user/)
+      expect(_1).to match(/some_ssh_key/)
+    }
+  end
 end

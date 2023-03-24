@@ -18,6 +18,7 @@ class VmSetup
 
   # YAML quoting
   def yq(s)
+    require "yaml"
     # I don't see a better way to quote a string meant for embedding
     # in literal YAML other than to generate a full YAML document and
     # then stripping out headers and footers.  Consider the special
@@ -35,20 +36,20 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(gua)
-    unix_user
+  def prep(unix_user, public_key, gua)
+    add_vm_user
     interfaces
     routes(gua)
-    cloudinit
+    cloudinit(unix_user, public_key)
     boot_disk
     install_systemd_unit
     forwarding
   end
 
-  def network(gua)
+  def network(unix_user, public_key, gua)
     interfaces
     routes(gua)
-    cloudinit
+    cloudinit(unix_user, public_key)
     forwarding
   end
 
@@ -60,7 +61,7 @@ class VmSetup
     r "deluser --remove-home #{q_vm}"
   end
 
-  def unix_user
+  def add_vm_user
     r "adduser --disabled-password --gecos '' #{q_vm}"
     r "usermod -a -G kvm #{q_vm}"
   end
@@ -108,7 +109,7 @@ class VmSetup
     r "ip -n #{q_vm} route add #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
   end
 
-  def cloudinit
+  def cloudinit(unix_user, public_key)
     require "yaml"
 
     vp.write_meta_data(<<EOS)
@@ -130,6 +131,16 @@ ethernets:
       addresses: [2a01:4ff:ff00::add:1, 2a01:4ff:ff00::add:2]
 EOS
 
+    write_user_data(unix_user, public_key)
+
+    r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
+    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_user_data} ::"
+    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_meta_data} ::"
+    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_network_config} ::"
+    FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
+  end
+
+  def write_user_data(unix_user, public_key)
     vp.write_user_data(<<EOS)
 #cloud-config
 users:
@@ -139,6 +150,12 @@ users:
     lock_passwd: False
     inactive: False
     shell: /bin/bash
+  - name: #{yq(unix_user)}
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    inactive: False
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - #{yq(public_key)}
 
 ssh_pwauth: False
 
@@ -147,12 +164,6 @@ runcmd:
   - [ systemctl, enable, notify-booted.service]
   - [ systemctl, start, --no-block, notify-booted.service ]
 EOS
-
-    r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
-    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_user_data} ::"
-    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_meta_data} ::"
-    r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_network_config} ::"
-    FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
   end
 
   def boot_disk
