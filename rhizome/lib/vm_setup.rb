@@ -91,15 +91,20 @@ class VmSetup
     r "ip link set dev vetho#{q_vm} up"
     r "ip route add #{gua.shellescape} via #{vethi_ll.shellescape} dev vetho#{q_vm}"
 
-    # From subordinate to host.
-    vetho_ll = mac_to_ipv6_link_local(File.read("/sys/class/net/vetho#{q_vm}/address").chomp)
-    r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
-    r "ip -n #{q_vm} route add default via #{vetho_ll.shellescape} dev vethi#{q_vm}"
-
     # Write out guest-delegated and clover infrastructure address
     # ranges, designed around non-floating IPv6 networks bound to the
     # host.
     guest_ephemeral, clover_ephemeral = subdivide_network(NetAddr.parse_net(gua))
+
+    # Accept clover traffic within the namespace (don't just let it
+    # enter a default routing loop via forwarding)
+    r "ip -n #{q_vm} addr add #{clover_ephemeral.to_s.shellescape} dev vethi#{q_vm}"
+
+    # Routing: from subordinate to host.
+    vetho_ll = mac_to_ipv6_link_local(File.read("/sys/class/net/vetho#{q_vm}/address").chomp)
+    r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
+    r "ip -n #{q_vm} route add default via #{vetho_ll.shellescape} dev vethi#{q_vm}"
+
     vp.write_guest_ephemeral(guest_ephemeral.to_s)
     vp.write_clover_ephemeral(clover_ephemeral.to_s)
 
