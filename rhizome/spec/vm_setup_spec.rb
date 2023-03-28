@@ -6,9 +6,9 @@ RSpec.describe VmSetup do
   subject(:vs) { described_class.new("test") }
 
   it "can halve an IPv6 network" do
-    lower, upper = vs.subdivide_network(NetAddr.parse_net("2a01:4f9:2b:35b:7e40:e918::/95"))
-    expect(lower.to_s).to eq("2a01:4f9:2b:35b:7e40:e918::/96")
-    expect(upper.to_s).to eq("2a01:4f9:2b:35b:7e40:e919::/96")
+    lower, upper = vs.subdivide_network(NetAddr.parse_net("2a01:4f9:2b:35b:7e40::/79"))
+    expect(lower.to_s).to eq("2a01:4f9:2b:35b:7e40::/80")
+    expect(upper.to_s).to eq("2a01:4f9:2b:35b:7e41::/80")
   end
 
   it "templates user YAML" do
