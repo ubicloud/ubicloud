@@ -36,20 +36,19 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, gua, boot_image)
-    add_vm_user
+  def prep(unix_user, public_key, private_subnets, gua, boot_image)
     interfaces
-    routes(gua)
-    cloudinit(unix_user, public_key)
+    routes(gua, private_subnets)
+    cloudinit(unix_user, public_key, private_subnets)
     boot_disk(boot_image)
     install_systemd_unit
     forwarding
   end
 
-  def network(unix_user, public_key, gua)
+  def network(unix_user, public_key, private_subnets, gua)
     interfaces
-    routes(gua)
-    cloudinit(unix_user, public_key)
+    routes(gua, private_subnets)
+    cloudinit(unix_user, public_key, private_subnets)
     forwarding
   end
 
@@ -59,11 +58,6 @@ class VmSetup
     FileUtils.rm_f(vp.systemd_service)
     r "systemctl daemon-reload"
     r "deluser --remove-home #{q_vm}"
-  end
-
-  def add_vm_user
-    r "adduser --disabled-password --gecos '' #{q_vm}"
-    r "usermod -a -G kvm #{q_vm}"
   end
 
   def interfaces
@@ -86,7 +80,7 @@ class VmSetup
     [halved, halved.next_sib]
   end
 
-  def routes(gua)
+  def routes(gua, private_subnets)
     # Routing: from host to subordinate.
     vethi_ll = mac_to_ipv6_link_local(r("ip netns exec #{q_vm} cat /sys/class/net/vethi#{q_vm}/address").chomp)
     r "ip link set dev vetho#{q_vm} up"
@@ -112,9 +106,14 @@ class VmSetup
     # Route ephemeral address to tap.
     r "ip -n #{q_vm} link set dev tap#{q_vm} up"
     r "ip -n #{q_vm} route add #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
+
+    # Route private subnet addresses to tap.
+    private_subnets.each do
+      r "ip -n #{q_vm} route add #{_1.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
+    end
   end
 
-  def cloudinit(unix_user, public_key)
+  def cloudinit(unix_user, public_key, private_subnets)
     require "yaml"
 
     vp.write_meta_data(<<EOS)
@@ -124,13 +123,19 @@ EOS
 
     tap_mac = r("ip netns exec #{q_vm} cat /sys/class/net/tap#{q_vm}/address")
 
+    private_subnets_config = private_subnets.map {
+      "      - " + yq(_1)
+    }.join("\n")
+
     vp.write_network_config(<<EOS)
 version: 2
 ethernets:
   id0:
     match:
       macaddress: #{yq(guest_mac)}
-    addresses: [#{yq(vp.read_guest_ephemeral)}]
+    addresses:
+      - #{yq(vp.read_guest_ephemeral)}
+#{private_subnets_config}
     gateway6: #{yq(mac_to_ipv6_link_local(tap_mac))}
     nameservers:
       addresses: [2a01:4ff:ff00::add:1, 2a01:4ff:ff00::add:2]

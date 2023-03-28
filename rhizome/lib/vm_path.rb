@@ -28,7 +28,7 @@ class VmPath
   end
 
   def home(n)
-    File.join("", "home", @vm_name, n)
+    File.join("", "vm", @vm_name, n)
   end
 
   # Define path, q_path, read, write methods for files in
