@@ -20,7 +20,7 @@ class Clover < Roda
     csp.default_src :none
     csp.style_src :self, "https://stackpath.bootstrapcdn.com"
     csp.form_action :self
-    csp.script_src :self
+    csp.script_src :self, "https://cdn.jsdelivr.net"
     csp.connect_src :self
     csp.base_uri :none
     csp.frame_ancestors :none
