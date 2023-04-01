@@ -18,8 +18,8 @@ class Clover < Roda
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
-    csp.img_src :self, "https://tailwindui.com/img/logos/mark.svg"
     csp.style_src :self
+    csp.img_src :self
     csp.form_action :self
     csp.script_src :self, "https://cdn.jsdelivr.net"
     csp.connect_src :self
