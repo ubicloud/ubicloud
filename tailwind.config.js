@@ -2,6 +2,7 @@
 module.exports = {
   content: [
     "./views/**/*.erb",
+    "./assets/**/*.js",
   ],
   theme: {
     extend: {},
