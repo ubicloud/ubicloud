@@ -18,7 +18,8 @@ class Clover < Roda
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
-    csp.style_src :self, "https://stackpath.bootstrapcdn.com"
+    csp.img_src :self, "https://tailwindui.com/img/logos/mark.svg"
+    csp.style_src :self
     csp.form_action :self
     csp.script_src :self, "https://cdn.jsdelivr.net"
     csp.connect_src :self
@@ -29,8 +30,8 @@ class Clover < Roda
   plugin :route_csrf
   plugin :disallow_file_uploads
   plugin :flash
-  plugin :assets, css: "app.scss", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
-  plugin :render, escape: true, layout: "./layout"
+  plugin :assets, js: 'app.js', css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
+  plugin :render, escape: true, layout: "./layouts/app"
   plugin :public
   plugin :Integer_matcher_max
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
@@ -109,6 +110,12 @@ class Clover < Roda
     end
 
     hmac_secret Config.clover_session_secret
+    
+    login_view do
+      render "auth/login"
+    end
+
+    already_logged_in { redirect login_redirect }
 
     # YYY: Should password secret and session secret be the same? Are
     # there rotation issues? See also:
@@ -130,15 +137,13 @@ class Clover < Roda
   route do |r|
     check_csrf! unless /application\/json/.match?(r.env["CONTENT_TYPE"])
 
-    @request_nonce = SecureRandom.alphanumeric
-    content_security_policy.style_src :self, "https://stackpath.bootstrapcdn.com", [:nonce, @request_nonce]
+    r.public
+    r.assets
 
     rodauth.load_memory
     rodauth.check_active_session
     r.rodauth
     rodauth.require_authentication
-    r.public
-    r.assets
     check_csrf!
 
     r.hash_branches("")

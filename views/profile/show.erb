@@ -1,0 +1,25 @@
+  <h1>You are logged in as
+    <%= DB[:accounts].where(id: rodauth.session_value).get(:email) %></h1>
+  <% if rodauth.two_factor_authenticated? %>
+    <p>You have authenticated using multifactor authentication (<%= rodauth.authenticated_by.join(" and ") %>).</p>
+  <% elsif rodauth.uses_two_factor_authentication? %>
+    <p>You have logged in via single factor authentication (<%= rodauth.authenticated_by.first %>), but have not authenticated using multifactor authentication.</p>
+  <% else %>
+    <p>You have authenticated via
+      <%= rodauth.authenticated_by.first %></p>
+  <% end %>
+
+  <ul>
+    <li><a href="/change-login">Change Login</a></li>
+    <li><a href="/change-password">Change Password</a></li>
+    <li><a href="/close-account">Close Account</a></li>
+    <li><a href="/remember">Change Remember Settings</a></li>
+    <% if rodauth.logged_in_via_remember_key? %>
+      <li><a href="/confirm-password">Confirm Password</a></li>
+    <% end %>
+    <% if rodauth.uses_two_factor_authentication? && !rodauth.two_factor_authenticated? %>
+      <li><a href="/multifactor-auth">Authenticate Using Additional Factor</a></li>
+    <% else %>
+      <li><a href="/multifactor-manage">Manage Multifactor Authentication</a></li>
+    <% end %>
+  </ul>

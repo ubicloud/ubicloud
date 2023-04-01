@@ -1,3 +1,6 @@
 /.env.rb
 /coverage
 spec/examples.txt
+
+# Frontend
+node_modules

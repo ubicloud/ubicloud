@@ -7,8 +7,6 @@ class Clover
 
   hash_branch("vm") do |r|
     r.get true do
-      @page_title = "Virtual Machine"
-
       @data = Vm.map { |vm|
         PageVm.new(id: ULID.from_uuidish(vm.id).to_s.downcase,
           name: vm.name,
@@ -21,7 +19,6 @@ class Clover
 
     r.on "create" do
       r.get true do
-        @page_title = "Create Virtual Machine"
         view "vm/create"
       end
 

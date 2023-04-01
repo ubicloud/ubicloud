@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= ["UbiCloud", @page_title].compact.join(" - ") %></title>
+  <%== assets(:css) %>
+  <script
+    src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"
+    integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+    crossorigin="anonymous"
+  ></script>
+</head>
+
+<body class="h-full">
+  <div>
+    <%== render("layouts/sidebar") %>
+    <div class="lg:pl-72">
+      <main class="py-10">
+        <div class="px-4 sm:px-6 lg:px-8">
+          <%== yield %>
+        </div>
+      </main>
+    </div>
+  </div>
+  <%== assets(:js) %>
+</body>
+</html>
