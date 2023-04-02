@@ -28,23 +28,23 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-200 bg-white">
-                <% @data.each do |item| %>
+                <% @data.each do |vm| %>
                   <tr>
-                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= item.name %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= item.location %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= item.size %></td>
+                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm.name %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm.location %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm.size %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <span class="inline-flex rounded-full <%= (item.state == "running") ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800" %> px-2 text-xs font-semibold leading-5">
-                        <%= item.state %>
+                      <span class="inline-flex rounded-full <%= (vm.state == "running") ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800" %> px-2 text-xs font-semibold leading-5">
+                        <%= vm.state %>
                       </span>
                     </td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <span class="copy-content cursor-pointer" data-content="<%= item.ip6 %>" data-message="Copied IPv6">
-                        <%= item.ip6 %>
+                      <span class="copy-content cursor-pointer" data-content="<%= vm.ip6 %>" data-message="Copied IPv6">
+                        <%= vm.ip6 %>
                       </span>
                     </td>
                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <a href="/vm/<%= item.id %>" class="text-indigo-600 hover:text-indigo-900">Show</a>
+                      <a href="/vm/<%= vm.id %>" class="text-indigo-600 hover:text-indigo-900">Show</a>
                     </td>
                   </tr>
                 <% end %>

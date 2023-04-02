@@ -35,7 +35,7 @@
         <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight"><%= @vm.name %></h2>
       </div>
       <div class="mt-4 flex md:ml-4 md:mt-0">
-        <span class="mr-3 inline-flex items-center rounded-full bg-green-100 px-3 py-0.5 text-sm font-medium text-green-800"><%= @vm.state %></span>
+        <span class="mr-3 inline-flex items-center rounded-full px-3 py-0.5 text-sm font-medium <%= (@vm.state == "running") ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800" %>"><%= @vm.state %></span>
         <button type="button"
           data-url="<%= request.path %>"
           data-csrf="<%= csrf_token(request.path, "DELETE") %>"
