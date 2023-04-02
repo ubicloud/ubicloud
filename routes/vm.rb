@@ -16,7 +16,7 @@ class Clover
 
       view "vm/index"
     end
-  
+
     r.on "create" do
       r.get true do
         view "vm/create"
@@ -44,7 +44,7 @@ class Clover
           name: vm.name,
           state: vm.display_state,
           ip6: vm.ephemeral_net6&.network)
-        
+
         view "vm/show"
       end
 

@@ -30,7 +30,7 @@ class Clover < Roda
   plugin :route_csrf
   plugin :disallow_file_uploads
   plugin :flash
-  plugin :assets, js: 'app.js', css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
+  plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :render, escape: true, layout: "./layouts/app"
   plugin :public
   plugin :Integer_matcher_max
@@ -111,7 +111,7 @@ class Clover < Roda
     end
 
     hmac_secret Config.clover_session_secret
-    
+
     login_view do
       render "auth/login"
     end
