@@ -3,7 +3,7 @@
 require "ulid"
 
 class Clover
-  PageVm = Struct.new(:id, :name, :state, :ip6, keyword_init: true)
+  PageVm = Struct.new(:id, :name, :state, :ip6, :location, :size, keyword_init: true)
 
   hash_branch("vm") do |r|
     r.get true do
@@ -11,6 +11,8 @@ class Clover
         PageVm.new(id: ULID.from_uuidish(vm.id).to_s.downcase,
           name: vm.name,
           state: vm.display_state,
+          location: vm.location,
+          size: vm.size,
           ip6: vm.ephemeral_net6&.network)
       }
 
@@ -43,6 +45,8 @@ class Clover
         @vm = PageVm.new(id: vm_ulid,
           name: vm.name,
           state: vm.display_state,
+          location: vm.location,
+          size: vm.size,
           ip6: vm.ephemeral_net6&.network)
 
         view "vm/show"
