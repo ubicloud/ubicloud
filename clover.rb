@@ -36,6 +36,7 @@ class Clover < Roda
   plugin :Integer_matcher_max
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :hash_branch_view_subdir
+  plugin :all_verbs
 
   logger = if ENV["RACK_ENV"] == "test"
     Class.new {

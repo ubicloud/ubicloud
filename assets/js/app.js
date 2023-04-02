@@ -16,3 +16,26 @@ $(".radio-stacked-cards input[type=radio]").on("change", function(event) {
     $(this).parent().addClass("border-indigo-600 ring-2 ring-indigo-600");
     $(this).parent().children("span.pointer-events-none").removeClass("border-2").addClass("border-transparent");
 });
+
+$(".delete-btn").on("click", function(event) {
+    event.preventDefault();
+    let url = $(this).data("url");
+    let csrf = $(this).data("csrf");
+
+    if (!confirm("Are you sure to delete?")) {
+        return;
+    }
+
+    $.ajax({
+        url: url,
+        type: 'DELETE',
+        data: {'_csrf': csrf},
+        success: function(result) {
+            alert(result);
+            location.reload();
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+            alert(`Error: ${thrownError}`);
+        }
+    });
+});
