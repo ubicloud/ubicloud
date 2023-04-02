@@ -6,6 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= ["UbiCloud", @page_title].compact.join(" - ") %></title>
   <%== assets(:css) %>
+    <script
+    src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"
+    integrity="sha256-oP6HI9z1XaZNBrJURtCoUT5SUnxFr8s3BzRl+cbzUq8="
+    crossorigin="anonymous"
+  ></script>
 </head>
 
 <body class="h-full">
@@ -54,5 +59,6 @@
     </div>
   </div>
 </div>
+<%== assets(:js) %>
 </body>
 </html>

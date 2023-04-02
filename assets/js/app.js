@@ -62,6 +62,11 @@ $(".copy-content").on("click", function(event) {
     notification(message);
 })
 
+$(".back-btn").on("click", function(event) {
+    event.preventDefault();
+    history.back();
+})
+
 function notification(message) {
     let container = $("#notification-template").parent();
     let newNotification = $("#notification-template").clone();
