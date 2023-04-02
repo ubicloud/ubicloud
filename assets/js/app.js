@@ -1,3 +1,21 @@
+let mobileMenu = false;
+
+$(".toggle-mobile-menu").on("click", function(event) {
+    if (!mobileMenu) {
+        $("#mobile-menu").show(0, function() {
+            $("#mobile-menu .menu-outer").addClass("opacity-100").removeClass("opacity-0");
+            $("#mobile-menu .menu-inner").addClass("translate-x-0").removeClass("-translate-x-full");
+        });
+    } else {
+        $("#mobile-menu .menu-outer").addClass("opacity-0").removeClass("opacity-100");
+        $("#mobile-menu .menu-inner").addClass("-translate-x-full").removeClass("translate-x-0");
+        setTimeout(function(){
+            $("#mobile-menu").hide();
+        }, 300);
+    }
+    mobileMenu = !mobileMenu;
+});
+
 $(".radio-small-cards input[type=radio]").on("change", function(event) {
     let name = $(this).attr("name");
     $(`#${name}-radios label`)
