@@ -21,6 +21,7 @@
     <div class="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
       <form class="rodauth space-y-6" role="form" method="POST">
         <%== rodauth.csrf_tag %>
+        <%== render("components/flash_message") %>
         <div>
           <label for="email" class="block text-sm font-medium leading-6 text-gray-900">Email address</label>
           <div class="mt-2">
