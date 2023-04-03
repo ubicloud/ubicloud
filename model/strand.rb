@@ -56,6 +56,18 @@ SQL
     puts "running " + prog.class.to_s
     DB.transaction do
       prog.public_send(label)
+    rescue Prog::Base::Nap => e
+      scheduled = DB[<<SQL, e.seconds, id].get
+UPDATE strand
+SET schedule = now() + (? * '1 second'::interval)
+WHERE id = ?
+RETURNING schedule
+SQL
+      # For convenience, reflect the updated record's schedule content
+      # in the model object, but since it's fresh, remove it from the
+      # changed columns so save_changes won't update it again.
+      self.schedule = scheduled
+      changed_columns.delete(:schedule)
     rescue Prog::Base::Hop => e
       puts e.to_s
     rescue Prog::Base::Exit => e

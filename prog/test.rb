@@ -39,4 +39,8 @@ class Prog::Test < Prog::Base
   def reaper
     reap
   end
+
+  def napper
+    nap(123)
+  end
 end
