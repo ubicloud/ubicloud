@@ -67,6 +67,20 @@ $(".back-btn").on("click", function(event) {
     history.back();
 })
 
+// Show price change for demo
+$("#location-radios input[type=radio]").on("change", function(event) {
+    let location = $(this).val();
+    $(".no-price").hide();
+
+    if (location.startsWith("hetzner")) {
+        $(".low-price").show();
+        $(".high-price").hide();
+    } else {
+        $(".low-price").hide();
+        $(".high-price").show();
+    }
+});
+
 function notification(message) {
     let container = $("#notification-template").parent();
     let newNotification = $("#notification-template").clone();

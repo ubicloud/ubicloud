@@ -61,18 +61,12 @@
                     <fieldset class="mt-2 radio-small-cards" id="location-radios">
                       <legend class="sr-only">Choose a location option</legend>
                       <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
-                        <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
-                          <input type="radio" name="location" value="hetzner-hel1" class="sr-only" required>
-                          <span>Hetzner Helsinki</span>
-                        </label>
-                        <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
-                          <input type="radio" name="location" value="hetzner-nbg1" class="sr-only" required>
-                          <span>Hetzner Nuremberg</span>
-                        </label>
-                        <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
-                          <input type="radio" name="location" value="equinix-da11" class="sr-only" required>
-                          <span>Equinix Dallas 11</span>
-                        </label>
+                        <% @locations.each do |location| %>
+                          <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
+                            <input type="radio" name="location" value="<%= location.name %>" class="sr-only" required>
+                            <span><%= location.display_name %></span>
+                          </label>
+                        <% end %>
                       </div>
                     </fieldset>
                   </div>
@@ -83,14 +77,12 @@
                     <fieldset class="mt-2 radio-small-cards" id="boot-image-radios">
                       <legend class="sr-only">Choose a image option</legend>
                       <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
-                        <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
-                          <input type="radio" name="boot-image" value="ubuntu-jammy" class="sr-only" required>
-                          <span>Ubuntu Jammy 22.04 LTS</span>
-                        </label>
-                        <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
-                          <input type="radio" name="boot-image" value="almalinux-9.1" class="sr-only" required>
-                          <span>AlmaLinux 9.1</span>
-                        </label>
+                        <% @images.each do |image| %>
+                          <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
+                            <input type="radio" name="boot-image" value="<%= image.name %>" class="sr-only" required>
+                            <span><%= image.display_name %></span>
+                          </label>
+                        <% end %>
                       </div>
                     </fieldset>
                   </div>
@@ -100,60 +92,28 @@
                     </div>
                     <fieldset class="mt-2 radio-stacked-cards" id="size-radios">
                       <div class="space-y-4"> 
-                        <label class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between">
-                          <input type="radio" name="size" value="standard-1" class="sr-only">
-                          <span class="flex items-center">
-                            <span class="flex flex-col text-sm">
-                              <span  class="font-medium text-gray-900">Standard 1</span>
-                              <span class="text-gray-500">
-                                <span class="block sm:inline">2GB / 1 CPUs</span>
-                                <span class="hidden sm:mx-1 sm:inline" aria-hidden="true">&middot;</span>
-                                <span class="block sm:inline">160 GB SSD disk</span>
+                        <% @sizes.each do |size| %>
+                          <label class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between">
+                            <input type="radio" name="size" value="<%= size.name %>" class="sr-only">
+                            <span class="flex items-center">
+                              <span class="flex flex-col text-sm">
+                                <span  class="font-medium text-gray-900"><%= size.display_name %></span>
+                                <span class="text-gray-500">
+                                  <span class="block sm:inline"><%= size.memory %>GB / <%= size.vcpu %> CPUs</span>
+                                  <span class="hidden sm:mx-1 sm:inline" aria-hidden="true">&middot;</span>
+                                  <span class="block sm:inline"><%= size.disk %>GB SSD disk</span>
+                                </span>
                               </span>
                             </span>
-                          </span>
-                          <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                            <span class="font-medium text-gray-900">$10</span>
-                            <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
-                          </span>
-                          <span class="pointer-events-none absolute -inset-px rounded-lg border-2" aria-hidden="true"></span>
-                        </label>
-                        <label class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between">
-                          <input type="radio" name="size" value="standard-2" class="sr-only">
-                          <span class="flex items-center">
-                            <span class="flex flex-col text-sm">
-                              <span  class="font-medium text-gray-900">Standard 2</span>
-                              <span class="text-gray-500">
-                                <span class="block sm:inline">4GB / 2 CPUs</span>
-                                <span class="hidden sm:mx-1 sm:inline" aria-hidden="true">&middot;</span>
-                                <span class="block sm:inline">256 GB SSD disk</span>
-                              </span>
+                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
+                              <span class="no-price font-medium text-gray-900">-</span>
+                              <span class="low-price font-medium text-gray-900 hidden">$<%= size.low_price %></span>
+                              <span class="high-price font-medium text-gray-900 hidden">$<%= size.high_price %></span>
+                              <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
                             </span>
-                          </span>
-                          <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                            <span class="font-medium text-gray-900">$20</span>
-                            <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
-                          </span>
-                          <span class="pointer-events-none absolute -inset-px rounded-lg border-2" aria-hidden="true"></span>
-                        </label>
-                        <label class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between">
-                          <input type="radio" name="size" value="Business" class="sr-only">
-                          <span class="flex items-center">
-                            <span class="flex flex-col text-sm">
-                              <span  class="font-medium text-gray-900">Standard 4</span>
-                              <span class="text-gray-500">
-                                <span class="block sm:inline">8GB / 4 CPUs</span>
-                                <span class="hidden sm:mx-1 sm:inline" aria-hidden="true">&middot;</span>
-                                <span class="block sm:inline">512 GB SSD disk</span>
-                              </span>
-                            </span>
-                          </span>
-                          <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                            <span class="font-medium text-gray-900">$40</span>
-                            <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
-                          </span>
-                          <span class="pointer-events-none absolute -inset-px rounded-lg border-2" aria-hidden="true"></span>
-                        </label>
+                            <span class="pointer-events-none absolute -inset-px rounded-lg border-2" aria-hidden="true"></span>
+                          </label>
+                        <% end %>
                       </div>
                     </fieldset>
 
