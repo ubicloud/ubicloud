@@ -11,7 +11,12 @@ class Sshable < Sequel::Model
   class SshError < StandardError; end
 
   def cmd(cmd)
-    ret = connect.exec!(cmd)
+    ret = begin
+      connect.exec!(cmd)
+    rescue
+      invalidate_cache_entry
+      raise
+    end
     fail SshError.new(ret) unless ret.exitstatus == 0
     ret
   end
@@ -32,14 +37,20 @@ class Sshable < Sequel::Model
     sess
   end
 
-  def clear_cache
+  def invalidate_cache_entry
+    Thread.current[:clover_ssh_cache]&.delete(host)
+  end
+
+  def self.reset_cache
     return [] unless (cache = Thread.current[:clover_ssh_cache])
 
-    cache.values.filter_map do |sess|
+    cache.filter_map do |host, sess|
       sess.close
       nil
     rescue => e
       e
+    ensure
+      cache.delete(host)
     end
   end
 end
