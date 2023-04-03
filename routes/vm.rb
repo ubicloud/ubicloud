@@ -6,7 +6,7 @@ class Clover
   PageVm = Struct.new(:id, :name, :state, :ip6, :location, :size, keyword_init: true)
   LocationOption = Struct.new(:name, :display_name)
   ImageOption = Struct.new(:name, :display_name)
-  SizeOption = Struct.new(:name, :display_name, :vcpu, :memory, :disk, :low_price, :high_price)
+  SizeOption = Struct.new(:name, :display_name, :vcpu, :memory, :disk, :prices)
 
   hash_branch("vm") do |r|
     r.get true do
@@ -40,11 +40,31 @@ class Clover
         ]
 
         @sizes = [
-          SizeOption.new(name: "standard-1", display_name: "Standard 1", vcpu: 1, memory: 2, disk: 160, low_price: 8, high_price: 12),
-          SizeOption.new(name: "standard-2", display_name: "Standard 2", vcpu: 2, memory: 4, disk: 256, low_price: 10, high_price: 25),
-          SizeOption.new(name: "standard-4", display_name: "Standard 4", vcpu: 4, memory: 8, disk: 512, low_price: 40, high_price: 60),
-          SizeOption.new(name: "memory-4", display_name: "Memory Optimized 4", vcpu: 4, memory: 16, disk: 512, low_price: 65, high_price: 80),
-          SizeOption.new(name: "memory-8", display_name: "Memory Optimized 8", vcpu: 8, memory: 32, disk: 1024, low_price: 120, high_price: 180)
+          SizeOption.new(name: "standard-1", display_name: "Standard 1", vcpu: 1, memory: 2, disk: 160,
+            prices: {
+              default: 8,
+              "equinix-ist": 15
+            }),
+          SizeOption.new(name: "standard-2", display_name: "Standard 2", vcpu: 2, memory: 4, disk: 256,
+            prices: {
+              default: 10,
+              "equinix-da11": 25.99
+            }),
+          SizeOption.new(name: "standard-4", display_name: "Standard 4", vcpu: 4, memory: 8, disk: 512,
+            prices: {
+              default: 40,
+              "equinix-da11": 65
+            }),
+          SizeOption.new(name: "memory-4", display_name: "Memory Optimized 4", vcpu: 4, memory: 16, disk: 512,
+            prices: {
+              default: 65,
+              "equinix-da11": 85
+            }),
+          SizeOption.new(name: "memory-8", display_name: "Memory Optimized 8", vcpu: 8, memory: 32, disk: 1024,
+            prices: {
+              default: 120.80,
+              "equinix-da11": 160
+            })
         ]
 
         view "vm/create"
