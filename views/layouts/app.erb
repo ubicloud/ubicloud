@@ -16,20 +16,37 @@
 </head>
 
 <body class="h-full">
-  <div>
-    <%== render("layouts/sidebar_desktop") %>
-    <%== render("layouts/sidebar_mobile") %>
-    <div class="lg:pl-72">
-      <%== render("layouts/topbar") %>
-      <main class="py-10">
-        <div class="px-4 sm:px-6 lg:px-8">
-          <%== render("components/flash_message") %>
+  <% if rodauth.authenticated? %>
+    <div>
+      <%== render("layouts/sidebar_desktop") %>
+      <%== render("layouts/sidebar_mobile") %>
+      <div class="lg:pl-72">
+        <%== render("layouts/topbar") %>
+        <main class="py-10">
+          <div class="px-4 sm:px-6 lg:px-8">
+            <%== render("components/flash_message") %>
+            <%== yield %>
+          </div>
+        </main>
+      </div>
+    </div>
+    <%== render("layouts/notifications") %>
+  <% else %>
+    <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div class="sm:mx-auto sm:w-full sm:max-w-md">
+        <h1 class="text-center text-5xl text-gray-800">
+            <span class="font-bold">Ubi</span>cloud
+        </h1>
+        <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">Sign in to your account</h2>
+      </div>
+
+      <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
           <%== yield %>
         </div>
-      </main>
+      </div>
     </div>
-  </div>
-  <%== render("layouts/notifications") %>
+  <% end %>
   <%== assets(:js) %>
 </body>
 </html>

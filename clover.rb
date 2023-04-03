@@ -120,7 +120,7 @@ class Clover < Roda
     hmac_secret Config.clover_session_secret
 
     login_view do
-      render "auth/login"
+      view "auth/login", "Login"
     end
 
     already_logged_in { redirect login_redirect }
