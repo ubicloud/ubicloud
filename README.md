@@ -282,12 +282,12 @@ It's harmless yet duplicative to run:
 
 RuboCop is a code linter and rewriter.  It can take care of all minor
 formatting issues automatically, e.g. indentation.  You can run
-auto-correction with `bundle exec rubocop -A`
+auto-correction with `bundle exec rubocop -a`
 
 If you ran `overwrite_envrb`, it generates a file that's prone to
 correction by RuboCop:
 
-    $ bundle exec rubocop -A
+    $ bundle exec rubocop -a
     Inspecting 46 files
     C.............................................
 
