@@ -119,9 +119,18 @@ class Clover < Roda
 
     hmac_secret Config.clover_session_secret
 
+    create_account_view do
+      view "auth/create_account", "Create Account"
+    end
+
     login_view do
       view "auth/login", "Login"
     end
+
+    verify_account_view do
+      view "auth/verify_account", "Verify Account"
+    end
+
 
     already_logged_in { redirect login_redirect }
 

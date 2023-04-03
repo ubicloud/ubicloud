@@ -1,5 +1,7 @@
 <% @page_title = "Login" %>
 
+<% @page_message = "Sign in to your account" %>
+
 <form class="rodauth space-y-6" role="form" method="POST">
   <%== rodauth.csrf_tag %>
   <%== render("components/flash_message") %>
@@ -28,7 +30,8 @@
     </div>
   </div>
 
-  <div>
+  <div class="flex flex-col text-center">
     <button type="submit" class="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Sign in</button>
+    <a href="/create-account" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Create a new account</a>
   </div>
 </form>
