@@ -90,7 +90,7 @@ I find use of `asdf` with
 obligatory, for the reasons discussed in its README.  Let's set it up
 as a user-global tool, and not a project-local one:
 
-    echo "direnv 2.32.2" >> ~/.tool_versions
+    echo "direnv 2.32.2" >> ~/.tool-versions
     asdf direnv setup --version latest
 
 After `direnv setup` you need to source your shell's startup files or
@@ -282,12 +282,12 @@ It's harmless yet duplicative to run:
 
 RuboCop is a code linter and rewriter.  It can take care of all minor
 formatting issues automatically, e.g. indentation.  You can run
-auto-correction with `bundle exec rubocop -A`
+auto-correction with `bundle exec rubocop -a`
 
 If you ran `overwrite_envrb`, it generates a file that's prone to
 correction by RuboCop:
 
-    $ bundle exec rubocop -A
+    $ bundle exec rubocop -a
     Inspecting 46 files
     C.............................................
 
