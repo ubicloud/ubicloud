@@ -53,7 +53,7 @@ class Clover < Roda
     @error_title = "Page not found"
     @error_detail = "Sorry, we couldn’t find the page you’re looking for."
 
-    render "/error"
+    view "/error"
   end
 
   if Config.development?
@@ -93,7 +93,7 @@ class Clover < Roda
       @error_title = "Unexcepted Error"
       @error_detail = "Sorry, we couldn’t process your request because of an unexpected error."
     end
-    render "/error"
+    view "/error"
   end
 
   plugin :sessions,
