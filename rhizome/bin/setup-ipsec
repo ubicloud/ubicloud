@@ -1,0 +1,66 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+unless (command = ARGV.shift)
+  puts "expected ipsec command as argument"
+  exit 1
+end
+
+unless (src_vm_name = ARGV.shift)
+  puts "expected src_vm_name as argument"
+  exit 1
+end
+
+unless (src_ephemeral_net6 = ARGV.shift)
+  puts "expected src_ephemeral_net6 as argument"
+  exit 1
+end
+
+unless (src_private_subnet = ARGV.shift)
+  puts "expected src_private_subnet as argument"
+  exit 1
+end
+
+unless (dest_vm_name = ARGV.shift)
+  puts "expected dest_vm_name as argument"
+  exit 1
+end
+
+unless (dest_ephemeral_net6 = ARGV.shift)
+  puts "expected dest_ephemeral_net6 as argument"
+  exit 1
+end
+
+unless (dest_private_subnet = ARGV.shift)
+  puts "expected dest_private_subnet as argument"
+  exit 1
+end
+
+unless (spi = ARGV.shift)
+  puts "expected spi as argument"
+  exit 1
+end
+
+unless (security_key = ARGV.shift)
+  puts "expected security_key as argument"
+  exit 1
+end
+
+require_relative "../lib/common"
+require_relative "../lib/ipsec_tunnel"
+
+require "fileutils"
+require "netaddr"
+
+src_endpoint = IPSecTunnelEndpoint.new(src_vm_name, NetAddr.parse_net(src_ephemeral_net6), src_private_subnet)
+dest_endpoint = IPSecTunnelEndpoint.new(dest_vm_name, NetAddr.parse_net(dest_ephemeral_net6), dest_private_subnet)
+ipsec_tunnel = IPSecTunnel.new(src_endpoint, dest_endpoint, spi, security_key)
+
+case command
+when "setup_src"
+  ipsec_tunnel.setup_src
+when "setup_dst"
+  ipsec_tunnel.setup_dst
+else
+  puts "Unknown command: #{command}"
+end

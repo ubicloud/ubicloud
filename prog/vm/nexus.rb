@@ -5,7 +5,7 @@ require "json"
 require "ulid"
 
 class Prog::Vm::Nexus < Prog::Base
-  semaphore :destroy
+  semaphore :destroy, :refresh_mesh
 
   def self.assemble(public_key, name: nil, size: "standard-4",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
@@ -24,6 +24,7 @@ class Prog::Vm::Nexus < Prog::Base
       private_subnets.each do
         VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
       end
+
       Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
     end
   end
@@ -68,7 +69,11 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def private_subnets
-    @private_subnets ||= vm.vm_private_subnet.map { _1.private_subnet }
+    @private_subnets ||= vm.private_subnets
+  end
+
+  def q_net
+    vm.ephemeral_net6.to_s.shellescape
   end
 
   def start
@@ -99,7 +104,6 @@ SQL
   end
 
   def prep
-    q_net = vm.ephemeral_net6.to_s.shellescape
     params_json = JSON.pretty_generate({
       "vm_name" => vm_name,
       "public_ipv6" => q_net,
@@ -119,7 +123,29 @@ SQL
     host.sshable.cmd("echo #{params_json.shellescape} | sudo -u #{q_vm} tee #{params_path.shellescape}")
 
     host.sshable.cmd("sudo bin/prepvm.rb #{params_path.shellescape}")
+    hop :trigger_refresh_mesh
+  end
+
+  def trigger_refresh_mesh
+    Vm.each do |vm|
+      vm.incr_refresh_mesh
+    end
+
     hop :run
+  end
+
+  def create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
+    q_dst_name = self.class.uuid_to_name(dst_vm.id).shellescape
+    q_dst_net = dst_vm.ephemeral_net6.to_s.shellescape
+
+    my_params = "#{q_vm} #{q_net} #{my_subnet.to_s.shellescape}"
+    dst_params = "#{q_dst_name} #{q_dst_net} #{dst_subnet.to_s.shellescape}"
+
+    spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
+    key = "0x" + SecureRandom.bytes(36).unpack1("H*")
+
+    host.sshable.cmd("sudo bin/setup-ipsec setup_src #{my_params} #{dst_params} #{spi} #{key}")
+    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec setup_dst #{my_params} #{dst_params} #{spi} #{key}")
   end
 
   def run
@@ -133,7 +159,34 @@ SQL
       hop :destroy
     end
 
+    when_refresh_mesh_set? do
+      hop :refresh_mesh
+    end
+
     nap 30
+  end
+
+  def refresh_mesh
+    # don't create tunnels to self or VMs already connected to
+    reject_list = vm.ipsec_tunnels.map(&:src_vm_id)
+    reject_list.append(vm.id)
+
+    vms = Vm.reject { reject_list.include? _1.id }
+
+    vms.each do |dst_vm|
+      private_subnets.each do |my_subnet|
+        dst_vm.private_subnets.each do |dst_subnet|
+          create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
+        end
+      end
+
+      # record that we created the tunnel from this vm to dst_vm
+      IpsecTunnel.create(src_vm_id: vm.id, dst_vm_id: dst_vm.id)
+    end
+
+    decr_refresh_mesh
+
+    hop :wait
   end
 
   def destroy
