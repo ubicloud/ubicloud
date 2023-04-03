@@ -14,13 +14,44 @@ RSpec.describe Sshable do
     expect(sa.private_key).to eq("test not a real private key")
   end
 
-  it "can cache SSH connections" do
-    expect(Net::SSH).to receive(:start).and_return instance_double(Net::SSH::Connection::Session, close: nil)
-    first_time = sa.connect
-    second_time = sa.connect
-    expect(first_time).to equal(second_time)
+  describe "caching" do
+    # The cache is thread local, so re-set the thread state by boxing
+    # each test in a new thread.
+    around do |ex|
+      Thread.new {
+        ex.run
+      }.join
+    end
 
-    expect(sa.clear_cache).to eq []
+    it "can cache SSH connections" do
+      expect(Net::SSH).to receive(:start) do
+        instance_double(Net::SSH::Connection::Session, close: nil)
+      end
+
+      expect(Thread.current[:clover_ssh_cache]).to be_nil
+      first_time = sa.connect
+      expect(Thread.current[:clover_ssh_cache].size).to eq(1)
+      second_time = sa.connect
+      expect(first_time).to equal(second_time)
+
+      expect(described_class.reset_cache).to eq []
+      expect(Thread.current[:clover_ssh_cache]).to be_empty
+    end
+
+    it "does not crash if a cache has never been made" do
+      expect {
+        sa.invalidate_cache_entry
+      }.not_to raise_error
+    end
+
+    it "can invalidate a single cache entry" do
+      sess = instance_double(Net::SSH::Connection::Session, close: nil)
+      expect(Net::SSH).to receive(:start).and_return sess
+      sa.connect
+      expect {
+        sa.invalidate_cache_entry
+      }.to change { Thread.current[:clover_ssh_cache] }.from({"test.localhost" => sess}).to({})
+    end
   end
 
   describe "#cmd" do
@@ -42,6 +73,13 @@ RSpec.describe Sshable do
         Net::SSH::Connection::Session::StringWithExitstatus.new("", 1)
       )
       expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, ""
+    end
+
+    it "invalidates the cache if the session raises an error" do
+      err = IOError.new("the party is over")
+      expect(session).to receive(:exec!).and_raise err
+      expect(sa).to receive(:invalidate_cache_entry)
+      expect { sa.cmd("irrelevant") }.to raise_error err
     end
   end
 end
