@@ -105,6 +105,7 @@ class Prog::Base
 
   def donate
     strand.children.map(&:run)
+    nap 0
   end
 
   def reap
