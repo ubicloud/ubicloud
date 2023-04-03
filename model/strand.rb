@@ -9,7 +9,7 @@ class Strand < Sequel::Model
 
   def lease
     self.class.lease(id) do
-      yield self
+      yield
     end
   end
 
@@ -34,7 +34,6 @@ SQL
 
     begin
       yield
-      true
     ensure
       num_updated = DB[<<SQL, id, lease].update
 UPDATE strand
@@ -52,11 +51,11 @@ SQL
   end
 
   def unsynchronized_run
-    prog = load
-    puts "running " + prog.class.to_s
+    prog_instance = load
     DB.transaction do
-      prog.public_send(label)
+      prog_instance.public_send(label)
     rescue Prog::Base::Nap => e
+      return e if e.seconds <= 0
       scheduled = DB[<<SQL, e.seconds, id].get
 UPDATE strand
 SET schedule = now() + (? * '1 second'::interval)
@@ -68,22 +67,29 @@ SQL
       # changed columns so save_changes won't update it again.
       self.schedule = scheduled
       changed_columns.delete(:schedule)
+      e
     rescue Prog::Base::Hop => e
-      puts e.to_s
+      e
     rescue Prog::Base::Exit => e
-      puts e.to_s
       delete
       @deleted = true
+      e
+    else
+      fail "BUG: Prog #{prog}##{label} did not provide flow control"
     end
-    puts "ran " + prog.class.to_s
-
-    prog
   end
 
-  def run
+  def run(seconds = 0)
     fail "already deleted" if @deleted
+    deadline = Time.now + seconds
     lease do
-      next unsynchronized_run
+      loop do
+        ret = unsynchronized_run
+        now = Time.now
+        if now > deadline || ret.is_a?(Prog::Base::Nap) || ret.is_a?(Prog::Base::Exit)
+          return ret
+        end
+      end
     end
   end
 end

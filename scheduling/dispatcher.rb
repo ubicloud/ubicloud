@@ -55,7 +55,7 @@ class Scheduling::Dispatcher
     end
 
     Thread.new do
-      strand.run
+      strand.run Strand::LEASE_EXPIRATION / 4
     ensure
       # Adequate to unblock IO.select.
       w.close
