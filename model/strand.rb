@@ -25,7 +25,7 @@ class Strand < Sequel::Model
   def self.lease(id)
     affected = DB[<<SQL, id].first
 UPDATE strand
-SET lease = now() + '120 seconds'
+SET lease = now() + '120 seconds', schedule = now()
 WHERE id = ? AND (lease IS NULL OR lease < now())
 RETURNING lease
 SQL
