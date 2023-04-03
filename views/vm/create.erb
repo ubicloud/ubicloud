@@ -72,22 +72,6 @@
                   </div>
                   <div class="col-span-full">
                     <div class="flex items-center justify-between">
-                      <h2 class="text-sm font-medium leading-6 text-gray-900">Boot Image</h2>
-                    </div>
-                    <fieldset class="mt-2 radio-small-cards" id="boot-image-radios">
-                      <legend class="sr-only">Choose a image option</legend>
-                      <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
-                        <% @images.each do |image| %>
-                          <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
-                            <input type="radio" name="boot-image" value="<%= image.name %>" class="sr-only" required>
-                            <span><%= image.display_name %></span>
-                          </label>
-                        <% end %>
-                      </div>
-                    </fieldset>
-                  </div>
-                  <div class="col-span-full">
-                    <div class="flex items-center justify-between">
                       <h2 class="text-sm font-medium leading-6 text-gray-900">Server size</h2>
                     </div>
                     <fieldset class="mt-2 radio-stacked-cards" id="size-radios">
@@ -117,6 +101,22 @@
                       </div>
                     </fieldset>
 
+                  </div>
+                  <div class="col-span-full">
+                    <div class="flex items-center justify-between">
+                      <h2 class="text-sm font-medium leading-6 text-gray-900">Boot Image</h2>
+                    </div>
+                    <fieldset class="mt-2 radio-small-cards" id="boot-image-radios">
+                      <legend class="sr-only">Choose a image option</legend>
+                      <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
+                        <% @images.each do |image| %>
+                          <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
+                            <input type="radio" name="boot-image" value="<%= image.name %>" class="sr-only" required>
+                            <span><%= image.display_name %></span>
+                          </label>
+                        <% end %>
+                      </div>
+                    </fieldset>
                   </div>
                 </div>
               </div>
