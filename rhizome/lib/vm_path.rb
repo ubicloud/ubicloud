@@ -32,7 +32,7 @@ class VmPath
   end
 
   # Define path, q_path, read, write methods for files in
-  # `/home/#{vm_name}`
+  # `/vm/#{vm_name}`
   %w[
     guest_mac
     guest_ephemeral
