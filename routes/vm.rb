@@ -60,6 +60,8 @@ class Clover
           boot_image: r.params["boot-image"]
         )
 
+        flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
+
         r.redirect "/vm"
       end
     end
