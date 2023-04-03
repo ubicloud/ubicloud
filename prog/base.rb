@@ -7,6 +7,10 @@ class Prog::Base
     @strand = strand
   end
 
+  def nap(seconds = 30)
+    fail Nap.new(seconds)
+  end
+
   def pop(o)
     outval = case o
     when nil
@@ -38,7 +42,9 @@ class Prog::Base
     end
   end
 
-  class Exit < RuntimeError
+  class FlowControl < RuntimeError; end
+
+  class Exit < FlowControl
     def initialize(strand)
       @strand = strand
     end
@@ -48,7 +54,7 @@ class Prog::Base
     end
   end
 
-  class Hop < RuntimeError
+  class Hop < FlowControl
     def initialize(old_prog, old_label, strand)
       @old_prog = old_prog
       @old_label = old_label
@@ -57,6 +63,18 @@ class Prog::Base
 
     def to_s
       "hop #{@old_prog}##{@old_label} -> #{@strand.prog}##{@strand.label}"
+    end
+  end
+
+  class Nap < FlowControl
+    attr_reader :seconds
+
+    def initialize(seconds)
+      @seconds = seconds
+    end
+
+    def to_s
+      "nap for #{seconds} seconds"
     end
   end
 

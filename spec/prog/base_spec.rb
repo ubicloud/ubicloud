@@ -49,4 +49,12 @@ RSpec.describe Prog::Base do
     expect { st.run }.to raise_error "already deleted"
     expect { st.reload }.to raise_error Sequel::NoExistingObject
   end
+
+  it "can nap" do
+    st = Strand.create(prog: "Test", label: "napper")
+    ante = st.schedule
+    st.run
+    post = st.schedule
+    expect(post - ante).to be > 121
+  end
 end

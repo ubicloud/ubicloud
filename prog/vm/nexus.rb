@@ -127,5 +127,6 @@ SQL
   end
 
   def wait
+    nap 30
   end
 end
