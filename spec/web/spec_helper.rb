@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../coverage_helper"
 require_relative "../spec_helper"
 raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
 
