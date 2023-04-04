@@ -36,8 +36,14 @@ $(".delete-btn").on("click", function(event) {
     event.preventDefault();
     let url = $(this).data("url");
     let csrf = $(this).data("csrf");
+    let confirmation = $(this).data("confirmation");
 
     if (!confirm("Are you sure to delete?")) {
+        return;
+    }
+
+    if (confirmation && prompt("Please enter resource name to confirm deletion", "") != confirmation) {
+        alert("Could not confirm resource name");
         return;
     }
 
@@ -46,8 +52,7 @@ $(".delete-btn").on("click", function(event) {
         type: 'DELETE',
         data: {'_csrf': csrf},
         success: function(result) {
-            alert(result);
-            location.reload();
+            window.location.href = "/vm";
         },
         error: function (xhr, ajaxOptions, thrownError) {
             alert(`Error: ${thrownError}`);

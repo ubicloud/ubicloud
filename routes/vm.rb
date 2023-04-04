@@ -89,6 +89,11 @@ class Clover
     r.is String do |vm_ulid|
       vm = Vm[id: ULID.parse(vm_ulid).to_uuidish]
 
+      unless vm
+        response.status = 404
+        r.halt
+      end
+
       r.get true do
         @vm = PageVm.new(id: vm_ulid,
           name: vm.name,
@@ -101,6 +106,7 @@ class Clover
       end
 
       r.delete true do
+        vm.incr_destroy
         return "Deleting #{vm.id}"
       end
     end
