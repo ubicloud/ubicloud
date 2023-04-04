@@ -5,7 +5,7 @@ require "json"
 require "ulid"
 
 class Prog::Vm::Nexus < Prog::Base
-  semaphores :destroy
+  semaphore :destroy
 
   def self.assemble(public_key, name: nil, size: "standard-4",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
