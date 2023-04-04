@@ -8,5 +8,5 @@ class Vm < Sequel::Model
   one_to_many :vm_private_subnet, key: :vm_id
 
   include SemaphoreMethods
-  semaphores :destroy
+  semaphore :destroy
 end

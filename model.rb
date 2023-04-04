@@ -21,16 +21,8 @@ module SemaphoreMethods
   end
 
   module ClassMethods
-    def semaphores(names)
-      names = case names
-      in Symbol
-        [names]
-      in [Symbol]
-        names
-      else
-        fail "BUG: only symbols should be passed to self.semaphores"
-      end
-
+    def semaphore(*names)
+      names.map!(&:intern)
       names.each do |name|
         define_method "incr_#{name}" do
           Semaphore.incr(id, name)
