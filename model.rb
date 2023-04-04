@@ -15,6 +15,31 @@ Sequel::Model.plugin :column_encryption do |enc|
   enc.key 0, Config.clover_column_encryption_key
 end
 
+module SemaphoreMethods
+  def self.included(base)
+    base.extend(ClassMethods)
+  end
+
+  module ClassMethods
+    def semaphores(names)
+      names = case names
+      in Symbol
+        [names]
+      in [Symbol]
+        names
+      else
+        fail "BUG: only symbols should be passed to self.semaphores"
+      end
+
+      names.each do |name|
+        define_method "incr_#{name}" do
+          Semaphore.incr(id, name)
+        end
+      end
+    end
+  end
+end
+
 if ENV["RACK_ENV"] == "development"
   unless defined?(Unreloader)
     require "rack/unreloader"
