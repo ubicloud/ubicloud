@@ -8,7 +8,7 @@ RSpec.describe Strand do
   it "can take leases" do
     st.save_changes
     did_it = st.lease {
-      next Prog::Test.new st.id
+      next Prog::Test.new st
     }
     expect(did_it).to be true
   end
