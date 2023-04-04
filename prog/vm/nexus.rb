@@ -5,6 +5,8 @@ require "json"
 require "ulid"
 
 class Prog::Vm::Nexus < Prog::Base
+  semaphores :destroy
+
   def self.assemble(public_key, name: nil, size: "standard-4",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnets: [])
@@ -127,5 +129,19 @@ SQL
   end
 
   def wait
+    when_destroy_set? do
+      hop :destroy
+    end
+
+    nap 30
+  end
+
+  def destroy
+    # YYY make idempotent
+    vm.vm_private_subnet_dataset.delete
+    vm.delete
+    host.sshable.cmd("sudo systemctl stop #{q_vm}")
+    host.sshable.cmd("sudo bin/deletevm.rb #{q_vm}")
+    pop "vm deleted"
   end
 end

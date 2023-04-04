@@ -17,8 +17,10 @@
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 ENV["RACK_ENV"] = "test"
 require_relative "../loader"
+require_relative "./coverage_helper"
 require "rspec"
 require "database_cleaner/sequel"
+require "logger"
 
 # DatabaseCleaner assumes the usual DATABASE_URL, but the
 # "roda-sequel-stack" way names each environment *and* application

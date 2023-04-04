@@ -24,12 +24,14 @@ class Prog::Test < Prog::Base
     w = th[:clover_test_in]
     th.thread_variable_set(:clover_test_out, Thread.current)
     w.close
+    nap 0
   end
 
   def wait_exit
     th = Thread.list.find { _1.name == "clover_test" }
     r = th[:clover_test_in]
     r.read
+    nap 0
   end
 
   def hop_entry
@@ -38,5 +40,10 @@ class Prog::Test < Prog::Base
 
   def reaper
     reap
+    nap 0
+  end
+
+  def napper
+    nap(123)
   end
 end

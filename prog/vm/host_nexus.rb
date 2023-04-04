@@ -52,5 +52,6 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def wait
+    nap 30
   end
 end

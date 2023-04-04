@@ -9,7 +9,7 @@ class Strand < Sequel::Model
 
   def lease
     self.class.lease(id) do
-      yield self
+      yield
     end
   end
 
@@ -34,7 +34,6 @@ SQL
 
     begin
       yield
-      true
     ensure
       num_updated = DB[<<SQL, id, lease].update
 UPDATE strand
@@ -47,31 +46,56 @@ SQL
     end
   end
 
-  def load
-    Object.const_get("::Prog::" + prog).new(self)
+  def load(snap = nil)
+    Object.const_get("::Prog::" + prog).new(self, snap)
   end
 
   def unsynchronized_run
-    prog = load
-    puts "running " + prog.class.to_s
     DB.transaction do
-      prog.public_send(label)
+      SemSnap.use(id) do |snap|
+        load(snap).public_send(label)
+      end
+    rescue Prog::Base::Nap => e
+      return e if e.seconds <= 0
+      scheduled = DB[<<SQL, e.seconds, id].get
+UPDATE strand
+SET schedule = now() + (? * '1 second'::interval)
+WHERE id = ?
+RETURNING schedule
+SQL
+      # For convenience, reflect the updated record's schedule content
+      # in the model object, but since it's fresh, remove it from the
+      # changed columns so save_changes won't update it again.
+      self.schedule = scheduled
+      changed_columns.delete(:schedule)
+      e
     rescue Prog::Base::Hop => e
-      puts e.to_s
+      e
     rescue Prog::Base::Exit => e
-      puts e.to_s
-      delete
-      @deleted = true
-    end
-    puts "ran " + prog.class.to_s
+      if parent_id.nil?
+        # No parent Strand to reap here, so self-reap.
+        Semaphore.where(strand_id: id).delete
+        delete
+        @deleted = true
+      end
 
-    prog
+      e
+    else
+      fail "BUG: Prog #{prog}##{label} did not provide flow control"
+    end
   end
 
-  def run
+  def run(seconds = 0)
     fail "already deleted" if @deleted
+    deadline = Time.now + seconds
     lease do
-      next unsynchronized_run
+      loop do
+        ret = unsynchronized_run
+        now = Time.now
+        if now > deadline || ret.is_a?(Prog::Base::Nap) || ret.is_a?(Prog::Base::Exit)
+          return ret
+        end
+      end
     end
   end
 end
