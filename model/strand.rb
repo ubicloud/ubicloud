@@ -46,14 +46,15 @@ SQL
     end
   end
 
-  def load
-    Object.const_get("::Prog::" + prog).new(self)
+  def load(snap = nil)
+    Object.const_get("::Prog::" + prog).new(self, snap)
   end
 
   def unsynchronized_run
-    prog_instance = load
     DB.transaction do
-      prog_instance.public_send(label)
+      SemSnap.use(id) do |snap|
+        load(snap).public_send(label)
+      end
     rescue Prog::Base::Nap => e
       return e if e.seconds <= 0
       scheduled = DB[<<SQL, e.seconds, id].get
@@ -73,6 +74,7 @@ SQL
     rescue Prog::Base::Exit => e
       if parent_id.nil?
         # No parent Strand to reap here, so self-reap.
+        Semaphore.where(strand_id: id).delete
         delete
         @deleted = true
       end
