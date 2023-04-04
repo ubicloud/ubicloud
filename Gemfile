@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 source "https://rubygems.org"
-ruby "3.2.1"
+ruby "3.2.2"
 
 gem "argon2"
 gem "bcrypt_pbkdf"
