@@ -71,8 +71,12 @@ SQL
     rescue Prog::Base::Hop => e
       e
     rescue Prog::Base::Exit => e
-      delete
-      @deleted = true
+      if parent_id.nil?
+        # No parent Strand to reap here, so self-reap.
+        delete
+        @deleted = true
+      end
+
       e
     else
       fail "BUG: Prog #{prog}##{label} did not provide flow control"
