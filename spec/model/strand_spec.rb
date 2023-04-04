@@ -7,7 +7,7 @@ RSpec.describe Strand do
 
   it "can take leases" do
     st.save_changes
-    prog = Prog::Test.new st.id
+    prog = Prog::Test.new st
     did_it = st.lease {
       next prog
     }
