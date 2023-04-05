@@ -78,7 +78,7 @@
                       <div class="space-y-4"> 
                         <% @sizes.each do |size| %>
                           <label class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between">
-                            <input type="radio" name="size" value="<%= size.name %>" class="sr-only">
+                            <input type="radio" name="size" value="<%= size.name %>" class="sr-only" required>
                             <span class="flex items-center">
                               <span class="flex flex-col text-sm">
                                 <span  class="font-medium text-gray-900"><%= size.display_name %></span>
