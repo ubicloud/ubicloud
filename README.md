@@ -288,19 +288,20 @@ If you ran `overwrite_envrb`, it generates a file that's prone to
 correction by RuboCop:
 
     $ bundle exec rubocop -a
-    Inspecting 46 files
-    C.............................................
+    Inspecting 68 files
+    C...................................................................
 
     Offenses:
 
-    .env.rb:1:1: C: [Corrected] Style/FrozenStringLiteralComment: Missing frozen string literal comment.
-    case ENV["RACK_ENV"] ||= "development"
-    ^
-    .env.rb:2:1: C: [Corrected] Layout/EmptyLineAfterMagicComment: Add an empty line after magic comments.
-    case ENV["RACK_ENV"] ||= "development"
-    ^
+    .env.rb:6:34: C: [Corrected] Style/StringLiterals: Prefer double-quoted strings unless you need single quotes to avoid extra backslashes for escaping.
+      ENV["CLOVER_DATABASE_URL"] ||= 'postgres:///clover_test?user=clover'
+                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-    46 files inspected, 2 offenses detected, 2 offenses corrected
+    68 files inspected, 1 offense detected, 1 offense corrected
+
+Some useful corrections are only made with `bundle exec rubocop -A`
+(upper case `A`) which applies "unsafe" corrections that may alter the
+semantics of the program.
 
 ### Running the migrations
 
