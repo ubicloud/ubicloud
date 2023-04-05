@@ -29,7 +29,7 @@ class VmSetup
     #
     # > YAML.dump('NO')[4..-2]
     # => "'NO'"
-    YAML.dump(s)[4..-2]
+    YAML.dump(s, line_width: -1)[4..-2]
   end
 
   def vp
