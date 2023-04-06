@@ -61,7 +61,7 @@
                     <fieldset class="mt-2 radio-small-cards" id="location-radios">
                       <legend class="sr-only">Choose a location option</legend>
                       <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
-                        <% @locations.each do |location| %>
+                        <% Option::Locations.each do |location| %>
                           <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
                             <input type="radio" name="location" value="<%= location.name %>" class="sr-only" required>
                             <span><%= location.display_name %></span>
@@ -76,7 +76,7 @@
                     </div>
                     <fieldset class="mt-2 radio-stacked-cards" id="size-radios">
                       <div class="space-y-4"> 
-                        <% @sizes.each do |size| %>
+                        <% Option::VmSizes.each do |size| %>
                           <label class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between">
                             <input type="radio" name="size" value="<%= size.name %>" class="sr-only" required>
                             <span class="flex items-center">
@@ -107,7 +107,7 @@
                     <fieldset class="mt-2 radio-small-cards" id="boot-image-radios">
                       <legend class="sr-only">Choose a image option</legend>
                       <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
-                        <% @images.each do |image| %>
+                        <% Option::BootImages.each do |image| %>
                           <label class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50">
                             <input type="radio" name="boot-image" value="<%= image.name %>" class="sr-only" required>
                             <span><%= image.display_name %></span>
