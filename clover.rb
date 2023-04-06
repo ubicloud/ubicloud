@@ -131,7 +131,6 @@ class Clover < Roda
       view "auth/verify_account", "Verify Account"
     end
 
-
     already_logged_in { redirect login_redirect }
 
     # YYY: Should password secret and session secret be the same? Are
