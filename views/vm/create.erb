@@ -42,9 +42,9 @@
     <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
         <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white">
-          <form action="create" method="POST">
+          <form action="/vm" method="POST">
             <!-- YYY: need a better way to manage coupling of routes and erbs -->
-            <%== csrf_tag("/vm/create") %>
+            <%== csrf_tag("/vm") %>
             <div class="space-y-12 px-4 py-6 sm:p-8">
               <div class="border-b border-gray-900/10 pb-12">
                 <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>

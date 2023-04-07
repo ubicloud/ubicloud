@@ -23,24 +23,24 @@ class Clover
       view "vm/index"
     end
 
+    r.post true do
+      Prog::Vm::Nexus.assemble(
+        r.params["public-key"],
+        name: r.params["name"],
+        unix_user: r.params["user"],
+        size: r.params["size"],
+        location: r.params["location"],
+        boot_image: r.params["boot-image"]
+      )
+
+      flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
+
+      r.redirect "/vm"
+    end
+
     r.on "create" do
       r.get true do
         view "vm/create"
-      end
-
-      r.post true do
-        Prog::Vm::Nexus.assemble(
-          r.params["public-key"],
-          name: r.params["name"],
-          unix_user: r.params["user"],
-          size: r.params["size"],
-          location: r.params["location"],
-          boot_image: r.params["boot-image"]
-        )
-
-        flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
-
-        r.redirect "/vm"
       end
     end
 

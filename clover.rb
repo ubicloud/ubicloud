@@ -80,8 +80,8 @@ class Clover < Roda
   plugin :error_handler do |e|
     case e
     when Roda::RodaPlugins::RouteCsrf::InvalidToken
-      response.status = 400
-      @error_code = 400
+      response.status = 419
+      @error_code = 419
       @error_title = "Invalid Security Token"
       @error_detail = "An invalid security token was submitted with this request, and this request could not be processed."
     else
