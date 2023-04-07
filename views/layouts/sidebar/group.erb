@@ -1,0 +1,36 @@
+<li>
+  <div class="group <%= items.map { _1[2] }.any? ? "active" : "" %>">
+    <button
+      type="button"
+      class="sidebar-group-btn w-full text-indigo-200 hover:text-white hover:bg-indigo-700 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
+    >
+      <svg class="text-white h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <%== icon %>
+      </svg>
+      <%= name %>
+      <svg
+        class="text-indigo-50 ml-auto h-6 w-6 shrink-0 group-[.active]:rotate-90 group-[.active]:text-white"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+          clip-rule="evenodd"
+        />
+      </svg>
+    </button>
+    <ul class="mt-1 px-2 hidden group-[.active]:block">
+      <% items.each do |item_name, item_url, item_is_active| %>
+        <li>
+          <a
+            href="<%= item_url %>"
+            class="<%= item_is_active ? "bg-indigo-700 text-white" : "text-indigo-200" %> hover:text-white hover:bg-indigo-700 block rounded-md py-2 pr-2 pl-9 text-sm leading-6"
+          >
+            <%= item_name %>
+          </a>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+</li>
