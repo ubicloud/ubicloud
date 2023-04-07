@@ -5,6 +5,7 @@ require_relative "../model"
 class VmHost < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :sshable, key: :id
+  one_to_many :vms
 
   def host_prefix
     net6.netmask.prefix_len

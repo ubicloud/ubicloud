@@ -12,6 +12,10 @@ $(".toggle-mobile-menu").on("click", function (event) {
     }
 });
 
+$(".sidebar-group-btn").on("click", function (event) {
+  $(this).parent().toggleClass("active");
+});
+
 $(".radio-stacked-cards input[type=radio]").on("change", function (event) {
     let name = $(this).attr("name");
     $(`#${name}-radios label`).removeClass("border-indigo-600 ring-2 ring-indigo-600");

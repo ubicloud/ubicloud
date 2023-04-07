@@ -79,6 +79,9 @@ class Clover < Roda
 
   plugin :error_handler do |e|
     case e
+    when Sequel::ValidationFailed
+      flash["error"] = e.to_s
+      return request.redirect env["HTTP_REFERER"]
     when Roda::RodaPlugins::RouteCsrf::InvalidToken
       response.status = 419
       @error_code = 419
