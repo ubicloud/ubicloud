@@ -1,7 +1,6 @@
 <% @page_title = "Create Virtual Machine" %>
 
 <div class="px-2 sm:px-3 lg:px-4">
-  <!-- Page Header -->
   <div>
     <%== render("components/breadcrumb", locals: {
       back: "/vm",
@@ -10,11 +9,7 @@
         ["Create", "#"]
       ] 
     }) %>
-    <div class="mt-2 md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">Create Virtual Machine</h2>
-      </div>
-    </div>
+    <%== render("components/page_header", locals: {title: "Create Virtual Machine"}) %>
   </div>
 
   <!-- Create Card -->

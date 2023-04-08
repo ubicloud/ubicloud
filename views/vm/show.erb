@@ -1,7 +1,6 @@
 <% @page_title = @vm.name %>
 
 <div class="px-2 sm:px-3 lg:px-4">
-  <!-- Page Header -->
   <div>
     <%== render("components/breadcrumb", locals: {
       back: "/vm",
@@ -10,14 +9,12 @@
         [@vm.name, "#"]
       ] 
     }) %>
-    <div class="mt-2 md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight"><%= @vm.name %></h2>
-      </div>
-      <div class="mt-4 flex md:ml-4 md:mt-0">
-        <span class="inline-flex items-center rounded-full px-3 py-0.5 text-md font-medium <%= (@vm.state == "running") ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800" %>"><%= @vm.state %></span>
-      </div>
-    </div>
+    <%== render("components/page_header", locals: {
+      title: @vm.name,
+      right_items: [
+        "<span class='inline-flex items-center rounded-full px-3 py-0.5 text-md font-medium #{(@vm.state == "running") ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}'>#{@vm.state}</span>"
+      ]
+    }) %>
   </div>
 
   <!-- Detail Card -->

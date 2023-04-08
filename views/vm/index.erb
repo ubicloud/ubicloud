@@ -2,14 +2,12 @@
 
 <% if @vms.count > 0 %>
   <div class="px-2 sm:px-3 lg:px-4">
-    <div class="md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">Virtual Machines</h2>
-      </div>
-      <div class="mt-4 flex md:ml-4 md:mt-0">
-        <a href="vm/create" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Create Virtual Machine</a>
-      </div>
-    </div>
+    <%== render("components/page_header", locals: {
+      title: "Virtual Machines",
+      right_items: [
+        "<a href='vm/create' class='inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'>Create Virtual Machine</a>"
+      ]
+    }) %>
     <div class="mt-8 flow-root">
       <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
         <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
