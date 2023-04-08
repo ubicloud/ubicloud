@@ -16,15 +16,7 @@
     <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
         <div
-          class="
-            overflow-hidden
-            shadow
-            ring-1
-            ring-black
-            ring-opacity-5
-            sm:rounded-lg
-            bg-white
-          "
+          class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white"
         >
           <form action="/vm" method="POST">
             <!-- YYY: need a better way to manage coupling of routes and erbs
@@ -41,25 +33,7 @@
                       type="text"
                       name="name"
                       id="name"
-                      class="
-                        mt-2
-                        block
-                        sm:max-w-md
-                        rounded-md
-                        border-0
-                        py-1.5
-                        text-gray-900
-                        shadow-sm
-                        ring-1
-                        ring-inset
-                        ring-gray-300
-                        placeholder:text-gray-400
-                        focus:ring-2
-                        focus:ring-inset
-                        focus:ring-indigo-600
-                        sm:text-sm
-                        sm:leading-6
-                      "
+                      class="mt-2 block sm:max-w-md rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                       placeholder="Enter Name"
                       required
                     >
@@ -73,25 +47,7 @@
                       <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
                         <% Option::Locations.each do |location| %>
                           <label
-                            class="
-                              flex
-                              items-center
-                              justify-center
-                              rounded-md
-                              py-3
-                              px-3
-                              text-sm
-                              font-semibold
-                              sm:flex-1
-                              cursor-pointer
-                              focus:outline-none
-                              ring-1
-                              ring-inset
-                              ring-gray-300
-                              bg-white
-                              text-gray-900
-                              hover:bg-gray-50
-                            "
+                            class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50"
                           >
                             <input
                               type="radio"
@@ -114,20 +70,7 @@
                       <div class="space-y-4">
                         <% Option::VmSizes.each do |size| %>
                           <label
-                            class="
-                              relative
-                              block
-                              cursor-pointer
-                              rounded-lg
-                              border
-                              bg-white
-                              px-6
-                              py-4
-                              shadow-sm
-                              focus:outline-none
-                              sm:flex
-                              sm:justify-between
-                            "
+                            class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between"
                           >
                             <input
                               type="radio"
@@ -156,13 +99,7 @@
                               <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
                             </span>
                             <span
-                              class="
-                                pointer-events-none
-                                absolute
-                                -inset-px
-                                rounded-lg
-                                border-2
-                              "
+                              class="pointer-events-none absolute -inset-px rounded-lg border-2"
                               aria-hidden="true"
                             ></span>
                           </label>
@@ -180,25 +117,7 @@
                       <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
                         <% Option::BootImages.each do |image| %>
                           <label
-                            class="
-                              flex
-                              items-center
-                              justify-center
-                              rounded-md
-                              py-3
-                              px-3
-                              text-sm
-                              font-semibold
-                              sm:flex-1
-                              cursor-pointer
-                              focus:outline-none
-                              ring-1
-                              ring-inset
-                              ring-gray-300
-                              bg-white
-                              text-gray-900
-                              hover:bg-gray-50
-                            "
+                            class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50"
                           >
                             <input
                               type="radio"
@@ -227,25 +146,7 @@
                       type="text"
                       name="user"
                       id="user"
-                      class="
-                        mt-2
-                        block
-                        sm:max-w-md
-                        rounded-md
-                        border-0
-                        py-1.5
-                        text-gray-900
-                        shadow-sm
-                        ring-1
-                        ring-inset
-                        ring-gray-300
-                        placeholder:text-gray-400
-                        focus:ring-2
-                        focus:ring-inset
-                        focus:ring-indigo-600
-                        sm:text-sm
-                        sm:leading-6
-                      "
+                      class="mt-2 block sm:max-w-md rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                       placeholder="Unix username"
                       value="ubi"
                       required
@@ -259,24 +160,7 @@
                         id="public-key"
                         name="public-key"
                         rows="3"
-                        class="
-                          block
-                          w-full
-                          rounded-md
-                          border-0
-                          text-gray-900
-                          shadow-sm
-                          ring-1
-                          ring-inset
-                          ring-gray-300
-                          placeholder:text-gray-400
-                          focus:ring-2
-                          focus:ring-inset
-                          focus:ring-indigo-600
-                          sm:py-1.5
-                          sm:text-sm
-                          sm:leading-6
-                        "
+                        class="block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:py-1.5 sm:text-sm sm:leading-6"
                         placeholder="ssh-ed25519 AAAA.."
                         required
                       ></textarea>
@@ -292,21 +176,7 @@
               <a href="/vm" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
               <button
                 type="submit"
-                class="
-                  rounded-md
-                  bg-indigo-600
-                  px-3
-                  py-2
-                  text-sm
-                  font-semibold
-                  text-white
-                  shadow-sm
-                  hover:bg-indigo-500
-                  focus-visible:outline
-                  focus-visible:outline-2
-                  focus-visible:outline-offset-2
-                  focus-visible:outline-indigo-600
-                "
+                class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
               >
                 Create
               </button>
