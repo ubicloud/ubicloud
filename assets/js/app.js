@@ -1,22 +1,13 @@
 $(".toggle-mobile-menu").on("click", function (event) {
-    if ($("#mobile-menu").is(":hidden")) {
-        $("#mobile-menu").show(0, function () {
-            $("#mobile-menu .menu-outer")
-                .addClass("opacity-100")
-                .removeClass("opacity-0");
-            $("#mobile-menu .menu-inner")
-                .addClass("translate-x-0")
-                .removeClass("-translate-x-full");
+    let menu = $("#mobile-menu")
+    if (menu.is(":hidden")) {
+        menu.show(0, function () {
+            menu.toggleClass("mobile-menu-open")
         });
     } else {
-        $("#mobile-menu .menu-outer")
-            .addClass("opacity-0")
-            .removeClass("opacity-100");
-        $("#mobile-menu .menu-inner")
-            .addClass("-translate-x-full")
-            .removeClass("translate-x-0");
+        menu.toggleClass("mobile-menu-open")
         setTimeout(function () {
-            $("#mobile-menu").hide();
+            menu.hide();
         }, 300);
     }
 });
