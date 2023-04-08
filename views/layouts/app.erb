@@ -1,54 +1,54 @@
 <!DOCTYPE html>
 <html class="h-full bg-gray-50">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
-  <title><%= ["Ubicloud", @page_title].compact.join(" - ") %></title>
-  <%== assets(:css) %>
-  <script
-    src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"
-    integrity="sha256-oP6HI9z1XaZNBrJURtCoUT5SUnxFr8s3BzRl+cbzUq8="
-    crossorigin="anonymous"
-  ></script>
-</head>
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <title><%= ["Ubicloud", @page_title].compact.join(" - ") %></title>
+    <%== assets(:css) %>
+    <script
+      src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"
+      integrity="sha256-oP6HI9z1XaZNBrJURtCoUT5SUnxFr8s3BzRl+cbzUq8="
+      crossorigin="anonymous"
+    ></script>
+  </head>
 
-<body class="h-full">
-  <% if @error_code %>
-    <%== yield %>
-  <% elsif rodauth.authenticated? %>
-    <div>
-      <%== render("layouts/sidebar/desktop") %>
-      <%== render("layouts/sidebar/mobile") %>
-      <div class="lg:pl-72">
-        <%== render("layouts/topbar") %>
-        <main class="py-10">
-          <div class="px-4 sm:px-6 lg:px-8">
-            <%== render("components/flash_message") %>
-            <%== yield %>
-          </div>
-        </main>
-      </div>
-    </div>
-    <%== render("layouts/notifications") %>
-  <% else %>
-    <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 class="text-center text-5xl text-gray-800">
-            <span class="font-bold">Ubi</span>cloud
-        </h1>
-        <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900"><%= @page_message %></h2>
-      </div>
-
-      <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
-          <%== yield %>
+  <body class="h-full">
+    <% if @error_code %>
+      <%== yield %>
+    <% elsif rodauth.authenticated? %>
+      <div>
+        <%== render("layouts/sidebar/desktop") %>
+        <%== render("layouts/sidebar/mobile") %>
+        <div class="lg:pl-72">
+          <%== render("layouts/topbar") %>
+          <main class="py-10">
+            <div class="px-4 sm:px-6 lg:px-8">
+              <%== render("components/flash_message") %>
+              <%== yield %>
+            </div>
+          </main>
         </div>
       </div>
-    </div>
-  <% end %>
-  <%== assets(:js) %>
-</body>
+      <%== render("layouts/notifications") %>
+    <% else %>
+      <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div class="sm:mx-auto sm:w-full sm:max-w-md">
+          <h1 class="text-center text-5xl text-gray-800">
+            <span class="font-bold">Ubi</span>cloud
+          </h1>
+          <h2 class="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900"><%= @page_message %></h2>
+        </div>
+
+        <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+          <div class="bg-white px-4 py-8 shadow sm:rounded-lg sm:px-10">
+            <%== yield %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+    <%== assets(:js) %>
+  </body>
 </html>

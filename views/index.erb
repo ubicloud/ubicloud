@@ -2,111 +2,307 @@
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div>
-    <%== render("components/page_header", locals: {title: "Getting Started"}) %>
+    <%== render("components/page_header", locals: { title: "Getting Started" }) %>
   </div>
-
   <!-- Create Card -->
   <div class="mt-8 flow-root">
-      <div class="divide-y divide-gray-200 overflow-hidden rounded-lg bg-gray-200 shadow sm:grid sm:grid-cols-2 sm:gap-px sm:divide-y-0">
-        <div class="rounded-tl-lg rounded-tr-lg sm:rounded-tr-none group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500">
-          <div>
-            <span class="inline-flex rounded-lg p-3 bg-teal-50 text-teal-700 ring-4 ring-white">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z" />
-              </svg>
-            </span>
-          </div>
-          <div class="mt-8">
-            <h3 class="text-base font-semibold leading-6 text-gray-900">
-              <a href="/vm/create" class="focus:outline-none">
-                <!-- Extend touch target to entire panel -->
-                <span class="absolute inset-0" aria-hidden="true"></span>
-                Create a Virtual Machine
-              </a>
-            </h3>
-            <p class="mt-2 text-sm text-gray-500">Linux-based virtual machines that run on top of virtualized hardware. Comprehensive, cost-effective cloud computing.</p>
-          </div>
-          <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
-            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z" />
+    <div
+      class="
+        divide-y
+        divide-gray-200
+        overflow-hidden
+        rounded-lg
+        bg-gray-200
+        shadow
+        sm:grid
+        sm:grid-cols-2
+        sm:gap-px
+        sm:divide-y-0
+      "
+    >
+      <div
+        class="
+          rounded-tl-lg
+          rounded-tr-lg
+          sm:rounded-tr-none
+          group
+          relative
+          bg-white
+          p-6
+          focus-within:ring-2
+          focus-within:ring-inset
+          focus-within:ring-indigo-500
+        "
+      >
+        <div>
+          <span
+            class="
+              inline-flex
+              rounded-lg
+              p-3
+              bg-teal-50
+              text-teal-700
+              ring-4
+              ring-white
+            "
+          >
+            <svg
+              class="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"
+              />
             </svg>
           </span>
         </div>
-
-        <div class="sm:rounded-tr-lg group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500">
-          <div>
-            <span class="inline-flex rounded-lg p-3 bg-purple-50 text-purple-700 ring-4 ring-white">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
-              </svg>
-            </span>
-          </div>
-          <div class="mt-8">
-            <h3 class="text-base font-semibold leading-6 text-gray-900">
-              <a href="#" class="focus:outline-none">
-                <!-- Extend touch target to entire panel -->
-                <span class="absolute inset-0" aria-hidden="true"></span>
-                Create an Object Storage Bucket
-              </a>
-            </h3>
-            <p class="mt-2 text-sm text-gray-500">Make data storage and delivery easy, reliable and affordable with our S3-compatible object storage.</p>
-          </div>
-          <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
-            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z" />
-            </svg>
-          </span>
+        <div class="mt-8">
+          <h3 class="text-base font-semibold leading-6 text-gray-900">
+            <a href="/vm/create" class="focus:outline-none">
+              <!-- Extend touch target to entire panel -->
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              Create a Virtual Machine
+            </a>
+          </h3>
+          <p class="mt-2 text-sm text-gray-500">Linux-based virtual machines that run on top of virtualized
+            hardware. Comprehensive, cost-effective cloud computing.</p>
         </div>
-
-        <div class="group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500">
-          <div>
-            <span class="inline-flex rounded-lg p-3 bg-sky-50 text-sky-700 ring-4 ring-white">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />              </svg>
-            </span>
-          </div>
-          <div class="mt-8">
-            <h3 class="text-base font-semibold leading-6 text-gray-900">
-              <a href="/profile" class="focus:outline-none">
-                <!-- Extend touch target to entire panel -->
-                <span class="absolute inset-0" aria-hidden="true"></span>
-                Account Settings
-              </a>
-            </h3>
-            <p class="mt-2 text-sm text-gray-500">Update your account details.</p>
-          </div>
-          <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
-            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z" />
-            </svg>
-          </span>
-        </div>
-
-        <div class="group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500">
-          <div>
-            <span class="inline-flex rounded-lg p-3 bg-yellow-50 text-yellow-700 ring-4 ring-white">
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-            </span>
-          </div>
-          <div class="mt-8">
-            <h3 class="text-base font-semibold leading-6 text-gray-900">
-              <a href="#" class="focus:outline-none">
-                <!-- Extend touch target to entire panel -->
-                <span class="absolute inset-0" aria-hidden="true"></span>
-                API Reference
-              </a>
-            </h3>
-            <p class="mt-2 text-sm text-gray-500">Manage your resources programmatically using conventional HTTP requests.</p>
-          </div>
-          <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
-            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z" />
-            </svg>
-          </span>
-        </div>
+        <span
+          class="
+            pointer-events-none
+            absolute
+            right-6
+            top-6
+            text-gray-300
+            group-hover:text-gray-400
+          "
+          aria-hidden="true"
+        >
+          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
+            />
+          </svg>
+        </span>
       </div>
+
+      <div
+        class="
+          sm:rounded-tr-lg
+          group
+          relative
+          bg-white
+          p-6
+          focus-within:ring-2
+          focus-within:ring-inset
+          focus-within:ring-indigo-500
+        "
+      >
+        <div>
+          <span
+            class="
+              inline-flex
+              rounded-lg
+              p-3
+              bg-purple-50
+              text-purple-700
+              ring-4
+              ring-white
+            "
+          >
+            <svg
+              class="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"
+              />
+            </svg>
+          </span>
+        </div>
+        <div class="mt-8">
+          <h3 class="text-base font-semibold leading-6 text-gray-900">
+            <a href="#" class="focus:outline-none">
+              <!-- Extend touch target to entire panel -->
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              Create an Object Storage Bucket
+            </a>
+          </h3>
+          <p class="mt-2 text-sm text-gray-500">Make data storage and delivery easy, reliable and affordable with
+            our S3-compatible object storage.</p>
+        </div>
+        <span
+          class="
+            pointer-events-none
+            absolute
+            right-6
+            top-6
+            text-gray-300
+            group-hover:text-gray-400
+          "
+          aria-hidden="true"
+        >
+          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
+            />
+          </svg>
+        </span>
+      </div>
+
+      <div
+        class="
+          group
+          relative
+          bg-white
+          p-6
+          focus-within:ring-2
+          focus-within:ring-inset
+          focus-within:ring-indigo-500
+        "
+      >
+        <div>
+          <span
+            class="
+              inline-flex
+              rounded-lg
+              p-3
+              bg-sky-50
+              text-sky-700
+              ring-4
+              ring-white
+            "
+          >
+            <svg
+              class="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+          </span>
+        </div>
+        <div class="mt-8">
+          <h3 class="text-base font-semibold leading-6 text-gray-900">
+            <a href="/profile" class="focus:outline-none">
+              <!-- Extend touch target to entire panel -->
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              Account Settings
+            </a>
+          </h3>
+          <p class="mt-2 text-sm text-gray-500">Update your account details.</p>
+        </div>
+        <span
+          class="
+            pointer-events-none
+            absolute
+            right-6
+            top-6
+            text-gray-300
+            group-hover:text-gray-400
+          "
+          aria-hidden="true"
+        >
+          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
+            />
+          </svg>
+        </span>
+      </div>
+
+      <div
+        class="
+          group
+          relative
+          bg-white
+          p-6
+          focus-within:ring-2
+          focus-within:ring-inset
+          focus-within:ring-indigo-500
+        "
+      >
+        <div>
+          <span
+            class="
+              inline-flex
+              rounded-lg
+              p-3
+              bg-yellow-50
+              text-yellow-700
+              ring-4
+              ring-white
+            "
+          >
+            <svg
+              class="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"
+              />
+            </svg>
+          </span>
+        </div>
+        <div class="mt-8">
+          <h3 class="text-base font-semibold leading-6 text-gray-900">
+            <a href="#" class="focus:outline-none">
+              <!-- Extend touch target to entire panel -->
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              API Reference
+            </a>
+          </h3>
+          <p class="mt-2 text-sm text-gray-500">Manage your resources programmatically using conventional HTTP
+            requests.</p>
+        </div>
+        <span
+          class="
+            pointer-events-none
+            absolute
+            right-6
+            top-6
+            text-gray-300
+            group-hover:text-gray-400
+          "
+          aria-hidden="true"
+        >
+          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
+            />
+          </svg>
+        </span>
+      </div>
+    </div>
   </div>
 </div>
