@@ -17,6 +17,7 @@ AllCops:
   Exclude:
     - public/**/*
     - vendor/**/*
+    - node_modules/**/*
 
 RSpec:
   Enabled: true
@@ -38,6 +39,10 @@ Style/FrozenStringLiteralComment:
 
 Layout/HeredocIndentation:
   Enabled: false
+
+Layout/SpaceInsideHashLiteralBraces:
+  Exclude:
+    - 'views/**/*.erb'
 
 RSpec/ExampleLength:
   Enabled: false
