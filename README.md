@@ -412,6 +412,9 @@ create an account. Check the rackup log for the verification link to navigate
 to, in production, we would send that output as email. Having verified, log
 in. You'll see the "Getting Started" page.
 
+When you change any template file, format them with `erb-formatter`:
+    bundle exec erb-format views/**/*.erb --write --print-width 120
+
 ### Conclusion
 
 That's everything there is to know.  As exercise, you can consider

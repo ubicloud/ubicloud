@@ -2,25 +2,16 @@
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        back: "/vm",
-        parts: [["Virtual Machines", "/vm"], %w[Create #]]
-      }
-    ) %>
-    <%== render("components/page_header", locals: {title: "Create Virtual Machine"}) %>
+    <%== render("components/breadcrumb", locals: { back: "/vm", parts: [["Virtual Machines", "/vm"], %w[Create #]] }) %>
+    <%== render("components/page_header", locals: { title: "Create Virtual Machine" }) %>
   </div>
   <!-- Create Card -->
   <div class="mt-8 flow-root">
     <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-        <div
-          class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white"
-        >
+        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white">
           <form action="/vm" method="POST">
-            <!-- YYY: need a better way to manage coupling of routes and erbs
-            -->
+            <!-- YYY: need a better way to manage coupling of routes and erbs -->
             <%== csrf_tag("/vm") %>
             <div class="space-y-12 px-4 py-6 sm:p-8">
               <div class="border-b border-gray-900/10 pb-12">
@@ -49,13 +40,7 @@
                           <label
                             class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50"
                           >
-                            <input
-                              type="radio"
-                              name="location"
-                              value="<%= location.name %>"
-                              class="sr-only"
-                              required
-                            >
+                            <input type="radio" name="location" value="<%= location.name %>" class="sr-only" required>
                             <span><%= location.display_name %></span>
                           </label>
                         <% end %>
@@ -72,13 +57,7 @@
                           <label
                             class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between"
                           >
-                            <input
-                              type="radio"
-                              name="size"
-                              value="<%= size.name %>"
-                              class="sr-only"
-                              required
-                            >
+                            <input type="radio" name="size" value="<%= size.name %>" class="sr-only" required>
                             <span class="flex items-center">
                               <span class="flex flex-col text-sm">
                                 <span class="font-medium text-gray-900"><%= size.display_name %></span>
@@ -92,16 +71,10 @@
                               </span>
                             </span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span
-                                class="size-price font-medium text-gray-900"
-                                data-prices="<%= size.prices.to_json %>"
-                              >-</span>
+                              <span class="size-price font-medium text-gray-900" data-prices="<%= size.prices.to_json %>">-</span>
                               <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
                             </span>
-                            <span
-                              class="pointer-events-none absolute -inset-px rounded-lg border-2"
-                              aria-hidden="true"
-                            ></span>
+                            <span class="pointer-events-none absolute -inset-px rounded-lg border-2" aria-hidden="true"></span>
                           </label>
                         <% end %>
                       </div>
@@ -119,13 +92,7 @@
                           <label
                             class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50"
                           >
-                            <input
-                              type="radio"
-                              name="boot-image"
-                              value="<%= image.name %>"
-                              class="sr-only"
-                              required
-                            >
+                            <input type="radio" name="boot-image" value="<%= image.name %>" class="sr-only" required>
                             <span><%= image.display_name %></span>
                           </label>
                         <% end %>
@@ -165,8 +132,7 @@
                         required
                       ></textarea>
                     </div>
-                    <p class="mt-3 text-sm leading-6 text-gray-600">SSH keys are a more secure method of logging into a
-                      server.</p>
+                    <p class="mt-3 text-sm leading-6 text-gray-600">SSH keys are a more secure method of logging into a server.</p>
                   </div>
                 </div>
               </div>
