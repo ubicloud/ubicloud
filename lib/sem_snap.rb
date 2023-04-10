@@ -44,6 +44,7 @@ class SemSnap
   private
 
   def apply
+    return if @defer_delete.empty?
     Semaphore.where(strand_id: @strand_id, id: @defer_delete).delete
     @defer_delete.clear
   end
