@@ -17,6 +17,7 @@ AllCops:
   Exclude:
     - public/**/*
     - vendor/**/*
+    - node_modules/**/*
 
 RSpec:
   Enabled: true

@@ -1,40 +1,155 @@
-<form action="create" method="POST">
-  <!-- YYY: need a better way to manage coupling of routes and erbs -->
-  <%== csrf_tag("/vm/create") %>
-  <div class="form-group">
-    <label for="name">Name</label>
-    <input type="text" class="form-control" id="name" name="name" placeholder="Enter name">
+<% @page_title = "Create Virtual Machine" %>
+
+<div class="px-2 sm:px-3 lg:px-4">
+  <div class="space-y-1">
+    <%== render("components/breadcrumb", locals: { back: "/vm", parts: [["Virtual Machines", "/vm"], %w[Create #]] }) %>
+    <%== render("components/page_header", locals: { title: "Create Virtual Machine" }) %>
   </div>
-  <div class="form-group">
-    <label for="size">Size</label>
-    <select class="form-control" id="size" name="size">
-      <option value="standard-1">standard-1</option>
-      <option value="standard-2">standard-2</option>
-      <option value="standard-4">standard-4</option>
-    </select>
+  <!-- Create Card -->
+  <div class="mt-8 flow-root">
+    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+      <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white">
+          <form action="/vm" method="POST">
+            <!-- YYY: need a better way to manage coupling of routes and erbs -->
+            <%== csrf_tag("/vm") %>
+            <div class="space-y-12 px-4 py-6 sm:p-8">
+              <div class="border-b border-gray-900/10 pb-12">
+                <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
+                <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your virtual machine.</p>
+                <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+                  <div class="sm:col-span-4">
+                    <label for="name" class="block text-sm font-medium leading-6 text-gray-900">Name</label>
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      class="mt-2 block sm:max-w-md rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      placeholder="Enter Name"
+                      required
+                    >
+                  </div>
+                  <div class="col-span-full">
+                    <div class="flex items-center justify-between">
+                      <h2 class="text-sm font-medium leading-6 text-gray-900">Location</h2>
+                    </div>
+                    <fieldset class="mt-2 radio-small-cards" id="location-radios">
+                      <legend class="sr-only">Choose a location option</legend>
+                      <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
+                        <% Option::Locations.each do |location| %>
+                          <label
+                            class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50"
+                          >
+                            <input type="radio" name="location" value="<%= location.name %>" class="sr-only" required>
+                            <span><%= location.display_name %></span>
+                          </label>
+                        <% end %>
+                      </div>
+                    </fieldset>
+                  </div>
+                  <div class="col-span-full">
+                    <div class="flex items-center justify-between">
+                      <h2 class="text-sm font-medium leading-6 text-gray-900">Server size</h2>
+                    </div>
+                    <fieldset class="mt-2 radio-stacked-cards" id="size-radios">
+                      <div class="space-y-4">
+                        <% Option::VmSizes.each do |size| %>
+                          <label
+                            class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between"
+                          >
+                            <input type="radio" name="size" value="<%= size.name %>" class="sr-only" required>
+                            <span class="flex items-center">
+                              <span class="flex flex-col text-sm">
+                                <span class="font-medium text-gray-900"><%= size.display_name %></span>
+                                <span class="text-gray-500">
+                                  <span class="block sm:inline"><%= size.memory %>GB /
+                                    <%= size.vcpu %>
+                                    CPUs</span>
+                                  <span class="hidden sm:mx-1 sm:inline" aria-hidden="true">&middot;</span>
+                                  <span class="block sm:inline"><%= size.disk %>GB SSD disk</span>
+                                </span>
+                              </span>
+                            </span>
+                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
+                              <span class="size-price font-medium text-gray-900" data-prices="<%= size.prices.to_json %>">-</span>
+                              <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
+                            </span>
+                            <span class="pointer-events-none absolute -inset-px rounded-lg border-2" aria-hidden="true"></span>
+                          </label>
+                        <% end %>
+                      </div>
+                    </fieldset>
+
+                  </div>
+                  <div class="col-span-full">
+                    <div class="flex items-center justify-between">
+                      <h2 class="text-sm font-medium leading-6 text-gray-900">Boot Image</h2>
+                    </div>
+                    <fieldset class="mt-2 radio-small-cards" id="boot-image-radios">
+                      <legend class="sr-only">Choose a image option</legend>
+                      <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
+                        <% Option::BootImages.each do |image| %>
+                          <label
+                            class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50"
+                          >
+                            <input type="radio" name="boot-image" value="<%= image.name %>" class="sr-only" required>
+                            <span><%= image.display_name %></span>
+                          </label>
+                        <% end %>
+                      </div>
+                    </fieldset>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border-b border-gray-900/10 pb-12">
+                <h2 class="text-base font-semibold leading-7 text-gray-900">Login Information</h2>
+                <p class="mt-1 text-sm leading-6 text-gray-600">This information will be used to login virtual machine.</p>
+
+                <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+                  <div class="sm:col-span-4">
+                    <label for="user" class="block text-sm font-medium leading-6 text-gray-900">User</label>
+                    <input
+                      type="text"
+                      name="user"
+                      id="user"
+                      class="mt-2 block sm:max-w-md rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      placeholder="Unix username"
+                      value="ubi"
+                      required
+                    >
+                  </div>
+
+                  <div class="col-span-full">
+                    <label for="about" class="block text-sm font-medium leading-6 text-gray-900">SSH Public Key</label>
+                    <div class="mt-2">
+                      <textarea
+                        id="public-key"
+                        name="public-key"
+                        rows="3"
+                        class="block w-full rounded-md border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:py-1.5 sm:text-sm sm:leading-6"
+                        placeholder="ssh-ed25519 AAAA.."
+                        required
+                      ></textarea>
+                    </div>
+                    <p class="mt-3 text-sm leading-6 text-gray-600">SSH keys are a more secure method of logging into a server.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-8 flex items-center justify-end gap-x-6 px-8">
+              <a href="/vm" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <button
+                type="submit"
+                class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              >
+                Create
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="form-group">
-    <label for="location">Location</label>
-    <select class="form-control" id="location" name="location">
-      <option value="hetzner-hel1">Hetzner Helsinki</option>
-      <option value="hetzner-nbg1">Hetzner Nuremberg</option>
-      <option value="equinix-da11">Equinix Dallas 11</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <label for="user">User</label>
-    <input type="text" class="form-control" id="user" name="user" placeholder="unix user" value="ubi">
-  </div>
-  <div class="form-group">
-    <label for="public-key">SSH Public Key</label>
-    <input type="text" class="form-control" id="public-key" name="public-key" placeholder="ssh-ed25519 AAAA...">
-  </div>
-  <div class="form-group">
-    <label for="size">Boot Image</label>
-    <select class="form-control" id="boot-image" name="boot-image">
-      <option value="ubuntu-jammy">Ubuntu Jammy 22.04 LTS</option>
-      <option value="almalinux-9.1">AlmaLinux 9.1</option>
-    </select>
-  </div>
-  <button type="submit" class="btn btn-primary">Create Virtual Machine</button>
-</form>
+</div>
