@@ -79,11 +79,7 @@
         <% if rodauth.logged_in? %>
           <form action="/logout" class="navbar-form pull-right" method="post">
             <%== csrf_tag("/logout") %>
-            <input
-              class="btn btn-primary form-control auth-button"
-              type="submit"
-              value="Logout"
-            />
+            <input class="btn btn-primary form-control auth-button" type="submit" value="Logout"/>
           </form>
         <% end %>
       </div>

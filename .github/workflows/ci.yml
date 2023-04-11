@@ -41,6 +41,11 @@ jobs:
         ruby-version: .tool-versions
         bundler-cache: true
 
+    - name: Run erb-formatter
+      run: |
+        bundle exec erb-format views/**/*.erb --write --print-width 120
+        git diff --exit-code
+
     - name: Run rubocop
       run: bundle exec rubocop
 
