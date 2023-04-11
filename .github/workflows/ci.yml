@@ -49,6 +49,9 @@ jobs:
     - name: Run rubocop
       run: bundle exec rubocop
 
+    - name: Run brakeman
+      run: bundle exec brakeman --force -Aq
+
     - name: Apply migrations
       env:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
