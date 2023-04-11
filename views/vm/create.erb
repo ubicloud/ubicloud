@@ -3,13 +3,7 @@
   <%== csrf_tag("/vm/create") %>
   <div class="form-group">
     <label for="name">Name</label>
-    <input
-      type="text"
-      class="form-control"
-      id="name"
-      name="name"
-      placeholder="Enter name"
-    >
+    <input type="text" class="form-control" id="name" name="name" placeholder="Enter name">
   </div>
   <div class="form-group">
     <label for="size">Size</label>
@@ -29,24 +23,11 @@
   </div>
   <div class="form-group">
     <label for="user">User</label>
-    <input
-      type="text"
-      class="form-control"
-      id="user"
-      name="user"
-      placeholder="unix user"
-      value="ubi"
-    >
+    <input type="text" class="form-control" id="user" name="user" placeholder="unix user" value="ubi">
   </div>
   <div class="form-group">
     <label for="public-key">SSH Public Key</label>
-    <input
-      type="text"
-      class="form-control"
-      id="public-key"
-      name="public-key"
-      placeholder="ssh-ed25519 AAAA..."
-    >
+    <input type="text" class="form-control" id="public-key" name="public-key" placeholder="ssh-ed25519 AAAA...">
   </div>
   <div class="form-group">
     <label for="size">Boot Image</label>
