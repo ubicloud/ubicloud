@@ -12,17 +12,6 @@ $(".toggle-mobile-menu").on("click", function (event) {
     }
 });
 
-$(".radio-small-cards input[type=radio]").on("change", function (event) {
-    let name = $(this).attr("name");
-    $(`#${name}-radios label`)
-        .addClass("ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50")
-        .removeClass("ring-2 ring-indigo-600 ring-offset-2 bg-indigo-600 text-white hover:bg-indigo-500");
-    $(this)
-        .parent()
-        .removeClass("ring-1 ring-inset ring-gray-300 bg-white text-gray-900 hover:bg-gray-50")
-        .addClass("ring-2 ring-indigo-600 ring-offset-2 bg-indigo-600 text-white hover:bg-indigo-500");
-});
-
 $(".radio-stacked-cards input[type=radio]").on("change", function (event) {
     let name = $(this).attr("name");
     $(`#${name}-radios label`).removeClass("border-indigo-600 ring-2 ring-indigo-600");
@@ -45,12 +34,13 @@ $(".delete-btn").on("click", function (event) {
     let url = $(this).data("url");
     let csrf = $(this).data("csrf");
     let confirmation = $(this).data("confirmation");
+    let redirect = $(this).data("redirect");
 
     if (!confirm("Are you sure to delete?")) {
         return;
     }
 
-    if (confirmation && prompt("Please enter resource name to confirm deletion", "") != confirmation) {
+    if (confirmation && prompt(`Please type "${confirmation}" to confirm deletion`, "") != confirmation) {
         alert("Could not confirm resource name");
         return;
     }
@@ -60,7 +50,7 @@ $(".delete-btn").on("click", function (event) {
         type: 'DELETE',
         data: { '_csrf': csrf },
         success: function (result) {
-            window.location.href = "/vm";
+            window.location.href = redirect;
         },
         error: function (xhr, ajaxOptions, thrownError) {
             alert(`Error: ${thrownError}`);
@@ -72,7 +62,10 @@ $(".copy-content").on("click", function (event) {
     let content = $(this).data("content");
     let message = $(this).data("message");
     navigator.clipboard.writeText(content);
-    notification(message);
+
+    if (message) {
+        notification(message);
+    }
 })
 
 $(".back-btn").on("click", function (event) {
