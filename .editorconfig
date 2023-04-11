@@ -1,0 +1,14 @@
+root = true
+
+[*]
+end_of_line = lf
+indent_style = space
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.{md}]
+indent_size = 4
+
+[*.{rb,erb,js}]
+indent_size = 2
