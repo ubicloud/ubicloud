@@ -6,6 +6,7 @@ require_relative "common"
 require "fileutils"
 require "netaddr"
 require_relative "vm_path"
+require_relative "cloud_hypervisor"
 
 class VmSetup
   def initialize(vm_name)
@@ -228,14 +229,14 @@ After=network.target
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
-ExecStart=/opt/cloud-hypervisor/v30.0/cloud-hypervisor \
-      --api-socket path=#{vp.ch_api_sock}              \
-      --kernel /opt/fw/v0.4.2/hypervisor-fw            \
-      --disk path=#{vp.boot_raw}                       \
-      --disk path=#{vp.cloudinit_img}                  \
-      --console off --serial file=#{vp.serial_log}     \
-      --cpus boot=4                                    \
-      --memory size=1024M                              \
+ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
+      --api-socket path=#{vp.ch_api_sock}                                     \
+      --kernel /opt/fw/v0.4.2/hypervisor-fw                                   \
+      --disk path=#{vp.boot_raw}                                              \
+      --disk path=#{vp.cloudinit_img}                                         \
+      --console off --serial file=#{vp.serial_log}                            \
+      --cpus boot=4                                                           \
+      --memory size=1024M                                                     \
       --net "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask="
 ExecStop=/opt/cloud-hypervisor/v30.0/ch-remote --api-socket #{vp.ch_api_sock} shutdown-vmm
 Restart=no
@@ -259,7 +260,7 @@ SERVICE
       "/usr/sbin/ip", "netns", "exec", @vm_name,
       "/usr/bin/setpriv", "--reuid=#{u.uid}", "--regid=#{u.gid}", "--init-groups", "--reset-env",
       "--",
-      "/opt/cloud-hypervisor/v30.0/cloud-hypervisor",
+      "/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor",
       "--api-socket", "path=#{vp.ch_api_sock}",
       "--kernel", "/opt/fw/v0.4.2/hypervisor-fw",
       "--disk", "path=#{vp.boot_raw}",

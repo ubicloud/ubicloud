@@ -2,20 +2,18 @@
 # frozen_string_literal: true
 
 require_relative "../lib/common"
+require_relative "../lib/cloud_hypervisor"
 require "fileutils"
-
-# cloud-hypervisor version
-ch_v = "30.0"
 
 # YYY: we should check against digests of each artifact, to detect and
 # report any unexpected content changes (e.g., supply chain attack).
 
-ch_dir = "/opt/cloud-hypervisor/v#{ch_v}"
+ch_dir = "/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}"
 FileUtils.mkdir_p(ch_dir)
 FileUtils.cd ch_dir do
-  r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{ch_v}/ch-remote"
+  r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{CloudHypervisor::VERSION}/ch-remote"
   FileUtils.chmod "a+x", "ch-remote"
-  r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{ch_v}/cloud-hypervisor"
+  r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{CloudHypervisor::VERSION}/cloud-hypervisor"
   FileUtils.chmod "a+x", "cloud-hypervisor"
 end
 
