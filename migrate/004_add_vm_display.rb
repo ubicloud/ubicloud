@@ -2,7 +2,6 @@
 
 Sequel.migration do
   change do
-    extension :pg_enum
     create_enum(:vm_display_state, %w[creating running])
 
     alter_table(:vm_host) do

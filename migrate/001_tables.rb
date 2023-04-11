@@ -2,8 +2,6 @@
 
 Sequel.migration do
   change do
-    extension :pg_enum
-
     create_enum(:allocation_state, %w[unprepared accepting draining])
 
     create_table(:strand) do
