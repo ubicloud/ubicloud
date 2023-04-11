@@ -39,6 +39,10 @@ Style/FrozenStringLiteralComment:
 Layout/HeredocIndentation:
   Enabled: false
 
+Layout/SpaceInsideHashLiteralBraces:
+  Exclude:
+    - 'views/**/*.erb'
+
 RSpec/ExampleLength:
   Enabled: false
 

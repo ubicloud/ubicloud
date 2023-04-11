@@ -26,7 +26,7 @@ gem "zeitwerk"
 gem "warning"
 
 group :development do
-  gem "erb-formatter"
+  gem "erb-formatter", github: "fdr/erb-formatter", ref: "5ecacb2cd5544a41de969bc86b57a98523f0ce06"
   gem "pry"
   gem "pry-byebug"
   gem "rackup"
