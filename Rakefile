@@ -8,6 +8,7 @@ migrate = lambda do |env, version|
   require "logger"
   require "sequel"
   Sequel.extension :migration
+  DB.extension :pg_enum
 
   DB.loggers << Logger.new($stdout) if DB.loggers.empty?
   Sequel::Migrator.apply(DB, "migrate", version)
