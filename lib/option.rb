@@ -16,7 +16,8 @@ module Option
 
   BootImages = [
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
-    ["almalinux-9.1", "AlmaLinux 9.1"]
+    ["almalinux-9.1", "AlmaLinux 9.1"],
+    ["opensuse-leap-15.4", "openSUSE Leap 15.4"]
   ].map { |args| BootImage.new(*args) }.freeze
 
   VmSizes = [

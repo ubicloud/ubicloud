@@ -180,7 +180,8 @@ EOS
   def boot_disk(boot_image)
     urls = {
       "ubuntu-jammy" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
-      "almalinux-9.1" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.1-20221118.x86_64.qcow2"
+      "almalinux-9.1" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.1-20221118.x86_64.qcow2",
+      "opensuse-leap-15.4" => "https://mirror.dogado.de/opensuse/distribution/leap/15.4/appliances/openSUSE-Leap-15.4-Minimal-VM.x86_64-15.4.0-OpenStack-Cloud-Build31.185.qcow2"
     }
 
     download = urls.fetch(boot_image)
