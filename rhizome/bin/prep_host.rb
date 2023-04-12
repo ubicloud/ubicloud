@@ -17,12 +17,11 @@ FileUtils.cd ch_dir do
   FileUtils.chmod "a+x", "cloud-hypervisor"
 end
 
-# rust-hypervisor-firmware version
-fw_v = "0.4.2"
-fw_dir = "/opt/fw/v#{fw_v}"
+# edk2 firmware
+fw_dir = File.dirname(CloudHypervisor.firmware)
 FileUtils.mkdir_p(fw_dir)
 FileUtils.cd fw_dir do
-  r "curl -L3 -O https://github.com/cloud-hypervisor/rust-hypervisor-firmware/releases/download/#{fw_v}/hypervisor-fw"
+  r "curl -L3 -o #{CloudHypervisor.firmware.shellescape} https://github.com/fdr/edk2/releases/download/#{CloudHypervisor::FIRMWARE_VERSION}/CLOUDHV.fd"
 end
 
 # Host-level network packet forwarding, otherwise packets cannot leave

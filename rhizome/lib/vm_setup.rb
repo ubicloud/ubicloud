@@ -217,10 +217,6 @@ EOS
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
     # from VmPath is also a good idea.
-
-    # YYY: Write helpers to select ch-remote and cloud-hypervisor
-    # binaries.  The `/opt/cloud-hypervisor/#{version}` paths are
-    # strewn around, and unmanable once there are multiple versions.
     vp.write_systemd_service <<SERVICE
 [Unit]
 Description=#{@vm_name}
@@ -232,7 +228,7 @@ ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
 ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
 --api-socket path=#{vp.ch_api_sock} \
---kernel /opt/fw/v0.4.2/hypervisor-fw \
+--kernel #{CloudHypervisor.firmware} \
 --disk path=#{vp.boot_raw} \
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
@@ -264,7 +260,7 @@ SERVICE
       "--",
       "/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor",
       "--api-socket", "path=#{vp.ch_api_sock}",
-      "--kernel", "/opt/fw/v0.4.2/hypervisor-fw",
+      "--kernel", CloudHypervisor.firmware,
       "--disk", "path=#{vp.boot_raw}",
       "--disk", "path=#{vp.cloudinit_img}",
       "--console", "off", "--serial", serial_device,
