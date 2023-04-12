@@ -1,0 +1,45 @@
+<% @page_title = "Create Tag Space" %>
+
+<div class="px-2 sm:px-3 lg:px-4">
+  <div class="space-y-1">
+    <%== render("components/breadcrumb", locals: { back: "/tag-space", parts: [["Tag Spaces", "/tag-space"], %w[Create #]] }) %>
+    <%== render("components/page_header", locals: { title: "Create Tag Space" }) %>
+  </div>
+  <!-- Create Card -->
+  <div class="mt-8 flow-root">
+    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+      <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white">
+          <form action="/tag-space" method="POST">
+            <!-- YYY: need a better way to manage coupling of routes and erbs -->
+            <%== csrf_tag("/tag-space") %>
+            <div class="space-y-12 px-4 py-6 sm:p-8">
+              <div class="border-b border-gray-900/10 pb-12">
+                <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+                  <div class="sm:col-span-3">
+                    <%== render(
+                      "components/form/text",
+                      locals: {
+                        name: "name",
+                        label: "Name",
+                        attributes: {
+                          required: true,
+                          placeholder: "Enter name"
+                        }
+                      }
+                    ) %>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-8 flex items-center justify-end gap-x-6 px-8">
+              <a href="/vm" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+              <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

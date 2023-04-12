@@ -1,0 +1,97 @@
+<% @page_title = "#{@tag_space.name} - Users" %>
+
+<div class="px-2 sm:px-3 lg:px-4">
+  <div class="space-y-1">
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: "/tag-space",
+        parts: [["Tag Spaces", "/tag-space"], [@tag_space.name, "/tag-space/#{@tag_space.id}"], %w[Users #]]
+      }
+    ) %>
+    <%== render("components/page_header", locals: { title: @tag_space.name }) %>
+  </div>
+
+  <main class="mt-4 md:mt-8">
+    <div class="max-w-screen-xl pb-6 lg:pb-16">
+      <div class="overflow-hidden rounded-lg bg-white shadow">
+        <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+          <%== render("tag_space/show_sidebar") %>
+          <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
+            <!-- Invite user -->
+            <form action="<%= "/tag-space/#{@tag_space.id}/user" %>" role="form" method="POST">
+              <%== csrf_tag("/tag-space/#{@tag_space.id}/user") %>
+              <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+                <div>
+                  <h2 class="text-lg font-medium leading-6 text-gray-900">Invite a new user</h2>
+                  <p class="mt-1 text-sm text-gray-500">
+                    You can invite new users to your tag space, though initially they will not have any permissions.
+                    You may modify the tag space access policy to grant permissions to these new users.
+                  </p>
+                </div>
+                <div class="grid grid-cols-12 gap-6">
+                  <div class="col-span-9 sm:col-span-6">
+                    <%== render(
+                      "components/form/text",
+                      locals: {
+                        name: "email",
+                        type: "email",
+                        attributes: {
+                          required: true,
+                          placeholder: "Email"
+                        }
+                      }
+                    ) %>
+                  </div>
+                  <div class="col-span-3 sm:col-span-6">
+                    <%== render("components/form/submit_button", locals: { text: "Invite" }) %>
+                  </div>
+                </div>
+              </div>
+            </form>
+            <!-- List users -->
+            <div>
+              <div class="px-4 py-6 sm:px-6">
+                <h2 class="text-lg font-medium leading-6 text-gray-900">Users</h2>
+                <p class="mt-1 text-sm text-gray-500">
+                  Access policies can be utilized to grant permissions to these users. While they will be able to see
+                  that they are a part of the tag space, they will not have access to its details without the proper
+                  permissions.
+                </p>
+              </div>
+              <table class="min-w-full divide-y divide-gray-300">
+                <thead class="">
+                  <tr>
+                    <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Email</th>
+                    <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6">
+                      <span class="sr-only">Remove</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 bg-white">
+                  <% @users.each do |user| %>
+                    <tr id="user-<%= user.id%>" class="whitespace-nowrap text-sm font-medium">
+                      <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= user.email %></td>
+                      <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                        <button
+                          type="button"
+                          data-url="<%= "/tag-space/#{@tag_space.id}/user/#{user.id}" %>"
+                          data-csrf="<%= csrf_token("/tag-space/#{@tag_space.id}/user/#{user.id}", "DELETE") %>"
+                          data-confirmation="<%= user.email %>"
+                          data-redirect="<%= "/tag-space/#{@tag_space.id}/user" %>"
+                          class="delete-btn text-rose-600 hover:text-rose-900"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

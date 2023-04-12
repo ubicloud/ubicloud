@@ -10,13 +10,14 @@ RSpec.describe Prog::Vm::Nexus do
 
   let(:st) { Strand.new }
   let(:vm) { Vm.new(size: "m5a.2x") }
+  let(:tg) { TagSpace.create(name: "default").tap { _1.associate_with_tag_space(_1) } }
 
   it "creates the user and key record" do
     private_subnets = [
       NetAddr::IPv6Net.parse("fd55:666:cd1a:ffff::/64"),
       NetAddr::IPv6Net.parse("fd12:345:6789:0abc::/64")
     ]
-    st = described_class.assemble("some_ssh_key", private_subnets: private_subnets)
+    st = described_class.assemble("some_ssh_key", tg.id, private_subnets: private_subnets)
     prog = described_class.new(st)
     vm = prog.vm
     vm.ephemeral_net6 = "fe80::/64"
