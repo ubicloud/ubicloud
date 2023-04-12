@@ -18,7 +18,7 @@
                 <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
                 <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your virtual machine.</p>
                 <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-                  <div class="sm:col-span-2">
+                  <div class="sm:col-span-3">
                     <%== render(
                       "components/form/text",
                       locals: {
@@ -27,6 +27,19 @@
                         attributes: {
                           required: true,
                           placeholder: "Enter name"
+                        }
+                      }
+                    ) %>
+                  </div>
+                  <div class="sm:col-span-3">
+                    <%== render(
+                      "components/form/select",
+                      locals: {
+                        name: "tag-space-id",
+                        label: "Tag Space",
+                        options: @tag_spaces.to_h { |tg| [tg.id, tg.name] },
+                        attributes: {
+                          required: true
                         }
                       }
                     ) %>

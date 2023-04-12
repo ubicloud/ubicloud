@@ -43,6 +43,7 @@ class Clover < Roda
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :hash_branch_view_subdir
   plugin :all_verbs
+  plugin :request_headers
 
   logger = if ENV["RACK_ENV"] == "test"
     Class.new {
@@ -103,6 +104,11 @@ class Clover < Roda
       @error_code = 419
       @error_title = "Invalid Security Token"
       @error_detail = "An invalid security token was submitted with this request, and this request could not be processed."
+    when Authorization::Unauthorized
+      response.status = 403
+      @error_code = 403
+      @error_title = "Forbidden"
+      @error_detail = "Sorry, you don't have permission to continue with this request."
     else
       $stderr.print "#{e.class}: #{e.message}\n"
       warn e.backtrace
@@ -112,6 +118,16 @@ class Clover < Roda
       @error_title = "Unexcepted Error"
       @error_detail = "Sorry, we couldn’t process your request because of an unexpected error."
     end
+
+    if request.headers["Accept"] == "application/json"
+      response["Content-Type"] = "application/json"
+      return {
+        error_code: @error_code,
+        error_title: @error_title,
+        error_detail: @error_detail
+      }.to_json
+    end
+
     view "/error"
   end
 
@@ -161,6 +177,10 @@ class Clover < Roda
     create_account_view { view "auth/create_account", "Create Account" }
     create_account_redirect { login_route }
     create_account_set_password? true
+    after_create_account do
+      current_user = Account[account_id]
+      current_user.create_tag_space_with_default_policy("#{current_user.username}_default_tag_space")
+    end
 
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }

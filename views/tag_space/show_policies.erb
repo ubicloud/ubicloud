@@ -1,0 +1,102 @@
+<% @page_title = "#{@tag_space.name} - Policy" %>
+
+<div class="px-2 sm:px-3 lg:px-4">
+  <div class="space-y-1">
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: "/tag-space",
+        parts: [["Tag Spaces", "/tag-space"], [@tag_space.name, "/tag-space/#{@tag_space.id}"], %w[Policy #]]
+      }
+    ) %>
+    <%== render("components/page_header", locals: { title: @tag_space.name }) %>
+  </div>
+
+  <main class="mt-4 md:mt-8">
+    <div class="max-w-screen-xl pb-6 lg:pb-16">
+      <div class="overflow-hidden rounded-lg bg-white shadow">
+        <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+          <%== render("tag_space/show_sidebar") %>
+          <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
+            <!-- Invite user -->
+            <form action="<%= "/tag-space/#{@tag_space.id}/policy/#{@policy.id}" %>" role="form" method="POST">
+              <%== csrf_tag("/tag-space/#{@tag_space.id}/policy/#{@policy.id}") %>
+              <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+                <div>
+                  <h2 class="text-lg font-medium leading-6 text-gray-900">Update policy</h2>
+                </div>
+                <div class="grid grid-cols-12 gap-6">
+                  <div class="col-span-full">
+                    <div class="policy-editor">
+                      <pre class="bg-gray-50 rounded-lg p-3 h-[60vh] overflow-scroll" contenteditable="true">
+                        <%= @policy.body %>
+                      </pre>
+                      <textarea name="body" class="hidden" required></textarea>
+                    </div>
+                  </div>
+                  <div class="col-span-3 sm:col-span-6">
+                    <%== render("components/form/submit_button", locals: { text: "Update" }) %>
+                  </div>
+                </div>
+                <div class="mt-12 text-sm text-gray-500">
+                  <h4 class="font-medium text-gray-900 text-lg">Access Policy Language</h4>
+                  <p class="mt-2">
+                    Access policies have 3 main parts: subjects, powers, and objects. All of them can be a single
+                    string or a list of strings.
+                    <span class="text-gray-700 font-medium">"TagSpace/&lt;NAME&gt;"</span>,
+                    <span class="text-gray-700 font-medium">"User/&lt;EMAIL&gt;"</span>,
+                    <span class="text-gray-700 font-medium">"Vm/&lt;NAME&gt;"</span>
+                    or custom tags can be used for subjects, and objects. To use a tag in policy, it should have to
+                    assoaciated with the tag space. Powers are predefined.
+                  </p>
+                  <table class="mt-4 min-w-full divide-y divide-gray-300 text-left text-sm">
+                    <thead class="font-semibold">
+                      <tr>
+                        <th scope="col" class="px-2 py-3.5 text-gray-900 border">Power</th>
+                        <th scope="col" class="px-2 py-3.5 text-gray-900 border">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 ">
+                      <tr>
+                        <td class="px-2 py-2 text-gray-500 border">Vm:view</td>
+                        <td class="px-2 py-2 text-gray-500 border">Grants permission to view Vm resources</td>
+                      </tr>
+                      <tr>
+                        <td class="px-2 py-2 text-gray-500 border">Vm:create</td>
+                        <td class="px-2 py-2 text-gray-500 border">Grants permission to create Vm in TagSpace</td>
+                      </tr>
+                      <tr>
+                        <td class="px-2 py-2 text-gray-500 border">Vm:delete</td>
+                        <td class="px-2 py-2 text-gray-500 border">Grants permission to delete Vm</td>
+                      </tr>
+                      <tr>
+                        <td class="px-2 py-2 text-gray-500 border">TagSpace:view</td>
+                        <td class="px-2 py-2 text-gray-500 border">Grants permission to view TagSpace details</td>
+                      </tr>
+                      <tr>
+                        <td class="px-2 py-2 text-gray-500 border">TagSpace:delete</td>
+                        <td class="px-2 py-2 text-gray-500 border">Grants permission to delete TagSpace</td>
+                      </tr>
+                      <tr>
+                        <td class="px-2 py-2 text-gray-500 border">TagSpace:user</td>
+                        <td class="px-2 py-2 text-gray-500 border">Grants permission to add/remove users to/from TagSpace</td>
+                      </tr>
+                      <tr>
+                        <td class="px-2 py-2 text-gray-500 border">TagSpace:policy</td>
+                        <td class="px-2 py-2 text-gray-500 border">Grants permission to update TagSpace's access policies</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p class="mt-2">
+                    Be careful while updating policy, if you remove your tag space permissions, you may lose your
+                    access to this tag space.
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
