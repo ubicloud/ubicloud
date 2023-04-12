@@ -3,16 +3,32 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "vm" do
+  let(:user) { Account[email: "user@example.com"] }
+
+  let(:tag_space) { user.create_tag_space_with_default_policy("tag-space-1") }
+
+  let(:tag_space_wo_permissions) { user.create_tag_space_with_default_policy("tag-space-2", policy_body: []) }
+
   let(:vm) do
-    vm = Prog::Vm::Nexus.assemble("dummy-public-key", name: "dummy-vm").vm
+    vm = Prog::Vm::Nexus.assemble("dummy-public-key", tag_space.id, name: "dummy-vm-1").vm
     vm.update(ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
     vm.reload # without reload ephemeral_net6 is string and can't call .network
   end
 
-  it "can not access without login" do
-    visit "/vm"
+  let(:vm_wo_permission) { Prog::Vm::Nexus.assemble("dummy-public-key", tag_space_wo_permissions.id, name: "dummy-vm-2").vm }
 
-    expect(page.title).to eq("Ubicloud - Login")
+  describe "unauthenticated" do
+    it "can not list without login" do
+      visit "/vm"
+
+      expect(page.title).to eq("Ubicloud - Login")
+    end
+
+    it "can not create without login" do
+      visit "/vm/create"
+
+      expect(page.title).to eq("Ubicloud - Login")
+    end
   end
 
   describe "authenticated" do
@@ -20,65 +36,120 @@ RSpec.describe Clover, "vm" do
       login
     end
 
-    it "can list no virtual machines" do
-      visit "/vm"
+    describe "list" do
+      it "can list no virtual machines" do
+        visit "/vm"
 
-      expect(page.title).to eq("Ubicloud - Virtual Machines")
-      expect(page).to have_content "No virtual machines"
+        expect(page.title).to eq("Ubicloud - Virtual Machines")
+        expect(page).to have_content "No virtual machines"
 
-      click_link "New Virtual Machine"
-      expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        click_link "New Virtual Machine"
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+      end
+
+      it "can not list virtual machines when does not have permissions" do
+        vm
+        vm_wo_permission
+        visit "/vm"
+
+        expect(page.title).to eq("Ubicloud - Virtual Machines")
+        expect(page).to have_content vm.name
+        expect(page).not_to have_content vm_wo_permission.name
+      end
     end
 
-    it "can create new virtual machine" do
-      visit "/vm/create"
+    describe "create" do
+      it "can create new virtual machine" do
+        tag_space
+        visit "/vm/create"
 
-      expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
-      fill_in "Name", with: "dummy-vm"
-      choose option: "hetzner-hel1"
-      choose option: "ubuntu-jammy"
-      choose option: "m5a.2x"
+        fill_in "Name", with: "dummy-vm"
+        select tag_space.name, from: "tag-space-id"
+        choose option: "hetzner-hel1"
+        choose option: "ubuntu-jammy"
+        choose option: "m5a.2x"
 
-      click_button "Create"
+        click_button "Create"
 
-      expect(page.title).to eq("Ubicloud - Virtual Machines")
-      expect(page).to have_content "'dummy-vm' will be ready in a few minutes"
-      expect(Vm.count).to eq(1)
+        expect(page.title).to eq("Ubicloud - Virtual Machines")
+        expect(page).to have_content "'dummy-vm' will be ready in a few minutes"
+        expect(Vm.count).to eq(1)
+      end
+
+      it "can not select tag space when does not have permissions" do
+        tag_space
+        tag_space_wo_permissions
+        visit "/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+
+        select tag_space.name, from: "tag-space-id"
+        expect { select tag_space_wo_permissions.name, from: "tag-space-id" }.to raise_error Capybara::ElementNotFound
+      end
     end
 
-    it "can show virtual machine details" do
-      shadow = Clover::VmShadow.new(vm)
-      visit "/vm"
+    describe "show" do
+      it "can show virtual machine details" do
+        shadow = Clover::VmShadow.new(vm)
+        visit "/vm"
 
-      expect(page.title).to eq("Ubicloud - Virtual Machines")
-      expect(page).to have_content shadow.name
+        expect(page.title).to eq("Ubicloud - Virtual Machines")
+        expect(page).to have_content shadow.name
 
-      click_link "Show", href: "/vm/#{shadow.id}"
+        click_link "Show", href: "/vm/#{shadow.id}"
 
-      expect(page.title).to eq("Ubicloud - #{shadow.name}")
-      expect(page).to have_content shadow.name
+        expect(page.title).to eq("Ubicloud - #{shadow.name}")
+        expect(page).to have_content shadow.name
+      end
+
+      it "raises forbidden when does not have permissions" do
+        shadow = Clover::VmShadow.new(vm_wo_permission)
+        visit "/vm/#{shadow.id}"
+
+        expect(page.title).to eq("Ubicloud - Forbidden")
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content "Forbidden"
+      end
+
+      it "raises not found when virtual machine not exists" do
+        visit "/vm/08s56d4kaj94xsmrnf5v5m3mav"
+
+        expect(page.title).to eq("Ubicloud - Page not found")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "Page not found"
+      end
     end
 
-    it "raises not found when virtual machine not exists" do
-      visit "/vm/08s56d4kaj94xsmrnf5v5m3mav"
+    describe "delete" do
+      it "can delete virtual machine" do
+        shadow = Clover::VmShadow.new(vm)
+        visit "/vm/#{shadow.id}"
 
-      expect(page.title).to eq("Ubicloud - Page not found")
-      expect(page.status_code).to eq(404)
-      expect(page).to have_content "Page not found"
-    end
+        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript enginer.
+        btn = find ".delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-    it "delete" do
-      shadow = Clover::VmShadow.new(vm)
-      visit "/vm/#{shadow.id}"
+        expect(page.body).to eq({message: "Deleting #{vm.name}"}.to_json)
+        expect(SemSnap.new(vm.id).set?("destroy")).to be true
+      end
 
-      # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-      # UI tests run without a JavaScript enginer.
-      btn = find ".delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      it "can not delete virtual machine when does not have permissions" do
+        shadow = Clover::VmShadow.new(vm_wo_permission)
 
-      expect(page.body).to eq("Deleting #{vm.id}")
-      expect(SemSnap.new(vm.id).set?("destroy")).to be true
+        # Give permission to view, so we can see the detail page
+        tag_space_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, powers: ["Vm:view"], objects: tag_space_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "/vm/#{shadow.id}"
+
+        expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
     end
   end
 end

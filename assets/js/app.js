@@ -1,3 +1,7 @@
+$(function() {
+  setupPolicyEditor();
+});
+
 $(".toggle-mobile-menu").on("click", function (event) {
     let menu = $("#mobile-menu")
     if (menu.is(":hidden")) {
@@ -51,13 +55,20 @@ $(".delete-btn").on("click", function (event) {
 
     $.ajax({
         url: url,
-        type: 'DELETE',
-        data: { '_csrf': csrf },
+        type: "DELETE",
+        data: { "_csrf": csrf },
+        dataType : "json",
+        headers: {"Accept": "application/json"},
         success: function (result) {
             window.location.href = redirect;
         },
         error: function (xhr, ajaxOptions, thrownError) {
-            alert(`Error: ${thrownError}`);
+          let message = thrownError;
+          try {
+            err = JSON.parse(xhr.responseText);
+            message = err.message
+          } catch {};
+          alert(`Error: ${message}`);
         }
     });
 });
@@ -90,4 +101,47 @@ function notification(message) {
     setTimeout(function () {
         newNotification.remove();
     }, 2000);
+}
+
+function setupPolicyEditor() {
+  $(".policy-editor").each(function() {
+    let pre = $(this).find("pre");
+    let textarea = $(this).find("textarea");
+    pre.html(jsonHighlight(pre.text()));
+
+    pre.on("focusout", function () {
+      pre.html(jsonHighlight(pre.text()));
+    })
+
+    pre.on("keyup", function () {
+      textarea.val(pre.text());
+    })
+  });
+}
+
+// Forked from: https://jsfiddle.net/ourcodeworld/KJQ9K/1209/
+function jsonHighlight(str) {
+  try {
+    json = JSON.stringify(JSON.parse(str), null, 2);
+  } catch (e) {
+    notification("Not valid JSON");
+    return;
+  }
+
+  json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+      var cls = 'text-orange-700'; // number
+      if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+              cls = 'text-rose-700 font-medium'; // key
+          } else {
+              cls = 'text-green-700'; // string
+          }
+      } else if (/true|false/.test(match)) {
+          cls = 'text-blue-700'; // boolean
+      } else if (/null/.test(match)) {
+          cls = 'text-pink-700'; // null
+      }
+      return '<span class="' + cls + '">' + match + '</span>';
+  });
 }
