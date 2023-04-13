@@ -71,7 +71,7 @@ class Clover < Roda
     end
   else
     def self.freeze
-      Sequel::Model.freeze_descendents
+      Sequel::Model.freeze_descendents unless Config.test?
       DB.freeze
       super
     end
