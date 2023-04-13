@@ -1,0 +1,57 @@
+<% @page_title = "Settings" %>
+
+<div class="px-2 sm:px-3 lg:px-4">
+  <%== render("components/page_header", locals: { title: "Settings" }) %>
+
+  <div class="mt-8 space-y-6 sm:px-6 lg:col-span-9 lg:px-0">
+    <section>
+      <form action="/<%= rodauth.close_account_route %>" role="form" method="POST">
+        <%== rodauth.csrf_tag("/" + rodauth.close_account_route) %>
+        <div class="shadow sm:overflow-hidden sm:rounded-md">
+          <div class="bg-white px-4 py-6 sm:p-6">
+            <%== render("settings/tab") %>
+
+            <div>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Close account</h2>
+              <p class="mt-1 text-sm text-gray-500">This action will permanently delete this account. Deleted data cannot be recovered. Use it carefully.</p>
+            </div>
+
+            <div class="mt-6 grid grid-cols-6 gap-6">
+              <% if rodauth.close_account_requires_password? %>
+                <div class="col-span-6 sm:col-span-2">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "password",
+                      type: "password",
+                      label: "Password",
+                      attributes: {
+                        required: true,
+                        autocomplete: "password"
+                      }
+                    }
+                  ) %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+          <div class="bg-gray-50 px-4 py-3 text-right sm:px-6">
+            <button
+              type="submit"
+              class="inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+            >
+              <svg class="-ml-0.5 mr-1.5 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Close Account
+            </button>
+          </div>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>

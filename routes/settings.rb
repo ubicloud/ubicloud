@@ -3,9 +3,9 @@
 require "ulid"
 
 class Clover
-  hash_branch("profile") do |r|
+  hash_branch("settings") do |r|
     r.get true do
-      view "profile/show"
+      r.redirect "/settings/change-password"
     end
   end
 end

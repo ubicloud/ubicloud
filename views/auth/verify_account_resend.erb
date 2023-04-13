@@ -1,0 +1,13 @@
+<% @page_title = "Resend Verification" %>
+
+<% @page_message = "Resend account verification" %>
+
+<form action="<%= rodauth.verify_account_resend_path %>" class="rodauth space-y-6" role="form" method="POST">
+  <%== rodauth.csrf_tag(rodauth.verify_account_resend_path) %>
+
+  <p class="leading-6 text-sm"><%== rodauth.verify_account_resend_explanatory_text %></p>
+  <div class="flex flex-col text-center">
+    <%== render("components/form/submit_button", locals: { text: "Send Verification Again" }) %>
+    <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to an another account</a>
+  </div>
+</form>

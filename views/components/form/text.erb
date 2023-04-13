@@ -1,9 +1,9 @@
 <% name = defined?(name) ? name : nil %>
 <% label = defined?(label) ? label : nil %>
 <% type = (defined?(type) && type) ? type : "text" %>
-<% error = defined?(error) ? error : flash.dig("errors", name) %>
-<% description = defined?(description) ? description : nil %>
-<% attributes = defined?(attributes) ? attributes : {} %>
+<% error = (defined?(error) && error) ? error : rodauth.field_error(name) || flash.dig("errors", name) %>
+<% description = (defined?(description) && description) ? description : nil %>
+<% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
 
 <div class="space-y-2">
   <label for="<%= name %>" class="block text-sm font-medium leading-6 text-gray-900"><%= label %></label>

@@ -1,0 +1,58 @@
+<% @page_title = "Settings" %>
+
+<div class="px-2 sm:px-3 lg:px-4">
+  <%== render("components/page_header", locals: { title: "Settings" }) %>
+
+  <div class="mt-8 space-y-6 sm:px-6 lg:col-span-9 lg:px-0">
+    <section>
+      <form action="/<%= rodauth.change_login_route %>" role="form" method="POST">
+        <%== rodauth.csrf_tag("/" + rodauth.change_login_route) %>
+        <div class="shadow sm:overflow-hidden sm:rounded-md">
+          <div class="bg-white px-4 py-6 sm:p-6">
+            <%== render("settings/tab") %>
+
+            <div>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Change Email Address</h2>
+            </div>
+
+            <div class="mt-6 grid grid-cols-6 gap-6">
+              <div class="col-span-6 sm:col-span-2">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "login",
+                    type: "email",
+                    label: "New Email Address",
+                    attributes: {
+                      required: true,
+                      autocomplete: "email"
+                    }
+                  }
+                ) %>
+              </div>
+              <% if rodauth.change_login_requires_password? %>
+                <div class="col-span-6 sm:col-span-2">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "password",
+                      type: "password",
+                      label: "Password",
+                      attributes: {
+                        required: true,
+                        autocomplete: "new-password"
+                      }
+                    }
+                  ) %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+          <div class="flex items-center justify-end bg-gray-50 px-4 py-3 text-right sm:px-6">
+            <%== render("components/form/submit_button", locals: { text: "Change Email" }) %>
+          </div>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
