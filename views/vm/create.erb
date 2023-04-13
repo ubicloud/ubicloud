@@ -45,38 +45,36 @@
                     ) %>
                   </div>
                   <div class="col-span-full">
-                    <div class="flex items-center justify-between">
-                      <h2 class="text-sm font-medium leading-6 text-gray-900">Server size</h2>
-                    </div>
-                    <fieldset class="mt-2 radio-stacked-cards" id="size-radios">
-                      <div class="space-y-4">
-                        <% Option::VmSizes.each do |size| %>
-                          <label
-                            class="relative block cursor-pointer rounded-lg border bg-white px-6 py-4 shadow-sm focus:outline-none sm:flex sm:justify-between"
-                          >
-                            <input type="radio" name="size" value="<%= size.name %>" class="sr-only" required>
-                            <span class="flex items-center">
-                              <span class="flex flex-col text-sm">
-                                <span class="font-medium text-gray-900"><%= size.display_name %></span>
-                                <span class="text-gray-500">
-                                  <span class="block sm:inline"><%= size.memory %>GB /
-                                    <%= size.vcpu %>
-                                    CPUs</span>
-                                  <span class="hidden sm:mx-1 sm:inline" aria-hidden="true">&middot;</span>
-                                  <span class="block sm:inline"><%= size.disk %>GB SSD disk</span>
+                    <div class="space-y-2">
+                      <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size</label>
+                      <fieldset class="radio-small-cards" id="size-radios">
+                        <legend class="sr-only">Server size</legend>
+                        <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
+                          <% Option::VmSizes.each do |size| %>
+                            <label>
+                              <input type="radio" name="size" value="<%= size.name %>" class="peer sr-only" required>
+                              <span
+                                class="flex items-center rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
+                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                                peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-600 peer-focus-visible:ring-offset-2 peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:hover:bg-indigo-500"
+                              >
+                                <span class="flex flex-col">
+                                  <span class="text-md font-semibold"><%= size.display_name %></span>
+                                  <span class="text-sm opacity-80">
+                                    <span class="block sm:inline"><%= size.vcpu %>
+                                      vCPUs /
+                                      <%= size.memory %>
+                                      GB /
+                                      <%= size.disk %>
+                                      GB SSD</span>
+                                  </span>
                                 </span>
                               </span>
-                            </span>
-                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="size-price font-medium text-gray-900" data-prices="<%= size.prices.to_json %>">-</span>
-                              <span class="ml-1 text-gray-500 sm:ml-0">/mo</span>
-                            </span>
-                            <span class="pointer-events-none absolute -inset-px rounded-lg border-2" aria-hidden="true"></span>
-                          </label>
-                        <% end %>
-                      </div>
-                    </fieldset>
-
+                            </label>
+                          <% end %>
+                        </div>
+                      </fieldset>
+                    </div>
                   </div>
                   <div class="col-span-full">
                     <%== render(

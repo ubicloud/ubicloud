@@ -10,7 +10,7 @@
   <label for="<%= name %>" class="text-sm font-medium leading-6 text-gray-900"><%= label %></label>
   <fieldset class="radio-small-cards" id="<%= name %>-radios">
     <legend class="sr-only"><%= label %></legend>
-    <div class="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-4">
+    <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
       <% options.each do |opt_val, opt_text| %>
         <label>
           <input
