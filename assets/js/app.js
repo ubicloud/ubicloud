@@ -77,16 +77,6 @@ $(".back-btn").on("click", function (event) {
     history.back();
 })
 
-// Show price change for demo
-$("#location-radios input[type=radio]").on("change", function (event) {
-    let location = $(this).val();
-    $('#size-radios .size-price').each(function (i, obj) {
-        let prices = $(this).data("prices");
-        let price = prices[location] || prices["default"]
-        $(this).text(`$${price.toFixed(2)}`)
-    });
-});
-
 function notification(message) {
     let container = $("#notification-template").parent();
     let newNotification = $("#notification-template").clone();
