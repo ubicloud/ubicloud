@@ -122,19 +122,37 @@ class Clover < Roda
 
     hmac_secret Config.clover_session_secret
 
-    create_account_view do
-      view "auth/create_account", "Create Account"
-    end
+    login_view { view "auth/login", "Login" }
 
-    login_view do
-      view "auth/login", "Login"
-    end
+    create_account_view { view "auth/create_account", "Create Account" }
+    create_account_redirect { login_route }
 
-    verify_account_view do
-      view "auth/verify_account", "Verify Account"
-    end
+    verify_account_view { view "auth/verify_account", "Verify Account" }
+    resend_verify_account_view { view "auth/verify_account_resend", "Resend Verification" }
+    verify_account_email_sent_redirect { login_route }
+    verify_account_email_recently_sent_redirect { login_route }
+
+    reset_password_view { view "auth/reset_password", "Request Password" }
+    reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
+    reset_password_redirect { login_route }
+    reset_password_email_sent_redirect { login_route }
+    reset_password_email_recently_sent_redirect { reset_password_request_route }
+
+    change_password_redirect "/settings/change-password"
+    change_password_route "settings/change-password"
+    change_password_view { view "settings/change_password", "Settings" }
+
+    change_login_redirect "/settings/change-login"
+    change_login_route "settings/change-login"
+    change_login_view { view "settings/change_login", "Settings" }
+
+    close_account_redirect "/login"
+    close_account_route "settings/close-account"
+    close_account_view { view "settings/close_account", "Settings" }
 
     already_logged_in { redirect login_redirect }
+
+    after_login { remember_login if request.params["remember-me"] == "on" }
 
     # YYY: Should password secret and session secret be the same? Are
     # there rotation issues? See also:
@@ -143,6 +161,9 @@ class Clover < Roda
     # https://github.com/jeremyevans/rodauth/commit/d8568a325749c643c9a5c9d6d780e287f8c59c31
     argon2_secret { Config.clover_session_secret }
     require_bcrypt? false
+
+    create_account_set_password? true
+    verify_account_set_password? false
   end
 
   def last_sms_sent
@@ -167,7 +188,7 @@ class Clover < Roda
 
     r.hash_branches("")
     r.root do
-      view "index"
+      view "dashboard"
     end
   end
 end
