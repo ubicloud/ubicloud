@@ -39,11 +39,28 @@ class Prog::Vm::HostNexus < Prog::Base
   def prep
     bud Prog::Vm::PrepHost, vmhost_id: strand.id
     bud Prog::LearnNetwork, vmhost_id: strand.id
+    bud Prog::LearnMemory, sshable_id: strand.id
+    bud Prog::LearnCores, sshable_id: strand.id
     hop :wait_prep
   end
 
   def wait_prep
-    reap
+    reap.each do |st|
+      case st.fetch(:prog)
+      when "LearnMemory"
+        fail "BUG" unless (mem_gib = st.dig(:exitval, "mem_gib"))
+        vm_host.update(total_mem_gib: mem_gib)
+      when "LearnCores"
+        fail "BUG" unless (total_sockets = st.dig(:exitval, "total_sockets"))
+        fail "BUG" unless (total_nodes = st.dig(:exitval, "total_nodes"))
+        fail "BUG" unless (total_cores = st.dig(:exitval, "total_cores"))
+        fail "BUG" unless (total_cpus = st.dig(:exitval, "total_cpus"))
+
+        vm_host.update(total_sockets: total_sockets, total_nodes: total_nodes,
+          total_cores: total_cores, total_cpus: total_cpus)
+      end
+    end
+
     if leaf?
       vm_host.update(allocation_state: "accepting")
       hop :wait
