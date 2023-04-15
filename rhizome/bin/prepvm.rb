@@ -43,8 +43,24 @@ unless (boot_image = params["boot_image"])
   exit 1
 end
 
+unless (max_vcpus = params["max_vcpus"])
+  puts "need max_vcpus in parameters json"
+  exit 1
+end
+
+unless (cpu_topology = params["cpu_topology"])
+  puts "need cpu_topology in parameters json"
+  exit 1
+end
+
+unless (mem_gib = params["mem_gib"])
+  puts "need mem_gib in parameters json"
+  exit 1
+end
+
 require "fileutils"
 require_relative "../lib/common"
 require_relative "../lib/vm_setup"
 
-VmSetup.new(vm_name).prep(unix_user, ssh_public_key, private_subnets, gua, boot_image)
+VmSetup.new(vm_name).prep(unix_user, ssh_public_key, private_subnets, gua, boot_image,
+  max_vcpus, cpu_topology, mem_gib)
