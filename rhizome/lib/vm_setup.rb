@@ -37,12 +37,12 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, boot_image)
+  def prep(unix_user, public_key, private_subnets, gua, boot_image, max_vcpus, cpu_topology, mem_gib)
     interfaces
     routes(gua, private_subnets)
     cloudinit(unix_user, public_key, private_subnets)
     boot_disk(boot_image)
-    install_systemd_unit
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
     forwarding
   end
 
@@ -214,10 +214,13 @@ EOS
     r("ip netns exec #{q_vm} sysctl -w net.ipv6.conf.all.forwarding=1")
   end
 
-  def install_systemd_unit
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
+    cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
+
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
     # from VmPath is also a good idea.
+    fail "BUG" if /["'\s]/.match?(cpu_setting)
     vp.write_systemd_service <<SERVICE
 [Unit]
 Description=#{@vm_name}
@@ -233,8 +236,8 @@ ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
 --disk path=#{vp.boot_raw} \
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
---cpus boot=4 \
---memory size=1024M \
+--cpus #{cpu_setting} \
+--memory size=#{mem_gib}G \
 --net "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask="
 
 ExecStop=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/ch-remote --api-socket #{vp.ch_api_sock} shutdown-vmm
