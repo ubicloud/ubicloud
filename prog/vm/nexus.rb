@@ -7,7 +7,7 @@ require "ulid"
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
 
-  def self.assemble(public_key, name: nil, size: "standard-4",
+  def self.assemble(public_key, name: nil, size: "standard-1",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnets: [])
 
@@ -76,41 +76,48 @@ class Prog::Vm::Nexus < Prog::Base
     vm.ephemeral_net6.to_s.shellescape
   end
 
-  def start
-    # Prototype quality vm allocator: find least-used host to
-    # demonstrate features that span hosts, because it ends up being
-    # like round-robin in a non-concurrent allocation-only
-    # demonstration.
-    #
-    # YYY: Lacks many necessary features like supporting different VM
-    # sizes and preventing over-allocation.  The allocator should also
-    # run in the strand of the host or do some other interlock to
-    # avoid overbooking in concurrent scenarios, but that requires
-    # more inter-strand synchronization than I want to do right now.
-    vm_host_id = DB[<<SQL, vm.location].first[:id]
-SELECT id
-FROM (SELECT vm_host.id, count(*)
-      FROM vm_host LEFT JOIN vm ON
-      vm_host.id = vm.vm_host_id
-      AND vm_host.allocation_state = 'accepting'
-      AND vm_host.location = ?
-      GROUP BY vm_host.id) AS counts
-ORDER BY count
-LIMIT 1
+  def allocation_dataset
+    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.location]
+SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
+FROM vm_host
+WHERE vm_host.used_cores + ? < vm_host.total_cores
+AND vm_host.total_mem_gib / vm_host.total_cores >= ?
+AND vm_host.allocation_state = 'accepting'
+AND vm_host.location = ?
+ORDER BY mem_ratio, used_cores
 SQL
+  end
 
+  def allocate
+    vm_host_id = allocation_dataset.limit(1).get(:id)
+    fail "no space left on any eligible hosts" unless vm_host_id
+
+    # N.B. check constraint required to address concurrency.  By
+    # injecting a crash from overbooking, it gives us the opportunity
+    # to try again.
+    VmHost.dataset.where(id: vm_host_id).update(used_cores: Sequel[:used_cores] + vm.cores)
+
+    vm_host_id
+  end
+
+  def start
+    vm_host_id = allocate
     vm.update(vm_host_id: vm_host_id, ephemeral_net6: VmHost[vm_host_id].ip6_random_vm_network.to_s)
     hop :prep
   end
 
   def prep
+    topo = vm.cloud_hypervisor_cpu_topology
     params_json = JSON.pretty_generate({
       "vm_name" => vm_name,
       "public_ipv6" => q_net,
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
       "private_subnets" => private_subnets.map { _1.to_s },
-      "boot_image" => vm.boot_image
+      "boot_image" => vm.boot_image,
+      "max_vcpus" => topo.max_vcpus,
+      "cpu_topology" => topo.to_s,
+      "mem_gib" => vm.mem_gib
     })
 
     # create vm's home directory
@@ -191,10 +198,15 @@ SQL
 
   def destroy
     # YYY make idempotent
-    vm.vm_private_subnet_dataset.delete
-    vm.delete
     host.sshable.cmd("sudo systemctl stop #{q_vm}")
     host.sshable.cmd("sudo bin/deletevm.rb #{q_vm}")
+
+    vm.vm_private_subnet_dataset.delete
+    VmHost.dataset.where(id: vm.vm_host_id).update(
+      used_cores: Sequel[:used_cores] - vm.cores
+    )
+    vm.delete
+
     pop "vm deleted"
   end
 end
