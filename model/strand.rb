@@ -26,7 +26,7 @@ class Strand < Sequel::Model
     affected = DB[<<SQL, id].first
 UPDATE strand
 SET lease = now() + '120 seconds', schedule = now()
-WHERE id = ? AND (lease IS NULL OR lease < now())
+WHERE id = ? AND (lease IS NULL OR lease < now()) AND exitval IS NULL
 RETURNING lease
 SQL
     return false unless affected
