@@ -205,6 +205,7 @@ EOS
     # Images are presumed to be atomically renamed into the path,
     # i.e. no partial images will be passed to qemu-image.
     r "qemu-img convert -p -f qcow2 -O raw #{image_path.shellescape} #{vp.q_boot_raw}"
+    r "truncate -s +10G #{vp.q_boot_raw}"
     FileUtils.chown @vm_name, @vm_name, vp.boot_raw
   end
 
