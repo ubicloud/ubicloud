@@ -27,7 +27,7 @@ RSpec.describe VmSetup do
         expect(path).to eq("/opt/ubuntu-jammy.qcow2.tmp")
       end.and_yield
 
-      expect(vs).to receive(:r).with("curl -o /opt/ubuntu-jammy.qcow2.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
+      expect(vs).to receive(:r).with("curl -L10 -o /opt/ubuntu-jammy.qcow2.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
       expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /opt/ubuntu-jammy.qcow2 /vm/test/boot.raw")
 
       expect(FileUtils).to receive(:mv).with("/opt/ubuntu-jammy.qcow2.tmp", "/opt/ubuntu-jammy.qcow2")
