@@ -28,6 +28,7 @@ RSpec.describe VmSetup do
       end.and_yield
 
       expect(vs).to receive(:r).with("curl -L10 -o /opt/ubuntu-jammy.qcow2.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
+      expect(vs).to receive(:r).with("truncate -s +10G /vm/test/boot.raw")
       expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /opt/ubuntu-jammy.qcow2 /vm/test/boot.raw")
 
       expect(FileUtils).to receive(:mv).with("/opt/ubuntu-jammy.qcow2.tmp", "/opt/ubuntu-jammy.qcow2")
@@ -37,6 +38,7 @@ RSpec.describe VmSetup do
 
     it "can use an image that's already downloaded" do
       expect(File).to receive(:exist?).with("/opt/almalinux-9.1.qcow2").and_return(true)
+      expect(vs).to receive(:r).with("truncate -s +10G /vm/test/boot.raw")
       expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /opt/almalinux-9.1.qcow2 /vm/test/boot.raw")
       expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/boot.raw")
       vs.boot_disk("almalinux-9.1")
