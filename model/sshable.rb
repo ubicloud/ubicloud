@@ -17,7 +17,7 @@ class Sshable < Sequel::Model
       invalidate_cache_entry
       raise
     end
-    fail SshError.new(ret) unless ret.exitstatus == 0
+    fail SshError.new(ret) unless ret.exitstatus.zero?
     ret
   end
 
