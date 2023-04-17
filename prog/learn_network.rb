@@ -35,7 +35,7 @@ class Prog::LearnNetwork < Prog::Base
   end
 
   Ip6 = Struct.new(:addr, :prefixlen)
-  # some would be backwards-incompatible.
+
   def parse_ip_addr_j(s)
     case JSON.parse(s)
     in [iface]
