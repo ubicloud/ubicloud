@@ -13,7 +13,7 @@ class Prog::BootstrapRhizome < Prog::Base
       non_interactive: true, timeout: 30,
       user_known_hosts_file: []) do |ssh|
       ret = ssh.exec!(cmd)
-      fail "Could not bootstrap rhizome" unless ret.exitstatus == 0
+      fail "Could not bootstrap rhizome" unless ret.exitstatus.zero?
       ret
     end
   end
