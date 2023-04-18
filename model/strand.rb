@@ -92,7 +92,9 @@ SQL
       loop do
         ret = unsynchronized_run
         now = Time.now
-        if now > deadline || ret.is_a?(Prog::Base::Nap) || ret.is_a?(Prog::Base::Exit)
+        if now > deadline ||
+            (ret.is_a?(Prog::Base::Nap) && ret.seconds != 0) ||
+            ret.is_a?(Prog::Base::Exit)
           return ret
         end
       end
