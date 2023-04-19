@@ -112,7 +112,7 @@ end
   end
 
   def frame
-    strand.stack&.first
+    strand.stack&.first&.freeze
   end
 
   def retval
