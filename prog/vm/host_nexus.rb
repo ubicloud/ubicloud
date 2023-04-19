@@ -37,8 +37,8 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def prep
-    bud Prog::Vm::PrepHost, vmhost_id: strand.id
-    bud Prog::LearnNetwork, vmhost_id: strand.id
+    bud Prog::Vm::PrepHost, sshable_id: strand.id
+    bud Prog::LearnNetwork, vm_host_id: strand.id
     bud Prog::LearnMemory, sshable_id: strand.id
     bud Prog::LearnCores, sshable_id: strand.id
     hop :wait_prep

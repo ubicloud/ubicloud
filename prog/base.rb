@@ -6,6 +6,23 @@ class Prog::Base
   def initialize(strand, snap = nil)
     @snap = snap || SemSnap.new(strand.id)
     @strand = strand
+
+    frame&.each do |k, v|
+      next unless k =~ /([a-z0-9_]+)_id/
+      table_name = $1
+      next unless Strand::NAVIGATE.include?(table_name)
+
+      q_v = v.inspect
+      instance_eval <<ACCESSOR, __FILE__, __LINE__ + 1
+def #{table_name}
+  @#{table_name} ||= #{camelize(table_name)}[#{q_v}]
+end
+
+def #{k}
+  #{q_v}
+end
+ACCESSOR
+    end
   end
 
   def self.semaphore(*names)
@@ -41,7 +58,7 @@ end
       Sequel.pg_jsonb_wrap(o)
     end
 
-    if strand.stack.length > 0 && (link = frame[:link])
+    if strand.stack.length > 0 && (link = frame["link"])
       # This is a multi-level stack with a back-link, i.e. one prog
       # calling another in the same Strand of execution.  The thing to
       # do here is pop the stack entry.
@@ -101,7 +118,7 @@ end
   end
 
   def frame
-    strand.stack[0]
+    strand.stack&.first
   end
 
   def retval
@@ -111,7 +128,7 @@ end
   def push(prog, frame, label = "start")
     old_prog = strand.prog
     old_label = strand.label
-    frame = frame.merge(link: [strand.prog, old_label])
+    frame = frame.merge("link" => [strand.prog, old_label])
     # YYY: Use in-database jsonb prepend rather than re-rendering a
     # new value doing the prepend.
     @strand.update(prog: Strand.prog_verify(prog), label: label,
@@ -148,5 +165,13 @@ end
     old_label = @strand.label
     @strand.update(label: label, retval: nil)
     fail Hop.new(old_prog, old_label, @strand)
+  end
+
+  private
+
+  # Copied from sequel/model/inflections.rb's camelize, to convert
+  # table names into idiomatic model class names.
+  def camelize(s)
+    s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase unless x == "/"}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
   end
 end

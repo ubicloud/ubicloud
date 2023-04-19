@@ -7,6 +7,12 @@ class Strand < Sequel::Model
   many_to_one :parent, key: :parent_id, class: self
   one_to_many :children, key: :parent_id, class: self
 
+  NAVIGATE = %w[vm vm_host sshable].freeze
+
+  NAVIGATE.each do
+    one_to_one _1.intern, key: :id
+  end
+
   def lease
     self.class.lease(id) do
       yield
