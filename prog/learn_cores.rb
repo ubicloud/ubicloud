@@ -3,10 +3,6 @@
 require "json"
 
 class Prog::LearnCores < Prog::Base
-  def sshable
-    @sshable ||= Sshable[frame["sshable_id"]]
-  end
-
   CpuTopology = Struct.new(:total_cpus, :total_cores, :total_nodes, :total_sockets, keyword_init: true)
 
   def parse_count(s)

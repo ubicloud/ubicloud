@@ -57,4 +57,9 @@ RSpec.describe Prog::Base do
     post = st.schedule
     expect(post - ante).to be > 121
   end
+
+  it "doesn't interpret navigations for undefined *_id strings" do
+    pr = Strand.new(prog: "Test", label: "start", stack: [{"bogus_id" => "nope"}]).load
+    expect(pr.respond_to?(:bogus_id)).to be false
+  end
 end
