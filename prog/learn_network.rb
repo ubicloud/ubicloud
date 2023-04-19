@@ -4,11 +4,7 @@ require "json"
 
 class Prog::LearnNetwork < Prog::Base
   def sshable
-    @sshable ||= Sshable[vm_host.id]
-  end
-
-  def vm_host
-    @vm_host ||= VmHost[frame["vmhost_id"]]
+    @sshable ||= Sshable[vm_host_id]
   end
 
   def start

@@ -1,10 +1,6 @@
 # frozen_string_literal: true
 
 class Prog::InstallRhizome < Prog::Base
-  def sshable
-    @sshable ||= Sshable[frame["sshable_id"]]
-  end
-
   def start
     require "rubygems/package"
     require "stringio"

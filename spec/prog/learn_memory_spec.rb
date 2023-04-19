@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnMemory do
-  subject(:lm) { described_class.new(Strand.new(stack: [])) }
+  subject(:lm) { described_class.new(Strand.new(stack: [{sshable_id: "bogus"}])) }
 
   let(:four_units) do
     <<EOS
@@ -32,16 +32,6 @@ EOS
 	Size: 16384 MB
 EOS
       }.to raise_error RuntimeError, "BUG: unexpected dmidecode unit"
-    end
-  end
-
-  # YYY: clean up having to test these simple accessors for every
-  # prog, or worse yet, having to do with database access.
-  describe "#sshable" do
-    it "can load" do
-      lm.strand.stack = [{"sshable_id" => "abc"}]
-      expect(Sshable).to receive(:[]).with("abc")
-      lm.sshable
     end
   end
 end

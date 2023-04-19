@@ -1,10 +1,6 @@
 # frozen_string_literal: true
 
 class Prog::LearnMemory < Prog::Base
-  def sshable
-    @sshable ||= Sshable[frame["sshable_id"]]
-  end
-
   def parse_sum(s)
     s.each_line.filter_map do |line|
       next unless line =~ /Size: (\d+) (\w+)/

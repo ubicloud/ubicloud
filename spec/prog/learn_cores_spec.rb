@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnCores do
-  subject(:lc) { described_class.new(Strand.new(stack: [])) }
+  subject(:lc) { described_class.new(Strand.new(stack: [{sshable_id: "bogus"}])) }
 
   # Gin up a topologically complex processor to test summations.
   let(:eight_thread_four_core_four_numa_two_socket) do
@@ -105,16 +105,6 @@ JSON
       expect(lc).to receive(:sshable).and_return(sshable)
       expect(lc).to receive(:pop).with(total_sockets: 2, total_cores: 4, total_nodes: 4, total_cpus: 8)
       lc.start
-    end
-  end
-
-  # YYY: clean up having to test these simple accessors for every
-  # prog, or worse yet, having to do with database access.
-  describe "#sshable" do
-    it "can load" do
-      lc.strand.stack = [{"sshable_id" => "abc"}]
-      expect(Sshable).to receive(:[]).with("abc")
-      lc.sshable
     end
   end
 end

@@ -99,7 +99,7 @@ machines:
 
     class Prog::Vm::PrepHost < Prog::Base
       def sshable
-        @sshable ||= Sshable[frame["vmhost_id"]]
+        @sshable ||= Sshable[frame["vm_host_id"]]
       end
 
       def start
