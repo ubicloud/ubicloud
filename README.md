@@ -383,6 +383,7 @@ web console if you do not want to see HTML files without any style.
 
 We manage node module versions through [npm](https://www.npmjs.com). It's
 installed with `nodejs` package.
+
     $ which npm
     /Users/enescakir/.asdf/installs/nodejs/19.8.1/bin/npm
     $ npm install
@@ -396,6 +397,7 @@ installed with `nodejs` package.
 
 Now we can build CSS file. If you do development on UI, you can run
 `npm run watch` on separate terminal window to see changes realtime.
+
     $ npm run prod
     > prod
     > npx tailwindcss -o assets/css/app.css --minify
@@ -405,6 +407,7 @@ Now we can build CSS file. If you do development on UI, you can run
     Done in 767ms.
 
 `assets/css/app.css` should be created. Let's start our web server.
+
     bundle exec rackup
 
 And then visiting [http://localhost:9292](http://localhost:9292), you can
@@ -413,6 +416,7 @@ to, in production, we would send that output as email. Having verified, log
 in. You'll see the "Getting Started" page.
 
 When you change any template file, format them with `erb-formatter`:
+
     bundle exec erb-format views/**/*.erb --write --print-width 120
 
 ### Conclusion
