@@ -32,13 +32,22 @@ class Strand < Sequel::Model
     affected = DB[<<SQL, id].first
 UPDATE strand
 SET lease = now() + '120 seconds', schedule = now()
-WHERE id = ? AND (lease IS NULL OR lease < now()) AND exitval IS NULL
-RETURNING lease
+WHERE id = ? AND (lease IS NULL OR lease < now())
+RETURNING lease, exitval IS NOT NULL AS exited
 SQL
     return false unless affected
     lease = affected.fetch(:lease)
 
     begin
+      if affected.fetch(:exited)
+        # Clear any semaphores that get added to a exited Strand prog,
+        # since incr is entitled to be run at *any time* (including
+        # after exitval is set) and any such incements will prevent
+        # deletion of a Strand via foreign_key
+        Semaphore.where(strand_id: id).delete
+        return
+      end
+
       yield
     ensure
       num_updated = DB[<<SQL, id, lease].update
