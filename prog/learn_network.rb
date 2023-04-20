@@ -44,11 +44,11 @@ class Prog::LearnNetwork < Prog::Base
                Ip6.new(local, prefixlen)
              end
            }
-        in [net6]
-          net6
-        else
-          fail "only one global unique address prefix supported on interface"
-        end
+      in [net6]
+        net6
+      else
+        fail "only one global unique address prefix supported on interface"
+      end
     else
       fail "only one one interface supported"
     end
