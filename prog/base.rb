@@ -146,7 +146,7 @@ end
     label = label.to_s if label.is_a?(Symbol)
     old_prog = @strand.prog
     old_label = @strand.label
-    @strand.update(label: label)
+    @strand.update(label: label, retval: nil)
     fail Hop.new(old_prog, old_label, @strand)
   end
 end
