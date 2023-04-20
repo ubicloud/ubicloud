@@ -13,6 +13,7 @@ class Prog::BootstrapRhizome < Prog::Base
   def rootish_ssh(cmd)
     Net::SSH.start(sshable.host, user, use_agent: true,
       non_interactive: true, timeout: 30,
+      keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5,
       user_known_hosts_file: []) do |ssh|
       ret = ssh.exec!(cmd)
       fail "Could not bootstrap rhizome" unless ret.exitstatus.zero?
