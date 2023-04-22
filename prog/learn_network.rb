@@ -3,9 +3,7 @@
 require "json"
 
 class Prog::LearnNetwork < Prog::Base
-  def sshable
-    @sshable ||= Sshable[vm_host_id]
-  end
+  subject_is :sshable, :vm_host
 
   def start
     ip6 = parse_ip_addr_j(sshable.cmd("/usr/sbin/ip -j -6 addr show scope global"))
