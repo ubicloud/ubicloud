@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Prog::BootstrapRhizome < Prog::Base
+  subject_is :sshable
+
   def user
     @user ||= frame.fetch("user", "root")
   end
@@ -39,6 +41,6 @@ echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
 sudo install -D -o rhizome -g rhizome -m 0600 #{authorized_keys_file.shellescape} /home/rhizome/.ssh/authorized_keys
 SH
 
-    push Prog::InstallRhizome, {sshable_id: sshable_id}
+    push Prog::InstallRhizome
   end
 end

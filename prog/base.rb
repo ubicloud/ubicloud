@@ -1,27 +1,21 @@
 # frozen_string_literal: true
 
 class Prog::Base
-  attr_reader :strand
+  attr_reader :strand, :subject_id
 
   def initialize(strand, snap = nil)
     @snap = snap || SemSnap.new(strand.id)
     @strand = strand
+    @subject_id = frame&.dig("subject_id") || @strand.id
+  end
 
-    frame&.each do |k, v|
-      next unless k =~ /([a-z0-9_]+)_id/
-      table_name = $1
-      next unless Strand::NAVIGATE.include?(table_name)
-
-      q_v = v.inspect
-      instance_eval <<ACCESSOR, __FILE__, __LINE__ + 1
-def #{table_name}
-  @#{table_name} ||= #{camelize(table_name)}[#{q_v}]
+  def self.subject_is(*names)
+    names.each do |name|
+      class_eval %(
+def #{name}
+  @#{name} ||= #{camelize(name.to_s)}[@subject_id]
 end
-
-def #{k}
-  #{q_v}
-end
-ACCESSOR
+), __FILE__, __LINE__ - 4
     end
   end
 
@@ -125,21 +119,23 @@ end
     strand.retval
   end
 
-  def push(prog, frame, label = "start")
+  def push(prog, new_frame = {}, label = "start")
     old_prog = strand.prog
     old_label = strand.label
-    frame = frame.merge("link" => [strand.prog, old_label])
+    new_frame = new_frame.merge("subject_id" => @subject_id, "link" => [strand.prog, old_label])
+
     # YYY: Use in-database jsonb prepend rather than re-rendering a
     # new value doing the prepend.
     @strand.update(prog: Strand.prog_verify(prog), label: label,
-      stack: [frame] + strand.stack, retval: nil)
+      stack: [new_frame] + strand.stack, retval: nil)
     fail Hop.new(old_prog, old_label, @strand)
   end
 
-  def bud(prog, frame, label = "start")
+  def bud(prog, new_frame = {}, label = "start")
+    new_frame = new_frame.merge("subject_id" => @subject_id)
     Strand.create(parent_id: strand.id,
       prog: Strand.prog_verify(prog), label: label,
-      stack: Sequel.pg_jsonb_wrap([frame]))
+      stack: Sequel.pg_jsonb_wrap([new_frame]))
   end
 
   def donate
@@ -167,11 +163,9 @@ end
     fail Hop.new(old_prog, old_label, @strand)
   end
 
-  private
-
   # Copied from sequel/model/inflections.rb's camelize, to convert
   # table names into idiomatic model class names.
-  def camelize(s)
+  private_class_method def self.camelize(s)
     s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase unless x == "/"}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
   end
 end
