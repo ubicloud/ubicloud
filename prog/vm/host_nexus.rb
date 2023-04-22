@@ -15,7 +15,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def start
-    bud Prog::BootstrapRhizome, sshable_id: strand.id
+    bud Prog::BootstrapRhizome
     hop :wait_bootstrap_rhizome
   end
 
@@ -26,10 +26,10 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def prep
-    bud Prog::Vm::PrepHost, sshable_id: strand.id
-    bud Prog::LearnNetwork, vm_host_id: strand.id
-    bud Prog::LearnMemory, sshable_id: strand.id
-    bud Prog::LearnCores, sshable_id: strand.id
+    bud Prog::Vm::PrepHost
+    bud Prog::LearnNetwork
+    bud Prog::LearnMemory
+    bud Prog::LearnCores
     hop :wait_prep
   end
 
