@@ -24,6 +24,10 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#start_cohort" do
+    after do
+      expect(Thread.list.count).to eq(1)
+    end
+
     it "can create threads" do
       # Isolate some thread local variables used for communication
       # within.
@@ -77,6 +81,7 @@ RSpec.describe Scheduling::Dispatcher do
         di.start_cohort
         expect(Ractor.receive).to eq :thread_dump
         w.close
+        di.threads.map(&:join)
       ensure
         Strand.truncate(cascade: true)
       end.join
