@@ -36,7 +36,18 @@ class Clover
 
     r.on "create" do
       r.get true do
-        @ssh_keys = `ssh-add -L`.split("\n")
+        @ssh_keys = if Config.development?
+          begin
+            agent = Net::SSH::Authentication::Agent.connect
+
+            (sshable.keys.map(&:public_key) + agent.identities.map { |pub|
+                                                SshKey.public_key(pub)
+                                              }).join("\n")
+          ensure
+            agent.close
+          end
+        end
+
         view "vm_host/create"
       end
     end

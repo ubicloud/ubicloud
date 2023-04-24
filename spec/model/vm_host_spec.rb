@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe VmHost do
   it "requires an Sshable too" do
     expect {
-      sa = Sshable.create(host: "test.localhost", private_key: "test not a real private key")
+      sa = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
       described_class.create(location: "test-location") { _1.id = sa.id }
     }.not_to raise_error
   end
