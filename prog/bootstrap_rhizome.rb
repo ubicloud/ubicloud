@@ -11,12 +11,12 @@ class Prog::BootstrapRhizome < Prog::Base
   # make a given Sshable work with the `rhizome` user.
   #
   # It must log into an account that can escalate to root via "sudo,"
-  # which typically includes the "root" account reflexively.
+  # which typically includes the "root" account reflexively.  The
+  # ssh-agent is employed by default here, since personnel are thought
+  # to be involved with preparing new VmHosts.
   def rootish_ssh(cmd)
-    Net::SSH.start(sshable.host, user, use_agent: true,
-      non_interactive: true, timeout: 30,
-      keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5,
-      user_known_hosts_file: []) do |ssh|
+    Net::SSH.start(sshable.host, user,
+      Sshable::COMMON_SSH_ARGS.merge(use_agent: true)) do |ssh|
       ret = ssh.exec!(cmd)
       fail "Could not bootstrap rhizome" unless ret.exitstatus.zero?
       ret
@@ -24,21 +24,21 @@ class Prog::BootstrapRhizome < Prog::Base
   end
 
   def start
-    pop "rhizome user bootstrapped and source installed" if retval == "installed rhizome"
+    sshable.update(raw_private_key_1: SshKey.generate.keypair)
+    hop :setup
+  end
 
-    # YYY: Generate a new SSH key for writing into Sshable, rather
-    # than copying authorized_keys in.  It may make sense to use the
-    # ssh-agent for preparing new hosts, but not for the Rhizome user
-    # once in production.
-    home = (user == "root") ? "/root" : "/home/#{user}"
-    authorized_keys_file = File.join(home, ".ssh", "authorized_keys")
+  def setup
+    pop "rhizome user bootstrapped and source installed" if retval == "installed rhizome"
 
     rootish_ssh(<<SH)
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
-sudo install -D -o rhizome -g rhizome -m 0600 #{authorized_keys_file.shellescape} /home/rhizome/.ssh/authorized_keys
+sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
+sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
+echo #{sshable.keys.map(&:public_key).join("\n")} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 SH
 
     push Prog::InstallRhizome
