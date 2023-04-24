@@ -3,15 +3,19 @@
 require_relative "spec_helper"
 
 RSpec.describe Sshable do
+  # Avoid using excessive entropy by using one generated key for all
+  # tests.
+  key = SshKey.generate.keypair.freeze
+
   subject(:sa) {
-    described_class.new(host: "test.localhost", private_key: "test not a real private key")
+    described_class.new(host: "test.localhost", raw_private_key_1: key)
   }
 
   it "can encrypt and decrypt a field" do
     sa.save_changes
 
-    expect(sa.values[:private_key] =~ /\AA[AgQ]..A/).not_to be_nil
-    expect(sa.private_key).to eq("test not a real private key")
+    expect(sa.values[:raw_private_key_1] =~ /\AA[AgQ]..A/).not_to be_nil
+    expect(sa.raw_private_key_1).to eq(key)
   end
 
   describe "caching" do
