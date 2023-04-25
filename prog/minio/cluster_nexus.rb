@@ -2,15 +2,17 @@
 
 class Prog::Minio::ClusterNexus < Prog::Base
   semaphore :destroy
-  def self.assemble(node_count, *args, **kwargs)
+  def self.assemble(name, node_count, *args, **kwargs)
     DB.transaction do
       id = SecureRandom.uuid
-      mc = MinioCluster.create() { _1.id = id}
+      mc = MinioCluster.create(name: name) { _1.id = id}
+      pp "created cluster #{mc.name} with id #{mc.id}"
+      st = Strand.create(prog: "Minio::ClusterNexus", label: "start") { _1.id = id }
       node_count.times do
         node_st = Prog::Minio::NodeNexus.assemble(mc, *args, **kwargs)
         node_st.update(parent_id: id)
       end
-      Strand.create(prog: "Minio::ClusterNexus", label: "start") { _1.id = id }
+      st
     end
   end
   
