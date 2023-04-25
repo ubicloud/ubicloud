@@ -5,6 +5,9 @@ if (suite = ENV.delete("COVERAGE"))
 
   SimpleCov.start do
     enable_coverage :branch
+    minimum_coverage line: 80, branch: 50
+    minimum_coverage_by_file line: 32, branch: 0
+
     command_name suite
 
     add_filter "/spec/"
