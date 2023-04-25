@@ -26,6 +26,14 @@ module Config
   optional :clover_session_secret, base64, clear: true
   optional :clover_column_encryption_key, base64, clear: true
 
+  # Some email services use a secret token for both user and password,
+  # so clear them both.
+  optional :smtp_user, string, clear: true
+  optional :smtp_password, string, clear: true
+  optional :smtp_hostname, string
+
+  optional :rodauth_email_from, string
+
   # Override -- value is returned or the set default.
   override :database_timeout, 10, int
   override :db_pool, 5, int

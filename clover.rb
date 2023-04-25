@@ -2,6 +2,7 @@
 
 require_relative "model"
 
+require "mail"
 require "roda"
 require "tilt/sass"
 
@@ -57,7 +58,6 @@ class Clover < Roda
   end
 
   if Config.development?
-    require "mail"
     ::Mail.defaults do
       delivery_method :logger
     end
@@ -70,6 +70,17 @@ class Clover < Roda
       end
     end
   else
+    ::Mail.defaults do
+      delivery_method :smtp, {
+        address: Config.smtp_hostname,
+        port: 587,
+        user_name: Config.smtp_user,
+        password: Config.smtp_password,
+        authentication: :plain,
+        enable_starttls: true
+      }
+    end
+
     def self.freeze
       Sequel::Model.freeze_descendents unless Config.test?
       DB.freeze
@@ -121,6 +132,8 @@ class Clover < Roda
     end
 
     hmac_secret Config.clover_session_secret
+
+    email_from Config.rodauth_email_from
 
     login_view { view "auth/login", "Login" }
 
