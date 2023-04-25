@@ -14,7 +14,7 @@ Sequel.migration do
     end
     Rodauth.create_database_authentication_functions(self, argon2: true)
 
-    user = get(Sequel.lit("current_user")).sub(/_password\z/, "")
+    user = get(Sequel.lit("current_user")).delete_suffix("_password")
     run "REVOKE ALL ON account_password_hashes FROM public"
     run "REVOKE ALL ON FUNCTION rodauth_get_salt(uuid) FROM public"
     run "REVOKE ALL ON FUNCTION rodauth_valid_password_hash(uuid, text) FROM public"
@@ -31,7 +31,7 @@ Sequel.migration do
     end
     Rodauth.create_database_previous_password_check_functions(self, argon2: true)
 
-    user = get(Sequel.lit("current_user")).sub(/_password\z/, "")
+    user = get(Sequel.lit("current_user")).delete_suffix("_password")
     run "REVOKE ALL ON account_previous_password_hashes FROM public"
     run "REVOKE ALL ON FUNCTION rodauth_get_previous_salt(uuid) FROM public"
     run "REVOKE ALL ON FUNCTION rodauth_previous_password_hash_match(uuid, text) FROM public"

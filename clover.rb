@@ -175,7 +175,7 @@ class Clover < Roda
   end
 
   route do |r|
-    check_csrf! unless /application\/json/.match?(r.env["CONTENT_TYPE"])
+    check_csrf! unless r.env["CONTENT_TYPE"]&.include?("application/json")
 
     r.public
     r.assets
