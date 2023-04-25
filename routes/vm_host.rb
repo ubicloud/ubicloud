@@ -39,10 +39,7 @@ class Clover
         @ssh_keys = if Config.development?
           begin
             agent = Net::SSH::Authentication::Agent.connect
-
-            (sshable.keys.map(&:public_key) + agent.identities.map { |pub|
-                                                SshKey.public_key(pub)
-                                              }).join("\n")
+            agent.identities.map { |pub| SshKey.public_key(pub) }
           ensure
             agent.close
           end
