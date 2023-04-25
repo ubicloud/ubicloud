@@ -279,8 +279,8 @@ SERVICE
   # Generate a MAC with the "local" (generated, non-manufacturer) bit
   # set and the multicast bit cleared in the first octet.
   #
-  # Accuracy here are is not a formality: otherwise assigning a ipv6
-  # link local address errors out.
+  # Accuracy here is not a formality: otherwise assigning a ipv6 link
+  # local address errors out.
   def gen_mac
     ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
       "%0.2X" % _1
