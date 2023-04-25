@@ -293,6 +293,11 @@ SERVICE
     # issues:
     # https://stackoverflow.com/questions/55686021/static-mac-addresses-for-ec2-instance
     # https://techcommunity.microsoft.com/t5/itops-talk-blog/understanding-static-mac-address-licensing-in-azure/ba-p/1386187
+    #
+    # Also necessary because Cloud Hypervisor, at time of writing,
+    # does not offer robust PCIe slot mapping of devices.  The MAC
+    # address is the most effective stable identifier for the guest in
+    # this case.
     @guest_mac ||= begin
       vp.read_guest_mac
     rescue Errno::ENOENT
