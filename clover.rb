@@ -117,7 +117,7 @@ class Clover < Roda
 
   plugin :sessions,
     key: "_Clover.session",
-    # cookie_options: {secure: ENV['RACK_ENV'] != 'test'}, # Uncomment if only allowing https:// access
+    cookie_options: {secure: !%w[test development].include?(ENV["RACK_ENV"])},
     secret: Config.clover_session_secret
 
   if Unreloader.autoload?

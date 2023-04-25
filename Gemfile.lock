@@ -63,6 +63,7 @@ GEM
     ffi-compiler (1.0.1)
       ffi (>= 1.0.0)
       rake
+    foreman (0.87.2)
     i18n (1.12.0)
       concurrent-ruby (~> 1.0)
     json (2.6.3)
@@ -91,6 +92,7 @@ GEM
       net-protocol
     net-ssh (7.1.0)
     netaddr (2.0.6)
+    nio4r (2.5.9)
     nokogiri (1.14.3-arm64-darwin)
       racc (~> 1.4)
     nokogiri (1.14.3-x86_64-darwin)
@@ -109,6 +111,8 @@ GEM
       byebug (~> 11.0)
       pry (>= 0.13, < 0.15)
     public_suffix (5.0.1)
+    puma (6.2.2)
+      nio4r (~> 2.0)
     racc (1.6.2)
     rack (3.0.7)
     rack-test (2.1.0)
@@ -232,11 +236,13 @@ DEPENDENCIES
   ed25519
   erb-formatter!
   erubi (>= 1.5)
+  foreman
   mail
   net-ssh
   netaddr
   pry
   pry-byebug
+  puma (>= 6.2.2)
   rack-unreloader (>= 1.8)
   rackup
   rake

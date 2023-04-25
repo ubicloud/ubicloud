@@ -118,3 +118,11 @@ task "annotate" do
   require "sequel/annotate"
   Sequel::Annotate.annotate(Dir["model/**/*.rb"])
 end
+
+desc "Emit assets before deploying"
+task "assets:precompile" do
+  `npm install`
+  fail unless $?.success?
+  `npm run prod`
+  fail unless $?.success?
+end
