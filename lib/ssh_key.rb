@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "stringio"
+
 class SshKey
   def self.generate
     new Ed25519::SigningKey.generate
