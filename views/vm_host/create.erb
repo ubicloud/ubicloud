@@ -31,11 +31,17 @@
                       }
                     ) %>
                     <div class="mt-2 space-y-2">
-                      <% @ssh_keys.each do |key| %>
-                        <div
-                          class="overflow-scroll whitespace-nowrap font-mono rounded-lg overlay text-sm leading-6 bg-slate-800 text-slate-50 px-4 py-2"
-                        >
-                          <%= key %>
+                      <% if @ssh_keys && !@ssh_keys.empty? %>
+                        <% @ssh_keys.each do |key| %>
+                          <div
+                            class="overflow-scroll whitespace-nowrap font-mono rounded-lg overlay text-sm leading-6 bg-slate-800 text-slate-50 px-4 py-2"
+                          >
+                            <%= key %>
+                          </div>
+                        <% end %>
+                      <% else %>
+                        <div class="rounded-md bg-red-50 p-4 text-sm text-red-800 font-medium">
+                          Could not detect any SSH keys loaded. Use "<span class="font-mono font-bold text-slate-800">ssh-add [PATH_TO_KEY]</span>" to add SSH keys to agent.
                         </div>
                       <% end %>
                     </div>
