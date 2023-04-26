@@ -174,6 +174,12 @@ SQL
   end
 
   def refresh_mesh
+    # YYY: Implement a robust mesh networking concurrency algorithm.
+    unless Config.development?
+      decr_refresh_mesh
+      hop :wait
+    end
+
     # don't create tunnels to self or VMs already connected to
     reject_list = vm.ipsec_tunnels.map(&:src_vm_id)
     reject_list.append(vm.id)
