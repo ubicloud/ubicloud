@@ -2,6 +2,11 @@
 
 require_relative "model"
 
+unless defined?(Unreloader)
+  require "rack/unreloader"
+  Unreloader = Rack::Unreloader.new(reload: false, autoload: !ENV["NO_AUTOLOAD"])
+end
+
 require "mail"
 require "roda"
 require "tilt/sass"
@@ -115,9 +120,14 @@ class Clover < Roda
     # cookie_options: {secure: ENV['RACK_ENV'] != 'test'}, # Uncomment if only allowing https:// access
     secret: Config.clover_session_secret
 
-  if Config.development?
-    Unreloader.require("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
+  if Unreloader.autoload?
+    plugin :autoload_hash_branches
+    autoload_hash_branch_dir("./routes")
   end
+
+  # rubocop:disable Performance/StringIdentifierArgument
+  Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
+  # rubocop:enable Performance/StringIdentifierArgument
 
   plugin :rodauth do
     enable :argon2, :change_login, :change_password, :close_account, :create_account,
