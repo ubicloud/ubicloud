@@ -8,7 +8,7 @@ class Prog::Minio::NodeNexus < Prog::Base
       puts "here it is"
       id = SecureRandom.uuid
       vm = Prog::Vm::Nexus.assemble(*args, **kwargs)
-      st = Strand.create(prog: "Minio::NodeNexus", label: "start", stack: [{vm_id: vm.id, minio_cluster_id: cluster.id}]) { _1.id = id }
+      st = Strand.create(prog: "Minio::NodeNexus", label: "start") { _1.id = id }
       vm.update(parent_id: id)
       pp "created node with id #{id}"
       pp "created vm with id #{vm.id}"
@@ -21,14 +21,20 @@ class Prog::Minio::NodeNexus < Prog::Base
     @minio_node ||= MinioNode[strand.id]
   end
   
+  def vm
+    @vm ||= Vm[strand.children.first.id]
+  end
+  
   def start
-    hop :create_entities if vm.display_state == "running"
+    # needs to get cleaned up
+    hop :create_entities if vm.reload.display_state == "running"
+
     donate
   end
   
   def create_entities
     Sshable.create(host: vm.ephemeral_net6.network.to_s) { _1.id = strand.id }
-    @minio_node = MinioNode.create(vm_id: vm_id, cluster_id: minio_cluster_id) { _1.id = strand.id }
+    MinioNode.create(vm_id: vm.id, cluster_id: strand.parent_id) { _1.id = strand.id }
     hop :bootstrap_rhizome
   end
   
@@ -38,7 +44,7 @@ class Prog::Minio::NodeNexus < Prog::Base
   end
   
   def install_minio
-    minio_node.sshable.cmd("sudo bin/prep_minio.rb #{MinioCluster[minio_cluster_id].name}")
+    minio_node.sshable.cmd("sudo bin/prep_minio.rb #{MinioCluster[strand.parent_id].name}")
     hop :wait_minio_cluster
   end
 
