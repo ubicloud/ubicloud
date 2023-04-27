@@ -30,6 +30,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnNetwork
     bud Prog::LearnMemory
     bud Prog::LearnCores
+    bud Prog::InstallDnsmasq
     hop :wait_prep
   end
 

@@ -96,6 +96,10 @@ class VmSetup
     # enter a default routing loop via forwarding)
     r "ip -n #{q_vm} addr add #{clover_ephemeral.to_s.shellescape} dev vethi#{q_vm}"
 
+    # Allocate ::1 in the guest network for DHCPv6.
+    guest_intrusion = guest_ephemeral.nth(1).to_s + "/" + guest_ephemeral.netmask.prefix_len.to_s
+    r "ip -n #{q_vm} addr add #{guest_intrusion.shellescape} dev tap#{q_vm}"
+
     # Routing: from subordinate to host.
     vetho_ll = mac_to_ipv6_link_local(File.read("/sys/class/net/vetho#{q_vm}/address").chomp)
     r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
@@ -115,31 +119,29 @@ class VmSetup
   end
 
   def cloudinit(unix_user, public_key, private_subnets)
-    require "yaml"
-
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
 EOS
 
-    tap_mac = r("ip netns exec #{q_vm} cat /sys/class/net/tap#{q_vm}/address")
+    guest_network = NetAddr.parse_net(vp.read_guest_ephemeral)
 
-    private_subnets_config = private_subnets.map {
-      "      - " + yq(_1)
-    }.join("\n")
+    vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
+pid-file=
+leasefile-ro
+enable-ra
+dhcp-authoritative
+ra-param=tap#{@vm_name}
+dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+DNSMASQ_CONF
 
     vp.write_network_config(<<EOS)
 version: 2
 ethernets:
-  id0:
+  #{yq("enx" + guest_mac.tr(":", "").downcase)}:
     match:
       macaddress: #{yq(guest_mac)}
-    addresses:
-      - #{yq(vp.read_guest_ephemeral)}
-#{private_subnets_config}
-    gateway6: #{yq(mac_to_ipv6_link_local(tap_mac))}
-    nameservers:
-      addresses: [2a01:4ff:ff00::add:1, 2a01:4ff:ff00::add:2]
+    dhcp6: true
 EOS
 
     write_user_data(unix_user, public_key)
@@ -172,8 +174,6 @@ ssh_pwauth: False
 
 runcmd:
   - [ systemctl, daemon-reload]
-  - [ systemctl, enable, notify-booted.service]
-  - [ systemctl, start, --no-block, notify-booted.service ]
 EOS
   end
 
@@ -218,6 +218,31 @@ EOS
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
+    vp.write_dnsmasq_service <<DNSMASQ_SERVICE
+[Unit]
+Description=A lightweight DHCP and caching DNS server
+After=network.target
+
+[Service]
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+Type=simple
+ExecStartPre=/usr/local/sbin/dnsmasq --test
+ExecStart=/usr/local/sbin/dnsmasq -k -h -C /vm/#{@vm_name}/dnsmasq.conf --log-debug -i tap#{@vm_name} --user=#{@vm_name} --group=#{@vm_name}
+ExecReload=/bin/kill -HUP $MAINPID
+# YYY: These are not enough capabilties, at least CAP_NET_RAW is
+# needed, as well as more for setgid
+# CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+# AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+ProtectSystem=strict
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadOnlyPaths=/
+DNSMASQ_SERVICE
+
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
     # from VmPath is also a good idea.
@@ -226,6 +251,8 @@ EOS
 [Unit]
 Description=#{@vm_name}
 After=network.target
+After=#{@vm_name}-dnsmasq.service
+Requires=#{@vm_name}-dnsmasq.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
