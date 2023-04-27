@@ -35,6 +35,21 @@
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm_host.location %></dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
+                <dt class="text-sm font-medium text-gray-500">Core Usage</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <% if @vm_host.total_cores %>
+                    <%= @vm_host.used_cores %>
+                    <span class="text-xs italic font-light">used</span>
+                    /
+                    <%= @vm_host.total_cores %>
+                    <span class="text-xs italic font-light">total</span>
+                  <% else %>
+                    -
+                  <% end %>
+                </dd>
+              </div>
+
+              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">IPv6</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
                   <span class="copy-content cursor-pointer" data-content="<%= @vm_host.ip6 %>" data-message="Copied IPv6">
