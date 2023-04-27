@@ -16,7 +16,8 @@ class Prog::BootstrapRhizome < Prog::Base
   # to be involved with preparing new VmHosts.
   def rootish_ssh(cmd)
     Net::SSH.start(sshable.host, user,
-      Sshable::COMMON_SSH_ARGS.merge(use_agent: true)) do |ssh|
+      Sshable::COMMON_SSH_ARGS.merge(key_data: sshable.keys.map(&:private_key),
+        use_agent: Config.development?)) do |ssh|
       ret = ssh.exec!(cmd)
       fail "Could not bootstrap rhizome" unless ret.exitstatus.zero?
       ret
