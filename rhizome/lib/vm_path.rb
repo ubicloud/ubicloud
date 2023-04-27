@@ -18,6 +18,14 @@ class VmPath
     File.write(path, s)
   end
 
+  def dnsmasq_service
+    "/etc/systemd/system/#{@vm_name}-dnsmasq.service"
+  end
+
+  def write_dnsmasq_service(s)
+    write(dnsmasq_service, s)
+  end
+
   def systemd_service
     File.join("/etc/systemd/system",
       IO.popen(["systemd-escape", @vm_name + ".service"]) { _1.read.chomp })
@@ -37,6 +45,7 @@ class VmPath
     guest_mac
     guest_ephemeral
     clover_ephemeral
+    dnsmasq.conf
     boot.raw
     meta-data
     network-config

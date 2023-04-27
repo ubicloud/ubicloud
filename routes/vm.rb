@@ -12,7 +12,7 @@ class Clover
       @state = vm.display_state
       @location = vm.location
       @size = vm.size
-      @ip6 = vm.ephemeral_net6&.network
+      @ip6 = vm.ephemeral_net6&.nth(2)
     end
   end
 
