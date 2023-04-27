@@ -4,7 +4,7 @@ require "ulid"
 
 class Clover
   class VmHostShadow
-    attr_accessor :id, :host, :state, :location, :ip6, :vms_count
+    attr_accessor :id, :host, :state, :location, :ip6, :vms_count, :total_cores, :used_cores
 
     def initialize(vm_host)
       @id = ULID.from_uuidish(vm_host.id).to_s.downcase
@@ -13,6 +13,8 @@ class Clover
       @location = vm_host.location
       @ip6 = vm_host.ip6
       @vms_count = vm_host.vms.count
+      @total_cores = vm_host.total_cores
+      @used_cores = vm_host.used_cores
     end
   end
 
