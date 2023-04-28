@@ -9,7 +9,7 @@ RSpec.describe Prog::Vm::Nexus do
   }
 
   let(:st) { Strand.new }
-  let(:vm) { Vm.new(size: "standard-1") }
+  let(:vm) { Vm.new(size: "m5a.2x") }
 
   it "creates the user and key record" do
     private_subnets = [
