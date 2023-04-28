@@ -19,15 +19,31 @@ class Vm < Sequel::Model
 
   def product
     return @product if @product
-    fail "BUG: cannot parse vm size" unless size =~ /\A(.*)-(\d+)\z/
+    fail "BUG: cannot parse vm size" unless size =~ /\A(.*)\.(\d+)x\z/
     line = $1
-    cores = Integer($2)
+
+    # YYY: Hack to deal with the presentation currently being in
+    # "vcpu" which has a pretty specific meaning being ambigious to
+    # threads or actual cores.
+    #
+    # The presentation is currently helpful because our bare metal
+    # sizes are quite small, supporting only 1, 2, 3 cores (reserving
+    # one for ourselves) and 2, 4, 6 vcpu.  So the product line is
+    # ambiguous as to whether it's ordinal or descriptive (it's
+    # descriptive).  To convey the right thing in demonstration, use
+    # vcpu counts.  It would have been nice to have gotten bigger
+    # hardware in time to avoid that and standardize on cores.
+    #
+    # As an aside, although we probably want to reserve a core an I/O
+    # process of some kind (e.g. SPDK, reserving the entire memory
+    # quota for it may be overkill.
+    cores = Integer($2) / 2
     @product = Product.new(line, cores)
   end
 
   def mem_gib_ratio
     @mem_gib_ratio ||= case product.line
-    when "standard"
+    when "m5a"
       4
     else
       fail "BUG: unrecognized product line"
