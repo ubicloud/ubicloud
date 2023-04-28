@@ -13,9 +13,15 @@ class Scheduling::Dispatcher
   end
 
   def scan
+    idle_connections = Config.db_pool - @threads.count - 1
+    if idle_connections < 1
+      puts "No enough database connection. Waiting active connections to finish their works. db_pool:#{Config.db_pool} active_threads:#{@threads.count}"
+      return []
+    end
+
     Strand.dataset.where(
       Sequel.lit("(lease IS NULL OR lease < now()) AND schedule < now()")
-    ).order_by(:schedule).limit(Config.db_pool - @threads.count - 1)
+    ).order_by(:schedule).limit(idle_connections)
   end
 
   def start_strand(strand)
