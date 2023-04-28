@@ -203,8 +203,19 @@ SQL
   end
 
   def destroy
-    # YYY make idempotent
-    host.sshable.cmd("sudo systemctl stop #{q_vm}")
+    # YYY make idempotent. And less repetitive.
+    begin
+      host.sshable.cmd("sudo systemctl stop #{q_vm}")
+    rescue Sshable::SshError => ex
+      raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.message)
+    end
+
+    begin
+      host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
+    rescue Sshable::SshError => ex
+      raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.message)
+    end
+
     host.sshable.cmd("sudo bin/deletevm.rb #{q_vm}")
 
     vm.vm_private_subnet_dataset.delete

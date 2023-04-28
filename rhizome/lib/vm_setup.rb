@@ -55,10 +55,20 @@ class VmSetup
 
   # Delete all traces of the VM.
   def purge
-    r "ip netns del #{q_vm}"
+    begin
+      r "ip netns del #{q_vm}"
+    rescue CommandFail => ex
+      raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
+    end
+
     FileUtils.rm_f(vp.systemd_service)
     r "systemctl daemon-reload"
-    r "deluser --remove-home #{q_vm}"
+
+    begin
+      r "deluser --remove-home #{q_vm}"
+    rescue CommandFail => ex
+      raise unless /The user `.*' does not exist./.match?(ex.stderr)
+    end
   end
 
   def interfaces
