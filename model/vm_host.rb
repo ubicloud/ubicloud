@@ -85,4 +85,9 @@ class VmHost < Sequel::Model
 
     [threads_per_core, cores_per_die, dies_per_package, total_sockets].map(&:to_s).join(":")
   end
+
+  # Introduced for refreshing rhizome programs via REPL.
+  def install_rhizome
+    Strand.create(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id}])
+  end
 end
