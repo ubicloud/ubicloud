@@ -53,8 +53,35 @@
                 <dt class="text-sm font-medium text-gray-500">IPv6</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
                   <span class="copy-content cursor-pointer" data-content="<%= @vm_host.ip6 %>" data-message="Copied IPv6">
-                    <%= @vm_host.ip6 %>
+                    <%= @vm_host.ip6 || "-" %>
                   </span>
+                </dd>
+              </div>
+              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
+                <dt class="text-sm font-medium text-gray-500">SSH Public Keys</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
+                  <% unless @vm_host.public_keys.empty? %>
+                    <div
+                      class="overflow-hidden whitespace-nowrap font-mono rounded-lg overlay text-sm leading-6 bg-slate-800 text-slate-50 px-4 py-2"
+                    >
+                      <span
+                        class="copy-content cursor-pointer"
+                        data-content="<%= @vm_host.public_keys.join("\n") %>"
+                        data-message="Copied SSH public keys"
+                      >
+                        <%== @vm_host.public_keys.join("</br>") %>
+                      </span>
+                    </div>
+                    <div class="mt-2">
+                      The control plane connects to VM host as
+                      <span class="font-bold text-rose-500">root</span>
+                      user via SSH.
+                      <br>
+                      SSH public keys should be added to the host.
+                    </div>
+                  <% else %>
+                    Waiting for SSH keys to be created. Please refresh the page.
+                  <% end %>
                 </dd>
               </div>
             </dl>
