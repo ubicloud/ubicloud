@@ -7,7 +7,7 @@ require "ulid"
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
 
-  def self.assemble(public_key, name: nil, size: "standard-1",
+  def self.assemble(public_key, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnets: [])
 

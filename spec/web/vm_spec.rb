@@ -38,7 +38,7 @@ RSpec.describe Clover, "vm" do
       fill_in "Name", with: "dummy-vm"
       choose option: "hetzner-hel1"
       choose option: "ubuntu-jammy"
-      choose option: "standard-1"
+      choose option: "m5a.2x"
 
       click_button "Create"
 
