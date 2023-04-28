@@ -36,27 +36,13 @@ RSpec.describe Clover, "vm_host" do
 
       click_button "Add"
 
-      expect(page.title).to eq("Ubicloud - VM Hosts")
-      expect(page).to have_content "'127.0.0.1' host will be ready in a few minutes"
+      expect(page.title).to eq("Ubicloud - 127.0.0.1")
+      expect(page).to have_content "Waiting for SSH keys to be created. Please refresh the page."
       expect(VmHost.count).to eq(1)
     end
 
-    it "can list ssh agent public keys at development" do
-      expect(Config).to receive(:development?).and_return(true)
-      expect(Net::SSH::Authentication::Agent).to receive(:connect) do
-        agent = instance_double(Net::SSH::Authentication::Agent, close: nil)
-        expect(agent).to receive(:identities).and_return(["dummy-key"])
-        expect(SshKey).to receive(:public_key).and_return(["dummy-key"])
-        agent
-      end
-
-      visit "/vm-host/create"
-
-      expect(page.title).to eq("Ubicloud - Add VM Host")
-      expect(page).to have_content "dummy-key"
-    end
-
     it "can show virtual machine host details" do
+      vm_host.sshable.update(raw_private_key_1: SshKey.generate.keypair)
       shadow = Clover::VmHostShadow.new(vm_host)
       visit "/vm-host"
 
@@ -67,6 +53,7 @@ RSpec.describe Clover, "vm_host" do
 
       expect(page.title).to eq("Ubicloud - #{shadow.host}")
       expect(page).to have_content shadow.host
+      expect(page).to have_content shadow.public_keys.first
     end
 
     it "raises not found when virtual machine host not exists" do
