@@ -113,7 +113,7 @@ class VmSetup
     # Routing: from subordinate to host.
     vetho_ll = mac_to_ipv6_link_local(File.read("/sys/class/net/vetho#{q_vm}/address").chomp)
     r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
-    r "ip -n #{q_vm} route add default via #{vetho_ll.shellescape} dev vethi#{q_vm}"
+    r "ip -n #{q_vm} route add 2000::/3 via #{vetho_ll.shellescape} dev vethi#{q_vm}"
 
     vp.write_guest_ephemeral(guest_ephemeral.to_s)
     vp.write_clover_ephemeral(clover_ephemeral.to_s)
