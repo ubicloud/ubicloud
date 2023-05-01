@@ -5,7 +5,7 @@ class Prog::LearnMemory < Prog::Base
 
   def parse_sum(s)
     s.each_line.filter_map do |line|
-      next unless line =~ /Size: (\d+) (\w+)/
+      next unless line =~ /\A\s*Size: (\d+) (\w+)/
       # Fail noisily if unit is not in gigabytes
       fail "BUG: unexpected dmidecode unit" unless $2 == "GB"
       Integer($1)
