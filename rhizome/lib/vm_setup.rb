@@ -144,6 +144,7 @@ enable-ra
 dhcp-authoritative
 ra-param=tap#{@vm_name}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
 
     vp.write_network_config(<<EOS)
