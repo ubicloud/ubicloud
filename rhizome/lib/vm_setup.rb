@@ -62,6 +62,7 @@ class VmSetup
     end
 
     FileUtils.rm_f(vp.systemd_service)
+    FileUtils.rm_f(vp.dnsmasq_service)
     r "systemctl daemon-reload"
 
     begin
