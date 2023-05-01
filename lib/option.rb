@@ -19,6 +19,8 @@ module Option
   VmSizes = [
     ["m5a.2x", "m5a.2x", 2, 4, 30],
     ["m5a.4x", "m5a.4x", 4, 8, 60],
-    ["m5a.6x", "m5a.6x", 6, 12, 90]
+    ["m5a.6x", "m5a.6x", 6, 12, 90],
+    ["c5a.2x", "c5a.2x", 2, 2, 30],
+    ["c5a.6x", "c5a.6x", 6, 6, 90]
   ].map { |args| VmSize.new(*args) }.freeze
 end
