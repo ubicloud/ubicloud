@@ -46,6 +46,10 @@ class Prog::Vm::Nexus < Prog::Base
     vm_name.shellescape
   end
 
+  def vm_home
+    File.join("", "vm", vm_name)
+  end
+
   def self.random_ula
     network_address = NetAddr::IPv6.new((SecureRandom.bytes(7) + 0xfd.chr).unpack1("Q<") << 64)
     network_mask = NetAddr::Mask128.new(64)
@@ -103,6 +107,17 @@ SQL
   def start
     vm_host_id = allocate
     vm.update(vm_host_id: vm_host_id, ephemeral_net6: VmHost[vm_host_id].ip6_random_vm_network.to_s)
+    hop :create_unix_user
+  end
+
+  def create_unix_user
+    # create vm's user and home directory
+    begin
+      host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} #{q_vm}")
+    rescue Sshable::SshError => ex
+      raise unless /adduser: The user `.*' already exists\./.match?(ex.message)
+    end
+
     hop :prep
   end
 
@@ -120,9 +135,7 @@ SQL
       "mem_gib" => vm.mem_gib
     })
 
-    # create vm's home directory
-    vm_home = File.join("", "vm", vm_name)
-    host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} #{q_vm}")
+    # Enable KVM access for VM user.
     host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
 
     # put prep.json
