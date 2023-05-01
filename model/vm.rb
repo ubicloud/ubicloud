@@ -45,6 +45,8 @@ class Vm < Sequel::Model
     @mem_gib_ratio ||= case product.line
     when "m5a"
       4
+    when "c5a"
+      2
     else
       fail "BUG: unrecognized product line"
     end
