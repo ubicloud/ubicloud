@@ -139,11 +139,10 @@ class Clover < Roda
 
     unless Config.development?
       enable :disallow_common_passwords
+      email_from Config.rodauth_email_from
     end
 
     hmac_secret Config.clover_session_secret
-
-    email_from Config.rodauth_email_from
 
     login_view { view "auth/login", "Login" }
 
