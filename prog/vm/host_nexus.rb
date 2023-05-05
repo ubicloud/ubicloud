@@ -3,10 +3,10 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
 
-  def self.assemble(sshable_hostname, location: "hetzner-hel1")
+  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil)
     DB.transaction do
       sa = Sshable.create(host: sshable_hostname)
-      VmHost.create(location: location) { _1.id = sa.id }
+      VmHost.create(location: location, net6: net6) { _1.id = sa.id }
 
       Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = sa.id }
     end
@@ -25,7 +25,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   def prep
     bud Prog::Vm::PrepHost
-    bud Prog::LearnNetwork
+    bud Prog::LearnNetwork unless vm_host.net6
     bud Prog::LearnMemory
     bud Prog::LearnCores
     bud Prog::InstallDnsmasq
