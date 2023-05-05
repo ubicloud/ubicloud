@@ -28,7 +28,22 @@ class VmHost < Sequel::Model
   # address space, i.e. leaving the door open for schemes relying on
   # SIIT translation: https://datatracker.ietf.org/doc/html/rfc7915
   def ip6_reserved_network(prefix = 79)
+    # Interpret a nil ip6 address and a not-nil network as there being
+    # no network reserved for the host in net6.
+    #
+    # The reason: some vendors prefer to delegate a network that
+    # bypasses neighbor discovery protocol (NDP) that is different
+    # than the network customarily assigned to the physical network
+    # interface.
+    #
+    # And on at least one, the network interface *must* respond to
+    # neighbor discovery for that customary network/IP in order to be
+    # routed the delegated /64.  The two networks have no overlap with
+    # one another.  So alas, our ability to auto-configure from the
+    # host in such a case is limited.
+    return nil if ip6.nil? && !net6.nil?
     fail "BUG: host prefix must be is shorter than reserved prefix" unless host_prefix < prefix
+
     NetAddr::IPv6Net.new(ip6, NetAddr::Mask128.new(prefix))
   end
 
@@ -55,7 +70,7 @@ class VmHost < Sequel::Model
     fail "BUG: host should be supernet of randomized subnet" unless net6.rel(proposal) == 1
     # :nocov:
 
-    case proposal.network.cmp(ip6_reserved_network.network)
+    case (rn = ip6_reserved_network) && proposal.network.cmp(rn.network)
     when 0
       # Guard against choosing the host-reserved network for a guest
       # and try again.  Recursion is used here because it's a likely
