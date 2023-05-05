@@ -8,7 +8,7 @@ module Option
   Locations = [
     ["hetzner-hel1", "Hetzner Finland"],
     ["hetzner-fsn1", "Hetzner Germany"],
-    ["equinix-da11", "Equinix Dallas"]
+    ["dp-istanbul-mars", "DataPacket Istanbul"]
   ].map { |args| Location.new(*args) }.freeze
 
   BootImages = [
