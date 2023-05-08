@@ -200,6 +200,7 @@ SQL
     vms = Vm.reject { reject_list.include? _1.id }
 
     vms.each do |dst_vm|
+      next if dst_vm.ephemeral_net6.nil?
       private_subnets.each do |my_subnet|
         dst_vm.private_subnets.each do |dst_subnet|
           create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
