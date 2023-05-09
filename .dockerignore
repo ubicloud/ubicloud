@@ -1,6 +1,6 @@
+.git
 .env.rb
 coverage
-spec/examples.txt
 demo/.env
 
 # Frontend
