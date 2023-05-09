@@ -40,7 +40,7 @@ module Config
   override :deployment, "production", string
   override :force_ssl, true, bool
   override :app_env, "production", string
-  override :port, 5000, int
+  override :port, 3000, int
   override :pretty_json, false, bool
   override :puma_max_threads, 16, int
   override :puma_min_threads, 1, int
