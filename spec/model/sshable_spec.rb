@@ -56,6 +56,29 @@ RSpec.describe Sshable do
         sa.invalidate_cache_entry
       }.to change { Thread.current[:clover_ssh_cache] }.from({"test.localhost" => sess}).to({})
     end
+
+    it "can reset caches when has cached connection" do
+      sess = instance_double(Net::SSH::Connection::Session, close: nil)
+      expect(Net::SSH).to receive(:start).and_return sess
+      sa.connect
+      expect {
+        described_class.reset_cache
+      }.to change { Thread.current[:clover_ssh_cache] }.from({"test.localhost" => sess}).to({})
+    end
+
+    it "can reset caches when has no cached connection" do
+      expect(described_class.reset_cache).to eq([])
+    end
+
+    it "can reset caches even if session fails while closing" do
+      sess = instance_double(Net::SSH::Connection::Session)
+      expect(sess).to receive(:close).and_raise Sshable::SshError
+      expect(Net::SSH).to receive(:start).and_return sess
+      sa.connect
+
+      expect(described_class.reset_cache.first).to be_a Sshable::SshError
+      expect(Thread.current[:clover_ssh_cache]).to eq({})
+    end
   end
 
   describe "#cmd" do
