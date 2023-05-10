@@ -1,6 +1,8 @@
 /.env.rb
 /coverage
 spec/examples.txt
+*DS_Store
+.vscode
 
 # Frontend
 node_modules

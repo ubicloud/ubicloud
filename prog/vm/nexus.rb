@@ -160,7 +160,6 @@ SQL
 
     my_params = "#{q_vm} #{q_net} #{my_subnet.to_s.shellescape}"
     dst_params = "#{q_dst_name} #{q_dst_net} #{dst_subnet.to_s.shellescape}"
-
     spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
     key = "0x" + SecureRandom.bytes(36).unpack1("H*")
 
@@ -171,6 +170,11 @@ SQL
   def run
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     vm.update(display_state: "running")
+    hop :setup_sshable
+  end
+
+  def setup_sshable
+    Sshable.create(host: vm.ephemeral_net6.network.to_s + "2") { _1.id = vm.id }
     hop :wait
   end
 
@@ -198,7 +202,6 @@ SQL
     reject_list.append(vm.id)
 
     vms = Vm.reject { reject_list.include? _1.id }
-
     vms.each do |dst_vm|
       next if dst_vm.ephemeral_net6.nil?
       private_subnets.each do |my_subnet|

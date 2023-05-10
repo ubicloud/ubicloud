@@ -73,7 +73,7 @@ class VmSetup
   end
 
   def interfaces
-    r "ip netns add #{q_vm}"
+    r "ip netns list | grep -q #{q_vm} && ip netns delete #{q_vm}; ip netns add #{q_vm}"
 
     # Generate MAC addresses rather than letting Linux do it to avoid
     # a vexing bug whereby a freshly created link will, at least once,

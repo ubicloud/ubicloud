@@ -31,7 +31,6 @@ class Prog::BootstrapRhizome < Prog::Base
 
   def setup
     pop "rhizome user bootstrapped and source installed" if retval == "installed rhizome"
-
     rootish_ssh(<<SH)
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
@@ -41,7 +40,6 @@ sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
 sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
 echo #{sshable.keys.map(&:public_key).join("\n")} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 SH
-
     push Prog::InstallRhizome
   end
 end
