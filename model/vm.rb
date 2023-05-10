@@ -79,10 +79,10 @@ class Vm < Sequel::Model
 
   def cloud_hypervisor_cpu_topology
     threads_per_core, r = vm_host.total_cpus.divmod vm_host.total_cores
-    fail "BUG" unless r == 0
+    fail "BUG" unless r.zero?
 
     total_dies_per_package, r = vm_host.total_nodes.divmod vm_host.total_sockets
-    fail "BUG" unless r == 0
+    fail "BUG" unless r.zero?
 
     total_packages = vm_host.total_sockets
 
@@ -94,13 +94,17 @@ class Vm < Sequel::Model
     fail "BUG: need uniform number of cores allocated per die" unless cores_per_die.denominator == 1
 
     topo = [threads_per_core, cores_per_die, dies_per_package, packages].map { |num|
-      fail "BUG: non-integer in topology array" if num.denominator != 1
+      # :nocov:
+      fail "BUG: non-integer in topology array" unless num.denominator == 1
+      # :nocov:
       Integer(num)
     }
 
+    # :nocov:
     unless topo.reduce(&:*) == threads_per_core * cores
       fail "BUG: arithmetic does not result in the correct number of vcpus"
     end
+    # :nocov:
 
     CloudHypervisorCpuTopo.new(*topo)
   end
