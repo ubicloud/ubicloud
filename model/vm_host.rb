@@ -66,26 +66,6 @@ class VmHost < Sequel::Model
     proposal
   end
 
-  # cloud-hypervisor takes topology information in this format:
-  #
-  # topology=<threads_per_core>:<cores_per_die>:<dies_per_package>:<packages>
-  #
-  # In particular, it uses a progressive series of ratios, whereas for
-  # allocation reasons, the database schema prefers system totals that
-  # can be converted to that, done here.
-  def cloud_hypervisor_cpu_topology
-    threads_per_core, r = total_cpus.divmod(total_cores)
-    fail "BUG" unless r.zero?
-
-    cores_per_die, r = total_cores.divmod(total_nodes)
-    fail "BUG" unless r.zero?
-
-    dies_per_package, r = total_nodes.divmod(total_sockets)
-    fail "BUG" unless r.zero?
-
-    [threads_per_core, cores_per_die, dies_per_package, total_sockets].map(&:to_s).join(":")
-  end
-
   # Introduced for refreshing rhizome programs via REPL.
   def install_rhizome
     Strand.create(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id}])
