@@ -132,7 +132,7 @@ end
   end
 
   def bud(prog, new_frame = {}, label = "start")
-    new_frame = new_frame.merge("subject_id" => @subject_id)
+    new_frame = {"subject_id" => @subject_id}.merge(new_frame)
     Strand.create(parent_id: strand.id,
       prog: Strand.prog_verify(prog), label: label,
       stack: Sequel.pg_jsonb_wrap([new_frame]))
@@ -161,6 +161,12 @@ end
     old_label = @strand.label
     @strand.update(label: label, retval: nil)
     fail Hop.new(old_prog, old_label, @strand)
+  end
+
+  def wait_buds_then_hop(label)
+    reap
+    hop label if leaf?
+    donate
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert

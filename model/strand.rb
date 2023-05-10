@@ -7,7 +7,7 @@ class Strand < Sequel::Model
   many_to_one :parent, key: :parent_id, class: self
   one_to_many :children, key: :parent_id, class: self
 
-  NAVIGATE = %w[vm vm_host sshable].freeze
+  NAVIGATE = %w[vm vm_host sshable minio_cluster minio_pool minio_node].freeze
 
   NAVIGATE.each do
     one_to_one _1.intern, key: :id

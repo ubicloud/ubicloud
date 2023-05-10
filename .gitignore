@@ -2,6 +2,8 @@
 coverage
 spec/examples.txt
 demo/.env
+*DS_Store
+.vscode
 
 # Frontend
 node_modules
