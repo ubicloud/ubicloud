@@ -152,9 +152,14 @@ class Clover < Roda
     hmac_secret Config.clover_session_secret
 
     login_view { view "auth/login", "Login" }
+    login_return_to_requested_location? true
+    two_factor_auth_return_to_requested_location? true
+    already_logged_in { redirect login_redirect }
+    after_login { remember_login if request.params["remember-me"] == "on" }
 
     create_account_view { view "auth/create_account", "Create Account" }
     create_account_redirect { login_route }
+    create_account_set_password? true
 
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
@@ -174,10 +179,6 @@ class Clover < Roda
     close_account_route "settings/close-account"
     close_account_view { view "settings/close_account", "Settings" }
 
-    already_logged_in { redirect login_redirect }
-
-    after_login { remember_login if request.params["remember-me"] == "on" }
-
     # YYY: Should password secret and session secret be the same? Are
     # there rotation issues? See also:
     #
@@ -185,8 +186,6 @@ class Clover < Roda
     # https://github.com/jeremyevans/rodauth/commit/d8568a325749c643c9a5c9d6d780e287f8c59c31
     argon2_secret { Config.clover_session_secret }
     require_bcrypt? false
-
-    create_account_set_password? true
   end
 
   def last_sms_sent
