@@ -152,6 +152,7 @@ class Clover < Roda
     hmac_secret Config.clover_session_secret
 
     login_view { view "auth/login", "Login" }
+    login_redirect "/dashboard"
     login_return_to_requested_location? true
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
@@ -196,6 +197,10 @@ class Clover < Roda
     nil
   end
 
+  hash_branch("dashboard") do |r|
+    view "/dashboard"
+  end
+
   route do |r|
     check_csrf! unless r.env["CONTENT_TYPE"]&.include?("application/json")
 
@@ -205,12 +210,12 @@ class Clover < Roda
     rodauth.load_memory
     rodauth.check_active_session
     r.rodauth
+    r.root do
+      r.redirect rodauth.login_route
+    end
     rodauth.require_authentication
     check_csrf!
 
-    r.hash_branches("")
-    r.root do
-      view "dashboard"
-    end
+    r.hash_branches
   end
 end
