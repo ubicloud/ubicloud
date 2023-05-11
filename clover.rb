@@ -131,15 +131,22 @@ class Clover < Roda
 
   plugin :rodauth do
     enable :argon2, :change_login, :change_password, :close_account, :create_account,
-      :lockout, :login, :logout, :remember, :reset_password, :verify_account,
+      :lockout, :login, :logout, :remember, :reset_password,
       :otp, :recovery_codes, :sms_codes,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password
     title_instance_variable :@page_title
 
     unless Config.development?
-      enable :disallow_common_passwords
+      enable :disallow_common_passwords, :verify_account
+
       email_from Config.rodauth_email_from
+
+      verify_account_view { view "auth/verify_account", "Verify Account" }
+      resend_verify_account_view { view "auth/verify_account_resend", "Resend Verification" }
+      verify_account_email_sent_redirect { login_route }
+      verify_account_email_recently_sent_redirect { login_route }
+      verify_account_set_password? false
     end
 
     hmac_secret Config.clover_session_secret
@@ -148,11 +155,6 @@ class Clover < Roda
 
     create_account_view { view "auth/create_account", "Create Account" }
     create_account_redirect { login_route }
-
-    verify_account_view { view "auth/verify_account", "Verify Account" }
-    resend_verify_account_view { view "auth/verify_account_resend", "Resend Verification" }
-    verify_account_email_sent_redirect { login_route }
-    verify_account_email_recently_sent_redirect { login_route }
 
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
@@ -185,7 +187,6 @@ class Clover < Roda
     require_bcrypt? false
 
     create_account_set_password? true
-    verify_account_set_password? false
   end
 
   def last_sms_sent
