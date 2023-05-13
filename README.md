@@ -28,12 +28,12 @@ Once you do, click add VM Hosts from the cloud dashboard. This will cloudify
 your Linux machines. Ubicloud can then provision and manage resources for
 cloud services on these machines.
 
-<< image >>
+![Cloudify Linux Machine](https://github.com/ubicloud/clover/assets/2545443/23bcba42-35ba-4e91-93ce-6b7e009d3522)
 
 Please note that Ubicloud uses SSH to manage Linux machines; and needs access
 to the SSH key you're using in accessing these machines. Also, once you create
 VMs, Ubicloud will assign them IPv6 addresses. If your ISP doesn't support IPv6,
-please use a VPN such Mullvad or contact us for IPv4 support.
+please use a VPN such Mullvad or contact us to allocate your IPv4 address space.
 
 ## Status
 
