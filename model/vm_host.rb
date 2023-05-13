@@ -28,7 +28,7 @@ class VmHost < Sequel::Model
   # address space, i.e. leaving the door open for schemes relying on
   # SIIT translation: https://datatracker.ietf.org/doc/html/rfc7915
   def ip6_reserved_network(prefix = 79)
-    fail "BUG" unless host_prefix < prefix
+    fail "BUG: host prefix must be is shorter than reserved prefix" unless host_prefix < prefix
     NetAddr::IPv6Net.new(ip6, NetAddr::Mask128.new(prefix))
   end
 
@@ -36,10 +36,6 @@ class VmHost < Sequel::Model
   # for delegation to a VM.
   def ip6_random_vm_network(prefix = 79)
     subnet_bits = prefix - host_prefix
-
-    # If there was only one subnet bit, it would be allocated already
-    # by ip6_reserved_network.
-    fail "BUG" unless subnet_bits > 1
 
     # Perform integer division, rounding up the number of random bytes
     # needed.
@@ -55,15 +51,20 @@ class VmHost < Sequel::Model
       NetAddr::IPv6.new(net6.network.addr | lower_bits), NetAddr::Mask128.new(prefix)
     )
 
+    # :nocov:
     fail "BUG: host should be supernet of randomized subnet" unless net6.rel(proposal) == 1
+    # :nocov:
 
-    # Guard against choosing the host-reserved network for a guest and
-    # try again.  Recursion is used here because it's a likely code
-    # path, and if there's a bug, it's better to stack overflow rather
-    # than loop forever.
-    ip6_random_vm_network(prefix) if proposal.network == ip6_reserved_network.network
-
-    proposal
+    case proposal.network.cmp(ip6_reserved_network.network)
+    when 0
+      # Guard against choosing the host-reserved network for a guest
+      # and try again.  Recursion is used here because it's a likely
+      # code path, and if there's a bug, it's better to stack overflow
+      # rather than loop forever.
+      ip6_random_vm_network(prefix)
+    else
+      proposal
+    end
   end
 
   # Introduced for refreshing rhizome programs via REPL.
