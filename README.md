@@ -9,13 +9,15 @@ OVH, Datapacket, Equinix Metal, AWS Bare Metal, and others.
 Start up Ubicloud's control plane and connect to its dashboard. The first time
 you connect, you'll need to sign up.
 
-  # Generate secrets for demo
-  ./demo/generate_env
-  
-  # Run containers: web, respirate, postgresql
-	docker-compose -f demo/docker-compose.yml up
-  
-	# Visit localhost:3000
+```
+# Generate secrets for demo
+./demo/generate_env
+
+# Run containers: web, respirate, postgresql
+docker-compose -f demo/docker-compose.yml up
+
+# Visit localhost:3000
+```
 
 The control plane is responsible for cloudifying bare metal Linux machines.
 When you click to "Create a Virtual Machine", you'll see example providers. The
@@ -36,7 +38,8 @@ please use a VPN such Mullvad or contact us for IPv4 support.
 ## Status
 
 Ubicloud is in public alpha. You can provide us your feedback, get help, or ask
-us to support your network environment in the [Community Forum]().
+us to support your network environment in the 
+[Community Forum](https://github.com/ubicloud/clover/discussions).
 
 You can also find our cloud services and their statuses below.
 
@@ -95,4 +98,4 @@ UI](https://tailwindui.com). We also use jQuery for interactivity.
 
 Any method of obtaining of Ruby and Postgres versions is acceptable,
 but if you have no opinion on this, our development team uses `asdf-vm` as
-[documented here in detail.](DEVELOPMENT.md)
+[documented here in detail.](DEVELOPERS.md)
