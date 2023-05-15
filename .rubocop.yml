@@ -64,3 +64,10 @@ RSpec/ExpectInHook:
 
 RSpec/InstanceVariable:
   Enabled: false
+
+# We renamed our repository to "ubicloud", but app class name is Clover.
+# Rubocop is failing for web UI tests.
+# RSpec/FilePath: Spec path should end with clover*vm*_spec.rb
+RSpec/FilePath:
+  Exclude:
+    - 'spec/web/**/*.rb'
