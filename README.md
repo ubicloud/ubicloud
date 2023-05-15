@@ -1,4 +1,4 @@
-# Ubicloud
+# Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml)
 
 Ubicloud is an open source portable cloud. It provides IaaS cloud features in
 common hardware and network environments, such as those available in Hetzner,
@@ -10,12 +10,12 @@ Start up Ubicloud's control plane and connect to its dashboard. The first time
 you connect, you'll need to sign up.
 
 ```
-git clone git@github.com:ubicloud/clover.git
+git clone git@github.com:ubicloud/ubicloud.git
 
 # Generate secrets for demo
 ./demo/generate_env
 
-# Run containers: web, respirate, postgresql
+# Run containers: db-migrator, app (web & respirate), postgresql
 docker-compose -f demo/docker-compose.yml up
 
 # Visit localhost:3000
@@ -31,9 +31,9 @@ to manage Linux machines; and will provide you with a public SSH key. You'll
 need to add this SSH key to your Linux machine's authorized keys, typically
 located in `/root/.ssh/authorized_keys`.
 
-![Cloudify Linux Machine](https://github.com/ubicloud/clover/assets/2545443/23bcba42-35ba-4e91-93ce-6b7e009d3522)
+![Cloudify Linux Machine](https://github.com/ubicloud/ubicloud/assets/2545443/23bcba42-35ba-4e91-93ce-6b7e009d3522)
 
-Once you add a VM Host, Ubicloud will cloudify that machine. You can then 
+Once you add a VM Host, Ubicloud will cloudify that machine. You can then
 provision and manage cloud services on those machines.
 
 Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP
@@ -43,8 +43,8 @@ your IPv4 address space.
 ## Status
 
 Ubicloud is in public alpha. You can provide us your feedback, get help, or ask
-us to support your network environment in the 
-[Community Forum](https://github.com/ubicloud/clover/discussions).
+us to support your network environment in the
+[Community Forum](https://github.com/ubicloud/ubicloud/discussions).
 
 You can also find our cloud services and their statuses below.
 
