@@ -10,6 +10,8 @@ Start up Ubicloud's control plane and connect to its dashboard. The first time
 you connect, you'll need to sign up.
 
 ```
+git clone git@github.com:ubicloud/clover.git
+
 # Generate secrets for demo
 ./demo/generate_env
 
@@ -24,16 +26,19 @@ When you click to "Create a Virtual Machine", you'll see example providers. The
 easiest way to build your own cloud is to lease instances from one of those
 providers. For example: https://www.hetzner.com/sb
 
-Once you do, click add VM Hosts from the cloud dashboard. This will cloudify
-your Linux machines. Ubicloud can then provision and manage resources for
-cloud services on these machines.
+Once you do, click add VM Hosts from the ubicloud dashboard. Ubicloud uses SSH
+to manage Linux machines; and will provide you with a public SSH key. You'll
+need to add this SSH key to your Linux machine's authorized keys, typically
+located in `/root/.ssh/authorized_keys`.
 
 ![Cloudify Linux Machine](https://github.com/ubicloud/clover/assets/2545443/23bcba42-35ba-4e91-93ce-6b7e009d3522)
 
-Please note that Ubicloud uses SSH to manage Linux machines; and needs access
-to the SSH key you're using in accessing these machines. Also, once you create
-VMs, Ubicloud will assign them IPv6 addresses. If your ISP doesn't support IPv6,
-please use a VPN such Mullvad or contact us to allocate your IPv4 address space.
+Once you add a VM Host, Ubicloud will cloudify that machine. You can then 
+provision and manage cloud services on those machines.
+
+Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP
+doesn't support IPv6, please use a VPN such Mullvad or contact us to allocate
+your IPv4 address space.
 
 ## Status
 
@@ -86,7 +91,7 @@ modifications. As the name indicates, we use
 
 We manage web authentication with [RodAuth](http://rodauth.jeremyevans.net/).
 
-We communicates with servers using SSH, via the library
+We communicate with servers using SSH, via the library
 [net-ssh](https://github.com/net-ssh/net-ssh).
 
 For our tests, we use [RSpec](https://rspec.info/). We also automatically lint
