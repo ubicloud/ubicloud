@@ -24,7 +24,7 @@ class Strand < Sequel::Model
     when /\AProg::(.*)\z/
       $1
     else
-      fail "BUG"
+      fail "BUG: prog must be in Prog module"
     end
   end
 
@@ -57,7 +57,11 @@ WHERE id = ? AND lease = ?
 SQL
       # Avoid leasing integrity check error if the record disappears
       # entirely.
-      fail "BUG: lease violated" unless num_updated == 1 || !@deleted
+      unless num_updated == 1 || !@deleted
+        # :nocov:
+        fail "BUG: lease violated"
+        # :nocov:
+      end
     end
   end
 

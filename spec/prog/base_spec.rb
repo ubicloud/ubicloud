@@ -5,8 +5,9 @@ require_relative "../model/spec_helper"
 RSpec.describe Prog::Base do
   it "deletes a child with a exitval set" do
     parent = Strand.create(prog: "Test", label: "reaper")
-    parent.add_child(exitval: "{}", parent_id: parent.id,
-      prog: "Test", label: "start")
+    child = parent.add_child(parent_id: parent.id,
+      prog: "Test", label: "popper")
+    expect(child.run.class).to eq(Prog::Base::Exit)
     expect {
       parent.run
     }.to change { parent.load.leaf? }.from(false).to(true)
@@ -14,7 +15,7 @@ RSpec.describe Prog::Base do
 
   it "does not delete a child that has no retval yet" do
     parent = Strand.create(prog: "Test", label: "reaper")
-    parent.add_child(parent_id: parent.id, prog: "Test", label: "start")
+    parent.add_child(parent_id: parent.id, prog: "Test", label: "popper")
 
     expect {
       parent.run

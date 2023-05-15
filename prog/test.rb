@@ -38,6 +38,10 @@ class Prog::Test < Prog::Base
     hop :hop_exit
   end
 
+  def hop_exit
+    pop({msg: "hop finished"})
+  end
+
   def reaper
     reap
     nap 0
@@ -45,5 +49,9 @@ class Prog::Test < Prog::Base
 
   def napper
     nap(123)
+  end
+
+  def popper
+    pop({msg: "popped"})
   end
 end
