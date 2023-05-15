@@ -36,9 +36,10 @@ located in `/root/.ssh/authorized_keys`.
 Once you add a VM Host, Ubicloud will cloudify that machine. You can then
 provision and manage cloud services on those machines.
 
-Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP
-doesn't support IPv6, please use a VPN such Mullvad or contact us to allocate
-your IPv4 address space.
+Later when you create VMs, Ubicloud will assign them IPv6
+addresses. If your ISP doesn't support IPv6, please use a VPN or
+tunnel broker such Mullvad or Hurricane Electric's
+https://tunnelbroker.net/ to connect.
 
 ## Status
 
