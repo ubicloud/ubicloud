@@ -63,5 +63,5 @@ jobs:
         CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
         CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
       run: |
-        bundle exec rspec
+        COVERAGE=1 bundle exec rspec
         bundle exec rspec -O /dev/null rhizome
