@@ -13,6 +13,7 @@ RSpec.describe Clover, "vm_host" do
 
   describe "authenticated" do
     before do
+      create_account
       login
     end
 

@@ -11,6 +11,7 @@ RSpec.describe Clover, "object_storage" do
 
   describe "authenticated" do
     before do
+      create_account
       login
     end
 
