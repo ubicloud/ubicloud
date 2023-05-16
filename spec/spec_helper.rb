@@ -21,6 +21,7 @@ require_relative "./coverage_helper"
 require "rspec"
 require "database_cleaner/sequel"
 require "logger"
+require "sequel/core"
 
 # DatabaseCleaner assumes the usual DATABASE_URL, but the
 # "roda-sequel-stack" way names each environment *and* application
@@ -42,16 +43,13 @@ RSpec.configure do |config|
   end
 
   config.before(:suite) do
-    DatabaseCleaner.strategy = :transaction
     DB.loggers << Logger.new($stdout) if DB.loggers.empty?
+
+    DatabaseCleaner.strategy = :transaction
     DatabaseCleaner.clean_with(:truncation,
-      # Skip tables that are part of RodAuth and can't be truncated on
-      # account of `ph` user separation.
+      # Skip tables that are filled with migrations.
       except: %w[
-        account_previous_password_hashes
         schema_info_password
-        account_password_hashes
-        accounts
         account_statuses
       ])
   end

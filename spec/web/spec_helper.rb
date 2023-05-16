@@ -28,32 +28,19 @@ RSpec.configure do |config|
     Capybara.reset_sessions!
     Capybara.use_default_driver
   end
-
-  config.before(:suite) do
-    create_user_if_not_exist("user@example.com", "0123456789")
-    create_user_if_not_exist("user2@example.com", "0123456789")
-  end
 end
 
-def create_user_if_not_exist(email, password)
-  # Create a default user to use in all test if not exits
-  # Database cleaner can't trunca accounts tables because of
-  # account of `ph` user separation.
+def create_account(email = "user@example.com", password = "0123456789")
+  hash = Argon2::Password.new({
+    t_cost: 1,
+    m_cost: 3,
+    secret: Config.clover_session_secret
+  }).create(password)
 
-  user = Account[email: email] || begin
-    hash = Argon2::Password.new({
-      t_cost: 1,
-      m_cost: 3,
-      secret: Config.clover_session_secret
-    }).create(password)
-
-    account = Account.create(email: email, status_id: 2)
-    DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
-
-    account
-  end
-  user.create_tag_space_with_default_policy("#{user.username}_tag_space")
-  user
+  account = Account.create(email: email, status_id: 2)
+  DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
+  account.create_tag_space_with_default_policy("#{account.username}_tag_space")
+  account
 end
 
 def login(email = "user@example.com", password = "0123456789")

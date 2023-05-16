@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "vm" do
-  let(:user) { Account[email: "user@example.com"] }
+  let(:user) { create_account }
 
   let(:tag_space) { user.create_tag_space_with_default_policy("tag-space-1") }
 
@@ -33,7 +33,7 @@ RSpec.describe Clover, "vm" do
 
   describe "authenticated" do
     before do
-      login
+      login(user.email)
     end
 
     describe "list" do

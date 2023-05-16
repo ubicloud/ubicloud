@@ -23,7 +23,8 @@ FROM pg_class
 WHERE relnamespace = 'public'::regnamespace AND relname = 'account_password_hashes'
 SQL
   when 0
-    ph_user = DB.get(Sequel.lit("current_user")) + "_password"
+    user = DB.get(Sequel.lit("current_user"))
+    ph_user = "#{user}_password"
 
     # NB: this grant/revoke cannot be transaction-isolated, so, in
     # sensitive settings, it would be good to check role access.
@@ -31,6 +32,14 @@ SQL
     Sequel.postgres(**DB.opts.merge(user: ph_user)) do |db|
       db.loggers << Logger.new($stdout) if db.loggers.empty?
       Sequel::Migrator.run(db, "migrate/ph", table: "schema_info_password")
+
+      if Config.test?
+        # User doesn't have permission to run TRUNCATE on password hash tables, so DatabaseCleaner
+        # can't clean Rodauth tables between test runs. While running migrations for test database,
+        # we allow it, so cleaner can clean them.
+        db["GRANT TRUNCATE ON account_password_hashes TO ?", user.to_sym].get
+        db["GRANT TRUNCATE ON account_previous_password_hashes TO ?", user.to_sym].get
+      end
     end
     DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
   when 1
