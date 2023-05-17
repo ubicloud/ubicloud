@@ -39,20 +39,15 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed)
+  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed)
+    ip4 = nil if ip4.empty?
     interfaces
-    routes(gua, private_subnets, ndp_needed)
-    cloudinit(unix_user, public_key, private_subnets)
+    routes6(gua, private_subnets, ndp_needed)
+    routes4(ip4, local_ip4)
+    cloudinit(unix_user, public_key, private_subnets, ip4)
     storage(boot_image)
     hugepages(mem_gib)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
-    forwarding
-  end
-
-  def network(unix_user, public_key, private_subnets, gua)
-    interfaces
-    routes(gua, private_subnets)
-    cloudinit(unix_user, public_key, private_subnets)
     forwarding
   end
 
@@ -91,8 +86,13 @@ class VmSetup
     # /sys/class/net/vethi#{q_vm}/address at two points in time.  The
     # result is a race condition that *sometimes* worked.
     r "ip link add vetho#{q_vm} addr #{gen_mac.shellescape} type veth peer name vethi#{q_vm} addr #{gen_mac.shellescape} netns #{q_vm}"
-
     r "ip -n #{q_vm} tuntap add dev tap#{q_vm} mode tap user #{q_vm}"
+  rescue CommandFail => ex
+    errors = [
+      /ioctl(TUNSETIFF): Device or resource busy/,
+      /File exists/
+    ]
+    raise unless errors.any? { |e| e.match?(ex.stderr) }
   end
 
   def subdivide_network(net)
@@ -101,7 +101,7 @@ class VmSetup
     [halved, halved.next_sib]
   end
 
-  def routes(gua, private_subnets, ndp_needed)
+  def routes6(gua, private_subnets, ndp_needed)
     # Routing: from host to subordinate.
     vethi_ll = mac_to_ipv6_link_local(r("ip netns exec #{q_vm} cat /sys/class/net/vethi#{q_vm}/address").chomp)
     r "ip link set dev vetho#{q_vm} up"
@@ -152,7 +152,28 @@ class VmSetup
     fail "No default route found in #{routes_j.inspect}"
   end
 
-  def cloudinit(unix_user, public_key, private_subnets)
+  def routes4(ip4, ip4_local)
+    return unless ip4
+    vm_sub = NetAddr::IPv4Net.parse(ip4)
+    local_ip = NetAddr::IPv4Net.parse(ip4_local)
+    vm, vetho, vethi = [vm_sub.to_s,
+      local_ip.network.to_s,
+      local_ip.next_sib.network.to_s]
+
+    r "ip addr add #{vetho}/32 dev vetho#{q_vm}"
+    r "ip route add #{vm} dev vetho#{q_vm}"
+    r "echo 1 > /proc/sys/net/ipv4/conf/vetho#{q_vm}/proxy_arp"
+
+    r "ip -n #{q_vm} addr add #{vethi}/32 dev vethi#{q_vm}"
+    r "ip -n #{q_vm} addr add #{vm} dev tap#{q_vm}"
+    r "ip -n #{q_vm} route add #{vetho} dev vethi#{q_vm}"
+    r "ip -n #{q_vm} route add default via #{vetho} dev vethi#{q_vm}"
+    r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
+    r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/tap#{q_vm}/proxy_arp'"
+  end
+
+  def cloudinit(unix_user, public_key, private_subnets, ip4)
+    vm_sub = NetAddr::IPv4Net.parse(ip4) if ip4
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -167,6 +188,7 @@ enable-ra
 dhcp-authoritative
 ra-param=tap#{@vm_name}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+#{"dhcp-range=tap#{@vm_name},#{vm_sub.nth(1)},#{vm_sub.nth(2**(32 - vm_sub.netmask.prefix_len) - 1)},#{vm_sub.netmask.prefix_len}" if ip4}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
 
@@ -177,6 +199,7 @@ ethernets:
     match:
       macaddress: #{yq(guest_mac)}
     dhcp6: true
+    #{"dhcp4: true" if ip4}
 EOS
 
     write_user_data(unix_user, public_key)
@@ -272,6 +295,8 @@ EOS
   # harmless and fast enough to double up.
   def forwarding
     r("ip netns exec #{q_vm} sysctl -w net.ipv6.conf.all.forwarding=1")
+    r("ip netns exec #{q_vm} sysctl -w net.ipv4.conf.all.forwarding=1")
+    r("ip netns exec #{q_vm} sysctl -w net.ipv4.ip_forward=1")
   end
 
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib)

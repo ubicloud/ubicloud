@@ -7,6 +7,8 @@ class Vm < Sequel::Model
   many_to_one :vm_host
   one_to_many :vm_private_subnet, key: :vm_id
   one_to_many :ipsec_tunnels, key: :src_vm_id
+  one_to_one :sshable, key: :id
+  one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
 
   dataset_module Authorization::Dataset
 
@@ -23,6 +25,14 @@ class Vm < Sequel::Model
 
   def path
     "/vm/#{ulid}"
+  end
+
+  def ephemeral_net4
+    assigned_vm_address&.ip&.nth(1)
+  end
+
+  def ip4
+    assigned_vm_address&.ip
   end
 
   Product = Struct.new(:line, :cores)

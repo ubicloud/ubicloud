@@ -23,6 +23,16 @@ unless (gua = params["public_ipv6"])
   exit 1
 end
 
+unless (ip4 = params["public_ipv4"])
+  puts "need public_ipv4 in parameters json"
+  exit 1
+end
+
+unless (local_ip4 = params["local_ipv4"])
+  puts "need local_ipv4 in parameters json"
+  exit 1
+end
+
 unless (unix_user = params["unix_user"])
   puts "need unix_user in parameters json"
   exit 1
@@ -64,5 +74,5 @@ require "fileutils"
 require_relative "../lib/common"
 require_relative "../lib/vm_setup"
 
-VmSetup.new(vm_name).prep(unix_user, ssh_public_key, private_subnets, gua, boot_image,
-  max_vcpus, cpu_topology, mem_gib, ndp_needed)
+VmSetup.new(vm_name).prep(unix_user, ssh_public_key, private_subnets, gua, ip4,
+  local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed)

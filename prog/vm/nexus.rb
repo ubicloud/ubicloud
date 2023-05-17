@@ -85,8 +85,16 @@ class Prog::Vm::Nexus < Prog::Base
     @private_subnets ||= vm.private_subnets
   end
 
-  def q_net
+  def q_net6
     vm.ephemeral_net6.to_s.shellescape
+  end
+
+  def q_net4
+    vm.ip4.to_s || ""
+  end
+
+  def local_ipv4
+    vm.local_vetho_ip&.to_s&.shellescape || ""
   end
 
   def allocation_dataset
@@ -121,7 +129,11 @@ SQL
 
   def start
     vm_host_id = allocate
-    vm.update(vm_host_id: vm_host_id, ephemeral_net6: VmHost[vm_host_id].ip6_random_vm_network.to_s)
+    vm_host = VmHost[vm_host_id]
+    ip4, address = vm_host.ip4_random_vm_network
+    vm.update(vm_host_id: vm_host_id, ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
+      local_vetho_ip: ip4 ? vm_host.veth_pair_random_ip4_addr.to_s : nil)
+    AssignedVmAddress.create(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
     hop :create_unix_user
   end
 
@@ -140,7 +152,9 @@ SQL
     topo = vm.cloud_hypervisor_cpu_topology
     params_json = JSON.pretty_generate({
       "vm_name" => vm_name,
-      "public_ipv6" => q_net,
+      "public_ipv6" => q_net6,
+      "public_ipv4" => q_net4,
+      "local_ipv4" => local_ipv4,
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
       "private_subnets" => private_subnets.map { _1.to_s },
@@ -174,7 +188,7 @@ SQL
     q_dst_name = self.class.uuid_to_name(dst_vm.id).shellescape
     q_dst_net = dst_vm.ephemeral_net6.to_s.shellescape
 
-    my_params = "#{q_vm} #{q_net} #{my_subnet.to_s.shellescape}"
+    my_params = "#{q_vm} #{q_net6} #{my_subnet.to_s.shellescape}"
     dst_params = "#{q_dst_name} #{q_dst_net} #{dst_subnet.to_s.shellescape}"
 
     spi = "0x" + SecureRandom.bytes(4).unpack1("H*")

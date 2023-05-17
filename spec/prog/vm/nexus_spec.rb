@@ -70,6 +70,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.ephemeral_net6 = "fe80::/64"
       vm.unix_user = "test_user"
       vm.public_key = "test_ssh_key"
+      vm.local_vetho_ip = "169.254.0.0"
       expect(vm).to receive(:private_subnets).and_return [NetAddr.parse_net("fd10:9b0b:6b4b:8fbb::/64")]
       expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
 
@@ -87,7 +88,8 @@ RSpec.describe Prog::Vm::Nexus do
           "ssh_public_key" => "test_ssh_key",
           "max_vcpus" => 1,
           "cpu_topology" => "1:1:1:1",
-          "mem_gib" => 4
+          "mem_gib" => 4,
+          "local_ipv4" => "169.254.0.0"
         })
       end
       expect(sshable).to receive(:cmd).with(/sudo bin\/prepvm/)
@@ -95,6 +97,16 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.prep }.to raise_error Prog::Base::Hop do |hop|
         expect(hop.new_label).to eq("trigger_refresh_mesh")
       end
+    end
+
+    it "generates local_ipv4 if not set" do
+      expect(nx.local_ipv4).to eq("")
+    end
+
+    it "generates local_ipv4 if set" do
+      vm = nx.vm
+      vm.local_vetho_ip = "169.254.0.0"
+      expect(nx.local_ipv4).to eq("169.254.0.0")
     end
   end
 

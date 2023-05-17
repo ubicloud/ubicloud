@@ -6,11 +6,17 @@ class VmHost < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :sshable, key: :id
   one_to_many :vms
+  one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address
+  one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
 
   include ResourceMethods
 
   def host_prefix
     net6.netmask.prefix_len
+  end
+
+  def vm_addresses
+    vms.filter_map(&:assigned_vm_address)
   end
 
   # Compute the IPv6 Subnet that can be used to address the host
@@ -84,8 +90,69 @@ class VmHost < Sequel::Model
     end
   end
 
+  def ip4_random_vm_network
+    # we get the available subnets and if the subnet is /32, we eliminate it
+    available_subnets = assigned_subnets.select { |a| a.cidr.version == 4 && a.cidr.netmask.prefix_len != 32 }
+    # we eliminate the subnets that are full
+    used_subnet = available_subnets.select { |as| as.assigned_vm_address.count != as.cidr.subnet_count(31) }.sample
+
+    # not available subnet
+    return [nil, nil] unless used_subnet
+
+    # we pick a random /31 subnet from the available subnet
+    rand = SecureRandom.random_number(32 - used_subnet.cidr.netmask.prefix_len).to_i
+    picked_subnet = used_subnet.cidr.nth_subnet(31, rand)
+    # we check if the picked subnet is used by one of the vms
+    return ip4_random_vm_network if vm_addresses.map(&:ip).map(&:to_s).include?(picked_subnet.to_s)
+    [picked_subnet, used_subnet]
+  end
+
+  def veth_pair_random_ip4_addr
+    addr = NetAddr::IPv4Net.parse("169.254.0.0/16")
+    # we get 1 address here and use the next address to assign
+    # route for vetho* and vethi* devices. So, we are splitting the local address
+    # space to two but only store 1 of them for the existence check.
+    # that's why the range is 2 * ((addr.len - 2) / 2)
+    selected_addr = NetAddr::IPv4Net.new(addr.nth(2 * SecureRandom.random_number((addr.len - 2) / 2)), NetAddr::Mask32.new(32))
+
+    return veth_pair_random_ip4_addr if selected_addr.network.to_s.nil? || vms.any? { |vm| vm.local_vetho_ip == selected_addr.network.to_s }
+    selected_addr
+  end
+
   # Introduced for refreshing rhizome programs via REPL.
   def install_rhizome
     Strand.create(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id}])
+  end
+
+  def sshable_address
+    assigned_host_addresses.find { |a| a.ip.version == 4 }
+  end
+
+  def create_addresses(ip_records)
+    return if ip_records.nil? || ip_records.empty?
+
+    DB.transaction do
+      ip_records.each do |ip_record|
+        ip_addr = ip_record[:ip_address]
+        source_host_ip = ip_record[:source_host_ip]
+        is_failover_ip = ip_record[:is_failover]
+
+        next if assigned_subnets.any? { |a| a.cidr.to_s == ip_addr }
+        # we need to find if it was previously created
+        # if it was, we need to update the routed_to_host_id
+        # if it wasn't, we need to create it
+        adr = Address.where(cidr: ip_addr).first
+        if adr && is_failover_ip
+          adr.update(routed_to_host_id: id)
+        else
+          if Sshable.where(host: source_host_ip).first.nil?
+            fail "BUG: source host #{source_host_ip} isn't added to the database"
+          end
+          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
+        end
+
+        AssignedHostAddress.create(host_id: id, ip: ip_addr, address_id: adr.id) unless is_failover_ip
+      end
+    end
   end
 end
