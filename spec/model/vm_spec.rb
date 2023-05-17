@@ -121,4 +121,17 @@ RSpec.describe Vm do
       end
     end
   end
+
+  describe "#utility functions" do
+    it "can compute the ipv4 addresses" do
+      as_ad = instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.new(NetAddr.parse_ip("1.1.1.0"), NetAddr::Mask32.new(31)))
+      expect(vm).to receive(:assigned_vm_address).and_return(as_ad).at_least(:once)
+      expect(vm.ephemeral_net4.to_s).to eq("1.1.1.1")
+      expect(vm.ip4.to_s).to eq("1.1.1.0/31")
+    end
+
+    it "can compute nil if ipv4 is not assigned" do
+      expect(vm.ephemeral_net4).to be_nil
+    end
+  end
 end

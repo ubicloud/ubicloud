@@ -7,7 +7,8 @@ class Prog::Vm::HostNexus < Prog::Base
     DB.transaction do
       sa = Sshable.create(host: sshable_hostname)
       VmHost.create(location: location, net6: net6, ndp_needed: ndp_needed) { _1.id = sa.id }
-
+      Address.create(cidr: sshable_hostname, routed_to_host_id: sa.id) { _1.id = sa.id }
+      AssignedHostAddress.create(ip: sshable_hostname, address_id: sa.id, host_id: sa.id)
       Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = sa.id }
     end
   end
