@@ -69,6 +69,7 @@ RSpec.describe Scheduling::Dispatcher do
     end
 
     it "can trigger thread dumps and exit if the Prog takes too long" do
+      expect(described_class).to receive(:print_thread_dump)
       Thread.new do
         th = Thread.current
         r, w = IO.pipe
@@ -79,7 +80,6 @@ RSpec.describe Scheduling::Dispatcher do
         di.instance_variable_set(:@dump_timeout, 0)
         Strand.create(prog: "Test", label: "wait_exit")
         di.start_cohort
-        expect(Ractor.receive).to eq :thread_dump
         w.close
         di.threads.each(&:join)
       ensure

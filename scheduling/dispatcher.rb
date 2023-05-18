@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "warning"
-Warning.ignore(/Ractor is experimental, and the behavior may change in future versions of Ruby! Also there are many implementation issues./, __FILE__)
-
 class Scheduling::Dispatcher
   attr_reader :threads
 
@@ -24,29 +21,24 @@ class Scheduling::Dispatcher
     ).order_by(:schedule).limit(idle_connections)
   end
 
+  def self.print_thread_dump
+    Thread.list.each do |thread|
+      puts "Thread: #{thread.inspect}"
+      puts thread.backtrace&.join("\n")
+    end
+  end
+
   def start_strand(strand)
     strand_id = strand.id.freeze
 
-    # Supervise the thread's timely execution with a Ractor, which
-    # doesn't share the GVL with the main Ractor that Prog work.  It's
-    # vital to terminate before Strand::LEASE_EXPIRATION, or else
-    # mutual exclusion no longer holds.
     r, w = IO.pipe
 
-    Ractor.new(
-      r,
-      Ractor.current,
-      strand_id,
-      @apoptosis_timeout,
-      @dump_timeout
-    ) do |r, parent, strand_id, apoptosis_timeout, dump_timeout|
-      ready, _, _ = IO.select([r], nil, nil, apoptosis_timeout)
+    Thread.new do
+      ready, _, _ = IO.select([r], nil, nil, @apoptosis_timeout)
 
       if ready.nil?
-        # Timed out, ask the main ractor to do a thread dump, wait a
-        # short time, and then exit.
-        parent.send(:thread_dump)
-        sleep dump_timeout
+        # Timed out, dump threads and exit
+        self.class.print_thread_dump
 
         # exit_group is syscall number 231 on Linux, to exit all
         # threads. I choose to exit with code 28, because it's
