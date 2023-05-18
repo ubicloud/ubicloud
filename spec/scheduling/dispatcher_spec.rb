@@ -7,6 +7,31 @@ require_relative "../model/spec_helper"
 RSpec.describe Scheduling::Dispatcher do
   subject(:di) { described_class.new }
 
+  describe "#scan" do
+    it "exits if there's not enough database connections" do
+      expect(Config).to receive(:db_pool).and_return(0).at_least(:once)
+      expect(di).to receive(:puts).with("Not enough database connections. Waiting active connections to finish their work. db_pool:0 active_threads:0")
+      di.scan
+    end
+  end
+
+  describe "#print_thread_dump" do
+    it "can dump threads" do
+      expect(described_class).to receive(:puts).with(/Thread: #<Thread:.*>/)
+      expect(described_class).to receive(:puts).with(/backtrace/)
+      described_class.print_thread_dump
+    end
+
+    it "can handle threads with a nil backtrace" do
+      # The documentation calls out that the backtrace is an array or
+      # nil.
+      expect(described_class).to receive(:puts).with(/Thread: #<InstanceDouble.*>/)
+      expect(described_class).to receive(:puts).with(nil)
+      expect(Thread).to receive(:list).and_return([instance_double(Thread, backtrace: nil)])
+      described_class.print_thread_dump
+    end
+  end
+
   describe "#wait_cohort" do
     it "operates when no threads are running" do
       expect { di.wait_cohort }.not_to raise_error
@@ -70,6 +95,8 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "can trigger thread dumps and exit if the Prog takes too long" do
       expect(described_class).to receive(:print_thread_dump)
+      expect(Kernel).to receive(:exit!)
+
       Thread.new do
         th = Thread.current
         r, w = IO.pipe
