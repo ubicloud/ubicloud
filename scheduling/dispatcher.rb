@@ -12,7 +12,7 @@ class Scheduling::Dispatcher
   def scan
     idle_connections = Config.db_pool - @threads.count - 1
     if idle_connections < 1
-      puts "No enough database connection. Waiting active connections to finish their works. db_pool:#{Config.db_pool} active_threads:#{@threads.count}"
+      puts "Not enough database connections. Waiting active connections to finish their work. db_pool:#{Config.db_pool} active_threads:#{@threads.count}"
       return []
     end
 
@@ -39,14 +39,12 @@ class Scheduling::Dispatcher
       if ready.nil?
         # Timed out, dump threads and exit
         self.class.print_thread_dump
+        Kernel.exit!
 
-        # exit_group is syscall number 231 on Linux, to exit all
-        # threads. I choose to exit with code 28, because it's
-        # distinctive, but otherwise, has no meaning.
-        Kernel.syscall(231, 28) unless Config.test?
-
-        # Unreachable, except in test.
+        # rubocop:disable Lint/UnreachableCode
+        # Reachable in test only.
         next
+        # rubocop:enable Lint/UnreachableCode
       end
 
       ready.first.close
