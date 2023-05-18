@@ -78,8 +78,8 @@ RSpec.describe Scheduling::Dispatcher do
         di.instance_variable_set(:@apoptosis_timeout, 0)
         di.instance_variable_set(:@dump_timeout, 0)
         Strand.create(prog: "Test", label: "wait_exit")
-        di.start_cohort
         expect(described_class).to receive(:print_thread_dump)
+        di.start_cohort
         w.close
         di.threads.each(&:join)
       ensure
