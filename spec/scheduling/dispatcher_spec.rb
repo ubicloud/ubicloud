@@ -79,7 +79,7 @@ RSpec.describe Scheduling::Dispatcher do
         di.instance_variable_set(:@dump_timeout, 0)
         Strand.create(prog: "Test", label: "wait_exit")
         di.start_cohort
-        expect(Ractor.receive).to eq :thread_dump
+        expect(described_class).to receive(:print_thread_dump)
         w.close
         di.threads.each(&:join)
       ensure
