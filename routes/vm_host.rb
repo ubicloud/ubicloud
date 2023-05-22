@@ -20,6 +20,10 @@ class Clover
   end
 
   hash_branch("vm-host") do |r|
+    unless vm_host_allowed?
+      fail Authorization::Unauthorized
+    end
+
     r.get true do
       @vm_hosts = VmHost.eager(:sshable, :vms).all.map { |vm_host| VmHostShadow.new(vm_host) }
 
