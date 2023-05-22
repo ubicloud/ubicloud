@@ -17,6 +17,42 @@ RSpec.describe Clover, "vm_host" do
       login
     end
 
+    describe "#vm_host_allowed?" do
+      it "can not list if email not allowed" do
+        expect(Config).to receive(:allowed_vm_host_users).and_return("user2@example.com,user3@example.com")
+
+        visit "/vm-host"
+
+        expect(page.title).to eq("Ubicloud - Forbidden")
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content "Forbidden"
+      end
+
+      it "can not click on sidebar if email not allowed" do
+        expect(Config).to receive(:allowed_vm_host_users).and_return("user2@example.com,user3@example.com").twice
+
+        visit "/dashboard"
+
+        expect(page.title).to eq("Ubicloud - Dashboard")
+        expect(page.status_code).to eq(200)
+
+        expect(page).not_to have_content "VM Hosts"
+        expect { find "a[href='/vm-host']" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can list if email allowed" do
+        expect(Config).to receive(:allowed_vm_host_users).and_return("user@example.com,user2@example.com").at_least(:once)
+
+        visit "/vm-host"
+
+        expect(page.title).to eq("Ubicloud - VM Hosts")
+        expect(page).to have_content "No virtual machine host"
+
+        click_link "New Virtual Machine Host"
+        expect(page.title).to eq("Ubicloud - Add VM Host")
+      end
+    end
+
     it "can list no virtual machine hosts" do
       visit "/vm-host"
 

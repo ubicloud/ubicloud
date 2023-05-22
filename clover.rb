@@ -217,6 +217,12 @@ class Clover < Roda
     nil
   end
 
+  def vm_host_allowed?
+    vm_host_users = Config.allowed_vm_host_users
+    return true if vm_host_users.empty?
+    vm_host_users.include?(Account[rodauth.session_value].email)
+  end
+
   hash_branch("dashboard") do |r|
     view "/dashboard"
   end

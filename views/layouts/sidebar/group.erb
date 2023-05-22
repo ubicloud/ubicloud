@@ -1,5 +1,5 @@
 <li>
-  <div class="group <%= items.map { _1[2] }.any? ? "active" : "" %>">
+  <div class="group <%= items.compact.map { _1[2] }.any? ? "active" : "" %>">
     <button
       type="button"
       class="sidebar-group-btn w-full text-indigo-200 hover:text-white hover:bg-indigo-700 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
@@ -21,7 +21,7 @@
       </svg>
     </button>
     <ul class="mt-1 px-2 hidden group-[.active]:block">
-      <% items.each do |item_name, item_url, item_is_active| %>
+      <% items.compact.each do |item_name, item_url, item_is_active| %>
         <li>
           <a
             href="<%= item_url %>"

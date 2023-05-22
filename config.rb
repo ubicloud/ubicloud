@@ -49,6 +49,7 @@ module Config
   override :root, File.expand_path(__dir__), string
   override :timeout, 10, int
   override :versioning, false, bool
+  override :allowed_vm_host_users, "", array(string)
 
   def self.development?
     Config.rack_env == "development"
