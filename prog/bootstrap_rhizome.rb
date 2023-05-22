@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "net/ssh"
+
 class Prog::BootstrapRhizome < Prog::Base
   subject_is :sshable
 
@@ -30,7 +32,7 @@ class Prog::BootstrapRhizome < Prog::Base
   end
 
   def setup
-    pop "rhizome user bootstrapped and source installed" if retval == "installed rhizome"
+    pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
 
     rootish_ssh(<<SH)
 set -ueo pipefail

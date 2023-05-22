@@ -44,13 +44,17 @@ end
     fail Nap.new(seconds)
   end
 
-  def pop(o)
-    outval = case o
-    when nil
-      nil
-    else
-      Sequel.pg_jsonb_wrap(o)
-    end
+  def pop(*args)
+    outval = Sequel.pg_jsonb_wrap(
+      case args
+      in [String => s]
+        {msg: s}
+      in [Hash => h]
+        h
+      else
+        fail "BUG: must pop with string or hash"
+      end
+    )
 
     if strand.stack.length > 0 && (link = frame["link"])
       # This is a multi-level stack with a back-link, i.e. one prog
@@ -131,8 +135,8 @@ end
     fail Hop.new(old_prog, old_label, @strand)
   end
 
-  def bud(prog, new_frame = {}, label = "start")
-    new_frame = new_frame.merge("subject_id" => @subject_id)
+  def bud(prog, new_frame = nil, label = "start")
+    new_frame = (new_frame || {}).merge("subject_id" => @subject_id)
     Strand.create(parent_id: strand.id,
       prog: Strand.prog_verify(prog), label: label,
       stack: Sequel.pg_jsonb_wrap([new_frame]))
@@ -146,7 +150,7 @@ end
   def reap
     strand.children_dataset.where(Sequel.~(exitval: nil)).returning.delete.tap {
       # Clear cache if anything was deleted.
-      strand.associations.delete(:children) unless _1.nil?
+      strand.associations.delete(:children) unless _1.empty?
     }
   end
 
@@ -156,7 +160,8 @@ end
 
   # A hop is a kind of jump, as in, like a jump instruction.
   def hop(label)
-    label = label.to_s if label.is_a?(Symbol)
+    fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
+    label = label.to_s
     old_prog = @strand.prog
     old_label = @strand.label
     @strand.update(label: label, retval: nil)
@@ -166,6 +171,6 @@ end
   # Copied from sequel/model/inflections.rb's camelize, to convert
   # table names into idiomatic model class names.
   private_class_method def self.camelize(s)
-    s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase unless x == "/"}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
+    s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
   end
 end

@@ -2,17 +2,20 @@
 
 # A no-operation prog for testing.
 class Prog::Test < Prog::Base
+  subject_is :sshable
+  semaphore :test_semaphore
+
   def start
   end
 
   def pusher1
-    pop 1 if retval
-    push Prog::Test, {test_level: 2}, :pusher2
+    pop "1" if retval
+    push Prog::Test, {test_level: "2"}, :pusher2
   end
 
   def pusher2
     pop frame[:test_level] if retval
-    push Prog::Test, {test_level: 3}, :pusher3
+    push Prog::Test, {test_level: "3"}, :pusher3
   end
 
   def pusher3
@@ -44,7 +47,7 @@ class Prog::Test < Prog::Base
 
   def reaper
     reap
-    nap 0
+    donate
   end
 
   def napper
@@ -53,5 +56,28 @@ class Prog::Test < Prog::Base
 
   def popper
     pop({msg: "popped"})
+  end
+
+  def invalid_hop
+    hop "hop_exit"
+  end
+
+  def budder
+    bud self.class, frame, :popper
+    hop :reaper
+  end
+
+  def increment_semaphore
+    incr_test_semaphore
+    donate
+  end
+
+  def decrement_semaphore
+    decr_test_semaphore
+    donate
+  end
+
+  def bad_pop
+    pop nil
   end
 end
