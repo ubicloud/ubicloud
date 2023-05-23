@@ -16,14 +16,17 @@ class Prog::Vm::Nexus < Prog::Base
       fail "Not existing tag space"
     end
 
+    id = SecureRandom.uuid
+    name ||= uuid_to_name(id)
+
+    Validation.validate_name(name)
+
     # if the caller hasn't provided any subnets, generate a random one
     if private_subnets.empty?
       private_subnets.append(random_ula)
     end
 
     DB.transaction do
-      id = SecureRandom.uuid
-      name ||= uuid_to_name(id)
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, size: size, location: location, boot_image: boot_image) { _1.id = id }
       vm.associate_with_tag_space(tag_space)
