@@ -101,10 +101,10 @@ class Clover < Roda
     case e
     when Sequel::ValidationFailed
       flash["error"] = e.to_s
-      return request.redirect env["HTTP_REFERER"]
+      return redirect_back_with_inputs
     when Validation::ValidationFailed
       flash["errors"] = (flash["errors"] || {}).merge(e.errors)
-      return request.redirect env["HTTP_REFERER"]
+      return redirect_back_with_inputs
     when Roda::RodaPlugins::RouteCsrf::InvalidToken
       response.status = 419
       @error_code = 419
@@ -215,12 +215,9 @@ class Clover < Roda
     require_bcrypt? false
   end
 
-  def last_sms_sent
-    nil
-  end
-
-  def last_mail_sent
-    nil
+  def redirect_back_with_inputs
+    flash["old"] = request.params
+    request.redirect env["HTTP_REFERER"]
   end
 
   def vm_host_allowed?

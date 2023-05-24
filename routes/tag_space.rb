@@ -173,7 +173,7 @@ class Clover
               fail JSON::ParserError unless JSON.parse(body).is_a?(Hash)
             rescue JSON::ParserError
               flash["error"] = "The policy isn't a valid JSON object."
-              return request.redirect env["HTTP_REFERER"]
+              return redirect_back_with_inputs
             end
 
             policy.update(body: body)

@@ -29,7 +29,7 @@
                   <div class="col-span-full">
                     <div class="policy-editor">
                       <pre class="bg-gray-50 rounded-lg p-3 h-[60vh] overflow-scroll" contenteditable="true">
-                        <%= @policy.body %>
+                        <%= flash.dig("old", "body") || @policy.body %>
                       </pre>
                       <textarea name="body" class="hidden" required></textarea>
                     </div>

@@ -1,7 +1,7 @@
 <% name = defined?(name) ? name : nil %>
 <% label = defined?(label) ? label : nil %>
 <% options = (defined?(options) && options) ? options : {} %>
-<% selected = defined?(selected) ? selected : nil %>
+<% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
 <% error = defined?(error) ? error : flash.dig("errors", name) %>
 <% description = defined?(description) ? description : nil %>
 <% attributes = defined?(attributes) ? attributes : {} %>
@@ -19,8 +19,8 @@
             value="<%= opt_val %>"
             class="peer sr-only"
             <%= (opt_val == selected) ? "checked" : "" %>
-            <% attributes.each do |key, value| %>
-            <%= key %>="<%= value %>"
+            <% attributes.each do |atr_key, atr_value| %>
+            <%= atr_key %>="<%= atr_value %>"
             <% end%>
           >
           <span

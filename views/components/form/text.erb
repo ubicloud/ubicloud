@@ -1,6 +1,7 @@
 <% name = defined?(name) ? name : nil %>
 <% label = defined?(label) ? label : nil %>
 <% type = (defined?(type) && type) ? type : "text" %>
+<% value = flash.dig("old", name) || ((defined?(value) && value) ? value : nil) %>
 <% error = (defined?(error) && error) ? error : rodauth.field_error(name) || flash.dig("errors", name) %>
 <% description = (defined?(description) && description) ? description : nil %>
 <% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
@@ -13,6 +14,9 @@
     id="<%= name %>"
     type="<%= type %>"
     name="<%= name %>"
+    <% if value %>
+    value="<%= value %>"
+    <% end %>
     class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%>"
     <% attributes.each do |atr_key, atr_value| %>
     <%= atr_key %>="<%= atr_value %>"

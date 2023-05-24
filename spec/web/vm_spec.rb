@@ -78,6 +78,25 @@ RSpec.describe Clover, "vm" do
         expect(Vm.count).to eq(1)
       end
 
+      it "can not create virtual machine with invalid name" do
+        tag_space
+        visit "/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+
+        fill_in "Name", with: "invalid name"
+        select tag_space.name, from: "tag-space-id"
+        choose option: "hetzner-hel1"
+        choose option: "ubuntu-jammy"
+        choose option: "c5a.2x"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_content "Name must only contain"
+        expect((find "input[name=name]")["value"]).to eq("invalid name")
+      end
+
       it "can not select tag space when does not have permissions" do
         tag_space
         tag_space_wo_permissions
