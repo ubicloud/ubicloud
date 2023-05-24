@@ -1,5 +1,5 @@
 <% name = defined?(name) ? name : nil %>
-<% value = defined?(value) ? value : nil %>
+<% value = flash.dig("old", name) || (defined?(value) ? value : nil) %>
 <% label = defined?(label) ? label : nil %>
 <% error = defined?(error) ? error : flash.dig("errors", name) %>
 <% description = defined?(description) ? description : nil %>

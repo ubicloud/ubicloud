@@ -261,7 +261,8 @@ RSpec.describe Clover, "tag_space" do
         click_button "Update"
 
         expect(page).to have_content "The policy isn't a valid JSON object."
-        expect(page).to have_content current_policy.to_json
+        expect(page).to have_content "{'invalid': 'json',}"
+        expect(current_policy).to eq(tag_space.access_policies.first.body)
       end
 
       it "raises not found when access policy not exists" do
