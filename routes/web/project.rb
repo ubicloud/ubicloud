@@ -2,8 +2,10 @@
 
 require "ulid"
 
-class Clover
+class CloverWeb
   hash_branch("project") do |r|
+    @serializer = Serializers::Web::Project
+
     current_user = Account[rodauth.session_value]
 
     @serializer = Serializers::Web::Project

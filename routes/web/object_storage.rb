@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Clover
+class CloverWeb
   hash_branch("object-storage") do |r|
     r.get true do
       @page_title = "Object Storage"

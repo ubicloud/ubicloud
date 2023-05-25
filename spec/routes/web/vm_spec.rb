@@ -152,9 +152,9 @@ RSpec.describe Clover, "vm" do
       it "raises not found when virtual machine not exists" do
         visit "/vm/08s56d4kaj94xsmrnf5v5m3mav"
 
-        expect(page.title).to eq("Ubicloud - Page not found")
+        expect(page.title).to eq("Ubicloud - Resource not found")
         expect(page.status_code).to eq(404)
-        expect(page).to have_content "Page not found"
+        expect(page).to have_content "Resource not found"
       end
     end
 

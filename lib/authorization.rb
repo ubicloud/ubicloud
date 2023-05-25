@@ -51,7 +51,11 @@ module Authorization
 
   module Dataset
     def authorized(subject_id, actions)
-      where(id: Authorization.authorized_resources(subject_id, actions))
+      # We can't use "id" column directly, because it's ambiguous in big joined queries.
+      # We need to determine table of id explicitly.
+      # @opts is the hash of options for this dataset, and introduced at Sequel::Dataset.
+      from = @opts[:from].first
+      where { {Sequel[from][:id] => Authorization.authorized_resources(subject_id, actions)} }
     end
   end
 
