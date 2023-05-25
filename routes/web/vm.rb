@@ -2,7 +2,7 @@
 
 require "ulid"
 
-class Clover
+class CloverWeb
   hash_branch("vm") do |r|
     @serializer = Serializers::Web::Vm
 

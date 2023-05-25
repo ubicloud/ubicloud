@@ -2,7 +2,7 @@
 
 require "ulid"
 
-class Clover
+class CloverWeb
   hash_branch("settings") do |r|
     r.get true do
       r.redirect "/settings/change-password"

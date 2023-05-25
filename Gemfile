@@ -26,6 +26,7 @@ gem "rake"
 gem "warning"
 gem "pry"
 gem "excon"
+gem "jwt"
 
 group :development do
   gem "brakeman"

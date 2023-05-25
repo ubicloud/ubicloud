@@ -70,4 +70,4 @@ RSpec/InstanceVariable:
 # RSpec/FilePath: Spec path should end with clover*vm*_spec.rb
 RSpec/FilePath:
   Exclude:
-    - 'spec/web/**/*.rb'
+    - 'spec/routes/**/*.rb'

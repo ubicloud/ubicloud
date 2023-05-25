@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
-raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
 
 require "capybara"
 require "capybara/rspec"
@@ -30,20 +29,7 @@ RSpec.configure do |config|
   end
 end
 
-def create_account(email = "user@example.com", password = "0123456789")
-  hash = Argon2::Password.new({
-    t_cost: 1,
-    m_cost: 3,
-    secret: Config.clover_session_secret
-  }).create(password)
-
-  account = Account.create(email: email, status_id: 2)
-  DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
-  account.create_project_with_default_policy("#{account.username}-project")
-  account
-end
-
-def login(email = "user@example.com", password = "0123456789")
+def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
   visit "/login"
   fill_in "Email address", with: email
   fill_in "Password", with: password

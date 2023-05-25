@@ -18,6 +18,8 @@ Unreloader = Rack::Unreloader.new(
 ) { Clover }
 
 Unreloader.autoload("#{__dir__}/clover.rb") { "Clover" }
+Unreloader.autoload("#{__dir__}/clover_api.rb") { "CloverApi" }
+Unreloader.autoload("#{__dir__}/clover_web.rb") { "CloverWeb" }
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
 
 AUTOLOAD_CONSTANTS = []
@@ -65,8 +67,8 @@ autoload_normal = ->(subdirectory, include_first: false) do
   end
 end
 
-%w[model lib].each { autoload_normal.call(_1) }
-%w[scheduling prog serializers/web].each { autoload_normal.call(_1, include_first: true) }
+%w[model lib clover_web clover_api].each { autoload_normal.call(_1) }
+%w[scheduling prog serializers/web serializers/api].each { autoload_normal.call(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
 

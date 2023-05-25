@@ -11,9 +11,9 @@ RSpec.describe Clover, "auth" do
 
   it "can not login new account without verification" do
     visit "/create-account"
-    fill_in "Email address", with: "user@example.com"
-    fill_in "Password", with: "Secret@Password123"
-    fill_in "Password Confirmation", with: "Secret@Password123"
+    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
 
     expect(Mail::TestMailer.deliveries.length).to eq 1
@@ -21,8 +21,8 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Login")
 
     visit "/login"
-    fill_in "Email address", with: "user@example.com"
-    fill_in "Password", with: "Secret@Password123"
+    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - Resend Verification")
@@ -30,9 +30,9 @@ RSpec.describe Clover, "auth" do
 
   it "can create new account and verify it" do
     visit "/create-account"
-    fill_in "Email address", with: "user@example.com"
-    fill_in "Password", with: "Secret@Password123"
-    fill_in "Password Confirmation", with: "Secret@Password123"
+    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
 
     expect(page).to have_content("An email has been sent to you with a link to verify your account")
@@ -50,8 +50,8 @@ RSpec.describe Clover, "auth" do
     account = create_account
 
     visit "/login"
-    fill_in "Email address", with: account.email
-    fill_in "Password", with: "0123456789"
+    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
     check "Remember me"
     click_button "Sign in"
 
