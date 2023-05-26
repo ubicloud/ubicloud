@@ -13,7 +13,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     tag_space = TagSpace[tag_space_id]
     unless tag_space || Config.development?
-      fail "Not existing tag space"
+      fail "No existing tag space"
     end
 
     id = SecureRandom.uuid

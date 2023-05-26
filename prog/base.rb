@@ -102,10 +102,16 @@ end
       @strand_update_args = strand_update_args
     end
 
+    def new_label
+      @strand_update_args[:label] || @old_label
+    end
+
+    def new_prog
+      @strand_update_args[:prog] || @old_prog
+    end
+
     def to_s
-      prog = @strand_update_args[:prog] || @old_prog
-      label = @strand_update_args[:label] || @old_label
-      "hop #{@old_prog}##{@old_label} -> #{prog}##{label}"
+      "hop #{@old_prog}##{@old_label} -> #{new_prog}##{new_label}"
     end
   end
 
