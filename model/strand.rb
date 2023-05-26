@@ -88,9 +88,11 @@ SQL
       self.schedule = scheduled
       changed_columns.delete(:schedule)
       e
-    rescue Prog::Base::Hop => e
+    rescue Prog::Base::Hop => hp
+      update(**hp.strand_update_args)
       e
-    rescue Prog::Base::Exit => e
+    rescue Prog::Base::Exit => ext
+      update(exitval: ext.exitval, retval: nil)
       if parent_id.nil?
         # No parent Strand to reap here, so self-reap.
         Semaphore.where(strand_id: id).delete
@@ -98,7 +100,7 @@ SQL
         @deleted = true
       end
 
-      e
+      ext
     else
       fail "BUG: Prog #{prog}##{label} did not provide flow control"
     end

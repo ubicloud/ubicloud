@@ -64,42 +64,48 @@ end
       old_label = strand.label
       prog, label = link
 
-      @strand.update(retval: outval,
-        stack: Sequel.pg_jsonb_wrap(@strand.stack[1..]),
-        prog: prog, label: label)
-      fail Hop.new(old_prog, old_label, @strand)
+      fail Hop.new(old_prog, old_label,
+        {retval: outval,
+         stack: Sequel.pg_jsonb_wrap(@strand.stack[1..]),
+         prog: prog, label: label})
     else
       fail "BUG: expect no stacks exceeding depth 1 with no back-link" if strand.stack.length > 1
 
       # Child strand with zero or one stack frames, set exitval. Clear
       # retval to avoid confusion, as it would have been set in a
       # previous intra-strand stack pop.
-      @strand.update(exitval: outval, retval: nil)
-      fail Exit.new(strand)
+      fail Exit.new(strand, outval)
     end
   end
 
   class FlowControl < RuntimeError; end
 
   class Exit < FlowControl
-    def initialize(strand)
+    attr_reader :exitval
+
+    def initialize(strand, exitval)
       @strand = strand
+      @exitval = exitval
     end
 
     def to_s
-      "Strand exits from #{@strand.prog}##{@strand.label} with #{@strand.exitval}"
+      "Strand exits from #{@strand.prog}##{@strand.label} with #{@exitval}"
     end
   end
 
   class Hop < FlowControl
-    def initialize(old_prog, old_label, strand)
+    attr_reader :strand_update_args
+
+    def initialize(old_prog, old_label, strand_update_args)
       @old_prog = old_prog
       @old_label = old_label
-      @strand = strand
+      @strand_update_args = strand_update_args
     end
 
     def to_s
-      "hop #{@old_prog}##{@old_label} -> #{@strand.prog}##{@strand.label}"
+      prog = @strand_update_args[:prog] || @old_prog
+      label = @strand_update_args[:label] || @old_label
+      "hop #{@old_prog}##{@old_label} -> #{prog}##{label}"
     end
   end
 
@@ -130,9 +136,9 @@ end
 
     # YYY: Use in-database jsonb prepend rather than re-rendering a
     # new value doing the prepend.
-    @strand.update(prog: Strand.prog_verify(prog), label: label,
-      stack: [new_frame] + strand.stack, retval: nil)
-    fail Hop.new(old_prog, old_label, @strand)
+    fail Hop.new(old_prog, old_label,
+      {prog: Strand.prog_verify(prog), label: label,
+       stack: [new_frame] + strand.stack, retval: nil})
   end
 
   def bud(prog, new_frame = nil, label = "start")
@@ -164,10 +170,7 @@ end
   def hop(label)
     fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
     label = label.to_s
-    old_prog = @strand.prog
-    old_label = @strand.label
-    @strand.update(label: label, retval: nil)
-    fail Hop.new(old_prog, old_label, @strand)
+    fail Hop.new(@strand.prog, @strand.label, {label: label, retval: nil})
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert
