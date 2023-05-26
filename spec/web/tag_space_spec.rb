@@ -251,6 +251,19 @@ RSpec.describe Clover, "tag_space" do
         expect(page).to have_content new_policy.to_json
       end
 
+      it "can not update policy when it is not valid JSON" do
+        shadow = Clover::TagSpaceShadow.new(tag_space)
+        current_policy = tag_space.access_policies.first.body
+
+        visit "/tag-space/#{shadow.id}/policy"
+
+        fill_in "body", with: "{'invalid': 'json',}"
+        click_button "Update"
+
+        expect(page).to have_content "The policy isn't a valid JSON object."
+        expect(page).to have_content current_policy.to_json
+      end
+
       it "raises not found when access policy not exists" do
         shadow = Clover::TagSpaceShadow.new(tag_space)
 

@@ -154,7 +154,16 @@ class Clover
           end
 
           r.post true do
-            policy.update(body: r.params["body"])
+            body = r.params["body"]
+
+            begin
+              fail JSON::ParserError unless JSON.parse(body).is_a?(Hash)
+            rescue JSON::ParserError
+              flash["error"] = "The policy isn't a valid JSON object."
+              return request.redirect env["HTTP_REFERER"]
+            end
+
+            policy.update(body: body)
 
             flash["notice"] = "'#{policy.name}' policy updated for '#{tag_space.name}'"
 
