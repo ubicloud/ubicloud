@@ -15,6 +15,18 @@ require_relative "loader"
 module Config
   extend CastingConfigHelpers
 
+  def self.production?
+    Config.rack_env == "production"
+  end
+
+  def self.development?
+    Config.rack_env == "development"
+  end
+
+  def self.test?
+    Config.rack_env == "test"
+  end
+
   # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
   mandatory :rack_env, string
@@ -26,13 +38,15 @@ module Config
   optional :clover_session_secret, base64, clear: true
   optional :clover_column_encryption_key, base64, clear: true
 
+  override :mail_driver, (production? ? :smtp : :logger), symbol
+  override :mail_from, (production? ? nil : "dev@example.com"), string
   # Some email services use a secret token for both user and password,
   # so clear them both.
   optional :smtp_user, string, clear: true
   optional :smtp_password, string, clear: true
   optional :smtp_hostname, string
-
-  optional :rodauth_email_from, string
+  override :smtp_port, 587, int
+  override :smtp_tls, true, bool
 
   # Override -- value is returned or the set default.
   override :database_timeout, 10, int
@@ -50,12 +64,4 @@ module Config
   override :timeout, 10, int
   override :versioning, false, bool
   override :allowed_vm_host_users, "", array(string)
-
-  def self.development?
-    Config.rack_env == "development"
-  end
-
-  def self.test?
-    Config.rack_env == "test"
-  end
 end
