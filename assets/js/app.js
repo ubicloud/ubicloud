@@ -124,7 +124,7 @@ function jsonHighlight(str) {
   try {
     json = JSON.stringify(JSON.parse(str), null, 2);
   } catch (e) {
-    notification("Not valid JSON");
+    notification("The policy isn't a valid JSON object.");
     return;
   }
 
