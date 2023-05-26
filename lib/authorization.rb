@@ -43,8 +43,8 @@ module Authorization
   def self.generate_default_acls(subject, object)
     {
       acls: [
-        {subjects: subject, powers: ["TagSpace:view", "TagSpace:delete", "TagSpace:user", "TagSpace:policy"], objects: object},
-        {subjects: subject, powers: ["Vm:view", "Vm:create", "Vm:delete"], objects: object}
+        {subjects: [subject], powers: ["TagSpace:view", "TagSpace:delete", "TagSpace:user", "TagSpace:policy"], objects: [object]},
+        {subjects: [subject], powers: ["Vm:view", "Vm:create", "Vm:delete"], objects: [object]}
       ]
     }
   end
