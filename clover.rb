@@ -63,11 +63,25 @@ class Clover < Roda
     view "/error"
   end
 
-  if Config.development?
+  case Config.mail_driver
+  when :smtp
+    ::Mail.defaults do
+      delivery_method :smtp, {
+        address: Config.smtp_hostname,
+        port: Config.smtp_port,
+        user_name: Config.smtp_user,
+        password: Config.smtp_password,
+        authentication: :plain,
+        enable_starttls: Config.smtp_tls
+      }
+    end
+  when :logger
     ::Mail.defaults do
       delivery_method :logger
     end
+  end
 
+  if Config.development?
     plugin :exception_page
     class RodaRequest
       def assets
@@ -76,17 +90,6 @@ class Clover < Roda
       end
     end
   else
-    ::Mail.defaults do
-      delivery_method :smtp, {
-        address: Config.smtp_hostname,
-        port: 587,
-        user_name: Config.smtp_user,
-        password: Config.smtp_password,
-        authentication: :plain,
-        enable_starttls: true
-      }
-    end
-
     def self.freeze
       Sequel::Model.freeze_descendents unless Config.test?
       DB.freeze
@@ -156,7 +159,7 @@ class Clover < Roda
     unless Config.development?
       enable :disallow_common_passwords, :verify_account
 
-      email_from Config.rodauth_email_from
+      email_from Config.mail_from
 
       verify_account_view { view "auth/verify_account", "Verify Account" }
       resend_verify_account_view { view "auth/verify_account_resend", "Resend Verification" }

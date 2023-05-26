@@ -103,14 +103,27 @@ class Clover
           email = r.params["email"]
           user = Account[email: email]
 
-          if user
-            user.associate_with_tag_space(tag_space)
-            # TODO: Send new tag space notification email
-          else
-            # TODO: Send invitation email to new user
+          user&.associate_with_tag_space(tag_space)
+
+          # TODO(enes): Move notifications to separate classes
+          body = "You've been invited by #{current_user.email} to join the '#{tag_space.name}' tag space on Ubicloud."
+          Mail.deliver do
+            from Config.mail_from
+            to email
+            subject "Join #{tag_space.name} tag space on Ubicloud"
+
+            text_part do
+              body body
+            end
+
+            html_part do
+              content_type "text/html; charset=UTF-8"
+              body "<h3>#{body}</h3><a href='#{r.base_url}'>Go to Ubicloud</a>"
+            end
           end
 
-          flash["notice"] = "Invitation sent successfully to '#{email}'. You need to add some policies to allow new user to operate in the tag space."
+          flash["notice"] = "Invitation sent successfully to '#{email}'. You need to add some policies to allow new user to operate in the tag space.
+                            If this user doesn't have account, they will need to create an account and you'll need to add them again."
 
           r.redirect "/tag-space/#{TagSpaceShadow.new(tag_space).id}/user"
         end
