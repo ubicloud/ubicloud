@@ -22,8 +22,16 @@ class VmPath
     "/etc/systemd/system/#{@vm_name}-dnsmasq.service"
   end
 
+  def spdk_service
+    "/etc/systemd/system/#{@vm_name}-spdk.service"
+  end
+
   def write_dnsmasq_service(s)
     write(dnsmasq_service, s)
+  end
+
+  def write_spdk_service(s)
+    write(spdk_service, s)
   end
 
   def systemd_service
@@ -53,6 +61,10 @@ class VmPath
     cloudinit.img
     ch-api.sock
     serial.log
+    spdk-config
+    spdk.sock
+    hugepages
+    vhost.sock
   ].each do |file_name|
     method_name = file_name.tr(".-", "_")
     fail "BUG" if method_defined?(method_name)

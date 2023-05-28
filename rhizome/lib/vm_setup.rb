@@ -43,6 +43,7 @@ class VmSetup
     routes(gua, private_subnets, ndp_needed)
     cloudinit(unix_user, public_key, private_subnets)
     boot_disk(boot_image)
+    spdk
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
     forwarding
   end
@@ -236,6 +237,47 @@ EOS
     FileUtils.chown @vm_name, @vm_name, vp.boot_raw
   end
 
+  def spdk
+    r "mkdir #{vp.q_hugepages}"
+    r "mount -t hugetlbfs -o uid=#{q_vm},size=1G nodev #{vp.q_hugepages}"
+    r "chown -R #{q_vm} #{vp.q_hugepages}"
+
+    vp.write_spdk_config(<<EOS)
+{
+  "subsystems": [
+    {
+      "subsystem": "bdev",
+      "config": [
+        {
+          "method": "bdev_aio_create",
+          "params": {
+            "name": "boot",
+            "block_size": 512,
+            "filename": "#{vp.boot_raw}",
+            "readonly": false
+          }
+        }
+      ]
+    },
+    {
+      "subsystem": "vhost_blk",
+      "config": [
+        {
+          "method": "vhost_create_blk_controller",
+          "params": {
+            "ctrlr": "vhost.sock",
+            "dev_name": "boot",
+            "readonly": false,
+            "transport": "vhost_user_blk"
+          }
+        }
+      ]
+    }
+  ]
+}
+EOS
+  end
+
   # Unnecessary if host has this set before creating the netns, but
   # harmless and fast enough to double up.
   def forwarding
@@ -270,6 +312,34 @@ NoNewPrivileges=yes
 ReadOnlyPaths=/
 DNSMASQ_SERVICE
 
+    cpu = r("ls -1 /vm/").split.size
+
+    vp.write_spdk_service <<SPDK_SERVICE
+[Unit]
+Description=Block Storage Service
+
+[Service]
+Type=simple
+Environment="XDG_RUNTIME_DIR=#{vp.home("")}"
+ExecStart=/opt/spdk/bin/vhost -S #{vp.home("")} \
+--huge-dir #{vp.q_hugepages} \
+--iova-mode va \
+--rpc-socket #{vp.q_spdk_sock} \
+--cpumask [#{cpu}] \
+--config #{vp.q_spdk_config}
+
+ExecReload=/bin/kill -HUP $MAINPID
+LimitMEMLOCK=8400113664
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+NoNewPrivileges=yes
+User=#{@vm_name}
+Group=#{@vm_name}
+SPDK_SERVICE
+
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
     # from VmPath is also a good idea.
@@ -279,7 +349,9 @@ DNSMASQ_SERVICE
 Description=#{@vm_name}
 After=network.target
 After=#{@vm_name}-dnsmasq.service
+After=#{@vm_name}-spdk.service
 Requires=#{@vm_name}-dnsmasq.service
+Requires=#{@vm_name}-spdk.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
@@ -288,11 +360,13 @@ ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
 --api-socket path=#{vp.ch_api_sock} \
 --kernel #{CloudHypervisor.firmware} \
---disk path=#{vp.boot_raw} \
+--disk vhost_user=true,socket=#{vp.q_vhost_sock},num_queues=1,queue_size=256 \
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
---memory size=#{mem_gib}G \
+--memory size=0G \
+--memory-zone id=mem0,size=1G,hugepages=on,hugepage_size=2M,shared=true \
+--memory-zone id=mem1,size=#{mem_gib.to_i - 1}G,shared=true \
 --net "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask="
 
 ExecStop=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/ch-remote --api-socket #{vp.ch_api_sock} shutdown-vmm
@@ -320,7 +394,7 @@ SERVICE
       "/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor",
       "--api-socket", "path=#{vp.ch_api_sock}",
       "--kernel", CloudHypervisor.firmware,
-      "--disk", "path=#{vp.boot_raw}",
+      "--disk", "vhost_user=true,socket=#{vp.q_vhost_sock},num_queues=1,queue_size=256",
       "--disk", "path=#{vp.cloudinit_img}",
       "--console", "off", "--serial", serial_device,
       "--cpus", "boot=4",

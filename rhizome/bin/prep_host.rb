@@ -24,6 +24,16 @@ FileUtils.cd fw_dir do
   r "curl -L3 -o #{CloudHypervisor.firmware.shellescape} https://github.com/fdr/edk2/releases/download/#{CloudHypervisor::FIRMWARE_VERSION}/CLOUDHV.fd"
 end
 
+# spdk
+spdk_dir = "/opt"
+FileUtils.cd spdk_dir do
+  r "curl -L3 -o /tmp/spdk.tar.gz https://ubicloud-spdk2.s3.us-east-2.amazonaws.com/spdk.tar.gz"
+  r "tar -xzf /tmp/spdk.tar.gz"
+end
+
+# spdk dependencies
+r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev"
+
 # Host-level network packet forwarding, otherwise packets cannot leave
 # the physical interface.
 File.write("/etc/sysctl.d/72-clover-forward-packets.conf", <<CONF)
@@ -37,3 +47,11 @@ r "sysctl --system"
 # For qemu-image convert and mcopy for cloud-init with the nocloud
 # driver.
 r "apt-get -y install qemu-utils mtools"
+
+# We currently use 1GB of hugepages per VM, so by requesting 16K 2MB pages as
+# below, we will have enough hugepages for 32 VMs in a host.
+#
+# TODO: It is possible that OS allocates less hugepages than requested, so
+# check how much hugepages were actually allocated, and use it in capacity
+# calculations.
+r "echo 16384 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
