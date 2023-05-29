@@ -49,7 +49,7 @@ FIXTURE
     end
 
     it "exits once InstallRhizome has returned" do
-      br.strand.retval = {"msg" => "installed rhizome"}
+      br.strand.retval = {msg: "installed rhizome"}
       expect { br.setup }.to raise_error Prog::Base::Exit do |h|
         expect(h.to_s).to eq('Strand exits from BootstrapRhizome#setup with {"msg"=>"rhizome user bootstrapped and source installed"}')
       end
