@@ -1,3 +1,5 @@
+![The Sky Above The Clouds](https://github.com/ubicloud/ubicloud/assets/2545443/c6b16994-6c0c-45c5-8fa5-dc2c02ca4e75)
+
 # Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml)
 
 Ubicloud is an open source portable cloud. It provides IaaS cloud features in
