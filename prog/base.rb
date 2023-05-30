@@ -137,9 +137,11 @@ end
 
   def bud(prog, new_frame = nil, label = "start")
     new_frame = (new_frame || {}).merge("subject_id" => @subject_id)
-    Strand.create(parent_id: strand.id,
-      prog: Strand.prog_verify(prog), label: label,
-      stack: Sequel.pg_jsonb_wrap([new_frame]))
+    strand.add_child(
+      prog: Strand.prog_verify(prog),
+      label: label,
+      stack: Sequel.pg_jsonb_wrap([new_frame])
+    )
   end
 
   def donate
