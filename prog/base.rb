@@ -150,7 +150,7 @@ end
   def reap
     strand.children_dataset.where(Sequel.~(exitval: nil)).returning.delete.tap {
       # Clear cache if anything was deleted.
-      strand.associations.delete(:children) unless _1.empty?
+      strand.children(reload: true) unless _1.empty?
     }
   end
 
