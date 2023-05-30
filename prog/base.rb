@@ -48,7 +48,7 @@ end
     outval = Sequel.pg_jsonb_wrap(
       case args
       in [String => s]
-        {msg: s}
+        {"msg" => s}
       in [Hash => h]
         h
       else
@@ -155,7 +155,7 @@ end
   end
 
   def leaf?
-    strand.children.empty?
+    strand.children(reload: true).empty?
   end
 
   # A hop is a kind of jump, as in, like a jump instruction.
