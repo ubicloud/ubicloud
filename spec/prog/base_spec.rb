@@ -48,15 +48,15 @@ RSpec.describe Prog::Base do
     expect {
       st.run
     }.to change { st.label }.from("pusher3").to "pusher2"
-    expect(st.retval).to eq({msg: "3"})
+    expect(st.retval).to eq({"msg" => "3"})
 
     expect {
       st.run
     }.to change { st.label }.from("pusher2").to "pusher1"
-    expect(st.retval).to eq({msg: "2"})
+    expect(st.retval).to eq({"msg" => "2"})
 
     st.run
-    expect(st.exitval).to eq({msg: "1"})
+    expect(st.exitval).to eq({"msg" => "1"})
 
     expect { st.run }.to raise_error "already deleted"
     expect { st.reload }.to raise_error Sequel::NoExistingObject
