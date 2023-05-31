@@ -248,6 +248,10 @@ SQL
         used_cores: Sequel[:used_cores] - vm.cores
       )
       vm.tag_spaces.map { vm.dissociate_with_tag_space(_1) }
+      # YYY: We should remove existing tunnels on dataplane too. Not hopping to
+      # :refresh_mesh label directly, because it doesn't remove deleted ones, only
+      # create missing ones.
+      IpsecTunnel.where(src_vm_id: vm.id).or(dst_vm_id: vm.id).delete
       vm.delete
     end
 
