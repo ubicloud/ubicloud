@@ -69,7 +69,7 @@ RSpec.describe Clover, "vm" do
         select tag_space.name, from: "tag-space-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
-        choose option: "m5a.2x"
+        choose option: "c5a.2x"
 
         click_button "Create"
 
