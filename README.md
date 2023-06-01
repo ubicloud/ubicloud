@@ -33,7 +33,7 @@ to manage Linux machines; and will provide you with a public SSH key. You'll
 need to add this SSH key to your Linux machine's authorized keys, typically
 located in `/root/.ssh/authorized_keys`.
 
-![Cloudify Linux Machine](https://github.com/ubicloud/ubicloud/assets/993199/93bc42c4-9c10-479e-ab2d-e585c0db9657)
+![Cloudify Linux Machine](https://github.com/ubicloud/ubicloud/assets/993199/b7d8badf-424b-4486-bc8d-0da8740f995c)
 
 Once you add a VM Host, Ubicloud will cloudify that machine. You can then
 provision and manage cloud services on those machines.
