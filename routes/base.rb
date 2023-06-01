@@ -86,6 +86,29 @@ module CloverBase
     @serializer.new(structure).serialize(data)
   end
 
+  def send_email(receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil)
+    html = render "/email/layout", locals: {subject: subject, greeting: greeting, body: body, button_title: button_title, button_link: button_link}
+    Mail.deliver do
+      from Config.mail_from
+      to receiver
+      subject subject
+
+      text_part do
+        body "#{greeting}\n#{Array(body).join("\n")}\n#{button_link}"
+      end
+
+      html_part do
+        content_type "text/html; charset=UTF-8"
+        body html
+      end
+    end
+  end
+
+  def base_url
+    port = ":#{request.port}" if request.port != Rack::Request::DEFAULT_PORTS[request.scheme]
+    "#{request.scheme}://#{request.host}#{port}"
+  end
+
   module ClassMethods
     def autoload_routes(route)
       route_path = "routes/#{route}"

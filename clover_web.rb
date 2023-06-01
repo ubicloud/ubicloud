@@ -107,6 +107,16 @@ class CloverWeb < Roda
       verify_account_email_sent_redirect { login_route }
       verify_account_email_recently_sent_redirect { login_route }
       verify_account_set_password? false
+
+      send_verify_account_email do
+        scope.send_email(email_to, "Welcome to Ubicloud: Please Verify Your Account",
+          greeting: "Welcome to Ubicloud,",
+          body: ["To complete your registration and activate your account, click the button below.",
+            "If you did not initiate this registration process, you may disregard this message.",
+            "We're excited to serve you. Should you require any assistance, our customer support team stands ready to help at support@ubicloud.com."],
+          button_title: "Verify Account",
+          button_link: verify_account_email_link)
+      end
     end
     # :nocov:
 
@@ -135,6 +145,17 @@ class CloverWeb < Roda
     reset_password_redirect { login_route }
     reset_password_email_sent_redirect { login_route }
     reset_password_email_recently_sent_redirect { reset_password_request_route }
+
+    send_reset_password_email do
+      user = Account[account_id]
+      scope.send_email(user.email, "Reset Ubicloud Account Password",
+        greeting: "Hello #{user.name},",
+        body: ["We received a request to reset your account password. To reset your password, click the button below.",
+          "If you did not initiate this request, no action is needed. Your account remains secure.",
+          "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+        button_title: "Reset Password",
+        button_link: reset_password_email_link)
+    end
 
     change_password_redirect "/settings/change-password"
     change_password_route "settings/change-password"

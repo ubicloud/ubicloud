@@ -38,7 +38,7 @@ RSpec.describe Clover, "auth" do
 
     expect(page).to have_content("An email has been sent to you with a link to verify your account")
     expect(Mail::TestMailer.deliveries.length).to eq 1
-    verify_link = Mail::TestMailer.deliveries.first.body.match(/(\/verify-account.+)\s\s/)[1]
+    verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
 
     visit verify_link
     expect(page.title).to eq("Ubicloud - Verify Account")
@@ -58,6 +58,24 @@ RSpec.describe Clover, "auth" do
 
     expect(page.title).to eq("Ubicloud - Dashboard")
     expect(DB[:account_remember_keys].first(id: account.id)).not_to be_nil
+  end
+
+  it "can reset password" do
+    create_account
+
+    visit "/login"
+    click_link "Forgot your password?"
+
+    fill_in "Email Address", with: TEST_USER_EMAIL
+
+    click_button "Request Password Reset"
+
+    expect(page).to have_content("An email has been sent to you with a link to reset the password for your account")
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    reset_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/reset-password.+?)"/)[1]
+
+    visit reset_link
+    expect(page.title).to eq("Ubicloud - Reset Password")
   end
 
   describe "authenticated" do

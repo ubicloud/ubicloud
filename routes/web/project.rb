@@ -82,21 +82,13 @@ class CloverWeb
           user&.associate_with_project(project)
 
           # TODO(enes): Move notifications to separate classes
-          body = "You've been invited by #{current_user.email} to join the '#{project.name}' project on Ubicloud."
-          Mail.deliver do
-            from Config.mail_from
-            to email
-            subject "Join #{project.name} project on Ubicloud"
-
-            text_part do
-              body body
-            end
-
-            html_part do
-              content_type "text/html; charset=UTF-8"
-              body "<h3>#{body}</h3><a href='#{r.base_url}'>Go to Ubicloud</a>"
-            end
-          end
+          send_email(email, "Invitation to Join '#{project.name}' Project on Ubicloud",
+            greeting: "Hello,",
+            body: ["You're invited by '#{current_user.name}' to join the '#{project.name}' project on Ubicloud.",
+              "To join project, click the button below.",
+              "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+            button_title: "Join Project",
+            button_link: base_url + project.path)
 
           flash["notice"] = "Invitation sent successfully to '#{email}'. You need to add some policies to allow new user to operate in the project.
                             If this user doesn't have account, they will need to create an account and you'll need to add them again."
