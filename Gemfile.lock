@@ -188,7 +188,7 @@ GEM
     ruby-ulid (0.8.0)
     sassc (2.4.0)
       ffi (~> 1.9)
-    sequel (5.68.0)
+    sequel (5.69.0)
     sequel-annotate (1.7.0)
       sequel (>= 4)
     sequel_pg (1.17.1)
