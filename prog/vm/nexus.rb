@@ -141,7 +141,8 @@ SQL
       "boot_image" => vm.boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
-      "mem_gib" => vm.mem_gib
+      "mem_gib" => vm.mem_gib,
+      "ndp_needed" => host.ndp_needed
     })
 
     # Enable KVM access for VM user.

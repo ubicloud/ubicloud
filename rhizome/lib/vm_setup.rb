@@ -7,6 +7,7 @@ require "fileutils"
 require "netaddr"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
+require "json"
 
 class VmSetup
   def initialize(vm_name)
@@ -37,9 +38,9 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, boot_image, max_vcpus, cpu_topology, mem_gib)
+  def prep(unix_user, public_key, private_subnets, gua, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed)
     interfaces
-    routes(gua, private_subnets)
+    routes(gua, private_subnets, ndp_needed)
     cloudinit(unix_user, public_key, private_subnets)
     boot_disk(boot_image)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
@@ -92,7 +93,7 @@ class VmSetup
     [halved, halved.next_sib]
   end
 
-  def routes(gua, private_subnets)
+  def routes(gua, private_subnets, ndp_needed)
     # Routing: from host to subordinate.
     vethi_ll = mac_to_ipv6_link_local(r("ip netns exec #{q_vm} cat /sys/class/net/vethi#{q_vm}/address").chomp)
     r "ip link set dev vetho#{q_vm} up"
@@ -102,6 +103,12 @@ class VmSetup
     # ranges, designed around non-floating IPv6 networks bound to the
     # host.
     guest_ephemeral, clover_ephemeral = subdivide_network(NetAddr.parse_net(gua))
+
+    if ndp_needed
+      routes = r "ip -j route"
+      main_device = parse_routes(routes)
+      r "ip -6 neigh add proxy #{guest_ephemeral.nth(2)} dev #{main_device}"
+    end
 
     # Accept clover traffic within the namespace (don't just let it
     # enter a default routing loop via forwarding)
@@ -127,6 +134,14 @@ class VmSetup
     private_subnets.each do
       r "ip -n #{q_vm} route add #{_1.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
     end
+  end
+
+  def parse_routes(routes)
+    routes_j = JSON.parse(routes)
+    default_route = routes_j.find { |route| route["dst"] == "default" }
+    return default_route["dev"] if default_route
+
+    fail "No default route found in #{routes_j.inspect}"
   end
 
   def cloudinit(unix_user, public_key, private_subnets)

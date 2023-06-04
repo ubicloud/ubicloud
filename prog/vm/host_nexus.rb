@@ -3,10 +3,10 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
 
-  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil)
+  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false)
     DB.transaction do
       sa = Sshable.create(host: sshable_hostname)
-      VmHost.create(location: location, net6: net6) { _1.id = sa.id }
+      VmHost.create(location: location, net6: net6, ndp_needed: ndp_needed) { _1.id = sa.id }
 
       Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = sa.id }
     end

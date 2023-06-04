@@ -4,7 +4,7 @@ require "ulid"
 
 class Clover
   class VmHostShadow
-    attr_accessor :id, :host, :state, :location, :ip6, :vms_count, :total_cores, :used_cores, :public_keys
+    attr_accessor :id, :host, :state, :location, :ip6, :vms_count, :total_cores, :used_cores, :public_keys, :ndp_needed
 
     def initialize(vm_host)
       @id = ULID.from_uuidish(vm_host.id).to_s.downcase
@@ -16,6 +16,7 @@ class Clover
       @total_cores = vm_host.total_cores
       @used_cores = vm_host.used_cores
       @public_keys = vm_host.sshable.keys.map(&:public_key)
+      @ndp_needed = vm_host.ndp_needed
     end
   end
 
@@ -33,7 +34,8 @@ class Clover
     r.post true do
       st = Prog::Vm::HostNexus.assemble(
         r.params["hostname"],
-        location: r.params["location"]
+        location: r.params["location"],
+        ndp_needed: r.params.key?("ndp-needed")
       )
 
       flash["notice"] = "You need to add SSH public keys to your host, so the control plane can connect to the host as root via SSH."

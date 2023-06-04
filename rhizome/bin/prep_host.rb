@@ -28,6 +28,7 @@ end
 # the physical interface.
 File.write("/etc/sysctl.d/72-clover-forward-packets.conf", <<CONF)
 net.ipv6.conf.all.forwarding=1
+net.ipv6.conf.all.proxy_ndp=1
 CONF
 r "sysctl --system"
 
