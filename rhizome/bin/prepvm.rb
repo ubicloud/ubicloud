@@ -58,9 +58,14 @@ unless (mem_gib = params["mem_gib"])
   exit 1
 end
 
+unless (ndp_needed = params["ndp_needed"])
+  puts "need ndp_needed in parameters json"
+  exit 1
+end
+
 require "fileutils"
 require_relative "../lib/common"
 require_relative "../lib/vm_setup"
 
 VmSetup.new(vm_name).prep(unix_user, ssh_public_key, private_subnets, gua, boot_image,
-  max_vcpus, cpu_topology, mem_gib)
+  max_vcpus, cpu_topology, mem_gib, ndp_needed)

@@ -24,7 +24,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     sshable = instance_spy(Sshable)
     vmh = instance_double(VmHost, sshable: sshable,
-      total_cpus: 80, total_cores: 80, total_nodes: 1, total_sockets: 1)
+      total_cpus: 80, total_cores: 80, total_nodes: 1, total_sockets: 1, ndp_needed: false)
 
     expect(st).to receive(:load).and_return(prog)
     expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)

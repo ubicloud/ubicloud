@@ -42,6 +42,18 @@
                       }
                     ) %>
                   </div>
+                  <div class="col-span-full">
+                    <%== render(
+                      "components/form/checkbox",
+                      locals: {
+                        name: "ndp-needed",
+                        label: "NDP Proxying",
+                        value: "1",
+                        description:
+                          "NDP proxy is needed for some hosting providers. Check with your provider to see if they need ndp proxy for IPv6 subnets."
+                      }
+                    ) %>
+                  </div>
                 </div>
               </div>
             </div>
