@@ -5,9 +5,9 @@ require_relative "common"
 
 require "fileutils"
 require "netaddr"
+require "json"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
-require "json"
 
 class VmSetup
   def initialize(vm_name)
@@ -242,40 +242,38 @@ EOS
     r "mount -t hugetlbfs -o uid=#{q_vm},size=1G nodev #{vp.q_hugepages}"
     r "chown -R #{q_vm} #{vp.q_hugepages}"
 
-    vp.write_spdk_config(<<EOS)
-{
-  "subsystems": [
-    {
-      "subsystem": "bdev",
-      "config": [
+    vp.write_spdk_config({
+      subsystems: [
         {
-          "method": "bdev_aio_create",
-          "params": {
-            "name": "boot",
-            "block_size": 512,
-            "filename": "#{vp.boot_raw}",
-            "readonly": false
-          }
+          subsystem: "bdev",
+          config: [
+            {
+              method: "bdev_aio_create",
+              params: {
+                name: "boot",
+                block_size: 512,
+                filename: vp.boot_raw.to_s,
+                readonly: false
+              }
+            }
+          ]
+        },
+        {
+          subsystem: "vhost_blk",
+          config: [
+            {
+              method: "vhost_create_blk_controller",
+              params: {
+                ctrlr: "vhost.sock",
+                dev_name: "boot",
+                readonly: false,
+                transport: "vhost_user_blk"
+              }
+            }
+          ]
         }
       ]
-    },
-    {
-      "subsystem": "vhost_blk",
-      "config": [
-        {
-          "method": "vhost_create_blk_controller",
-          "params": {
-            "ctrlr": "vhost.sock",
-            "dev_name": "boot",
-            "readonly": false,
-            "transport": "vhost_user_blk"
-          }
-        }
-      ]
-    }
-  ]
-}
-EOS
+    }.to_json)
   end
 
   # Unnecessary if host has this set before creating the netns, but
@@ -312,8 +310,6 @@ NoNewPrivileges=yes
 ReadOnlyPaths=/
 DNSMASQ_SERVICE
 
-    cpu = r("ls -1 /vm/").split.size
-
     vp.write_spdk_service <<SPDK_SERVICE
 [Unit]
 Description=Block Storage Service
@@ -325,7 +321,9 @@ ExecStart=/opt/spdk/bin/vhost -S #{vp.home("")} \
 --huge-dir #{vp.q_hugepages} \
 --iova-mode va \
 --rpc-socket #{vp.q_spdk_sock} \
---cpumask [#{cpu}] \
+--cpumask [0] \
+--disable-cpumask-locks \
+--mem-size 512 \
 --config #{vp.q_spdk_config}
 
 ExecReload=/bin/kill -HUP $MAINPID

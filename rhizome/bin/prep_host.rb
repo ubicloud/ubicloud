@@ -48,10 +48,10 @@ r "sysctl --system"
 # driver.
 r "apt-get -y install qemu-utils mtools"
 
-# We currently use 1GB of hugepages per VM, so by requesting 16K 2MB pages as
+# We currently use 512MB of hugepages per VM, so by requesting 8K 2MB pages as
 # below, we will have enough hugepages for 32 VMs in a host.
 #
 # TODO: It is possible that OS allocates less hugepages than requested, so
 # check how much hugepages were actually allocated, and use it in capacity
 # calculations.
-r "echo 16384 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
+r "echo 8192 | sudo tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages"
