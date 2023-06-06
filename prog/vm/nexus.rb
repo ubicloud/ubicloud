@@ -9,7 +9,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def self.assemble(public_key, tag_space_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnets: [])
+    private_subnets: [], storage_size_gb: 20, storage_encrypted: false)
 
     tag_space = TagSpace[tag_space_id]
     unless tag_space || Config.development?
@@ -30,6 +30,11 @@ class Prog::Vm::Nexus < Prog::Base
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, size: size, location: location, boot_image: boot_image) { _1.id = id }
       vm.associate_with_tag_space(tag_space)
+      VmStorage.create(vm_id: vm.id,
+        boot: true,
+        size_gb: storage_size_gb,
+        encrypted: storage_encrypted,
+        encryption_key: "00112233445566778899001122334455")
       private_subnets.each do
         VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
       end
@@ -89,6 +94,10 @@ class Prog::Vm::Nexus < Prog::Base
     vm.ephemeral_net6.to_s.shellescape
   end
 
+  def storage
+    @storage ||= vm.vm_storage.map { |s| s.to_hash }
+  end
+
   def allocation_dataset
     DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.location]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
@@ -137,6 +146,7 @@ SQL
       "public_ipv6" => q_net,
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
+      "storage" => storage,
       "private_subnets" => private_subnets.map { _1.to_s },
       "boot_image" => vm.boot_image,
       "max_vcpus" => topo.max_vcpus,

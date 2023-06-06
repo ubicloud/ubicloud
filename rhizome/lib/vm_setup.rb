@@ -38,7 +38,7 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed)
+  def prep(unix_user, public_key, private_subnets, gua, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage)
     interfaces
     routes(gua, private_subnets, ndp_needed)
     cloudinit(unix_user, public_key, private_subnets)

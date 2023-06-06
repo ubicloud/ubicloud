@@ -7,6 +7,7 @@ class Vm < Sequel::Model
   many_to_one :vm_host
   one_to_many :vm_private_subnet, key: :vm_id
   one_to_many :ipsec_tunnels, key: :src_vm_id
+  one_to_many :vm_storage, key: :vm_id
 
   dataset_module Authorization::Dataset
 
