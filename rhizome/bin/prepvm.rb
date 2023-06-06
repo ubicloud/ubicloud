@@ -58,11 +58,7 @@ unless (mem_gib = params["mem_gib"])
   exit 1
 end
 
-ndp_needed = params["ndp_needed"]
-if ndp_needed.nil?
-  puts "need ndp_needed in parameters json"
-  exit 1
-end
+ndp_needed = params.fetch("ndp_needed", false)
 
 unless (storage = params["storage"])
   puts "need storage in parameters json"
