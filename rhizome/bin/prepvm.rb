@@ -58,10 +58,7 @@ unless (mem_gib = params["mem_gib"])
   exit 1
 end
 
-unless (ndp_needed = params["ndp_needed"])
-  puts "need ndp_needed in parameters json"
-  exit 1
-end
+ndp_needed = params.fetch("ndp_needed", false)
 
 require "fileutils"
 require_relative "../lib/common"
