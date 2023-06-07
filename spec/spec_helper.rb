@@ -22,6 +22,7 @@ require "rspec"
 require "database_cleaner/sequel"
 require "logger"
 require "sequel/core"
+require "warning"
 
 # DatabaseCleaner assumes the usual DATABASE_URL, but the
 # "roda-sequel-stack" way names each environment *and* application
@@ -32,6 +33,8 @@ require "sequel/core"
 DatabaseCleaner.url_allowlist = [
   nil
 ]
+
+Warning.ignore([:not_reached, :unused_var], /.*lib\/mail\/parser.*/)
 
 RSpec.configure do |config|
   config.define_derived_metadata(file_path: %r{/spec/}) do |metadata|
