@@ -79,6 +79,10 @@ class Clover < Roda
     ::Mail.defaults do
       delivery_method :logger
     end
+  when :test
+    ::Mail.defaults do
+      delivery_method :test
+    end
   end
 
   if Config.development?
