@@ -2,11 +2,6 @@
 
 require_relative "model"
 
-unless defined?(Unreloader)
-  require "rack/unreloader"
-  Unreloader = Rack::Unreloader.new(reload: false, autoload: !ENV["NO_AUTOLOAD"])
-end
-
 require "mail"
 require "roda"
 require "tilt/sass"
@@ -144,11 +139,13 @@ class Clover < Roda
 
   if Unreloader.autoload?
     plugin :autoload_hash_branches
-    autoload_hash_branch_dir("./routes")
+    Dir["routes/*"].each do |f|
+      autoload_hash_branch(File.basename(f, ".rb").tr("_", "-"), f)
+    end
   end
 
   # rubocop:disable Performance/StringIdentifierArgument
-  Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
+  Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
   # rubocop:enable Performance/StringIdentifierArgument
 
   plugin :rodauth do

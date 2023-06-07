@@ -141,3 +141,8 @@ RSpec.configure do |config|
   # as the one that triggered the failure.
   Kernel.srand config.seed
 end
+
+unless defined?(Unreloader)
+  require "rack/unreloader"
+  Unreloader = Rack::Unreloader.new(reload: false, autoload: !ENV["NO_AUTOLOAD"])
+end

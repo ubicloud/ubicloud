@@ -10,7 +10,7 @@ end
 require_relative "loader"
 
 require "rack/unreloader"
-Unreloader = Rack::Unreloader.new(subclasses: %w[Roda Sequel::Model], logger: logger, reload: dev) { Clover }
+Unreloader = Rack::Unreloader.new(subclasses: %w[Roda Sequel::Model], logger: logger, reload: dev, autoload: dev) { Clover }
 require_relative "model"
 Unreloader.require("clover.rb") { "Clover" }
 run(dev ? Unreloader : Clover.freeze.app)
