@@ -9,15 +9,72 @@ end
 
 require "bundler/setup"
 Bundler.setup
-require "zeitwerk"
-Loader = Zeitwerk::Loader.new
-Loader.push_dir("#{__dir__}/")
-Loader.push_dir("#{__dir__}/model")
-Loader.push_dir("#{__dir__}/lib")
-Loader.ignore("#{__dir__}/routes")
-Loader.ignore("#{__dir__}/migrate")
-Loader.ignore("#{__dir__}/spec")
-Loader.ignore("#{__dir__}/model.rb")
-Loader.inflector.inflect("db" => "DB")
-Loader.enable_reloading
-Loader.setup
+
+require_relative "./lib/casting_config_helpers"
+require_relative "./config"
+
+require "rack/unreloader"
+
+Unreloader = Rack::Unreloader.new(
+  reload: Config.development?,
+  autoload: true,
+  logger: if Config.development?
+            require "logger"
+            Logger.new($stdout)
+          end
+) { Clover }
+
+Unreloader.autoload("#{__dir__}/clover.rb") { "Clover" }
+Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
+
+def camelize s
+  s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
+end
+
+AUTOLOAD_CONSTANTS = []
+
+# Set up autoloads using Unreloader using a style much like Zeitwerk:
+# directories are modules, file names are classes.
+def autoload_normal(subdirectory, include_first: false)
+  prefix = File.join(__dir__, subdirectory)
+  rgx = Regexp.new('\A' + Regexp.escape(prefix + "/") + '(.*)\.rb\z')
+  last_namespace = nil
+
+  Unreloader.autoload(prefix) do |f|
+    full_name = camelize((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
+    parts = full_name.split("::")
+    namespace = parts[0..-2].freeze
+
+    # Skip namespace traversal if the last namespace handled has the
+    # same components, forming a fast-path that works well when output
+    # is the result of a depth-first traversal of the file system, as
+    # is normally the case.
+    unless namespace == last_namespace
+      scope = Object
+      namespace.each { |nested|
+        scope = if scope.const_defined?(nested, false)
+          scope.const_get(nested, false)
+        else
+          Module.new.tap { scope.const_set(nested, _1) }
+        end
+      }
+      last_namespace = namespace
+    end
+
+    # Reloading re-executes this block, which will crash on the
+    # subsequently frozen AUTOLOAD_CONSTANTS.  It's also undesirable
+    # to have re-additions to the array.
+    AUTOLOAD_CONSTANTS << full_name unless AUTOLOAD_CONSTANTS.frozen?
+
+    full_name
+  end
+end
+
+%w[model lib].each { autoload_normal(_1) }
+%w[scheduling prog].each { autoload_normal(_1, include_first: true) }
+
+AUTOLOAD_CONSTANTS.freeze
+
+if Config.production?
+  AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
+end

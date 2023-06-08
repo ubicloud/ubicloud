@@ -32,15 +32,6 @@ module SemaphoreMethods
   end
 end
 
-if ENV["RACK_ENV"] == "development"
-  unless defined?(Unreloader)
-    require "rack/unreloader"
-    Unreloader = Rack::Unreloader.new(reload: false)
-  end
-
-  Unreloader.require("model") { |f| Sequel::Model.send(:camelize, File.basename(f).delete_suffix(".rb")) }
-end
-
 if ENV["RACK_ENV"] == "development" || ENV["RACK_ENV"] == "test"
   require "logger"
   LOGGER = Logger.new($stdout)
