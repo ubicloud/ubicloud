@@ -2,11 +2,6 @@
 
 require_relative "model"
 
-unless defined?(Unreloader)
-  require "rack/unreloader"
-  Unreloader = Rack::Unreloader.new(reload: false, autoload: !ENV["NO_AUTOLOAD"])
-end
-
 require "mail"
 require "roda"
 require "tilt/sass"
@@ -142,14 +137,16 @@ class Clover < Roda
     cookie_options: {secure: !%w[test development].include?(ENV["RACK_ENV"])},
     secret: Config.clover_session_secret
 
-  if Unreloader.autoload?
-    plugin :autoload_hash_branches
-    autoload_hash_branch_dir("./routes")
-  end
+  # YYY: It'd be nice to use autoload, but it can't work while
+  # constants used across files are defined inside routes files and
+  # the autoload dependency cannot be tracked cheaply.
+  #
+  # if Unreloader.autoload?
+  #   plugin :autoload_hash_branches
+  #   autoload_hash_branch_dir("./routes")
+  # end
 
-  # rubocop:disable Performance/StringIdentifierArgument
-  Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
-  # rubocop:enable Performance/StringIdentifierArgument
+  Unreloader.require("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
 
   plugin :rodauth do
     enable :argon2, :change_login, :change_password, :close_account, :create_account,

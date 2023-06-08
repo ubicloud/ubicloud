@@ -1,19 +1,8 @@
 # frozen_string_literal: true
 
-dev = ENV["RACK_ENV"] == "development"
-
-if dev
-  require "logger"
-  logger = Logger.new($stdout)
-end
-
 require_relative "loader"
 
-require "rack/unreloader"
-Unreloader = Rack::Unreloader.new(subclasses: %w[Roda Sequel::Model], logger: logger, reload: dev) { Clover }
-require_relative "model"
-Unreloader.require("clover.rb") { "Clover" }
-run(dev ? Unreloader : Clover.freeze.app)
+run(Config.development? ? Unreloader : Clover.freeze.app)
 
 freeze_core = false
 # freeze_core = !dev # Uncomment to enable refrigerator
