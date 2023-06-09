@@ -9,6 +9,7 @@ class Vm < Sequel::Model
   one_to_many :ipsec_tunnels, key: :src_vm_id
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
+  one_to_many :vm_storage_volumes, key: :vm_id
 
   dataset_module Authorization::Dataset
 
@@ -131,5 +132,18 @@ class Vm < Sequel::Model
 
   def cores
     product.cores
+  end
+
+  def self.uuid_to_name(id)
+    "vm" + ULID.from_uuidish(id).to_s[0..5].downcase
+  end
+
+  def inhost_name
+    # YYY: various names in linux, like interface names, are obliged
+    # to be short, so alas, probably can't reproduce entropy from
+    # vm.id to be collision free and there will need to be a second
+    # addressing scheme scoped to each VmHost.  But for now, assume
+    # entropy.
+    self.class.uuid_to_name(id)
   end
 end

@@ -36,7 +36,7 @@ Description=Block Storage Service
 [Service]
 Type=simple
 Environment="XDG_RUNTIME_DIR=#{Spdk.home.shellescape}"
-ExecStart=/opt/spdk/bin/vhost -S #{Spdk.vhost_dir.shellescape} \
+ExecStart=#{Spdk.bin("vhost")} -S #{Spdk.vhost_dir.shellescape} \
 --huge-dir #{q_hugepages_dir} \
 --iova-mode va \
 --rpc-socket #{Spdk.rpc_sock.shellescape} \

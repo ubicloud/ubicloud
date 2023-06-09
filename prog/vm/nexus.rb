@@ -9,7 +9,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnets: [])
+    private_subnets: [], storage_size_gib: 20)
 
     project = Project[project_id]
     unless project || Config.development?
@@ -17,7 +17,7 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     id = SecureRandom.uuid
-    name ||= uuid_to_name(id)
+    name ||= Vm.uuid_to_name(id)
 
     Validation.validate_name(name)
 
@@ -33,22 +33,19 @@ class Prog::Vm::Nexus < Prog::Base
       private_subnets.each do
         VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
       end
+      VmStorageVolume.create(
+        vm_id: vm.id,
+        boot: true,
+        size_gib: storage_size_gib,
+        disk_index: 0
+      )
 
       Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
     end
   end
 
-  def self.uuid_to_name(id)
-    "vm" + ULID.from_uuidish(id).to_s[0..5].downcase
-  end
-
   def vm_name
-    # YYY: various names in linux, like interface names, are obliged
-    # to be short, so alas, probably can't reproduce entropy from
-    # vm.id to be collision free and there will need to be a second
-    # addressing scheme scoped to each VmHost.  But for now, assume
-    # entropy.
-    self.class.uuid_to_name(vm.id)
+    @vm_name ||= vm.inhost_name
   end
 
   def q_vm
@@ -95,6 +92,16 @@ class Prog::Vm::Nexus < Prog::Base
 
   def local_ipv4
     vm.local_vetho_ip&.to_s&.shellescape || ""
+  end
+
+  def storage_volumes
+    @storage_volumes ||= vm.vm_storage_volumes.map { |s|
+      {
+        "boot" => s.boot,
+        "size_gib" => s.size_gib,
+        "device_id" => s.device_id
+      }
+    }
   end
 
   def allocation_dataset
@@ -162,7 +169,8 @@ SQL
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
       "mem_gib" => vm.mem_gib,
-      "ndp_needed" => host.ndp_needed
+      "ndp_needed" => host.ndp_needed,
+      "storage_volumes" => storage_volumes
     })
 
     # Enable KVM access for VM user.
@@ -185,7 +193,7 @@ SQL
   end
 
   def create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
-    q_dst_name = self.class.uuid_to_name(dst_vm.id).shellescape
+    q_dst_name = dst_vm.inhost_name.shellescape
     q_dst_net = dst_vm.ephemeral_net6.to_s.shellescape
 
     my_params = "#{q_vm} #{q_net6} #{my_subnet.to_s.shellescape}"

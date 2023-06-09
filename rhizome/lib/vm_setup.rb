@@ -39,15 +39,15 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed)
+  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes)
     ip4 = nil if ip4.empty?
     interfaces
     routes6(gua, private_subnets, ndp_needed)
     routes4(ip4, local_ip4)
     cloudinit(unix_user, public_key, private_subnets, ip4)
-    storage(boot_image)
+    vhost_sockets = storage(storage_volumes, boot_image)
     hugepages(mem_gib)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
     forwarding
   end
 
@@ -235,32 +235,60 @@ runcmd:
 EOS
   end
 
-  def storage(boot_image)
+  def storage(storage_volumes, boot_image)
     FileUtils.mkdir_p vp.storage("")
+    storage_volumes.map.with_index { |volume, idx|
+      setup_volume(volume, idx, boot_image)
+    }
+  end
 
-    image_path = download_boot_image(boot_image)
+  def setup_volume(storage_volume, index, boot_image)
+    disk_file = setup_disk_file(storage_volume, index, boot_image)
+    q_disk_file = disk_file.shellescape
 
-    # Images are presumed to be atomically renamed into the path,
-    # i.e. no partial images will be passed to qemu-image.
-    r "qemu-img convert -p -f qcow2 -O raw #{image_path.shellescape} #{vp.q_boot_raw}"
-    r "truncate -s +10G #{vp.q_boot_raw}"
-    FileUtils.chown @vm_name, @vm_name, vp.boot_raw
+    FileUtils.chown @vm_name, @vm_name, disk_file
 
     # don't allow others to read user's disk
-    FileUtils.chmod "u=rw,g=r,o=", vp.boot_raw
+    FileUtils.chmod "u=rw,g=r,o=", disk_file
 
     # allow spdk to access the image
-    r "setfacl -m u:spdk:rw #{vp.q_boot_raw}"
+    r "setfacl -m u:spdk:rw #{q_disk_file}"
 
-    q_bdev = "boot_#{@vm_name}".shellescape
-    r "#{Spdk.rpc_py} bdev_aio_create #{vp.q_boot_raw} #{q_bdev} 512"
-    r "#{Spdk.rpc_py} vhost_create_blk_controller #{@vm_name} #{q_bdev}"
+    q_bdev = storage_volume["device_id"].shellescape
+    vhost = "#{@vm_name}_#{index}".shellescape
+    r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_bdev} 512"
+    r "#{Spdk.rpc_py} vhost_create_blk_controller #{vhost.shellescape} #{q_bdev}"
 
     # create a symlink to the socket in the per vm storage dir
-    FileUtils.ln_s Spdk.vhost_sock(@vm_name), vp.vhost_sock
+    FileUtils.ln_s Spdk.vhost_sock(vhost), vp.vhost_sock(index)
 
     # allow vm user to access the vhost socket
-    r "setfacl -m u:#{@vm_name}:rw #{vp.q_vhost_sock}"
+    r "setfacl -m u:#{@vm_name}:rw #{vp.vhost_sock(index).shellescape}"
+
+    vp.vhost_sock(index)
+  end
+
+  def setup_disk_file(storage_volume, index, boot_image)
+    disk_file = vp.disk(index)
+    q_disk_file = disk_file.shellescape
+
+    if storage_volume["boot"]
+      image_path = download_boot_image(boot_image)
+
+      # Images are presumed to be atomically renamed into the path,
+      # i.e. no partial images will be passed to qemu-image.
+      r "qemu-img convert -p -f qcow2 -O raw #{image_path.shellescape} #{q_disk_file}"
+
+      size = File.size(disk_file)
+
+      fail "Image size greater than requested disk size" unless size <= storage_volume["size_gib"] * 2**30
+    else
+      FileUtils.touch(disk_file)
+    end
+
+    r "truncate -s #{storage_volume["size_gib"]}G #{q_disk_file}"
+
+    disk_file
   end
 
   def download_boot_image(boot_image)
@@ -299,7 +327,7 @@ EOS
     r("ip netns exec #{q_vm} sysctl -w net.ipv4.ip_forward=1")
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
@@ -327,6 +355,10 @@ NoNewPrivileges=yes
 ReadOnlyPaths=/
 DNSMASQ_SERVICE
 
+    disk_params = vhost_sockets.map { |socket|
+      "--disk vhost_user=true,socket=#{socket},num_queues=1,queue_size=256 \\"
+    }
+
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
     # from VmPath is also a good idea.
@@ -345,7 +377,7 @@ ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
 --api-socket path=#{vp.ch_api_sock} \
 --kernel #{CloudHypervisor.firmware} \
---disk vhost_user=true,socket=#{vp.q_vhost_sock},num_queues=1,queue_size=256 \
+#{disk_params.join("\n")}
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
