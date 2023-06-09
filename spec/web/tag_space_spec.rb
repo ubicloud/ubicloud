@@ -78,26 +78,26 @@ RSpec.describe Clover, "tag_space" do
 
     describe "show - details" do
       it "can show tag space details" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
+        tag_space
         visit "/tag-space"
 
         expect(page.title).to eq("Ubicloud - Tag Spaces")
-        expect(page).to have_content shadow.name
+        expect(page).to have_content tag_space.name
 
-        click_link "Show", href: "/tag-space/#{shadow.id}"
+        click_link "Show", href: tag_space.path
 
-        expect(page.title).to eq("Ubicloud - #{shadow.name}")
-        expect(page).to have_content shadow.name
+        expect(page.title).to eq("Ubicloud - #{tag_space.name}")
+        expect(page).to have_content tag_space.name
       end
 
       it "raises forbidden when does not have permissions" do
-        shadow = Clover::TagSpaceShadow.new(tag_space_wo_permissions)
+        tag_space_wo_permissions
         visit "/tag-space"
 
         expect(page.title).to eq("Ubicloud - Tag Spaces")
-        expect(page).to have_content shadow.name
+        expect(page).to have_content tag_space_wo_permissions.name
 
-        click_link "Show", href: "/tag-space/#{shadow.id}"
+        click_link "Show", href: tag_space_wo_permissions.path
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -115,27 +115,25 @@ RSpec.describe Clover, "tag_space" do
 
     describe "show - users" do
       it "can show tag space users" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
-        visit "/tag-space/#{shadow.id}"
+        visit tag_space.path
 
         click_link "Users"
 
-        expect(page.title).to eq("Ubicloud - #{shadow.name} - Users")
+        expect(page.title).to eq("Ubicloud - #{tag_space.name} - Users")
         expect(page).to have_content user.email
       end
 
       it "raises forbidden when does not have permissions" do
-        shadow = Clover::TagSpaceShadow.new(tag_space_wo_permissions)
-        visit "/tag-space/#{shadow.id}/user"
+        tag_space_wo_permissions
+        visit "#{tag_space_wo_permissions.path}/user"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
       end
 
-      it "can invite registered user to tag space" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
-        visit "/tag-space/#{shadow.id}/user"
+      it "can invite new user to tag space" do
+        visit "#{tag_space.path}/user"
 
         expect(page).to have_content user.email
         expect(page).not_to have_content user2.email
@@ -149,9 +147,8 @@ RSpec.describe Clover, "tag_space" do
         Mail::TestMailer.deliveries.clear
       end
 
-      it "can invite unregistered user to tag space" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
-        visit "/tag-space/#{shadow.id}/user"
+      it "can invite new existing email to tag space and nothing happens" do
+        visit "#{tag_space.path}/user"
 
         expect(page).to have_content user.email
 
@@ -165,50 +162,44 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "can remove user from tag space" do
-        tag_space_shadow = Clover::TagSpaceShadow.new(tag_space)
-        user2_shadow = Clover::UserShadow.new(user2)
         user2.associate_with_tag_space(tag_space)
 
-        visit "/tag-space/#{tag_space_shadow.id}/user"
+        visit "#{tag_space.path}/user"
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
-        btn = find "#user-#{user2_shadow.id} .delete-btn"
+        btn = find "#user-#{user2.ulid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.body).to eq({message: "Removing #{user2.email} from #{tag_space.name}"}.to_json)
 
-        visit "/tag-space/#{tag_space_shadow.id}/user"
+        visit "#{tag_space.path}/user"
         expect(page).to have_content user.email
         expect(page).not_to have_content user2.email
       end
 
       it "raises bad request when it's the last user" do
-        tag_space_shadow = Clover::TagSpaceShadow.new(tag_space)
-        user_shadow = Clover::UserShadow.new(user)
-
-        visit "/tag-space/#{tag_space_shadow.id}/user"
+        user
+        visit "#{tag_space.path}/user"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
-        btn = find "#user-#{user_shadow.id} .delete-btn"
+        btn = find "#user-#{user.ulid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.body).to eq({message: "You can't remove the last user from '#{tag_space.name}' tag space. Delete tag space instead."}.to_json)
 
-        visit "/tag-space/#{tag_space_shadow.id}/user"
+        visit "#{tag_space.path}/user"
         expect(page).to have_content user.email
       end
 
       it "raises not found when user not exists" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
-
         expect(Account).to receive(:[]).and_return(nil).twice
 
-        visit "/tag-space/#{shadow.id}/user/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{tag_space.path}/user/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Page not found")
         expect(page.status_code).to eq(404)
@@ -218,18 +209,16 @@ RSpec.describe Clover, "tag_space" do
 
     describe "show - policies" do
       it "can show tag space policy" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
-        visit "/tag-space/#{shadow.id}"
+        visit tag_space.path
 
         click_link "Policy"
 
-        expect(page.title).to eq("Ubicloud - #{shadow.name} - Policy")
+        expect(page.title).to eq("Ubicloud - #{tag_space.name} - Policy")
         expect(page).to have_content tag_space.access_policies.first.body.to_json
       end
 
       it "raises forbidden when does not have permissions" do
-        shadow = Clover::TagSpaceShadow.new(tag_space_wo_permissions)
-        visit "/tag-space/#{shadow.id}/policy"
+        visit "#{tag_space_wo_permissions.path}/policy"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -237,7 +226,6 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "can update policy" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
         current_policy = tag_space.access_policies.first.body
         new_policy = {
           acls: [
@@ -245,7 +233,7 @@ RSpec.describe Clover, "tag_space" do
           ]
         }
 
-        visit "/tag-space/#{shadow.id}/policy"
+        visit "#{tag_space.path}/policy"
 
         expect(page).to have_content current_policy.to_json
 
@@ -256,10 +244,9 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "can not update policy when it is not valid JSON" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
         current_policy = tag_space.access_policies.first.body
 
-        visit "/tag-space/#{shadow.id}/policy"
+        visit "#{tag_space.path}/policy"
 
         fill_in "body", with: "{'invalid': 'json',}"
         click_button "Update"
@@ -270,11 +257,9 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "raises not found when access policy not exists" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
-
         expect(AccessPolicy).to receive(:[]).and_return(nil)
 
-        visit "/tag-space/#{shadow.id}/policy/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{tag_space.path}/policy/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Page not found")
         expect(page.status_code).to eq(404)
@@ -284,8 +269,7 @@ RSpec.describe Clover, "tag_space" do
 
     describe "delete" do
       it "can delete tag space" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
-        visit "/tag-space/#{shadow.id}"
+        visit tag_space.path
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -300,10 +284,9 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "can not delete tag space when it has resources" do
-        shadow = Clover::TagSpaceShadow.new(tag_space)
         Prog::Vm::Nexus.assemble("key", tag_space.id, name: "vm1")
 
-        visit "/tag-space/#{shadow.id}"
+        visit tag_space.path
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -318,14 +301,12 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "can not delete tag space when does not have permissions" do
-        shadow = Clover::TagSpaceShadow.new(tag_space_wo_permissions)
-
         # Give permission to view, so we can see the detail page
         tag_space_wo_permissions.access_policies.first.update(body: {acls: [
           {subjects: user.hyper_tag_name, powers: ["TagSpace:view"], objects: tag_space_wo_permissions.hyper_tag_name}
         ]})
 
-        visit "/tag-space/#{shadow.id}"
+        visit tag_space_wo_permissions.path
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end

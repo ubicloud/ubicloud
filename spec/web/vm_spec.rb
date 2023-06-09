@@ -64,8 +64,8 @@ RSpec.describe Clover, "vm" do
         visit "/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
-
-        fill_in "Name", with: "dummy-vm"
+        name = "dummy-vm"
+        fill_in "Name", with: name
         select tag_space.name, from: "tag-space-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
@@ -73,8 +73,8 @@ RSpec.describe Clover, "vm" do
 
         click_button "Create"
 
-        expect(page.title).to eq("Ubicloud - Virtual Machines")
-        expect(page).to have_content "'dummy-vm' will be ready in a few minutes"
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_content "'#{name}' will be ready in a few minutes"
         expect(Vm.count).to eq(1)
       end
 
@@ -111,21 +111,20 @@ RSpec.describe Clover, "vm" do
 
     describe "show" do
       it "can show virtual machine details" do
-        shadow = Clover::VmShadow.new(vm)
+        vm
         visit "/vm"
 
         expect(page.title).to eq("Ubicloud - Virtual Machines")
-        expect(page).to have_content shadow.name
+        expect(page).to have_content vm.name
 
-        click_link "Show", href: "/vm/#{shadow.id}"
+        click_link "Show", href: vm.path
 
-        expect(page.title).to eq("Ubicloud - #{shadow.name}")
-        expect(page).to have_content shadow.name
+        expect(page.title).to eq("Ubicloud - #{vm.name}")
+        expect(page).to have_content vm.name
       end
 
       it "raises forbidden when does not have permissions" do
-        shadow = Clover::VmShadow.new(vm_wo_permission)
-        visit "/vm/#{shadow.id}"
+        visit vm_wo_permission.path
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -143,8 +142,7 @@ RSpec.describe Clover, "vm" do
 
     describe "delete" do
       it "can delete virtual machine" do
-        shadow = Clover::VmShadow.new(vm)
-        visit "/vm/#{shadow.id}"
+        visit vm.path
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -156,8 +154,6 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not delete virtual machine when does not have permissions" do
-        shadow = Clover::VmShadow.new(vm_wo_permission)
-
         # Give permission to view, so we can see the detail page
         tag_space_wo_permissions.access_policies.first.update(body: {
           acls: [
@@ -165,7 +161,7 @@ RSpec.describe Clover, "vm" do
           ]
         })
 
-        visit "/vm/#{shadow.id}"
+        visit vm_wo_permission.path
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end

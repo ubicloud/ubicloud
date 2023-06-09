@@ -80,17 +80,17 @@ RSpec.describe Clover, "vm_host" do
 
     it "can show virtual machine host details" do
       vm_host.sshable.update(raw_private_key_1: SshKey.generate.keypair)
-      shadow = Clover::VmHostShadow.new(vm_host)
+      ser = Serializers::Web::VmHost.new(:default).serialize(vm_host)
       visit "/vm-host"
 
       expect(page.title).to eq("Ubicloud - VM Hosts")
-      expect(page).to have_content shadow.host
+      expect(page).to have_content ser[:host]
 
-      click_link "Show", href: "/vm-host/#{shadow.id}"
+      click_link "Show", href: "/vm-host/#{ser[:ulid]}"
 
-      expect(page.title).to eq("Ubicloud - #{shadow.host}")
-      expect(page).to have_content shadow.host
-      expect(page).to have_content shadow.public_keys.first
+      expect(page.title).to eq("Ubicloud - #{ser[:host]}")
+      expect(page).to have_content ser[:host]
+      expect(page).to have_content ser[:public_keys].first
     end
 
     it "raises not found when virtual machine host not exists" do

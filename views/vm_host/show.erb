@@ -1,13 +1,13 @@
-<% @page_title = @vm_host.host %>
+<% @page_title = @vm_host[:host] %>
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div>
-    <%== render("components/breadcrumb", locals: { back: "/vm-host", parts: [["VM Hosts", "/vm-host"], [@vm_host.host, "#"]] }) %>
+    <%== render("components/breadcrumb", locals: { back: "/vm-host", parts: [["VM Hosts", "/vm-host"], [@vm_host[:host], "#"]] }) %>
     <%== render(
       "components/page_header",
       locals: {
-        title: @vm_host.host,
-        right_items: [render("components/vm_host_state_label", locals: { state: @vm_host.state, extra_class: "text-md" })]
+        title: @vm_host[:host],
+        right_items: [render("components/vm_host_state_label", locals: { state: @vm_host[:state], extra_class: "text-md" })]
       }
     ) %>
   </div>
@@ -20,34 +20,34 @@
             <dl class="sm:divide-y sm:divide-gray-200">
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">ID</dt>
-                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm_host.id %></dd>
+                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm_host[:ulid] %></dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">Host</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                  <span class="copy-content cursor-pointer" data-content="<%= @vm_host.host %>" data-message="Copied host">
-                    <%= @vm_host.host %>
+                  <span class="copy-content cursor-pointer" data-content="<%= @vm_host[:host] %>" data-message="Copied host">
+                    <%= @vm_host[:host] %>
                   </span>
                 </dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">NDP Proxying</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                  <%= @vm_host.ndp_needed %>
+                  <%= @vm_host[:ndp_needed] %>
                 </dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">Provider & Location</dt>
-                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm_host.location %></dd>
+                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm_host[:location] %></dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">Core Usage</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                  <% if @vm_host.total_cores %>
-                    <%= @vm_host.used_cores %>
+                  <% if @vm_host[:total_cores] %>
+                    <%= @vm_host[:used_cores] %>
                     <span class="text-xs italic font-light">used</span>
                     /
-                    <%= @vm_host.total_cores %>
+                    <%= @vm_host[:total_cores] %>
                     <span class="text-xs italic font-light">total</span>
                   <% else %>
                     -
@@ -58,24 +58,24 @@
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">IPv6</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                  <span class="copy-content cursor-pointer" data-content="<%= @vm_host.ip6 %>" data-message="Copied IPv6">
-                    <%= @vm_host.ip6 || "-" %>
+                  <span class="copy-content cursor-pointer" data-content="<%= @vm_host[:ip6] %>" data-message="Copied IPv6">
+                    <%= @vm_host[:ip6] || "-" %>
                   </span>
                 </dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">SSH Public Keys</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                  <% unless @vm_host.public_keys.empty? %>
+                  <% unless @vm_host[:public_keys].empty? %>
                     <div
                       class="overflow-hidden whitespace-nowrap font-mono rounded-lg overlay text-sm leading-6 bg-slate-800 text-slate-50 px-4 py-2"
                     >
                       <span
                         class="copy-content cursor-pointer"
-                        data-content="<%= @vm_host.public_keys.join("\n") %>"
+                        data-content="<%= @vm_host[:public_keys].join("\n") %>"
                         data-message="Copied SSH public keys"
                       >
-                        <%== @vm_host.public_keys.join("</br>") %>
+                        <%== @vm_host[:public_keys].join("</br>") %>
                       </span>
                     </div>
                     <div class="mt-2">
@@ -121,22 +121,22 @@
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 bg-white">
-              <% if @vms.count > 0 %>
-                <% @vms.each do |vm| %>
+              <% if @vm_host[:vms].count > 0 %>
+                <% @vm_host[:vms].each do |vm| %>
                   <tr>
-                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm.name %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm.location %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm.size %></td>
+                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm[:name] %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:location] %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:size] %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <%== render("components/vm_state_label", locals: { state: vm.state }) %>
+                      <%== render("components/vm_state_label", locals: { state: vm[:state] }) %>
                     </td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <span class="copy-content cursor-pointer" data-content="<%= vm.ip6 %>" data-message="Copied IPv6">
-                        <%= vm.ip6 %>
+                      <span class="copy-content cursor-pointer" data-content="<%= vm[:ip6] %>" data-message="Copied IPv6">
+                        <%= vm[:ip6] %>
                       </span>
                     </td>
                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <a href="/vm/<%= vm.id %>" class="text-orange-600 hover:text-orange-700">Show</a>
+                      <a href="<%= vm[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
                     </td>
                   </tr>
                 <% end %>

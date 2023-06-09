@@ -3,30 +3,15 @@
 require "ulid"
 
 class Clover
-  class VmHostShadow
-    attr_accessor :id, :host, :state, :location, :ip6, :vms_count, :total_cores, :used_cores, :public_keys, :ndp_needed
-
-    def initialize(vm_host)
-      @id = ULID.from_uuidish(vm_host.id).to_s.downcase
-      @host = vm_host.sshable.host
-      @state = vm_host.allocation_state
-      @location = vm_host.location
-      @ip6 = vm_host.ip6
-      @vms_count = vm_host.vms.count
-      @total_cores = vm_host.total_cores
-      @used_cores = vm_host.used_cores
-      @public_keys = vm_host.sshable.keys.map(&:public_key)
-      @ndp_needed = vm_host.ndp_needed
-    end
-  end
-
   hash_branch("vm-host") do |r|
     unless vm_host_allowed?
       fail Authorization::Unauthorized
     end
 
+    @serializer = Serializers::Web::VmHost
+
     r.get true do
-      @vm_hosts = VmHost.eager(:sshable, :vms).all.map { |vm_host| VmHostShadow.new(vm_host) }
+      @vm_hosts = serialize(VmHost.eager(:sshable, :vms).all)
 
       view "vm_host/index"
     end
@@ -40,7 +25,7 @@ class Clover
 
       flash["notice"] = "You need to add SSH public keys to your host, so the control plane can connect to the host as root via SSH."
 
-      r.redirect "/vm-host/#{VmHostShadow.new(st.vm_host).id}"
+      r.redirect "/vm-host/#{st.vm_host.ulid}"
     end
 
     r.on "create" do
@@ -58,8 +43,7 @@ class Clover
       end
 
       r.get true do
-        @vm_host = VmHostShadow.new(vm_host)
-        @vms = vm_host.vms.map { |vm| VmShadow.new(vm) }
+        @vm_host = serialize(vm_host, :detail)
 
         view "vm_host/show"
       end

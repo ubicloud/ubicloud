@@ -32,6 +32,24 @@ module SemaphoreMethods
   end
 end
 
+module ResourceMethods
+  require "ulid"
+
+  def self.included(base)
+    base.extend(ClassMethods)
+  end
+
+  def ulid
+    @ulid ||= ULID.from_uuidish(id).to_s.downcase
+  end
+
+  module ClassMethods
+    def from_ulid(ulid)
+      self[id: ULID.parse(ulid).to_uuidish]
+    end
+  end
+end
+
 if ENV["RACK_ENV"] == "development" || ENV["RACK_ENV"] == "test"
   require "logger"
   LOGGER = Logger.new($stdout)

@@ -10,6 +10,7 @@ class Vm < Sequel::Model
 
   dataset_module Authorization::Dataset
 
+  include ResourceMethods
   include SemaphoreMethods
   semaphore :destroy, :refresh_mesh
 
@@ -18,6 +19,10 @@ class Vm < Sequel::Model
 
   def private_subnets
     vm_private_subnet.map { _1.private_subnet }
+  end
+
+  def path
+    "/vm/#{ulid}"
   end
 
   Product = Struct.new(:line, :cores)

@@ -37,7 +37,7 @@
                       locals: {
                         name: "tag-space-id",
                         label: "Tag Space",
-                        options: @tag_spaces.to_h { |tg| [tg.id, tg.name] },
+                        options: @tag_spaces.to_h { |tg| [tg[:ulid], tg[:name]] },
                         attributes: {
                           required: true
                         }

@@ -33,33 +33,33 @@
                 <% @vm_hosts.each do |vm_host| %>
                   <tr>
                     <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                      <span class="copy-content cursor-pointer" data-content="<%= vm_host.host %>" data-message="Copied host">
-                        <%= vm_host.host %>
+                      <span class="copy-content cursor-pointer" data-content="<%= vm_host[:host] %>" data-message="Copied host">
+                        <%= vm_host[:host] %>
                       </span>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm_host.location %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm_host[:location] %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <%== render("components/vm_host_state_label", locals: { state: vm_host.state }) %>
+                      <%== render("components/vm_host_state_label", locals: { state: vm_host[:state] }) %>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm_host.vms_count %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm_host[:vms_count] %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <% if vm_host.total_cores %>
-                        <%= vm_host.used_cores %>
+                      <% if vm_host[:total_cores] %>
+                        <%= vm_host[:used_cores] %>
                         <span class="text-xs italic font-light">used</span>
                         /
-                        <%= vm_host.total_cores %>
+                        <%= vm_host[:total_cores] %>
                         <span class="text-xs italic font-light">total</span>
                       <% else %>
                         -
                       <% end %>
                     </td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <span class="copy-content cursor-pointer" data-content="<%= vm_host.ip6 %>" data-message="Copied IPv6">
-                        <%= vm_host.ip6 %>
+                      <span class="copy-content cursor-pointer" data-content="<%= vm_host[:ip6] %>" data-message="Copied IPv6">
+                        <%= vm_host[:ip6] %>
                       </span>
                     </td>
                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <a href="/vm-host/<%= vm_host.id %>" class="text-orange-600 hover:text-orange-700">Show</a>
+                      <a href="/vm-host/<%= vm_host[:ulid] %>" class="text-orange-600 hover:text-orange-700">Show</a>
                     </td>
                   </tr>
                 <% end %>

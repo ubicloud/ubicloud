@@ -32,20 +32,20 @@
               <tbody class="divide-y divide-gray-200 bg-white">
                 <% @vms.each do |vm| %>
                   <tr>
-                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm.name %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm.tag_spaces.map(&:name).join(", ") %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm.location %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm.size %></td>
+                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm[:name] %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:tag_spaces].map { _1[:name] }.join(", ") %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:location] %></td>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:size] %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <%== render("components/vm_state_label", locals: { state: vm.state }) %>
+                      <%== render("components/vm_state_label", locals: { state: vm[:state] }) %>
                     </td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <span class="copy-content cursor-pointer" data-content="<%= vm.ip6 %>" data-message="Copied IPv6">
-                        <%= vm.ip6 %>
+                      <span class="copy-content cursor-pointer" data-content="<%= vm[:ip6] %>" data-message="Copied IPv6">
+                        <%= vm[:ip6] %>
                       </span>
                     </td>
                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <a href="/vm/<%= vm.id %>" class="text-orange-600 hover:text-orange-700">Show</a>
+                      <a href="<%= vm[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
                     </td>
                   </tr>
                 <% end %>
