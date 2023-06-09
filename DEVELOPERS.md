@@ -417,7 +417,7 @@ in. You'll see the "Getting Started" page.
 
 When you change any template file, format them with `erb-formatter`:
 
-    bundle exec erb-format views/**/*.erb --write --print-width 120
+    rake linter:erb_formatter
 
 ### Conclusion
 
