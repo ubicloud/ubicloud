@@ -142,17 +142,11 @@ class Clover < Roda
     secret: Config.clover_session_secret
 
   autoload_normal("serializers/web", include_first: true)
-
-  # YYY: It'd be nice to use autoload, but it can't work while
-  # constants used across files are defined inside routes files and
-  # the autoload dependency cannot be tracked cheaply.
-  #
-  # if Unreloader.autoload?
-  #   plugin :autoload_hash_branches
-  #   autoload_hash_branch_dir("./routes")
-  # end
-
-  Unreloader.require("routes", delete_hook: proc { |f| hash_branch(File.basename(f).delete_suffix(".rb")) }) {}
+  plugin :autoload_hash_branches
+  Dir["routes/*"].each do |f|
+    autoload_hash_branch(File.basename(f, ".rb").tr("_", "-"), f)
+  end
+  Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
 
   plugin :rodauth do
     enable :argon2, :change_login, :change_password, :close_account, :create_account,
