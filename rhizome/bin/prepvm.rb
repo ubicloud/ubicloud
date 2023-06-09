@@ -70,9 +70,14 @@ end
 
 ndp_needed = params.fetch("ndp_needed", false)
 
+unless (storage_volumes = params["storage_volumes"])
+  puts "need storage_volumes in parameters json"
+  exit 1
+end
+
 require "fileutils"
 require_relative "../lib/common"
 require_relative "../lib/vm_setup"
 
 VmSetup.new(vm_name).prep(unix_user, ssh_public_key, private_subnets, gua, ip4,
-  local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed)
+  local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes)

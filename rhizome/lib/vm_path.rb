@@ -90,24 +90,11 @@ class VmPath
     end
   end
 
-  # Define path, q_path methods for files in `/var/storage/#{vm_name}`
-  %w[
-    vhost.sock
-    boot.raw
-  ].each do |file_name|
-    method_name = file_name.tr(".-", "_")
-    fail "BUG" if method_defined?(method_name)
+  def vhost_sock(index)
+    storage("vhost_#{index}.sock")
+  end
 
-    # Method producing a path, e.g. #user_data
-    define_method method_name do
-      storage(file_name)
-    end
-
-    # Method producing a shell-quoted path, e.g. #q_user_data.
-    quoted_method_name = "q_" + method_name
-    fail "BUG" if method_defined?(quoted_method_name)
-    define_method quoted_method_name do
-      storage(file_name).shellescape
-    end
+  def disk(index)
+    storage("disk_#{index}.raw")
   end
 end
