@@ -3,24 +3,11 @@
 require "ulid"
 
 class Clover
-  class VmShadow
-    attr_accessor :id, :raw_id, :name, :state, :location, :size, :ip6, :tag_spaces
-
-    def initialize(vm)
-      @id = ULID.from_uuidish(vm.id).to_s.downcase
-      @raw_id = vm.id
-      @name = vm.name
-      @state = vm.display_state
-      @location = vm.location
-      @size = vm.size
-      @ip6 = vm.ephemeral_net6&.nth(2)
-      @tag_spaces = vm.tag_spaces.map { TagSpaceShadow.new(_1) }
-    end
-  end
-
   hash_branch("vm") do |r|
+    @serializer = Serializers::Web::Vm
+
     r.get true do
-      @vms = Vm.authorized(rodauth.session_value, "Vm:view").map { VmShadow.new(_1) }
+      @vms = serialize(Vm.authorized(rodauth.session_value, "Vm:view").all)
 
       view "vm/index"
     end
@@ -29,7 +16,7 @@ class Clover
       tag_space_id = ULID.parse(r.params["tag-space-id"]).to_uuidish
       Authorization.authorize(rodauth.session_value, "Vm:create", tag_space_id)
 
-      Prog::Vm::Nexus.assemble(
+      st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
         tag_space_id,
         name: r.params["name"],
@@ -41,19 +28,19 @@ class Clover
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
 
-      r.redirect "/vm"
+      r.redirect "/vm/#{st.vm.ulid}"
     end
 
     r.on "create" do
       r.get true do
-        @tag_spaces = TagSpace.authorized(rodauth.session_value, "Vm:create").map { TagSpaceShadow.new(_1) }
+        @tag_spaces = Serializers::Web::TagSpace.new(:default).serialize(TagSpace.authorized(rodauth.session_value, "Vm:create").all)
 
         view "vm/create"
       end
     end
 
     r.is String do |vm_ulid|
-      vm = Vm[id: ULID.parse(vm_ulid).to_uuidish]
+      vm = Vm.from_ulid(vm_ulid)
 
       unless vm
         response.status = 404
@@ -63,7 +50,7 @@ class Clover
       r.get true do
         Authorization.authorize(rodauth.session_value, "Vm:view", vm.id)
 
-        @vm = VmShadow.new(vm)
+        @vm = serialize(vm)
 
         view "vm/show"
       end

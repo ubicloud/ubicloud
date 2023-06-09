@@ -1,4 +1,4 @@
-<% @page_title = "#{@tag_space.name} - Users" %>
+<% @page_title = "#{@tag_space[:name]} - Users" %>
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
@@ -6,10 +6,10 @@
       "components/breadcrumb",
       locals: {
         back: "/tag-space",
-        parts: [["Tag Spaces", "/tag-space"], [@tag_space.name, "/tag-space/#{@tag_space.id}"], %w[Users #]]
+        parts: [["Tag Spaces", "/tag-space"], [@tag_space[:name], @tag_space[:path]], %w[Users #]]
       }
     ) %>
-    <%== render("components/page_header", locals: { title: @tag_space.name }) %>
+    <%== render("components/page_header", locals: { title: @tag_space[:name] }) %>
   </div>
 
   <main class="mt-4 md:mt-8">
@@ -19,8 +19,8 @@
           <%== render("tag_space/show_sidebar") %>
           <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
             <!-- Invite user -->
-            <form action="<%= "/tag-space/#{@tag_space.id}/user" %>" role="form" method="POST">
-              <%== csrf_tag("/tag-space/#{@tag_space.id}/user") %>
+            <form action="<%= "#{@tag_space[:path]}/user" %>" role="form" method="POST">
+              <%== csrf_tag("#{@tag_space[:path]}/user") %>
               <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
                 <div>
                   <h2 class="text-lg font-medium leading-6 text-gray-900">Invite a new user</h2>
@@ -70,15 +70,15 @@
                 </thead>
                 <tbody class="divide-y divide-gray-200 bg-white">
                   <% @users.each do |user| %>
-                    <tr id="user-<%= user.id%>" class="whitespace-nowrap text-sm font-medium">
-                      <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= user.email %></td>
+                    <tr id="user-<%= user[:ulid]%>" class="whitespace-nowrap text-sm font-medium">
+                      <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= user[:email] %></td>
                       <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                         <button
                           type="button"
-                          data-url="<%= "/tag-space/#{@tag_space.id}/user/#{user.id}" %>"
-                          data-csrf="<%= csrf_token("/tag-space/#{@tag_space.id}/user/#{user.id}", "DELETE") %>"
-                          data-confirmation="<%= user.email %>"
-                          data-redirect="<%= "/tag-space/#{@tag_space.id}/user" %>"
+                          data-url="<%= "#{@tag_space[:path]}/user/#{user[:ulid]}" %>"
+                          data-csrf="<%= csrf_token("#{@tag_space[:path]}/user/#{user[:ulid]}", "DELETE") %>"
+                          data-confirmation="<%= user[:email] %>"
+                          data-redirect="<%= "#{@tag_space[:path]}/user" %>"
                           class="delete-btn text-rose-600 hover:text-rose-900"
                         >
                           Remove

@@ -27,9 +27,9 @@
               <tbody class="divide-y divide-gray-200 bg-white">
                 <% @tag_spaces.each do |tag_space| %>
                   <tr>
-                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= tag_space.name %></td>
+                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= tag_space[:name] %></td>
                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <a href="/tag-space/<%= tag_space.id %>" class="text-orange-600 hover:text-orange-700">Show</a>
+                      <a href="<%= tag_space[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
                     </td>
                   </tr>
                 <% end %>

@@ -7,6 +7,8 @@ class VmHost < Sequel::Model
   one_to_one :sshable, key: :id
   one_to_many :vms
 
+  include ResourceMethods
+
   def host_prefix
     net6.netmask.prefix_len
   end

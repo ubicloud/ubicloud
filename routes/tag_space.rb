@@ -3,40 +3,13 @@
 require "ulid"
 
 class Clover
-  class TagSpaceShadow
-    attr_accessor :id, :name, :raw_id
-
-    def initialize(tag_space)
-      @id = ULID.from_uuidish(tag_space.id).to_s.downcase
-      @raw_id = tag_space.id
-      @name = tag_space.name
-    end
-  end
-
-  class UserShadow
-    attr_accessor :id, :email
-
-    def initialize(user)
-      @id = ULID.from_uuidish(user.id).to_s.downcase
-      @email = user.email
-    end
-  end
-
-  class AccessPolicyShadow
-    attr_accessor :id, :name, :body
-
-    def initialize(policy)
-      @id = ULID.from_uuidish(policy.id).to_s.downcase
-      @name = policy.name
-      @body = policy.body.to_json
-    end
-  end
-
   hash_branch("tag-space") do |r|
     current_user = Account[rodauth.session_value]
 
+    @serializer = Serializers::Web::TagSpace
+
     r.get true do
-      @tag_spaces = current_user.tag_spaces.map { TagSpaceShadow.new(_1) }
+      @tag_spaces = serialize(current_user.tag_spaces)
 
       view "tag_space/index"
     end
@@ -44,7 +17,7 @@ class Clover
     r.post true do
       tag_space = current_user.create_tag_space_with_default_policy(r.params["name"])
 
-      r.redirect "/tag-space/#{TagSpaceShadow.new(tag_space).id}"
+      r.redirect tag_space.path
     end
 
     r.is "create" do
@@ -54,14 +27,14 @@ class Clover
     end
 
     r.on String do |tag_space_ulid|
-      tag_space = TagSpace[id: ULID.parse(tag_space_ulid).to_uuidish]
+      tag_space = TagSpace.from_ulid(tag_space_ulid)
 
       unless tag_space
         response.status = 404
         r.halt
       end
 
-      @tag_space = TagSpaceShadow.new(tag_space)
+      @tag_space = serialize(tag_space)
 
       r.get true do
         Authorization.authorize(rodauth.session_value, "TagSpace:view", tag_space.id)
@@ -91,10 +64,11 @@ class Clover
 
       r.on "user" do
         Authorization.authorize(rodauth.session_value, "TagSpace:user", tag_space.id)
+        @serializer = Serializers::Web::Account
 
         r.get true do
           users_with_hyper_tag = tag_space.user_ids
-          @users = Account.where(id: users_with_hyper_tag).map { UserShadow.new(_1) }
+          @users = serialize(Account.where(id: users_with_hyper_tag).all)
 
           view "tag_space/show_users"
         end
@@ -125,11 +99,11 @@ class Clover
           flash["notice"] = "Invitation sent successfully to '#{email}'. You need to add some policies to allow new user to operate in the tag space.
                             If this user doesn't have account, they will need to create an account and you'll need to add them again."
 
-          r.redirect "/tag-space/#{TagSpaceShadow.new(tag_space).id}/user"
+          r.redirect "#{tag_space.path}/user"
         end
 
         r.is String do |user_ulid|
-          user = Account[id: ULID.parse(user_ulid).to_uuidish]
+          user = Account.from_ulid(user_ulid)
 
           unless user
             response.status = 404
@@ -151,15 +125,17 @@ class Clover
 
       r.on "policy" do
         Authorization.authorize(rodauth.session_value, "TagSpace:policy", tag_space.id)
+        @serializer = Serializers::Web::AccessPolicy
 
         r.get true do
-          @policy = AccessPolicyShadow.new(tag_space.access_policies.first)
+          # For UI simplicity, we are showing only one policy at the moment
+          @policy = serialize(tag_space.access_policies.first)
 
           view "tag_space/show_policies"
         end
 
         r.is String do |policy_ulid|
-          policy = AccessPolicy[id: ULID.parse(policy_ulid).to_uuidish]
+          policy = AccessPolicy.from_ulid(policy_ulid)
 
           unless policy
             response.status = 404
@@ -180,7 +156,7 @@ class Clover
 
             flash["notice"] = "'#{policy.name}' policy updated for '#{tag_space.name}'"
 
-            r.redirect "/tag-space/#{TagSpaceShadow.new(tag_space).id}/policy"
+            r.redirect "#{tag_space.path}/policy"
           end
         end
       end

@@ -141,6 +141,8 @@ class Clover < Roda
     cookie_options: {secure: !%w[test development].include?(ENV["RACK_ENV"])},
     secret: Config.clover_session_secret
 
+  autoload_normal("serializers/web", include_first: true)
+
   # YYY: It'd be nice to use autoload, but it can't work while
   # constants used across files are defined inside routes files and
   # the autoload dependency cannot be tracked cheaply.
@@ -225,6 +227,10 @@ class Clover < Roda
     vm_host_users = Config.allowed_vm_host_users
     return true if vm_host_users.empty?
     vm_host_users.include?(Account[rodauth.session_value].email)
+  end
+
+  def serialize(data, structure = :default)
+    @serializer.new(structure).serialize(data)
   end
 
   hash_branch("dashboard") do |r|

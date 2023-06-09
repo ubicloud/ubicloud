@@ -5,6 +5,7 @@ require "mail"
 require_relative "../model"
 
 class Account < Sequel::Model(:accounts)
+  include ResourceMethods
   include Authorization::HyperTagMethods
 
   def hyper_tag_identifier

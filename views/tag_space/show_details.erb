@@ -1,4 +1,4 @@
-<% @page_title = @tag_space.name %>
+<% @page_title = @tag_space[:name] %>
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
@@ -6,10 +6,10 @@
       "components/breadcrumb",
       locals: {
         back: "/tag-space",
-        parts: [["Tag Spaces", "/tag-space"], [@tag_space.name, "/tag-space/#{@tag_space.id}"], %w[Details #]]
+        parts: [["Tag Spaces", "/tag-space"], [@tag_space[:name], @tag_space[:path]], %w[Details #]]
       }
     ) %>
-    <%== render("components/page_header", locals: { title: @tag_space.name }) %>
+    <%== render("components/page_header", locals: { title: @tag_space[:name] }) %>
   </div>
 
   <main class="mt-4 md:mt-8">
@@ -27,17 +27,17 @@
                 <dl class="sm:divide-y sm:divide-gray-200">
                   <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                     <dt class="text-sm font-medium text-gray-500">ID</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @tag_space.id %></dd>
+                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @tag_space[:ulid] %></dd>
                   </div>
                   <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                     <dt class="text-sm font-medium text-gray-500">Name</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @tag_space.name %></dd>
+                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @tag_space[:name] %></dd>
                   </div>
                 </dl>
               </div>
             </div>
             <!-- Delete -->
-            <% if Authorization.has_power?(rodauth.session_value, "TagSpace:delete", @tag_space.raw_id) %>
+            <% if Authorization.has_power?(rodauth.session_value, "TagSpace:delete", @tag_space[:id]) %>
               <div>
                 <div class="px-4 py-6 sm:px-6">
                   <h2 class="text-lg font-medium leading-6 text-gray-900">Delete tag space</h2>
@@ -49,7 +49,7 @@
                     type="button"
                     data-url="<%= request.path %>"
                     data-csrf="<%= csrf_token(request.path, "DELETE") %>"
-                    data-confirmation="<%= @tag_space.name %>"
+                    data-confirmation="<%= @tag_space[:name] %>"
                     data-redirect="/tag-space"
                     class="delete-btn inline-flex items-center mt-2 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
                   >
