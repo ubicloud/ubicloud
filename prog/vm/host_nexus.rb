@@ -50,6 +50,20 @@ class Prog::Vm::HostNexus < Prog::Base
     end
 
     if leaf?
+      hop :setup_hugepages
+    end
+    donate
+  end
+
+  def setup_hugepages
+    bud Prog::SetupHugepages
+    hop :wait_setup_hugepages
+  end
+
+  def wait_setup_hugepages
+    reap
+
+    if leaf?
       vm_host.update(allocation_state: "accepting")
       hop :wait
     end
