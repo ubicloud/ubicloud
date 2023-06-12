@@ -56,7 +56,8 @@ RSpec.describe Prog::Vm::Nexus do
               total_nodes: 4,
               total_cores: 80,
               total_cpus: 80,
-              total_mem_gib: 320}.merge(args)
+              total_mem_gib: 320,
+              total_hugepages_1g: 316}.merge(args)
       sa = Sshable.create(host: "127.0.0.#{@host_index}")
       @host_index += 1
       VmHost.new(**args) { _1.id = sa.id }
