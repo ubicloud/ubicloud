@@ -43,6 +43,7 @@ class VmSetup
     routes(gua, private_subnets, ndp_needed)
     cloudinit(unix_user, public_key, private_subnets)
     boot_disk(boot_image)
+    hugepages(mem_gib)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
     forwarding
   end
@@ -71,6 +72,12 @@ class VmSetup
     rescue CommandFail => ex
       raise unless /The user `.*' does not exist./.match?(ex.stderr)
     end
+  end
+
+  def hugepages(mem_gib)
+    r "mkdir #{vp.q_hugepages}"
+    r "mount -t hugetlbfs -o uid=#{q_vm},size=#{mem_gib}G nodev #{vp.q_hugepages}"
+    r "chown -R #{q_vm} #{vp.q_hugepages}"
   end
 
   def interfaces
@@ -292,7 +299,7 @@ ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
---memory size=#{mem_gib}G \
+--memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \
 --net "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask="
 
 ExecStop=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/ch-remote --api-socket #{vp.ch_api_sock} shutdown-vmm

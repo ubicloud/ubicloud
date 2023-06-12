@@ -90,11 +90,12 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def allocation_dataset
-    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.location]
+    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.location]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
 FROM vm_host
 WHERE vm_host.used_cores + ? < vm_host.total_cores
 AND vm_host.total_mem_gib / vm_host.total_cores >= ?
+AND vm_host.used_hugepages_1g + ? < vm_host.total_hugepages_1g
 AND vm_host.allocation_state = 'accepting'
 AND vm_host.location = ?
 ORDER BY mem_ratio, used_cores
@@ -108,7 +109,12 @@ SQL
     # N.B. check constraint required to address concurrency.  By
     # injecting a crash from overbooking, it gives us the opportunity
     # to try again.
-    VmHost.dataset.where(id: vm_host_id).update(used_cores: Sequel[:used_cores] + vm.cores)
+    VmHost.dataset
+      .where(id: vm_host_id)
+      .update(
+        used_cores: Sequel[:used_cores] + vm.cores,
+        used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib
+      )
 
     vm_host_id
   end
