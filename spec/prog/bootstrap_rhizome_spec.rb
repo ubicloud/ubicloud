@@ -21,9 +21,7 @@ RSpec.describe Prog::BootstrapRhizome do
 
       expect(br).to receive(:sshable).and_return(sshable)
 
-      expect { br.start }.to raise_error Prog::Base::Hop do |h|
-        expect(h.to_s).to eq("hop BootstrapRhizome#start -> BootstrapRhizome#setup")
-      end
+      expect { br.start }.to hop("setup", "BootstrapRhizome")
     end
   end
 
@@ -43,9 +41,7 @@ sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authoriz
 echo test key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 FIXTURE
 
-      expect { br.setup }.to raise_error Prog::Base::Hop do |h|
-        expect(h.to_s).to eq("hop BootstrapRhizome#setup -> InstallRhizome#start")
-      end
+      expect { br.setup }.to hop("start", "InstallRhizome")
     end
 
     it "exits once InstallRhizome has returned" do

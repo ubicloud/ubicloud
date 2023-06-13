@@ -149,4 +149,35 @@ RSpec.configure do |config|
   # test failures related to randomization by passing the same `--seed` value
   # as the one that triggered the failure.
   Kernel.srand config.seed
+
+  # Custom matcher to expect Progs to hop new label
+  # If expected_label is not provided, it expects to hop any label.
+  # If expected_prog is not provided, it expects to hop to label at old prog.
+  RSpec::Matchers.define :hop do |expected_label, expected_prog|
+    supports_block_expectations
+
+    match do |block|
+      block.call
+      false
+    rescue Prog::Base::Hop => hop
+      @hop = hop
+      (expected_label.nil? || hop.new_label == expected_label) &&
+        ((expected_prog.nil? && hop.old_prog == hop.new_prog) || hop.new_prog == expected_prog)
+    end
+
+    failure_message do
+      "expected: ".rjust(16) + default_prog(expected_prog) + (expected_label || "any_label") + "\n" +
+        "got: ".rjust(16) + default_prog(@hop&.new_prog) + (@hop&.new_label || "not hopped") + "\n "
+    end
+
+    failure_message_when_negated do
+      "not expected: ".rjust(16) + default_prog(expected_prog) + (expected_label || "any_label") + "\n" +
+        "got: ".rjust(16) + default_prog(@hop&.new_prog) + (@hop&.new_label || "not hopped") + "\n "
+    end
+
+    def default_prog(new_prog)
+      prog = new_prog || @hop&.old_prog
+      prog.nil? ? "" : "#{prog}#"
+    end
+  end
 end

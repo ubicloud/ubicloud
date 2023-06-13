@@ -43,9 +43,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "runs adduser" do
       expect(sshable).to receive(:cmd).with(/sudo.*adduser.*#{nx.vm_name}/)
 
-      expect { nx.create_unix_user }.to raise_error Prog::Base::Hop do |hop|
-        expect(hop.new_label).to eq("prep")
-      end
+      expect { nx.create_unix_user }.to hop("prep")
     end
 
     it "absorbs an already-exists error as a success" do
@@ -53,9 +51,7 @@ RSpec.describe Prog::Vm::Nexus do
         Sshable::SshError.new("adduser", "", "adduser: The user `vmabc123' already exists.", 1, nil)
       )
 
-      expect { nx.create_unix_user }.to raise_error Prog::Base::Hop do |hop|
-        expect(hop.new_label).to eq("prep")
-      end
+      expect { nx.create_unix_user }.to hop("prep")
     end
 
     it "raises other errors" do
@@ -96,9 +92,7 @@ RSpec.describe Prog::Vm::Nexus do
       end
       expect(sshable).to receive(:cmd).with(/sudo bin\/prepvm/, {stdin: "{\"storage\":{}}"})
 
-      expect { nx.prep }.to raise_error Prog::Base::Hop do |hop|
-        expect(hop.new_label).to eq("trigger_refresh_mesh")
-      end
+      expect { nx.prep }.to hop("trigger_refresh_mesh")
     end
 
     it "generates local_ipv4 if not set" do
@@ -127,9 +121,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(args[:vm_host_id]).to match vmh_id
       end
 
-      expect { nx.start }.to raise_error Prog::Base::Hop do |hop|
-        expect(hop.new_label).to eq("create_unix_user")
-      end
+      expect { nx.start }.to hop("create_unix_user")
     end
   end
 

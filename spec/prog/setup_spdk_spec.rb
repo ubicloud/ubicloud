@@ -17,9 +17,7 @@ RSpec.describe Prog::SetupSpdk do
       expect(vm_host).to receive(:used_hugepages_1g).and_return(0)
       expect(ss).to receive(:sshable).and_return(sshable)
       expect(ss).to receive(:vm_host).and_return(vm_host).at_least(:once)
-      expect { ss.start }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("start_service")
-      end
+      expect { ss.start }.to hop("start_service")
     end
 
     it "fails if not enough hugepages" do
