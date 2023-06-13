@@ -36,9 +36,7 @@ RSpec.describe Prog::SetupHugepages do
       sshable = instance_double(Sshable)
       expect(sshable).to receive(:cmd).with("echo 1").and_return("1")
       expect(sh).to receive(:sshable).and_return(sshable)
-      expect { sh.wait_reboot }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("check_hugepages")
-      end
+      expect { sh.wait_reboot }.to hop("check_hugepages")
     end
   end
 

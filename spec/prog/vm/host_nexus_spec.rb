@@ -44,9 +44,7 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#start" do
     it "buds a bootstrap rhizome process" do
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome)
-      expect { nx.start }.to raise_error Prog::Base::Hop do
-        expect(_1.new_label).to eq("wait_bootstrap_rhizome")
-      end
+      expect { nx.start }.to hop("wait_bootstrap_rhizome")
     end
   end
 
@@ -56,9 +54,7 @@ RSpec.describe Prog::Vm::HostNexus do
     it "hops to prep if there are no sub-programs running" do
       expect(nx).to receive(:leaf?).and_return true
 
-      expect { nx.wait_bootstrap_rhizome }.to raise_error Prog::Base::Hop do
-        expect(_1.new_label).to eq("prep")
-      end
+      expect { nx.wait_bootstrap_rhizome }.to hop("prep")
     end
 
     it "donates if there are sub-programs running" do
@@ -78,9 +74,7 @@ RSpec.describe Prog::Vm::HostNexus do
         budded << _1
       end.at_least(:once)
 
-      expect { nx.prep }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("wait_prep")
-      end
+      expect { nx.prep }.to hop("wait_prep")
 
       expect(budded).to eq([
         Prog::Vm::PrepHost,
@@ -98,9 +92,7 @@ RSpec.describe Prog::Vm::HostNexus do
         budded_learn_network ||= (_1 == Prog::LearnNetwork)
       end.at_least(:once)
 
-      expect { nx.prep }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("wait_prep")
-      end
+      expect { nx.prep }.to hop("wait_prep")
 
       expect(budded_learn_network).to be true
     end
@@ -119,9 +111,7 @@ RSpec.describe Prog::Vm::HostNexus do
         {prog: "ArbitraryOtherProg"}
       ])
 
-      expect { nx.wait_prep }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("setup_hugepages")
-      end
+      expect { nx.wait_prep }.to hop("setup_hugepages")
     end
 
     it "crashes if an expected field is not set for LearnMemory" do
@@ -145,9 +135,7 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#setup_hugepages" do
     it "buds the hugepage program" do
       expect(nx).to receive(:bud).with(Prog::SetupHugepages)
-      expect { nx.setup_hugepages }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("wait_setup_hugepages")
-      end
+      expect { nx.setup_hugepages }.to hop("wait_setup_hugepages")
     end
   end
 
@@ -158,9 +146,7 @@ RSpec.describe Prog::Vm::HostNexus do
       vmh = instance_double(VmHost)
       nx.instance_variable_set(:@vm_host, vmh)
 
-      expect { nx.wait_setup_hugepages }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("setup_spdk")
-      end
+      expect { nx.wait_setup_hugepages }.to hop("setup_spdk")
     end
 
     it "donates its time if child strands are still running" do
@@ -175,9 +161,7 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#setup_spdk" do
     it "buds the spdk program" do
       expect(nx).to receive(:bud).with(Prog::SetupSpdk)
-      expect { nx.setup_spdk }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("wait_setup_spdk")
-      end
+      expect { nx.setup_spdk }.to hop("wait_setup_spdk")
     end
   end
 
@@ -190,9 +174,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
       expect(vmh).to receive(:update).with(allocation_state: "accepting")
 
-      expect { nx.wait_setup_spdk }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("wait")
-      end
+      expect { nx.wait_setup_spdk }.to hop("wait")
     end
 
     it "donates its time if child strands are still running" do

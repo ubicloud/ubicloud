@@ -94,7 +94,7 @@ end
   end
 
   class Hop < FlowControl
-    attr_reader :strand_update_args
+    attr_reader :strand_update_args, :old_prog
 
     def initialize(old_prog, old_label, strand_update_args)
       @old_prog = old_prog

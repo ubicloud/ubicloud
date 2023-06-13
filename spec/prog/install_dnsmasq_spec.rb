@@ -13,9 +13,7 @@ RSpec.describe Prog::InstallDnsmasq do
       expect(idm).to receive(:bud).with(described_class, {sshable_id: "bogus"}, :install_build_dependencies)
       expect(idm).to receive(:bud).with(described_class, {sshable_id: "bogus"}, :git_clone_dnsmasq)
 
-      expect { idm.start }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq "wait_downloads"
-      end
+      expect { idm.start }.to hop("wait_downloads")
     end
   end
 
@@ -30,9 +28,7 @@ RSpec.describe Prog::InstallDnsmasq do
 
     it "hops to compile_and_install when the downloads are done" do
       expect(idm).to receive(:leaf?).and_return true
-      expect { idm.wait_downloads }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq "compile_and_install"
-      end
+      expect { idm.wait_downloads }.to hop("compile_and_install")
     end
   end
 

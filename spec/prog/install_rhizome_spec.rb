@@ -20,9 +20,7 @@ RSpec.describe Prog::InstallRhizome do
         # https://www.gnu.org/software/tar/manual/html_node/Standard.html
         expect(kwargs[:stdin][257..261]).to eq "ustar"
       end
-      expect { ir.start }.to raise_error Prog::Base::Hop do |h|
-        expect(h.new_label).to eq "install_gems"
-      end
+      expect { ir.start }.to hop("install_gems")
     end
   end
 
