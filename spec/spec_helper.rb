@@ -61,6 +61,7 @@ RSpec.configure do |config|
   config.around do |example|
     DatabaseCleaner.cleaning do
       example.run
+      Mail::TestMailer.deliveries.clear if defined?(Mail)
     end
   end
 

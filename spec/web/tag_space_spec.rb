@@ -144,7 +144,6 @@ RSpec.describe Clover, "tag_space" do
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
         expect(Mail::TestMailer.deliveries.length).to eq 1
-        Mail::TestMailer.deliveries.clear
       end
 
       it "can invite new existing email to tag space and nothing happens" do
@@ -158,7 +157,6 @@ RSpec.describe Clover, "tag_space" do
         expect(page).to have_content user.email
         expect(page).to have_content "Invitation sent successfully to 'new@example.com'."
         expect(Mail::TestMailer.deliveries.length).to eq 1
-        Mail::TestMailer.deliveries.clear
       end
 
       it "can remove user from tag space" do

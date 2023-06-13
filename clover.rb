@@ -40,13 +40,15 @@ class Clover < Roda
   plugin :all_verbs
   plugin :request_headers
 
-  logger = if ENV["RACK_ENV"] == "test"
+  logger = if Config.test?
     Class.new {
       def write(_)
       end
     }.new
   else
+    # :nocov:
     $stderr
+    # :nocov:
   end
   plugin :common_logger, logger
 
@@ -58,6 +60,7 @@ class Clover < Roda
     view "/error"
   end
 
+  # :nocov:
   case Config.mail_driver
   when :smtp
     ::Mail.defaults do
@@ -79,8 +82,10 @@ class Clover < Roda
       delivery_method :test
     end
   end
+  # :nocov:
 
   if Config.development?
+    # :nocov:
     plugin :exception_page
     class RodaRequest
       def assets
@@ -88,9 +93,12 @@ class Clover < Roda
         super
       end
     end
+    # :nocov:
   else
     def self.freeze
+      # :nocov:
       Sequel::Model.freeze_descendents unless Config.test?
+      # :nocov:
       DB.freeze
       super
     end
@@ -117,7 +125,10 @@ class Clover < Roda
     else
       $stderr.print "#{e.class}: #{e.message}\n"
       warn e.backtrace
-      next exception_page(e, assets: true) if ENV["RACK_ENV"] == "development"
+
+      # :nocov:
+      next exception_page(e, assets: true) if Config.development?
+      # :nocov:
 
       @error_code = 500
       @error_title = "Unexcepted Error"
@@ -138,7 +149,7 @@ class Clover < Roda
 
   plugin :sessions,
     key: "_Clover.session",
-    cookie_options: {secure: !%w[test development].include?(ENV["RACK_ENV"])},
+    cookie_options: {secure: !(Config.development? || Config.test?)},
     secret: Config.clover_session_secret
 
   autoload_normal("serializers/web", include_first: true)
@@ -162,6 +173,7 @@ class Clover < Roda
       :verify_login_change, :change_password_notify, :confirm_password
     title_instance_variable :@page_title
 
+    # :nocov:
     unless Config.development?
       enable :disallow_common_passwords, :verify_account
 
@@ -173,6 +185,7 @@ class Clover < Roda
       verify_account_email_recently_sent_redirect { login_route }
       verify_account_set_password? false
     end
+    # :nocov:
 
     hmac_secret Config.clover_session_secret
 
@@ -238,10 +251,10 @@ class Clover < Roda
   end
 
   route do |r|
-    check_csrf! unless r.env["CONTENT_TYPE"]&.include?("application/json")
-
     r.public
     r.assets
+
+    check_csrf!
 
     rodauth.load_memory
     rodauth.check_active_session
@@ -250,7 +263,6 @@ class Clover < Roda
       r.redirect rodauth.login_route
     end
     rodauth.require_authentication
-    check_csrf!
 
     r.hash_branches
   end
