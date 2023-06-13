@@ -25,6 +25,7 @@ gem "rack-unreloader", ">= 1.8"
 gem "rake"
 gem "warning"
 gem "pry"
+gem "excon"
 
 group :development do
   gem "brakeman"
@@ -47,4 +48,5 @@ group :test do
   gem "database_cleaner-sequel"
   gem "capybara"
   gem "rspec"
+  gem "webmock"
 end

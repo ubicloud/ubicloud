@@ -6,6 +6,40 @@ RSpec.describe Prog::Vm::HostNexus do
   subject(:nx) { described_class.new(st) }
 
   let(:st) { Strand.new }
+  let(:hetzner_ips) {
+    [
+      {ip_address: "127.0.0.1", source_host_ip: "127.0.0.1", is_failover: false},
+      {ip_address: "30.30.30.32/29", source_host_ip: "127.0.0.1", is_failover: true},
+      {ip_address: "2a01:4f8:10a:128b::/64", source_host_ip: "127.0.0.1", is_failover: true}
+    ]
+  }
+
+  describe ".assemble" do
+    it "creates addresses properly for a regular host" do
+      st = described_class.assemble("127.0.0.1")
+      expect(st).to be_a Strand
+      expect(st.label).to eq("start")
+      expect(st.vm_host.assigned_subnets.count).to eq(1)
+      expect(st.vm_host.assigned_subnets.first.cidr.to_s).to eq("127.0.0.1/32")
+
+      expect(st.vm_host.assigned_host_addresses.count).to eq(1)
+      expect(st.vm_host.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
+      expect(st.vm_host.provider).to be_nil
+    end
+
+    it "creates addresses properly for a hetzner host" do
+      expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+      st = described_class.assemble("127.0.0.1", provider: "hetzner", hetzner_server_identifier: "1")
+      expect(st).to be_a Strand
+      expect(st.label).to eq("start")
+      expect(st.vm_host.assigned_subnets.count).to eq(3)
+      expect(st.vm_host.assigned_subnets.map(&:cidr).map(&:to_s).sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
+
+      expect(st.vm_host.assigned_host_addresses.count).to eq(1)
+      expect(st.vm_host.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
+      expect(st.vm_host.provider).to eq("hetzner")
+    end
+  end
 
   describe "#start" do
     it "buds a bootstrap rhizome process" do

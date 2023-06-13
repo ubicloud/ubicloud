@@ -108,16 +108,24 @@ RSpec.describe VmHost do
     expect(vh.sshable_address).to eq(assigned_host_address)
   end
 
+  it "hetznerifies a host" do
+    expect(vh).to receive(:create_addresses).at_least(:once)
+    expect(HetznerHost).to receive(:create).with(server_identifier: "12").and_return(true)
+
+    vh.hetznerify("12")
+  end
+
   it "create_addresses fails if a failover ip of non existent server is being added" do
+    expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "test.localhost") { _1.id = vh.id }
     described_class.create(location: "test-location") { _1.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([]).at_least(:once)
-    expect { vh.create_addresses(hetzner_ips) }.to raise_error(RuntimeError, "BUG: source host 1.1.1.1 isn't added to the database")
+    expect { vh.create_addresses }.to raise_error(RuntimeError, "BUG: source host 1.1.1.1 isn't added to the database")
   end
 
-  it "create_addresses creates addresses properly" do
+  it "create_addresses creates given addresses and doesn't make an api call when ips given" do
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
     Sshable.create(host: "1.1.1.1")
@@ -125,25 +133,77 @@ RSpec.describe VmHost do
     described_class.create(location: "test-location") { _1.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([]).at_least(:once)
-    vh.create_addresses(hetzner_ips)
+    vh.create_addresses(ip_records: hetzner_ips)
+
+    expect(Address.where(routed_to_host_id: vh.id).count).to eq(4)
+  end
+
+  it "create_addresses creates addresses" do
+    expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+    expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
+    Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
+    Sshable.create(host: "1.1.1.1")
+
+    described_class.create(location: "test-location") { _1.id = vh.id }
+
+    expect(vh).to receive(:assigned_subnets).and_return([]).at_least(:once)
+    vh.create_addresses
 
     expect(Address.where(routed_to_host_id: vh.id).count).to eq(4)
   end
 
   it "create_addresses returns immediately if there are no addresses to create" do
-    vh.create_addresses([])
+    expect(Hosting::Apis).to receive(:pull_ips).and_return(nil)
+    vh.create_addresses
     expect(Address.where(routed_to_host_id: vh.id).count).to eq(0)
   end
 
   it "skips already assigned subnets" do
+    expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
     Sshable.create(host: "1.1.1.1")
     described_class.create(location: "test-location") { _1.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([Address.new(cidr: NetAddr::IPv4Net.parse("1.1.1.0/30".shellescape))]).at_least(:once)
-    vh.create_addresses(hetzner_ips)
+    vh.create_addresses
     expect(Address.where(routed_to_host_id: vh.id).count).to eq(3)
+  end
+
+  it "updates the routed_to_host_id if the address is reassigned to another host and there is no vm using the ip range" do
+    hetzner_ips = [{ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true}]
+    old_id = "4c5dc171-a116-4a05-9e6d-381a4b382b71"
+    new_id = "46683a25-acb1-4371-afe9-d39f303e44b4"
+
+    expect(vh).to receive(:id).and_return(new_id).at_least(:once)
+    expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+
+    Sshable.create(host: "1.1.0.0") { _1.id = old_id }
+    described_class.create(location: "test-location") { _1.id = old_id }
+
+    Sshable.create(host: "1.1.1.1")
+    adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
+    expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
+
+    expect(adr).to receive(:update).with(routed_to_host_id: new_id).and_return(true)
+    vh.create_addresses
+  end
+
+  it "fails if the ip range is already assigned to a vm" do
+    hetzner_ips = [{ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true}]
+    old_id = "4c5dc171-a116-4a05-9e6d-381a4b382b71"
+    expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+
+    Sshable.create(host: "1.1.0.0") { _1.id = old_id }
+    described_class.create(location: "test-location") { _1.id = old_id }
+
+    adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
+    expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
+
+    expect(adr).to receive(:assigned_vm_address).and_return([instance_double(Vm)]).at_least(:once)
+    expect {
+      vh.create_addresses
+    }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"
   end
 
   it "finds local ip to assign to veth* devices" do

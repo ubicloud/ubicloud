@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require_relative "../lib/hosting/apis"
 
 class VmHost < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :sshable, key: :id
   one_to_many :vms
   one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address
+  one_to_one :hetzner_host, key: :id
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
 
   include ResourceMethods
@@ -17,6 +19,10 @@ class VmHost < Sequel::Model
 
   def vm_addresses
     vms.filter_map(&:assigned_vm_address)
+  end
+
+  def provider
+    hetzner_host ? HetznerHost::PROVIDER_NAME : nil
   end
 
   # Compute the IPv6 Subnet that can be used to address the host
@@ -128,7 +134,8 @@ class VmHost < Sequel::Model
     assigned_host_addresses.find { |a| a.ip.version == 4 }
   end
 
-  def create_addresses(ip_records)
+  def create_addresses(ip_records: nil)
+    ip_records ||= Hosting::Apis.pull_ips(self)
     return if ip_records.nil? || ip_records.empty?
 
     DB.transaction do
@@ -138,14 +145,19 @@ class VmHost < Sequel::Model
         is_failover_ip = ip_record[:is_failover]
 
         next if assigned_subnets.any? { |a| a.cidr.to_s == ip_addr }
+
         # we need to find if it was previously created
-        # if it was, we need to update the routed_to_host_id
+        # if it was, we need to update the routed_to_host_id but only if there is no VM that's using it
         # if it wasn't, we need to create it
         adr = Address.where(cidr: ip_addr).first
         if adr && is_failover_ip
+          if adr.assigned_vm_address.count > 0
+            fail "BUG: failover ip #{ip_addr} is already assigned to a vm"
+          end
+
           adr.update(routed_to_host_id: id)
         else
-          if Sshable.where(host: source_host_ip).first.nil?
+          if Sshable.where(host: source_host_ip).count == 0
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
           adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
@@ -153,6 +165,13 @@ class VmHost < Sequel::Model
 
         AssignedHostAddress.create(host_id: id, ip: ip_addr, address_id: adr.id) unless is_failover_ip
       end
+    end
+  end
+
+  def hetznerify(server_id)
+    DB.transaction do
+      HetznerHost.create(server_identifier: server_id) { _1.id = id }
+      create_addresses
     end
   end
 end
