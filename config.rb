@@ -64,4 +64,8 @@ module Config
   override :timeout, 10, int
   override :versioning, false, bool
   override :allowed_vm_host_users, "", array(string)
+  optional :hetzner_user, string, clear: true
+  optional :hetzner_password, string, clear: true
+  override :providers, "hetzner", array(string)
+  override :hetzner_connection_string, "https://robot-ws.your-server.de", string
 end

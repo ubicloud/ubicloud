@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "vm_host" do
-  let(:vm_host) { Prog::Vm::HostNexus.assemble("127.0.0.1").vm_host }
+  let(:vm_host) { Prog::Vm::HostNexus.assemble("127.0.0.1", provider: "test").vm_host }
 
   it "can not access without login" do
     visit "/vm-host"

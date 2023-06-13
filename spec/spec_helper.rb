@@ -17,7 +17,9 @@
 # See https://rubydoc.info/gems/rspec-core/RSpec/Core/Configuration
 ENV["RACK_ENV"] = "test"
 ENV["MAIL_DRIVER"] = "test"
-
+ENV["HETZNER_CONNECTION_STRING"] = "https://robot-ws.your-server.de"
+ENV["HETZNER_USER"] = "user1"
+ENV["HETZNER_PASSWORD"] = "pass"
 require_relative "../loader"
 require_relative "./coverage_helper"
 require "rspec"
@@ -25,6 +27,7 @@ require "database_cleaner/sequel"
 require "logger"
 require "sequel/core"
 require "warning"
+require "webmock/rspec"
 
 # DatabaseCleaner assumes the usual DATABASE_URL, but the
 # "roda-sequel-stack" way names each environment *and* application
