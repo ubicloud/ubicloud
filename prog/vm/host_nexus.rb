@@ -65,7 +65,17 @@ class Prog::Vm::HostNexus < Prog::Base
 
   def wait_setup_hugepages
     reap
+    hop :setup_spdk if leaf?
+    donate
+  end
 
+  def setup_spdk
+    bud Prog::SetupSpdk
+    hop :wait_setup_spdk
+  end
+
+  def wait_setup_spdk
+    reap
     if leaf?
       vm_host.update(allocation_state: "accepting")
       hop :wait

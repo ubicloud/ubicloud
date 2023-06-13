@@ -118,16 +118,14 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#wait_setup_hugepages" do
-    it "enters the wait state and toggled the VM acceptance state if all tasks are done" do
+    it "enters the setup_spdk state" do
       expect(nx).to receive(:reap).and_return([])
       expect(nx).to receive(:leaf?).and_return true
       vmh = instance_double(VmHost)
       nx.instance_variable_set(:@vm_host, vmh)
 
-      expect(vmh).to receive(:update).with(allocation_state: "accepting")
-
       expect { nx.wait_setup_hugepages }.to raise_error(Prog::Base::Hop) do
-        expect(_1.new_label).to eq("wait")
+        expect(_1.new_label).to eq("setup_spdk")
       end
     end
 
@@ -137,6 +135,38 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:donate).and_call_original
 
       expect { nx.wait_setup_hugepages }.to raise_error Prog::Base::Nap
+    end
+  end
+
+  describe "#setup_spdk" do
+    it "buds the spdk program" do
+      expect(nx).to receive(:bud).with(Prog::SetupSpdk)
+      expect { nx.setup_spdk }.to raise_error(Prog::Base::Hop) do
+        expect(_1.new_label).to eq("wait_setup_spdk")
+      end
+    end
+  end
+
+  describe "#wait_setup_spdk" do
+    it "enters the wait state and toggled the VM acceptance state if all tasks are done" do
+      expect(nx).to receive(:reap).and_return([])
+      expect(nx).to receive(:leaf?).and_return true
+      vmh = instance_double(VmHost)
+      nx.instance_variable_set(:@vm_host, vmh)
+
+      expect(vmh).to receive(:update).with(allocation_state: "accepting")
+
+      expect { nx.wait_setup_spdk }.to raise_error(Prog::Base::Hop) do
+        expect(_1.new_label).to eq("wait")
+      end
+    end
+
+    it "donates its time if child strands are still running" do
+      expect(nx).to receive(:reap).and_return([])
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_setup_spdk }.to raise_error Prog::Base::Nap
     end
   end
 

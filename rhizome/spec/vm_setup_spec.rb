@@ -23,25 +23,32 @@ RSpec.describe VmSetup do
 
   describe "#boot_disk" do
     it "can download an image before converting it" do
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/")
+
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/opt/ubuntu-jammy.qcow2.tmp")
       end.and_yield
 
+      boot_raw = "/var/storage/test/boot.raw"
+
       expect(vs).to receive(:r).with("curl -L10 -o /opt/ubuntu-jammy.qcow2.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
-      expect(vs).to receive(:r).with("truncate -s +10G /vm/test/boot.raw")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /opt/ubuntu-jammy.qcow2 /vm/test/boot.raw")
+      expect(vs).to receive(:r).with("truncate -s +10G #{boot_raw}")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /opt/ubuntu-jammy.qcow2 #{boot_raw}")
+      expect(vs).to receive(:r).with(/setfacl.*boot.raw/)
+      expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create/)
+      expect(vs).to receive(:r).with(/.*rpc.py.*vhost_create_blk_controller/)
 
       expect(FileUtils).to receive(:mv).with("/opt/ubuntu-jammy.qcow2.tmp", "/opt/ubuntu-jammy.qcow2")
-      expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/boot.raw")
-      vs.boot_disk("ubuntu-jammy")
+      expect(FileUtils).to receive(:chown).with("test", "test", boot_raw)
+      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", boot_raw)
+      expect(FileUtils).to receive(:ln_s).with("/var/storage/vhost/test", "/var/storage/test/vhost.sock")
+      expect(vs).to receive(:r).with(/setfacl.*vhost.sock/)
+      vs.storage("ubuntu-jammy")
     end
 
     it "can use an image that's already downloaded" do
       expect(File).to receive(:exist?).with("/opt/almalinux-9.1.qcow2").and_return(true)
-      expect(vs).to receive(:r).with("truncate -s +10G /vm/test/boot.raw")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /opt/almalinux-9.1.qcow2 /vm/test/boot.raw")
-      expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/boot.raw")
-      vs.boot_disk("almalinux-9.1")
+      vs.download_boot_image("almalinux-9.1")
     end
   end
 end

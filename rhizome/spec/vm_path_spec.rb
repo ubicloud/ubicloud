@@ -14,23 +14,23 @@ RSpec.describe VmPath do
   end
 
   it "will snakeify difficult characters" do
-    expect(vp.boot_raw).to eq("/vm/test'vm/boot.raw")
+    expect(vp.serial_log).to eq("/vm/test'vm/serial.log")
   end
 
   it "can read file contents" do
-    expect(File).to receive(:read).with(vp.boot_raw).and_return("\n")
-    expect(vp.read_boot_raw).to eq("")
+    expect(File).to receive(:read).with(vp.serial_log).and_return("\n")
+    expect(vp.read_serial_log).to eq("")
   end
 
   context "when writing" do
     it "affixes a newline if it is missing" do
-      expect(File).to receive(:write).with(vp.boot_raw, "test content\n")
-      vp.write_boot_raw("test content")
+      expect(File).to receive(:write).with(vp.serial_log, "test content\n")
+      vp.write_serial_log("test content")
     end
 
     it "doesn't add more newlines than necessary" do
-      expect(File).to receive(:write).with(vp.boot_raw, "test content\n")
-      vp.write_boot_raw("test content\n")
+      expect(File).to receive(:write).with(vp.serial_log, "test content\n")
+      vp.write_serial_log("test content\n")
     end
   end
 end
