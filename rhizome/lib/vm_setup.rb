@@ -7,6 +7,7 @@ require "fileutils"
 require "netaddr"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
+require_relative "spdk"
 require "json"
 
 class VmSetup
@@ -42,7 +43,7 @@ class VmSetup
     interfaces
     routes(gua, private_subnets, ndp_needed)
     cloudinit(unix_user, public_key, private_subnets)
-    boot_disk(boot_image)
+    storage(boot_image)
     hugepages(mem_gib)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib)
     forwarding
@@ -211,7 +212,35 @@ runcmd:
 EOS
   end
 
-  def boot_disk(boot_image)
+  def storage(boot_image)
+    FileUtils.mkdir_p vp.storage("")
+
+    image_path = download_boot_image(boot_image)
+
+    # Images are presumed to be atomically renamed into the path,
+    # i.e. no partial images will be passed to qemu-image.
+    r "qemu-img convert -p -f qcow2 -O raw #{image_path.shellescape} #{vp.q_boot_raw}"
+    r "truncate -s +10G #{vp.q_boot_raw}"
+    FileUtils.chown @vm_name, @vm_name, vp.boot_raw
+
+    # don't allow others to read user's disk
+    FileUtils.chmod "u=rw,g=r,o=", vp.boot_raw
+
+    # allow spdk to access the image
+    r "setfacl -m u:spdk:rw #{vp.q_boot_raw}"
+
+    q_bdev = "boot_#{@vm_name}".shellescape
+    r "#{Spdk.rpc_py} bdev_aio_create #{vp.q_boot_raw} #{q_bdev} 512"
+    r "#{Spdk.rpc_py} vhost_create_blk_controller #{@vm_name} #{q_bdev}"
+
+    # create a symlink to the socket in the per vm storage dir
+    FileUtils.ln_s Spdk.vhost_sock(@vm_name), vp.vhost_sock
+
+    # allow vm user to access the vhost socket
+    r "setfacl -m u:#{@vm_name}:rw #{vp.q_vhost_sock}"
+  end
+
+  def download_boot_image(boot_image)
     urls = {
       "ubuntu-jammy" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
       "almalinux-9.1" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.1-20221118.x86_64.qcow2",
@@ -236,11 +265,7 @@ EOS
       FileUtils.mv(temp_path, image_path)
     end
 
-    # Images are presumed to be atomically renamed into the path,
-    # i.e. no partial images will be passed to qemu-image.
-    r "qemu-img convert -p -f qcow2 -O raw #{image_path.shellescape} #{vp.q_boot_raw}"
-    r "truncate -s +10G #{vp.q_boot_raw}"
-    FileUtils.chown @vm_name, @vm_name, vp.boot_raw
+    image_path
   end
 
   # Unnecessary if host has this set before creating the netns, but
@@ -295,7 +320,7 @@ ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
 --api-socket path=#{vp.ch_api_sock} \
 --kernel #{CloudHypervisor.firmware} \
---disk path=#{vp.boot_raw} \
+--disk vhost_user=true,socket=#{vp.q_vhost_sock},num_queues=1,queue_size=256 \
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \

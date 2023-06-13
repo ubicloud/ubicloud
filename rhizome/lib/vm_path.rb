@@ -39,6 +39,10 @@ class VmPath
     File.join("", "vm", @vm_name, n)
   end
 
+  def storage(n)
+    File.join("", "var", "storage", @vm_name, n)
+  end
+
   # Define path, q_path, read, write methods for files in
   # `/vm/#{vm_name}`
   %w[
@@ -46,7 +50,6 @@ class VmPath
     guest_ephemeral
     clover_ephemeral
     dnsmasq.conf
-    boot.raw
     meta-data
     network-config
     user-data
@@ -84,6 +87,27 @@ class VmPath
     fail "BUG" if method_defined?(write_method_name)
     define_method write_method_name do |s|
       write(home(file_name), s)
+    end
+  end
+
+  # Define path, q_path methods for files in `/var/storage/#{vm_name}`
+  %w[
+    vhost.sock
+    boot.raw
+  ].each do |file_name|
+    method_name = file_name.tr(".-", "_")
+    fail "BUG" if method_defined?(method_name)
+
+    # Method producing a path, e.g. #user_data
+    define_method method_name do
+      storage(file_name)
+    end
+
+    # Method producing a shell-quoted path, e.g. #q_user_data.
+    quoted_method_name = "q_" + method_name
+    fail "BUG" if method_defined?(quoted_method_name)
+    define_method quoted_method_name do
+      storage(file_name).shellescape
     end
   end
 end
