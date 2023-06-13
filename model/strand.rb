@@ -90,7 +90,8 @@ SQL
       e
     rescue Prog::Base::Hop => hp
       update(**hp.strand_update_args)
-      e
+
+      hp
     rescue Prog::Base::Exit => ext
       update(exitval: ext.exitval, retval: nil)
       if parent_id.nil?
