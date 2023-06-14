@@ -71,7 +71,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.unix_user = "test_user"
       vm.public_key = "test_ssh_key"
       vm.local_vetho_ip = "169.254.0.0"
-      expect(vm).to receive(:private_subnets).and_return [NetAddr.parse_net("fd10:9b0b:6b4b:8fbb::/64")]
+      expect(vm).to receive(:vm_private_subnet).and_return [VmPrivateSubnet.new(private_subnet: "fd10:9b0b:6b4b:8fbb::/64")]
       expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
 
       sshable = instance_spy(Sshable)
