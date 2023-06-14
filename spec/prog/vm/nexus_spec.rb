@@ -14,7 +14,7 @@ RSpec.describe Prog::Vm::Nexus do
   let(:vm) { Vm.new(size: "m5a.2x").tap { _1.id = "a410a91a-dc31-4119-9094-3c6a1fb49601" } }
   let(:tg) { TagSpace.create(name: "default").tap { _1.associate_with_tag_space(_1) } }
 
-  describe "#assemble" do
+  describe ".assemble" do
     it "fails if there is no tagspace" do
       expect {
         described_class.assemble("some_ssh_key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")

@@ -36,16 +36,19 @@ class Prog::Vm::HostNexus < Prog::Base
     reap.each do |st|
       case st.fetch(:prog)
       when "LearnMemory"
-        fail "BUG" unless (mem_gib = st.dig(:exitval, "mem_gib"))
+        fail "BUG: mem_gib not set" unless (mem_gib = st.dig(:exitval, "mem_gib"))
         vm_host.update(total_mem_gib: mem_gib)
       when "LearnCores"
-        fail "BUG" unless (total_sockets = st.dig(:exitval, "total_sockets"))
-        fail "BUG" unless (total_nodes = st.dig(:exitval, "total_nodes"))
-        fail "BUG" unless (total_cores = st.dig(:exitval, "total_cores"))
-        fail "BUG" unless (total_cpus = st.dig(:exitval, "total_cpus"))
+        kwargs = {
+          total_sockets: st.dig(:exitval, "total_sockets"),
+          total_nodes: st.dig(:exitval, "total_nodes"),
+          total_cores: st.dig(:exitval, "total_cores"),
+          total_cpus: st.dig(:exitval, "total_cpus")
+        }
 
-        vm_host.update(total_sockets: total_sockets, total_nodes: total_nodes,
-          total_cores: total_cores, total_cpus: total_cpus)
+        fail "BUG: one of the LearnCores fields is not set" if kwargs.value?(nil)
+
+        vm_host.update(**kwargs)
       end
     end
 
