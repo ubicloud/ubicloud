@@ -51,6 +51,11 @@ RSpec.describe VmHost do
     }.to raise_error RuntimeError, "BUG: host prefix must be is shorter than reserved prefix"
   end
 
+  it "has no ipv6 reserved network when vendor used NDP" do
+    expect(vh).to receive(:ip6).and_return(nil)
+    expect(vh.ip6_reserved_network).to be_nil
+  end
+
   it "tries to get another random network if the proposal matches the reserved nework" do
     expect(SecureRandom).to receive(:bytes).and_return("\0\0")
     expect(SecureRandom).to receive(:bytes).and_call_original

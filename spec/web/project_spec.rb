@@ -254,6 +254,19 @@ RSpec.describe Clover, "project" do
         expect(current_policy).to eq(project.access_policies.first.body)
       end
 
+      it "can not update policy when its root is not JSON object" do
+        current_policy = project.access_policies.first.body
+
+        visit "#{project.path}/policy"
+
+        fill_in "body", with: "[{}, {}]"
+        click_button "Update"
+
+        expect(page).to have_content "The policy isn't a valid JSON object."
+        expect(page).to have_content "[{}, {}]"
+        expect(current_policy).to eq(project.access_policies.first.body)
+      end
+
       it "raises not found when access policy not exists" do
         expect(AccessPolicy).to receive(:[]).and_return(nil)
 
