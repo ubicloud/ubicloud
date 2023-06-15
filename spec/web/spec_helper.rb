@@ -39,7 +39,7 @@ def create_account(email = "user@example.com", password = "0123456789")
 
   account = Account.create(email: email, status_id: 2)
   DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
-  account.create_tag_space_with_default_policy("#{account.username}_tag_space")
+  account.create_project_with_default_policy("#{account.username}-project")
   account
 end
 

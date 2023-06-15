@@ -13,12 +13,12 @@ class Clover
     end
 
     r.post true do
-      tag_space_id = ULID.parse(r.params["tag-space-id"]).to_uuidish
-      Authorization.authorize(rodauth.session_value, "Vm:create", tag_space_id)
+      project_id = ULID.parse(r.params["project-id"]).to_uuidish
+      Authorization.authorize(rodauth.session_value, "Vm:create", project_id)
 
       st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
-        tag_space_id,
+        project_id,
         name: r.params["name"],
         unix_user: r.params["user"],
         size: r.params["size"],
@@ -33,7 +33,7 @@ class Clover
 
     r.on "create" do
       r.get true do
-        @tag_spaces = Serializers::Web::TagSpace.new(:default).serialize(TagSpace.authorized(rodauth.session_value, "Vm:create").all)
+        @projects = Serializers::Web::Project.new(:default).serialize(Project.authorized(rodauth.session_value, "Vm:create").all)
 
         view "vm/create"
       end

@@ -1,32 +1,32 @@
-<% @page_title = "#{@tag_space[:name]} - Users" %>
+<% @page_title = "#{@project[:name]} - Users" %>
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
     <%== render(
       "components/breadcrumb",
       locals: {
-        back: "/tag-space",
-        parts: [["Tag Spaces", "/tag-space"], [@tag_space[:name], @tag_space[:path]], %w[Users #]]
+        back: "/project",
+        parts: [%w[Projects /project], [@project[:name], @project[:path]], %w[Users #]]
       }
     ) %>
-    <%== render("components/page_header", locals: { title: @tag_space[:name] }) %>
+    <%== render("components/page_header", locals: { title: @project[:name] }) %>
   </div>
 
   <main class="mt-4 md:mt-8">
     <div class="max-w-screen-xl pb-6 lg:pb-16">
       <div class="overflow-hidden rounded-lg bg-white shadow">
         <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
-          <%== render("tag_space/show_sidebar") %>
+          <%== render("project/show_sidebar") %>
           <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
             <!-- Invite user -->
-            <form action="<%= "#{@tag_space[:path]}/user" %>" role="form" method="POST">
-              <%== csrf_tag("#{@tag_space[:path]}/user") %>
+            <form action="<%= "#{@project[:path]}/user" %>" role="form" method="POST">
+              <%== csrf_tag("#{@project[:path]}/user") %>
               <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
                 <div>
                   <h2 class="text-lg font-medium leading-6 text-gray-900">Invite a new user</h2>
                   <p class="mt-1 text-sm text-gray-500">
-                    You can invite new users to your tag space, though initially they will not have any permissions.
-                    You may modify the tag space access policy to grant permissions to these new users.
+                    You can invite new users to your project, though initially they will not have any permissions. You
+                    may modify the project access policy to grant permissions to these new users.
                   </p>
                 </div>
                 <div class="grid grid-cols-12 gap-6">
@@ -55,7 +55,7 @@
                 <h2 class="text-lg font-medium leading-6 text-gray-900">Users</h2>
                 <p class="mt-1 text-sm text-gray-500">
                   Access policies can be utilized to grant permissions to these users. While they will be able to see
-                  that they are a part of the tag space, they will not have access to its details without the proper
+                  that they are a part of the project, they will not have access to its details without the proper
                   permissions.
                 </p>
               </div>
@@ -75,10 +75,10 @@
                       <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                         <button
                           type="button"
-                          data-url="<%= "#{@tag_space[:path]}/user/#{user[:ulid]}" %>"
-                          data-csrf="<%= csrf_token("#{@tag_space[:path]}/user/#{user[:ulid]}", "DELETE") %>"
+                          data-url="<%= "#{@project[:path]}/user/#{user[:ulid]}" %>"
+                          data-csrf="<%= csrf_token("#{@project[:path]}/user/#{user[:ulid]}", "DELETE") %>"
                           data-confirmation="<%= user[:email] %>"
-                          data-redirect="<%= "#{@tag_space[:path]}/user" %>"
+                          data-redirect="<%= "#{@project[:path]}/user" %>"
                           class="delete-btn text-rose-600 hover:text-rose-900"
                         >
                           Remove

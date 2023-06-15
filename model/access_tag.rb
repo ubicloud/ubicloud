@@ -3,6 +3,6 @@
 require_relative "../model"
 
 class AccessTag < Sequel::Model
-  many_to_one :tag_space
+  many_to_one :project
   one_to_many :applied_tags
 end

@@ -7,13 +7,13 @@ require "ulid"
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
 
-  def self.assemble(public_key, tag_space_id, name: nil, size: "m5a.2x",
+  def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnets: [])
 
-    tag_space = TagSpace[tag_space_id]
-    unless tag_space || Config.development?
-      fail "No existing tag space"
+    project = Project[project_id]
+    unless project || Config.development?
+      fail "No existing project"
     end
 
     id = SecureRandom.uuid
@@ -29,7 +29,7 @@ class Prog::Vm::Nexus < Prog::Base
     DB.transaction do
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, size: size, location: location, boot_image: boot_image) { _1.id = id }
-      vm.associate_with_tag_space(tag_space)
+      vm.associate_with_project(project)
       private_subnets.each do
         VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
       end
@@ -268,7 +268,7 @@ SQL
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores
       )
-      vm.tag_spaces.map { vm.dissociate_with_tag_space(_1) }
+      vm.projects.map { vm.dissociate_with_project(_1) }
       # YYY: We should remove existing tunnels on dataplane too. Not hopping to
       # :refresh_mesh label directly, because it doesn't remove deleted ones, only
       # create missing ones.

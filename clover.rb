@@ -195,7 +195,7 @@ class Clover < Roda
     create_account_set_password? true
     after_create_account do
       current_user = Account[account_id]
-      current_user.create_tag_space_with_default_policy("#{current_user.username}_default_tag_space")
+      current_user.create_project_with_default_policy("#{current_user.username}-default-project")
     end
 
     reset_password_view { view "auth/reset_password", "Request Password" }

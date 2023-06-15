@@ -1,22 +1,22 @@
-<% @page_title = @tag_space[:name] %>
+<% @page_title = @project[:name] %>
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
     <%== render(
       "components/breadcrumb",
       locals: {
-        back: "/tag-space",
-        parts: [["Tag Spaces", "/tag-space"], [@tag_space[:name], @tag_space[:path]], %w[Details #]]
+        back: "/project",
+        parts: [%w[Projects /project], [@project[:name], @project[:path]], %w[Details #]]
       }
     ) %>
-    <%== render("components/page_header", locals: { title: @tag_space[:name] }) %>
+    <%== render("components/page_header", locals: { title: @project[:name] }) %>
   </div>
 
   <main class="mt-4 md:mt-8">
     <div class="max-w-screen-xl pb-6 lg:pb-16">
       <div class="overflow-hidden rounded-lg bg-white shadow">
         <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
-          <%== render("tag_space/show_sidebar") %>
+          <%== render("project/show_sidebar") %>
           <div class="divide-y divide-gray-200 lg:col-span-9 pb-10">
             <!-- Details -->
             <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
@@ -27,30 +27,30 @@
                 <dl class="sm:divide-y sm:divide-gray-200">
                   <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                     <dt class="text-sm font-medium text-gray-500">ID</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @tag_space[:ulid] %></dd>
+                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @project[:ulid] %></dd>
                   </div>
                   <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                     <dt class="text-sm font-medium text-gray-500">Name</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @tag_space[:name] %></dd>
+                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @project[:name] %></dd>
                   </div>
                 </dl>
               </div>
             </div>
             <!-- Delete -->
-            <% if Authorization.has_power?(rodauth.session_value, "TagSpace:delete", @tag_space[:id]) %>
+            <% if Authorization.has_permission?(rodauth.session_value, "Project:delete", @project[:id]) %>
               <div>
                 <div class="px-4 py-6 sm:px-6">
-                  <h2 class="text-lg font-medium leading-6 text-gray-900">Delete tag space</h2>
+                  <h2 class="text-lg font-medium leading-6 text-gray-900">Delete project</h2>
                   <p class="mt-1 text-sm text-gray-500">
-                    This action will permanently delete this tag space. Deleted data cannot be recovered. Use it
+                    This action will permanently delete this project. Deleted data cannot be recovered. Use it
                     carefully.
                   </p>
                   <button
                     type="button"
                     data-url="<%= request.path %>"
                     data-csrf="<%= csrf_token(request.path, "DELETE") %>"
-                    data-confirmation="<%= @tag_space[:name] %>"
-                    data-redirect="/tag-space"
+                    data-confirmation="<%= @project[:name] %>"
+                    data-redirect="/project"
                     class="delete-btn inline-flex items-center mt-2 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
                   >
                     <svg class="-ml-0.5 mr-1.5 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

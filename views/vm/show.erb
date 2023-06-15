@@ -27,8 +27,8 @@
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm[:name] %></dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
-                <dt class="text-sm font-medium text-gray-500">Tag Space</dt>
-                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm[:tag_spaces].map { _1[:name] }.join(", ") %></dd>
+                <dt class="text-sm font-medium text-gray-500">Project</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm[:projects].map { _1[:name] }.join(", ") %></dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">Provider & Location</dt>
@@ -49,7 +49,7 @@
             </dl>
           </div>
         </div>
-        <% if Authorization.has_power?(rodauth.session_value, "Vm:delete", @vm[:id]) %>
+        <% if Authorization.has_permission?(rodauth.session_value, "Vm:delete", @vm[:id]) %>
           <div class="mt-6 bg-white shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">
               <div class="sm:flex sm:items-center sm:justify-between">
