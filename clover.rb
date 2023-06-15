@@ -152,12 +152,17 @@ class Clover < Roda
     cookie_options: {secure: !(Config.development? || Config.test?)},
     secret: Config.clover_session_secret
 
-  autoload_normal("serializers/web", include_first: true)
-  plugin :autoload_hash_branches
-  Dir["routes/*"].each do |f|
-    autoload_hash_branch(File.basename(f, ".rb").tr("_", "-"), f)
+  if Config.production?
+    # :nocov:
+    Unreloader.require("routes")
+    # :nocov:
+  else
+    plugin :autoload_hash_branches
+    Dir["routes/*"].each do |f|
+      autoload_hash_branch(File.basename(f, ".rb").tr("_", "-"), f)
+    end
+    Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
   end
-  Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
 
   plugin :rodauth do
     enable :argon2, :change_login, :change_password, :close_account, :create_account,
