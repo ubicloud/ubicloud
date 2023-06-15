@@ -5,17 +5,17 @@ require_relative "spec_helper"
 RSpec.describe Clover, "vm" do
   let(:user) { create_account }
 
-  let(:tag_space) { user.create_tag_space_with_default_policy("tag-space-1") }
+  let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:tag_space_wo_permissions) { user.create_tag_space_with_default_policy("tag-space-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
 
   let(:vm) do
-    vm = Prog::Vm::Nexus.assemble("dummy-public-key", tag_space.id, name: "dummy-vm-1").vm
+    vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").vm
     vm.update(ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
     vm.reload # without reload ephemeral_net6 is string and can't call .network
   end
 
-  let(:vm_wo_permission) { Prog::Vm::Nexus.assemble("dummy-public-key", tag_space_wo_permissions.id, name: "dummy-vm-2").vm }
+  let(:vm_wo_permission) { Prog::Vm::Nexus.assemble("dummy-public-key", project_wo_permissions.id, name: "dummy-vm-2").vm }
 
   describe "unauthenticated" do
     it "can not list without login" do
@@ -60,13 +60,13 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "can create new virtual machine" do
-        tag_space
+        project
         visit "/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
-        select tag_space.name, from: "tag-space-id"
+        select project.name, from: "project-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
@@ -79,13 +79,13 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not create virtual machine with invalid name" do
-        tag_space
+        project
         visit "/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: "invalid name"
-        select tag_space.name, from: "tag-space-id"
+        select project.name, from: "project-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
@@ -98,13 +98,13 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not create virtual machine with same name" do
-        tag_space
+        project
         visit "/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: vm.name
-        select tag_space.name, from: "tag-space-id"
+        select project.name, from: "project-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
@@ -115,15 +115,15 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "name is already taken"
       end
 
-      it "can not select tag space when does not have permissions" do
-        tag_space
-        tag_space_wo_permissions
+      it "can not select project when does not have permissions" do
+        project
+        project_wo_permissions
         visit "/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
-        select tag_space.name, from: "tag-space-id"
-        expect { select tag_space_wo_permissions.name, from: "tag-space-id" }.to raise_error Capybara::ElementNotFound
+        select project.name, from: "project-id"
+        expect { select project_wo_permissions.name, from: "project-id" }.to raise_error Capybara::ElementNotFound
       end
     end
 
@@ -173,9 +173,9 @@ RSpec.describe Clover, "vm" do
 
       it "can not delete virtual machine when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        tag_space_wo_permissions.access_policies.first.update(body: {
+        project_wo_permissions.access_policies.first.update(body: {
           acls: [
-            {subjects: user.hyper_tag_name, powers: ["Vm:view"], objects: tag_space_wo_permissions.hyper_tag_name}
+            {subjects: user.hyper_tag_name, actions: ["Vm:view"], objects: project_wo_permissions.hyper_tag_name}
           ]
         })
 

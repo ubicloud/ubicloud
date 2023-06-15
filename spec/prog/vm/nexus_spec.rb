@@ -12,19 +12,19 @@ RSpec.describe Prog::Vm::Nexus do
 
   let(:st) { Strand.new }
   let(:vm) { Vm.new(size: "m5a.2x").tap { _1.id = "a410a91a-dc31-4119-9094-3c6a1fb49601" } }
-  let(:tg) { TagSpace.create(name: "default").tap { _1.associate_with_tag_space(_1) } }
+  let(:p) { Project.create(name: "default").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
-    it "fails if there is no tagspace" do
+    it "fails if there is no project" do
       expect {
         described_class.assemble("some_ssh_key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      }.to raise_error RuntimeError, "No existing tag space"
+      }.to raise_error RuntimeError, "No existing project"
     end
 
     it "adds the VM to a private subnet if passed" do
       net = NetAddr.parse_net("fd10:9b0b:6b4b:8fbb::/64")
       expect {
-        id = described_class.assemble("some_ssh_key", tg.id, private_subnets: [net]).id
+        id = described_class.assemble("some_ssh_key", p.id, private_subnets: [net]).id
         expect(VmPrivateSubnet[vm_id: id].private_subnet.cmp(net)).to eq 0
       }.to change(VmPrivateSubnet, :count).from(0).to 1
     end

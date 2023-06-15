@@ -2,7 +2,7 @@
 
 require_relative "../model"
 
-class TagSpace < Sequel::Model
+class Project < Sequel::Model
   one_to_many :access_tags
   one_to_many :access_policies
 
@@ -17,6 +17,6 @@ class TagSpace < Sequel::Model
   end
 
   def path
-    "/tag-space/#{ulid}"
+    "/project/#{ulid}"
   end
 end

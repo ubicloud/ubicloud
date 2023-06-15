@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class AccessPolicy < Sequel::Model
-  many_to_one :tag_space
+  many_to_one :project
 
   include ResourceMethods
 end

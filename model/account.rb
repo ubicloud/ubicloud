@@ -18,12 +18,12 @@ class Account < Sequel::Model(:accounts)
 
   include Authorization::TaggableMethods
 
-  def create_tag_space_with_default_policy(name, policy_body = nil)
-    tag_space = TagSpace.create(name: name)
-    tag_space.associate_with_tag_space(tag_space)
-    associate_with_tag_space(tag_space)
-    tag_space.add_access_policy(name: "default", body: policy_body || Authorization.generate_default_acls(hyper_tag_name, tag_space.hyper_tag_name))
-    tag_space
+  def create_project_with_default_policy(name, policy_body = nil)
+    project = Project.create(name: name)
+    project.associate_with_project(project)
+    associate_with_project(project)
+    project.add_access_policy(name: "default", body: policy_body || Authorization.generate_default_acls(hyper_tag_name, project.hyper_tag_name))
+    project
   end
 
   # TODO: probably we need to get name from users

@@ -13,7 +13,7 @@ class Serializers::Web::Vm < Serializers::Base
       location: vm.location,
       size: vm.size,
       ip6: vm.ephemeral_net6&.nth(2),
-      tag_spaces: Serializers::Web::TagSpace.new(:default).serialize(vm.tag_spaces)
+      projects: Serializers::Web::Project.new(:default).serialize(vm.projects)
     }
   end
 

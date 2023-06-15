@@ -35,9 +35,9 @@
                     <%== render(
                       "components/form/select",
                       locals: {
-                        name: "tag-space-id",
-                        label: "Tag Space",
-                        options: @tag_spaces.to_h { |tg| [tg[:ulid], tg[:name]] },
+                        name: "project-id",
+                        label: "Project",
+                        options: @projects.to_h { |p| [p[:ulid], p[:name]] },
                         attributes: {
                           required: true
                         }

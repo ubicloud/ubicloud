@@ -3,38 +3,38 @@
 module Authorization
   class Unauthorized < StandardError; end
 
-  def self.has_power?(subject_id, powers, object_id)
-    !matched_policies(subject_id, powers, object_id).empty?
+  def self.has_permission?(subject_id, actions, object_id)
+    !matched_policies(subject_id, actions, object_id).empty?
   end
 
-  def self.authorize(subject_id, powers, object_id)
-    unless has_power?(subject_id, powers, object_id)
+  def self.authorize(subject_id, actions, object_id)
+    unless has_permission?(subject_id, actions, object_id)
       fail Unauthorized
     end
   end
 
-  def self.authorized_resources(subject_id, powers)
-    matched_policies(subject_id, powers).map { _1[:tagged_id] }
+  def self.authorized_resources(subject_id, actions)
+    matched_policies(subject_id, actions).map { _1[:tagged_id] }
   end
 
-  def self.matched_policies(subject_id, powers, object_id = nil)
+  def self.matched_policies(subject_id, actions, object_id = nil)
     object_filter = if object_id
       Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
     else
       Sequel.lit("")
     end
 
-    DB[<<~SQL, {subject_id: subject_id, powers: Sequel.pg_array(Array(powers)), object_filter: object_filter}].all
-      SELECT object_applied_tags.tagged_id, object_applied_tags.tagged_table, subjects, powers, objects
+    DB[<<~SQL, {subject_id: subject_id, actions: Sequel.pg_array(Array(actions)), object_filter: object_filter}].all
+      SELECT object_applied_tags.tagged_id, object_applied_tags.tagged_table, subjects, actions, objects
       FROM accounts AS subject
         JOIN applied_tag AS subject_applied_tags ON subject.id = subject_applied_tags.tagged_id
           JOIN access_tag AS subject_access_tags ON subject_applied_tags.access_tag_id = subject_access_tags.id
-          JOIN access_policy AS acl ON subject_access_tags.tag_space_id = acl.tag_space_id
-          JOIN jsonb_to_recordset(acl.body->'acls') as items(subjects JSONB, powers JSONB, objects JSONB) ON TRUE
-          JOIN access_tag AS object_access_tags ON subject_access_tags.tag_space_id = object_access_tags.tag_space_id
+          JOIN access_policy AS acl ON subject_access_tags.project_id = acl.project_id
+          JOIN jsonb_to_recordset(acl.body->'acls') as items(subjects JSONB, actions JSONB, objects JSONB) ON TRUE
+          JOIN access_tag AS object_access_tags ON subject_access_tags.project_id = object_access_tags.project_id
           JOIN applied_tag AS object_applied_tags ON object_access_tags.id = object_applied_tags.access_tag_id AND objects ? object_access_tags."name"
       WHERE subject.id = :subject_id
-        AND powers ?| array[:powers]
+        AND actions ?| array[:actions]
         AND subjects ? subject_access_tags."name"
         :object_filter
     SQL
@@ -43,22 +43,22 @@ module Authorization
   def self.generate_default_acls(subject, object)
     {
       acls: [
-        {subjects: [subject], powers: ["TagSpace:view", "TagSpace:delete", "TagSpace:user", "TagSpace:policy"], objects: [object]},
-        {subjects: [subject], powers: ["Vm:view", "Vm:create", "Vm:delete"], objects: [object]}
+        {subjects: [subject], actions: ["Project:view", "Project:delete", "Project:user", "Project:policy"], objects: [object]},
+        {subjects: [subject], actions: ["Vm:view", "Vm:create", "Vm:delete"], objects: [object]}
       ]
     }
   end
 
   module Dataset
-    def authorized(subject_id, powers)
-      where(id: Authorization.authorized_resources(subject_id, powers))
+    def authorized(subject_id, actions)
+      where(id: Authorization.authorized_resources(subject_id, actions))
     end
   end
 
   module HyperTagMethods
     def self.included(base)
       base.class_eval do
-        many_to_many :tag_spaces, join_table: AccessTag.table_name, left_key: :hyper_tag_id, right_key: :tag_space_id
+        many_to_many :projects, join_table: AccessTag.table_name, left_key: :hyper_tag_id, right_key: :project_id
       end
     end
 
@@ -74,40 +74,40 @@ module Authorization
       "#{hyper_tag_prefix}/#{send(hyper_tag_identifier)}"
     end
 
-    def hyper_tag(tag_space)
-      AccessTag.where(tag_space_id: tag_space.id, hyper_tag_id: id).first
+    def hyper_tag(project)
+      AccessTag.where(project_id: project.id, hyper_tag_id: id).first
     end
 
-    def create_hyper_tag(tag_space)
-      AccessTag.create(tag_space_id: tag_space.id, name: hyper_tag_name, hyper_tag_id: id, hyper_tag_table: self.class.table_name)
+    def create_hyper_tag(project)
+      AccessTag.create(project_id: project.id, name: hyper_tag_name, hyper_tag_id: id, hyper_tag_table: self.class.table_name)
     end
 
-    def delete_hyper_tag(tag_space)
+    def delete_hyper_tag(project)
       DB.transaction do
-        tag = hyper_tag(tag_space)
+        tag = hyper_tag(project)
         AppliedTag.where(access_tag_id: tag.id).delete
         tag.delete
       end
     end
 
-    def associate_with_tag_space(tag_space)
-      return if tag_space.nil?
+    def associate_with_project(project)
+      return if project.nil?
 
       DB.transaction do
-        self_tag = create_hyper_tag(tag_space)
-        tag_space_tag = tag_space.hyper_tag(tag_space)
+        self_tag = create_hyper_tag(project)
+        project_tag = project.hyper_tag(project)
         tag(self_tag)
-        tag(tag_space_tag) if self_tag.id != tag_space_tag.id
+        tag(project_tag) if self_tag.id != project_tag.id
       end
     end
 
-    def dissociate_with_tag_space(tag_space)
-      return if tag_space.nil?
+    def dissociate_with_project(project)
+      return if project.nil?
 
       DB.transaction do
-        tag_space_tag = tag_space.hyper_tag(tag_space)
-        untag(tag_space_tag)
-        delete_hyper_tag(tag_space)
+        project_tag = project.hyper_tag(project)
+        untag(project_tag)
+        delete_hyper_tag(project)
       end
     end
   end

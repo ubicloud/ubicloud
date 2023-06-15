@@ -2,23 +2,23 @@
 
 require_relative "spec_helper"
 
-RSpec.describe Clover, "tag_space" do
+RSpec.describe Clover, "project" do
   let(:user) { create_account }
   let(:user2) { create_account("user2@example.com") }
 
-  let(:tag_space) { user.create_tag_space_with_default_policy("tag-space-1") }
+  let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:tag_space_wo_permissions) { user.create_tag_space_with_default_policy("tag-space-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
 
   describe "unauthenticated" do
     it "can not list without login" do
-      visit "/tag-space"
+      visit "/project"
 
       expect(page.title).to eq("Ubicloud - Login")
     end
 
     it "can not create without login" do
-      visit "/tag-space/create"
+      visit "/project/create"
 
       expect(page.title).to eq("Ubicloud - Login")
     end
@@ -30,37 +30,37 @@ RSpec.describe Clover, "tag_space" do
     end
 
     describe "list" do
-      it "can list no tag spaces" do
+      it "can list no projects" do
         expect(Account).to receive(:[]).and_return(user).twice
-        expect(user).to receive(:tag_spaces).and_return([])
+        expect(user).to receive(:projects).and_return([])
 
-        visit "/tag-space"
+        visit "/project"
 
-        expect(page.title).to eq("Ubicloud - Tag Spaces")
-        expect(page).to have_content "No tag spaces"
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "No projects"
 
-        click_link "New Tag Space"
-        expect(page.title).to eq("Ubicloud - Create Tag Space")
+        click_link "New Project"
+        expect(page.title).to eq("Ubicloud - Create Project")
       end
 
-      it "can not list tag spaces when does not invited" do
-        tag_space
-        new_tag_space = user2.create_tag_space_with_default_policy("tag-space-3")
+      it "can not list projects when does not invited" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
 
-        visit "/tag-space"
+        visit "/project"
 
-        expect(page.title).to eq("Ubicloud - Tag Spaces")
-        expect(page).to have_content tag_space.name
-        expect(page).not_to have_content new_tag_space.name
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content project.name
+        expect(page).not_to have_content new_project.name
       end
     end
 
     describe "create" do
-      it "can create new tag space" do
-        name = "new-tag-space"
-        visit "/tag-space/create"
+      it "can create new project" do
+        name = "new-project"
+        visit "/project/create"
 
-        expect(page.title).to eq("Ubicloud - Create Tag Space")
+        expect(page.title).to eq("Ubicloud - Create Project")
 
         fill_in "Name", with: name
         click_button "Create"
@@ -68,36 +68,36 @@ RSpec.describe Clover, "tag_space" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_content name
 
-        tag_space = TagSpace[name: name]
-        expect(tag_space.access_tags.count).to be 2
-        expect(tag_space.access_policies.count).to be 1
-        expect(tag_space.applied_access_tags.count).to be 1
-        expect(user.hyper_tag(tag_space)).to exist
+        project = Project[name: name]
+        expect(project.access_tags.count).to be 2
+        expect(project.access_policies.count).to be 1
+        expect(project.applied_access_tags.count).to be 1
+        expect(user.hyper_tag(project)).to exist
       end
     end
 
     describe "show - details" do
-      it "can show tag space details" do
-        tag_space
-        visit "/tag-space"
+      it "can show project details" do
+        project
+        visit "/project"
 
-        expect(page.title).to eq("Ubicloud - Tag Spaces")
-        expect(page).to have_content tag_space.name
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content project.name
 
-        click_link "Show", href: tag_space.path
+        click_link "Show", href: project.path
 
-        expect(page.title).to eq("Ubicloud - #{tag_space.name}")
-        expect(page).to have_content tag_space.name
+        expect(page.title).to eq("Ubicloud - #{project.name}")
+        expect(page).to have_content project.name
       end
 
       it "raises forbidden when does not have permissions" do
-        tag_space_wo_permissions
-        visit "/tag-space"
+        project_wo_permissions
+        visit "/project"
 
-        expect(page.title).to eq("Ubicloud - Tag Spaces")
-        expect(page).to have_content tag_space_wo_permissions.name
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content project_wo_permissions.name
 
-        click_link "Show", href: tag_space_wo_permissions.path
+        click_link "Show", href: project_wo_permissions.path
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -105,7 +105,7 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "raises not found when virtual machine not exists" do
-        visit "/tag-space/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "/project/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Page not found")
         expect(page.status_code).to eq(404)
@@ -114,26 +114,26 @@ RSpec.describe Clover, "tag_space" do
     end
 
     describe "show - users" do
-      it "can show tag space users" do
-        visit tag_space.path
+      it "can show project users" do
+        visit project.path
 
         click_link "Users"
 
-        expect(page.title).to eq("Ubicloud - #{tag_space.name} - Users")
+        expect(page.title).to eq("Ubicloud - #{project.name} - Users")
         expect(page).to have_content user.email
       end
 
       it "raises forbidden when does not have permissions" do
-        tag_space_wo_permissions
-        visit "#{tag_space_wo_permissions.path}/user"
+        project_wo_permissions
+        visit "#{project_wo_permissions.path}/user"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
       end
 
-      it "can invite new user to tag space" do
-        visit "#{tag_space.path}/user"
+      it "can invite new user to project" do
+        visit "#{project.path}/user"
 
         expect(page).to have_content user.email
         expect(page).not_to have_content user2.email
@@ -146,8 +146,8 @@ RSpec.describe Clover, "tag_space" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
-      it "can invite new existing email to tag space and nothing happens" do
-        visit "#{tag_space.path}/user"
+      it "can invite new existing email to project and nothing happens" do
+        visit "#{project.path}/user"
 
         expect(page).to have_content user.email
 
@@ -159,10 +159,10 @@ RSpec.describe Clover, "tag_space" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
-      it "can remove user from tag space" do
-        user2.associate_with_tag_space(tag_space)
+      it "can remove user from project" do
+        user2.associate_with_project(project)
 
-        visit "#{tag_space.path}/user"
+        visit "#{project.path}/user"
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
@@ -172,32 +172,32 @@ RSpec.describe Clover, "tag_space" do
         btn = find "#user-#{user2.ulid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Removing #{user2.email} from #{tag_space.name}"}.to_json)
+        expect(page.body).to eq({message: "Removing #{user2.email} from #{project.name}"}.to_json)
 
-        visit "#{tag_space.path}/user"
+        visit "#{project.path}/user"
         expect(page).to have_content user.email
         expect(page).not_to have_content user2.email
       end
 
       it "raises bad request when it's the last user" do
         user
-        visit "#{tag_space.path}/user"
+        visit "#{project.path}/user"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
         btn = find "#user-#{user.ulid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "You can't remove the last user from '#{tag_space.name}' tag space. Delete tag space instead."}.to_json)
+        expect(page.body).to eq({message: "You can't remove the last user from '#{project.name}' project. Delete project instead."}.to_json)
 
-        visit "#{tag_space.path}/user"
+        visit "#{project.path}/user"
         expect(page).to have_content user.email
       end
 
       it "raises not found when user not exists" do
         expect(Account).to receive(:[]).and_return(nil).twice
 
-        visit "#{tag_space.path}/user/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/user/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Page not found")
         expect(page.status_code).to eq(404)
@@ -206,17 +206,17 @@ RSpec.describe Clover, "tag_space" do
     end
 
     describe "show - policies" do
-      it "can show tag space policy" do
-        visit tag_space.path
+      it "can show project policy" do
+        visit project.path
 
         click_link "Policy"
 
-        expect(page.title).to eq("Ubicloud - #{tag_space.name} - Policy")
-        expect(page).to have_content tag_space.access_policies.first.body.to_json
+        expect(page.title).to eq("Ubicloud - #{project.name} - Policy")
+        expect(page).to have_content project.access_policies.first.body.to_json
       end
 
       it "raises forbidden when does not have permissions" do
-        visit "#{tag_space_wo_permissions.path}/policy"
+        visit "#{project_wo_permissions.path}/policy"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -224,14 +224,14 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "can update policy" do
-        current_policy = tag_space.access_policies.first.body
+        current_policy = project.access_policies.first.body
         new_policy = {
           acls: [
-            {powers: ["TagSpace:policy"], objects: tag_space.hyper_tag_name, subjects: user.hyper_tag_name}
+            {actions: ["Project:policy"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
           ]
         }
 
-        visit "#{tag_space.path}/policy"
+        visit "#{project.path}/policy"
 
         expect(page).to have_content current_policy.to_json
 
@@ -242,22 +242,22 @@ RSpec.describe Clover, "tag_space" do
       end
 
       it "can not update policy when it is not valid JSON" do
-        current_policy = tag_space.access_policies.first.body
+        current_policy = project.access_policies.first.body
 
-        visit "#{tag_space.path}/policy"
+        visit "#{project.path}/policy"
 
         fill_in "body", with: "{'invalid': 'json',}"
         click_button "Update"
 
         expect(page).to have_content "The policy isn't a valid JSON object."
         expect(page).to have_content "{'invalid': 'json',}"
-        expect(current_policy).to eq(tag_space.access_policies.first.body)
+        expect(current_policy).to eq(project.access_policies.first.body)
       end
 
       it "raises not found when access policy not exists" do
         expect(AccessPolicy).to receive(:[]).and_return(nil)
 
-        visit "#{tag_space.path}/policy/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/policy/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Page not found")
         expect(page.status_code).to eq(404)
@@ -266,45 +266,45 @@ RSpec.describe Clover, "tag_space" do
     end
 
     describe "delete" do
-      it "can delete tag space" do
-        visit tag_space.path
+      it "can delete project" do
+        visit project.path
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
         btn = find ".delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "'#{tag_space.name}' tag space is deleted."}.to_json)
+        expect(page.body).to eq({message: "'#{project.name}' project is deleted."}.to_json)
 
-        expect(TagSpace[tag_space.id]).to be_nil
-        expect(AccessTag.where(tag_space_id: tag_space.id).count).to eq(0)
-        expect(AccessPolicy.where(tag_space_id: tag_space.id).count).to eq(0)
+        expect(Project[project.id]).to be_nil
+        expect(AccessTag.where(project_id: project.id).count).to eq(0)
+        expect(AccessPolicy.where(project_id: project.id).count).to eq(0)
       end
 
-      it "can not delete tag space when it has resources" do
-        Prog::Vm::Nexus.assemble("key", tag_space.id, name: "vm1")
+      it "can not delete project when it has resources" do
+        Prog::Vm::Nexus.assemble("key", project.id, name: "vm1")
 
-        visit tag_space.path
+        visit project.path
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
         btn = find ".delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "'#{tag_space.name}' tag space has some resources. Delete all related resources first."}.to_json)
+        expect(page.body).to eq({message: "'#{project.name}' project has some resources. Delete all related resources first."}.to_json)
 
-        visit "/tag-space"
+        visit "/project"
 
-        expect(page).to have_content tag_space.name
+        expect(page).to have_content project.name
       end
 
-      it "can not delete tag space when does not have permissions" do
+      it "can not delete project when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        tag_space_wo_permissions.access_policies.first.update(body: {acls: [
-          {subjects: user.hyper_tag_name, powers: ["TagSpace:view"], objects: tag_space_wo_permissions.hyper_tag_name}
+        project_wo_permissions.access_policies.first.update(body: {acls: [
+          {subjects: user.hyper_tag_name, actions: ["Project:view"], objects: project_wo_permissions.hyper_tag_name}
         ]})
 
-        visit tag_space_wo_permissions.path
+        visit project_wo_permissions.path
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
