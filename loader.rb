@@ -71,7 +71,7 @@ def autoload_normal(subdirectory, include_first: false)
 end
 
 %w[model lib].each { autoload_normal(_1) }
-%w[scheduling prog].each { autoload_normal(_1, include_first: true) }
+%w[scheduling prog serializers/web].each { autoload_normal(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
 
