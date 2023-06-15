@@ -55,9 +55,10 @@ task :test_up do
   migrate.call("test", nil)
 end
 
-desc "Migrate test database all the way down"
+desc "Migrate test database down. If VERSION isn't given, migrates to all the way down."
 task :test_down do
-  migrate.call("test", 0)
+  version = ENV["VERSION"].to_i || 0
+  migrate.call("test", version)
 end
 
 desc "Migrate test database all the way down and then back up"
@@ -71,9 +72,10 @@ task :dev_up do
   migrate.call("development", nil)
 end
 
-desc "Migrate development database to all the way down"
+desc "Migrate development database down. If VERSION isn't given, migrates to all the way down."
 task :dev_down do
-  migrate.call("development", 0)
+  version = ENV["VERSION"].to_i || 0
+  migrate.call("development", version)
 end
 
 desc "Migrate development database all the way down and then back up"
