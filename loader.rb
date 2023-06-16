@@ -27,21 +27,23 @@ Unreloader = Rack::Unreloader.new(
 Unreloader.autoload("#{__dir__}/clover.rb") { "Clover" }
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
 
-def camelize s
-  s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
-end
-
 AUTOLOAD_CONSTANTS = []
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
-def autoload_normal(subdirectory, include_first: false)
+autoload_normal = ->(subdirectory, include_first: false) do
+  # Copied from sequel/model/inflections.rb's camelize, to convert
+  # file paths into module and class names.
+  camelize = ->(s) do
+    s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
+  end
+
   prefix = File.join(__dir__, subdirectory)
   rgx = Regexp.new('\A' + Regexp.escape(prefix + "/") + '(.*)\.rb\z')
   last_namespace = nil
 
   Unreloader.autoload(prefix) do |f|
-    full_name = camelize((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
+    full_name = camelize.call((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
     parts = full_name.split("::")
     namespace = parts[0..-2].freeze
 
@@ -70,8 +72,8 @@ def autoload_normal(subdirectory, include_first: false)
   end
 end
 
-%w[model lib].each { autoload_normal(_1) }
-%w[scheduling prog serializers/web].each { autoload_normal(_1, include_first: true) }
+%w[model lib].each { autoload_normal.call(_1) }
+%w[scheduling prog serializers/web].each { autoload_normal.call(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
 
