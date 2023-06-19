@@ -77,6 +77,6 @@ end
 
 AUTOLOAD_CONSTANTS.freeze
 
-if Config.production?
+if Config.production? && !Config.no_eager_load
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
 end
