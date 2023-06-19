@@ -30,8 +30,12 @@ class Prog::InstallDnsmasq < Prog::Base
   end
 
   def git_clone_dnsmasq
-    sshable.cmd("git clone https://github.com/fdr/dnsmasq.git --depth=1 && " \
-                "(cd dnsmasq && git checkout aaba66efbd3b4e7283993ca3718df47706a8549b && git fsck --full)")
+    q_commit = "aaba66efbd3b4e7283993ca3718df47706a8549b".shellescape
+    sshable.cmd("git init dnsmasq && " \
+                "(cd dnsmasq && " \
+                "  git fetch https://github.com/fdr/dnsmasq.git #{q_commit} --depth=1 &&" \
+                "  git checkout #{q_commit} &&" \
+                "  git fsck --full)")
     pop "downloaded and verified dnsmasq successfully"
   end
 end
