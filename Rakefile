@@ -4,6 +4,12 @@
 
 migrate = lambda do |env, version|
   ENV["RACK_ENV"] = env
+
+  # Eager loading normally will force the loading of models, but this
+  # is liable to break when model files and accompanying migrations
+  # have both been added.  A solution is to not eagerly load, even in
+  # production, when running migrations.
+  ENV["NO_EAGER_LOAD"] = "true"
   require_relative "loader"
   require "logger"
   require "sequel"

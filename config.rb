@@ -50,6 +50,7 @@ module Config
 
   # Override -- value is returned or the set default.
   override :database_timeout, 10, int
+  override :no_eager_load, false, bool
   override :db_pool, 5, int
   override :deployment, "production", string
   override :force_ssl, true, bool
