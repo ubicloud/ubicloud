@@ -138,30 +138,34 @@ task "assets:precompile" do
   fail unless $?.success?
 end
 
-namespace :linter do
-  # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
-  require "bundler/setup"
-  Bundler.setup
+begin
+  namespace :linter do
+    # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
+    require "bundler/setup"
+    Bundler.setup
 
-  require "rubocop/rake_task"
-  desc "Run Rubocop"
-  RuboCop::RakeTask.new
+    require "rubocop/rake_task"
+    desc "Run Rubocop"
+    RuboCop::RakeTask.new
 
-  desc "Run Brakeman"
-  task :brakeman do
-    puts "Running Brakeman..."
-    require "brakeman"
-    Brakeman.run app_path: ".", quiet: true, force_scan: true, print_report: true, run_all_checks: true
+    desc "Run Brakeman"
+    task :brakeman do
+      puts "Running Brakeman..."
+      require "brakeman"
+      Brakeman.run app_path: ".", quiet: true, force_scan: true, print_report: true, run_all_checks: true
+    end
+
+    desc "Run ERB::Formatter"
+    task :erb_formatter do
+      puts "Running ERB::Formatter..."
+      require "erb/formatter/command_line"
+      files = Dir.glob("views/**/*.erb").entries
+      ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
+    end
   end
 
-  desc "Run ERB::Formatter"
-  task :erb_formatter do
-    puts "Running ERB::Formatter..."
-    require "erb/formatter/command_line"
-    files = Dir.glob("views/**/*.erb").entries
-    ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
-  end
+  desc "Run all linters"
+  task linter: ["rubocop", "brakeman", "erb_formatter"].map { "linter:#{_1}" }
+rescue LoadError
+  puts "Could not load dev dependencies"
 end
-
-desc "Run all linters"
-task linter: ["rubocop", "brakeman", "erb_formatter"].map { "linter:#{_1}" }
