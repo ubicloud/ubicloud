@@ -386,33 +386,6 @@ SERVICE
     r "systemctl daemon-reload"
   end
 
-  # Does not return, replaces process with cloud-hypervisor running the guest.
-  def exec_cloud_hypervisor
-    require "etc"
-    serial_device = if $stdout.tty?
-      "tty"
-    else
-      "file=#{vp.serial_log}"
-    end
-    u = Etc.getpwnam(@vm_name)
-    Dir.chdir(u.dir)
-    exec(
-      "/usr/sbin/ip", "netns", "exec", @vm_name,
-      "/usr/bin/setpriv", "--reuid=#{u.uid}", "--regid=#{u.gid}", "--init-groups", "--reset-env",
-      "--",
-      "/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor",
-      "--api-socket", "path=#{vp.ch_api_sock}",
-      "--kernel", CloudHypervisor.firmware,
-      "--disk", "path=#{vp.boot_raw}",
-      "--disk", "path=#{vp.cloudinit_img}",
-      "--console", "off", "--serial", serial_device,
-      "--cpus", "boot=4",
-      "--memory", "size=1024M",
-      "--net", "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask=",
-      close_others: true
-    )
-  end
-
   # Generate a MAC with the "local" (generated, non-manufacturer) bit
   # set and the multicast bit cleared in the first octet.
   #
