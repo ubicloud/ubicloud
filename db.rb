@@ -1,13 +1,8 @@
 # frozen_string_literal: true
 
 require "netaddr"
-
-begin
-  require_relative ".env"
-rescue LoadError
-end
-
 require "sequel/core"
+require_relative "config"
 
 DB = Sequel.connect(Config.clover_database_url).tap do |db|
   # Replace dangerous (for cidrs) Ruby IPAddr type that is otherwise

@@ -1,18 +1,9 @@
 # frozen_string_literal: true
 
-begin
-  require_relative ".env"
-rescue LoadError
-  # .env.rb is optional, if the environment variables have been set
-  # some other way.
-end
-
 require "bundler/setup"
 Bundler.setup
 
-require_relative "./lib/casting_config_helpers"
-require_relative "./config"
-
+require_relative "config"
 require "rack/unreloader"
 
 Unreloader = Rack::Unreloader.new(
@@ -77,6 +68,6 @@ end
 
 AUTOLOAD_CONSTANTS.freeze
 
-if Config.production? && !Config.no_eager_load
+if Config.production?
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
 end
