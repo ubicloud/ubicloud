@@ -1,6 +1,13 @@
 # frozen_string_literal: true
 
-require_relative "loader"
+require_relative "lib/casting_config_helpers"
+
+begin
+  require_relative ".env"
+rescue LoadError
+  # .env.rb is optional
+end
+
 # Adapted from
 # https://github.com/interagent/pliny/blob/fcc8f3b103ec5296bd754898fdefeb2fda2ab292/lib/template/config/config.rb.
 #
@@ -50,7 +57,6 @@ module Config
 
   # Override -- value is returned or the set default.
   override :database_timeout, 10, int
-  override :no_eager_load, false, bool
   override :db_pool, 5, int
   override :deployment, "production", string
   override :force_ssl, true, bool
