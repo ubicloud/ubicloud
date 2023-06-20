@@ -215,12 +215,6 @@ EOS
     vp.write_user_data(<<EOS)
 #cloud-config
 users:
-  - name: cloud
-    passwd: $6$7125787751a8d18a$sHwGySomUA1PawiNFWVCKYQN.Ec.Wzz0JtPPL1MvzFrkwmop2dq7.4CYf03A5oemPQ4pOFCCrtCelvFBEle/K.
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: False
-    inactive: False
-    shell: /bin/bash
   - name: #{yq(unix_user)}
     sudo: ALL=(ALL) NOPASSWD:ALL
     inactive: False
