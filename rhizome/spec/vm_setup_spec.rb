@@ -25,6 +25,7 @@ RSpec.describe VmSetup do
     it "can setup a storage volume" do
       disk_file = "/var/storage/test/disk_0.raw"
       device_id = "some_device_id"
+      spdk_vhost_sock = "/var/storage/vhost/test_0"
 
       expect(vs).to receive(:setup_disk_file).and_return(disk_file)
       expect(vs).to receive(:r).with(/setfacl.*#{disk_file}/)
@@ -32,8 +33,9 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:r).with(/.*rpc.py.*vhost_create_blk_controller test_0 #{device_id}/)
       expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
-      expect(FileUtils).to receive(:ln_s).with("/var/storage/vhost/test_0", "/var/storage/test/vhost_0.sock")
-      expect(vs).to receive(:r).with(/setfacl.*vhost_0.sock/)
+      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
+      expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, "/var/storage/test/vhost_0.sock")
+      expect(vs).to receive(:r).with(/setfacl.*#{spdk_vhost_sock}/)
 
       expect(
         vs.setup_volume({"boot" => true, "size_gib" => 5, "device_id" => device_id}, 0, "ubuntu-jammy")
