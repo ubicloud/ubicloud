@@ -253,11 +253,14 @@ EOS
     r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_bdev} 512"
     r "#{Spdk.rpc_py} vhost_create_blk_controller #{vhost.shellescape} #{q_bdev}"
 
-    # create a symlink to the socket in the per vm storage dir
-    FileUtils.ln_s Spdk.vhost_sock(vhost), vp.vhost_sock(index)
+    # don't allow others to access the vhost socket
+    FileUtils.chmod "u=rw,g=r,o=", Spdk.vhost_sock(vhost)
 
     # allow vm user to access the vhost socket
-    r "setfacl -m u:#{@vm_name}:rw #{vp.vhost_sock(index).shellescape}"
+    r "setfacl -m u:#{@vm_name}:rw #{Spdk.vhost_sock(vhost).shellescape}"
+
+    # create a symlink to the socket in the per vm storage dir
+    FileUtils.ln_s Spdk.vhost_sock(vhost), vp.vhost_sock(index)
 
     vp.vhost_sock(index)
   end
