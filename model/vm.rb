@@ -5,7 +5,7 @@ require_relative "../model"
 class Vm < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
-  one_to_many :vm_private_subnet, key: :vm_id
+  one_to_many :private_subnets, key: :vm_id, class: :VmPrivateSubnet
   one_to_many :ipsec_tunnels, key: :src_vm_id
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
@@ -20,16 +20,12 @@ class Vm < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  def private_subnets
-    vm_private_subnet.map { _1.private_subnet }
-  end
-
   def path
     "/vm/#{ulid}"
   end
 
   def ephemeral_net4
-    assigned_vm_address&.ip&.nth(1)
+    assigned_vm_address&.ip&.network
   end
 
   def ip4

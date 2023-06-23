@@ -1,80 +1,97 @@
 # frozen_string_literal: true
 
 require_relative "common"
-require_relative "vm_path"
 require "netaddr"
 
-IPSecTunnelEndpoint = Struct.new(:vm_name, :ephemeral_net6, :private_subnet) do
-  def clover_ephemeral
-    vp = VmPath.new(vm_name)
-    subnet = NetAddr::IPv6Net.parse(vp.read_clover_ephemeral)
-    subnet.network.to_s
-  end
-
-  def q_clover_ephemeral
-    @q_clover_ephemeral ||= clover_ephemeral.shellescape
-  end
-
-  def q_private_subnet
-    private_subnet.shellescape
-  end
-end
-
 class IPSecTunnel
-  def initialize(from_endpoint, to_endpoint, spi, security_key)
-    @from_endpoint = from_endpoint
-    @to_endpoint = to_endpoint
-    @security_key = security_key
+  def initialize(namespace, src_clover_ephemeral, dst_clover_ephemeral, src_private_subnet, dst_private_subnet, src_private_subnet4, dst_private_subnet4, spi, spi4, security_key, direction)
+    @namespace = namespace
+    @src_clover_ephemeral = src_clover_ephemeral
+    @dst_clover_ephemeral = dst_clover_ephemeral
+    @src_private_subnet = src_private_subnet
+    @dst_private_subnet = dst_private_subnet
+    @src_private_subnet4 = src_private_subnet4
+    @dst_private_subnet4 = dst_private_subnet4
     @spi = spi
+    @spi4 = spi4
+    @security_key = security_key
+    @direction = direction
   end
 
-  def setup_src
-    namespace = @from_endpoint.vm_name
+  def setup
     # first delete any existing state & policy for idempotency
-    r(delete_state_command(namespace))
-    r(delete_policy_command(namespace, "out"))
-    r(add_state_command(namespace))
-    r(add_policy_command(namespace, "out"))
+    r(delete_state_command)
+    r(delete_policy_command)
+    r(delete_state_command4)
+    r(delete_policy_command4)
+    r(add_state_command)
+    r(add_state_command4)
+    r(add_policy_command)
+    r(add_policy_command4)
   end
 
-  def setup_dst
-    namespace = @to_endpoint.vm_name
-    # first delete any existing state & policy for idempotency
-    r(delete_state_command(namespace))
-    r(delete_policy_command(namespace, "fwd"))
-    r(add_state_command(namespace))
-    r(add_policy_command(namespace, "fwd"))
+  def delete_state_command
+    p "ip -n #{@namespace} xfrm state deleteall " \
+        "src #{@src_clover_ephemeral} " \
+        "dst #{@dst_clover_ephemeral}"
   end
 
-  def delete_state_command(namespace)
-    p "ip -n #{namespace.shellescape} xfrm state deleteall " \
-        "src #{@from_endpoint.q_clover_ephemeral} " \
-        "dst #{@to_endpoint.q_clover_ephemeral}"
+  def delete_state_command4
+    p "ip -n #{@namespace} xfrm state deleteall " \
+        "src #{@src_private_subnet4} " \
+        "dst #{@dst_private_subnet4}"
   end
 
-  def delete_policy_command(namespace, direction)
-    p "ip -n #{namespace.shellescape} xfrm policy deleteall " \
-        "src #{@from_endpoint.q_private_subnet} " \
-        "dst #{@to_endpoint.q_private_subnet} " \
-        "dir #{direction}"
+  def delete_policy_command
+    p "ip -n #{@namespace} xfrm policy deleteall " \
+        "src #{@src_private_subnet} " \
+        "dst #{@dst_private_subnet} " \
+        "dir #{@direction}"
   end
 
-  def add_state_command(namespace)
-    p "ip -n #{namespace.shellescape} xfrm state add " \
-      "src #{@from_endpoint.q_clover_ephemeral} " \
-      "dst #{@to_endpoint.q_clover_ephemeral} " \
+  def delete_policy_command4
+    p "ip -n #{@namespace} xfrm policy deleteall " \
+        "src #{@src_private_subnet4} " \
+        "dst #{@dst_private_subnet4} " \
+        "dir #{@direction}"
+  end
+
+  def add_state_command
+    p "ip -n #{@namespace} xfrm state add " \
+      "src #{@src_clover_ephemeral} " \
+      "dst #{@dst_clover_ephemeral} " \
       "proto esp " \
       "spi #{@spi} reqid 1 mode tunnel " \
       "aead 'rfc4106(gcm(aes))' #{@security_key.shellescape} 128"
   end
 
-  def add_policy_command(namespace, direction)
-    p "ip -n #{namespace.shellescape} xfrm policy add " \
-      "src #{@from_endpoint.q_private_subnet} " \
-      "dst #{@to_endpoint.q_private_subnet} dir #{direction} " \
-      "tmpl src #{@from_endpoint.q_clover_ephemeral} " \
-      "dst #{@to_endpoint.q_clover_ephemeral} " \
+  def add_state_command4
+    p "ip -n #{@namespace} xfrm state add " \
+      "src #{@src_clover_ephemeral} " \
+      "dst #{@dst_clover_ephemeral} " \
+      "proto esp " \
+      "spi #{@spi4} reqid 1 mode tunnel " \
+      "aead 'rfc4106(gcm(aes))' #{@security_key.shellescape} 128 " \
+      "sel src 0.0.0.0/0 dst 0.0.0.0/0"
+  end
+
+  def add_policy_command
+    p "ip -n #{@namespace} xfrm policy add " \
+      "src #{@src_private_subnet} " \
+      "dst #{@dst_private_subnet} dir #{@direction} " \
+      "tmpl src #{@src_clover_ephemeral} " \
+      "dst #{@dst_clover_ephemeral} " \
       "spi #{@spi} proto esp reqid 1 " \
+      "mode tunnel"
+  end
+
+  def add_policy_command4
+    p "ip -n #{@namespace} xfrm policy add " \
+      "src #{@src_private_subnet4} " \
+      "dst #{@dst_private_subnet4} dir #{@direction} " \
+      "tmpl src #{@src_clover_ephemeral} " \
+      "dst #{@dst_clover_ephemeral} " \
+      "spi #{@spi4} proto esp reqid 1 " \
       "mode tunnel"
   end
 end

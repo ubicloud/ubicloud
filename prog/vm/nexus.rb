@@ -31,15 +31,15 @@ class Prog::Vm::Nexus < Prog::Base
 
     # if the caller hasn't provided any subnets, generate a random one
     if private_subnets.empty?
-      private_subnets.append(random_ula)
+      private_subnets.append([random_ula, random_private_ipv4])
     end
 
     DB.transaction do
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, size: size, location: location, boot_image: boot_image) { _1.id = id }
       vm.associate_with_project(project)
-      private_subnets.each do
-        VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
+      private_subnets.each do |net6, net4|
+        VmPrivateSubnet.create(vm_id: vm.id, net6: net6.to_s, net4: net4.to_s)
       end
 
       if storage_encrypted
@@ -81,6 +81,12 @@ class Prog::Vm::Nexus < Prog::Base
     NetAddr::IPv6Net.new(network_address, network_mask)
   end
 
+  def self.random_private_ipv4
+    addr = NetAddr::IPv4Net.parse("192.168.0.0/24")
+    network_mask = NetAddr::Mask32.new(32)
+    NetAddr::IPv4Net.new(addr.nth(SecureRandom.random_number(addr.len - 2).to_i + 2), network_mask)
+  end
+
   def vm
     @vm ||= Vm[strand.id]
   end
@@ -107,6 +113,10 @@ class Prog::Vm::Nexus < Prog::Base
 
   def q_net4
     vm.ip4.to_s || ""
+  end
+
+  def private_ipv4
+    vm.private_subnets.first&.net4&.to_s&.shellescape || ""
   end
 
   def local_ipv4
@@ -167,7 +177,7 @@ SQL
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network
     vm.update(vm_host_id: vm_host_id, ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
-      local_vetho_ip: ip4 ? vm_host.veth_pair_random_ip4_addr.to_s : nil)
+      local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s)
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
     hop :create_unix_user
   end
@@ -192,10 +202,11 @@ SQL
       "vm_name" => vm_name,
       "public_ipv6" => q_net6,
       "public_ipv4" => q_net4,
+      "private_ipv4" => private_ipv4,
       "local_ipv4" => local_ipv4,
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
-      "private_subnets" => private_subnets.map { _1.to_s },
+      "private_subnets" => vm.private_subnets.map { |vps| [vps.net6, vps.net4] },
       "boot_image" => vm.boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
@@ -227,18 +238,50 @@ SQL
     hop :run
   end
 
-  def create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
-    q_dst_name = dst_vm.inhost_name.shellescape
-    q_dst_net = dst_vm.ephemeral_net6.to_s.shellescape
-
-    my_params = "#{q_vm} #{q_net6} #{my_subnet.to_s.shellescape}"
-    dst_params = "#{q_dst_name} #{q_dst_net} #{dst_subnet.to_s.shellescape}"
+  def create_ipsec_tunnel(my_subnet6, my_subnet4, dst_vm, dst_subnet6, dst_subnet4)
+    src_namespace = vm.inhost_name.shellescape
+    dst_namespace = dst_vm.inhost_name.shellescape
+    src_clover_ephemeral = subdivide_network(vm.ephemeral_net6)
+    dst_clover_ephemeral = subdivide_network(dst_vm.ephemeral_net6)
+    src_private_addr_6 = my_subnet6.to_s.shellescape
+    dst_private_addr_6 = dst_subnet6.to_s.shellescape
+    src_private_addr_4 = my_subnet4.to_s.shellescape
+    dst_private_addr_4 = dst_subnet4.to_s.shellescape
+    src_direction = "out"
+    dst_direction = "fwd"
 
     spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
+    spi4 = "0x" + SecureRandom.bytes(4).unpack1("H*")
     key = "0x" + SecureRandom.bytes(36).unpack1("H*")
 
-    host.sshable.cmd("sudo bin/setup-ipsec setup_src #{my_params} #{dst_params} #{spi} #{key}")
-    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec setup_dst #{my_params} #{dst_params} #{spi} #{key}")
+    # setup source ipsec tunnels
+    host.sshable.cmd("sudo bin/setup-ipsec " \
+      "#{src_namespace} #{src_clover_ephemeral} " \
+      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
+      "#{dst_private_addr_6} #{src_private_addr_4} " \
+      "#{dst_private_addr_4} #{src_direction} " \
+      "#{spi} #{spi4} #{key}")
+
+    # setup destination ipsec tunnels
+    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec " \
+      "#{dst_namespace} #{src_clover_ephemeral} " \
+      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
+      "#{dst_private_addr_6} #{src_private_addr_4} " \
+      "#{dst_private_addr_4} #{dst_direction} " \
+      "#{spi} #{spi4} #{key}")
+  end
+
+  def subdivide_network(net)
+    prefix = net.netmask.prefix_len + 1
+    halved = net.resize(prefix)
+    halved.next_sib
+  end
+
+  def create_private_route(dst_subnet)
+    ### YYY: make this idempotent
+    [dst_subnet.net6, dst_subnet.net4].each do |dst_ip|
+      host.sshable.cmd("sudo ip -n #{q_vm} route replace #{dst_ip.to_s.shellescape} dev vethi#{q_vm}")
+    end
   end
 
   def run
@@ -276,7 +319,8 @@ SQL
       next if dst_vm.ephemeral_net6.nil?
       private_subnets.each do |my_subnet|
         dst_vm.private_subnets.each do |dst_subnet|
-          create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
+          create_ipsec_tunnel(my_subnet.net6, my_subnet.net4, dst_vm, dst_subnet.net6, dst_subnet.net4)
+          create_private_route(dst_subnet)
         end
       end
 
@@ -307,7 +351,7 @@ SQL
     end
 
     DB.transaction do
-      vm.vm_private_subnet_dataset.delete
+      vm.private_subnets_dataset.delete
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores
       )

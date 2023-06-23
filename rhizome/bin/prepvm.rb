@@ -40,6 +40,11 @@ unless (local_ip4 = params["local_ipv4"])
   exit 1
 end
 
+unless (private_ipv4 = params["private_ipv4"])
+  puts "need private_ipv4 in parameters json"
+  exit 1
+end
+
 unless (unix_user = params["unix_user"])
   puts "need unix_user in parameters json"
   exit 1
@@ -87,5 +92,5 @@ require_relative "../lib/common"
 require_relative "../lib/vm_setup"
 
 VmSetup.new(vm_name).prep(unix_user, ssh_public_key, private_subnets, gua, ip4,
-  local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes,
-  storage_secrets)
+  local_ip4, private_ipv4, boot_image, max_vcpus, cpu_topology, mem_gib,
+  ndp_needed, storage_volumes, storage_secrets)

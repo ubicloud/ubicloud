@@ -22,10 +22,12 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "adds the VM to a private subnet if passed" do
-      net = NetAddr.parse_net("fd10:9b0b:6b4b:8fbb::/64")
+      net6 = NetAddr.parse_net("fd10:9b0b:6b4b:8fbb::/64")
+      net4 = NetAddr.parse_net("1.1.1.1/32")
       expect {
-        id = described_class.assemble("some_ssh_key", p.id, private_subnets: [net]).id
-        expect(VmPrivateSubnet[vm_id: id].private_subnet.cmp(net)).to eq 0
+        id = described_class.assemble("some_ssh_key", p.id, private_subnets: [[net6, net4]]).id
+        expect(VmPrivateSubnet[vm_id: id].net6.cmp(net6)).to eq 0
+        expect(VmPrivateSubnet[vm_id: id].net4.cmp(net4)).to eq 0
       }.to change(VmPrivateSubnet, :count).from(0).to 1
     end
   end
@@ -71,7 +73,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.unix_user = "test_user"
       vm.public_key = "test_ssh_key"
       vm.local_vetho_ip = "169.254.0.0"
-      expect(vm).to receive(:vm_private_subnet).and_return [VmPrivateSubnet.new(private_subnet: "fd10:9b0b:6b4b:8fbb::/64")]
+      expect(vm).to receive(:private_subnets).and_return([VmPrivateSubnet.new(net6: "fd10:9b0b:6b4b:8fbb::/64")]).at_least(:once)
       expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
 
       sshable = instance_spy(Sshable)

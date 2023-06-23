@@ -74,15 +74,17 @@ RSpec.describe VmHost do
   it "assigned_subnets returns the assigned subnets" do
     expect(vh).to receive(:assigned_subnets).and_return([address])
     expect(vh).to receive(:vm_addresses).and_return([])
-    expect(SecureRandom).to receive(:random_number).with(2).and_return(0)
+    expect(SecureRandom).to receive(:random_number).with(4).and_return(0)
+    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
     ip4, r_address = vh.ip4_random_vm_network
-    expect(ip4.to_s).to eq("0.0.0.0/31")
+    expect(ip4.to_s).to eq("0.0.0.0")
     expect(r_address).to eq(address)
   end
 
   it "returns nil if there is no available subnet" do
     expect(vh).to receive(:assigned_subnets).and_return([address])
-    expect(address.assigned_vm_address).to receive(:count).and_return(2)
+    expect(address.assigned_vm_address).to receive(:count).and_return(4)
+    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
     ip4, address = vh.ip4_random_vm_network
     expect(ip4).to be_nil
     expect(address).to be_nil
@@ -90,10 +92,11 @@ RSpec.describe VmHost do
 
   it "finds another address if it's already assigned" do
     expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
-    expect(vh).to receive(:vm_addresses).and_return([instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.parse("0.0.0.0/31"))]).at_least(:once)
-    expect(SecureRandom).to receive(:random_number).with(2).and_return(0, 1)
+    expect(vh).to receive(:vm_addresses).and_return([instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.parse("0.0.0.0"))]).at_least(:once)
+    expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
+    expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
     ip4, r_address = vh.ip4_random_vm_network
-    expect(ip4.to_s).to eq("0.0.0.2/31")
+    expect(ip4.to_s).to eq("0.0.0.1")
     expect(r_address).to eq(address)
   end
 
