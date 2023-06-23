@@ -21,7 +21,7 @@ class Vm < Sequel::Model
   include Authorization::TaggableMethods
 
   def private_subnets
-    vm_private_subnet.map { _1.private_subnet }
+    vm_private_subnet.map { [_1.private_subnet, _1.net4] }
   end
 
   def path

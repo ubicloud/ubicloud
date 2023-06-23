@@ -21,6 +21,11 @@ unless (src_private_subnet = ARGV.shift)
   exit 1
 end
 
+unless (src_private_subnet4 = ARGV.shift)
+  puts "expected src_private_subnet4 as argument"
+  exit 1
+end
+
 unless (dest_vm_name = ARGV.shift)
   puts "expected dest_vm_name as argument"
   exit 1
@@ -36,8 +41,18 @@ unless (dest_private_subnet = ARGV.shift)
   exit 1
 end
 
+unless (dest_private_subnet4 = ARGV.shift)
+  puts "expected dest_private_subnet4 as argument"
+  exit 1
+end
+
 unless (spi = ARGV.shift)
   puts "expected spi as argument"
+  exit 1
+end
+
+unless (spi4 = ARGV.shift)
+  puts "expected spi4 as argument"
   exit 1
 end
 
@@ -52,9 +67,9 @@ require_relative "../lib/ipsec_tunnel"
 require "fileutils"
 require "netaddr"
 
-src_endpoint = IPSecTunnelEndpoint.new(src_vm_name, NetAddr.parse_net(src_ephemeral_net6), src_private_subnet)
-dest_endpoint = IPSecTunnelEndpoint.new(dest_vm_name, NetAddr.parse_net(dest_ephemeral_net6), dest_private_subnet)
-ipsec_tunnel = IPSecTunnel.new(src_endpoint, dest_endpoint, spi, security_key)
+src_endpoint = IPSecTunnelEndpoint.new(src_vm_name, NetAddr.parse_net(src_ephemeral_net6), src_private_subnet, src_private_subnet4)
+dest_endpoint = IPSecTunnelEndpoint.new(dest_vm_name, NetAddr.parse_net(dest_ephemeral_net6), dest_private_subnet, dest_private_subnet4)
+ipsec_tunnel = IPSecTunnel.new(src_endpoint, dest_endpoint, spi, spi4, security_key)
 
 case command
 when "setup_src"

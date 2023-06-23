@@ -44,7 +44,7 @@ class VmSetup
     interfaces
     routes6(gua, private_subnets, ndp_needed)
     routes4(ip4, local_ip4)
-    cloudinit(unix_user, public_key, private_subnets, ip4)
+    cloudinit(unix_user, public_key, ip4)
     vhost_sockets = storage(storage_volumes, boot_image)
     hugepages(mem_gib)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
@@ -138,9 +138,12 @@ class VmSetup
     r "ip -n #{q_vm} link set dev tap#{q_vm} up"
     r "ip -n #{q_vm} route add #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
 
+    r "ip -n #{q_vm} addr add 192.168.0.1/32 dev tap#{q_vm}"
+    r "ip -n #{q_vm} route add 192.168.0.0/24 dev tap#{q_vm}"
+    
     # Route private subnet addresses to tap.
-    private_subnets.each do
-      r "ip -n #{q_vm} route add #{_1.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
+    private_subnets.each do |net6, net4|
+      r "ip -n #{q_vm} route add #{net6.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
     end
   end
 
@@ -172,7 +175,7 @@ class VmSetup
     r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/tap#{q_vm}/proxy_arp'"
   end
 
-  def cloudinit(unix_user, public_key, private_subnets, ip4)
+  def cloudinit(unix_user, public_key, ip4)
     vm_sub = NetAddr::IPv4Net.parse(ip4) if ip4
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}

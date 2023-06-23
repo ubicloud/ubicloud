@@ -24,15 +24,15 @@ class Prog::Vm::Nexus < Prog::Base
 
     # if the caller hasn't provided any subnets, generate a random one
     if private_subnets.empty?
-      private_subnets.append(random_ula)
+      private_subnets.append([random_ula, random_private_ipv4])
     end
 
     DB.transaction do
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, size: size, location: location, boot_image: boot_image) { _1.id = id }
       vm.associate_with_project(project)
-      private_subnets.each do
-        VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
+      private_subnets.each do |net6, net4|
+        VmPrivateSubnet.create(vm_id: vm.id, private_subnet: net6.to_s, net4: net4.to_s)
       end
       VmStorageVolume.create(
         vm_id: vm.id,
@@ -61,6 +61,12 @@ class Prog::Vm::Nexus < Prog::Base
     network_address = NetAddr::IPv6.new((SecureRandom.bytes(7) + 0xfd.chr).unpack1("Q<") << 64)
     network_mask = NetAddr::Mask128.new(64)
     NetAddr::IPv6Net.new(network_address, network_mask)
+  end
+
+  def self.random_private_ipv4
+    addr = NetAddr::IPv4Net.parse("192.168.0.0/24")
+    network_mask = NetAddr::Mask32.new(32)
+    NetAddr::IPv4Net.new(addr.nth(SecureRandom.random_number(addr.len)), network_mask)
   end
 
   def vm
@@ -165,7 +171,7 @@ SQL
       "local_ipv4" => local_ipv4,
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
-      "private_subnets" => private_subnets.map { _1.to_s },
+      "private_subnets" => private_subnets.map { _1.map(&:to_s) },
       "boot_image" => vm.boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
@@ -193,18 +199,37 @@ SQL
     hop :run
   end
 
-  def create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
+  def create_ipsec_tunnel(my_subnet6, my_subnet4, dst_vm, dst_subnet6, dst_subnet4)
     q_dst_name = dst_vm.inhost_name.shellescape
     q_dst_net = dst_vm.ephemeral_net6.to_s.shellescape
 
-    my_params = "#{q_vm} #{q_net6} #{my_subnet.to_s.shellescape}"
-    dst_params = "#{q_dst_name} #{q_dst_net} #{dst_subnet.to_s.shellescape}"
+    my_params = "#{q_vm} #{q_net6} #{my_subnet6.to_s.shellescape} #{my_subnet4.to_s.shellescape}"
+    dst_params = "#{q_dst_name} #{q_dst_net} #{dst_subnet6.to_s.shellescape} #{dst_subnet4.to_s.shellescape}"
 
     spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
+    spi4 = "0x" + SecureRandom.bytes(4).unpack1("H*")
     key = "0x" + SecureRandom.bytes(36).unpack1("H*")
 
-    host.sshable.cmd("sudo bin/setup-ipsec setup_src #{my_params} #{dst_params} #{spi} #{key}")
-    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec setup_dst #{my_params} #{dst_params} #{spi} #{key}")
+    pp "sudo bin/setup-ipsec setup_src #{my_params} #{dst_params} #{spi} #{spi4} #{key}"
+    host.sshable.cmd("sudo bin/setup-ipsec setup_src #{my_params} #{dst_params} #{spi} #{spi4} #{key}")
+    pp "sudo bin/setup-ipsec setup_dst #{my_params} #{dst_params} #{spi} #{spi4} #{key}"
+    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec setup_dst #{my_params} #{dst_params} #{spi} #{spi4} #{key}")
+  end
+
+  def create_private_route(my_subnet, dst_subnet)
+    begin
+      pp "sudo ip -n #{q_vm} route add #{dst_subnet.to_s.shellescape} dev tap#{q_vm}"
+      host.sshable.cmd("sudo ip -n #{q_vm} route add #{dst_subnet.to_s.shellescape} dev tap#{q_vm}")
+    rescue Sshable::SshError => ex
+      pp ex.message
+    end
+
+    begin
+      pp "sudo ip -n #{q_vm} route add #{my_subnet.to_s.shellescape} dev tap#{q_vm}"
+      host.sshable.cmd("sudo ip -n #{q_vm} route add #{my_subnet.to_s.shellescape} dev tap#{q_vm}")
+    rescue Sshable::SshError => ex
+      pp ex.message
+    end
   end
 
   def run
@@ -242,7 +267,8 @@ SQL
       next if dst_vm.ephemeral_net6.nil?
       private_subnets.each do |my_subnet|
         dst_vm.private_subnets.each do |dst_subnet|
-          create_ipsec_tunnel(my_subnet, dst_vm, dst_subnet)
+          create_ipsec_tunnel(my_subnet.first, my_subnet.last, dst_vm, dst_subnet.first, dst_subnet.last)
+          create_private_route(my_subnet.first, dst_subnet.first)
         end
       end
 
