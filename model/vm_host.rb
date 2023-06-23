@@ -100,14 +100,14 @@ class VmHost < Sequel::Model
     # we get the available subnets and if the subnet is /32, we eliminate it
     available_subnets = assigned_subnets.select { |a| a.cidr.version == 4 && a.cidr.netmask.prefix_len != 32 }
     # we eliminate the subnets that are full
-    used_subnet = available_subnets.select { |as| as.assigned_vm_address.count != as.cidr.subnet_count(31) }.sample
+    used_subnet = available_subnets.select { |as| as.assigned_vm_address.count != as.cidr.subnet_count(32) }.sample
 
     # not available subnet
     return [nil, nil] unless used_subnet
 
     # we pick a random /31 subnet from the available subnet
-    rand = SecureRandom.random_number(32 - used_subnet.cidr.netmask.prefix_len).to_i
-    picked_subnet = used_subnet.cidr.nth_subnet(31, rand)
+    rand = SecureRandom.random_number(2**(32 - used_subnet.cidr.netmask.prefix_len) - 2).to_i + 2
+    picked_subnet = used_subnet.cidr.nth(rand)
     # we check if the picked subnet is used by one of the vms
     return ip4_random_vm_network if vm_addresses.map(&:ip).map(&:to_s).include?(picked_subnet.to_s)
     [picked_subnet, used_subnet]

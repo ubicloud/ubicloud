@@ -39,12 +39,13 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes)
+  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, private_ipv4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes)
     ip4 = nil if ip4.empty?
     interfaces
     routes6(gua, private_subnets, ndp_needed)
     routes4(ip4, local_ip4)
-    cloudinit(unix_user, public_key, ip4)
+    nat4(ip4, private_ipv4)
+    cloudinit(unix_user, public_key, private_ipv4)
     vhost_sockets = storage(storage_volumes, boot_image)
     hugepages(mem_gib)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
@@ -138,9 +139,6 @@ class VmSetup
     r "ip -n #{q_vm} link set dev tap#{q_vm} up"
     r "ip -n #{q_vm} route add #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
 
-    r "ip -n #{q_vm} addr add 192.168.0.1/32 dev tap#{q_vm}"
-    r "ip -n #{q_vm} route add 192.168.0.0/24 dev tap#{q_vm}"
-    
     # Route private subnet addresses to tap.
     private_subnets.each do |net6, net4|
       r "ip -n #{q_vm} route add #{net6.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
@@ -162,21 +160,46 @@ class VmSetup
     vm, vetho, vethi = [vm_sub.to_s,
       local_ip.network.to_s,
       local_ip.next_sib.network.to_s]
+    
+    vp.write_public_ipv4(vm)
 
     r "ip addr add #{vetho}/32 dev vetho#{q_vm}"
     r "ip route add #{vm} dev vetho#{q_vm}"
     r "echo 1 > /proc/sys/net/ipv4/conf/vetho#{q_vm}/proxy_arp"
 
     r "ip -n #{q_vm} addr add #{vethi}/32 dev vethi#{q_vm}"
-    r "ip -n #{q_vm} addr add #{vm} dev tap#{q_vm}"
+    #default?
     r "ip -n #{q_vm} route add #{vetho} dev vethi#{q_vm}"
+    r "ip -n #{q_vm} route add #{vm} dev tap#{q_vm}"
     r "ip -n #{q_vm} route add default via #{vetho} dev vethi#{q_vm}"
+    
     r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
     r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/tap#{q_vm}/proxy_arp'"
+
+    r "ip -n #{q_vm} addr add 192.168.0.1/24 dev tap#{q_vm}"
   end
 
-  def cloudinit(unix_user, public_key, ip4)
-    vm_sub = NetAddr::IPv4Net.parse(ip4) if ip4
+  def nat4(ip4, private_ipv4)
+    public_sub = NetAddr::IPv4Net.parse(ip4)
+    public_ipv4 = public_sub.network.to_s
+
+    private_sub = NetAddr::IPv4Net.parse(private_ipv4)
+    private_ipv4 = private_sub.network.to_s
+
+    vp.write_nftables_conf(<<NFTABLES_CONF)
+table ip raw {
+  chain prerouting {
+    type filter hook prerouting priority raw; policy accept;
+    ip daddr #{public_ipv4} ip daddr set #{private_ipv4} notrack
+    ip saddr #{private_ipv4} ip daddr != 192.168.0.0/16 ip saddr set #{public_ipv4} notrack
+  }
+}
+NFTABLES_CONF
+    r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
+  end
+
+  def cloudinit(unix_user, public_key, private_ipv4)
+    vm_sub = NetAddr::IPv4Net.parse(private_ipv4) if private_ipv4
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -191,7 +214,7 @@ enable-ra
 dhcp-authoritative
 ra-param=tap#{@vm_name}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
-#{"dhcp-range=tap#{@vm_name},#{vm_sub.nth(1)},#{vm_sub.nth(2**(32 - vm_sub.netmask.prefix_len) - 1)},#{vm_sub.netmask.prefix_len}" if ip4}
+#{"dhcp-range=tap#{@vm_name},#{vm_sub.nth(0)},#{vm_sub.nth(0)},#{vm_sub.netmask.prefix_len}" if private_ipv4}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
 
@@ -202,7 +225,7 @@ ethernets:
     match:
       macaddress: #{yq(guest_mac)}
     dhcp6: true
-    #{"dhcp4: true" if ip4}
+    #{"dhcp4: true" if private_ipv4}
 EOS
 
     write_user_data(unix_user, public_key)

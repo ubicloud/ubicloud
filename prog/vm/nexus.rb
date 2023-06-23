@@ -169,6 +169,7 @@ SQL
       "public_ipv6" => q_net6,
       "public_ipv4" => q_net4,
       "local_ipv4" => local_ipv4,
+      "private_ipv4" => private_subnets.first&.last&.to_s&.shellescape || "",
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
       "private_subnets" => private_subnets.map { _1.map(&:to_s) },

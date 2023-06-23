@@ -57,6 +57,8 @@ class VmPath
     ch-api.sock
     serial.log
     hugepages
+    public_ipv4
+    nftables_conf
   ].each do |file_name|
     method_name = file_name.tr(".-", "_")
     fail "BUG" if method_defined?(method_name)
