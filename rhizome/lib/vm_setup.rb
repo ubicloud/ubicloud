@@ -45,7 +45,7 @@ class VmSetup
     routes6(gua, private_subnets, ndp_needed)
     routes4(ip4, local_ip4)
     nat4(ip4, private_ipv4)
-    cloudinit(unix_user, public_key, private_ipv4)
+    cloudinit(unix_user, public_key, private_ipv4, private_subnets)
     vhost_sockets = storage(storage_volumes, boot_image)
     hugepages(mem_gib)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
@@ -198,7 +198,7 @@ NFTABLES_CONF
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_key, private_ipv4)
+  def cloudinit(unix_user, public_key, private_ipv4, private_subnets)
     vm_sub = NetAddr::IPv4Net.parse(private_ipv4) if private_ipv4
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
@@ -214,6 +214,7 @@ enable-ra
 dhcp-authoritative
 ra-param=tap#{@vm_name}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+#{private_subnets.map { |net6, net4| "dhcp-range=tap#{@vm_name},#{NetAddr.parse_net(net6).nth(0)},#{NetAddr.parse_net(net6).nth(0)},#{NetAddr.parse_net(net6).netmask.prefix_len}"}.join("\n")}
 #{"dhcp-range=tap#{@vm_name},#{vm_sub.nth(0)},#{vm_sub.nth(0)},#{vm_sub.netmask.prefix_len}" if private_ipv4}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
