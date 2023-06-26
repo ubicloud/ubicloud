@@ -29,7 +29,7 @@ class Vm < Sequel::Model
   end
 
   def ephemeral_net4
-    assigned_vm_address&.ip&.nth(1)
+    assigned_vm_address&.ip&.network
   end
 
   def ip4
