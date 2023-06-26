@@ -5,10 +5,13 @@ require_relative "common"
 
 require "fileutils"
 require "netaddr"
+require "json"
+require "openssl"
+require "base64"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "spdk"
-require "json"
+require_relative "storage_key_encryption"
 
 class VmSetup
   def initialize(vm_name)
@@ -39,13 +42,13 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes)
+  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets)
     ip4 = nil if ip4.empty?
     interfaces
     routes6(gua, private_subnets, ndp_needed)
     routes4(ip4, local_ip4)
     cloudinit(unix_user, public_key, private_subnets, ip4)
-    vhost_sockets = storage(storage_volumes, boot_image)
+    vhost_sockets = storage(storage_volumes, storage_secrets, boot_image)
     hugepages(mem_gib)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
     forwarding
@@ -228,16 +231,21 @@ runcmd:
 EOS
   end
 
-  def storage(storage_volumes, boot_image)
-    FileUtils.mkdir_p vp.storage("")
-    storage_volumes.map.with_index { |volume, idx|
-      setup_volume(volume, idx, boot_image)
+  def storage(storage_volumes, storage_secrets, boot_image)
+    storage_volumes.map { |volume|
+      idx = volume["disk_index"]
+      FileUtils.mkdir_p vp.storage(idx, "")
+      device_id = volume["device_id"]
+      key_wrapping_secrets = storage_secrets[device_id]
+      setup_volume(volume, idx, boot_image, key_wrapping_secrets)
     }
   end
 
-  def setup_volume(storage_volume, index, boot_image)
-    disk_file = setup_disk_file(storage_volume, index, boot_image)
-    q_disk_file = disk_file.shellescape
+  def setup_volume(storage_volume, index, boot_image, key_wrapping_secrets)
+    encrypted = !key_wrapping_secrets.nil?
+    encryption_key = setup_data_encryption_key(index, key_wrapping_secrets) if encrypted
+
+    disk_file = setup_disk_file(storage_volume, index)
 
     FileUtils.chown @vm_name, @vm_name, disk_file
 
@@ -245,12 +253,21 @@ EOS
     FileUtils.chmod "u=rw,g=r,o=", disk_file
 
     # allow spdk to access the image
-    r "setfacl -m u:spdk:rw #{q_disk_file}"
+    r "setfacl -m u:spdk:rw #{disk_file.shellescape}"
 
-    q_bdev = storage_volume["device_id"].shellescape
+    bdev = storage_volume["device_id"]
+
+    if storage_volume["boot"]
+      copy_image(disk_file, boot_image,
+        storage_volume["size_gib"],
+        encrypted, encryption_key)
+    end
+
+    setup_spdk_bdev(bdev, disk_file, encrypted, encryption_key)
+
     vhost = "#{@vm_name}_#{index}".shellescape
-    r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_bdev} 512"
-    r "#{Spdk.rpc_py} vhost_create_blk_controller #{vhost.shellescape} #{q_bdev}"
+
+    r "#{Spdk.rpc_py} vhost_create_blk_controller #{vhost.shellescape} #{bdev.shellescape}"
 
     # don't allow others to access the vhost socket
     FileUtils.chmod "u=rw,g=r,o=", Spdk.vhost_sock(vhost)
@@ -264,24 +281,134 @@ EOS
     vp.vhost_sock(index)
   end
 
-  def setup_disk_file(storage_volume, index, boot_image)
+  def setup_spdk_bdev(bdev, disk_file, encrypted, encryption_key)
+    q_bdev = bdev.shellescape
+    q_disk_file = disk_file.shellescape
+
+    if encrypted
+      q_keyname = "#{bdev}_key".shellescape
+      q_aio_bdev = "#{bdev}_aio".shellescape
+      r "#{Spdk.rpc_py} accel_crypto_key_create " \
+        "-c #{encryption_key[:cipher].shellescape} " \
+        "-k #{encryption_key[:key].shellescape} " \
+        "-e #{encryption_key[:key2].shellescape} " \
+        "-n #{q_keyname}"
+      r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_aio_bdev} 512"
+      r "#{Spdk.rpc_py} bdev_crypto_create -n #{q_keyname} #{q_aio_bdev} #{q_bdev}"
+    else
+      r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_bdev} 512"
+    end
+  end
+
+  def setup_data_encryption_key(index, key_wrapping_secrets)
+    data_encryption_key = OpenSSL::Cipher.new("aes-256-xts").random_key.unpack1("H*")
+
+    result = {
+      cipher: "AES_XTS",
+      key: data_encryption_key[..63],
+      key2: data_encryption_key[64..]
+    }
+
+    key_file = vp.data_encryption_key(index)
+
+    # save encrypted key
+    sek = StorageKeyEncryption.new(key_wrapping_secrets)
+    sek.write_encrypted_dek(key_file, result)
+
+    FileUtils.chown @vm_name, @vm_name, key_file
+    FileUtils.chmod "u=rw,g=,o=", key_file
+
+    sync_parent_dir(key_file)
+
+    result
+  end
+
+  def copy_image(disk_file, boot_image, disk_size_gib, encrypted, encryption_key)
+    image_path = download_boot_image(boot_image)
+
+    size = File.size(image_path)
+
+    fail "Image size greater than requested disk size" unless size <= disk_size_gib * 2**30
+
+    # Note that spdk_dd doesn't interact with the main spdk process. It is a
+    # tool which starts the spdk infra as a separate process, creates bdevs
+    # from config, does the copy, and exits. Since it is a separate process
+    # for each image, although bdev names are same, they don't conflict.
+    # Goal is to copy the image into disk_file, which will be registered
+    # in the main spdk daemon after this function returns.
+
+    bdev_conf = [{
+      method: "bdev_aio_create",
+      params: {
+        name: "aio0",
+        block_size: 512,
+        filename: disk_file,
+        readonly: false
+      }
+    }]
+
+    if encrypted
+      bdev_conf.append({
+        method: "bdev_crypto_create",
+        params: {
+          base_bdev_name: "aio0",
+          name: "crypt0",
+          key_name: "super_key"
+        }
+      })
+    end
+
+    accel_conf = []
+    if encrypted
+      accel_conf.append(
+        {
+          method: "accel_crypto_key_create",
+          params: {
+            name: "super_key",
+            cipher: encryption_key[:cipher],
+            key: encryption_key[:key],
+            key2: encryption_key[:key2]
+          }
+        }
+      )
+    end
+
+    spdk_config_json = {
+      subsystems: [
+        {
+          subsystem: "accel",
+          config: accel_conf
+        },
+        {
+          subsystem: "bdev",
+          config: bdev_conf
+        }
+      ]
+    }.to_json
+
+    target_bdev = if encrypted
+      "crypt0"
+    else
+      "aio0"
+    end
+
+    # spdk_dd uses the same spdk app infra, so it will bind to an rpc socket,
+    # which we won't use. But its path shouldn't conflict with other VM setups,
+    # so it doesn't error out in concurrent VM creations.
+    rpc_socket = "/var/tmp/spdk_dd.sock.#{@vm_name}"
+
+    r("#{Spdk.bin("spdk_dd")} --config /dev/stdin " \
+    "--disable-cpumask-locks " \
+    "--rpc-socket #{rpc_socket.shellescape} " \
+    "--if #{image_path.shellescape} " \
+    "--ob #{target_bdev.shellescape}", stdin: spdk_config_json)
+  end
+
+  def setup_disk_file(storage_volume, index)
     disk_file = vp.disk(index)
     q_disk_file = disk_file.shellescape
 
-    if storage_volume["boot"]
-      image_path = download_boot_image(boot_image)
-
-      # Images are presumed to be atomically renamed into the path,
-      # i.e. no partial images will be passed to qemu-image.
-      r "qemu-img convert -p -f qcow2 -O raw #{image_path.shellescape} #{q_disk_file}"
-
-      size = File.size(disk_file)
-
-      fail "Image size greater than requested disk size" unless size <= storage_volume["size_gib"] * 2**30
-    else
-      FileUtils.touch(disk_file)
-    end
-
+    FileUtils.touch(disk_file)
     r "truncate -s #{storage_volume["size_gib"]}G #{q_disk_file}"
 
     disk_file
@@ -295,7 +422,7 @@ EOS
     }
 
     download = urls.fetch(boot_image)
-    image_path = "/opt/" + boot_image + ".qcow2"
+    image_path = "/opt/" + boot_image + ".raw"
     unless File.exist?(image_path)
       # Use of File::EXCL provokes a crash rather than a race
       # condition if two VMs are lazily getting their images at the
@@ -305,11 +432,14 @@ EOS
       # customer images.  As-is, it does not have all the
       # synchronization features we might want if we were to keep this
       # code longer term, but, that's not the plan.
-      temp_path = image_path + ".tmp"
+      temp_path = "/opt/" + boot_image + ".qcow2.tmp"
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
         r "curl -L10 -o #{temp_path.shellescape} #{download.shellescape}"
       end
-      FileUtils.mv(temp_path, image_path)
+
+      # Images are presumed to be atomically renamed into the path,
+      # i.e. no partial images will be passed to qemu-image.
+      r "qemu-img convert -p -f qcow2 -O raw #{temp_path.shellescape} #{image_path.shellescape}"
     end
 
     image_path

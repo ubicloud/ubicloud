@@ -4,13 +4,15 @@ require "netaddr"
 require "json"
 require "ulid"
 require "shellwords"
+require "openssl"
+require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
 
   def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnets: [], storage_size_gib: 20)
+    private_subnets: [], storage_size_gib: 20, storage_encrypted: true)
 
     project = Project[project_id]
     unless project || Config.development?
@@ -21,6 +23,11 @@ class Prog::Vm::Nexus < Prog::Base
     name ||= Vm.uuid_to_name(id)
 
     Validation.validate_name(name)
+
+    key_wrapping_algorithm = "aes-256-gcm"
+    cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
+    key_wrapping_key = cipher.random_key
+    key_wrapping_iv = cipher.random_iv
 
     # if the caller hasn't provided any subnets, generate a random one
     if private_subnets.empty?
@@ -34,11 +41,22 @@ class Prog::Vm::Nexus < Prog::Base
       private_subnets.each do
         VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
       end
+
+      if storage_encrypted
+        key_encryption_key = StorageKeyEncryptionKey.create(
+          algorithm: key_wrapping_algorithm,
+          key: Base64.encode64(key_wrapping_key),
+          init_vector: Base64.encode64(key_wrapping_iv),
+          auth_data: "#{vm.inhost_name}_0"
+        )
+      end
+
       VmStorageVolume.create(
         vm_id: vm.id,
         boot: true,
         size_gib: storage_size_gib,
-        disk_index: 0
+        disk_index: 0,
+        key_encryption_key_1_id: storage_encrypted ? key_encryption_key.id : nil
       )
 
       Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
@@ -100,9 +118,18 @@ class Prog::Vm::Nexus < Prog::Base
       {
         "boot" => s.boot,
         "size_gib" => s.size_gib,
-        "device_id" => s.device_id
+        "device_id" => s.device_id,
+        "disk_index" => s.disk_index
       }
     }
+  end
+
+  def storage_secrets
+    @storage_secrets ||= vm.vm_storage_volumes.filter_map { |s|
+      if !s.key_encryption_key_1.nil?
+        [s.device_id, s.key_encryption_key_1.secret_key_material_hash]
+      end
+    }.to_h
   end
 
   def allocation_dataset
@@ -158,6 +185,9 @@ SQL
 
   def prep
     topo = vm.cloud_hypervisor_cpu_topology
+
+    # we don't write secrets to params_json, because it
+    # shouldn't be stored in the host for security reasons.
     params_json = JSON.pretty_generate({
       "vm_name" => vm_name,
       "public_ipv6" => q_net6,
@@ -174,6 +204,10 @@ SQL
       "storage_volumes" => storage_volumes
     })
 
+    secrets_json = JSON.generate({
+      storage: storage_secrets
+    })
+
     # Enable KVM access for VM user.
     host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
 
@@ -181,7 +215,7 @@ SQL
     params_path = File.join(vm_home, "prep.json")
     host.sshable.cmd("echo #{params_json.shellescape} | sudo -u #{q_vm} tee #{params_path.shellescape}")
 
-    host.sshable.cmd("sudo bin/prepvm.rb #{params_path.shellescape}")
+    host.sshable.cmd("sudo bin/prepvm.rb #{params_path.shellescape}", stdin: secrets_json)
     hop :trigger_refresh_mesh
   end
 

@@ -92,7 +92,7 @@ RSpec.describe Prog::Vm::Nexus do
           "local_ipv4" => "169.254.0.0"
         })
       end
-      expect(sshable).to receive(:cmd).with(/sudo bin\/prepvm/)
+      expect(sshable).to receive(:cmd).with(/sudo bin\/prepvm/, {stdin: "{\"storage\":{}}"})
 
       expect { nx.prep }.to raise_error Prog::Base::Hop do |hop|
         expect(hop.new_label).to eq("trigger_refresh_mesh")
