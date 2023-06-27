@@ -9,7 +9,15 @@ class Sshable < Sequel::Model
     enc.column :raw_private_key_2
   end
 
-  class SshError < StandardError; end
+  class SshError < StandardError
+    attr_reader :exit_code, :exit_signal
+
+    def initialize(message, exit_code, exit_signal)
+      @exit_code = exit_code
+      @exit_signal = exit_signal
+      super message
+    end
+  end
 
   def keys
     [raw_private_key_1, raw_private_key_2].compact.map {
@@ -17,14 +25,43 @@ class Sshable < Sequel::Model
     }
   end
 
-  def cmd(cmd)
-    ret = begin
-      connect.exec!(cmd)
+  def cmd(cmd, stdin: nil)
+    stdout = StringIO.new
+    exit_code = nil
+    exit_signal = nil
+
+    channel = begin
+      connect.open_channel do |ch|
+        ch.exec(cmd) do |ch, success|
+          ch.on_data do |ch, data|
+            stdout.write(data)
+          end
+
+          # Print stderr.
+          ch.on_extended_data do |ch, data|
+            $stderr.write(data)
+          end
+
+          ch.on_request("exit-status") do |ch2, data|
+            exit_code = data.read_long
+          end
+
+          ch.on_request("exit-signal") do |ch2, data|
+            exit_signal = data.read_long
+          end
+          ch.send_data stdin
+          ch.eof!
+          ch.wait
+        end
+      end
     rescue
       invalidate_cache_entry
       raise
     end
-    fail SshError.new(ret) unless ret.exitstatus.zero?
+
+    channel.wait
+    ret = stdout.string.freeze
+    fail SshError.new(ret, exit_code, exit_signal) unless exit_code.zero?
     ret
   end
 
