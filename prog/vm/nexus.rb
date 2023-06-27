@@ -218,18 +218,22 @@ SQL
   end
 
   def create_private_route(my_subnet, dst_subnet)
-    begin
-      pp "sudo ip -n #{q_vm} route add #{dst_subnet.to_s.shellescape} dev tap#{q_vm}"
-      host.sshable.cmd("sudo ip -n #{q_vm} route add #{dst_subnet.to_s.shellescape} dev tap#{q_vm}")
-    rescue Sshable::SshError => ex
-      pp ex.message
-    end
+    ipv6_privs = [my_subnet.first, dst_subnet.first]
+    ipv4_privs = [my_subnet.last, dst_subnet.last]
+    [ipv6_privs, ipv4_privs].each do |src_ip, dst_ip|
+      begin
+        pp "sudo ip -n #{q_vm} route add #{src_ip.to_s.shellescape} dev tap#{q_vm}"
+        host.sshable.cmd("sudo ip -n #{q_vm} route add #{src_ip.to_s.shellescape} dev tap#{q_vm}")
+      rescue Sshable::SshError => ex
+        pp ex.message
+      end
 
-    begin
-      pp "sudo ip -n #{q_vm} route add #{my_subnet.to_s.shellescape} dev tap#{q_vm}"
-      host.sshable.cmd("sudo ip -n #{q_vm} route add #{my_subnet.to_s.shellescape} dev tap#{q_vm}")
-    rescue Sshable::SshError => ex
-      pp ex.message
+      begin
+        pp "sudo ip -n #{q_vm} route add #{dst_ip.to_s.shellescape} dev vethi#{q_vm}"
+        host.sshable.cmd("sudo ip -n #{q_vm} route add #{dst_ip.to_s.shellescape} dev vethi#{q_vm}")
+      rescue Sshable::SshError => ex
+        pp ex.message
+      end
     end
   end
 
@@ -269,7 +273,7 @@ SQL
       private_subnets.each do |my_subnet|
         dst_vm.private_subnets.each do |dst_subnet|
           create_ipsec_tunnel(my_subnet.first, my_subnet.last, dst_vm, dst_subnet.first, dst_subnet.last)
-          create_private_route(my_subnet.first, dst_subnet.first)
+          create_private_route(my_subnet, dst_subnet)
         end
       end
 
