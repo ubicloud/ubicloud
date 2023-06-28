@@ -22,7 +22,9 @@ class Prog::InstallRhizome < Prog::Base
             end
           end
         else
+          # :nocov:
           fail "BUG"
+          # :nocov:
         end
       end
     end
