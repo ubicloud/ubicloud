@@ -1,48 +1,43 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-unless (command = ARGV.shift)
-  puts "expected ipsec command as argument"
+unless (namespace = ARGV.shift)
+  puts "expected namespace as argument"
   exit 1
 end
 
-unless (src_vm_name = ARGV.shift)
-  puts "expected src_vm_name as argument"
+unless (src_clover_ephemeral = ARGV.shift)
+  puts "expected src_clover_ephemeral as argument"
   exit 1
 end
 
-unless (src_ephemeral_net6 = ARGV.shift)
-  puts "expected src_ephemeral_net6 as argument"
+unless (dst_clover_ephemeral = ARGV.shift)
+  puts "expected dst_clover_ephemeral as argument"
   exit 1
 end
 
-unless (src_private_subnet = ARGV.shift)
-  puts "expected src_private_subnet as argument"
+unless (src_private_addr_6 = ARGV.shift)
+  puts "expected src_private_addr_6 as argument"
   exit 1
 end
 
-unless (src_private_subnet4 = ARGV.shift)
-  puts "expected src_private_subnet4 as argument"
+unless (dst_private_addr_6 = ARGV.shift)
+  puts "expected dst_private_addr_6 as argument"
   exit 1
 end
 
-unless (dest_vm_name = ARGV.shift)
-  puts "expected dest_vm_name as argument"
+unless (src_private_addr_4 = ARGV.shift)
+  puts "expected src_private_addr_4 as argument"
   exit 1
 end
 
-unless (dest_ephemeral_net6 = ARGV.shift)
-  puts "expected dest_ephemeral_net6 as argument"
+unless (dst_private_addr_4 = ARGV.shift)
+  puts "expected dst_private_addr_4 as argument"
   exit 1
 end
 
-unless (dest_private_subnet = ARGV.shift)
-  puts "expected dest_private_subnet as argument"
-  exit 1
-end
-
-unless (dest_private_subnet4 = ARGV.shift)
-  puts "expected dest_private_subnet4 as argument"
+unless (direction = ARGV.shift)
+  puts "expected direction as argument"
   exit 1
 end
 
@@ -67,15 +62,10 @@ require_relative "../lib/ipsec_tunnel"
 require "fileutils"
 require "netaddr"
 
-src_endpoint = IPSecTunnelEndpoint.new(src_vm_name, NetAddr.parse_net(src_ephemeral_net6), src_private_subnet, src_private_subnet4)
-dest_endpoint = IPSecTunnelEndpoint.new(dest_vm_name, NetAddr.parse_net(dest_ephemeral_net6), dest_private_subnet, dest_private_subnet4)
-ipsec_tunnel = IPSecTunnel.new(src_endpoint, dest_endpoint, spi, spi4, security_key)
+ipsec_tunnel = IPSecTunnel.new(namespace, 
+  src_clover_ephemeral, dst_clover_ephemeral, 
+  src_private_addr_6, dst_private_addr_6, 
+  src_private_addr_4, dst_private_addr_4, 
+  spi, spi4, security_key, direction)
 
-case command
-when "setup_src"
-  ipsec_tunnel.setup_src
-when "setup_dst"
-  ipsec_tunnel.setup_dst
-else
-  puts "Unknown command: #{command}"
-end
+ipsec_tunnel.setup

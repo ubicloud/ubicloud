@@ -66,7 +66,7 @@ class Prog::Vm::Nexus < Prog::Base
   def self.random_private_ipv4
     addr = NetAddr::IPv4Net.parse("192.168.0.0/24")
     network_mask = NetAddr::Mask32.new(32)
-    NetAddr::IPv4Net.new(addr.nth(SecureRandom.random_number(addr.len)), network_mask)
+    NetAddr::IPv4Net.new(addr.nth(SecureRandom.random_number(addr.len - 2).to_i + 2), network_mask)
   end
 
   def vm
@@ -201,35 +201,61 @@ SQL
   end
 
   def create_ipsec_tunnel(my_subnet6, my_subnet4, dst_vm, dst_subnet6, dst_subnet4)
-    q_dst_name = dst_vm.inhost_name.shellescape
-    q_dst_net = dst_vm.ephemeral_net6.to_s.shellescape
-
-    my_params = "#{q_vm} #{q_net6} #{my_subnet6.to_s.shellescape} #{my_subnet4.to_s.shellescape}"
-    dst_params = "#{q_dst_name} #{q_dst_net} #{dst_subnet6.to_s.shellescape} #{dst_subnet4.to_s.shellescape}"
+    src_namespace = vm.inhost_name.shellescape
+    dst_namespace = dst_vm.inhost_name.shellescape
+    src_clover_ephemeral = subdivide_network(vm.ephemeral_net6)
+    dst_clover_ephemeral = subdivide_network(dst_vm.ephemeral_net6)
+    src_private_addr_6 = my_subnet6.to_s.shellescape
+    dst_private_addr_6 = dst_subnet6.to_s.shellescape
+    src_private_addr_4 = my_subnet4.to_s.shellescape
+    dst_private_addr_4 = dst_subnet4.to_s.shellescape
+    src_direction = "out"
+    dst_direction = "fwd"
 
     spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
     spi4 = "0x" + SecureRandom.bytes(4).unpack1("H*")
     key = "0x" + SecureRandom.bytes(36).unpack1("H*")
 
-    pp "sudo bin/setup-ipsec setup_src #{my_params} #{dst_params} #{spi} #{spi4} #{key}"
-    host.sshable.cmd("sudo bin/setup-ipsec setup_src #{my_params} #{dst_params} #{spi} #{spi4} #{key}")
-    pp "sudo bin/setup-ipsec setup_dst #{my_params} #{dst_params} #{spi} #{spi4} #{key}"
-    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec setup_dst #{my_params} #{dst_params} #{spi} #{spi4} #{key}")
+    # setup source ipsec tunnels
+    pp "sudo bin/setup-ipsec " \
+      "#{src_namespace} #{src_clover_ephemeral} " \
+      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
+      "#{dst_private_addr_6} #{src_private_addr_4} " \
+      "#{dst_private_addr_4} #{src_direction} " \
+      "#{spi} #{spi4} #{key}"
+
+    pp "sudo bin/setup-ipsec " \
+      "#{dst_namespace} #{dst_clover_ephemeral} " \
+      "#{src_clover_ephemeral} #{dst_private_addr_6} " \
+      "#{src_private_addr_6} #{dst_private_addr_4} " \
+      "#{src_private_addr_4} #{dst_direction} " \
+      "#{spi} #{spi4} #{key}"
+
+    host.sshable.cmd("sudo bin/setup-ipsec " \
+      "#{src_namespace} #{src_clover_ephemeral} " \
+      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
+      "#{dst_private_addr_6} #{src_private_addr_4} " \
+      "#{dst_private_addr_4} #{src_direction} " \
+      "#{spi} #{spi4} #{key}")
+    
+    # setup destination ipsec tunnels
+    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec " \
+      "#{dst_namespace} #{src_clover_ephemeral} " \
+      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
+      "#{dst_private_addr_6} #{src_private_addr_4} " \
+      "#{dst_private_addr_4} #{dst_direction} " \
+      "#{spi} #{spi4} #{key}")
   end
 
-  def create_private_route(my_subnet, dst_subnet)
-    ipv6_privs = [my_subnet.first, dst_subnet.first]
-    ipv4_privs = [my_subnet.last, dst_subnet.last]
-    [ipv6_privs, ipv4_privs].each do |src_ip, dst_ip|
-      begin
-        pp "sudo ip -n #{q_vm} route add #{src_ip.to_s.shellescape} dev tap#{q_vm}"
-        host.sshable.cmd("sudo ip -n #{q_vm} route add #{src_ip.to_s.shellescape} dev tap#{q_vm}")
-      rescue Sshable::SshError => ex
-        pp ex.message
-      end
+  def subdivide_network(net)
+    prefix = net.netmask.prefix_len + 1
+    halved = net.resize(prefix)
+    halved.next_sib
+  end
 
+  def create_private_route(dst_subnet)
+    dst_subnet.each do |dst_ip|
       begin
-        pp "sudo ip -n #{q_vm} route add #{dst_ip.to_s.shellescape} dev vethi#{q_vm}"
         host.sshable.cmd("sudo ip -n #{q_vm} route add #{dst_ip.to_s.shellescape} dev vethi#{q_vm}")
       rescue Sshable::SshError => ex
         pp ex.message
@@ -273,7 +299,7 @@ SQL
       private_subnets.each do |my_subnet|
         dst_vm.private_subnets.each do |dst_subnet|
           create_ipsec_tunnel(my_subnet.first, my_subnet.last, dst_vm, dst_subnet.first, dst_subnet.last)
-          create_private_route(my_subnet, dst_subnet)
+          create_private_route(dst_subnet)
         end
       end
 
