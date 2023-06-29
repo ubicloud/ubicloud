@@ -72,7 +72,7 @@ RSpec.describe Sshable do
 
     it "can reset caches even if session fails while closing" do
       sess = instance_double(Net::SSH::Connection::Session)
-      expect(sess).to receive(:close).and_raise Sshable::SshError.new("bogus", nil, nil)
+      expect(sess).to receive(:close).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Net::SSH).to receive(:start).and_return sess
       sa.connect
 
@@ -85,60 +85,66 @@ RSpec.describe Sshable do
     let(:session) { instance_double(Net::SSH::Connection::Session) }
 
     before do
-      expect(sa).to receive(:connect).and_return(session)
+      expect(sa).to receive(:connect).and_return(session).at_least(:once)
     end
 
     it "can run a command" do
-      expect(session).to receive(:open_channel) do |&blk|
-        chan = instance_spy(Net::SSH::Connection::Channel)
-        expect(chan).to receive(:exec).with("echo hello") do |&blk|
-          chan2 = instance_spy(Net::SSH::Connection::Channel)
+      [false, true].each do |repl_value|
+        stub_const("REPL", repl_value)
+        expect(session).to receive(:open_channel) do |&blk|
+          chan = instance_spy(Net::SSH::Connection::Channel)
+          expect(chan).to receive(:exec).with("echo hello") do |&blk|
+            chan2 = instance_spy(Net::SSH::Connection::Channel)
 
-          expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
-            buf = instance_double(Net::SSH::Buffer)
-            expect(buf).to receive(:read_long).and_return(0)
-            blk.call(nil, buf)
+            expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
+              buf = instance_double(Net::SSH::Buffer)
+              expect(buf).to receive(:read_long).and_return(0)
+              blk.call(nil, buf)
+            end
+
+            expect($stderr).to receive(:write).with("hello") if repl_value
+            expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), "hello")
+
+            blk.call(chan2, true)
           end
-
-          expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), "hello")
-          blk.call(chan2, true)
+          blk.call(chan, true)
+          chan
         end
-        blk.call(chan, true)
-        chan
-      end
 
-      expect(sa.cmd("echo hello")).to eq("hello")
+        expect(sa.cmd("echo hello")).to eq("hello")
+      end
     end
 
     it "raises an error with a non-zero exit status" do
-      expect(session).to receive(:open_channel) do |&blk|
-        chan = instance_spy(Net::SSH::Connection::Channel)
-        expect(chan).to receive(:exec).with("exit 1") do |&blk|
-          chan2 = instance_spy(Net::SSH::Connection::Channel)
-          expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
-            buf = instance_double(Net::SSH::Buffer)
-            expect(buf).to receive(:read_long).and_return(1)
-            blk.call(nil, buf)
-          end
+      [false, true].each do |repl_value|
+        stub_const("REPL", repl_value)
+        expect(session).to receive(:open_channel) do |&blk|
+          chan = instance_spy(Net::SSH::Connection::Channel)
+          expect(chan).to receive(:exec).with("exit 1") do |&blk|
+            chan2 = instance_spy(Net::SSH::Connection::Channel)
+            expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
+              buf = instance_double(Net::SSH::Buffer)
+              expect(buf).to receive(:read_long).and_return(1)
+              blk.call(nil, buf)
+            end
 
-          expect(chan2).to receive(:on_request).with("exit-signal") do |&blk|
-            buf = instance_double(Net::SSH::Buffer)
-            expect(buf).to receive(:read_long).and_return(127)
-            blk.call(nil, buf)
-          end
+            expect(chan2).to receive(:on_request).with("exit-signal") do |&blk|
+              buf = instance_double(Net::SSH::Buffer)
+              expect(buf).to receive(:read_long).and_return(127)
+              blk.call(nil, buf)
+            end
 
-          expect(chan2).to receive(:on_extended_data) do |&blk|
-            expect($stderr).to receive(:write).with("hello")
-            blk.call(nil, "hello")
-          end
+            expect($stderr).to receive(:write).with("hello") if repl_value
+            expect(chan2).to receive(:on_extended_data).and_yield(nil, 1, "hello")
 
-          blk.call(chan2, true)
+            blk.call(chan2, true)
+          end
+          blk.call(chan, true)
+          chan
         end
-        blk.call(chan, true)
-        chan
-      end
 
-      expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, ""
+        expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+      end
     end
 
     it "invalidates the cache if the session raises an error" do

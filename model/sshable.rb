@@ -10,12 +10,14 @@ class Sshable < Sequel::Model
   end
 
   class SshError < StandardError
-    attr_reader :exit_code, :exit_signal
+    attr_reader :stdout, :stderr, :exit_code, :exit_signal
 
-    def initialize(message, exit_code, exit_signal)
+    def initialize(cmd, stdout, stderr, exit_code, exit_signal)
       @exit_code = exit_code
       @exit_signal = exit_signal
-      super message
+      @stdout = stdout
+      @stderr = stderr
+      super "command exited with an error: " + cmd
     end
   end
 
@@ -27,19 +29,21 @@ class Sshable < Sequel::Model
 
   def cmd(cmd, stdin: nil)
     stdout = StringIO.new
+    stderr = StringIO.new
     exit_code = nil
     exit_signal = nil
 
-    channel = begin
+    begin
       connect.open_channel do |ch|
         ch.exec(cmd) do |ch, success|
           ch.on_data do |ch, data|
+            $stderr.write(data) if REPL
             stdout.write(data)
           end
 
-          # Print stderr.
-          ch.on_extended_data do |ch, data|
-            $stderr.write(data)
+          ch.on_extended_data do |ch, type, data|
+            $stderr.write(data) if REPL
+            stderr.write(data)
           end
 
           ch.on_request("exit-status") do |ch2, data|
@@ -53,15 +57,14 @@ class Sshable < Sequel::Model
           ch.eof!
           ch.wait
         end
-      end
+      end.wait
     rescue
       invalidate_cache_entry
       raise
     end
 
-    channel.wait
     ret = stdout.string.freeze
-    fail SshError.new(ret, exit_code, exit_signal) unless exit_code.zero?
+    fail SshError.new(cmd, ret, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
     ret
   end
 

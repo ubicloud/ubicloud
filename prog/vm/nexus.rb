@@ -149,7 +149,7 @@ SQL
     begin
       host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} #{q_vm}")
     rescue Sshable::SshError => ex
-      raise unless /adduser: The user `.*' already exists\./.match?(ex.message)
+      raise unless /adduser: The user `.*' already exists\./.match?(ex.stderr)
     end
 
     hop :prep
