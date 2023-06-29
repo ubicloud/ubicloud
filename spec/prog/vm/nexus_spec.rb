@@ -48,7 +48,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "absorbs an already-exists error as a success" do
       expect(sshable).to receive(:cmd).with(/sudo.*adduser.*#{nx.vm_name}/).and_raise(
-        Sshable::SshError.new("adduser: The user `vmabc123' already exists.", 1, nil)
+        Sshable::SshError.new("adduser", "", "adduser: The user `vmabc123' already exists.", 1, nil)
       )
 
       expect { nx.create_unix_user }.to raise_error Prog::Base::Hop do |hop|
@@ -57,7 +57,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "raises other errors" do
-      ex = Sshable::SshError.new("out of memory", 1, nil)
+      ex = Sshable::SshError.new("allocate a lot", "", "out of memory", 1, nil)
       expect(sshable).to receive(:cmd).with(/sudo.*adduser.*#{nx.vm_name}/).and_raise(ex)
 
       expect { nx.create_unix_user }.to raise_error ex

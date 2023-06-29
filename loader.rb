@@ -6,6 +6,8 @@ Bundler.setup
 require_relative "config"
 require "rack/unreloader"
 
+REPL = false unless defined? REPL
+
 Unreloader = Rack::Unreloader.new(
   reload: Config.development?,
   autoload: true,
