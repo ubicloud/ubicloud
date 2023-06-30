@@ -235,12 +235,6 @@ class Clover < Roda
     request.redirect env["HTTP_REFERER"]
   end
 
-  def vm_host_allowed?
-    vm_host_users = Config.allowed_vm_host_users
-    return true if vm_host_users.empty?
-    vm_host_users.include?(Account[rodauth.session_value].email)
-  end
-
   def serialize(data, structure = :default)
     @serializer.new(structure).serialize(data)
   end
