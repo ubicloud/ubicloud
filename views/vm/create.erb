@@ -58,6 +58,23 @@
                     ) %>
                   </div>
                   <div class="col-span-full">
+                    <%== render(
+                      "components/form/range_slider",
+                      locals: {
+                        name: "storage-size-gib",
+                        label: "Storage Size",
+                        range_labels: (1..10).map { "#{_1 * 10}GB" },
+                        value: 40,
+                        attributes: {
+                          min: 10,
+                          max: 100,
+                          step: 10,
+                          required: true
+                        }
+                      }
+                    ) %>
+                  </div>
+                  <div class="col-span-full">
                     <div class="space-y-2">
                       <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size</label>
                       <fieldset class="radio-small-cards" id="size-radios">
@@ -84,9 +101,7 @@
                                     <span class="block sm:inline"><%= size.vcpu %>
                                       vCPUs /
                                       <%= size.memory %>
-                                      GB /
-                                      <%= size.disk %>
-                                      GB SSD</span>
+                                      GB</span>
                                   </span>
                                 </span>
                               </span>

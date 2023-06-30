@@ -146,4 +146,8 @@ class Vm < Sequel::Model
     # entropy.
     self.class.uuid_to_name(id)
   end
+
+  def storage_size_gib
+    vm_storage_volumes.map { _1.size_gib }.sum
+  end
 end
