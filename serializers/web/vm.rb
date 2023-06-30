@@ -12,6 +12,7 @@ class Serializers::Web::Vm < Serializers::Base
       state: vm.display_state,
       location: vm.location,
       size: vm.size,
+      storage_size_gib: vm.storage_size_gib,
       ip6: vm.ephemeral_net6&.nth(2),
       projects: Serializers::Web::Project.new(:default).serialize(vm.projects)
     }

@@ -39,6 +39,11 @@
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm[:size] %></dd>
               </div>
               <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
+                <dt class="text-sm font-medium text-gray-500">Storage Size</dt>
+                <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @vm[:storage_size_gib] %>
+                  GB</dd>
+              </div>
+              <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                 <dt class="text-sm font-medium text-gray-500">IPv6</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
                   <span class="copy-content cursor-pointer" data-content="<%= @vm[:ip6] %>" data-message="Copied IPv6">

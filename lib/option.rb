@@ -3,7 +3,7 @@
 module Option
   Location = Struct.new(:name, :display_name)
   BootImage = Struct.new(:name, :display_name)
-  VmSize = Struct.new(:name, :display_name, :vcpu, :memory, :disk)
+  VmSize = Struct.new(:name, :display_name, :vcpu, :memory)
 
   Locations = [
     ["hetzner-hel1", "Hetzner Finland"],
@@ -18,8 +18,8 @@ module Option
   ].map { |args| BootImage.new(*args) }.freeze
 
   VmSizes = [
-    ["c5a.2x", "c5a.2x", 2, 2, 30],
-    ["c5a.4x", "c5a.4x", 4, 4, 60],
-    ["c5a.6x", "c5a.6x", 6, 6, 90]
+    ["c5a.2x", "c5a.2x", 2, 2],
+    ["c5a.4x", "c5a.4x", 4, 4],
+    ["c5a.6x", "c5a.6x", 6, 6]
   ].map { |args| VmSize.new(*args) }.freeze
 end
