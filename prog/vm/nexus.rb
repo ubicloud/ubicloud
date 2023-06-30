@@ -3,6 +3,7 @@
 require "netaddr"
 require "json"
 require "ulid"
+require "shellwords"
 
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
