@@ -66,6 +66,11 @@ jobs:
         COVERAGE=1 bundle exec rspec
         bundle exec rspec -O /dev/null rhizome
 
+    - name: Revert migrations
+      env:
+        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
+      run: rake test_down
+
     - name: Archive code coverage results
       if: failure()
       uses: actions/upload-artifact@v3
