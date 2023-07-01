@@ -1,15 +1,18 @@
 # frozen_string_literal: true
 
 module Option
-  Location = Struct.new(:name, :display_name)
   BootImage = Struct.new(:name, :display_name)
   VmSize = Struct.new(:name, :display_name, :vcpu, :memory)
 
-  Locations = [
-    ["hetzner-hel1", "Hetzner Finland"],
-    ["hetzner-fsn1", "Hetzner Germany"],
-    ["dp-istanbul-mars", "DataPacket Istanbul"]
-  ].map { |args| Location.new(*args) }.freeze
+  Providers = [
+    [Provider::HETZNER, "Hetzner", [
+      ["hel1", "Finland"],
+      ["fsn1", "Germany"]
+    ]],
+    [Provider::DATAPACKET, "DataPacket", [
+      ["istanbul-mars", "Istanbul"]
+    ]]
+  ].to_h { |args| [args[0], Provider.new(*args)] }.freeze
 
   BootImages = [
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],

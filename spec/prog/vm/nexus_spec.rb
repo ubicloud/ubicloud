@@ -134,11 +134,13 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#allocate" do
     before do
       @host_index = 0
+      vm.provider = "some-provider"
       vm.location = "somewhere-normal"
     end
 
     def new_host(**args)
       args = {allocation_state: "accepting",
+              provider: "some-provider",
               location: "somewhere-normal",
               total_sockets: 1,
               total_nodes: 4,
@@ -153,6 +155,16 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "fails if there are no VmHosts" do
       expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
+    end
+
+    it "only matches when provider matches" do
+      vm.provider = "some-provider"
+      vmh = new_host(provider: "another-provider").save_changes
+      expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
+
+      vm.provider = "another-provider"
+      expect(nx.allocate).to eq vmh.id
+      expect(vmh.reload.used_cores).to eq(1)
     end
 
     it "only matches when location matches" do

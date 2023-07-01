@@ -67,7 +67,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         select project.name, from: "project-id"
-        choose option: "hetzner-hel1"
+        choose option: "hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
 
@@ -86,7 +86,7 @@ RSpec.describe Clover, "vm" do
 
         fill_in "Name", with: "invalid name"
         select project.name, from: "project-id"
-        choose option: "hetzner-hel1"
+        choose option: "hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
 
@@ -105,7 +105,7 @@ RSpec.describe Clover, "vm" do
 
         fill_in "Name", with: vm.name
         select project.name, from: "project-id"
-        choose option: "hetzner-hel1"
+        choose option: "hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
 

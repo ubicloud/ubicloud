@@ -9,7 +9,7 @@ class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
 
   def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
-    unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
+    unix_user: "ubi", provider: Provider::HETZNER, location: "hel1", boot_image: "ubuntu-jammy",
     private_subnets: [], storage_size_gib: 20)
 
     project = Project[project_id]
@@ -29,7 +29,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     DB.transaction do
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
-        name: name, size: size, location: location, boot_image: boot_image) { _1.id = id }
+        name: name, size: size, provider: provider, location: location, boot_image: boot_image) { _1.id = id }
       vm.associate_with_project(project)
       private_subnets.each do
         VmPrivateSubnet.create(vm_id: vm.id, private_subnet: _1.to_s)
@@ -106,13 +106,14 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def allocation_dataset
-    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.location]
+    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.provider, vm.location]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
 FROM vm_host
 WHERE vm_host.used_cores + ? < vm_host.total_cores
 AND vm_host.total_mem_gib / vm_host.total_cores >= ?
 AND vm_host.used_hugepages_1g + ? < vm_host.total_hugepages_1g
 AND vm_host.allocation_state = 'accepting'
+AND vm_host.provider = ?
 AND vm_host.location = ?
 ORDER BY mem_ratio, used_cores
 SQL

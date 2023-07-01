@@ -44,13 +44,14 @@
                       }
                     ) %>
                   </div>
+                  <input type="hidden" name="provider" value="<%= Provider::HETZNER %>">
                   <div class="col-span-full">
                     <%== render(
                       "components/form/radio_small_cards",
                       locals: {
                         name: "location",
-                        label: "Provider & Location",
-                        options: Option::Locations.to_h { |l| [l.name, l.display_name] },
+                        label: "Location",
+                        options: Option::Providers[Provider::HETZNER].locations.to_h { |l| [l.name, l.display_name] },
                         attributes: {
                           required: true
                         }
