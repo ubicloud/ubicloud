@@ -140,9 +140,9 @@ class VmHost < Sequel::Model
 
     DB.transaction do
       ip_records.each do |ip_record|
-        ip_addr = ip_record[:ip_address]
-        source_host_ip = ip_record[:source_host_ip]
-        is_failover_ip = ip_record[:is_failover]
+        ip_addr = ip_record.ip_address
+        source_host_ip = ip_record.source_host_ip
+        is_failover_ip = ip_record.is_failover
 
         next if assigned_subnets.any? { |a| a.cidr.to_s == ip_addr }
 

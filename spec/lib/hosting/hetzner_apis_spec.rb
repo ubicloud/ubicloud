@@ -106,12 +106,16 @@ RSpec.describe Hosting::HetznerApis do
         }
       ]))
 
-      expect(hetzner_apis.pull_ips).to eq(
-        [{ip_address: "1.1.1.1/32", source_host_ip: "1.1.1.1", is_failover: false},
-          {ip_address: "1.1.2.0/32", source_host_ip: "1.1.1.1", is_failover: false},
-          {ip_address: "2.2.2.0/29", source_host_ip: "1.1.1.1", is_failover: false},
-          {ip_address: "30.30.30.30/29", source_host_ip: "1.1.1.1", is_failover: true}]
-      )
+      expected = [
+        ["1.1.1.1/32", "1.1.1.1", false],
+        ["1.1.2.0/32", "1.1.1.1", false],
+        ["2.2.2.0/29", "1.1.1.1", false],
+        ["30.30.30.30/29", "1.1.1.1", true]
+      ].map {
+        Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
+      }
+
+      expect(hetzner_apis.pull_ips).to eq expected
     end
   end
 end
