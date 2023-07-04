@@ -42,23 +42,28 @@ RSpec.describe Hosting::HetznerApis do
     end
 
     it "can pull data from the API" do
-      stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([{
-        "ip" => {
-          "ip" => "1.1.1.1",
-          "server_ip" => "1.1.1.1"
+      stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([
+        {
+          "ip" => {
+            "ip" => "1.1.1.1",
+            "server_ip" => "1.1.1.1"
+          }
+        },
+        {
+          "ip" => {
+            "ip" => "1.1.2.0",
+            "server_ip" => "1.1.1.1"
+          }
         }
-      },
-        "ip" => {
-          "ip" => "1.1.2.0",
-          "server_ip" => "1.1.1.1"
-        }]))
-      stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([{
-        "subnet" => {
-          "ip" => "2.2.2.0",
-          "mask" => 29,
-          "server_ip" => "1.1.1.1"
-        }
-      },
+      ]))
+      stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([
+        {
+          "subnet" => {
+            "ip" => "2.2.2.0",
+            "mask" => 29,
+            "server_ip" => "1.1.1.1"
+          }
+        },
         {
           "subnet" => {
             "ip" => "3.3.3.0",
@@ -79,22 +84,27 @@ RSpec.describe Hosting::HetznerApis do
             "mask" => 29,
             "server_ip" => "1.1.1.1"
           }
-        }]))
-
-      stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 200, body: JSON.dump([{
-        "failover" => {
-          "ip" => "15.15.15.15",
-          "mask" => 29,
-          "server_ip" => "1.1.1.1",
-          "active_server_ip" => "0.0.0.0" # routed to a different server
         }
-      },
-        "failover" => {
-          "ip" => "30.30.30.30",
-          "mask" => 29,
-          "server_ip" => "1.1.1.1",
-          "active_server_ip" => "1.1.1.1"
-        }]))
+      ]))
+
+      stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 200, body: JSON.dump([
+        {
+          "failover" => {
+            "ip" => "15.15.15.15",
+            "mask" => 29,
+            "server_ip" => "1.1.1.1",
+            "active_server_ip" => "0.0.0.0" # routed to a different server
+          }
+        },
+        {
+          "failover" => {
+            "ip" => "30.30.30.30",
+            "mask" => 29,
+            "server_ip" => "1.1.1.1",
+            "active_server_ip" => "1.1.1.1"
+          }
+        }
+      ]))
 
       expect(hetzner_apis.pull_ips).to eq(
         [{ip_address: "1.1.1.1/32", source_host_ip: "1.1.1.1", is_failover: false},
