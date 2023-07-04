@@ -18,12 +18,36 @@ class VmPath
     File.write(path, s)
   end
 
+  def kea_dhcp6_service
+    "/etc/systemd/system/#{@vm_name}-kea-dhcp6.service"
+  end
+
+  def kea_dhcp4_service
+    "/etc/systemd/system/#{@vm_name}-kea-dhcp4.service"
+  end
+
+  def radvd_service
+    "/etc/systemd/system/#{@vm_name}-radvd.service"
+  end
+
   def dnsmasq_service
     "/etc/systemd/system/#{@vm_name}-dnsmasq.service"
   end
 
   def write_dnsmasq_service(s)
     write(dnsmasq_service, s)
+  end
+
+  def write_kea_dhcp6_service(s)
+    write(kea_dhcp6_service, s)
+  end
+
+  def write_kea_dhcp4_service(s)
+    write(kea_dhcp4_service, s)
+  end
+
+  def write_radvd_service(s)
+    write(radvd_service, s)
   end
 
   def systemd_service
@@ -50,6 +74,9 @@ class VmPath
     guest_ephemeral
     clover_ephemeral
     dnsmasq.conf
+    kea_dhcp6.conf
+    kea_dhcp4.conf
+    radvd.conf
     meta-data
     network-config
     user-data

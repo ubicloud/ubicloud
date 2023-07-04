@@ -36,7 +36,8 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnNetwork unless vm_host.net6
     bud Prog::LearnMemory
     bud Prog::LearnCores
-    bud Prog::InstallDnsmasq
+    # bud Prog::InstallDnsmasq
+    bud Prog::InstallKea
     hop :wait_prep
   end
 

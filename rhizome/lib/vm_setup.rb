@@ -219,6 +219,92 @@ dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netma
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
 
+    vp.write_radvd_conf(<<RADVD_CONF)
+interface tap#{@vm_name}
+{
+  AdvSendAdvert on;
+  prefix #{guest_network.to_s}
+  {
+    AdvOnLink on;
+    AdvAutonomous off;
+    AdvRouterAddr off;
+  };
+};
+RADVD_CONF
+    r "mkdir -p /vm/#{@vm_name}/kea-server6"
+    vp.write_kea_dhcp6_conf(<<KEA_DHCP6_CONF)
+{
+  "Dhcp6": {
+    "data-directory": "/vm/#{@vm_name}/kea-server6",
+    "valid-lifetime": 4000,
+    "renew-timer": 1000,
+    "rebind-timer": 2000,
+    "preferred-lifetime": 3000,
+    "interfaces-config": {
+      "interfaces": [ "tap#{@vm_name}" ]
+    },
+    "subnet6": [{
+      "subnet": "#{guest_network}",
+      "pools": [{ "pool": "#{guest_network}" }]
+    }],
+    "loggers": [{
+      "name": "kea-dhcp6",
+      "output_options": [{
+        "output": "/vm/#{@vm_name}/kea-dhcp6.log"
+      }],
+      "severity": "DEBUG",
+      "debuglevel": 99
+    }]
+  }
+}
+KEA_DHCP6_CONF
+
+    vp.write_kea_dhcp4_conf(<<KEA_DHCP4_CONF)
+{
+  # DHCPv4 configuration starts on the next line
+  "Dhcp4": {
+      # First we set up global values
+      "valid-lifetime": 4000,
+      "renew-timer": 1000,
+      "rebind-timer": 2000,
+
+      # Next we set up the interfaces to be used by the server.
+      "interfaces-config": {
+          "interfaces": [ "tap#{@vm_name}" ]
+      },
+
+      # And we specify the type of lease database
+      "lease-database": {
+          "type": "memfile",
+          "persist": true,
+          "name": "/var/lib/kea/dhcp4.leases"
+      },
+
+      # Finally, we list the subnets from which we will be leasing addresses.
+      "subnet4": [
+          {
+              "subnet": "#{vm_sub.nth(0)}/24",
+              "pools": [
+                  {
+                      "pool": "#{vm_sub.nth(0)} - #{vm_sub.nth(0)}"
+                  }
+              ],
+              "option-data": [
+                  {
+                      "name": "routers",
+                      "data": "192.0.0.1"
+                  }
+              ]
+          }
+      ]
+      # DHCPv4 configuration ends with the next line
+  }
+}
+KEA_DHCP4_CONF
+
+    r "chown -R #{q_vm}:#{q_vm} /run/kea"
+    r "chown #{q_vm}:#{q_vm} /vm/#{q_vm}/radvd.conf"
+
     vp.write_network_config(<<EOS)
 version: 2
 ethernets:
@@ -354,17 +440,52 @@ EOS
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
-    vp.write_dnsmasq_service <<DNSMASQ_SERVICE
+    vp.write_radvd_service <<RADVD_SERVICE
+# It's not recommended to modify this file in-place, because it
+# will be overwritten during upgrades.  If you want to customize,
+# the best way is to use the "systemctl edit" command.
+
 [Unit]
-Description=A lightweight DHCP and caching DNS server
+Description=Router advertisement daemon for IPv6
+Documentation=man:radvd(8)
 After=network.target
+ConditionPathExists=/vm/#{@vm_name}/radvd.conf
+
+[Service]
+User=root
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+Type=forking
+ExecStartPre=/usr/sbin/radvd --logmethod stderr_clean -C /vm/#{@vm_name}/radvd.conf --configtest
+ExecStart=/usr/sbin/radvd --logmethod stderr_clean -C /vm/#{@vm_name}/radvd.conf
+ExecReload=/usr/sbin/radvd --logmethod stderr_clean -C /vm/#{@vm_name}/radvd.conf --configtest
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+# Set the CPU scheduling policy to idle which is for running very low priority background jobs
+CPUSchedulingPolicy=idle
+
+# Allow for binding to low ports and doing raw network access
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE  CAP_NET_RAW
+
+# Ensures that the service process and all its children can never gain new privileges
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
+RADVD_SERVICE
+
+    vp.write_kea_dhcp4_service <<KEA_DHCP4_SERVICE
+[Unit]
+Description=ISC KEA IPv4 DHCP daemon
+Documentation=man:kea-dhcp4(8)
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
-ExecStartPre=/usr/local/sbin/dnsmasq --test
-ExecStart=/usr/local/sbin/dnsmasq -k -h -C /vm/#{@vm_name}/dnsmasq.conf --log-debug -i tap#{@vm_name} --user=#{@vm_name} --group=#{@vm_name}
 ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=/usr/sbin/kea-dhcp4 -c /vm/#{@vm_name}/kea_dhcp4.conf 
 # YYY: These are not enough capabilties, at least CAP_NET_RAW is
 # needed, as well as more for setgid
 # CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
@@ -377,7 +498,60 @@ ProtectControlGroups=yes
 ProtectHome=yes
 NoNewPrivileges=yes
 ReadOnlyPaths=/
-DNSMASQ_SERVICE
+ReadWriteDirectories=/vm/#{@vm_name}/
+KEA_DHCP4_SERVICE
+
+  vp.write_kea_dhcp6_service <<KEA_DHCP6_SERVICE
+[Unit]
+Description=ISC KEA IPv4 DHCP daemon
+Documentation=man:kea-dhcp6(8)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+Type=simple
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=/usr/sbin/kea-dhcp6 -c /vm/#{@vm_name}/kea_dhcp6.conf
+# YYY: These are not enough capabilties, at least CAP_NET_RAW is
+# needed, as well as more for setgid
+# CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+# AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+ProtectSystem=strict
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadOnlyPaths=/
+ReadWriteDirectories=/vm/#{@vm_name}/
+KEA_DHCP6_SERVICE
+
+#     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
+# [Unit]
+# Description=A lightweight DHCP and caching DNS server
+# After=network.target
+
+# [Service]
+# NetworkNamespacePath=/var/run/netns/#{@vm_name}
+# Type=simple
+# ExecStartPre=/usr/local/sbin/dnsmasq --test
+# ExecStart=/usr/local/sbin/dnsmasq -k -h -C /vm/#{@vm_name}/dnsmasq.conf --log-debug -i tap#{@vm_name} --user=#{@vm_name} --group=#{@vm_name}
+# ExecReload=/bin/kill -HUP $MAINPID
+# # YYY: These are not enough capabilties, at least CAP_NET_RAW is
+# # needed, as well as more for setgid
+# # CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+# # AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+# ProtectSystem=strict
+# PrivateDevices=yes
+# PrivateTmp=yes
+# ProtectKernelTunables=yes
+# ProtectControlGroups=yes
+# ProtectHome=yes
+# NoNewPrivileges=yes
+# ReadOnlyPaths=/
+# DNSMASQ_SERVICE
 
     disk_params = vhost_sockets.map { |socket|
       "--disk vhost_user=true,socket=#{socket},num_queues=1,queue_size=256 \\"
@@ -391,8 +565,8 @@ DNSMASQ_SERVICE
 [Unit]
 Description=#{@vm_name}
 After=network.target
-After=#{@vm_name}-dnsmasq.service
-Requires=#{@vm_name}-dnsmasq.service
+After=#{@vm_name}-kea-dhcp6.service #{@vm_name}-kea-dhcp4.service #{@vm_name}-radvd.service
+Requires=#{@vm_name}-kea-dhcp6.service #{@vm_name}-kea-dhcp4.service #{@vm_name}-radvd.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}

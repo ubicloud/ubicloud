@@ -321,7 +321,9 @@ SQL
       end
 
       begin
-        host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
+        #host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
+        host.sshable.cmd("sudo systemctl stop #{q_vm}-kea-dhcp4")
+        host.sshable.cmd("sudo systemctl stop #{q_vm}-kea-dhcp6")
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.message)
       end
