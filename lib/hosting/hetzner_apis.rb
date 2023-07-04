@@ -59,32 +59,31 @@ class Hosting::HetznerApis
 
   def find_matching_ips(result)
     host_address = @host.vm_host.sshable.host
-    matching_ips = []
 
-    # Check ips
-    result[:ips].each do |ip|
-      if ip["active_server_ip"] == host_address
-        matching_ips << {
+    (
+      # Aggregate single-ip addresses.
+      result[:ips].filter_map do |ip|
+        next unless ip["active_server_ip"] == host_address
+        {
           ip_address: "#{ip["ip"]}/32",
           source_host_ip: ip["server_ip"],
           is_failover: ip["failover_ip"]
         }
-      end
-    end
+      end +
 
-    # Check subnets
-    result[:subnets].each do |subnet|
-      if subnet["active_server_ip"] == host_address
+      # Aggregate subnets (including IPv6 /64 blocks).
+      result[:subnets].filter_map do |subnet|
+        next unless subnet["active_server_ip"] == host_address
+
         # Check if it is IPv6 or not by the existence of colon in the IP address
-        mask = subnet["ip"].include?(":") ? 64 : subnet["mask"]
-        matching_ips << {
+        mask = subnet["ip"].include?(":") ? 64 : subnet.fetch("mask")
+
+        {
           ip_address: "#{subnet["ip"]}/#{mask}",
           source_host_ip: subnet["server_ip"],
           is_failover: subnet["failover_ip"]
         }
       end
-    end
-
-    matching_ips
+    )
   end
 end
