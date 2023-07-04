@@ -217,7 +217,6 @@ EOS
 users:
   - name: #{yq(unix_user)}
     sudo: ALL=(ALL) NOPASSWD:ALL
-    inactive: False
     shell: /bin/bash
     ssh_authorized_keys:
       - #{yq(public_key)}
