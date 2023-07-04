@@ -57,6 +57,8 @@ class Hosting::HetznerApis
     end
   end
 
+  IpInfo = Struct.new(:ip_address, :source_host_ip, :is_failover, keyword_init: true)
+
   def find_matching_ips(result)
     host_address = @host.vm_host.sshable.host
 
@@ -64,11 +66,11 @@ class Hosting::HetznerApis
       # Aggregate single-ip addresses.
       result[:ips].filter_map do |ip|
         next unless ip["active_server_ip"] == host_address
-        {
+        IpInfo.new(
           ip_address: "#{ip["ip"]}/32",
           source_host_ip: ip["server_ip"],
           is_failover: ip["failover_ip"]
-        }
+        )
       end +
 
       # Aggregate subnets (including IPv6 /64 blocks).
@@ -78,11 +80,11 @@ class Hosting::HetznerApis
         # Check if it is IPv6 or not by the existence of colon in the IP address
         mask = subnet["ip"].include?(":") ? 64 : subnet.fetch("mask")
 
-        {
+        IpInfo.new(
           ip_address: "#{subnet["ip"]}/#{mask}",
           source_host_ip: subnet["server_ip"],
           is_failover: subnet["failover_ip"]
-        }
+        )
       end
     )
   end

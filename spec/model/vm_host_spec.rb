@@ -27,11 +27,13 @@ RSpec.describe VmHost do
   }
   let(:hetzner_ips) {
     [
-      {ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true},
-      {ip_address: "1.1.1.2/32", source_host_ip: "1.1.0.0", is_failover: true},
-      {ip_address: "1.1.1.3/32", source_host_ip: "1.1.1.1", is_failover: false},
-      {ip_address: "2a01:4f8:10a:128b::/64", source_host_ip: "1.1.1.1", is_failover: true}
-    ]
+      ["1.1.1.0/30", "1.1.1.1", true],
+      ["1.1.1.2/32", "1.1.0.0", true],
+      ["1.1.1.3/32", "1.1.1.1", false],
+      ["2a01:4f8:10a:128b::/64", "1.1.1.1", true]
+    ].map {
+      Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
+    }
   }
 
   it "requires an Sshable too" do
@@ -174,7 +176,9 @@ RSpec.describe VmHost do
   end
 
   it "updates the routed_to_host_id if the address is reassigned to another host and there is no vm using the ip range" do
-    hetzner_ips = [{ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true}]
+    hetzner_ips = [
+      Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)
+    ]
     old_id = "4c5dc171-a116-4a05-9e6d-381a4b382b71"
     new_id = "46683a25-acb1-4371-afe9-d39f303e44b4"
 
@@ -193,7 +197,9 @@ RSpec.describe VmHost do
   end
 
   it "fails if the ip range is already assigned to a vm" do
-    hetzner_ips = [{ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true}]
+    hetzner_ips = [
+      Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)
+    ]
     old_id = "4c5dc171-a116-4a05-9e6d-381a4b382b71"
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
 
