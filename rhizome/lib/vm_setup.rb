@@ -250,7 +250,7 @@ RADVD_CONF
     "loggers": [{
       "name": "kea-dhcp6",
       "output_options": [{
-        "output": "/vm/#{@vm_name}/kea-dhcp6.log"
+        "output": "/vm/#{@vm_name}/kea-server6/kea-dhcp6.log"
       }],
       "severity": "DEBUG",
       "debuglevel": 99
@@ -259,51 +259,64 @@ RADVD_CONF
 }
 KEA_DHCP6_CONF
 
+    r "mkdir -p /vm/#{@vm_name}/kea-server4"
+    r "touch /vm/#{@vm_name}/kea-server4/dhcp4.leases"
+    r "touch /vm/#{@vm_name}/kea-server6/kea-dhcp6.log"
     vp.write_kea_dhcp4_conf(<<KEA_DHCP4_CONF)
 {
   # DHCPv4 configuration starts on the next line
   "Dhcp4": {
-      # First we set up global values
-      "valid-lifetime": 4000,
-      "renew-timer": 1000,
-      "rebind-timer": 2000,
-
-      # Next we set up the interfaces to be used by the server.
-      "interfaces-config": {
-          "interfaces": [ "tap#{@vm_name}" ]
-      },
-
-      # And we specify the type of lease database
-      "lease-database": {
-          "type": "memfile",
-          "persist": true,
-          "name": "/var/lib/kea/dhcp4.leases"
-      },
-
-      # Finally, we list the subnets from which we will be leasing addresses.
-      "subnet4": [
-          {
-              "subnet": "#{vm_sub.nth(0)}/24",
-              "pools": [
-                  {
-                      "pool": "#{vm_sub.nth(0)} - #{vm_sub.nth(0)}"
-                  }
-              ],
-              "option-data": [
-                  {
-                      "name": "routers",
-                      "data": "192.0.0.1"
-                  }
-              ]
-          }
+    # First we set up global values
+    "valid-lifetime": 4000,
+    "renew-timer": 1000,
+    "rebind-timer": 2000,
+    
+    # Next we set up the interfaces to be used by the server.
+    "interfaces-config": {
+      "interfaces": [ "tap#{@vm_name}" ]
+    },
+    
+    # And we specify the type of lease database
+    "lease-database": {
+      "type": "memfile",
+      "persist": true,
+      "name": "/vm/#{@vm_name}/kea-server4/dhcp4.leases"
+    },
+    
+    # Finally, we list the subnets from which we will be leasing addresses.
+    "subnet4": [{
+      "subnet": "#{vm_sub.nth(0)}/24",
+      "pools": [
+        {
+          "pool": "#{vm_sub.nth(0)} - #{vm_sub.nth(0)}"
+        }
+      ],
+      "option-data": [
+        {
+          "name": "routers",
+          "data": "192.0.0.1"
+        },
+        {
+          "name": "domain-name-servers",
+          "code": 6,
+          "space": "dhcp4",
+          "csv-format": true,
+          "data": "9.9.9.9, 149.112.112.112"
+        }
       ]
-      # DHCPv4 configuration ends with the next line
+    }],
+    "loggers": [{
+      "name": "kea-dhcp4",
+      "output_options": [{
+        "output": "/vm/#{@vm_name}/kea-server4/kea-dhcp4.log"
+      }],
+      "severity": "DEBUG",
+      "debuglevel": 99
+    }]
+    # DHCPv4 configuration ends with the next line
   }
 }
 KEA_DHCP4_CONF
-
-    r "chown -R #{q_vm}:#{q_vm} /run/kea"
-    r "chown #{q_vm}:#{q_vm} /vm/#{q_vm}/radvd.conf"
 
     vp.write_network_config(<<EOS)
 version: 2
@@ -440,6 +453,8 @@ EOS
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
+    r "mkdir -p /vm/#{@vm_name}/radvd_files"
+    r "sudo chmod o+rx /vm/#{@vm_name}/"
     vp.write_radvd_service <<RADVD_SERVICE
 # It's not recommended to modify this file in-place, because it
 # will be overwritten during upgrades.  If you want to customize,
@@ -456,7 +471,7 @@ User=root
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=forking
 ExecStartPre=/usr/sbin/radvd --logmethod stderr_clean -C /vm/#{@vm_name}/radvd.conf --configtest
-ExecStart=/usr/sbin/radvd --logmethod stderr_clean -C /vm/#{@vm_name}/radvd.conf
+ExecStart=/usr/sbin/radvd --logmethod logfile -C /vm/#{@vm_name}/radvd.conf -p /vm/#{@vm_name}/radvd_files/radvd.pid -d 5 -l /vm/#{@vm_name}/radvd_files/radvd.log
 ExecReload=/usr/sbin/radvd --logmethod stderr_clean -C /vm/#{@vm_name}/radvd.conf --configtest
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
@@ -482,6 +497,7 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
+Environment="KEA_PIDFILE_DIR=/vm/#{@vm_name}/kea-server4/"
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
 ExecReload=/bin/kill -HUP $MAINPID
@@ -503,7 +519,7 @@ KEA_DHCP4_SERVICE
 
   vp.write_kea_dhcp6_service <<KEA_DHCP6_SERVICE
 [Unit]
-Description=ISC KEA IPv4 DHCP daemon
+Description=ISC KEA IPv6 DHCP daemon
 Documentation=man:kea-dhcp6(8)
 Wants=network-online.target
 After=network-online.target
