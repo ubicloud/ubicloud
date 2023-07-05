@@ -33,7 +33,7 @@ SQL
     DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
     Sequel.postgres(**DB.opts.merge(user: ph_user)) do |db|
       db.loggers << Logger.new($stdout) if db.loggers.empty?
-      Sequel::Migrator.run(db, "migrate/ph", table: "schema_info_password")
+      Sequel::Migrator.run(db, "migrate/ph", table: "schema_migrations_password")
 
       if Config.test?
         # User doesn't have permission to run TRUNCATE on password hash tables, so DatabaseCleaner

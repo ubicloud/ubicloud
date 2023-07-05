@@ -57,7 +57,7 @@ RSpec.configure do |config|
     DatabaseCleaner.clean_with(:truncation,
       # Skip tables that are filled with migrations.
       except: %w[
-        schema_info_password
+        schema_migrations_password
         account_statuses
       ])
   end
