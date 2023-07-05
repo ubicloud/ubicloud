@@ -217,20 +217,6 @@ SQL
     key = "0x" + SecureRandom.bytes(36).unpack1("H*")
 
     # setup source ipsec tunnels
-    pp "sudo bin/setup-ipsec " \
-      "#{src_namespace} #{src_clover_ephemeral} " \
-      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
-      "#{dst_private_addr_6} #{src_private_addr_4} " \
-      "#{dst_private_addr_4} #{src_direction} " \
-      "#{spi} #{spi4} #{key}"
-
-    pp "sudo bin/setup-ipsec " \
-      "#{dst_namespace} #{dst_clover_ephemeral} " \
-      "#{src_clover_ephemeral} #{dst_private_addr_6} " \
-      "#{src_private_addr_6} #{dst_private_addr_4} " \
-      "#{src_private_addr_4} #{dst_direction} " \
-      "#{spi} #{spi4} #{key}"
-
     host.sshable.cmd("sudo bin/setup-ipsec " \
       "#{src_namespace} #{src_clover_ephemeral} " \
       "#{dst_clover_ephemeral} #{src_private_addr_6} " \
@@ -264,6 +250,10 @@ SQL
   end
 
   def run
+    host.sshable.cmd("sudo systemctl start #{q_vm}")
+    host.sshable.cmd("sudo systemctl stop #{q_vm}-kea-dhcp4")
+    sleep 5
+    host.sshable.cmd("sudo systemctl start #{q_vm}-kea-dhcp4")
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     vm.update(display_state: "running")
     hop :wait

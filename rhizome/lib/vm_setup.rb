@@ -467,7 +467,6 @@ After=network.target
 ConditionPathExists=/vm/#{@vm_name}/radvd.conf
 
 [Service]
-User=root
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=forking
 ExecStartPre=/usr/sbin/radvd --logmethod stderr_clean -C /vm/#{@vm_name}/radvd.conf --configtest
@@ -497,7 +496,9 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-Environment="KEA_PIDFILE_DIR=/vm/#{@vm_name}/kea-server4/"
+User=#{@vm_name}
+Group=#{@vm_name}
+Environment="KEA_PIDFILE_DIR=/vm/#{@vm_name}/kea-server4"
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
 ExecReload=/bin/kill -HUP $MAINPID
@@ -514,7 +515,7 @@ ProtectControlGroups=yes
 ProtectHome=yes
 NoNewPrivileges=yes
 ReadOnlyPaths=/
-ReadWriteDirectories=/vm/#{@vm_name}/
+ReadWriteDirectories=/vm/#{@vm_name}/kea-server4
 KEA_DHCP4_SERVICE
 
   vp.write_kea_dhcp6_service <<KEA_DHCP6_SERVICE
@@ -525,6 +526,9 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
+User=#{@vm_name}
+Group=#{@vm_name}
+Environment="KEA_PIDFILE_DIR=/vm/#{@vm_name}/kea-server6"
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
 ExecReload=/bin/kill -HUP $MAINPID
@@ -541,7 +545,7 @@ ProtectControlGroups=yes
 ProtectHome=yes
 NoNewPrivileges=yes
 ReadOnlyPaths=/
-ReadWriteDirectories=/vm/#{@vm_name}/
+ReadWriteDirectories=/vm/#{@vm_name}/kea-server6
 KEA_DHCP6_SERVICE
 
 #     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
