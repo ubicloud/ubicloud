@@ -66,16 +66,8 @@ module Authorization
       end
     end
 
-    def hyper_tag_identifier
-      :name
-    end
-
-    def hyper_tag_prefix
-      self.class.name
-    end
-
-    def hyper_tag_name
-      "#{hyper_tag_prefix}/#{send(hyper_tag_identifier)}"
+    def hyper_tag_name(project = nil)
+      raise NoMethodError
     end
 
     def hyper_tag(project)
@@ -83,7 +75,7 @@ module Authorization
     end
 
     def create_hyper_tag(project)
-      AccessTag.create(project_id: project.id, name: hyper_tag_name, hyper_tag_id: id, hyper_tag_table: self.class.table_name)
+      AccessTag.create(project_id: project.id, name: hyper_tag_name(project), hyper_tag_id: id, hyper_tag_table: self.class.table_name)
     end
 
     def delete_hyper_tag(project)

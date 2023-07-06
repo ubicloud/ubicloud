@@ -12,6 +12,11 @@ class Project < Sequel::Model
 
   include ResourceMethods
   include Authorization::HyperTagMethods
+
+  def hyper_tag_name(project = nil)
+    "project/#{ulid}"
+  end
+
   include Authorization::TaggableMethods
 
   def user_ids

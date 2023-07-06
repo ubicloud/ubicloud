@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "sequel/model"
+
 RSpec.describe Authorization do
   let(:users) { [Account.create(email: "auth1@example.com"), Account.create(email: "auth2@example.com")] }
   let(:projects) { (0..1).map { users[_1].create_project_with_default_policy("project-#{_1}") } }
@@ -22,9 +24,9 @@ RSpec.describe Authorization do
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, ["Vm:view", "Vm:create"], 4],
         [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name]}], users[0].id, "Vm:view", 4],
         [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], 4],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms[0].hyper_tag_name}], users[0].id, "Vm:view", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms.map(&:hyper_tag_name)}], users[0].id, "Vm:view", 2],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name}], users[0].id, "Vm:view", 0]
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms.map { _1.hyper_tag_name(access_policy.project) }}], users[0].id, "Vm:view", 2],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 0]
       ].each do |policies, subject_id, actions, matched_count|
         access_policy.update(body: {acls: policies})
         expect(described_class.matched_policies(subject_id, actions).count).to eq(matched_count)
@@ -97,9 +99,18 @@ RSpec.describe Authorization do
 
   describe "#HyperTagMethods" do
     it "hyper_tag_name" do
-      expect(users[0].hyper_tag_name).to eq("User/auth1@example.com")
-      expect(vms[0].hyper_tag_name).to eq("Vm/vm0")
-      expect(projects[0].hyper_tag_name).to eq("Project/project-0")
+      expect(users[0].hyper_tag_name).to eq("user/auth1@example.com")
+      p = vms[0].projects.first
+      expect(vms[0].hyper_tag_name(p)).to eq("project/#{p.ulid}/location/hetzner-hel1/vm/vm0")
+      expect(projects[0].hyper_tag_name).to eq("project/#{projects[0].ulid}")
+    end
+
+    it "hyper_tag_name error" do
+      c = Class.new(Sequel::Model) do
+        include Authorization::HyperTagMethods
+      end
+
+      expect { c.new.hyper_tag_name }.to raise_error NoMethodError
     end
 
     it "hyper_tag methods" do

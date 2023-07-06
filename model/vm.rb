@@ -18,6 +18,11 @@ class Vm < Sequel::Model
   semaphore :destroy, :refresh_mesh
 
   include Authorization::HyperTagMethods
+
+  def hyper_tag_name(project)
+    "project/#{project.ulid}/location/#{location}/vm/#{name}"
+  end
+
   include Authorization::TaggableMethods
 
   def path
