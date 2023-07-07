@@ -18,8 +18,10 @@ class CommandFail < RuntimeError
   end
 end
 
-class FsyncFail < RuntimeError
+# rubocop:disable Lint/InheritException
+class FsyncFail < Exception
 end
+# rubocop:enable Lint/InheritException
 
 def r(commandline, stdin: "")
   stdout, stderr, status = Open3.capture3(commandline, stdin_data: stdin)
