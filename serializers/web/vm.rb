@@ -13,6 +13,7 @@ class Serializers::Web::Vm < Serializers::Base
       location: vm.location,
       size: vm.size,
       storage_size_gib: vm.storage_size_gib,
+      storage_encryption: vm.storage_encrypted? ? "encrypted" : "not encrypted",
       ip6: vm.ephemeral_net6&.nth(2),
       projects: Serializers::Web::Project.new(:default).serialize(vm.projects)
     }
