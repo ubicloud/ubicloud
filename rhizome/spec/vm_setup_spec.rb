@@ -55,6 +55,7 @@ RSpec.describe VmSetup do
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
       expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
+      expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)
       expect(vs).to receive(:r).with(/setfacl.*#{spdk_vhost_sock}/)
 
       expect(

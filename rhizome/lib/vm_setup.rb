@@ -278,6 +278,11 @@ EOS
     # create a symlink to the socket in the per vm storage dir
     FileUtils.ln_s Spdk.vhost_sock(vhost), vp.vhost_sock(index)
 
+    # Change ownership of the symlink. FileUtils.chown uses File.lchown for
+    # symlinks and doesn't follow links. We don't use File.lchown directly
+    # because it expects numeric uid & gid, which is less convenient.
+    FileUtils.chown @vm_name, @vm_name, vp.vhost_sock(index)
+
     vp.vhost_sock(index)
   end
 
