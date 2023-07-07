@@ -150,4 +150,8 @@ class Vm < Sequel::Model
   def storage_size_gib
     vm_storage_volumes.map { _1.size_gib }.sum
   end
+
+  def storage_encrypted?
+    vm_storage_volumes.all? { !_1.key_encryption_key_1_id.nil? }
+  end
 end
