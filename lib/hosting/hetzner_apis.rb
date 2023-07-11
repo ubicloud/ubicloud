@@ -28,10 +28,10 @@ class Hosting::HetznerApis
     json_arr_ips = JSON.parse(response.body)
 
     response = connection.get(path: "/failover")
-    if response.status != 200
+    if response.status != 200 && response.status != 404
       raise "unexpected status #{response.status}"
     end
-    json_arr_failover = JSON.parse(response.body)
+    json_arr_failover = (response.status == 404) ? [] : JSON.parse(response.body)
 
     addresses_with_assignment = process_ips_subnets_failovers(json_arr_ips, json_arr_subnets, json_arr_failover)
     find_matching_ips(addresses_with_assignment)
