@@ -195,7 +195,7 @@ table ip raw {
   chain prerouting {
     type filter hook prerouting priority raw; policy accept;
     ip daddr #{public_ipv4} ip daddr set #{private_ipv4} notrack
-    ip saddr #{private_ipv4} ip daddr != 192.168.0.0/16 ip saddr set #{public_ipv4} notrack
+    ip saddr #{private_ipv4} ip daddr != { 192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 } ip saddr set #{public_ipv4} notrack
   }
 }
 NFTABLES_CONF
