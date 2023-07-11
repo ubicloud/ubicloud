@@ -338,13 +338,13 @@ SQL
       begin
         host.sshable.cmd("sudo systemctl stop #{q_vm}")
       rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.message)
+        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
       begin
         host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
       rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.message)
+        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
       host.sshable.cmd("sudo bin/deletevm.rb #{q_vm}")
