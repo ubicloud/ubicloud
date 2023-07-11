@@ -24,7 +24,7 @@
                   <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Size</th>
                   <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Storage Size</th>
                   <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">IPv6</th>
+                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">IP Address</th>
                   <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
                     <span class="sr-only">Show</span>
                   </th>
@@ -43,9 +43,15 @@
                       <%== render("components/vm_state_label", locals: { state: vm[:state] }) %>
                     </td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <span class="copy-content cursor-pointer" data-content="<%= vm[:ip6] %>" data-message="Copied IPv6">
-                        <%= vm[:ip6] %>
-                      </span>
+                      <% if vm[:ip4] %>
+                        <span class="copy-content cursor-pointer" data-content="<%= vm[:ip4] %>" data-message="Copied IPv4">
+                          <%= vm[:ip4] %>
+                        </span>
+                      <% else %>
+                        <span class="copy-content cursor-pointer" data-content="<%= vm[:ip6] %>" data-message="Copied IPv6">
+                          <%= vm[:ip6] %>
+                        </span>
+                      <% end %>
                     </td>
                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <a href="<%= vm[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
