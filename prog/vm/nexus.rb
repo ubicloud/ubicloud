@@ -352,6 +352,9 @@ SQL
 
     DB.transaction do
       vm.private_subnets_dataset.delete
+      vm.assigned_vm_address_dataset.delete
+      vm.vm_storage_volumes_dataset.delete
+
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores
       )
