@@ -38,9 +38,7 @@ RSpec.describe Prog::InstallDnsmasq do
       expect(sshable).to receive(:cmd).with "(cd dnsmasq && make -sj$(nproc) && sudo make install)"
       expect(idm).to receive(:sshable).and_return(sshable)
 
-      expect { idm.compile_and_install }.to raise_error(Prog::Base::Exit) do
-        expect(_1.exitval).to eq({"msg" => "compiled and installed dnsmasq"})
-      end
+      expect { idm.compile_and_install }.to exit({"msg" => "compiled and installed dnsmasq"})
     end
   end
 
@@ -50,9 +48,7 @@ RSpec.describe Prog::InstallDnsmasq do
       expect(sshable).to receive(:cmd).with "sudo apt-get -y install make gcc"
       expect(idm).to receive(:sshable).and_return(sshable)
 
-      expect { idm.install_build_dependencies }.to raise_error(Prog::Base::Exit) do
-        expect(_1.exitval).to eq({"msg" => "installed build dependencies"})
-      end
+      expect { idm.install_build_dependencies }.to exit({"msg" => "installed build dependencies"})
     end
   end
 
@@ -64,9 +60,7 @@ git init dnsmasq && (cd dnsmasq &&   git fetch https://github.com/fdr/dnsmasq.gi
 CMD
       expect(idm).to receive(:sshable).and_return(sshable)
 
-      expect { idm.git_clone_dnsmasq }.to raise_error(Prog::Base::Exit) do
-        expect(_1.exitval).to eq({"msg" => "downloaded and verified dnsmasq successfully"})
-      end
+      expect { idm.git_clone_dnsmasq }.to exit({"msg" => "downloaded and verified dnsmasq successfully"})
     end
   end
 end

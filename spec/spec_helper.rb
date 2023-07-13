@@ -180,4 +180,28 @@ RSpec.configure do |config|
       prog.nil? ? "" : "#{prog}#"
     end
   end
+
+  # Custom matcher to expect Progs to exit
+  # If expected_exitval is not provided, it expects to exit with any value.
+  RSpec::Matchers.define :exit do |expected_exitval|
+    supports_block_expectations
+
+    match do |block|
+      block.call
+      false
+    rescue Prog::Base::Exit => ext
+      @ext = ext
+      expected_exitval.nil? || ext.exitval == expected_exitval
+    end
+
+    failure_message do
+      "expected: ".rjust(16) + (expected_exitval.nil? ? "exit with any value" : expected_exitval.to_s) + "\n" +
+        "got: ".rjust(16) + (@ext.nil? ? "not exited" : @ext.exitval.to_s) + "\n "
+    end
+
+    failure_message_when_negated do
+      "not expected: ".rjust(16) + (expected_exitval.nil? ? "exit with any value" : expected_exitval.to_s) + "\n" +
+        "got: ".rjust(16) + (@ext.nil? ? "not exited" : @ext.exitval.to_s) + "\n "
+    end
+  end
 end

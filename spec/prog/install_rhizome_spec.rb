@@ -28,9 +28,7 @@ RSpec.describe Prog::InstallRhizome do
     it "runs some commands and exits" do
       expect(sshable).to receive(:cmd).with("bundle config set --local path vendor/bundle")
       expect(sshable).to receive(:cmd).with("bundle install")
-      expect { ir.install_gems }.to raise_error Prog::Base::Exit do |ex|
-        expect(ex.exitval).to eq({"msg" => "installed rhizome"})
-      end
+      expect { ir.install_gems }.to exit({"msg" => "installed rhizome"})
     end
   end
 end
