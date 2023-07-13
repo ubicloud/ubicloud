@@ -8,9 +8,21 @@
   <%== render(
     "components/form/text",
     locals: {
+      name: "name",
+      label: "Full Name",
+      attributes: {
+        required: true,
+        autocomplete: "name"
+      }
+    }
+  ) %>
+
+  <%== render(
+    "components/form/text",
+    locals: {
       name: "login",
       type: "email",
-      label: "Email address",
+      label: "Email Address",
       attributes: {
         required: true,
         autocomplete: "email"

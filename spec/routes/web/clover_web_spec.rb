@@ -13,7 +13,7 @@ RSpec.describe Clover do
     expect(Account).to receive(:[]).and_raise(RuntimeError)
 
     visit "/create-account"
-    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
 

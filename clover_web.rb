@@ -122,6 +122,9 @@ class CloverWeb < Roda
     create_account_view { view "auth/create_account", "Create Account" }
     create_account_redirect { login_route }
     create_account_set_password? true
+    before_create_account do
+      account[:name] = param("name")
+    end
     after_create_account do
       current_user = Account[account_id]
       current_user.create_project_with_default_policy("#{current_user.username}-default-project")
