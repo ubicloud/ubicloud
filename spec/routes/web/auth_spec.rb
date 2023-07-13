@@ -11,7 +11,7 @@ RSpec.describe Clover, "auth" do
 
   it "can not login new account without verification" do
     visit "/create-account"
-    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
@@ -21,7 +21,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Login")
 
     visit "/login"
-    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
@@ -30,7 +30,8 @@ RSpec.describe Clover, "auth" do
 
   it "can create new account and verify it" do
     visit "/create-account"
-    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "John Doe"
+    fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
@@ -50,7 +51,7 @@ RSpec.describe Clover, "auth" do
     account = create_account
 
     visit "/login"
-    fill_in "Email address", with: TEST_USER_EMAIL
+    fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
     check "Remember me"
     click_button "Sign in"

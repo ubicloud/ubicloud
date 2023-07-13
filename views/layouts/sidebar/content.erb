@@ -105,7 +105,7 @@
             />
           </svg>
           <span class="sr-only">Your profile</span>
-          <span aria-hidden="true"><%= DB[:accounts].where(id: rodauth.session_value).get(:email) %></span>
+          <span aria-hidden="true"><%= DB[:accounts].where(id: rodauth.session_value).get(:name) %></span>
         </a>
       </li>
     </ul>
