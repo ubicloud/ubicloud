@@ -37,7 +37,7 @@
               </div>
             </div>
             <!-- Delete -->
-            <% if Authorization.has_permission?(rodauth.session_value, "Project:delete", @project[:id]) %>
+            <% if Authorization.has_permission?(@current_user.id, "Project:delete", @project[:id]) %>
               <div>
                 <div class="px-4 py-6 sm:px-6">
                   <h2 class="text-lg font-medium leading-6 text-gray-900">Delete project</h2>

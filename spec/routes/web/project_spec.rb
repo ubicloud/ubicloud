@@ -195,8 +195,6 @@ RSpec.describe Clover, "project" do
       end
 
       it "raises not found when user not exists" do
-        expect(Account).to receive(:[]).and_return(nil).twice
-
         visit "#{project.path}/user/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Resource not found")

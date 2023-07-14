@@ -30,7 +30,7 @@
             ]
           }
         ) %>
-        <% if Authorization.has_permission?(rodauth.session_value, "Vm:delete", @vm[:id]) %>
+        <% if Authorization.has_permission?(@current_user.id, "Vm:delete", @vm[:id]) %>
           <div class="mt-6 bg-white shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">
               <div class="sm:flex sm:items-center sm:justify-between">
