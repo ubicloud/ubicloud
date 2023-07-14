@@ -7,14 +7,14 @@ class CloverWeb
     @serializer = Serializers::Web::Vm
 
     r.get true do
-      @vms = serialize(Vm.authorized(rodauth.session_value, "Vm:view").all)
+      @vms = serialize(Vm.authorized(@current_user.id, "Vm:view").all)
 
       view "vm/index"
     end
 
     r.post true do
       project_id = ULID.parse(r.params["project-id"]).to_uuidish
-      Authorization.authorize(rodauth.session_value, "Vm:create", project_id)
+      Authorization.authorize(@current_user.id, "Vm:create", project_id)
 
       st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
@@ -34,7 +34,7 @@ class CloverWeb
 
     r.on "create" do
       r.get true do
-        @projects = Serializers::Web::Project.new(:default).serialize(Project.authorized(rodauth.session_value, "Vm:create").all)
+        @projects = Serializers::Web::Project.new(:default).serialize(Project.authorized(@current_user.id, "Vm:create").all)
 
         view "vm/create"
       end
@@ -49,7 +49,7 @@ class CloverWeb
       end
 
       r.get true do
-        Authorization.authorize(rodauth.session_value, "Vm:view", vm.id)
+        Authorization.authorize(@current_user.id, "Vm:view", vm.id)
 
         @vm = serialize(vm)
 
@@ -57,7 +57,7 @@ class CloverWeb
       end
 
       r.delete true do
-        Authorization.authorize(rodauth.session_value, "Vm:delete", vm.id)
+        Authorization.authorize(@current_user.id, "Vm:delete", vm.id)
 
         vm.incr_destroy
 

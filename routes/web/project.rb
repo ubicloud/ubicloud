@@ -6,18 +6,14 @@ class CloverWeb
   hash_branch("project") do |r|
     @serializer = Serializers::Web::Project
 
-    current_user = Account[rodauth.session_value]
-
-    @serializer = Serializers::Web::Project
-
     r.get true do
-      @projects = serialize(current_user.projects)
+      @projects = serialize(@current_user.projects)
 
       view "project/index"
     end
 
     r.post true do
-      project = current_user.create_project_with_default_policy(r.params["name"])
+      project = @current_user.create_project_with_default_policy(r.params["name"])
 
       r.redirect project.path
     end
@@ -39,13 +35,13 @@ class CloverWeb
       @project = serialize(project)
 
       r.get true do
-        Authorization.authorize(rodauth.session_value, "Project:view", project.id)
+        Authorization.authorize(@current_user.id, "Project:view", project.id)
 
         view "project/show_details"
       end
 
       r.delete true do
-        Authorization.authorize(rodauth.session_value, "Project:delete", project.id)
+        Authorization.authorize(@current_user.id, "Project:delete", project.id)
 
         # If it has some resources, do not allow to delete it.
         if project.access_tags_dataset.exclude(hyper_tag_table: [Account.table_name.to_s, Project.table_name.to_s, AccessTag.table_name.to_s]).count > 0
@@ -65,7 +61,7 @@ class CloverWeb
       end
 
       r.on "user" do
-        Authorization.authorize(rodauth.session_value, "Project:user", project.id)
+        Authorization.authorize(@current_user.id, "Project:user", project.id)
         @serializer = Serializers::Web::Account
 
         r.get true do
@@ -84,7 +80,7 @@ class CloverWeb
           # TODO(enes): Move notifications to separate classes
           send_email(email, "Invitation to Join '#{project.name}' Project on Ubicloud",
             greeting: "Hello,",
-            body: ["You're invited by '#{current_user.name}' to join the '#{project.name}' project on Ubicloud.",
+            body: ["You're invited by '#{@current_user.name}' to join the '#{project.name}' project on Ubicloud.",
               "To join project, click the button below.",
               "For any questions or assistance, reach out to our team at support@ubicloud.com."],
             button_title: "Join Project",
@@ -118,7 +114,7 @@ class CloverWeb
       end
 
       r.on "policy" do
-        Authorization.authorize(rodauth.session_value, "Project:policy", project.id)
+        Authorization.authorize(@current_user.id, "Project:policy", project.id)
         @serializer = Serializers::Web::AccessPolicy
 
         r.get true do
