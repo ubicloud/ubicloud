@@ -29,7 +29,7 @@ RSpec.describe Prog::SetupHugepages do
       sshable = instance_double(Sshable)
       expect(sshable).to receive(:cmd).with("echo 1").and_raise("not connected")
       expect(sh).to receive(:sshable).and_return(sshable)
-      expect { sh.wait_reboot }.to raise_error Prog::Base::Nap
+      expect { sh.wait_reboot }.to nap(15)
     end
 
     it "transitions to check_hugepages if ssh succeeds" do

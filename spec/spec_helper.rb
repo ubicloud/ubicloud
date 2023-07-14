@@ -204,4 +204,28 @@ RSpec.configure do |config|
         "got: ".rjust(16) + (@ext.nil? ? "not exited" : @ext.exitval.to_s) + "\n "
     end
   end
+
+  # Custom matcher to expect Progs to nap
+  # If expected_seconds is not provided, it expects to nap with any seconds.
+  RSpec::Matchers.define :nap do |expected_seconds|
+    supports_block_expectations
+
+    match do |block|
+      block.call
+      false
+    rescue Prog::Base::Nap => nap
+      @nap = nap
+      expected_seconds.nil? || nap.seconds == expected_seconds
+    end
+
+    failure_message do
+      "expected: ".rjust(16) + "nap" + (expected_seconds.nil? ? "" : " #{expected_seconds} seconds") + "\n" +
+        "got: ".rjust(16) + (@nap.nil? ? "not nap" : "nap #{@nap.seconds} seconds") + "\n "
+    end
+
+    failure_message_when_negated do
+      "not expected: ".rjust(16) + "nap" + (expected_seconds.nil? ? "" : " #{expected_seconds} seconds") + "\n" +
+        "got: ".rjust(16) + (@nap.nil? ? "not nap" : "nap #{@nap.seconds} seconds") + "\n "
+    end
+  end
 end
