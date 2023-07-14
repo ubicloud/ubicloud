@@ -1,4 +1,4 @@
-<% @page_title = @project[:name] %>
+<% @page_title = @project_data[:name] %>
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
@@ -6,10 +6,10 @@
       "components/breadcrumb",
       locals: {
         back: "/project",
-        parts: [%w[Projects /project], [@project[:name], @project[:path]], %w[Details #]]
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Details #]]
       }
     ) %>
-    <%== render("components/page_header", locals: { title: @project[:name] }) %>
+    <%== render("components/page_header", locals: { title: @project_data[:name] }) %>
   </div>
 
   <main class="mt-4 md:mt-8">
@@ -27,17 +27,17 @@
                 <dl class="sm:divide-y sm:divide-gray-200">
                   <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                     <dt class="text-sm font-medium text-gray-500">ID</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @project[:ulid] %></dd>
+                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @project_data[:ulid] %></dd>
                   </div>
                   <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 sm:py-5">
                     <dt class="text-sm font-medium text-gray-500">Name</dt>
-                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @project[:name] %></dd>
+                    <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0"><%= @project_data[:name] %></dd>
                   </div>
                 </dl>
               </div>
             </div>
             <!-- Delete -->
-            <% if Authorization.has_permission?(@current_user.id, "Project:delete", @project[:id]) %>
+            <% if Authorization.has_permission?(@current_user.id, "Project:delete", @project_data[:id]) %>
               <div>
                 <div class="px-4 py-6 sm:px-6">
                   <h2 class="text-lg font-medium leading-6 text-gray-900">Delete project</h2>
@@ -49,7 +49,7 @@
                     type="button"
                     data-url="<%= request.path %>"
                     data-csrf="<%= csrf_token(request.path, "DELETE") %>"
-                    data-confirmation="<%= @project[:name] %>"
+                    data-confirmation="<%= @project_data[:name] %>"
                     data-redirect="/project"
                     class="delete-btn inline-flex items-center mt-2 rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
                   >

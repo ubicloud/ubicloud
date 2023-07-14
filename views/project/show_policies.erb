@@ -1,4 +1,4 @@
-<% @page_title = "#{@project[:name]} - Policy" %>
+<% @page_title = "#{@project_data[:name]} - Policy" %>
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
@@ -6,10 +6,10 @@
       "components/breadcrumb",
       locals: {
         back: "/project",
-        parts: [%w[Projects /project], [@project[:name], @project[:path]], %w[Policy #]]
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Policy #]]
       }
     ) %>
-    <%== render("components/page_header", locals: { title: @project[:name] }) %>
+    <%== render("components/page_header", locals: { title: @project_data[:name] }) %>
   </div>
 
   <main class="mt-4 md:mt-8">
@@ -19,8 +19,8 @@
           <%== render("project/show_sidebar") %>
           <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
             <!-- Invite user -->
-            <form action="<%= "#{@project[:path]}/policy/#{@policy[:ulid]}" %>" role="form" method="POST">
-              <%== csrf_tag("#{@project[:path]}/policy/#{@policy[:ulid]}") %>
+            <form action="<%= "#{@project_data[:path]}/policy/#{@policy[:ulid]}" %>" role="form" method="POST">
+              <%== csrf_tag("#{@project_data[:path]}/policy/#{@policy[:ulid]}") %>
               <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
                 <div>
                   <h2 class="text-lg font-medium leading-6 text-gray-900">Update policy</h2>
