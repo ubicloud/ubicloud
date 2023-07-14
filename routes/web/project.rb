@@ -32,7 +32,7 @@ class CloverWeb
         r.halt
       end
 
-      @project = serialize(project)
+      @project_data = serialize(project)
 
       r.get true do
         Authorization.authorize(@current_user.id, "Project:view", project.id)
