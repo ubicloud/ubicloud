@@ -70,6 +70,16 @@ SQL
   end
 
   def unsynchronized_run
+    stack.each do |frame|
+      next unless (deadline_at = frame["deadline_at"])
+
+      if Time.now > deadline_at
+        # TODO: Enrich the summary
+        # TODO: Use better conflict target
+        Page.dataset.insert_conflict(target: :id).insert(summary: "Strand #{id} hit a deadline")
+      end
+    end
+
     DB.transaction do
       SemSnap.use(id) do |snap|
         load(snap).public_send(label)

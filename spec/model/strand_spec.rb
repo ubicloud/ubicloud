@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Strand do
-  let(:st) { described_class.new(prog: "Test", label: "start") }
+  let(:st) { described_class.create(prog: "Test", label: "start", stack: [{}]) }
 
   context "when leasing" do
     it "can take a lease only if one is not already taken" do

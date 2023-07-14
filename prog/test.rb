@@ -77,6 +77,11 @@ class Prog::Test < Prog::Base
     donate
   end
 
+  def set_expired_deadline
+    push Prog::Test, {test_level: "1"}, :pusher1, deadline_in: -1
+    nap 0
+  end
+
   def bad_pop
     pop nil
   end

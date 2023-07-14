@@ -60,6 +60,15 @@ end
       # This is a multi-level stack with a back-link, i.e. one prog
       # calling another in the same Strand of execution.  The thing to
       # do here is pop the stack entry.
+
+      # If there is an active page for the current frame, it can be
+      # resolved now. Checking deadline_at saves us from running a DB
+      # query if deadline is not set at all, which is the most likely
+      # case.
+      if frame["deadline_at"] && (page = Page.active[strand.id])
+        page.resolve
+      end
+
       old_prog = strand.prog
       old_label = strand.label
       prog, label = link
@@ -135,10 +144,11 @@ end
     strand.retval
   end
 
-  def push(prog, new_frame = {}, label = "start")
+  def push(prog, new_frame = {}, label = "start", deadline_in: nil)
     old_prog = strand.prog
     old_label = strand.label
     new_frame = new_frame.merge("subject_id" => @subject_id, "link" => [strand.prog, old_label])
+    new_frame["deadline_at"] = Time.now + deadline_in if deadline_in
 
     # YYY: Use in-database jsonb prepend rather than re-rendering a
     # new value doing the prepend.
@@ -147,8 +157,9 @@ end
        stack: [new_frame] + strand.stack, retval: nil})
   end
 
-  def bud(prog, new_frame = nil, label = "start")
+  def bud(prog, new_frame = nil, label = "start", deadline_in: nil)
     new_frame = (new_frame || {}).merge("subject_id" => @subject_id)
+    new_frame["deadline_at"] = Time.now + deadline_in if deadline_in
     strand.add_child(
       prog: Strand.prog_verify(prog),
       label: label,
