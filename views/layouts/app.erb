@@ -16,7 +16,7 @@
   </head>
 
   <body class="h-full">
-    <% if @error_code %>
+    <% if @error %>
       <%== yield %>
     <% elsif rodauth.authenticated? %>
       <div>
