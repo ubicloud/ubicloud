@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "mail"
 require_relative "../model"
 
 class Account < Sequel::Model(:accounts)
@@ -19,10 +18,5 @@ class Account < Sequel::Model(:accounts)
     associate_with_project(project)
     project.add_access_policy(name: "default", body: policy_body || Authorization.generate_default_acls(hyper_tag_name, project.hyper_tag_name))
     project
-  end
-
-  # TODO: probably we need to get name from users
-  def username
-    "#{Mail::Address.new(email).local}-#{ulid.to_s[0..5].downcase}"
   end
 end
