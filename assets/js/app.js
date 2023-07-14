@@ -16,6 +16,15 @@ $(".toggle-mobile-menu").on("click", function (event) {
     }
 });
 
+$(document).click(function(){
+  $(".dropdown").removeClass("active");
+});
+
+$(".dropdown").on("click", function (event) {
+  event.stopPropagation();
+  $(this).toggleClass("active");
+});
+
 $(".sidebar-group-btn").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });
