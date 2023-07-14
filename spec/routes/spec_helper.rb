@@ -16,6 +16,6 @@ def create_account(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
 
   account = Account.create(email: email, status_id: 2)
   DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
-  account.create_project_with_default_policy("#{account.username}-project")
+  account.create_project_with_default_policy("Default")
   account
 end

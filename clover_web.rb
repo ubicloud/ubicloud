@@ -136,8 +136,7 @@ class CloverWeb < Roda
       account[:name] = param("name")
     end
     after_create_account do
-      current_user = Account[account_id]
-      current_user.create_project_with_default_policy("#{current_user.username}-default-project")
+      Account[account_id].create_project_with_default_policy("Default")
     end
 
     reset_password_view { view "auth/reset_password", "Request Password" }
