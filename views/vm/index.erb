@@ -2,15 +2,26 @@
 
 <% if @vms.count > 0 %>
   <div class="px-2 sm:px-3 lg:px-4">
-    <%== render(
-      "components/page_header",
-      locals: {
-        title: "Virtual Machines",
-        right_items: [
-          "<a href='vm/create' class='inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600'>Create Virtual Machine</a>"
-        ]
-      }
-    ) %>
+    <div class="space-y-1">
+      <%== render(
+        "components/breadcrumb",
+        locals: {
+          back: @project_data[:path],
+          parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]]
+        }
+      ) %>
+
+      <%== render(
+        "components/page_header",
+        locals: {
+          title: "Virtual Machines",
+          right_items: [
+            "<a href='vm/create' class='inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600'>Create Virtual Machine</a>"
+          ]
+        }
+      ) %>
+
+    </div>
     <div class="mt-8 flow-root">
       <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
         <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
@@ -19,7 +30,6 @@
               <thead class="bg-gray-50">
                 <tr>
                   <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Project</th>
                   <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Provider & Location</th>
                   <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Size</th>
                   <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Storage Size</th>
@@ -34,7 +44,6 @@
                 <% @vms.each do |vm| %>
                   <tr>
                     <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm[:name] %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:projects].map { _1[:name] }.join(", ") %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:location] %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:size] %></td>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:storage_size_gib] %>
@@ -54,7 +63,7 @@
                       <% end %>
                     </td>
                     <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <a href="<%= vm[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
+                      <a href="<%= @project_data[:path] %><%= vm[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
                     </td>
                   </tr>
                 <% end %>
@@ -78,7 +87,7 @@
     <p class="mt-1 text-sm text-gray-500">Get started by creating a new virtual machine.</p>
     <div class="mt-6">
       <a
-        href="/vm/create"
+        href="<%= @project_data[:path] %>/vm/create"
         class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
       >
         <svg class="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">

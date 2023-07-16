@@ -38,7 +38,7 @@ RSpec.describe Clover, "vm" do
 
     describe "list" do
       it "can list no virtual machines" do
-        visit "/vm"
+        visit "#{project.path}/vm"
 
         expect(page.title).to eq("Ubicloud - Virtual Machines")
         expect(page).to have_content "No virtual machines"
@@ -50,7 +50,7 @@ RSpec.describe Clover, "vm" do
       it "can not list virtual machines when does not have permissions" do
         vm
         vm_wo_permission
-        visit "/vm"
+        visit "#{project.path}/vm"
 
         expect(page.title).to eq("Ubicloud - Virtual Machines")
         expect(page).to have_content vm.name
@@ -61,12 +61,11 @@ RSpec.describe Clover, "vm" do
     describe "create" do
       it "can create new virtual machine" do
         project
-        visit "/vm/create"
+        visit "#{project.path}/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
-        select project.name, from: "project-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
@@ -76,16 +75,16 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_content "'#{name}' will be ready in a few minutes"
         expect(Vm.count).to eq(1)
+        expect(Vm.first.projects.first.id).to eq(project.id)
       end
 
       it "can not create virtual machine with invalid name" do
         project
-        visit "/vm/create"
+        visit "#{project.path}/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: "invalid name"
-        select project.name, from: "project-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
@@ -99,12 +98,11 @@ RSpec.describe Clover, "vm" do
 
       it "can not create virtual machine with same name" do
         project
-        visit "/vm/create"
+        visit "#{project.path}/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: vm.name
-        select project.name, from: "project-id"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
@@ -115,34 +113,32 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "name is already taken"
       end
 
-      it "can not select project when does not have permissions" do
-        project
+      it "can not create vm in a project when does not have permissions" do
         project_wo_permissions
-        visit "/vm/create"
+        visit "#{project_wo_permissions.path}/vm/create"
 
-        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
-
-        select project.name, from: "project-id"
-        expect { select project_wo_permissions.name, from: "project-id" }.to raise_error Capybara::ElementNotFound
+        expect(page.title).to eq("Ubicloud - Forbidden")
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content "Forbidden"
       end
     end
 
     describe "show" do
       it "can show virtual machine details" do
         vm
-        visit "/vm"
+        visit "#{project.path}/vm"
 
         expect(page.title).to eq("Ubicloud - Virtual Machines")
         expect(page).to have_content vm.name
 
-        click_link "Show", href: vm.path
+        click_link "Show", href: "#{project.path}#{vm.path}"
 
         expect(page.title).to eq("Ubicloud - #{vm.name}")
         expect(page).to have_content vm.name
       end
 
       it "raises forbidden when does not have permissions" do
-        visit vm_wo_permission.path
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -150,7 +146,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "raises not found when virtual machine not exists" do
-        visit "/vm/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/hetzner-hel1/vm/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Resource not found")
         expect(page.status_code).to eq(404)
@@ -160,7 +156,7 @@ RSpec.describe Clover, "vm" do
 
     describe "delete" do
       it "can delete virtual machine" do
-        visit vm.path
+        visit "#{project.path}#{vm.path}"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
@@ -179,7 +175,7 @@ RSpec.describe Clover, "vm" do
           ]
         })
 
-        visit vm_wo_permission.path
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
