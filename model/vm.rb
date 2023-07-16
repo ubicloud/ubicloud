@@ -26,7 +26,7 @@ class Vm < Sequel::Model
   include Authorization::TaggableMethods
 
   def path
-    "/vm/#{ulid}"
+    "/location/#{location}/vm/#{name}"
   end
 
   def ephemeral_net4

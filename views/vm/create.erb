@@ -2,7 +2,18 @@
 
 <div class="px-2 sm:px-3 lg:px-4">
   <div class="space-y-1">
-    <%== render("components/breadcrumb", locals: { back: "/vm", parts: [["Virtual Machines", "/vm"], %w[Create #]] }) %>
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: "#{@project_data[:path]}/vm",
+        parts: [
+          %w[Projects /project],
+          [@project_data[:name], @project_data[:path]],
+          ["Virtual Machines", "#{@project_data[:path]}/vm"],
+          %w[Create #]
+        ]
+      }
+    ) %>
     <%== render("components/page_header", locals: { title: "Create Virtual Machine" }) %>
   </div>
   <!-- Create Card -->
@@ -10,9 +21,9 @@
     <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
         <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white">
-          <form action="/vm" method="POST">
+          <form action="<%= "#{@project_data[:path]}/vm" %>" method="POST">
             <!-- YYY: need a better way to manage coupling of routes and erbs -->
-            <%== csrf_tag("/vm") %>
+            <%== csrf_tag("#{@project_data[:path]}/vm") %>
             <div class="space-y-12 px-4 py-6 sm:p-8">
               <div class="border-b border-gray-900/10 pb-12">
                 <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
@@ -27,19 +38,6 @@
                         attributes: {
                           required: true,
                           placeholder: "Enter name"
-                        }
-                      }
-                    ) %>
-                  </div>
-                  <div class="sm:col-span-3">
-                    <%== render(
-                      "components/form/select",
-                      locals: {
-                        name: "project-id",
-                        label: "Project",
-                        options: @projects.to_h { |p| [p[:ulid], p[:name]] },
-                        attributes: {
-                          required: true
                         }
                       }
                     ) %>
