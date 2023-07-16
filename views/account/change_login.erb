@@ -1,7 +1,7 @@
-<% @page_title = "Settings" %>
+<% @page_title = "My Account" %>
 
 <div class="px-2 sm:px-3 lg:px-4">
-  <%== render("components/page_header", locals: { title: "Settings" }) %>
+  <%== render("components/page_header", locals: { title: "My Account" }) %>
 
   <div class="mt-8 space-y-6 sm:px-6 lg:col-span-9 lg:px-0">
     <section>
@@ -9,7 +9,7 @@
         <%== rodauth.csrf_tag("/" + rodauth.change_login_route) %>
         <div class="shadow sm:overflow-hidden sm:rounded-md">
           <div class="bg-white px-4 py-6 sm:p-6">
-            <%== render("settings/tab") %>
+            <%== render("account/tab") %>
 
             <div>
               <h2 class="text-lg font-medium leading-6 text-gray-900">Change Email Address</h2>
