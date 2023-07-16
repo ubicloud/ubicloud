@@ -76,6 +76,13 @@ RSpec.describe Clover, "project" do
       end
     end
 
+    it "can view project dashboard" do
+      visit "#{project.path}/dashboard"
+
+      expect(page.title).to eq("Ubicloud - #{project.name} Dashboard")
+      expect(page).to have_content project.name
+    end
+
     describe "show - details" do
       it "can show project details" do
         project

@@ -60,6 +60,12 @@ class CloverWeb
         return {message: "'#{@project.name}' project is deleted."}.to_json
       end
 
+      r.get "dashboard" do
+        Authorization.authorize(@current_user.id, "Project:view", @project.id)
+
+        view "project/dashboard"
+      end
+
       r.hash_branches(:project_prefix)
     end
   end
