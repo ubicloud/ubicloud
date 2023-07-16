@@ -37,7 +37,7 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "Project:view", @project.id)
 
-        view "project/show_details"
+        view "project/show"
       end
 
       r.delete true do

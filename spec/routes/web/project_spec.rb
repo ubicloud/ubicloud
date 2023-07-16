@@ -83,7 +83,7 @@ RSpec.describe Clover, "project" do
       expect(page).to have_content project.name
     end
 
-    describe "show - details" do
+    describe "details" do
       it "can show project details" do
         project
         visit "/project"
@@ -111,7 +111,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content "Forbidden"
       end
 
-      it "raises not found when virtual machine not exists" do
+      it "raises not found when project not exists" do
         visit "/project/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Resource not found")
@@ -120,11 +120,13 @@ RSpec.describe Clover, "project" do
       end
     end
 
-    describe "show - users" do
+    describe "users" do
       it "can show project users" do
         visit project.path
 
-        click_link "Users"
+        within find_by_id("desktop-menu") do
+          click_link "Users"
+        end
 
         expect(page.title).to eq("Ubicloud - #{project.name} - Users")
         expect(page).to have_content user.email
@@ -210,11 +212,13 @@ RSpec.describe Clover, "project" do
       end
     end
 
-    describe "show - policies" do
+    describe "access policies" do
       it "can show project policy" do
         visit project.path
 
-        click_link "Policy"
+        within find_by_id("desktop-menu") do
+          click_link "Access Policy"
+        end
 
         expect(page.title).to eq("Ubicloud - #{project.name} - Policy")
         expect(page).to have_content project.access_policies.first.body.to_json

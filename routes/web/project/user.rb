@@ -9,7 +9,7 @@ class CloverWeb
       users_with_hyper_tag = @project.user_ids
       @users = serialize(Account.where(id: users_with_hyper_tag).all)
 
-      view "project/show_users"
+      view "project/user"
     end
 
     r.post true do
