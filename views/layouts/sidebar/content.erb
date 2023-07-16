@@ -59,32 +59,6 @@
           ) %>
         </ul>
       </li>
-
-      <li class="">
-        <form action="/logout" class="-mx-2" method="post">
-          <%== csrf_tag("/logout") %>
-          <button
-            type="submit"
-            class="w-full group flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-orange-100 hover:bg-orange-700 hover:text-white"
-          >
-            <svg
-              class="h-6 w-6 shrink-0 text-orange-100 group-hover:text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"
-              />
-            </svg>
-            Log out
-          </button>
-        </form>
-      </li>
       <li class="-mx-6 mt-auto">
         <%== render("layouts/sidebar/project_switcher") %>
       </li>
