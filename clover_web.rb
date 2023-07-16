@@ -156,17 +156,17 @@ class CloverWeb < Roda
         button_link: reset_password_email_link)
     end
 
-    change_password_redirect "/settings/change-password"
-    change_password_route "settings/change-password"
-    change_password_view { view "settings/change_password", "Settings" }
+    change_password_redirect "/account/change-password"
+    change_password_route "account/change-password"
+    change_password_view { view "account/change_password", "My Account" }
 
-    change_login_redirect "/settings/change-login"
-    change_login_route "settings/change-login"
-    change_login_view { view "settings/change_login", "Settings" }
+    change_login_redirect "/account/change-login"
+    change_login_route "account/change-login"
+    change_login_view { view "account/change_login", "My Account" }
 
     close_account_redirect "/login"
-    close_account_route "settings/close-account"
-    close_account_view { view "settings/close_account", "Settings" }
+    close_account_route "account/close-account"
+    close_account_view { view "account/close_account", "My Account" }
 
     # YYY: Should password secret and session secret be the same? Are
     # there rotation issues? See also:
