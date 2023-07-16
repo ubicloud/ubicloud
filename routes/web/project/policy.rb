@@ -9,7 +9,7 @@ class CloverWeb
       # For UI simplicity, we are showing only one policy at the moment
       @policy = serialize(@project.access_policies.first)
 
-      view "project/show_policies"
+      view "project/policy"
     end
 
     r.is String do |policy_ulid|
