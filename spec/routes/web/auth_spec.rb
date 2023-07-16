@@ -93,9 +93,7 @@ RSpec.describe Clover, "auth" do
     it "can logout" do
       visit "/dashboard"
 
-      within find_by_id("desktop-menu") do
-        click_button "Log out"
-      end
+      click_button "Log out"
 
       expect(page.title).to eq("Ubicloud - Login")
     end
