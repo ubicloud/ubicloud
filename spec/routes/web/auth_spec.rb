@@ -44,7 +44,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Verify Account")
 
     click_button "Verify Account"
-    expect(page.title).to eq("Ubicloud - Dashboard")
+    expect(page.title).to eq("Ubicloud - #{Account[email: TEST_USER_EMAIL].projects.first.name} Dashboard")
   end
 
   it "can remember login" do
@@ -56,7 +56,7 @@ RSpec.describe Clover, "auth" do
     check "Remember me"
     click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - Dashboard")
+    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
     expect(DB[:account_remember_keys].first(id: account.id)).not_to be_nil
   end
 

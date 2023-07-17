@@ -123,7 +123,7 @@ class CloverWeb < Roda
     hmac_secret Config.clover_session_secret
 
     login_view { view "auth/login", "Login" }
-    login_redirect "/dashboard"
+    login_redirect { "/after-login" }
     login_return_to_requested_location? true
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
@@ -184,6 +184,10 @@ class CloverWeb < Roda
 
   hash_branch("dashboard") do |r|
     view "/dashboard"
+  end
+
+  hash_branch("after-login") do |r|
+    r.redirect "#{@current_user.projects.first.path}/dashboard"
   end
 
   route do |r|

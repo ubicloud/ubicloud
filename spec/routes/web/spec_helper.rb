@@ -35,5 +35,5 @@ def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
   fill_in "Password", with: password
   click_button "Sign in"
 
-  expect(page.title).to eq("Ubicloud - Dashboard")
+  expect(page.title).to end_with("Dashboard")
 end
