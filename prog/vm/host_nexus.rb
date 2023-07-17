@@ -21,6 +21,8 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def start
+    register_deadline(:wait, 15 * 60)
+
     bud Prog::BootstrapRhizome
     hop :wait_bootstrap_rhizome
   end
