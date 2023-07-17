@@ -128,7 +128,7 @@ end
   end
 
   def frame
-    strand.stack.first.freeze
+    @frame ||= strand.stack.first.dup.freeze
   end
 
   def retval
