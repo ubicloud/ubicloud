@@ -128,7 +128,7 @@ end
   end
 
   def frame
-    strand.stack&.first.freeze
+    strand.stack.first.freeze
   end
 
   def retval

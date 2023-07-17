@@ -3,6 +3,9 @@
 require_relative "../model"
 
 class Strand < Sequel::Model
+  Strand.plugin :defaults_setter, cache: true
+  Strand.default_values[:stack] = [{}]
+
   LEASE_EXPIRATION = 120
   many_to_one :parent, key: :parent_id, class: self
   one_to_many :children, key: :parent_id, class: self
