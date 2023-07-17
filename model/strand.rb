@@ -2,6 +2,8 @@
 
 require_relative "../model"
 
+require "time"
+
 class Strand < Sequel::Model
   Strand.plugin :defaults_setter, cache: true
   Strand.default_values[:stack] = [{}]
@@ -79,11 +81,34 @@ SQL
   end
 
   def unsynchronized_run
+    if label == stack.first["deadline_target"].to_s
+      stack.first.delete("deadline_target")
+      stack.first.delete("deadline_at")
+      if stack.first["page_id"]
+        Page[stack.first["page_id"]].incr_resolve
+        stack.first.delete("page_id")
+      end
+
+      modified!(:stack)
+    end
+
+    stack.each do |frame|
+      next unless (deadline_at = frame["deadline_at"])
+
+      if Time.now > Time.parse(deadline_at.to_s)
+        frame["page_id"] ||= Prog::PageNexus.assemble("Strand[#{id}] has an expired deadline! #{prog} did not reach #{frame["deadline_target"]} on time").id
+
+        modified!(:stack)
+      end
+    end
+
     DB.transaction do
       SemSnap.use(id) do |snap|
         load(snap).public_send(label)
       end
     rescue Prog::Base::Nap => e
+      save_changes
+
       return e if e.seconds <= 0
       scheduled = DB[<<SQL, e.seconds, id].get
 UPDATE strand

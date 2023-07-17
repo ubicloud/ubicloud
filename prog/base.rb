@@ -60,6 +60,8 @@ end
       # This is a multi-level stack with a back-link, i.e. one prog
       # calling another in the same Strand of execution.  The thing to
       # do here is pop the stack entry.
+      Page[frame["page_id"]].incr_resolve if frame["page_id"]
+
       old_prog = strand.prog
       old_label = strand.label
       prog, label = link
@@ -178,6 +180,15 @@ end
     fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
     label = label.to_s
     fail Hop.new(@strand.prog, @strand.label, {label: label, retval: nil})
+  end
+
+  def register_deadline(deadline_target, deadline_in)
+    return if strand.stack.first["deadline_target"] == deadline_target && Time.parse(strand.stack.first["deadline_at"].to_s) < Time.now + deadline_in
+
+    strand.stack.first["deadline_target"] = deadline_target
+    strand.stack.first["deadline_at"] = Time.now + deadline_in
+
+    strand.modified!(:stack)
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert

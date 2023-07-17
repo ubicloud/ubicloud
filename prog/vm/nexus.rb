@@ -175,6 +175,8 @@ SQL
   end
 
   def start
+    register_deadline(:wait, 10 * 60)
+
     vm_host_id = allocate
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network
@@ -305,6 +307,8 @@ SQL
   end
 
   def refresh_mesh
+    register_deadline(:wait, 5 * 60)
+
     # YYY: Implement a robust mesh networking concurrency algorithm.
     unless Config.development?
       decr_refresh_mesh
@@ -336,6 +340,8 @@ SQL
   end
 
   def destroy
+    register_deadline(nil, 5 * 60)
+
     unless host.nil?
       begin
         host.sshable.cmd("sudo systemctl stop #{q_vm}")
