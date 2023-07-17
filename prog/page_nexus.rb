@@ -13,7 +13,7 @@ class Prog::PageNexus < Prog::Base
   end
 
   def start
-    #no op until we have a pagerduty integration
+    page.trigger
     hop :wait
   end
 

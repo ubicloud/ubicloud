@@ -104,6 +104,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.15.3-x86_64-linux)
       racc (~> 1.4)
+    pagerduty (4.0.0)
     parallel (1.23.0)
     parser (3.2.2.3)
       ast (~> 2.4.1)
@@ -256,6 +257,7 @@ DEPENDENCIES
   mail
   net-ssh
   netaddr
+  pagerduty (>= 4.0)
   pry
   pry-byebug
   puma (>= 6.2.2)
