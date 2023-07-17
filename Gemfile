@@ -26,6 +26,7 @@ gem "warning"
 gem "pry"
 gem "excon"
 gem "jwt"
+gem "pagerduty", ">= 4.0"
 
 group :development do
   gem "brakeman"
