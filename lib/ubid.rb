@@ -48,6 +48,7 @@ class UBID
   TYPE_STRAND = "st"
   TYPE_SEMAPHORE = "sm"
   TYPE_SSHABLE = "sh"
+  TYPE_PAGE = "pg"
 
   def self.generate(type)
     case type
@@ -103,6 +104,8 @@ class UBID
       Semaphore[uuid]
     when TYPE_SSHABLE
       Sshable[uuid]
+    when TYPE_PAGE
+      Page[uuid]
     else
       fail "Couldn't decode ubid: #{ubid_str}"
     end
