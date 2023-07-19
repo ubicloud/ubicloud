@@ -36,6 +36,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnNetwork unless vm_host.net6
     bud Prog::LearnMemory
     bud Prog::LearnCores
+    bud Prog::LearnStorage
     bud Prog::InstallDnsmasq
     hop :wait_prep
   end
@@ -55,6 +56,15 @@ class Prog::Vm::HostNexus < Prog::Base
         }
 
         fail "BUG: one of the LearnCores fields is not set" if kwargs.value?(nil)
+
+        vm_host.update(**kwargs)
+      when "LearnStorage"
+        kwargs = {
+          total_storage_gib: st.dig(:exitval, "total_storage_gib"),
+          available_storage_gib: st.dig(:exitval, "available_storage_gib")
+        }
+
+        fail "BUG: one of the LearnStorage fields is not set" if kwargs.value?(nil)
 
         vm_host.update(**kwargs)
       end

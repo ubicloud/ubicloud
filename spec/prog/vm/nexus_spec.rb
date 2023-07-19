@@ -11,7 +11,14 @@ RSpec.describe Prog::Vm::Nexus do
   }
 
   let(:st) { Strand.new }
-  let(:vm) { Vm.new(size: "m5a.2x").tap { _1.id = "a410a91a-dc31-4119-9094-3c6a1fb49601" } }
+  let(:vm) {
+    disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
+    Vm.new(size: "m5a.2x").tap {
+      _1.id = "a410a91a-dc31-4119-9094-3c6a1fb49601"
+      _1.vm_storage_volumes.append(disk)
+      disk.vm = _1
+    }
+  }
   let(:p) { Project.create(name: "default").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
@@ -139,7 +146,9 @@ RSpec.describe Prog::Vm::Nexus do
               total_cores: 80,
               total_cpus: 80,
               total_mem_gib: 320,
-              total_hugepages_1g: 316}.merge(args)
+              total_hugepages_1g: 316,
+              total_storage_gib: 500,
+              available_storage_gib: 200}.merge(args)
       sa = Sshable.create(host: "127.0.0.#{@host_index}")
       @host_index += 1
       VmHost.new(**args) { _1.id = sa.id }
@@ -161,6 +170,12 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "does not match if there is not enough ram capacity" do
       new_host(total_mem_gib: 1).save_changes
+      expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
+    end
+
+    it "does not match if there is not enough storage capacity" do
+      new_host(available_storage_gib: 10).save_changes
+      expect(vm.storage_size_gib).to eq(20)
       expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
     end
 
