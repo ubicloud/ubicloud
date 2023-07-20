@@ -5,4 +5,10 @@ require_relative "../model"
 class Address < Sequel::Model
   one_to_many :assigned_vm_address, key: :address_id, class: :AssignedVmAddress
   one_to_many :assigned_host_address, key: :address_id, class: :AssignedHostAddress
+
+  include ResourceMethods
+
+  def self.ubid_type
+    UBID::TYPE_ADDRESS
+  end
 end

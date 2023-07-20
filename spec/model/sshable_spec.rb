@@ -8,7 +8,11 @@ RSpec.describe Sshable do
   key = SshKey.generate.keypair.freeze
 
   subject(:sa) {
-    described_class.new(host: "test.localhost", raw_private_key_1: key)
+    described_class.new(
+      id: UBID.generate(UBID::TYPE_SSHABLE).to_uuid,
+      host: "test.localhost",
+      raw_private_key_1: key
+    )
   }
 
   it "can encrypt and decrypt a field" do

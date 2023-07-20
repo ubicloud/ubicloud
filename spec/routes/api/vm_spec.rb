@@ -19,14 +19,14 @@ RSpec.describe Clover, "vm" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ulid}/location/#{vm.location}/vm"
+      get "/api/project/#{project.ubid}/location/#{vm.location}/vm"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not create" do
-      post "/api/project/#{project.ulid}/location/#{vm.location}/vm"
+      post "/api/project/#{project.ubid}/location/#{vm.location}/vm"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -40,14 +40,14 @@ RSpec.describe Clover, "vm" do
 
     describe "list" do
       it "empty" do
-        get "/api/project/#{project.ulid}/location/#{TEST_LOCATION}/vm"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)).to eq([])
       end
 
       it "success" do
-        get "/api/project/#{project.ulid}/location/#{vm.location}/vm"
+        get "/api/project/#{project.ubid}/location/#{vm.location}/vm"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body).length).to eq(1)
@@ -56,7 +56,7 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
-        post "/api/project/#{project.ulid}/location/#{TEST_LOCATION}/vm", {
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm", {
           public_key: "ssh key",
           name: "test-vm",
           unix_user: "ubi",
@@ -70,7 +70,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid name" do
-        post "/api/project/#{project.ulid}/location/#{TEST_LOCATION}/vm", {
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm", {
           public_key: "ssh key",
           name: "invalid name",
           unix_user: "ubi",
@@ -86,14 +86,14 @@ RSpec.describe Clover, "vm" do
 
     describe "show" do
       it "success" do
-        get "/api/project/#{project.ulid}/location/#{vm.location}/vm/#{vm.name}"
+        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
       end
 
       it "not found" do
-        get "/api/project/#{project.ulid}/location/#{vm.location}/vm/not-exists-vm"
+        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/not-exists-vm"
 
         expect(last_response.status).to eq(404)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
@@ -102,7 +102,7 @@ RSpec.describe Clover, "vm" do
 
     describe "delete" do
       it "success" do
-        delete "/api/project/#{project.ulid}/location/#{vm.location}/vm/#{vm.name}"
+        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
 
         expect(last_response.status).to eq(200)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true

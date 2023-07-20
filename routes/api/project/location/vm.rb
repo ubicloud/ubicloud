@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "ulid"
-
 class CloverApi
   hash_branch(:project_location_prefix, "vm") do |r|
     @serializer = Serializers::Api::Vm

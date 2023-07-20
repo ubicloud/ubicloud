@@ -4,7 +4,7 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::Base do
   it "can bud and reap" do
-    parent = Strand.create(prog: "Test", label: "budder")
+    parent = Strand.create_with_id(prog: "Test", label: "budder")
     expect {
       parent.unsynchronized_run
       parent.reload
@@ -34,7 +34,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can push prog and frames on the stack" do
-    st = Strand.create(prog: "Test", label: :pusher1)
+    st = Strand.create_with_id(prog: "Test", label: :pusher1)
     expect {
       st.run
     }.to change { st.label }.from("pusher1").to("pusher2")
@@ -63,7 +63,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can nap" do
-    st = Strand.create(prog: "Test", label: "napper")
+    st = Strand.create_with_id(prog: "Test", label: "napper")
     ante = st.schedule
     st.run
     post = st.schedule
@@ -77,7 +77,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can manipulate semaphores" do
-    st = Strand.create(prog: "Test", label: "increment_semaphore")
+    st = Strand.create_with_id(prog: "Test", label: "increment_semaphore")
     expect {
       st.run
     }.to change { Semaphore.where(strand_id: st.id).any? }.from(false).to(true)

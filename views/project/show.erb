@@ -15,7 +15,7 @@
   <div class="mt-8 flow-root">
     <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-        <%== render("components/kv_data_card", locals: { data: [["ID", @project_data[:ulid]], ["Name", @project_data[:name]]] }) %>
+        <%== render("components/kv_data_card", locals: { data: [["ID", @project_data[:ubid]], ["Name", @project_data[:name]]] }) %>
         <% if Authorization.has_permission?(@current_user.id, "Vm:delete", @project_data[:id]) %>
           <div class="mt-6 bg-white shadow sm:rounded-lg">
             <div class="px-4 py-5 sm:p-6">

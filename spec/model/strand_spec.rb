@@ -3,7 +3,11 @@
 require_relative "spec_helper"
 
 RSpec.describe Strand do
-  let(:st) { described_class.new(prog: "Test", label: "start") }
+  let(:st) {
+    described_class.new(id: UBID.generate(UBID::TYPE_STRAND).to_uuid,
+      prog: "Test",
+      label: "start")
+  }
 
   context "when leasing" do
     it "can take a lease only if one is not already taken" do

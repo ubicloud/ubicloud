@@ -160,10 +160,12 @@ class VmHost < Sequel::Model
           if Sshable.where(host: source_host_ip).count == 0
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
-          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
+          adr = Address.create_with_id(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
         end
 
-        AssignedHostAddress.create(host_id: id, ip: ip_addr, address_id: adr.id) unless is_failover_ip
+        unless is_failover_ip
+          AssignedHostAddress.create_with_id(host_id: id, ip: ip_addr, address_id: adr.id)
+        end
       end
     end
   end

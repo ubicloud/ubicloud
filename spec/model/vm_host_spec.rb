@@ -36,7 +36,7 @@ RSpec.describe VmHost do
 
   it "requires an Sshable too" do
     expect {
-      sa = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+      sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
       described_class.create(location: "test-location") { _1.id = sa.id }
     }.not_to raise_error
   end
@@ -131,7 +131,7 @@ RSpec.describe VmHost do
   it "create_addresses creates given addresses and doesn't make an api call when ips given" do
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
-    Sshable.create(host: "1.1.1.1")
+    Sshable.create_with_id(host: "1.1.1.1")
 
     described_class.create(location: "test-location") { _1.id = vh.id }
 
@@ -145,7 +145,7 @@ RSpec.describe VmHost do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
-    Sshable.create(host: "1.1.1.1")
+    Sshable.create_with_id(host: "1.1.1.1")
 
     described_class.create(location: "test-location") { _1.id = vh.id }
 
@@ -165,7 +165,7 @@ RSpec.describe VmHost do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
     Sshable.create(host: "1.1.0.0") { _1.id = vh.id }
-    Sshable.create(host: "1.1.1.1")
+    Sshable.create_with_id(host: "1.1.1.1")
     described_class.create(location: "test-location") { _1.id = vh.id }
 
     expect(vh).to receive(:assigned_subnets).and_return([Address.new(cidr: NetAddr::IPv4Net.parse("1.1.1.0/30".shellescape))]).at_least(:once)
@@ -184,8 +184,8 @@ RSpec.describe VmHost do
     Sshable.create(host: "1.1.0.0") { _1.id = old_id }
     described_class.create(location: "test-location") { _1.id = old_id }
 
-    Sshable.create(host: "1.1.1.1")
-    adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
+    Sshable.create_with_id(host: "1.1.1.1")
+    adr = Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
     expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
 
     expect(adr).to receive(:update).with(routed_to_host_id: new_id).and_return(true)
@@ -200,7 +200,7 @@ RSpec.describe VmHost do
     Sshable.create(host: "1.1.0.0") { _1.id = old_id }
     described_class.create(location: "test-location") { _1.id = old_id }
 
-    adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
+    adr = Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
     expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
 
     expect(adr).to receive(:assigned_vm_address).and_return([instance_double(Vm)]).at_least(:once)

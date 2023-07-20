@@ -3,7 +3,12 @@
 require "sequel/model"
 
 RSpec.describe Authorization do
-  let(:users) { [Account.create(email: "auth1@example.com"), Account.create(email: "auth2@example.com")] }
+  let(:users) {
+    [
+      Account.create_with_id(email: "auth1@example.com"),
+      Account.create_with_id(email: "auth2@example.com")
+    ]
+  }
   let(:projects) { (0..1).map { users[_1].create_project_with_default_policy("project-#{_1}") } }
   let(:vms) { (0..3).map { Prog::Vm::Nexus.assemble("key", projects[_1 / 2].id, name: "vm#{_1}") }.map(&:vm) }
   let(:access_policy) { projects[0].access_policies.first }
@@ -101,8 +106,8 @@ RSpec.describe Authorization do
     it "hyper_tag_name" do
       expect(users[0].hyper_tag_name).to eq("user/auth1@example.com")
       p = vms[0].projects.first
-      expect(vms[0].hyper_tag_name(p)).to eq("project/#{p.ulid}/location/hetzner-hel1/vm/vm0")
-      expect(projects[0].hyper_tag_name).to eq("project/#{projects[0].ulid}")
+      expect(vms[0].hyper_tag_name(p)).to eq("project/#{p.ubid}/location/hetzner-hel1/vm/vm0")
+      expect(projects[0].hyper_tag_name).to eq("project/#{projects[0].ubid}")
     end
 
     it "hyper_tag_name error" do
@@ -114,7 +119,7 @@ RSpec.describe Authorization do
     end
 
     it "hyper_tag methods" do
-      project = Project.create(name: "test")
+      project = Project.create_with_id(name: "test")
       expect(project.hyper_tag(project)).to be_nil
 
       tag = project.create_hyper_tag(project)
@@ -129,7 +134,7 @@ RSpec.describe Authorization do
     end
 
     it "associate/dissociate with project" do
-      project = Project.create(name: "test")
+      project = Project.create_with_id(name: "test")
       project.associate_with_project(project)
       users[0].associate_with_project(project)
 
@@ -144,7 +149,7 @@ RSpec.describe Authorization do
     end
 
     it "does not associate/dissociate with nil project" do
-      project = Project.create(name: "test")
+      project = Project.create_with_id(name: "test")
       expect(project.associate_with_project(nil)).to be_nil
       expect(project.applied_access_tags.count).to eq(0)
 

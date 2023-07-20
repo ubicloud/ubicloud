@@ -12,6 +12,12 @@ class Strand < Sequel::Model
 
   NAVIGATE = %w[vm vm_host sshable].freeze
 
+  include ResourceMethods
+
+  def self.ubid_type
+    UBID::TYPE_STRAND
+  end
+
   NAVIGATE.each do
     one_to_one _1.intern, key: :id
   end
@@ -126,3 +132,6 @@ SQL
     end
   end
 end
+
+# We need to unrestrict primary key so strand.add_child works in Prog::Base.
+Strand.unrestrict_primary_key

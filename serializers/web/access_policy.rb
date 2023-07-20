@@ -6,7 +6,7 @@ class Serializers::Web::AccessPolicy < Serializers::Base
   def self.base(ap)
     {
       id: ap.id,
-      ulid: ap.ulid,
+      ubid: ap.ubid,
       name: ap.name,
       body: ap.body.to_json
     }

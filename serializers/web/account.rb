@@ -6,7 +6,7 @@ class Serializers::Web::Account < Serializers::Base
   def self.base(a)
     {
       id: a.id,
-      ulid: a.ulid,
+      ubid: a.ubid,
       email: a.email
     }
   end
