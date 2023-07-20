@@ -10,12 +10,7 @@
   <% if label %>
     <label for="<%= name %>" class="block text-sm font-medium leading-6"><%= label %></label>
   <% end %>
-  <div class="flex justify-between">
-    <% range_labels.each do |lbl| %>
-      <div><%= lbl %></div>
-    <% end %>
-  </div>
-  <div class="flex items-center space-x-4">
+  <div class="flex flex-col space-y-2 p-2">
     <input
       id="<%= name %>"
       type="range"
@@ -28,6 +23,11 @@
       <%= atr_key %>="<%= atr_value %>"
       <% end%>
     >
+    <ul class="flex justify-between w-full px-[10px] pt-1 sm:pt-3">
+      <% range_labels.each do |lbl| %>
+        <li class="flex justify-right sm:justify-center relative items-center rotate-90 sm:rotate-0 mb-6 sm:mb-0"><span class="absolute"><%= lbl %></span></li>
+      <% end %>
+    </ul>
   </div>
   <% if error %>
     <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
