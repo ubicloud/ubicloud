@@ -1,102 +1,83 @@
 <% @page_title = "Virtual Machines" %>
 
 <% if @vms.count > 0 %>
-  <div class="px-2 sm:px-3 lg:px-4">
-    <div class="space-y-1">
-      <%== render(
-        "components/breadcrumb",
-        locals: {
-          back: @project_data[:path],
-          parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]]
-        }
-      ) %>
+  <div class="space-y-1">
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: @project_data[:path],
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]]
+      }
+    ) %>
 
-      <%== render(
-        "components/page_header",
-        locals: {
-          title: "Virtual Machines",
-          right_items: [
-            "<a href='vm/create' class='inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600'>Create Virtual Machine</a>"
-          ]
-        }
-      ) %>
+    <%== render(
+      "components/page_header",
+      locals: {
+        title: "Virtual Machines",
+        right_items: [
+          "<a href='vm/create' class='inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600'>Create Virtual Machine</a>"
+        ]
+      }
+    ) %>
+  </div>
 
-    </div>
-    <div class="mt-8 flow-root">
-      <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-          <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-            <table class="min-w-full divide-y divide-gray-300">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Provider & Location</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Size</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Storage Size</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
-                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">IP Address</th>
-                  <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                    <span class="sr-only">Show</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-200 bg-white">
-                <% @vms.each do |vm| %>
-                  <tr>
-                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm[:name] %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:location] %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:size] %></td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:storage_size_gib] %>
-                      GB</td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <%== render("components/vm_state_label", locals: { state: vm[:state] }) %>
-                    </td>
-                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <% if vm[:ip4] %>
-                        <span class="copy-content cursor-pointer" data-content="<%= vm[:ip4] %>" data-message="Copied IPv4">
-                          <%= vm[:ip4] %>
-                        </span>
-                      <% else %>
-                        <span class="copy-content cursor-pointer" data-content="<%= vm[:ip6] %>" data-message="Copied IPv6">
-                          <%= vm[:ip6] %>
-                        </span>
-                      <% end %>
-                    </td>
-                    <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <a href="<%= @project_data[:path] %><%= vm[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
-                    </td>
-                  </tr>
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Provider & Location</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Size</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Storage Size</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">IP Address</th>
+            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+              <span class="sr-only">Show</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @vms.each do |vm| %>
+            <tr>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= vm[:name] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:location] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:size] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:storage_size_gib] %>
+                GB</td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%== render("components/vm_state_label", locals: { state: vm[:state] }) %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <% if vm[:ip4] %>
+                  <span class="copy-content cursor-pointer" data-content="<%= vm[:ip4] %>" data-message="Copied IPv4">
+                    <%= vm[:ip4] %>
+                  </span>
+                <% else %>
+                  <span class="copy-content cursor-pointer" data-content="<%= vm[:ip6] %>" data-message="Copied IPv6">
+                    <%= vm[:ip6] %>
+                  </span>
                 <% end %>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+              </td>
+              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                <a href="<%= @project_data[:path] %><%= vm[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
     </div>
   </div>
 <% else %>
-  <div class="text-center">
-    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"
-      />
-    </svg>
-    <h3 class="mt-2 text-sm font-semibold text-gray-900">No virtual machines</h3>
-    <p class="mt-1 text-sm text-gray-500">Get started by creating a new virtual machine.</p>
-    <div class="mt-6">
-      <a
-        href="<%= @project_data[:path] %>/vm/create"
-        class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
-      >
-        <svg class="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path
-            d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"
-          />
-        </svg>
-        New Virtual Machine
-      </a>
-    </div>
-  </div>
+  <%== render(
+    "components/empty_state",
+    locals: {
+      icon:
+        "<path stroke-linecap='round' stroke-linejoin='round' d='M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z' />",
+      title: "No virtual machines",
+      description: "Get started by creating a new virtual machine.",
+      button_link: "#{@project_data[:path]}/vm/create",
+      button_title: "New Virtual Machine"
+    }
+  ) %>
 <% end %>
