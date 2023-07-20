@@ -2,6 +2,9 @@
 
 require("securerandom")
 
+class UBIDParseError < RuntimeError
+end
+
 class UBID
   # Binary format, which is UUDIv8 compatible, is:
   # 0                   1                   2                   3
@@ -24,8 +27,46 @@ class UBID
   # we have 64 random bits in the format, so 2^64 - 1
   MAX_ENTROPY = 18446744073709551615
 
-  def self.generate(type, moment: current_milliseconds, entropy: reasonable_entropy)
-    from_parts(moment, type, entropy & 0b11, entropy >> 2)
+  # timestamp is 48 bits, so 2^48 - 1
+  MAX_TIMESTAMP = 281474976710655
+
+  # types
+  TYPE_VM = "vm"
+  TYPE_STORAGE_VOLUME = "v1"
+  TYPE_STORAGE_KEY_ENCRYPTION_KEY = "ke"
+  TYPE_PROJECT = "pj"
+  TYPE_ACCESS_TAG = "tg"
+  TYPE_ACCESS_POLICY = "pc"
+  TYPE_ACCOUNT = "ac"
+  TYPE_ACCOUNT_AUTH_AUDIT_LOGS = "al"
+  TYPE_ACCOUNT_JWT_REFRESH_KEYS = "jw"
+  TYPE_IPSEC_TUNNEL = "tn"
+  TYPE_PRIVATE_SUBNET = "sb"
+  TYPE_ADDRESS = "ad"
+  TYPE_ASSIGNED_VM_ADDRESS = "av"
+  TYPE_ASSIGNED_HOST_ADDRESS = "ah"
+  TYPE_STRAND = "st"
+  TYPE_SEMAPHORE = "sm"
+  TYPE_SSHABLE = "sh"
+
+  def self.generate(type)
+    case type
+    when TYPE_STRAND, TYPE_SEMAPHORE
+      generate_from_current_ts(type)
+    else
+      generate_random(type)
+    end
+  end
+
+  def self.generate_random(type)
+    timestamp = SecureRandom.random_number(MAX_TIMESTAMP)
+    random_value = SecureRandom.random_number(MAX_ENTROPY)
+    from_parts(timestamp, type, random_value & 0b11, random_value >> 2)
+  end
+
+  def self.generate_from_current_ts(type)
+    random_value = SecureRandom.random_number(MAX_ENTROPY)
+    from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
   end
 
   def self.from_uuidish(uuidish)
@@ -44,19 +85,19 @@ class UBID
   end
 
   def self.parse(s)
-    fail "Invalid encoding length: #{s.length}" unless s.length == 26
+    fail UBIDParseError.new("Invalid encoding length: #{s.length}") unless s.length == 26
 
     type = s[0..1]
 
     top_bits_with_parity = to_base32_n(s[2..12])
-    fail "Invalid top bits parity" unless parity(top_bits_with_parity) == 0
+    fail UBIDParseError.new("Invalid top bits parity") unless parity(top_bits_with_parity) == 0
     top_bits = (top_bits_with_parity >> 1)
     unix_ts_ms = get_bits(top_bits, 6, 53)
     version = get_bits(top_bits, 2, 5)
     rand_a = get_bits(top_bits, 0, 1)
 
     bottom_bits_with_parity = to_base32_n(s[13..])
-    fail "Invalid bottom bits parity" unless parity(bottom_bits_with_parity) == 0
+    fail UBIDParseError.new("Invalid bottom bits parity") unless parity(bottom_bits_with_parity) == 0
     bottom_bits = (bottom_bits_with_parity >> 1)
     variant = get_bits(bottom_bits, 62, 63)
     rand_b = get_bits(bottom_bits, 0, 61)
@@ -112,10 +153,6 @@ class UBID
 
   def self.current_milliseconds
     (Time.now.to_r * 1000).to_i
-  end
-
-  def self.reasonable_entropy
-    SecureRandom.random_number(MAX_ENTROPY)
   end
 
   def self.set_bits(n, from, to, bits)

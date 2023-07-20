@@ -12,8 +12,8 @@ class CloverWeb
       view "project/policy"
     end
 
-    r.is String do |policy_ulid|
-      policy = AccessPolicy.from_ulid(policy_ulid)
+    r.is String do |policy_ubid|
+      policy = AccessPolicy.from_ubid(policy_ubid)
 
       unless policy
         response.status = 404

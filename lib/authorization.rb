@@ -75,7 +75,12 @@ module Authorization
     end
 
     def create_hyper_tag(project)
-      AccessTag.create(project_id: project.id, name: hyper_tag_name(project), hyper_tag_id: id, hyper_tag_table: self.class.table_name)
+      AccessTag.create_with_id(
+        project_id: project.id,
+        name: hyper_tag_name(project),
+        hyper_tag_id: id,
+        hyper_tag_table: self.class.table_name
+      )
     end
 
     def delete_hyper_tag(project)

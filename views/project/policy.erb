@@ -16,8 +16,8 @@
     <div class="py-2 -mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8 align-middle sm:px-6 lg:px-8">
       <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white text-sm text-gray-500">
         <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
-          <form action="<%= "#{@project_data[:path]}/policy/#{@policy[:ulid]}" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}/policy/#{@policy[:ulid]}") %>
+          <form action="<%= "#{@project_data[:path]}/policy/#{@policy[:ubid]}" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}/policy/#{@policy[:ubid]}") %>
             <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
               <div class="grid grid-cols-12 gap-6">
                 <div class="col-span-full">

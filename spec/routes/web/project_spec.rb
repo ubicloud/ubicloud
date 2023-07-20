@@ -178,7 +178,7 @@ RSpec.describe Clover, "project" do
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
-        btn = find "#user-#{user2.ulid} .delete-btn"
+        btn = find "#user-#{user2.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.body).to eq({message: "Removing #{user2.email} from #{project.name}"}.to_json)
@@ -194,7 +194,7 @@ RSpec.describe Clover, "project" do
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
-        btn = find "#user-#{user.ulid} .delete-btn"
+        btn = find "#user-#{user.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.body).to eq({message: "You can't remove the last user from '#{project.name}' project. Delete project instead."}.to_json)
@@ -279,7 +279,7 @@ RSpec.describe Clover, "project" do
       it "raises not found when access policy not exists" do
         expect(AccessPolicy).to receive(:[]).and_return(nil)
 
-        visit "#{project.path}/policy/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/policy/pcqv67qwh9t23k4g88xrjya7eb"
 
         expect(page.title).to eq("Ubicloud - Resource not found")
         expect(page.status_code).to eq(404)

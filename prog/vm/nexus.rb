@@ -2,10 +2,10 @@
 
 require "netaddr"
 require "json"
-require "ulid"
 require "shellwords"
 require "openssl"
 require "base64"
+require_relative "../../lib/ubid"
 
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
@@ -19,8 +19,8 @@ class Prog::Vm::Nexus < Prog::Base
       fail "No existing project"
     end
 
-    id = SecureRandom.uuid
-    name ||= Vm.uuid_to_name(id)
+    ubid = UBID.generate(UBID::TYPE_VM)
+    name ||= Vm.ubid_to_name(ubid)
 
     Validation.validate_name(name)
 
@@ -36,14 +36,14 @@ class Prog::Vm::Nexus < Prog::Base
 
     DB.transaction do
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
-        name: name, size: size, location: location, boot_image: boot_image) { _1.id = id }
+        name: name, size: size, location: location, boot_image: boot_image) { _1.id = ubid.to_uuid }
       vm.associate_with_project(project)
       private_subnets.each do |net6, net4|
-        VmPrivateSubnet.create(vm_id: vm.id, net6: net6.to_s, net4: net4.to_s)
+        VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: net6.to_s, net4: net4.to_s)
       end
 
       if storage_encrypted
-        key_encryption_key = StorageKeyEncryptionKey.create(
+        key_encryption_key = StorageKeyEncryptionKey.create_with_id(
           algorithm: key_wrapping_algorithm,
           key: Base64.encode64(key_wrapping_key),
           init_vector: Base64.encode64(key_wrapping_iv),
@@ -51,7 +51,7 @@ class Prog::Vm::Nexus < Prog::Base
         )
       end
 
-      VmStorageVolume.create(
+      VmStorageVolume.create_with_id(
         vm_id: vm.id,
         boot: true,
         size_gib: storage_size_gib,
@@ -180,7 +180,7 @@ SQL
     ip4, address = vm_host.ip4_random_vm_network
     vm.update(vm_host_id: vm_host_id, ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
       local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s)
-    AssignedVmAddress.create(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
+    AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
     hop :create_unix_user
   end
 
@@ -327,7 +327,7 @@ SQL
       end
 
       # record that we created the tunnel from this vm to dst_vm
-      IpsecTunnel.create(src_vm_id: vm.id, dst_vm_id: dst_vm.id)
+      IpsecTunnel.create_with_id(src_vm_id: vm.id, dst_vm_id: dst_vm.id)
     end
 
     decr_refresh_mesh

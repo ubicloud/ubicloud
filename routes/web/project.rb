@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "ulid"
-
 class CloverWeb
   hash_branch("project") do |r|
     @serializer = Serializers::Web::Project
@@ -24,8 +22,8 @@ class CloverWeb
       end
     end
 
-    r.on String do |project_ulid|
-      @project = Project.from_ulid(project_ulid)
+    r.on String do |project_ubid|
+      @project = Project.from_ubid(project_ubid)
 
       unless @project
         response.status = 404

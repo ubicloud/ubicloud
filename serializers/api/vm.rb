@@ -5,7 +5,7 @@ require_relative "../base"
 class Serializers::Api::Vm < Serializers::Base
   def self.base(vm)
     {
-      id: vm.ulid,
+      id: vm.ubid,
       name: vm.name,
       state: vm.display_state,
       location: vm.location,

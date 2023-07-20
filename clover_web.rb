@@ -133,6 +133,7 @@ class CloverWeb < Roda
     create_account_redirect { login_route }
     create_account_set_password? true
     before_create_account do
+      account[:id] = UBID.generate(UBID::TYPE_ACCOUNT).to_uuid
       account[:name] = param("name")
     end
     after_create_account do

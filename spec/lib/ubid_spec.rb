@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../../lib/ubid"
-require "ulid"
 
 RSpec.describe UBID do
   it "can set_bits" do
@@ -71,22 +70,14 @@ RSpec.describe UBID do
     expect(described_class.parse(id.to_s).to_i).to eq(id.to_i)
   end
 
-  it "generates the same ULID as the ULID it was generated from" do
-    ulid1 = ULID.generate
-    ubid1 = described_class.new(ulid1.to_i)
-    ubid2 = described_class.parse(ubid1.to_s)
-    ulid2 = ULID.from_integer(ubid2.to_i)
-    expect(ulid1.to_s).to eq(ulid2.to_s)
-  end
-
   it "can generate random ids" do
-    ubid1 = described_class.generate("vm")
+    ubid1 = described_class.generate(UBID::TYPE_VM)
     ubid2 = described_class.parse(ubid1.to_s)
     expect(ubid2.to_i).to eq(ubid1.to_i)
   end
 
   it "can convert to and from uuid" do
-    ubid1 = described_class.generate("sr")
+    ubid1 = described_class.generate(UBID::TYPE_ACCESS_TAG)
     ubid2 = described_class.from_uuidish(ubid1.to_uuid)
     expect(ubid2.to_s).to eq(ubid1.to_s)
   end
@@ -115,5 +106,112 @@ RSpec.describe UBID do
     expect {
       described_class.parse(invalid_ubid)
     }.to raise_error RuntimeError, "Invalid bottom bits parity"
+  end
+
+  it "generates random timestamp for most types" do
+    [UBID::TYPE_VM,
+      UBID::TYPE_STORAGE_VOLUME,
+      UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY,
+      UBID::TYPE_PROJECT,
+      UBID::TYPE_ACCESS_POLICY,
+      UBID::TYPE_ACCOUNT,
+      UBID::TYPE_ACCOUNT_AUTH_AUDIT_LOGS,
+      UBID::TYPE_ACCOUNT_JWT_REFRESH_KEYS,
+      UBID::TYPE_IPSEC_TUNNEL,
+      UBID::TYPE_PRIVATE_SUBNET,
+      UBID::TYPE_ADDRESS,
+      UBID::TYPE_ASSIGNED_VM_ADDRESS,
+      UBID::TYPE_ASSIGNED_HOST_ADDRESS,
+      UBID::TYPE_SSHABLE].each { |type|
+      # generate 10 ids with this type, and verify that their timestamp
+      # part is not close
+      ubids = (1..10).map { described_class.generate(type).to_i }
+      max_ubid = ubids.max
+      min_ubid = ubids.min
+      expect(max_ubid - min_ubid).to be > (1 << 83)
+    }
+  end
+
+  it "generates clock timestamp for strand and semaphor" do
+    [UBID::TYPE_STRAND,
+      UBID::TYPE_SEMAPHORE].each { |type|
+      # generate 10 ids with this type, and verify that their timestamp
+      # part is close
+      ubids = (1..10).map { described_class.generate(type).to_i }
+      max_ubid = ubids.max
+      min_ubid = ubids.min
+      expect(max_ubid - min_ubid).to be < (1 << 83)
+    }
+  end
+
+  it "has unique type identifiers" do
+    types = [
+      UBID::TYPE_VM,
+      UBID::TYPE_STORAGE_VOLUME,
+      UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY,
+      UBID::TYPE_PROJECT,
+      UBID::TYPE_ACCESS_POLICY,
+      UBID::TYPE_ACCOUNT,
+      UBID::TYPE_ACCOUNT_AUTH_AUDIT_LOGS,
+      UBID::TYPE_ACCOUNT_JWT_REFRESH_KEYS,
+      UBID::TYPE_IPSEC_TUNNEL,
+      UBID::TYPE_PRIVATE_SUBNET,
+      UBID::TYPE_ADDRESS,
+      UBID::TYPE_ASSIGNED_VM_ADDRESS,
+      UBID::TYPE_ASSIGNED_HOST_ADDRESS,
+      UBID::TYPE_STRAND,
+      UBID::TYPE_SEMAPHORE,
+      UBID::TYPE_SSHABLE
+    ]
+    expect(types.uniq.length).to eq(types.length)
+  end
+
+  it "generates ids with proper prefix" do
+    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", size: "x", location: "x", boot_image: "x")
+    expect(vm.ubid).to start_with UBID::TYPE_VM
+
+    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
+    expect(sv.ubid).to start_with UBID::TYPE_STORAGE_VOLUME
+
+    kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
+    expect(kek.ubid).to start_with UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY
+
+    account = Account.create_with_id(email: "x@y.net")
+    expect(account.ubid).to start_with UBID::TYPE_ACCOUNT
+
+    prj = account.create_project_with_default_policy("x")
+    expect(prj.ubid).to start_with UBID::TYPE_PROJECT
+
+    policy = prj.access_policies.first
+    expect(policy.ubid).to start_with UBID::TYPE_ACCESS_POLICY
+
+    atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
+    expect(atag.ubid).to start_with UBID::TYPE_ACCESS_TAG
+
+    tun = IpsecTunnel.create_with_id(src_vm_id: vm.id, dst_vm_id: vm.id)
+    expect(tun.ubid).to start_with UBID::TYPE_IPSEC_TUNNEL
+
+    subnet = VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: "0::0", net4: "127.0.0.1")
+    expect(subnet.ubid).to start_with UBID::TYPE_PRIVATE_SUBNET
+
+    sshable = Sshable.create_with_id
+    expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
+
+    host = VmHost.create(location: "x") { _1.id = sshable.id }
+
+    adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
+    expect(adr.ubid).to start_with UBID::TYPE_ADDRESS
+
+    vm_adr = AssignedVmAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+    expect(vm_adr.ubid).to start_with UBID::TYPE_ASSIGNED_VM_ADDRESS
+
+    host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
+    expect(host_adr.ubid).to start_with UBID::TYPE_ASSIGNED_HOST_ADDRESS
+
+    strand = Strand.create_with_id(prog: "x", label: "y")
+    expect(strand.ubid).to start_with UBID::TYPE_STRAND
+
+    semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
+    expect(semaphore.ubid).to start_with UBID::TYPE_SEMAPHORE
   end
 end

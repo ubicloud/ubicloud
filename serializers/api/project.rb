@@ -5,7 +5,7 @@ require_relative "../base"
 class Serializers::Api::Project < Serializers::Base
   def self.base(p)
     {
-      id: p.ulid,
+      id: p.ubid,
       name: p.name
     }
   end

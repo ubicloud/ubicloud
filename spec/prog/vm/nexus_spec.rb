@@ -14,12 +14,12 @@ RSpec.describe Prog::Vm::Nexus do
   let(:vm) {
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
     Vm.new(size: "m5a.2x").tap {
-      _1.id = "a410a91a-dc31-4119-9094-3c6a1fb49601"
+      _1.id = UBID.generate(UBID::TYPE_VM).to_uuid
       _1.vm_storage_volumes.append(disk)
       disk.vm = _1
     }
   }
-  let(:p) { Project.create(name: "default").tap { _1.associate_with_project(_1) } }
+  let(:p) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
     it "fails if there is no project" do
@@ -149,7 +149,7 @@ RSpec.describe Prog::Vm::Nexus do
               total_hugepages_1g: 316,
               total_storage_gib: 500,
               available_storage_gib: 200}.merge(args)
-      sa = Sshable.create(host: "127.0.0.#{@host_index}")
+      sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
       @host_index += 1
       VmHost.new(**args) { _1.id = sa.id }
     end

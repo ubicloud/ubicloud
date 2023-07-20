@@ -5,7 +5,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil)
     DB.transaction do
-      sa = Sshable.create(host: sshable_hostname)
+      sa = Sshable.create_with_id(host: sshable_hostname)
       vmh = VmHost.create(location: location, net6: net6, ndp_needed: ndp_needed) { _1.id = sa.id }
 
       if provider == HetznerHost::PROVIDER_NAME
@@ -13,7 +13,7 @@ class Prog::Vm::HostNexus < Prog::Base
         vmh.create_addresses
       else
         Address.create(cidr: sshable_hostname, routed_to_host_id: sa.id) { _1.id = sa.id }
-        AssignedHostAddress.create(ip: sshable_hostname, address_id: sa.id, host_id: sa.id)
+        AssignedHostAddress.create_with_id(ip: sshable_hostname, address_id: sa.id, host_id: sa.id)
       end
 
       Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = sa.id }

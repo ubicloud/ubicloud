@@ -6,7 +6,7 @@ class Serializers::Web::Project < Serializers::Base
   def self.base(p)
     {
       id: p.id,
-      ulid: p.ulid,
+      ubid: p.ubid,
       path: p.path,
       name: p.name
     }

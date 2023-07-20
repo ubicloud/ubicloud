@@ -19,8 +19,12 @@ class Vm < Sequel::Model
 
   include Authorization::HyperTagMethods
 
+  def self.ubid_type
+    UBID::TYPE_VM
+  end
+
   def hyper_tag_name(project)
-    "project/#{project.ulid}/location/#{location}/vm/#{name}"
+    "project/#{project.ubid}/location/#{location}/vm/#{name}"
   end
 
   include Authorization::TaggableMethods
@@ -135,8 +139,8 @@ class Vm < Sequel::Model
     product.cores
   end
 
-  def self.uuid_to_name(id)
-    "vm" + ULID.from_uuidish(id).to_s[0..5].downcase
+  def self.ubid_to_name(id)
+    id.to_s[0..7]
   end
 
   def inhost_name
@@ -145,7 +149,7 @@ class Vm < Sequel::Model
     # vm.id to be collision free and there will need to be a second
     # addressing scheme scoped to each VmHost.  But for now, assume
     # entropy.
-    self.class.uuid_to_name(id)
+    self.class.ubid_to_name(UBID.from_uuidish(id))
   end
 
   def storage_size_gib

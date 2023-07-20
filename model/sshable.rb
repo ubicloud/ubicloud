@@ -4,6 +4,8 @@ require "net/ssh"
 require_relative "../model"
 
 class Sshable < Sequel::Model
+  include ResourceMethods
+
   plugin :column_encryption do |enc|
     enc.column :raw_private_key_1
     enc.column :raw_private_key_2
@@ -19,6 +21,10 @@ class Sshable < Sequel::Model
       @stderr = stderr
       super "command exited with an error: " + cmd
     end
+  end
+
+  def self.ubid_type
+    UBID::TYPE_SSHABLE
   end
 
   def keys
@@ -108,3 +114,7 @@ class Sshable < Sequel::Model
     end
   end
 end
+
+# We need to unrestrict primary key so Sshable.new(...).save_changes works
+# in sshable_spec.rb.
+Sshable.unrestrict_primary_key

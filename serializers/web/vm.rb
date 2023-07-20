@@ -6,7 +6,7 @@ class Serializers::Web::Vm < Serializers::Base
   def self.base(vm)
     {
       id: vm.id,
-      ulid: vm.ulid,
+      ubid: vm.ubid,
       path: vm.path,
       name: vm.name,
       state: vm.display_state,

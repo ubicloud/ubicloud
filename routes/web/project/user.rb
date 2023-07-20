@@ -33,8 +33,8 @@ class CloverWeb
       r.redirect "#{@project.path}/user"
     end
 
-    r.is String do |user_ulid|
-      user = Account.from_ulid(user_ulid)
+    r.is String do |user_ubid|
+      user = Account.from_ubid(user_ubid)
 
       unless user
         response.status = 404

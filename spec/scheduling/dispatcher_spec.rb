@@ -70,7 +70,7 @@ RSpec.describe Scheduling::Dispatcher do
 
         # Ensure the test can be found by "#scan" and runs in a
         # thread.
-        s = Strand.create(prog: "Test", label: "synchronized")
+        s = Strand.create_with_id(prog: "Test", label: "synchronized")
         di.start_cohort
         expect(di.threads.count).to be 1
         expect(di.threads[0].name).to eq(s.id)
@@ -105,7 +105,7 @@ RSpec.describe Scheduling::Dispatcher do
 
         di.instance_variable_set(:@apoptosis_timeout, 0)
         di.instance_variable_set(:@dump_timeout, 0)
-        Strand.create(prog: "Test", label: "wait_exit")
+        Strand.create_with_id(prog: "Test", label: "wait_exit")
         di.start_cohort
         w.close
         di.threads.each(&:join)

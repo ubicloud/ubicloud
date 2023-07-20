@@ -33,19 +33,25 @@ module SemaphoreMethods
 end
 
 module ResourceMethods
-  require "ulid"
+  require_relative "lib/ubid"
 
   def self.included(base)
     base.extend(ClassMethods)
   end
 
-  def ulid
-    @ulid ||= ULID.from_uuidish(id).to_s.downcase
+  def ubid
+    @ubid ||= UBID.from_uuidish(id).to_s.downcase
   end
 
   module ClassMethods
-    def from_ulid(ulid)
-      self[id: ULID.parse(ulid).to_uuidish]
+    def from_ubid(ubid)
+      self[id: UBID.parse(ubid).to_uuid]
+    rescue UBIDParseError
+      nil
+    end
+
+    def create_with_id(*args, **kwargs)
+      create(*args, **kwargs) { _1.id = UBID.generate(ubid_type).to_uuid }
     end
   end
 end
