@@ -1,175 +1,173 @@
 <% @page_title = "Create Virtual Machine" %>
 
-<div class="px-2 sm:px-3 lg:px-4">
-  <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        back: "#{@project_data[:path]}/vm",
-        parts: [
-          %w[Projects /project],
-          [@project_data[:name], @project_data[:path]],
-          ["Virtual Machines", "#{@project_data[:path]}/vm"],
-          %w[Create #]
-        ]
-      }
-    ) %>
-    <%== render("components/page_header", locals: { title: "Create Virtual Machine" }) %>
-  </div>
-  <!-- Create Card -->
-  <div class="mt-8 flow-root">
-    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-      <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg bg-white">
-          <form action="<%= "#{@project_data[:path]}/vm" %>" method="POST">
-            <!-- YYY: need a better way to manage coupling of routes and erbs -->
-            <%== csrf_tag("#{@project_data[:path]}/vm") %>
-            <div class="space-y-12 px-4 py-6 sm:p-8">
-              <div class="border-b border-gray-900/10 pb-12">
-                <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
-                <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your virtual machine.</p>
-                <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-                  <div class="sm:col-span-3">
-                    <%== render(
-                      "components/form/text",
-                      locals: {
-                        name: "name",
-                        label: "Name",
-                        attributes: {
-                          required: true,
-                          placeholder: "Enter name"
-                        }
-                      }
-                    ) %>
-                  </div>
-                  <div class="col-span-full">
-                    <%== render(
-                      "components/form/radio_small_cards",
-                      locals: {
-                        name: "location",
-                        label: "Provider & Location",
-                        options: Option::Locations.to_h { |l| [l.name, l.display_name] },
-                        attributes: {
-                          required: true
-                        }
-                      }
-                    ) %>
-                  </div>
-                  <div class="col-span-full">
-                    <%== render(
-                      "components/form/range_slider",
-                      locals: {
-                        name: "storage-size-gib",
-                        label: "Storage Size",
-                        range_labels: (1..10).map { "#{_1 * 10}GB" },
-                        value: 40,
-                        attributes: {
-                          min: 10,
-                          max: 100,
-                          step: 10,
-                          required: true
-                        }
-                      }
-                    ) %>
-                  </div>
-                  <div class="col-span-full">
-                    <div class="space-y-2">
-                      <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size</label>
-                      <fieldset class="radio-small-cards" id="size-radios">
-                        <legend class="sr-only">Server size</legend>
-                        <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
-                          <% Option::VmSizes.each do |size| %>
-                            <label>
-                              <input
-                                type="radio"
-                                name="size"
-                                value="<%= size.name %>"
-                                class="peer sr-only"
-                                required
-                                <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
-                              >
-                              <span
-                                class="flex items-center rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: "#{@project_data[:path]}/vm",
+      parts: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["Virtual Machines", "#{@project_data[:path]}/vm"],
+        %w[Create #]
+      ]
+    }
+  ) %>
+  <%== render("components/page_header", locals: { title: "Create Virtual Machine" }) %>
+</div>
+
+<div class="grid gap-6">
+  <form action="<%= "#{@project_data[:path]}/vm" %>" method="POST">
+    <!-- YYY: need a better way to manage coupling of routes and erbs -->
+    <%== csrf_tag("#{@project_data[:path]}/vm") %>
+    <!-- Create Card -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your virtual machine.</p>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "name",
+                    label: "Name",
+                    attributes: {
+                      required: true,
+                      placeholder: "Enter name"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <%== render(
+                  "components/form/radio_small_cards",
+                  locals: {
+                    name: "location",
+                    label: "Provider & Location",
+                    options: Option::Locations.to_h { |l| [l.name, l.display_name] },
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <%== render(
+                  "components/form/range_slider",
+                  locals: {
+                    name: "storage-size-gib",
+                    label: "Storage Size",
+                    range_labels: (1..10).map { "#{_1 * 10}GB" },
+                    value: 40,
+                    attributes: {
+                      min: 10,
+                      max: 100,
+                      step: 10,
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <div class="space-y-2">
+                  <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size</label>
+                  <fieldset class="radio-small-cards" id="size-radios">
+                    <legend class="sr-only">Server size</legend>
+                    <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
+                      <% Option::VmSizes.each do |size| %>
+                        <label>
+                          <input
+                            type="radio"
+                            name="size"
+                            value="<%= size.name %>"
+                            class="peer sr-only"
+                            required
+                            <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
+                          >
+                          <span
+                            class="flex items-center rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
                                 ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
                                 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
-                              >
-                                <span class="flex flex-col">
-                                  <span class="text-md font-semibold"><%= size.display_name %></span>
-                                  <span class="text-sm opacity-80">
-                                    <span class="block sm:inline"><%= size.vcpu %>
-                                      vCPUs /
-                                      <%= size.memory %>
-                                      GB</span>
-                                  </span>
-                                </span>
+                          >
+                            <span class="flex flex-col">
+                              <span class="text-md font-semibold"><%= size.display_name %></span>
+                              <span class="text-sm opacity-80">
+                                <span class="block sm:inline"><%= size.vcpu %>
+                                  vCPUs /
+                                  <%= size.memory %>
+                                  GB</span>
                               </span>
-                            </label>
-                          <% end %>
-                        </div>
-                      </fieldset>
+                            </span>
+                          </span>
+                        </label>
+                      <% end %>
                     </div>
-                  </div>
-                  <div class="col-span-full">
-                    <%== render(
-                      "components/form/radio_small_cards",
-                      locals: {
-                        name: "boot-image",
-                        label: "Boot Image",
-                        options: Option::BootImages.to_h { |bi| [bi.name, bi.display_name] },
-                        attributes: {
-                          required: true
-                        }
-                      }
-                    ) %>
-                  </div>
+                  </fieldset>
                 </div>
               </div>
-              <div class="border-b border-gray-900/10 pb-12">
-                <h2 class="text-base font-semibold leading-7 text-gray-900">Login Information</h2>
-                <p class="mt-1 text-sm leading-6 text-gray-600">This information will be used to login virtual machine.</p>
-
-                <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-                  <div class="sm:col-span-2">
-                    <%== render(
-                      "components/form/text",
-                      locals: {
-                        name: "user",
-                        label: "User",
-                        value: "ubi",
-                        attributes: {
-                          required: true,
-                          placeholder: "Unix username"
-                        }
-                      }
-                    ) %>
-                  </div>
-
-                  <div class="col-span-full">
-                    <%== render(
-                      "components/form/textarea",
-                      locals: {
-                        name: "public-key",
-                        label: "SSH Public Key",
-                        description: "SSH keys are a more secure method of logging into a server.",
-                        attributes: {
-                          required: true,
-                          placeholder: "ssh-ed25519 AAAA...",
-                          rows: 3
-                        }
-                      }
-                    ) %>
-                  </div>
-                </div>
+              <div class="col-span-full">
+                <%== render(
+                  "components/form/radio_small_cards",
+                  locals: {
+                    name: "boot-image",
+                    label: "Boot Image",
+                    options: Option::BootImages.to_h { |bi| [bi.name, bi.display_name] },
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
               </div>
             </div>
+          </div>
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Login Information</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">This information will be used to login virtual machine.</p>
 
-            <div class="mb-8 flex items-center justify-end gap-x-6 px-8">
-              <a href="/vm" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-              <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="sm:col-span-2">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "user",
+                    label: "User",
+                    value: "ubi",
+                    attributes: {
+                      required: true,
+                      placeholder: "Unix username"
+                    }
+                  }
+                ) %>
+              </div>
+
+              <div class="col-span-full">
+                <%== render(
+                  "components/form/textarea",
+                  locals: {
+                    name: "public-key",
+                    label: "SSH Public Key",
+                    description: "SSH keys are a more secure method of logging into a server.",
+                    attributes: {
+                      required: true,
+                      placeholder: "ssh-ed25519 AAAA...",
+                      rows: 3
+                    }
+                  }
+                ) %>
+              </div>
             </div>
-          </form>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="/vm" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
         </div>
       </div>
     </div>
-  </div>
+  </form>
 </div>

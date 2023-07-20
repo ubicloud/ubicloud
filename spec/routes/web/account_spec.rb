@@ -18,7 +18,7 @@ RSpec.describe Clover, "account" do
     it "show password change page" do
       visit "/account"
 
-      expect(page.title).to eq("Ubicloud - My Account")
+      expect(page.title).to eq("Ubicloud - Change Password")
       expect(page).to have_content "Change Password"
     end
   end
