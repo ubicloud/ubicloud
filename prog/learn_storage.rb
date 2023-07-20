@@ -23,8 +23,8 @@ class Prog::LearnStorage < Prog::Base
 
   def start
     storage_root = "/var"
-    total_storage_gib = parse_size_gib(storage_root, sshable.cmd("sudo df -h --output=size #{storage_root}"))
-    reported_available_storage_gib = parse_size_gib(storage_root, sshable.cmd("sudo df -h --output=avail #{storage_root}"))
+    total_storage_gib = parse_size_gib(storage_root, sshable.cmd("df -h --output=size #{storage_root}"))
+    reported_available_storage_gib = parse_size_gib(storage_root, sshable.cmd("df -h --output=avail #{storage_root}"))
 
     # reserve 5G for future host related stuff
     available_storage_gib = [0, reported_available_storage_gib - 5].max
