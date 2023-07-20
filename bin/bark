@@ -1,0 +1,85 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+#
+#
+# Exoskeleton is a process that launches a subprocess and supervises
+# or supports it in some way.
+#
+# For now, it concerns itself with forwarding logs.
+#
+# This general approach to log collection is inspired by Postgres's
+# syslogger.c, which I thought had an elegant way to obtain both
+# structured and unstructured logs, where the latter may be emitted by
+# libraries not under Postgres's control.
+#
+# By doing things this way, this process can add some default headers
+# to unstructured logs and ensure they are forwarded to the log
+# processor of choice.
+#
+# The general way it works is by using the atomic properties of the
+# POSIX macro `PIPE_BUF` to frame log protocol traffic: because a
+# write() that fits PIPE_BUF will be delivered atomically to a read()
+# system call without being refragmented or spliced with other system
+# calls, we can inspect the buffer as something like a datagram, and
+# see if it kind-of looks like something that has come from our
+# structured logging code.
+#
+# In Postgres's case, the magic bytes are beginning with two NUL
+# bytes, in our case, looking like a newline terminatd JSON may be
+# good enough.
+require "fcntl"
+
+# Unfortunately PIPE_BUF is a macro, and not in any standard
+# `extern`'d word of memory.  So I use the Linux default for the time
+# being, to avoid having to add a C extension to expose it, e.g. via
+# `rb_define_const(mSomemodule, "PIPE_BUF", UINT2NUM(PIPE_BUF));`
+ASSUMED_PIPE_BUF = 4096
+
+r_out, w_out = IO.pipe
+r_err, w_err = IO.pipe
+live_fds = [r_out, r_err]
+live_fds.each do |fd|
+  mode = fd.fcntl(Fcntl::F_GETFL, 0)
+  fd.fcntl(Fcntl::F_SETFL, Fcntl::O_NONBLOCK | mode)
+end
+
+# Spawn subprocess, inheriting stdin and passing pipes for stdout and
+# stderr.  Close the file descriptor in the current process to be able
+# to receive EOF from read_nonblock.
+pid = Process.spawn(*ARGV, close_others: true, in: $stdin, out: w_out, err: w_err)
+[$stdin, w_out, w_err].each(&:close)
+
+th = Thread.new do
+  loop do
+    result = IO.select(live_fds)
+
+    # Remove fds from the select fd_set as EOF is received.
+    live_fds = (result[0] & live_fds).select do |fd|
+      next unless (read = fd.read_nonblock(ASSUMED_PIPE_BUF, exception: false))
+      next true if read == :wait_readable
+
+      case fd
+      when r_out
+        $stdout.write(read)
+      when r_err
+        $stderr.write(read)
+      else
+        fail "BUG"
+      end
+
+      true
+    end
+
+    # All file descriptors have sent EOF, time to end the thread.
+    break if live_fds.empty?
+  end
+end
+
+_, status = Process.wait2 pid
+
+# Ensure that any remaining data in the pipe gets handled: EOFs
+# received on both stdout and stderr will cause the thread to exit.
+th.join
+
+exit status.exitstatus
