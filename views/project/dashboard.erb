@@ -1,38 +1,62 @@
 <% @page_title = "#{@project_data[:name]} Dashboard" %>
 
-<div class="px-2 sm:px-3 lg:px-4">
-  <div>
-    <%== render("components/page_header", locals: { title: "Getting Started with your Project" }) %>
-  </div>
-  <!-- Create Card -->
-  <div class="mt-8 flow-root">
-    <div class="gap-10 overflow-hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 pb-5">
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: "/project",
+      parts: [%w[Projects /project], [@project_data[:name], ""]]
+    }
+  ) %>
+  <%== render("components/page_header", locals: { title: "Getting Started with your Project" }) %>
+</div>
+
+<div class="flow-root">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-10">
+    <% [
+      [
+        "<path stroke-linecap='round' stroke-linejoin='round' d='M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z' />",
+        "bg-teal-50 text-teal-700", "Create Virtual Machine",
+        "Linux-based virtual machines that run on top of virtualized hardware. Comprehensive, cost-effective cloud computing.",
+        "#{@project_data[:path]}/vm/create"
+      ], [
+        "<path stroke-linecap='round' stroke-linejoin='round' d='M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' />",
+        "bg-purple-50 text-purple-700", "Add User to Project",
+        "Projects are the central point for working with others within Ubicloud. Get started by adding others to your project to be able to share access and collaborate.",
+        "#{@project_data[:path]}/user"
+      ], [
+        "<path stroke-linecap='round' stroke-linejoin='round' d='M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z' />",
+        "bg-sky-50 text-sky-700", "Update Access Policy",
+        "Access policies help to specify who can perform particular actions on your project's resources.",
+        "#{@project_data[:path]}/policy"
+      ], [
+        "<path stroke-linecap='round' stroke-linejoin='round' d='M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z' />",
+        "bg-yellow-50 text-yellow-700", "API Reference",
+        "Manage your resources programmatically using conventional HTTP requests.",
+        "#"
+      ]
+    ].each do |icon, color, title, description, link| %>
       <div
         class="rounded-lg shadow group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-orange-600"
       >
         <div>
-          <span class="inline-flex rounded-lg p-3 bg-teal-50 text-teal-700 ring-4 ring-white">
+          <span class="inline-flex rounded-lg p-3 <%= color %> ring-4 ring-white">
             <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"
-              />
+              <%== icon %>
             </svg>
           </span>
         </div>
         <div class="mt-8">
           <h3 class="text-base font-semibold leading-6 text-gray-900">
-            <a href="<%= @project_data[:path] %>/vm/create" class="focus:outline-none">
+            <a href="<%= link %>" class="focus:outline-none">
               <!-- Extend touch target to entire panel -->
               <span class="absolute inset-0" aria-hidden="true"></span>
-              Create Virtual Machine
+              <%= title %>
             </a>
           </h3>
-          <p class="mt-2 text-sm text-gray-500">Linux-based virtual machines that run on top of virtualized hardware. Comprehensive, cost-effective cloud
-            computing.</p>
+          <p class="mt-2 text-sm text-gray-500"><%= description %></p>
         </div>
-        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
+        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
           <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
             <path
               d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
@@ -40,113 +64,6 @@
           </svg>
         </span>
       </div>
-
-      <div
-        class="rounded-lg shadow group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-orange-600"
-      >
-        <div>
-          <span class="inline-flex rounded-lg p-3 bg-purple-50 text-purple-700 ring-4 ring-white">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              class="w-6 h-6"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
-              />
-            </svg>
-          </span>
-        </div>
-        <div class="mt-8">
-          <h3 class="text-base font-semibold leading-6 text-gray-900">
-            <a href="<%= @project_data[:path] %>/user" class="focus:outline-none">
-              <!-- Extend touch target to entire panel -->
-              <span class="absolute inset-0" aria-hidden="true"></span>
-              Add User to Project
-            </a>
-          </h3>
-          <p class="mt-2 text-sm text-gray-500">Projects are the central point for working with others within Ubicloud. Get started by adding others to
-            your project to be able to share access and collaborate.</p>
-        </div>
-        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
-          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
-            />
-          </svg>
-        </span>
-      </div>
-
-      <div
-        class="rounded-lg shadow group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-orange-600"
-      >
-        <div>
-          <span class="inline-flex rounded-lg p-3 bg-sky-50 text-sky-700 ring-4 ring-white">
-            <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
-              />
-            </svg>
-          </span>
-        </div>
-        <div class="mt-8">
-          <h3 class="text-base font-semibold leading-6 text-gray-900">
-            <a href="<%= @project_data[:path] %>/policy" class="focus:outline-none">
-              <!-- Extend touch target to entire panel -->
-              <span class="absolute inset-0" aria-hidden="true"></span>
-              Update Access Policy
-            </a>
-          </h3>
-          <p class="mt-2 text-sm text-gray-500">Access policies help to specify who can perform particular actions on your project's resources.</p>
-        </div>
-        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
-          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
-            />
-          </svg>
-        </span>
-      </div>
-
-      <div
-        class="rounded-lg shadow group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-orange-600"
-      >
-        <div>
-          <span class="inline-flex rounded-lg p-3 bg-yellow-50 text-yellow-700 ring-4 ring-white">
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"
-              />
-            </svg>
-          </span>
-        </div>
-        <div class="mt-8">
-          <h3 class="text-base font-semibold leading-6 text-gray-900">
-            <a href="#" class="focus:outline-none">
-              <!-- Extend touch target to entire panel -->
-              <span class="absolute inset-0" aria-hidden="true"></span>
-              API Reference
-            </a>
-          </h3>
-          <p class="mt-2 text-sm text-gray-500">Manage your resources programmatically using conventional HTTP requests.</p>
-        </div>
-        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400" aria-hidden="true">
-          <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M20 4h1a1 1 0 00-1-1v1zm-1 12a1 1 0 102 0h-2zM8 3a1 1 0 000 2V3zM3.293 19.293a1 1 0 101.414 1.414l-1.414-1.414zM19 4v12h2V4h-2zm1-1H8v2h12V3zm-.707.293l-16 16 1.414 1.414 16-16-1.414-1.414z"
-            />
-          </svg>
-        </span>
-      </div>
-    </div>
+    <% end %>
   </div>
 </div>

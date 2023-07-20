@@ -26,8 +26,10 @@
           <%== render("layouts/topbar") %>
           <main class="py-10">
             <div class="px-4 sm:px-6 lg:px-8">
-              <%== render("components/flash_message") %>
-              <%== yield %>
+              <div class="px-2 sm:px-3 lg:px-4">
+                <%== render("components/flash_message") %>
+                <%== yield %>
+              </div>
             </div>
           </main>
         </div>
