@@ -12,7 +12,11 @@ class Scheduling::Dispatcher
   def scan
     idle_connections = Config.db_pool - @threads.count - 1
     if idle_connections < 1
-      puts "Not enough database connections. Waiting active connections to finish their work. db_pool:#{Config.db_pool} active_threads:#{@threads.count}"
+      Clog.info("Not enough database connections. Waiting active connections to finish their work.",
+        pool_state: {
+          db_pool: Config.db_pool,
+          active_threads: threads.count
+        })
       return []
     end
 
