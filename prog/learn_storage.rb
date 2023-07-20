@@ -6,12 +6,13 @@ class Prog::LearnStorage < Prog::Base
   def parse_size_gib(storage_root, s)
     sizes = s.each_line.filter_map do |line|
       next unless line =~ /^\s*(\d+)(\w+)$/
-      # Fail noisily if unit is not in gigabytes or terabytes
-      fail "BUG: unexpected storage size unit: #{$2}" unless ($2 == "G") || ($2 == "T")
       if $2 == "G"
         Integer($1)
-      else
+      elsif $2 == "T"
         Integer($1) * 1024
+      else
+        # Fail noisily if unit is not in gigabytes or terabytes
+        fail "BUG: unexpected storage size unit: #{$2}"
       end
     end
 
