@@ -5,7 +5,6 @@ require "json"
 require "shellwords"
 require "openssl"
 require "base64"
-require_relative "../../lib/ubid"
 
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh

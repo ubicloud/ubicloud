@@ -33,8 +33,6 @@ module SemaphoreMethods
 end
 
 module ResourceMethods
-  require_relative "lib/ubid"
-
   def self.included(base)
     base.extend(ClassMethods)
   end

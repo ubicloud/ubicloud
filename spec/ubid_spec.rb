@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/ubid"
-
 RSpec.describe UBID do
   it "can set_bits" do
     expect(described_class.set_bits(0, 0, 7, 0xab)).to eq(0xab)

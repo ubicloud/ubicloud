@@ -21,6 +21,7 @@ Unreloader.autoload("#{__dir__}/clover.rb") { "Clover" }
 Unreloader.autoload("#{__dir__}/clover_api.rb") { "CloverApi" }
 Unreloader.autoload("#{__dir__}/clover_web.rb") { "CloverWeb" }
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
+Unreloader.autoload("#{__dir__}/ubid.rb") { "UBID" }
 
 AUTOLOAD_CONSTANTS = []
 
