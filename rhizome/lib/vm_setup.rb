@@ -42,16 +42,17 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, private_subnets, gua, ip4, local_ip4, private_ipv4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets)
+  def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets)
     ip4 = nil if ip4.empty?
-    interfaces
-    routes6(gua, private_subnets, ndp_needed)
-    routes4(ip4, local_ip4)
-    nat4(ip4, private_ipv4)
-    cloudinit(unix_user, public_key, private_ipv4, private_subnets)
+    interfaces(nics)
+    setup_veths_6(gua, ndp_needed)
+    setup_taps_6(gua, nics)
+    routes4(ip4, local_ip4, nics)
+    nat4(ip4, nics)
+    cloudinit(unix_user, public_key, nics)
     vhost_sockets = storage(storage_volumes, storage_secrets, boot_image)
     hugepages(mem_gib)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets, nics)
     forwarding
   end
 
@@ -109,7 +110,7 @@ class VmSetup
     r "chown -R #{q_vm} #{vp.q_hugepages}"
   end
 
-  def interfaces
+  def interfaces(nics)
     r "ip netns add #{q_vm}"
 
     # Generate MAC addresses rather than letting Linux do it to avoid
@@ -119,7 +120,9 @@ class VmSetup
     # /sys/class/net/vethi#{q_vm}/address at two points in time.  The
     # result is a race condition that *sometimes* worked.
     r "ip link add vetho#{q_vm} addr #{gen_mac.shellescape} type veth peer name vethi#{q_vm} addr #{gen_mac.shellescape} netns #{q_vm}"
-    r "ip -n #{q_vm} tuntap add dev tap#{q_vm} mode tap user #{q_vm}"
+    nics.each do |ip6, ip4, tap, mac|
+      r "ip -n #{q_vm} tuntap add dev #{tap} mode tap user #{q_vm}"
+    end
   rescue CommandFail => ex
     errors = [
       /ioctl(TUNSETIFF): Device or resource busy/,
@@ -134,7 +137,7 @@ class VmSetup
     [halved, halved.next_sib]
   end
 
-  def routes6(gua, private_subnets, ndp_needed)
+  def setup_veths_6(gua, ndp_needed)
     # Routing: from host to subordinate.
     vethi_ll = mac_to_ipv6_link_local(r("ip netns exec #{q_vm} cat /sys/class/net/vethi#{q_vm}/address").chomp)
     r "ip link set dev vetho#{q_vm} up"
@@ -155,10 +158,6 @@ class VmSetup
     # enter a default routing loop via forwarding)
     r "ip -n #{q_vm} addr replace #{clover_ephemeral.to_s.shellescape} dev vethi#{q_vm}"
 
-    # Allocate ::1 in the guest network for DHCPv6.
-    guest_intrusion = guest_ephemeral.nth(1).to_s + "/" + guest_ephemeral.netmask.prefix_len.to_s
-    r "ip -n #{q_vm} addr replace #{guest_intrusion.shellescape} dev tap#{q_vm}"
-
     # Routing: from subordinate to host.
     vetho_ll = mac_to_ipv6_link_local(File.read("/sys/class/net/vetho#{q_vm}/address").chomp)
     r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
@@ -166,15 +165,29 @@ class VmSetup
 
     vp.write_guest_ephemeral(guest_ephemeral.to_s)
     vp.write_clover_ephemeral(clover_ephemeral.to_s)
+  end
 
-    # Route ephemeral address to tap.
-    r "ip -n #{q_vm} link set dev tap#{q_vm} up"
-    r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
+  def setup_taps_6(gua, nics)
+    # Write out guest-delegated and clover infrastructure address
+    # ranges, designed around non-floating IPv6 networks bound to the
+    # host.
+    guest_ephemeral, _ = subdivide_network(NetAddr.parse_net(gua))
 
-    # Route private subnet addresses to tap.
-    private_subnets.each do |net6, net4|
-      r "ip -n #{q_vm} addr replace #{NetAddr.parse_net(net6).nth(1)}/64 dev tap#{q_vm}"
-      r "ip -n #{q_vm} route replace #{net6.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev tap#{q_vm}"
+    # Allocate ::1 in the guest network for DHCPv6.
+    guest_intrusion = guest_ephemeral.nth(1).to_s + "/" + guest_ephemeral.netmask.prefix_len.to_s
+    nics.each do |net6, net4, tapname, mac|
+      r "ip -n #{q_vm} addr replace #{guest_intrusion.shellescape} dev #{tapname}"
+
+      # Route ephemeral address to tap.
+      r "ip -n #{q_vm} link set dev #{tapname} up"
+      r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev #{tapname}"
+
+      # Route private subnet addresses to tap.
+      ip6 = NetAddr::IPv6Net.parse(net6)
+
+      # Allocate ::1 in the guest network for DHCPv6.
+      r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{tapname}"
+      r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev #{tapname}"
     end
   end
 
@@ -186,7 +199,7 @@ class VmSetup
     fail "No default route found in #{routes_j.inspect}"
   end
 
-  def routes4(ip4, ip4_local)
+  def routes4(ip4, ip4_local, nics)
     vm_sub = NetAddr::IPv4Net.parse(ip4) if ip4
     local_ip = NetAddr::IPv4Net.parse(ip4_local)
     vm = vm_sub.to_s if ip4
@@ -202,20 +215,26 @@ class VmSetup
     r "ip -n #{q_vm} addr replace #{vethi}/32 dev vethi#{q_vm}"
     # default?
     r "ip -n #{q_vm} route replace #{vetho} dev vethi#{q_vm}"
-    r "ip -n #{q_vm} route replace #{vm} dev tap#{q_vm}" if ip4
-    r "ip -n #{q_vm} route replace default via #{vetho} dev vethi#{q_vm}"
 
-    r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
-    r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/tap#{q_vm}/proxy_arp'"
+    nics.each do |net6, net4, tapname, mac|
+      r "ip -n #{q_vm} route replace #{vm} dev #{tapname}" if ip4
+      r "ip -n #{q_vm} route replace default via #{vetho} dev vethi#{q_vm}"
 
-    r "ip -n #{q_vm} addr replace 192.168.0.1/24 dev tap#{q_vm}"
+      r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
+      r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{tapname}/proxy_arp'"
+
+      r "ip -n #{q_vm} addr replace 192.168.0.1/16 dev #{tapname}"
+      r "ip -n #{q_vm} addr replace 10.0.0.1/8 dev #{tapname}"
+      r "ip -n #{q_vm} addr replace 172.16.0.1/12 dev #{tapname}"
+    end
   end
 
-  def nat4(ip4, private_ipv4)
+  def nat4(ip4, nics)
     return unless ip4
     public_sub = NetAddr::IPv4Net.parse(ip4)
     public_ipv4 = public_sub.network.to_s
 
+    private_ipv4 = nics.first[1]
     private_sub = NetAddr::IPv4Net.parse(private_ipv4)
     private_ipv4 = private_sub.network.to_s
 
@@ -228,38 +247,54 @@ table ip raw {
   }
 }
 NFTABLES_CONF
+    # We first flush the ruleset to make this function idempotent
+    r "ip netns exec #{q_vm} bash -c 'nft flush ruleset'"
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_key, private_ipv4, private_subnets)
-    vm_sub = NetAddr::IPv4Net.parse(private_ipv4) if private_ipv4
+  def cloudinit(unix_user, public_key, nics)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
 EOS
 
     guest_network = NetAddr.parse_net(vp.read_guest_ephemeral)
+    private_ip_dhcp = nics.map do |net6, net4, tapname, mac|
+      vm_sub_6 = NetAddr::IPv6Net.parse(net6)
+      vm_sub_4 = NetAddr::IPv4Net.parse(net4)
+      <<DHCP
+dhcp-range=#{tapname},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},#{vm_sub_4.netmask.prefix_len}
+dhcp-range=#{tapname},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
+DHCP
+    end.join("\n")
+
+    raparams = nics.map { |net6, net4, tapname, mac| "ra-param=#{tapname}" }.join("\n")
 
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
 enable-ra
 dhcp-authoritative
-ra-param=tap#{@vm_name}
+#{raparams}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
-#{private_subnets.map { |net6, net4| "dhcp-range=tap#{@vm_name},#{NetAddr.parse_net(net6).nth(2)},#{NetAddr.parse_net(net6).nth(2)},slaac,#{NetAddr.parse_net(net6).netmask.prefix_len},12h" }.join("\n")}
-#{"dhcp-range=tap#{@vm_name},#{vm_sub.nth(0)},#{vm_sub.nth(0)},#{vm_sub.netmask.prefix_len}" if private_ipv4}
+#{private_ip_dhcp}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
+
+    ethernets = nics.map do |net6, net4, tapname, mac|
+      <<ETHERNETS
+  #{yq("enx" + mac.tr(":", "").downcase)}:
+    match:
+      macaddress: #{mac}
+    dhcp6: true
+    dhcp4: true
+ETHERNETS
+    end.join("\n")
 
     vp.write_network_config(<<EOS)
 version: 2
 ethernets:
-  #{yq("enx" + guest_mac.tr(":", "").downcase)}:
-    match:
-      macaddress: #{yq(guest_mac)}
-    dhcp6: true
-    #{"dhcp4: true" if private_ipv4}
+#{ethernets}
 EOS
 
     write_user_data(unix_user, public_key)
@@ -517,8 +552,12 @@ EOS
     r("ip netns exec #{q_vm} sysctl -w net.ipv4.ip_forward=1")
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets, nics)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
+
+    tapnames = nics.map { |net6, net4, tap, mac|
+      "-i #{tap}"
+    }.join(" ")
 
     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
 [Unit]
@@ -529,7 +568,7 @@ After=network.target
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
 ExecStartPre=/usr/local/sbin/dnsmasq --test
-ExecStart=/usr/local/sbin/dnsmasq -k -h -C /vm/#{@vm_name}/dnsmasq.conf --log-debug -i tap#{@vm_name} --user=#{@vm_name} --group=#{@vm_name}
+ExecStart=/usr/local/sbin/dnsmasq -k -h -C /vm/#{@vm_name}/dnsmasq.conf --log-debug #{tapnames} --user=#{@vm_name} --group=#{@vm_name}
 ExecReload=/bin/kill -HUP $MAINPID
 # YYY: These are not enough capabilties, at least CAP_NET_RAW is
 # needed, as well as more for setgid
@@ -547,6 +586,10 @@ DNSMASQ_SERVICE
 
     disk_params = vhost_sockets.map { |socket|
       "--disk vhost_user=true,socket=#{socket},num_queues=1,queue_size=256 \\"
+    }
+
+    net_params = nics.map { |net6, net4, tap, mac|
+      "--net mac=#{mac},tap=#{tap},ip=,mask="
     }
 
     # YYY: Do something about systemd escaping, i.e. research the
@@ -572,7 +615,7 @@ ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
 --memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \
---net "mac=#{guest_mac},tap=tap#{@vm_name},ip=,mask="
+#{net_params.join(" \\\n")}
 
 ExecStop=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/ch-remote --api-socket #{vp.ch_api_sock} shutdown-vmm
 Restart=no
