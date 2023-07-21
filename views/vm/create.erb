@@ -46,8 +46,8 @@
                   "components/form/radio_small_cards",
                   locals: {
                     name: "location",
-                    label: "Provider & Location",
-                    options: Option::Locations.to_h { |l| [l.name, l.display_name] },
+                    label: "Location",
+                    options: Option.locations_for_provider(@project_data.dig(:provider, :name)).to_h { |l| [l.name, l.display_name] },
                     attributes: {
                       required: true
                     }

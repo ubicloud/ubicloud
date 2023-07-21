@@ -13,7 +13,16 @@
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <%== render("components/kv_data_card", locals: { data: [["ID", @project_data[:ubid]], ["Name", @project_data[:name]]] }) %>
+  <%== render(
+    "components/kv_data_card",
+    locals: {
+      data: [
+        ["ID", @project_data[:ubid]],
+        ["Name", @project_data[:name]],
+        ["Provider", @project_data.dig(:provider, :display_name)]
+      ]
+    }
+  ) %>
   <!-- Delete Card -->
   <% if Authorization.has_permission?(@current_user.id, "Vm:delete", @project_data[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">

@@ -16,8 +16,9 @@ class Account < Sequel::Model(:accounts)
 
   include Authorization::TaggableMethods
 
-  def create_project_with_default_policy(name, policy_body = nil)
-    project = Project.create(name: name) { _1.id = UBID.generate(UBID::TYPE_PROJECT).to_uuid }
+  def create_project_with_default_policy(name, provider: Option::Provider::HETZNER, policy_body: nil)
+    Validation.validate_provider(provider)
+    project = Project.create(name: name, provider: provider) { _1.id = UBID.generate(UBID::TYPE_PROJECT).to_uuid }
     project.associate_with_project(project)
     associate_with_project(project)
     project.add_access_policy(
