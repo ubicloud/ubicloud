@@ -120,20 +120,12 @@ class Prog::Vm::Nexus < Prog::Base
     @public_key ||= vm.public_key
   end
 
-  def private_subnets
-    @private_subnets ||= vm.private_subnets
-  end
-
   def q_net6
     vm.ephemeral_net6.to_s.shellescape
   end
 
   def q_net4
     vm.ip4.to_s || ""
-  end
-
-  def private_ipv4
-    vm.private_subnets.first&.net4&.to_s&.shellescape || ""
   end
 
   def local_ipv4
@@ -228,7 +220,6 @@ SQL
       "vm_name" => vm_name,
       "public_ipv6" => q_net6,
       "public_ipv4" => q_net4,
-      "private_ipv4" => private_ipv4,
       "local_ipv4" => local_ipv4,
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
