@@ -69,6 +69,45 @@ class UBID
     from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
   end
 
+  def self.decode(ubid)
+    ubid_str = ubid.to_s
+    uuid = UBID.parse(ubid_str).to_uuid
+    case ubid_str[..1]
+    when TYPE_VM
+      Vm[uuid]
+    when TYPE_STORAGE_VOLUME
+      VmStorageVolume[uuid]
+    when TYPE_STORAGE_KEY_ENCRYPTION_KEY
+      StorageKeyEncryptionKey[uuid]
+    when TYPE_PROJECT
+      Project[uuid]
+    when TYPE_ACCESS_TAG
+      AccessTag[uuid]
+    when TYPE_ACCESS_POLICY
+      AccessPolicy[uuid]
+    when TYPE_ACCOUNT
+      Account[uuid]
+    when TYPE_IPSEC_TUNNEL
+      IpsecTunnel[uuid]
+    when TYPE_PRIVATE_SUBNET
+      VmPrivateSubnet[uuid]
+    when TYPE_ADDRESS
+      Address[uuid]
+    when TYPE_ASSIGNED_VM_ADDRESS
+      AssignedVmAddress[uuid]
+    when TYPE_ASSIGNED_HOST_ADDRESS
+      AssignedHostAddress[uuid]
+    when TYPE_STRAND
+      Strand[uuid]
+    when TYPE_SEMAPHORE
+      Semaphore[uuid]
+    when TYPE_SSHABLE
+      Sshable[uuid]
+    else
+      fail "Couldn't decode ubid: #{ubid_str}"
+    end
+  end
+
   def self.from_uuidish(uuidish)
     value = uuidish.to_s.tr("-", "").to_i(16)
     new(value)

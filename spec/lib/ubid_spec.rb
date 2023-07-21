@@ -214,4 +214,49 @@ RSpec.describe UBID do
     semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
     expect(semaphore.ubid).to start_with UBID::TYPE_SEMAPHORE
   end
+
+  # useful for comparing objects having network values
+  def string_kv(obj)
+    obj.to_hash.map { |k, v| [k.to_s, v.to_s] }.to_h
+  end
+
+  it "can decode ids" do
+    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", size: "x", location: "x", boot_image: "x")
+    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
+    kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
+    account = Account.create_with_id(email: "x@y.net")
+    prj = account.create_project_with_default_policy("x")
+    policy = prj.access_policies.first
+    atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
+    tun = IpsecTunnel.create_with_id(src_vm_id: vm.id, dst_vm_id: vm.id)
+    subnet = VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: "0::0", net4: "127.0.0.1")
+    sshable = Sshable.create_with_id
+    host = VmHost.create(location: "x") { _1.id = sshable.id }
+    adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
+    vm_adr = AssignedVmAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
+    host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
+    strand = Strand.create_with_id(prog: "x", label: "y")
+    semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
+
+    expect(described_class.decode(vm.ubid)).to eq(vm)
+    expect(described_class.decode(sv.ubid)).to eq(sv)
+    expect(described_class.decode(kek.ubid)).to eq(kek)
+    expect(described_class.decode(account.ubid)).to eq(account)
+    expect(described_class.decode(policy.ubid)).to eq(policy)
+    expect(described_class.decode(atag.ubid)).to eq(atag)
+    expect(described_class.decode(tun.ubid)).to eq(tun)
+    expect(string_kv(described_class.decode(subnet.ubid))).to eq(string_kv(subnet))
+    expect(described_class.decode(sshable.ubid)).to eq(sshable)
+    expect(string_kv(described_class.decode(adr.ubid))).to eq(string_kv(adr))
+    expect(string_kv(described_class.decode(vm_adr.ubid))).to eq(string_kv(vm_adr))
+    expect(string_kv(described_class.decode(host_adr.ubid))).to eq(string_kv(host_adr))
+    expect(described_class.decode(strand.ubid)).to eq(strand)
+    expect(described_class.decode(semaphore.ubid)).to eq(semaphore)
+  end
+
+  it "fails to decode unknown type" do
+    expect {
+      described_class.decode("han2sefsk4f61k91z77vn0y978")
+    }.to raise_error RuntimeError, "Couldn't decode ubid: han2sefsk4f61k91z77vn0y978"
+  end
 end
