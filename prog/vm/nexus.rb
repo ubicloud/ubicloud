@@ -17,6 +17,7 @@ class Prog::Vm::Nexus < Prog::Base
     unless project || Config.development?
       fail "No existing project"
     end
+    Validation.validate_location(location, project&.provider)
 
     ubid = UBID.generate(UBID::TYPE_VM)
     name ||= Vm.ubid_to_name(ubid)

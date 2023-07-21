@@ -12,6 +12,12 @@
   <img class="h-8 w-auto lg:hidden" src="/logo-orange.png" alt="Ubicloud">
   <div class="flex flex-1 gap-x-4 self-stretch justify-end lg:gap-x-6">
     <div class="flex items-center gap-x-4 lg:gap-x-6">
+      <% if @project_data %>
+        <div class="text-gray-900">
+          <span class="font-semibold">Provider:</span>
+          <%= @project_data.dig(:provider, :display_name) %>
+        </div>
+      <% end %>
       <!-- Separator -->
       <div class="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-900/10" aria-hidden="true"></div>
       <!-- Profile dropdown -->

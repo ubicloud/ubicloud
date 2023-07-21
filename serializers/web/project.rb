@@ -8,7 +8,8 @@ class Serializers::Web::Project < Serializers::Base
       id: p.id,
       ubid: p.ubid,
       path: p.path,
-      name: p.name
+      name: p.name,
+      provider: Option::Providers[p.provider]
     }
   end
 

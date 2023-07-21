@@ -63,6 +63,8 @@ RSpec.describe Clover, "project" do
         expect(page.title).to eq("Ubicloud - Create Project")
 
         fill_in "Name", with: name
+        choose option: "hetzner"
+
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")

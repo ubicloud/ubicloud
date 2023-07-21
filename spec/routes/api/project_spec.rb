@@ -41,7 +41,8 @@ RSpec.describe Clover, "vm" do
     describe "create" do
       it "success" do
         post "/api/project", {
-          name: "test-project"
+          name: "test-project",
+          provider: "hetzner"
         }
 
         expect(last_response.status).to eq(200)

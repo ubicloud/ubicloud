@@ -11,7 +11,7 @@ class CloverApi
     end
 
     r.post true do
-      project = @current_user.create_project_with_default_policy(r.params["name"])
+      project = @current_user.create_project_with_default_policy(r.params["name"], provider: r.params["provider"])
 
       serialize(project)
     end

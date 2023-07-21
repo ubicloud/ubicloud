@@ -26,6 +26,19 @@
               }
             ) %>
           </div>
+          <div class="sm:col-span-full">
+            <%== render(
+              "components/form/radio_small_cards",
+              locals: {
+                name: "provider",
+                label: "Provider",
+                options: Option::Providers.map { [_1, _2.display_name] }.to_h,
+                attributes: {
+                  required: true
+                }
+              }
+            ) %>
+          </div>
         </div>
 
       </div>
