@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe UBID do
+  let(:all_types) { described_class.constants.select { _1.start_with?("TYPE_") }.map { described_class.const_get(_1) } }
+
   it "can set_bits" do
     expect(described_class.set_bits(0, 0, 7, 0xab)).to eq(0xab)
     expect(described_class.set_bits(0xab, 8, 12, 0xc)).to eq(0xcab)
@@ -107,20 +109,7 @@ RSpec.describe UBID do
   end
 
   it "generates random timestamp for most types" do
-    [UBID::TYPE_VM,
-      UBID::TYPE_STORAGE_VOLUME,
-      UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY,
-      UBID::TYPE_PROJECT,
-      UBID::TYPE_ACCESS_POLICY,
-      UBID::TYPE_ACCOUNT,
-      UBID::TYPE_ACCOUNT_AUTH_AUDIT_LOGS,
-      UBID::TYPE_ACCOUNT_JWT_REFRESH_KEYS,
-      UBID::TYPE_IPSEC_TUNNEL,
-      UBID::TYPE_PRIVATE_SUBNET,
-      UBID::TYPE_ADDRESS,
-      UBID::TYPE_ASSIGNED_VM_ADDRESS,
-      UBID::TYPE_ASSIGNED_HOST_ADDRESS,
-      UBID::TYPE_SSHABLE].each { |type|
+    (all_types - described_class::CURRENT_TIMESTAMP_TYPES).each { |type|
       # generate 10 ids with this type, and verify that their timestamp
       # part is not close
       ubids = (1..10).map { described_class.generate(type).to_i }
@@ -131,8 +120,7 @@ RSpec.describe UBID do
   end
 
   it "generates clock timestamp for strand and semaphor" do
-    [UBID::TYPE_STRAND,
-      UBID::TYPE_SEMAPHORE].each { |type|
+    described_class::CURRENT_TIMESTAMP_TYPES.each { |type|
       # generate 10 ids with this type, and verify that their timestamp
       # part is close
       ubids = (1..10).map { described_class.generate(type).to_i }
@@ -143,25 +131,7 @@ RSpec.describe UBID do
   end
 
   it "has unique type identifiers" do
-    types = [
-      UBID::TYPE_VM,
-      UBID::TYPE_STORAGE_VOLUME,
-      UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY,
-      UBID::TYPE_PROJECT,
-      UBID::TYPE_ACCESS_POLICY,
-      UBID::TYPE_ACCOUNT,
-      UBID::TYPE_ACCOUNT_AUTH_AUDIT_LOGS,
-      UBID::TYPE_ACCOUNT_JWT_REFRESH_KEYS,
-      UBID::TYPE_IPSEC_TUNNEL,
-      UBID::TYPE_PRIVATE_SUBNET,
-      UBID::TYPE_ADDRESS,
-      UBID::TYPE_ASSIGNED_VM_ADDRESS,
-      UBID::TYPE_ASSIGNED_HOST_ADDRESS,
-      UBID::TYPE_STRAND,
-      UBID::TYPE_SEMAPHORE,
-      UBID::TYPE_SSHABLE
-    ]
-    expect(types.uniq.length).to eq(types.length)
+    expect(all_types.uniq.length).to eq(all_types.length)
   end
 
   it "generates ids with proper prefix" do
@@ -211,6 +181,9 @@ RSpec.describe UBID do
 
     semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
     expect(semaphore.ubid).to start_with UBID::TYPE_SEMAPHORE
+
+    page = Page.create_with_id(summary: "x")
+    expect(page.ubid).to start_with UBID::TYPE_PAGE
   end
 
   # useful for comparing objects having network values
@@ -223,9 +196,9 @@ RSpec.describe UBID do
     sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
-    prj = account.create_project_with_default_policy("x")
-    policy = prj.access_policies.first
-    atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
+    project = account.create_project_with_default_policy("x")
+    policy = project.access_policies.first
+    atag = AccessTag.create_with_id(project_id: project.id, hyper_tag_table: "x", name: "x")
     tun = IpsecTunnel.create_with_id(src_vm_id: vm.id, dst_vm_id: vm.id)
     subnet = VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: "0::0", net4: "127.0.0.1")
     sshable = Sshable.create_with_id
@@ -235,11 +208,13 @@ RSpec.describe UBID do
     host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
     strand = Strand.create_with_id(prog: "x", label: "y")
     semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
+    page = Page.create_with_id(summary: "x")
 
     expect(described_class.decode(vm.ubid)).to eq(vm)
     expect(described_class.decode(sv.ubid)).to eq(sv)
     expect(described_class.decode(kek.ubid)).to eq(kek)
     expect(described_class.decode(account.ubid)).to eq(account)
+    expect(described_class.decode(project.ubid)).to eq(project)
     expect(described_class.decode(policy.ubid)).to eq(policy)
     expect(described_class.decode(atag.ubid)).to eq(atag)
     expect(described_class.decode(tun.ubid)).to eq(tun)
@@ -250,6 +225,7 @@ RSpec.describe UBID do
     expect(string_kv(described_class.decode(host_adr.ubid))).to eq(string_kv(host_adr))
     expect(described_class.decode(strand.ubid)).to eq(strand)
     expect(described_class.decode(semaphore.ubid)).to eq(semaphore)
+    expect(described_class.decode(page.ubid)).to eq(page)
   end
 
   it "fails to decode unknown type" do
