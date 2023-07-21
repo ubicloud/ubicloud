@@ -17,9 +17,6 @@ Unreloader = Rack::Unreloader.new(
           end
 ) { Clover }
 
-Unreloader.autoload("#{__dir__}/clover.rb") { "Clover" }
-Unreloader.autoload("#{__dir__}/clover_api.rb") { "CloverApi" }
-Unreloader.autoload("#{__dir__}/clover_web.rb") { "CloverWeb" }
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
 Unreloader.autoload("#{__dir__}/ubid.rb") { "UBID" }
 
@@ -34,11 +31,11 @@ autoload_normal = ->(subdirectory, include_first: false) do
     s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
   end
 
-  prefix = File.join(__dir__, subdirectory)
-  rgx = Regexp.new('\A' + Regexp.escape(prefix + "/") + '(.*)\.rb\z')
+  absolute = File.join(__dir__, subdirectory)
+  rgx = Regexp.new('\A' + Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/") + '(.*)\.rb\z')
   last_namespace = nil
 
-  Unreloader.autoload(prefix) do |f|
+  Unreloader.autoload(absolute) do |f|
     full_name = camelize.call((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
     parts = full_name.split("::")
     namespace = parts[0..-2].freeze
@@ -68,7 +65,7 @@ autoload_normal = ->(subdirectory, include_first: false) do
   end
 end
 
-%w[model lib clover_web clover_api].each { autoload_normal.call(_1) }
+%w[model lib clover.rb clover_web.rb clover_api.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers/web serializers/api].each { autoload_normal.call(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
