@@ -1,5 +1,6 @@
 $(function() {
   setupPolicyEditor();
+  setupVmSizes();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -152,5 +153,32 @@ function jsonHighlight(str) {
           cls = 'text-pink-700'; // null
       }
       return '<span class="' + cls + '">' + match + '</span>';
+  });
+}
+
+$("input[type=radio]").on("change", function (event) {
+  setupVmSizes();
+});
+
+function setupVmSizes() {
+  let selectedLocation = $("input[name=location]:checked")
+  let prices = selectedLocation.length ? selectedLocation.data("details") : {};
+  $("input[name=size]").each(function(i, obj) {
+    let details = $(this).data("details");
+    let sizeCount = 0
+    if (pricePerCore = prices?.VmCores?.[details?.family]) {
+      let monthly = pricePerCore * details.vcpu * 60 * 24 * 30;
+      $(this).parent().show();
+      $(this).parent().find(".price").text(`$${monthly.toFixed(2)}`);
+      sizeCount++;
+    } else {
+      $(this).parent().hide();
+      $(this).prop('checked', false);
+    }
+    if (sizeCount) {
+      $("#size-description").hide();
+    } else {
+      $("#size-description").show();
+    }
   });
 }

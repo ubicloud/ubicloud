@@ -11,12 +11,13 @@
   <fieldset class="radio-small-cards" id="<%= name %>-radios">
     <legend class="sr-only"><%= label %></legend>
     <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-      <% options.each do |opt_val, opt_text| %>
+      <% options.each do |opt_val, opt_text, opt_details| %>
         <label>
           <input
             type="radio"
             name="<%= name %>"
             value="<%= opt_val %>"
+            data-details="<%= opt_details %>"
             class="peer sr-only"
             <%= (opt_val == selected) ? "checked" : "" %>
             <% attributes.each do |atr_key, atr_value| %>
