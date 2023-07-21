@@ -5,8 +5,8 @@ require_relative "../model"
 class Vm < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
-  one_to_many :private_subnets, key: :vm_id, class: :VmPrivateSubnet
-  one_to_many :ipsec_tunnels, key: :src_vm_id
+  one_to_many :nics, key: :vm_id, class: :Nic
+  many_to_many :private_subnets, join_table: Nic.table_name, left_key: :vm_id, right_key: :private_subnet_id
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
   one_to_many :vm_storage_volumes, key: :vm_id
