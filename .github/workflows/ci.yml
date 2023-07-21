@@ -65,3 +65,10 @@ jobs:
       run: |
         COVERAGE=1 bundle exec rspec
         bundle exec rspec -O /dev/null rhizome
+
+    - name: Archive code coverage results
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: code-coverage-report
+        path: coverage/
