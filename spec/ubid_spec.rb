@@ -171,11 +171,20 @@ RSpec.describe UBID do
     atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
     expect(atag.ubid).to start_with UBID::TYPE_ACCESS_TAG
 
-    tun = IpsecTunnel.create_with_id(src_vm_id: vm.id, dst_vm_id: vm.id)
-    expect(tun.ubid).to start_with UBID::TYPE_IPSEC_TUNNEL
+    subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x")
+    expect(subnet.ubid).to start_with UBID::TYPE_PRIVATE_SUBNET
 
-    subnet = VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: "0::0", net4: "127.0.0.1")
-    expect(subnet.ubid).to start_with UBID::TYPE_VM_PRIVATE_SUBNET
+    nic = Nic.create_with_id(
+      private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
+      private_ipv4: "10.0.0.12/32",
+      mac: "00:11:22:33:44:55",
+      encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065",
+      private_subnet_id: subnet.id,
+      name: "def-nic"
+    )
+    expect(nic.ubid).to start_with UBID::TYPE_NIC
+    tun = IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: nic.id)
+    expect(tun.ubid).to start_with UBID::TYPE_IPSEC_TUNNEL
 
     sshable = Sshable.create_with_id
     expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
@@ -214,8 +223,9 @@ RSpec.describe UBID do
     project = account.create_project_with_default_policy("x")
     policy = project.access_policies.first
     atag = AccessTag.create_with_id(project_id: project.id, hyper_tag_table: "x", name: "x")
-    tun = IpsecTunnel.create_with_id(src_vm_id: vm.id, dst_vm_id: vm.id)
-    subnet = VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: "0::0", net4: "127.0.0.1")
+    subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x")
+    nic = Nic.create_with_id(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
+    tun = IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: nic.id)
     sshable = Sshable.create_with_id
     host = VmHost.create(location: "x") { _1.id = sshable.id }
     adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
@@ -241,6 +251,7 @@ RSpec.describe UBID do
     expect(described_class.decode(strand.ubid)).to eq(strand)
     expect(described_class.decode(semaphore.ubid)).to eq(semaphore)
     expect(described_class.decode(page.ubid)).to eq(page)
+    expect(string_kv(described_class.decode(nic.ubid))).to eq(string_kv(nic))
   end
 
   it "fails to decode unknown type" do
