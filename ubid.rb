@@ -50,9 +50,11 @@ class UBID
   TYPE_SSHABLE = "sh"
   TYPE_PAGE = "pg"
 
+  CURRENT_TIMESTAMP_TYPES = [TYPE_STRAND, TYPE_SEMAPHORE]
+
   def self.generate(type)
     case type
-    when TYPE_STRAND, TYPE_SEMAPHORE
+    when *CURRENT_TIMESTAMP_TYPES
       generate_from_current_ts(type)
     else
       generate_random(type)

@@ -108,9 +108,11 @@ RSpec.describe Prog::Vm::HostNexus do
       nx.instance_variable_set(:@vm_host, vmh)
       expect(vmh).to receive(:update).with(total_mem_gib: 1)
       expect(vmh).to receive(:update).with(total_cores: 4, total_cpus: 5, total_nodes: 3, total_sockets: 2)
+      expect(vmh).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
       expect(nx).to receive(:reap).and_return([
         {prog: "LearnMemory", exitval: {"mem_gib" => 1}},
         {prog: "LearnCores", exitval: {"total_sockets" => 2, "total_nodes" => 3, "total_cores" => 4, "total_cpus" => 5}},
+        {prog: "LearnStorage", exitval: {"total_storage_gib" => 300, "available_storage_gib" => 500}},
         {prog: "ArbitraryOtherProg"}
       ])
 
@@ -125,6 +127,11 @@ RSpec.describe Prog::Vm::HostNexus do
     it "crashes if an expected field is not set for LearnCores" do
       expect(nx).to receive(:reap).and_return([{prog: "LearnCores", exitval: {}}])
       expect { nx.wait_prep }.to raise_error RuntimeError, "BUG: one of the LearnCores fields is not set"
+    end
+
+    it "crashes if an expected field is not set for LearnStorage" do
+      expect(nx).to receive(:reap).and_return([{prog: "LearnStorage", exitval: {}}])
+      expect { nx.wait_prep }.to raise_error RuntimeError, "BUG: one of the LearnStorage fields is not set"
     end
 
     it "donates to children if they are not exited yet" do

@@ -5,7 +5,7 @@ if (suite = ENV.delete("COVERAGE"))
 
   SimpleCov.start do
     enable_coverage :branch
-    minimum_coverage line: 90, branch: 90
+    minimum_coverage line: 90.5, branch: 91
     minimum_coverage_by_file line: 0, branch: 50
 
     command_name suite
