@@ -47,7 +47,10 @@
                   locals: {
                     name: "location",
                     label: "Location",
-                    options: Option.locations_for_provider(@project_data.dig(:provider, :name)).to_h { |l| [l.name, l.display_name] },
+                    options:
+                      Option
+                        .locations_for_provider(@project_data.dig(:provider, :name))
+                        .map { |l| [l.name, l.display_name, @prices[l.name].to_json] },
                     attributes: {
                       required: true
                     }
@@ -106,11 +109,12 @@
                             name="size"
                             value="<%= size.name %>"
                             class="peer sr-only"
+                            data-details="<%= {family: size.name.split(".").first, vcpu: size.vcpu}.to_json %>"
                             required
                             <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
                           >
                           <span
-                            class="flex items-center rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
+                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
                                 ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
                                 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
                           >
@@ -123,11 +127,17 @@
                                   GB</span>
                               </span>
                             </span>
+                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
+                              <span class="font-medium price">-</span>
+                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                            </span>
                           </span>
                         </label>
                       <% end %>
                     </div>
                   </fieldset>
+                  <p id="size-description" class="text-sm text-gray-500 leading-6">
+                    Select location to see available server sizes</p>
                 </div>
               </div>
               <div class="col-span-full">

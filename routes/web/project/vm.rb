@@ -36,6 +36,10 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
         @subnets = Serializers::Web::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
+        @prices = BillingRate.all.each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
+          hash[br.location][br.resource_type][br.resource_family] = br.unit_price.to_f
+        end
+
         view "vm/create"
       end
     end
