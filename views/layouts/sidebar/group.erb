@@ -4,17 +4,11 @@
       type="button"
       class="sidebar-group-btn w-full text-orange-100 hover:text-white hover:bg-orange-700 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
     >
-      <svg class="text-white h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-        <%== icon %>
-      </svg>
+      <%== render("components/icon", locals: { name: icon, classes: "text-white h-6 w-6 shrink-0" }) %>
       <%= name %>
-      <svg class="ml-auto h-6 w-6 shrink-0 group-[.active]:rotate-90" viewBox="0 0 20 20" fill="currentColor">
-        <path
-          fill-rule="evenodd"
-          d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-          clip-rule="evenodd"
-        />
-      </svg>
+      <div class="ml-auto shrink-0 group-[.active]:rotate-90">
+        <%== render("components/icon", locals: { name: "hero-chevron-right" }) %>
+      </div>
     </button>
     <ul class="mt-1 px-2 hidden group-[.active]:block space-y-1">
       <% items.compact.each do |item_name, item_url, item_is_active| %>
