@@ -5,17 +5,9 @@
       class="inline-flex w-full items-center gap-x-4 px-6 py-3 text-md font-semibold leading-6 text-white bg-orange-700 hover:bg-orange-800"
       id="menu-button"
     >
-      <svg class="h-8 w-8 rounded-full" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-        <path
-          stroke-linecap='round'
-          stroke-linejoin='round'
-          d='M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776'
-        />
-      </svg>
+      <%== render("components/icon", locals: { name: "hero-folder-open", classes: "h-8 w-8 rounded-full" }) %>
       <span><%= @project ? @project[:name] : "Global" %></span>
-      <svg class="ml-auto h-8 w-8" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9"/>
-      </svg>
+      <%== render("components/icon", locals: { name: "hero-chevron-up-down", classes: "h-8 w-8 ml-auto" }) %>
     </button>
   </div>
   <div
@@ -39,17 +31,10 @@
         class="group flex items-center px-4 py-2 hover:bg-gray-100 hover:text-gray-900"
         role="menuitem"
         tabindex="-1"
-        id="menu-item-0"
       >
-        <svg
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="2.5"
-          stroke="currentColor"
-          class="mr-2 h-5 w-5 text-gray-400 group-hover:text-gray-500"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
-        </svg>
+        <div class="mr-2 text-gray-400 group-hover:text-gray-500">
+          <%== render("components/icon", locals: { name: "hero-plus", classes: "h-5 w-5 stroke-[2.5px]" }) %>
+        </div>
         Create Project
       </a>
     </div>
