@@ -108,6 +108,38 @@ RSpec.describe Prog::Base do
   end
 
   context "with deadlines" do
+    it "registers a deadline only if the current deadline is nil, later or to a different target" do
+      st = Strand.create_with_id(prog: "Test", label: :set_expired_deadline)
+
+      # register if current deadline is nil
+      expect {
+        st.unsynchronized_run
+      }.to change { st.stack.first["deadline_at"] }
+
+      # register if current deadline is further in the time
+      st.label = :set_expired_deadline
+      st.stack.first["deadline_at"] = Time.now + 30
+      expect {
+        st.unsynchronized_run
+      }.to change { st.stack.first["deadline_at"] }
+
+      # register if the target is different
+      st.label = :set_expired_deadline
+      st.stack.first["deadline_target"] = :napper
+      expect {
+        st.unsynchronized_run
+      }.to change { st.stack.first["deadline_at"] }
+      st.unsynchronized_run
+
+      # ignore if new deadline is further in the time and target is same
+      st.label = :set_expired_deadline
+      st.stack.first["deadline_at"] = Time.now - 60
+      st.stack.first["deadline_target"] = :pusher2
+      expect {
+        st.unsynchronized_run
+      }.not_to change { st.stack.first["deadline_at"] }
+    end
+
     it "triggers a page exactly once when deadline is expired" do
       st = Strand.create_with_id(prog: "Test", label: :set_expired_deadline)
       st.unsynchronized_run
@@ -147,6 +179,25 @@ RSpec.describe Prog::Base do
 
       expect {
         st.unsynchronized_run
+        Strand[page_id].unsynchronized_run
+        Strand[page_id].unsynchronized_run
+      }.to change { Page.active.count }.from(1).to(0)
+    end
+
+    it "resolves the page once a new deadline is registered" do
+      st = Strand.create_with_id(prog: "Test", label: :start)
+      page_id = Prog::PageNexus.assemble("dummy-summary").id
+
+      st.stack.first["deadline_target"] = :napper
+      st.stack.first["deadline_at"] = Time.now - 1
+      st.stack.first["page_id"] = page_id
+
+      st.update(label: :set_popping_deadline2)
+
+      expect {
+        st.unsynchronized_run
+
+        page_id = Page.first.id
         Strand[page_id].unsynchronized_run
         Strand[page_id].unsynchronized_run
       }.to change { Page.active.count }.from(1).to(0)

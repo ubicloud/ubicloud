@@ -183,12 +183,21 @@ end
   end
 
   def register_deadline(deadline_target, deadline_in)
-    return if strand.stack.first["deadline_target"] == deadline_target && Time.parse(strand.stack.first["deadline_at"].to_s) < Time.now + deadline_in
+    current_frame = strand.stack.first
+    if (deadline_at = current_frame["deadline_at"]).nil? ||
+        Time.parse(deadline_at.to_s) > Time.now + deadline_in ||
+        (old_deadline_target = current_frame["deadline_target"]) != deadline_target
 
-    strand.stack.first["deadline_target"] = deadline_target
-    strand.stack.first["deadline_at"] = Time.now + deadline_in
+      if old_deadline_target != deadline_target && (page_id = current_frame["page_id"])
+        Page[page_id].incr_resolve
+        current_frame.delete("page_id")
+      end
 
-    strand.modified!(:stack)
+      current_frame["deadline_target"] = deadline_target
+      current_frame["deadline_at"] = Time.now + deadline_in
+
+      strand.modified!(:stack)
+    end
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert
