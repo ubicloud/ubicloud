@@ -11,7 +11,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnets: [], storage_size_gib: 20, storage_encrypted: false)
+    private_subnet_id: nil, nic_id: nil, storage_size_gib: 20, storage_encrypted: false)
 
     project = Project[project_id]
     unless project || Config.development?
@@ -29,18 +29,47 @@ class Prog::Vm::Nexus < Prog::Base
     key_wrapping_key = cipher.random_key
     key_wrapping_iv = cipher.random_iv
 
-    # if the caller hasn't provided any subnets, generate a random one
-    if private_subnets.empty?
-      private_subnets.append([random_ula, random_private_ipv4])
-    end
-
     DB.transaction do
+      # Here the logic is the following;
+      # - If the user provided nic_id, that nic has to exist and we fetch private_subnet
+      # from the reference of nic. We just assume it and not even check the validity of the
+      # private_subnet_id.
+      # - If the user did not provide nic_id but the private_subnet_id, that private_subnet
+      # must exist, otherwise we fail.
+      # - If the user did not provide nic_id but the private_subnet_id and that subnet exists
+      # then we create a nic on that subnet.
+      # - If the user provided neither nic_id nor private_subnet_id, that's OK, we create both.
+      nic = nil
+      subnet = nil
+      if nic_id
+        nic = Nic[nic_id]
+        raise("Given nic doesn't exist with the id #{nic_id}") unless nic
+        raise("Given nic is assigned to a VM already") if nic.vm_id
+        raise("Given nic is created in a different location") if nic.private_subnet.location != location
+        raise("Given nic is not available in the given project") unless project.private_subnets.any? { |ps| ps.id == nic.private_subnet_id }
+
+        subnet = nic.private_subnet
+        subnet.add_nic(nic)
+      end
+
+      unless nic
+        if private_subnet_id
+          subnet = PrivateSubnet[private_subnet_id]
+          raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
+          raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
+        else
+          subnet_s = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location)
+          subnet = PrivateSubnet[subnet_s.id]
+        end
+        nic_s = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic")
+        nic = Nic[nic_s.id]
+      end
+
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, size: size, location: location, boot_image: boot_image) { _1.id = ubid.to_uuid }
+      nic.update(vm_id: vm.id)
+
       vm.associate_with_project(project)
-      private_subnets.each do |net6, net4|
-        VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: net6.to_s, net4: net4.to_s)
-      end
 
       if storage_encrypted
         key_encryption_key = StorageKeyEncryptionKey.create_with_id(
@@ -73,18 +102,6 @@ class Prog::Vm::Nexus < Prog::Base
 
   def vm_home
     File.join("", "vm", vm_name)
-  end
-
-  def self.random_ula
-    network_address = NetAddr::IPv6.new((SecureRandom.bytes(7) + 0xfd.chr).unpack1("Q<") << 64)
-    network_mask = NetAddr::Mask128.new(64)
-    NetAddr::IPv6Net.new(network_address, network_mask)
-  end
-
-  def self.random_private_ipv4
-    addr = NetAddr::IPv4Net.parse("192.168.0.0/24")
-    network_mask = NetAddr::Mask32.new(32)
-    NetAddr::IPv4Net.new(addr.nth(SecureRandom.random_number(addr.len - 2).to_i + 2), network_mask)
   end
 
   def vm
@@ -178,6 +195,10 @@ SQL
   def start
     register_deadline(:wait, 10 * 60)
 
+    unless vm.nics.all? { |n| n.strand.label == "wait" }
+      nap 10
+    end
+
     vm_host_id = allocate
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network
@@ -211,7 +232,7 @@ SQL
       "local_ipv4" => local_ipv4,
       "unix_user" => unix_user,
       "ssh_public_key" => public_key,
-      "private_subnets" => vm.private_subnets.map { |vps| [vps.net6, vps.net4] },
+      "nics" => vm.nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
       "boot_image" => vm.boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
@@ -236,57 +257,9 @@ SQL
   end
 
   def trigger_refresh_mesh
-    Vm.each do |vm|
-      vm.incr_refresh_mesh
-    end
+    vm.private_subnets.each { |ps| ps.incr_refresh_mesh }
 
     hop :run
-  end
-
-  def create_ipsec_tunnel(my_subnet6, my_subnet4, dst_vm, dst_subnet6, dst_subnet4)
-    src_namespace = vm.inhost_name.shellescape
-    dst_namespace = dst_vm.inhost_name.shellescape
-    src_clover_ephemeral = subdivide_network(vm.ephemeral_net6)
-    dst_clover_ephemeral = subdivide_network(dst_vm.ephemeral_net6)
-    src_private_addr_6 = my_subnet6.to_s.shellescape
-    dst_private_addr_6 = dst_subnet6.to_s.shellescape
-    src_private_addr_4 = my_subnet4.to_s.shellescape
-    dst_private_addr_4 = dst_subnet4.to_s.shellescape
-    src_direction = "out"
-    dst_direction = "fwd"
-
-    spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
-    spi4 = "0x" + SecureRandom.bytes(4).unpack1("H*")
-    key = "0x" + SecureRandom.bytes(36).unpack1("H*")
-
-    # setup source ipsec tunnels
-    host.sshable.cmd("sudo bin/setup-ipsec " \
-      "#{src_namespace} #{src_clover_ephemeral} " \
-      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
-      "#{dst_private_addr_6} #{src_private_addr_4} " \
-      "#{dst_private_addr_4} #{src_direction} " \
-      "#{spi} #{spi4} #{key}")
-
-    # setup destination ipsec tunnels
-    dst_vm.vm_host.sshable.cmd("sudo bin/setup-ipsec " \
-      "#{dst_namespace} #{src_clover_ephemeral} " \
-      "#{dst_clover_ephemeral} #{src_private_addr_6} " \
-      "#{dst_private_addr_6} #{src_private_addr_4} " \
-      "#{dst_private_addr_4} #{dst_direction} " \
-      "#{spi} #{spi4} #{key}")
-  end
-
-  def subdivide_network(net)
-    prefix = net.netmask.prefix_len + 1
-    halved = net.resize(prefix)
-    halved.next_sib
-  end
-
-  def create_private_route(dst_subnet)
-    ### YYY: make this idempotent
-    [dst_subnet.net6, dst_subnet.net4].each do |dst_ip|
-      host.sshable.cmd("sudo ip -n #{q_vm} route replace #{dst_ip.to_s.shellescape} dev vethi#{q_vm}")
-    end
   end
 
   def run
@@ -316,27 +289,8 @@ SQL
       hop :wait
     end
 
-    # don't create tunnels to self or VMs already connected to
-    reject_list = vm.ipsec_tunnels.map(&:src_vm_id)
-    reject_list.append(vm.id)
-
-    vms = Vm.reject { reject_list.include? _1.id }
-
-    vms.each do |dst_vm|
-      next if dst_vm.ephemeral_net6.nil?
-      private_subnets.each do |my_subnet|
-        dst_vm.private_subnets.each do |dst_subnet|
-          create_ipsec_tunnel(my_subnet.net6, my_subnet.net4, dst_vm, dst_subnet.net6, dst_subnet.net4)
-          create_private_route(dst_subnet)
-        end
-      end
-
-      # record that we created the tunnel from this vm to dst_vm
-      IpsecTunnel.create_with_id(src_vm_id: vm.id, dst_vm_id: dst_vm.id)
-    end
-
+    vm.private_subnets.each { |ps| ps.incr_refresh_mesh }
     decr_refresh_mesh
-
     hop :wait
   end
 
@@ -360,7 +314,11 @@ SQL
     end
 
     DB.transaction do
-      vm.private_subnets_dataset.delete
+      vm.nics.map do |nic|
+        nic.update(vm_id: nil)
+        nic.incr_destroy
+      end
+
       vm.assigned_vm_address_dataset.delete
       vm.vm_storage_volumes_dataset.delete
 
@@ -368,10 +326,7 @@ SQL
         used_cores: Sequel[:used_cores] - vm.cores
       )
       vm.projects.map { vm.dissociate_with_project(_1) }
-      # YYY: We should remove existing tunnels on dataplane too. Not hopping to
-      # :refresh_mesh label directly, because it doesn't remove deleted ones, only
-      # create missing ones.
-      IpsecTunnel.where(src_vm_id: vm.id).or(dst_vm_id: vm.id).delete
+
       vm.delete
     end
 

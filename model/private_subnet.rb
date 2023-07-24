@@ -7,9 +7,11 @@ class PrivateSubnet < Sequel::Model
   one_to_many :nics, key: :private_subnet_id
   one_to_one :strand, key: :id
 
-  def self.uuid_to_name(id)
-    "ps" + ULID.from_uuidish(id).to_s[0..8].downcase
-  end
+  PRIVATE_SUBNET_RANGES = [
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16"
+  ].freeze
 
   dataset_module Authorization::Dataset
   include ResourceMethods
@@ -17,6 +19,9 @@ class PrivateSubnet < Sequel::Model
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
   end
+
+  include SemaphoreMethods
+  semaphore :destroy, :refresh_mesh
 
   def self.random_subnet
     PRIVATE_SUBNET_RANGES.sample
