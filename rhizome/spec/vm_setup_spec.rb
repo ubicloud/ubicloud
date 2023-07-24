@@ -94,7 +94,7 @@ RSpec.describe VmSetup do
       disk_file = "/var/storage/test/disk_0.raw"
       expect(vs).to receive(:download_boot_image).and_return image_path
       expect(File).to receive(:size).with(image_path).and_return(2 * 2**30)
-      expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob aio0$/, stdin: /{.*}/)
+      expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob aio0 --bs=[0-9]+$/, stdin: /{.*}/)
       vs.copy_image(disk_file, boot_image, 10, false, nil)
     end
 
@@ -105,7 +105,7 @@ RSpec.describe VmSetup do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
       expect(vs).to receive(:download_boot_image).and_return image_path
       expect(File).to receive(:size).with(image_path).and_return(2 * 2**30)
-      expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0$/, stdin: /{.*}/)
+      expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+$/, stdin: /{.*}/)
       vs.copy_image(disk_file, boot_image, 10, true, encryption_key)
     end
   end

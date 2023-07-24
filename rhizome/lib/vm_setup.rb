@@ -434,7 +434,8 @@ EOS
     "--disable-cpumask-locks " \
     "--rpc-socket #{rpc_socket.shellescape} " \
     "--if #{image_path.shellescape} " \
-    "--ob #{target_bdev.shellescape}", stdin: spdk_config_json)
+    "--ob #{target_bdev.shellescape} " \
+    "--bs=2097152", stdin: spdk_config_json)
   end
 
   def setup_disk_file(storage_volume, index)
