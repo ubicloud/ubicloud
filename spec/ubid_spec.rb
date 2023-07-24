@@ -130,6 +130,21 @@ RSpec.describe UBID do
     }
   end
 
+  it "uses canonical type characters" do
+    # In crockford's base32 multiple characters can map to a single number,
+    # for example ["1","I","L"] all map to 1. However, the reverse (number
+    # -> character) only uses one canonical one (e.g. 1 maps to "1").
+    # This test ensures we only use canonical characters in our type
+    # constants, so ids are actually prefixed by those constants.
+    #
+    # See https://www.crockford.com/base32.html
+
+    all_types.each { |type|
+      ubid = described_class.generate(type).to_s
+      expect(ubid).to start_with type
+    }
+  end
+
   it "has unique type identifiers" do
     expect(all_types.uniq.length).to eq(all_types.length)
   end
