@@ -3,7 +3,7 @@
 class Prog::Vm::PrepHost < Prog::Base
   subject_is :sshable
 
-  def start
+  label def start
     sshable.cmd("sudo bin/prep_host.rb")
     pop "host prepared"
   end

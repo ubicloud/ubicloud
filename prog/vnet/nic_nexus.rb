@@ -23,100 +23,100 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      hop :destroy if strand.label != "destroy"
+      hop_destroy if strand.label != "destroy"
     end
   end
 
-  def wait_vm
+  label def wait_vm
     when_setup_nic_set? do
-      hop :add_subnet_addr
+      hop_add_subnet_addr
     end
     nap 1
   end
 
-  def add_subnet_addr
+  label def add_subnet_addr
     bud Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
-    hop :wait_add_subnet_addr
+    hop_wait_add_subnet_addr
   end
 
-  def wait_add_subnet_addr
+  label def wait_add_subnet_addr
     reap
     if leaf?
       nic.private_subnet.incr_add_new_nic
-      hop :wait_setup
+      hop_wait_setup
     end
     nap 1
   end
 
-  def wait_setup
+  label def wait_setup
     when_start_rekey_set? do
       decr_setup_nic
-      hop :start_rekey
+      hop_start_rekey
     end
     nap 1
   end
 
-  def wait
+  label def wait
     when_detach_vm_set? do
-      hop :detach_vm
+      hop_detach_vm
     end
 
     when_start_rekey_set? do
-      hop :start_rekey
+      hop_start_rekey
     end
 
     nap 30
   end
 
-  def start_rekey
+  label def start_rekey
     bud Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
-    hop :wait_rekey_inbound
+    hop_wait_rekey_inbound
   end
 
-  def wait_rekey_inbound
+  label def wait_rekey_inbound
     reap
     if leaf?
       decr_start_rekey
-      hop :wait_rekey_outbound_trigger
+      hop_wait_rekey_outbound_trigger
     end
     donate
   end
 
-  def wait_rekey_outbound_trigger
+  label def wait_rekey_outbound_trigger
     when_trigger_outbound_update_set? do
       bud Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
-      hop :wait_rekey_outbound
+      hop_wait_rekey_outbound
     end
     donate
   end
 
-  def wait_rekey_outbound
+  label def wait_rekey_outbound
     reap
     if leaf?
       decr_trigger_outbound_update
-      hop :wait_rekey_old_state_drop_trigger
+      hop_wait_rekey_old_state_drop_trigger
     end
     donate
   end
 
-  def wait_rekey_old_state_drop_trigger
+  label def wait_rekey_old_state_drop_trigger
     when_old_state_drop_trigger_set? do
       bud Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
-      hop :wait_rekey_old_state_drop
+      hop_wait_rekey_old_state_drop
     end
     donate
   end
 
-  def wait_rekey_old_state_drop
+  label def wait_rekey_old_state_drop
     reap
     if leaf?
       decr_old_state_drop_trigger
-      hop :wait
+      hop_wait
     end
     donate
   end
 
-  def destroy
+  label def destroy
     if nic.vm
       fail "Cannot destroy nic with active vm, first clean up the attached resources"
     end
@@ -132,7 +132,7 @@ class Prog::Vnet::NicNexus < Prog::Base
     pop "nic deleted"
   end
 
-  def detach_vm
+  label def detach_vm
     DB.transaction do
       nic.update(vm_id: nil)
       nic.src_ipsec_tunnels_dataset.destroy
@@ -142,7 +142,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       decr_detach_vm
     end
 
-    hop :wait
+    hop_wait
   end
 
   # Generate a MAC with the "local" (generated, non-manufacturer) bit

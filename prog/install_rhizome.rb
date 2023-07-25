@@ -3,7 +3,7 @@
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable
 
-  def start
+  label def start
     require "rubygems/package"
     require "stringio"
 
@@ -32,10 +32,10 @@ class Prog::InstallRhizome < Prog::Base
     payload = tar.string.freeze
     sshable.cmd("tar xf -", stdin: payload)
 
-    hop :install_gems
+    hop_install_gems
   end
 
-  def install_gems
+  label def install_gems
     sshable.cmd("bundle config set --local path vendor/bundle")
     sshable.cmd("bundle install")
     pop "installed rhizome"

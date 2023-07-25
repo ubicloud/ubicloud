@@ -12,7 +12,7 @@ class Prog::LearnMemory < Prog::Base
     end.sum
   end
 
-  def start
+  label def start
     # Use dmidecode to get an integral amount of system memory.
     # Generally, there is a gigabyte or so less available to
     # applications than installed as reported by /proc/meminfo.

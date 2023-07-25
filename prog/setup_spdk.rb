@@ -3,12 +3,12 @@
 class Prog::SetupSpdk < Prog::Base
   subject_is :sshable, :vm_host
 
-  def start
+  label def start
     sshable.cmd("sudo bin/setup-spdk")
-    hop :enable_service
+    hop_enable_service
   end
 
-  def enable_service
+  label def enable_service
     sshable.cmd("sudo systemctl enable home-spdk-hugepages.mount")
     sshable.cmd("sudo systemctl enable spdk")
 

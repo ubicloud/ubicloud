@@ -26,12 +26,12 @@ class Prog::BootstrapRhizome < Prog::Base
     end
   end
 
-  def start
+  label def start
     sshable.update(raw_private_key_1: SshKey.generate.keypair)
-    hop :setup
+    hop_setup
   end
 
-  def setup
+  label def setup
     pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
 
     rootish_ssh(<<SH)

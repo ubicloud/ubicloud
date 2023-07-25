@@ -40,6 +40,18 @@ end
     end
   end
 
+  def self.labels
+    @labels || []
+  end
+
+  def self.label(label)
+    (@labels ||= []) << label
+
+    define_method "hop_#{label}" do
+      dynamic_hop label
+    end
+  end
+
   def nap(seconds = 30)
     fail Nap.new(seconds)
   end
@@ -178,8 +190,9 @@ end
   end
 
   # A hop is a kind of jump, as in, like a jump instruction.
-  def hop(label)
+  private def dynamic_hop(label)
     fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
+    fail "BUG: not valid hop target" unless self.class.labels.include? label
     label = label.to_s
     fail Hop.new(@strand.prog, @strand.label, {label: label, retval: nil})
   end

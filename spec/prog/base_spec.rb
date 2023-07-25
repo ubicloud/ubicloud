@@ -76,6 +76,12 @@ RSpec.describe Prog::Base do
     }.to raise_error RuntimeError, "BUG: #hop only accepts a symbol"
   end
 
+  it "requires valid label for hop" do
+    expect {
+      Strand.new(prog: "Test", label: :invalid_hop_target).unsynchronized_run
+    }.to raise_error RuntimeError, "BUG: not valid hop target"
+  end
+
   it "can manipulate semaphores" do
     st = Strand.create_with_id(prog: "Test", label: "increment_semaphore")
     expect {

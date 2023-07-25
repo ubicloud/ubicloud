@@ -23,30 +23,30 @@ class Prog::Vm::HostNexus < Prog::Base
     end
   end
 
-  def start
+  label def start
     register_deadline(:wait, 15 * 60)
 
     bud Prog::BootstrapRhizome
-    hop :wait_bootstrap_rhizome
+    hop_wait_bootstrap_rhizome
   end
 
-  def wait_bootstrap_rhizome
+  label def wait_bootstrap_rhizome
     reap
-    hop :prep if leaf?
+    hop_prep if leaf?
     donate
   end
 
-  def prep
+  label def prep
     bud Prog::Vm::PrepHost
     bud Prog::LearnNetwork unless vm_host.net6
     bud Prog::LearnMemory
     bud Prog::LearnCores
     bud Prog::LearnStorage
     bud Prog::InstallDnsmasq
-    hop :wait_prep
+    hop_wait_prep
   end
 
-  def wait_prep
+  label def wait_prep
     reap.each do |st|
       case st.prog
       when "LearnMemory"
@@ -72,36 +72,36 @@ class Prog::Vm::HostNexus < Prog::Base
     end
 
     if leaf?
-      hop :setup_hugepages
+      hop_setup_hugepages
     end
     donate
   end
 
-  def setup_hugepages
+  label def setup_hugepages
     bud Prog::SetupHugepages
-    hop :wait_setup_hugepages
+    hop_wait_setup_hugepages
   end
 
-  def wait_setup_hugepages
+  label def wait_setup_hugepages
     reap
-    hop :setup_spdk if leaf?
+    hop_setup_spdk if leaf?
     donate
   end
 
-  def setup_spdk
+  label def setup_spdk
     bud Prog::SetupSpdk
-    hop :wait_setup_spdk
+    hop_wait_setup_spdk
   end
 
-  def wait_setup_spdk
+  label def wait_setup_spdk
     reap
     if leaf?
-      hop :reboot
+      hop_reboot
     end
     donate
   end
 
-  def reboot
+  label def reboot
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
@@ -113,35 +113,35 @@ class Prog::Vm::HostNexus < Prog::Base
 
     decr_reboot
 
-    hop :wait_reboot
+    hop_wait_reboot
   end
 
-  def wait_reboot
+  label def wait_reboot
     begin
       sshable.cmd("echo 1")
     rescue
       nap 15
     end
 
-    hop :verify_boot_id_changed
+    hop_verify_boot_id_changed
   end
 
-  def verify_boot_id_changed
+  label def verify_boot_id_changed
     boot_id = get_boot_id
     raise "reboot failed" if boot_id == vm_host.last_boot_id
     vm_host.update(last_boot_id: boot_id)
 
-    hop :verify_spdk
+    hop_verify_spdk
   end
 
-  def verify_spdk
+  label def verify_spdk
     is_active = sshable.cmd("systemctl is-active spdk.service").strip
     fail "SPDK failed to start" unless is_active == "active"
 
-    hop :verify_hugepages
+    hop_verify_hugepages
   end
 
-  def verify_hugepages
+  label def verify_hugepages
     host_meminfo = sshable.cmd("cat /proc/meminfo")
     fail "Couldn't set hugepage size to 1G" unless host_meminfo.match?(/^Hugepagesize:\s+1048576 kB$/)
 
@@ -162,22 +162,22 @@ class Prog::Vm::HostNexus < Prog::Base
       used_hugepages_1g: total_hugepages - free_hugepages + total_vm_mem_gib
     )
 
-    hop :start_vms
+    hop_start_vms
   end
 
-  def start_vms
+  label def start_vms
     vm_host.vms.each { |vm|
       vm.incr_start_after_host_reboot
     }
 
     vm_host.update(allocation_state: "accepting")
 
-    hop :wait
+    hop_wait
   end
 
-  def wait
+  label def wait
     when_reboot_set? do
-      hop :reboot
+      hop_reboot
     end
 
     nap 30

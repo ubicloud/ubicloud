@@ -3,7 +3,7 @@
 class Prog::SetupHugepages < Prog::Base
   subject_is :sshable, :vm_host
 
-  def start
+  label def start
     hugepage_size = "1G"
     # put away 1 core of overhead for host, and reserve 1G for SPDK
     hugepage_cnt = 1 + (vm_host.total_mem_gib * (vm_host.total_cores - 1)) / vm_host.total_cores
