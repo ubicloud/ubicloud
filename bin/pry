@@ -11,3 +11,7 @@ $0 = "clover-#{ENV["RACK_ENV"]}"
 opts = Pry::CLI.parse_options
 Pry.config.prompt_name = $0
 Pry::CLI.start(opts)
+
+def udec(*args)
+  UBID.decode(*args)
+end
