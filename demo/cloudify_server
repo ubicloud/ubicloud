@@ -1,0 +1,87 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+REPL = true
+
+require_relative "../loader"
+require "timeout"
+
+LOCATIONS = Option::Locations.map { |l| [l.name, "#{l.provider.display_name} #{l.display_name}"] }.to_h
+
+def get_input(msg, default = nil)
+  prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
+  input = ""
+
+  while input.empty?
+    print prompt
+    input = gets.chomp
+    input = default if input.empty? && !default.nil?
+  end
+
+  input
+end
+
+def select_option(msg, options, default = nil)
+  puts "\n"
+  options.each_with_index { |(key, name), index| puts "#{index + 1}. #{name}" }
+  puts "\n"
+
+  prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
+  selected = nil
+
+  while selected.nil?
+    print prompt
+    option = gets.chomp
+    option = if option.empty?
+      default
+    elsif option.to_i < 1
+      puts "Plese enter a number between 1-#{options.count}#{default.nil? ? "" : " or leave empty for default"}"
+    else
+      option.to_i
+    end
+
+    selected = options.keys[option - 1] unless option.nil?
+  end
+
+  selected
+end
+
+hostname = get_input("Enter hostname or IP address")
+location = select_option("Select provider and location", LOCATIONS, 1)
+
+puts "\n\nCloudifying '#{hostname}' server for '#{LOCATIONS[location]}' \n\n"
+
+strand = Prog::Vm::HostNexus.assemble(hostname, location: location)
+
+puts "Waiting public SSH keys\n\n"
+until (ssh_key = strand.reload.sshable.keys.map(&:public_key).first)
+  sleep 2
+end
+puts "Add following public SSH key to '/root/.ssh/authorized_keys' on your machine\n\n"
+puts ssh_key
+
+print "\n\nPress enter after you add the above SSH key to your machine\n\n"
+gets.chomp
+
+begin
+  Timeout.timeout(10 * 60) do
+    puts "Waiting for server to be cloudified"
+    previous_state = nil
+    while (state = strand.reload.label) != "wait"
+      if previous_state != state
+        puts "#{Time.now} state: #{state}"
+        previous_state = state
+      end
+      sleep 2
+    end
+  end
+rescue Timeout::Error
+  puts "\n\n"
+  puts "Could not cloudify server in 10 minutes. Probably something went wrong."
+  puts "Last state: #{strand.label}. Server ID for debug: #{strand.id}"
+  puts "Please check your hostname/IP address and be sure that you added the correct public SSH key to your server."
+  puts "You can ask for help on GitHub discussion page: https://github.com/ubicloud/ubicloud/discussions"
+  exit 1
+end
+
+puts "\n\nYour server is cloudified now. You can create virtual machines at '#{location}' in the cloud dashboard."
