@@ -15,10 +15,6 @@ class Page < Sequel::Model
   include ResourceMethods
   semaphore :resolve
 
-  def self.ubid_type
-    UBID::TYPE_PAGE
-  end
-
   def pagerduty_client
     @@pagerduty_client ||= Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
   end

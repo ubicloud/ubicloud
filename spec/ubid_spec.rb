@@ -154,7 +154,7 @@ RSpec.describe UBID do
     expect(vm.ubid).to start_with UBID::TYPE_VM
 
     sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
-    expect(sv.ubid).to start_with UBID::TYPE_STORAGE_VOLUME
+    expect(sv.ubid).to start_with UBID::TYPE_VM_STORAGE_VOLUME
 
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     expect(kek.ubid).to start_with UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY
@@ -175,7 +175,7 @@ RSpec.describe UBID do
     expect(tun.ubid).to start_with UBID::TYPE_IPSEC_TUNNEL
 
     subnet = VmPrivateSubnet.create_with_id(vm_id: vm.id, net6: "0::0", net4: "127.0.0.1")
-    expect(subnet.ubid).to start_with UBID::TYPE_PRIVATE_SUBNET
+    expect(subnet.ubid).to start_with UBID::TYPE_VM_PRIVATE_SUBNET
 
     sshable = Sshable.create_with_id
     expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE

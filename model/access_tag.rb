@@ -7,8 +7,4 @@ class AccessTag < Sequel::Model
   one_to_many :applied_tags
 
   include ResourceMethods
-
-  def self.ubid_type
-    UBID::TYPE_ACCESS_TAG
-  end
 end

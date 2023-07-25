@@ -16,10 +16,6 @@ class Strand < Sequel::Model
 
   include ResourceMethods
 
-  def self.ubid_type
-    UBID::TYPE_STRAND
-  end
-
   NAVIGATE.each do
     one_to_one _1.intern, key: :id
   end

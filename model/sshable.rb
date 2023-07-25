@@ -23,10 +23,6 @@ class Sshable < Sequel::Model
     end
   end
 
-  def self.ubid_type
-    UBID::TYPE_SSHABLE
-  end
-
   def keys
     [raw_private_key_1, raw_private_key_2].compact.map {
       SshKey.from_binary(_1)
