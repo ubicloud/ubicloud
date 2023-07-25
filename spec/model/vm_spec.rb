@@ -12,26 +12,42 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#mem_gib" do
-    it "handles the 'm5a' instance line" do
-      vm.size = "m5a.2x"
-      expect(vm.mem_gib).to eq 4
+  describe Vm::Product do
+    it "can render and parse products" do
+      products = [
+        ["amd", 20, 0.3, 4],
+        ["amd", 20, 1, 4],
+        ["amd", 20, 2, 8],
+        ["amd", 20, 4, 16],
+        ["amd", 20, 8, 32],
+        ["amd", 20, 64, 512],
+        ["amd", 30, 1024, 16384]
+      ].map {
+        described_class.new(**[:manufacturer, :year, :cores, :ram].zip(_1).to_h)
+      }
+      strings = products.map(&:to_s)
+      expect(strings).to eq(%w[
+        amd20-0.3c-4r
+        amd20-1c-4r
+        amd20-2c-8r
+        amd20-4c-t16r
+        amd20-8c-t32r
+        amd20-t64c-u512r
+        amd30-v1024c-w16384r
+      ])
+      expect(strings.map { described_class.parse(_1) }).to eq(products)
     end
 
-    it "handles the 'c5a' instance line" do
-      vm.size = "c5a.2x"
-      expect(vm.mem_gib).to eq 2
-    end
-
-    it "crashes if a bogus size is passed" do
-      vm.size = "nope.10x"
-      expect { vm.mem_gib }.to raise_error RuntimeError, "BUG: unrecognized product line"
+    it "rejects input that cannot have a sort assist byte inserted" do
+      expect {
+        described_class.parse("amd20-4c-666666r")
+      }.to raise_error RuntimeError, "BUG: unsupported number of digits"
     end
   end
 
   describe "#cloud_hypervisor_cpu_topology" do
     it "scales a single-socket hyperthreaded system" do
-      vm.size = "m5a.4x"
+      vm.size = "amd19-2c-4r"
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 12,
@@ -43,7 +59,7 @@ RSpec.describe Vm do
     end
 
     it "scales a dual-socket hyperthreaded system" do
-      vm.size = "m5a.4x"
+      vm.size = "amd19-2c-4r"
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 24,
@@ -77,7 +93,7 @@ RSpec.describe Vm do
     end
 
     it "crashes if cores allocated per die is not uniform number" do
-      vm.size = "m5a.4x"
+      vm.size = "amd19-2c-4r"
 
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
@@ -91,9 +107,6 @@ RSpec.describe Vm do
     end
 
     context "with a dual socket Ampere Altra" do
-      # YYY: Hacked up to pretend Ampere Altras have hyperthreading
-      # for demonstration on small metal instances.
-
       before do
         expect(vm).to receive(:vm_host).and_return(instance_double(
           # Based on a dual-socket Ampere Altra running in quad-node
@@ -111,12 +124,12 @@ RSpec.describe Vm do
         # grained configuration, such an allocation we prefer to grant
         # locality so the VM guest doesn't have to think about NUMA
         # until this size.
-        vm.size = "m5a.40x"
+        vm.size = "ampere20-t20c-t64r"
         expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:20:1:1")
       end
 
       it "can compute bizarre, multi-node topologies for bizarre allocations" do
-        vm.size = "m5a.180x"
+        vm.size = "ampere20-t90c-t256r"
         expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:15:3:2")
       end
     end

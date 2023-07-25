@@ -68,7 +68,7 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: name
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "amd19-1c-8r"
 
         click_button "Create"
 
@@ -87,7 +87,7 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: "invalid name"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "amd19-1c-8r"
 
         click_button "Create"
 
@@ -105,7 +105,7 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: vm.name
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "amd19-1c-8r"
 
         click_button "Create"
 

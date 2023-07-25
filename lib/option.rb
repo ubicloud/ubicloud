@@ -29,8 +29,8 @@ module Option
 
   VmSize = Struct.new(:name, :display_name, :vcpu, :memory)
   VmSizes = [
-    ["c5a.2x", "c5a.2x", 2, 2],
-    ["c5a.4x", "c5a.4x", 4, 4],
-    ["c5a.6x", "c5a.6x", 6, 6]
+    ["amd19-1c-8r"] * 2 + [2, 8],
+    ["amd19-2c-t16r"] * 2 + [4, 16],
+    ["amd19-4c-t64r"] * 2 + [8, 64]
   ].map { |args| VmSize.new(*args) }.freeze
 end

@@ -9,7 +9,7 @@ require "base64"
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh
 
-  def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
+  def self.assemble(public_key, project_id, name: nil, size: "amd19-1c-4r",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnets: [], storage_size_gib: 20, storage_encrypted: false)
 
