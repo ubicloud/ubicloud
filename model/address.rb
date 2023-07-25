@@ -7,8 +7,4 @@ class Address < Sequel::Model
   one_to_many :assigned_host_address, key: :address_id, class: :AssignedHostAddress
 
   include ResourceMethods
-
-  def self.ubid_type
-    UBID::TYPE_ADDRESS
-  end
 end

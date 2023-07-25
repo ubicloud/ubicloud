@@ -42,10 +42,20 @@ module ResourceMethods
   end
 
   module ClassMethods
+    # Adapted from sequel/model/inflections.rb's underscore, to convert
+    # class names into symbols
+    def self.uppercase_underscore(s)
+      s.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2').gsub(/([a-z\d])([A-Z])/, '\1_\2').tr("-", "_").upcase
+    end
+
     def from_ubid(ubid)
       self[id: UBID.parse(ubid).to_uuid]
     rescue UBIDParseError
       nil
+    end
+
+    def ubid_type
+      Object.const_get("UBID::TYPE_#{ClassMethods.uppercase_underscore(name)}")
     end
 
     def create_with_id(*args, **kwargs)

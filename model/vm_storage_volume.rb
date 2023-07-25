@@ -9,10 +9,6 @@ class VmStorageVolume < Sequel::Model
 
   include ResourceMethods
 
-  def self.ubid_type
-    UBID::TYPE_STORAGE_VOLUME
-  end
-
   def device_id
     "#{vm.inhost_name}_#{disk_index}"
   end

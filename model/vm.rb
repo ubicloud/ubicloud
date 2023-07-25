@@ -19,10 +19,6 @@ class Vm < Sequel::Model
 
   include Authorization::HyperTagMethods
 
-  def self.ubid_type
-    UBID::TYPE_VM
-  end
-
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{location}/vm/#{name}"
   end

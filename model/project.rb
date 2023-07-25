@@ -13,10 +13,6 @@ class Project < Sequel::Model
   include ResourceMethods
   include Authorization::HyperTagMethods
 
-  def self.ubid_type
-    UBID::TYPE_PROJECT
-  end
-
   def hyper_tag_name(project = nil)
     "project/#{ubid}"
   end

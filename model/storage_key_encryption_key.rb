@@ -10,10 +10,6 @@ class StorageKeyEncryptionKey < Sequel::Model
 
   include ResourceMethods
 
-  def self.ubid_type
-    UBID::TYPE_STORAGE_KEY_ENCRYPTION_KEY
-  end
-
   def secret_key_material_hash
     # default to_hash doesn't decrypt encrypted columns, so implement
     # this to decrypt keys when they need to be sent to a running copy

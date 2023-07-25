@@ -6,10 +6,6 @@ class Account < Sequel::Model(:accounts)
   include ResourceMethods
   include Authorization::HyperTagMethods
 
-  def self.ubid_type
-    UBID::TYPE_ACCOUNT
-  end
-
   def hyper_tag_name(project = nil)
     "user/#{email}"
   end

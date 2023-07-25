@@ -5,10 +5,6 @@ require_relative "../model"
 class Semaphore < Sequel::Model
   include ResourceMethods
 
-  def self.ubid_type
-    UBID::TYPE_SEMAPHORE
-  end
-
   def self.incr(strand_id, name)
     DB.transaction do
       Strand.dataset.where(id: strand_id).update(schedule: Sequel::CURRENT_TIMESTAMP)
