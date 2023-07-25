@@ -13,8 +13,12 @@ module Spdk
     File.join("", "var", "storage", "vhost")
   end
 
-  def self.vhost_sock(vm_name)
-    File.join(vhost_dir, vm_name)
+  def self.vhost_sock(controller)
+    File.join(vhost_dir, controller)
+  end
+
+  def self.vhost_controller(vm_name, disk_index)
+    "#{vm_name}_#{disk_index}"
   end
 
   def self.hugepages_dir

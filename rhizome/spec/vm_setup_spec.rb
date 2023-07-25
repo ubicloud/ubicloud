@@ -157,4 +157,60 @@ RSpec.describe VmSetup do
       vs.setup_data_encryption_key(3, key_wrapping_secrets)
     end
   end
+
+  describe "#purge_storage" do
+    it "can purge storage" do
+      rpc_py = "/opt/spdk/scripts/rpc.py -s /home/spdk/spdk.sock"
+      params = JSON.generate({
+        storage_volumes: [
+          {
+            boot: true,
+            size_gib: 20,
+            device_id: "test_0",
+            disk_index: 0,
+            encrypted: false
+          },
+          {
+            boot: false,
+            size_gib: 20,
+            device_id: "test_1",
+            disk_index: 1,
+            encrypted: true
+          }
+        ]
+      })
+
+      expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
+
+      # delete the unencrypted volume
+      expect(vs).to receive(:r).with("#{rpc_py} vhost_delete_controller test_0")
+      expect(vs).to receive(:r).with("#{rpc_py} bdev_aio_delete test_0")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_0")
+
+      # delete the encrypted volume
+      expect(vs).to receive(:r).with("#{rpc_py} vhost_delete_controller test_1")
+      expect(vs).to receive(:r).with("#{rpc_py} bdev_crypto_delete test_1")
+      expect(vs).to receive(:r).with("#{rpc_py} bdev_aio_delete test_1_aio")
+      expect(vs).to receive(:r).with("#{rpc_py} accel_crypto_key_destroy -n test_1_key")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_1")
+
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/test")
+
+      vs.purge_storage
+    end
+  end
+
+  describe "#purge" do
+    it "can purge" do
+      expect(vs).to receive(:r).with("ip netns del test")
+      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
+      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
+      expect(vs).to receive(:r).with("systemctl daemon-reload")
+      expect(vs).to receive(:purge_storage)
+      expect(vs).to receive(:r).with("umount /vm/test/hugepages")
+      expect(vs).to receive(:r).with("deluser --remove-home test")
+
+      vs.purge
+    end
+  end
 end

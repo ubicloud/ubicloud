@@ -29,6 +29,12 @@ def r(commandline, stdin: "")
   stdout
 end
 
+def rm_if_exists(path)
+  FileUtils.rm_r(path)
+rescue Errno::ENOENT
+  # ignore if path doesn't exist, otherwise raise error
+end
+
 def fsync_or_fail(f)
   # Throw a custom exception type inheriting directly from Exception,
   # unlikely to be accidentally rescued as to better halt the program

@@ -129,7 +129,8 @@ class Prog::Vm::Nexus < Prog::Base
         "boot" => s.boot,
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
-        "disk_index" => s.disk_index
+        "disk_index" => s.disk_index,
+        "encrypted" => !s.key_encryption_key_1.nil?
       }
     }
   end

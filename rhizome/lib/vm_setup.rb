@@ -67,11 +67,40 @@ class VmSetup
     FileUtils.rm_f(vp.dnsmasq_service)
     r "systemctl daemon-reload"
 
+    purge_storage
+    r "umount #{vp.q_hugepages}"
+
     begin
       r "deluser --remove-home #{q_vm}"
     rescue CommandFail => ex
       raise unless /The user `.*' does not exist./.match?(ex.stderr)
     end
+  end
+
+  def purge_storage
+    params = JSON.parse(File.read(vp.prep_json))
+    params["storage_volumes"].each { |disk|
+      device_id = disk["device_id"]
+      index = disk["disk_index"]
+
+      vhost_controller = Spdk.vhost_controller(@vm_name, index)
+
+      r "#{Spdk.rpc_py} vhost_delete_controller #{vhost_controller.shellescape}"
+
+      if disk["encrypted"]
+        q_keyname = "#{device_id}_key".shellescape
+        q_aio_bdev = "#{device_id}_aio".shellescape
+        r "#{Spdk.rpc_py} bdev_crypto_delete #{device_id.shellescape}"
+        r "#{Spdk.rpc_py} bdev_aio_delete #{q_aio_bdev}"
+        r "#{Spdk.rpc_py} accel_crypto_key_destroy -n #{q_keyname}"
+      else
+        r "#{Spdk.rpc_py} bdev_aio_delete #{device_id.shellescape}"
+      end
+
+      rm_if_exists(Spdk.vhost_sock(vhost_controller))
+    }
+
+    rm_if_exists(vp.storage_root)
   end
 
   def hugepages(mem_gib)
@@ -293,18 +322,19 @@ EOS
 
     setup_spdk_bdev(bdev, disk_file, encrypted, encryption_key)
 
-    vhost = "#{@vm_name}_#{index}".shellescape
+    vhost_controller = Spdk.vhost_controller(@vm_name, index)
+    spdk_vhost_sock = Spdk.vhost_sock(vhost_controller)
 
-    r "#{Spdk.rpc_py} vhost_create_blk_controller #{vhost.shellescape} #{bdev.shellescape}"
+    r "#{Spdk.rpc_py} vhost_create_blk_controller #{vhost_controller.shellescape} #{bdev.shellescape}"
 
     # don't allow others to access the vhost socket
-    FileUtils.chmod "u=rw,g=r,o=", Spdk.vhost_sock(vhost)
+    FileUtils.chmod "u=rw,g=r,o=", spdk_vhost_sock
 
     # allow vm user to access the vhost socket
-    r "setfacl -m u:#{@vm_name}:rw #{Spdk.vhost_sock(vhost).shellescape}"
+    r "setfacl -m u:#{@vm_name}:rw #{spdk_vhost_sock.shellescape}"
 
     # create a symlink to the socket in the per vm storage dir
-    FileUtils.ln_s Spdk.vhost_sock(vhost), vp.vhost_sock(index)
+    FileUtils.ln_s spdk_vhost_sock, vp.vhost_sock(index)
 
     # Change ownership of the symlink. FileUtils.chown uses File.lchown for
     # symlinks and doesn't follow links. We don't use File.lchown directly
