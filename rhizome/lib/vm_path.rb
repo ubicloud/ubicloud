@@ -39,8 +39,12 @@ class VmPath
     File.join("", "vm", @vm_name, n)
   end
 
+  def storage_root
+    File.join("", "var", "storage", @vm_name)
+  end
+
   def storage(disk_index, n)
-    File.join("", "var", "storage", @vm_name, disk_index.to_s, n)
+    File.join(storage_root, disk_index.to_s, n)
   end
 
   # Define path, q_path, read, write methods for files in
@@ -59,6 +63,7 @@ class VmPath
     hugepages
     public_ipv4
     nftables_conf
+    prep.json
   ].each do |file_name|
     method_name = file_name.tr(".-", "_")
     fail "BUG" if method_defined?(method_name)
