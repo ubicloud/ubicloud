@@ -21,7 +21,7 @@ class Prog::LearnStorage < Prog::Base
     sizes.first
   end
 
-  def start
+  label def start
     storage_root = "/var"
     total_storage_gib = parse_size_gib(storage_root, sshable.cmd("df -h --output=size #{storage_root}"))
     reported_available_storage_gib = parse_size_gib(storage_root, sshable.cmd("df -h --output=avail #{storage_root}"))

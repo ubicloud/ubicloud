@@ -223,9 +223,8 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
       expect(vms).to all receive(:update).with(display_state: "rebooting")
       expect(sshable).to receive(:cmd).with("sudo systemctl reboot")
-      expect(nx).to receive(:hop).with(:wait_reboot)
       expect(nx).to receive(:decr_reboot)
-      nx.reboot
+      expect { nx.reboot }.to hop("wait_reboot")
     end
 
     it "wait_reboot naps if ssh fails" do
@@ -235,8 +234,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "wait_reboot transitions to verify_boot_id_changed if ssh succeeds" do
       expect(sshable).to receive(:cmd).with("echo 1").and_return("1")
-      expect(nx).to receive(:hop).with(:verify_boot_id_changed)
-      nx.wait_reboot
+      expect { nx.wait_reboot }.to hop("verify_boot_id_changed")
     end
 
     it "verify_boot_id_changed fails if boot_id hasn't changed" do
@@ -249,14 +247,12 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
       expect(vm_host).to receive(:last_boot_id).and_return("abc")
       expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
-      expect(nx).to receive(:hop).with(:verify_spdk)
-      nx.verify_boot_id_changed
+      expect { nx.verify_boot_id_changed }.to hop("verify_spdk")
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
       expect(sshable).to receive(:cmd).with("systemctl is-active spdk.service").and_return("active\n")
-      expect(nx).to receive(:hop).with(:verify_hugepages)
-      nx.verify_spdk
+      expect { nx.verify_spdk }.to hop("verify_hugepages")
     end
 
     it "verify_spdk fails if spdk not started" do
@@ -266,9 +262,8 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "start_vms starts vms & hops to wait" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
-      expect(nx).to receive(:hop).with(:wait)
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
-      nx.start_vms
+      expect { nx.start_vms }.to hop("wait")
     end
 
     it "can get boot id" do
@@ -323,8 +318,7 @@ RSpec.describe Prog::Vm::HostNexus do
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 4")
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 5, used_hugepages_1g: 4)
-      expect(nx).to receive(:hop).with(:start_vms)
-      nx.verify_hugepages
+      expect { nx.verify_hugepages }.to hop("start_vms")
     end
   end
 end

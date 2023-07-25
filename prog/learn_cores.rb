@@ -20,7 +20,7 @@ class Prog::LearnCores < Prog::Base
       total_nodes: nodes, total_sockets: sockets)
   end
 
-  def start
+  label def start
     topo = parse_count(sshable.cmd("/usr/bin/lscpu -Jye"))
     pop(**topo.to_h)
   end

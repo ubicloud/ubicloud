@@ -37,19 +37,19 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     private_subnet.nics.select { !_1.rekey_payload.nil? }
   end
 
-  def wait
+  label def wait
     when_destroy_set? do
-      hop :destroy
+      hop_destroy
     end
 
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
-      hop :refresh_keys
+      hop_refresh_keys
     end
 
     when_add_new_nic_set? do
       private_subnet.update(state: "adding_new_nic")
-      hop :add_new_nic
+      hop_add_new_nic
     end
 
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
@@ -75,56 +75,56 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     active_nics + to_be_added_nics
   end
 
-  def add_new_nic
+  label def add_new_nic
     nics_to_rekey.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
     end
     decr_add_new_nic
-    hop :wait_inbound_setup
+    hop_wait_inbound_setup
   end
 
-  def refresh_keys
+  label def refresh_keys
     active_nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
     end
 
     decr_refresh_keys
-    hop :wait_inbound_setup
+    hop_wait_inbound_setup
   end
 
-  def wait_inbound_setup
+  label def wait_inbound_setup
     if rekeying_nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
       rekeying_nics.each(&:incr_trigger_outbound_update)
-      hop :wait_outbound_setup
+      hop_wait_outbound_setup
     end
 
     donate
   end
 
-  def wait_outbound_setup
+  label def wait_outbound_setup
     if rekeying_nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
       rekeying_nics.each(&:incr_old_state_drop_trigger)
-      hop :wait_old_state_drop
+      hop_wait_old_state_drop
     end
 
     donate
   end
 
-  def wait_old_state_drop
+  label def wait_old_state_drop
     if rekeying_nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
       rekeying_nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
       end
 
-      hop :wait
+      hop_wait
     end
     donate
   end
 
-  def destroy
+  label def destroy
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
       fail "Cannot destroy subnet with active nics, first clean up the attached resources"
     end

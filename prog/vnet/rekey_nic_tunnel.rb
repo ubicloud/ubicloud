@@ -3,12 +3,12 @@
 class Prog::Vnet::RekeyNicTunnel < Prog::Base
   subject_is :nic
 
-  def add_subnet_addr
+  label def add_subnet_addr
     nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} addr replace #{nic.private_subnet.net4} dev #{nic.ubid_to_tap_name}")
     pop "add_subnet_addr is complete"
   end
 
-  def setup_inbound
+  label def setup_inbound
     nic.dst_ipsec_tunnels.each do |tunnel|
       args = tunnel.src_nic.rekey_payload
       next unless args
@@ -21,7 +21,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     pop "inbound_setup is complete"
   end
 
-  def setup_outbound
+  label def setup_outbound
     nic.src_ipsec_tunnels.each do |tunnel|
       args = tunnel.src_nic.rekey_payload
       next unless args
@@ -35,7 +35,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     pop "outbound_setup is complete"
   end
 
-  def drop_old_state
+  label def drop_old_state
     if nic.src_ipsec_tunnels.empty? && nic.dst_ipsec_tunnels.empty?
       nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} xfrm state deleteall")
       pop "drop_old_state is complete early"

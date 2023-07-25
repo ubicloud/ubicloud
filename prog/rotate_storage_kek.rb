@@ -6,7 +6,7 @@ require "json"
 class Prog::RotateStorageKek < Prog::Base
   subject_is :vm_storage_volume
 
-  def start
+  label def start
     if vm_storage_volume.key_encryption_key_1_id.nil?
       pop "storage volume is not encrypted"
     end
@@ -28,10 +28,10 @@ class Prog::RotateStorageKek < Prog::Base
       vm_storage_volume.update({key_encryption_key_2_id: key_encryption_key.id})
     end
 
-    hop :install
+    hop_install
   end
 
-  def install
+  label def install
     data_json = JSON.generate({
       old_key: vm_storage_volume.key_encryption_key_1.secret_key_material_hash,
       new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash
@@ -41,10 +41,10 @@ class Prog::RotateStorageKek < Prog::Base
     disk_index = vm_storage_volume.disk_index
     sshable.cmd("sudo bin/storage-key-tool #{q_vm} #{disk_index} reencrypt", stdin: data_json)
 
-    hop :test_keys_on_server
+    hop_test_keys_on_server
   end
 
-  def test_keys_on_server
+  label def test_keys_on_server
     data_json = JSON.generate({
       old_key: vm_storage_volume.key_encryption_key_1.secret_key_material_hash,
       new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash
@@ -54,18 +54,18 @@ class Prog::RotateStorageKek < Prog::Base
     disk_index = vm_storage_volume.disk_index
     sshable.cmd("sudo bin/storage-key-tool #{q_vm} #{disk_index} test-keys", stdin: data_json)
 
-    hop :retire_old_key_on_server
+    hop_retire_old_key_on_server
   end
 
-  def retire_old_key_on_server
+  label def retire_old_key_on_server
     q_vm = vm.inhost_name.shellescape
     disk_index = vm_storage_volume.disk_index
     sshable.cmd("sudo bin/storage-key-tool #{q_vm} #{disk_index} retire-old-key", stdin: "{}")
 
-    hop :retire_old_key_in_database
+    hop_retire_old_key_in_database
   end
 
-  def retire_old_key_in_database
+  label def retire_old_key_in_database
     vm_storage_volume.update({
       key_encryption_key_1_id: vm_storage_volume.key_encryption_key_2_id,
       key_encryption_key_2_id: nil

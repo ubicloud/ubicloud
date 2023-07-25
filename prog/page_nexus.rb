@@ -14,12 +14,12 @@ class Prog::PageNexus < Prog::Base
     end
   end
 
-  def start
+  label def start
     page.trigger
-    hop :wait
+    hop_wait
   end
 
-  def wait
+  label def wait
     when_resolve_set? do
       page.resolve
       pop "page is resolved"
