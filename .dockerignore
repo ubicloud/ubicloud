@@ -1,4 +1,5 @@
 .git
+.env
 .env.rb
 coverage
 demo/.env

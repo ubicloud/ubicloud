@@ -11,7 +11,7 @@ REPL = false unless defined? REPL
 Unreloader = Rack::Unreloader.new(
   reload: Config.development?,
   autoload: true,
-  logger: if Config.development?
+  logger: if Config.development? && !REPL
             require "logger"
             Logger.new($stdout)
           end
