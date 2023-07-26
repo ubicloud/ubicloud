@@ -355,4 +355,23 @@ RSpec.describe Prog::Vm::Nexus do
       nx.destroy
     end
   end
+
+  describe "#start_after_host_reboot" do
+    let(:sshable) { instance_double(Sshable) }
+    let(:vm_host) { instance_double(VmHost, sshable: sshable) }
+
+    before do
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+    end
+
+    it "can start a vm after reboot" do
+      expect(sshable).to receive(:cmd).with(
+        /sudo bin\/recreate-unpersisted \/vm\/vm[0-9a-z]+\/prep.json/,
+        {stdin: "{\"storage\":{}}"}
+      )
+      expect(sshable).to receive(:cmd).with(/sudo systemctl start vm[0-9a-z]+/)
+
+      expect { nx.start_after_host_reboot }.to hop("wait")
+    end
+  end
 end

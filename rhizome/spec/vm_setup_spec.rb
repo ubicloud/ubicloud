@@ -38,30 +38,34 @@ RSpec.describe VmSetup do
     it "can setup a storage volume" do
       disk_file = "/var/storage/test/0/disk.raw"
       device_id = "some_device_id"
-      spdk_vhost_sock = "/var/storage/vhost/test_0"
-      vm_vhost_sock = "/var/storage/test/0/vhost.sock"
       boot_image = "ubuntu-jammy"
       size_gib = 5
       key_wrapping_secrets = {}
       data_encryption_key = {cipher: "AES-XTS", k: "123", e: "456"}
 
       expect(vs).to receive(:setup_disk_file).and_return(disk_file)
-      expect(vs).to receive(:r).with(/setfacl.*#{disk_file}/)
       expect(vs).to receive(:setup_data_encryption_key).with(0, key_wrapping_secrets).and_return(data_encryption_key)
-      expect(vs).to receive(:copy_image).with(disk_file, boot_image, size_gib, true, data_encryption_key)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, true, data_encryption_key)
+      expect(vs).to receive(:copy_image).with(disk_file, boot_image, size_gib, data_encryption_key)
+      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, data_encryption_key)
+
+      vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
+        0, boot_image, key_wrapping_secrets)
+    end
+  end
+
+  describe "#setup_spdk_vhost" do
+    it "can setup spdk vhost" do
+      device_id = "some_device_id"
+      spdk_vhost_sock = "/var/storage/vhost/test_0"
+      vm_vhost_sock = "/var/storage/test/0/vhost.sock"
+
       expect(vs).to receive(:r).with(/.*rpc.py.*vhost_create_blk_controller test_0 #{device_id}/)
-      expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
-      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
       expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
       expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)
       expect(vs).to receive(:r).with(/setfacl.*#{spdk_vhost_sock}/)
 
-      expect(
-        vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
-          0, boot_image, key_wrapping_secrets)
-      ).to eq(vm_vhost_sock)
+      vs.setup_spdk_vhost(0, device_id)
     end
   end
 
@@ -69,6 +73,9 @@ RSpec.describe VmSetup do
     it "can setup a disk" do
       disk_file = "/var/storage/test/0/disk.raw"
       expect(FileUtils).to receive(:touch).with(disk_file)
+      expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
+      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
+      expect(vs).to receive(:r).with(/setfacl.*#{disk_file}/)
       expect(vs).to receive(:r).with("truncate -s 5G #{disk_file}")
       expect(
         vs.setup_disk_file({"boot" => true, "size_gib" => 5, "device_id" => "disk0"}, 0)
@@ -84,7 +91,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:download_boot_image).and_return image_path
       expect(File).to receive(:size).with(image_path).and_return(5 * 2**30)
       expect {
-        vs.copy_image(disk_file, boot_image, 2, false, nil)
+        vs.copy_image(disk_file, boot_image, 2, nil)
       }.to raise_error RuntimeError, "Image size greater than requested disk size"
     end
 
@@ -95,7 +102,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:download_boot_image).and_return image_path
       expect(File).to receive(:size).with(image_path).and_return(2 * 2**30)
       expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob aio0 --bs=[0-9]+$/, stdin: /{.*}/)
-      vs.copy_image(disk_file, boot_image, 10, false, nil)
+      vs.copy_image(disk_file, boot_image, 10, nil)
     end
 
     it "copies encrypted image" do
@@ -106,7 +113,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:download_boot_image).and_return image_path
       expect(File).to receive(:size).with(image_path).and_return(2 * 2**30)
       expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+$/, stdin: /{.*}/)
-      vs.copy_image(disk_file, boot_image, 10, true, encryption_key)
+      vs.copy_image(disk_file, boot_image, 10, encryption_key)
     end
   end
 
@@ -133,7 +140,7 @@ RSpec.describe VmSetup do
       bdev = "bdev_name"
       disk_file = "/path/to/disk/file"
       expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev} 512$/)
-      vs.setup_spdk_bdev(bdev, disk_file, false, nil)
+      vs.setup_spdk_bdev(bdev, disk_file, nil)
     end
 
     it "can setup an encrypted volume" do
@@ -143,7 +150,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:r).with(/.*rpc.py.*accel_crypto_key_create -c aes_xts -k key1value -e key2value/)
       expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev}_aio 512$/)
       expect(vs).to receive(:r).with(/.*rpc.py.*bdev_crypto_create.*#{bdev}_aio #{bdev}$/)
-      vs.setup_spdk_bdev(bdev, disk_file, true, encryption_key)
+      vs.setup_spdk_bdev(bdev, disk_file, encryption_key)
     end
   end
 
@@ -211,6 +218,81 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:r).with("deluser --remove-home test")
 
       vs.purge
+    end
+  end
+
+  describe "#recreate_unpersisted" do
+    it "can recreate unpersisted state" do
+      storage_volumes = [
+        {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
+        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true}
+      ]
+      storage_secrets = {
+        "test_1" => "storage_secrets"
+      }
+
+      expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false)
+
+      expect(vs).to receive(:setup_spdk_bdev).with("test_0", "/var/storage/test/0/disk.raw", nil)
+      expect(vs).to receive(:setup_spdk_vhost).with(0, "test_0")
+
+      expect(vs).to receive(:read_data_encryption_key).with(1, "storage_secrets").and_return("dek")
+      expect(vs).to receive(:setup_spdk_bdev).with("test_1", "/var/storage/test/1/disk.raw", "dek")
+      expect(vs).to receive(:setup_spdk_vhost).with(1, "test_1")
+
+      expect(vs).to receive(:hugepages).with(4)
+
+      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, storage_volumes, storage_secrets)
+    end
+  end
+
+  describe "#setup_networking" do
+    it "can setup networking" do
+      vps = instance_spy(VmPath)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+
+      gua = "fddf:53d2:4c89:2305:46a0::"
+      guest_ephemeral = NetAddr.parse_net("fddf:53d2:4c89:2305::/65")
+      clover_ephemeral = NetAddr.parse_net("fddf:53d2:4c89:2305:8000::/65")
+      ip4 = "192.168.1.100"
+
+      expect(vs).to receive(:interfaces).with([])
+      expect(vs).to receive(:setup_veths_6) {
+        expect(_1.to_s).to eq(guest_ephemeral.to_s)
+        expect(_2.to_s).to eq(clover_ephemeral.to_s)
+        expect(_3).to eq(gua)
+        expect(_4).to be(false)
+      }
+      expect(vs).to receive(:setup_taps_6).with(gua, [])
+      expect(vs).to receive(:routes4).with(ip4, "local_ip4", [])
+      expect(vs).to receive(:write_nat4_config).with(ip4, [])
+      expect(vs).to receive(:apply_nat4_rules)
+      expect(vs).to receive(:forwarding)
+
+      expect(vps).to receive(:write_guest_ephemeral).with(guest_ephemeral.to_s)
+      expect(vps).to receive(:write_clover_ephemeral).with(clover_ephemeral.to_s)
+
+      vs.setup_networking(false, gua, ip4, "local_ip4", [], false)
+    end
+
+    it "can setup networking for empty ip4" do
+      gua = "fddf:53d2:4c89:2305:46a0::"
+      expect(vs).to receive(:interfaces).with([])
+      expect(vs).to receive(:setup_veths_6)
+      expect(vs).to receive(:setup_taps_6).with(gua, [])
+      expect(vs).to receive(:routes4).with(nil, "local_ip4", [])
+      expect(vs).to receive(:forwarding)
+
+      vs.setup_networking(true, gua, "", "local_ip4", [], false)
+    end
+  end
+
+  describe "#hugepages" do
+    it "can setup hugepages" do
+      expect(FileUtils).to receive(:mkdir_p).with("/vm/test/hugepages")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/hugepages")
+      expect(vs).to receive(:r).with("mount -t hugetlbfs -o uid=test,size=2G nodev /vm/test/hugepages")
+      vs.hugepages(2)
     end
   end
 end

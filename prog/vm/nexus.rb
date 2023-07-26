@@ -7,7 +7,7 @@ require "openssl"
 require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
-  semaphore :destroy, :refresh_mesh
+  semaphore :destroy, :refresh_mesh, :start_after_host_reboot
 
   def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
@@ -211,6 +211,10 @@ SQL
     hop :prep
   end
 
+  def params_path
+    @params_path ||= File.join(vm_home, "prep.json")
+  end
+
   def prep
     topo = vm.cloud_hypervisor_cpu_topology
 
@@ -240,7 +244,6 @@ SQL
     host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
 
     # put prep.json
-    params_path = File.join(vm_home, "prep.json")
     host.sshable.cmd("echo #{params_json.shellescape} | sudo -u #{q_vm} tee #{params_path.shellescape}")
 
     host.sshable.cmd("sudo bin/prepvm.rb #{params_path.shellescape}", stdin: secrets_json)
@@ -266,6 +269,10 @@ SQL
 
     when_refresh_mesh_set? do
       hop :refresh_mesh
+    end
+
+    when_start_after_host_reboot_set? do
+      hop :start_after_host_reboot
     end
 
     nap 30
@@ -322,5 +329,20 @@ SQL
     end
 
     pop "vm deleted"
+  end
+
+  def start_after_host_reboot
+    register_deadline(:wait, 5 * 60)
+
+    secrets_json = JSON.generate({
+      storage: storage_secrets
+    })
+
+    host.sshable.cmd("sudo bin/recreate-unpersisted #{params_path.shellescape}", stdin: secrets_json)
+    host.sshable.cmd("sudo systemctl start #{q_vm}")
+
+    decr_start_after_host_reboot
+
+    hop :wait
   end
 end
