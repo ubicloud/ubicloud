@@ -14,6 +14,17 @@ class PrivateSubnet < Sequel::Model
   ].freeze
 
   dataset_module Authorization::Dataset
+  include Authorization::HyperTagMethods
+  def hyper_tag_name(project)
+    "project/#{project.ubid}/location/#{location}/private-subnet/#{name}"
+  end
+
+  include Authorization::TaggableMethods
+
+  def path
+    "/location/#{location}/private-subnet/#{name}"
+  end
+
   include ResourceMethods
 
   def self.ubid_to_name(ubid)

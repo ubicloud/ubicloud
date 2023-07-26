@@ -24,13 +24,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "uses ipv6_addr if passed and creates entities" do
+      ps = instance_double(PrivateSubnet)
+      expect(ps).to receive(:associate_with_project).with(p).and_return(true)
       expect(PrivateSubnet).to receive(:create).with(
         name: "default-ps",
         location: "hel1",
         net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "10.0.0.0/26",
         state: "waiting"
-      )
+      ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv4).and_return("10.0.0.0/26")
       expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(
@@ -42,13 +44,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "uses ipv4_addr if passed and creates entities" do
+      ps = instance_double(PrivateSubnet)
+      expect(ps).to receive(:associate_with_project).with(p).and_return(true)
       expect(PrivateSubnet).to receive(:create).with(
         name: "default-ps",
         location: "hel1",
         net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "10.0.0.0/26",
         state: "waiting"
-      )
+      ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
       expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(

@@ -44,7 +44,8 @@ module Authorization
     {
       acls: [
         {subjects: [subject], actions: ["Project:view", "Project:delete", "Project:user", "Project:policy"], objects: [object]},
-        {subjects: [subject], actions: ["Vm:view", "Vm:create", "Vm:delete"], objects: [object]}
+        {subjects: [subject], actions: ["Vm:view", "Vm:create", "Vm:delete"], objects: [object]},
+        {subjects: [subject], actions: ["PrivateSubnet:view", "PrivateSubnet:create", "PrivateSubnet:delete", "PrivateSubnet:nic"], objects: [object]}
       ]
     }
   end
