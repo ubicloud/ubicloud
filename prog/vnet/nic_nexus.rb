@@ -56,6 +56,11 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   def refresh_mesh
+    if nic.vm_id.nil?
+      decr_refresh_mesh
+      hop :wait
+    end
+
     nic.src_ipsec_tunnels.each do |tunnel|
       tunnel.refresh
     end
