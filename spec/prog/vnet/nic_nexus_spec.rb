@@ -134,7 +134,16 @@ RSpec.describe Prog::Vnet::NicNexus do
       allow(nx).to receive(:nic).and_return(nic)
     end
 
+    it "just decrements semaphore and hops back when not attached to a vm" do
+      expect(nx).to receive(:decr_refresh_mesh).and_return(true)
+
+      expect {
+        nx.refresh_mesh
+      }.to hop("wait")
+    end
+
     it "refreshes tunnels" do
+      expect(nic).to receive(:vm_id).and_return("vm_id")
       expect(nic).to receive(:src_ipsec_tunnels).and_return(ipsec_tunnels)
       expect(ipsec_tunnels[0]).to receive(:refresh).and_return(true)
       expect(ipsec_tunnels[1]).to receive(:refresh).and_return(true)
