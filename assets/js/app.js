@@ -116,10 +116,10 @@ function setupPolicyEditor() {
   $(".policy-editor").each(function() {
     let pre = $(this).find("pre");
     let textarea = $(this).find("textarea");
-    pre.html(jsonHighlight(pre.text()));
+    pre.html(jsonHighlight(DOMPurify.sanitize(pre.text())));
 
     pre.on("focusout", function () {
-      pre.html(jsonHighlight(pre.text()));
+      pre.html(jsonHighlight(DOMPurify.sanitize(pre.text())));
     })
 
     pre.on("keyup", function () {
