@@ -24,7 +24,7 @@ class CloverWeb < Roda
     csp.style_src :self
     csp.img_src :self
     csp.form_action :self
-    csp.script_src :self, "https://cdn.jsdelivr.net"
+    csp.script_src :self, "https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js", "https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"
     csp.connect_src :self
     csp.base_uri :none
     csp.frame_ancestors :none
