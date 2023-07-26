@@ -8,7 +8,6 @@ RSpec.describe PrivateSubnet do
       net6: NetAddr.parse_net("fd1b:9793:dcef:cd0a::/64"),
       net4: NetAddr.parse_net("10.9.39.0/26"),
       location: "hetzner-hel1",
-      state: "waiting",
       name: "ps"
     )
   }

@@ -298,7 +298,6 @@ SQL
     addr = vm.ephemeral_net4 || vm.ephemeral_net6.nth(2)
     out = `ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@#{addr} 2>&1`
     if out.include? "Host key verification failed."
-      vm.update(display_state: "running")
       hop_wait
     end
     nap 1
@@ -316,8 +315,6 @@ SQL
     register_deadline(nil, 5 * 60)
 
     decr_destroy
-
-    vm.update(display_state: "deleting")
 
     unless host.nil?
       begin
@@ -360,16 +357,12 @@ SQL
   label def start_after_host_reboot
     register_deadline(:wait, 5 * 60)
 
-    vm.update(display_state: "starting")
-
     secrets_json = JSON.generate({
       storage: storage_secrets
     })
 
     host.sshable.cmd("sudo bin/recreate-unpersisted #{params_path.shellescape}", stdin: secrets_json)
     host.sshable.cmd("sudo systemctl start #{q_vm}")
-
-    vm.update(display_state: "running")
 
     decr_start_after_host_reboot
 

@@ -15,6 +15,16 @@ class Vm < Sequel::Model
   dataset_module Authorization::Dataset
 
   include ResourceMethods
+  display_state :creating, [:start, :create_unix_user, :prep, :run, :wait_sshable]
+  display_state :running, [:wait]
+  display_state :deleting, [:destroy]
+  display_state :starting, [:start_after_host_reboot]
+
+  def display_state
+    return "deleting" if destroy_set?
+    super
+  end
+
   include SemaphoreMethods
   semaphore :destroy, :start_after_host_reboot
 
@@ -36,11 +46,6 @@ class Vm < Sequel::Model
 
   def ip4
     assigned_vm_address&.ip
-  end
-
-  def display_state
-    return "deleting" if destroy_set?
-    super
   end
 
   def mem_gib_ratio

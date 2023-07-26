@@ -37,7 +37,7 @@ RSpec.describe Prog::Vm::Nexus do
   describe ".assemble" do
     let(:ps) {
       PrivateSubnet.create(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting") { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+        net4: "1.1.1.0/26") { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
       Nic.new(private_subnet_id: ps.id,
@@ -400,14 +400,12 @@ RSpec.describe Prog::Vm::Nexus do
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@10.0.0.1 2>&1").and_return("Host key verification failed.")
-      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
       expect { nx.wait_sshable }.to hop("wait")
     end
 
     it "uses ipv6 if ipv4 is not enabled" do
       expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:3bfa::/79"))
       expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@2a01:4f8:10a:128b:3bfa::2 2>&1").and_return("Host key verification failed.")
-      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
       expect { nx.wait_sshable }.to hop("wait")
     end
   end
@@ -475,7 +473,6 @@ RSpec.describe Prog::Vm::Nexus do
 
       before do
         expect(vm).to receive(:vm_host).and_return(vm_host)
-        expect(vm).to receive(:update).with(display_state: "deleting")
       end
 
       it "absorbs an already deleted errors as a success" do
@@ -521,7 +518,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:update).with(vm_id: nil)
       expect(nic).to receive(:incr_destroy)
       expect(vm).to receive(:nics).and_return([nic])
-      expect(vm).to receive(:update).with(display_state: "deleting")
       expect(vm).to receive(:destroy)
 
       expect { nx.destroy }.to exit({"msg" => "vm deleted"})
@@ -542,10 +538,15 @@ RSpec.describe Prog::Vm::Nexus do
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
       )
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm[0-9a-z]+/)
-      expect(vm).to receive(:update).with(display_state: "starting")
-      expect(vm).to receive(:update).with(display_state: "running")
 
       expect { nx.start_after_host_reboot }.to hop("wait")
+    end
+  end
+
+  it "each label has display state" do
+    expect(described_class.labels.sort).to eq(Vm.display_states.keys.sort)
+    described_class.labels.each do |label|
+      expect(Vm.display_states[label]).not_to be_nil
     end
   end
 end

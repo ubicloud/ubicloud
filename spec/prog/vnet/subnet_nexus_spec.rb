@@ -9,7 +9,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   let(:prj) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
   let(:ps) {
     PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "1.1.1.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+      net4: "1.1.1.0/26").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
   }
 
   before do
@@ -50,8 +50,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         name: "default-ps",
         location: "hetzner-hel1",
         net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "10.0.0.0/26",
-        state: "waiting"
+        net4: "10.0.0.0/26"
       ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv4).and_return("10.0.0.0/26")
       expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
@@ -70,8 +69,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         name: "default-ps",
         location: "hetzner-hel1",
         net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "10.0.0.0/26",
-        state: "waiting"
+        net4: "10.0.0.0/26"
       ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
       expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
@@ -379,6 +377,13 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:dissociate_with_project).with(prj).and_return(true)
       expect(nx).to receive(:pop).with("subnet destroyed").and_return(true)
       nx.destroy
+    end
+  end
+
+  it "each label has display state" do
+    expect(described_class.labels.length).to eq(PrivateSubnet::DISPLAY_STATES.length)
+    described_class.labels.each do |label|
+      expect(PrivateSubnet::DISPLAY_STATES[label]).not_to be_nil
     end
   end
 end

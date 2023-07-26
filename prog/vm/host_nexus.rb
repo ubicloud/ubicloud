@@ -105,6 +105,7 @@ class Prog::Vm::HostNexus < Prog::Base
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
+    # FIXME(enes)
     vm_host.vms.each { |vm|
       vm.update(display_state: "rebooting")
     }

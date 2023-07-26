@@ -67,6 +67,10 @@ module ResourceMethods
     super
   end
 
+  def display_state
+    self.class.display_states[strand.label.intern]
+  end
+
   module ClassMethods
     # Adapted from sequel/model/inflections.rb's underscore, to convert
     # class names into symbols
@@ -94,6 +98,16 @@ module ResourceMethods
 
     def create_with_id(*, **)
       create(*, **) { _1.id = generate_uuid }
+    end
+
+    def display_states
+      @display_states || {}
+    end
+
+    def display_state(display, labels)
+      @display_states ||= {}
+
+      labels.each { @display_states[_1] = display }
     end
   end
 end

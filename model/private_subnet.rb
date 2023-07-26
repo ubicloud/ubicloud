@@ -14,6 +14,7 @@ class PrivateSubnet < Sequel::Model
   ].freeze
 
   dataset_module Authorization::Dataset
+
   include Authorization::HyperTagMethods
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{location}/private-subnet/#{name}"
@@ -26,13 +27,12 @@ class PrivateSubnet < Sequel::Model
   end
 
   include ResourceMethods
+  display_state :available, [:wait]
+  display_state :refreshing_mesh, [:refresh_mesh, :wait_refresh_mesh]
+  display_state :deleting, [:destroy]
 
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
-  end
-
-  def display_state
-    (state == "waiting") ? "available" : state
   end
 
   include SemaphoreMethods
