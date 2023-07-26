@@ -65,4 +65,15 @@ RSpec.describe PrivateSubnet do
       expect(described_class.ubid_to_name("psetv2ff83xj6h3prt2jwavh0q")).to eq "psetv2ff"
     end
   end
+
+  describe "ui utility methods" do
+    it "returns path" do
+      expect(private_subnet.path).to eq "/location/hel1/private-subnet/ps"
+    end
+
+    it "returns tag name" do
+      pr = instance_double(Project, ubid: "prjubid")
+      expect(private_subnet.hyper_tag_name(pr)).to eq "project/prjubid/location/hel1/private-subnet/ps"
+    end
+  end
 end
