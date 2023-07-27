@@ -24,15 +24,30 @@ rescue CommandFail => ex
 end
 
 r "sudo --user=#{q_user} mkdir -p #{q_hugepages_dir}"
-r "mount -t hugetlbfs -o uid=#{q_user},size=1G nodev #{q_hugepages_dir}"
 
 # Directory to put vhost sockets.
 FileUtils.mkdir_p(Spdk.vhost_dir)
 FileUtils.chown Spdk.user, Spdk.user, Spdk.vhost_dir
 
-spdk_service = <<SPDK_SERVICE
+File.write("/lib/systemd/system/home-spdk-hugepages.mount", <<SPDK_HUGEPAGES_MOUNT
+[Unit]
+Description=SPDK hugepages mount
+
+[Mount]
+What=hugetlbfs
+Where=/home/spdk/hugepages
+Type=hugetlbfs
+Options=uid=spdk,size=1G
+
+[Install]
+WantedBy=spdk.service
+SPDK_HUGEPAGES_MOUNT
+)
+
+File.write("/lib/systemd/system/spdk.service", <<SPDK_SERVICE
 [Unit]
 Description=Block Storage Service
+Requires=home-spdk-hugepages.mount
 [Service]
 Type=simple
 Environment="XDG_RUNTIME_DIR=#{Spdk.home.shellescape}"
@@ -52,6 +67,8 @@ ProtectHome=no
 NoNewPrivileges=yes
 User=spdk
 Group=spdk
+[Install]
+WantedBy=multi-user.target
+Alias=spdk.service
 SPDK_SERVICE
-
-File.write("/etc/systemd/system/spdk.service", spdk_service)
+)
