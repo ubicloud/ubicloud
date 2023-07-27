@@ -6,11 +6,11 @@ RSpec.describe VmPath do
   subject(:vp) { described_class.new("test'vm") }
 
   it "can compute a path" do
-    expect(vp.guest_mac).to eq("/vm/test'vm/guest_mac")
+    expect(vp.guest_ephemeral).to eq("/vm/test'vm/guest_ephemeral")
   end
 
   it "can escape a path" do
-    expect(vp.q_guest_mac).to eq("/vm/test\\'vm/guest_mac")
+    expect(vp.q_guest_ephemeral).to eq("/vm/test\\'vm/guest_ephemeral")
   end
 
   it "will snakeify difficult characters" do

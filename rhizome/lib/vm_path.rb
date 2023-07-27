@@ -50,7 +50,6 @@ class VmPath
   # Define path, q_path, read, write methods for files in
   # `/vm/#{vm_name}`
   %w[
-    guest_mac
     guest_ephemeral
     clover_ephemeral
     dnsmasq.conf
