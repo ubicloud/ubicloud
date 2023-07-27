@@ -32,6 +32,8 @@ RSpec.describe Prog::SetupSpdk do
   describe "#start_service" do
     it "exits, reducing number of hugepages" do
       sshable = instance_double(Sshable)
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable home-spdk-hugepages.mount")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable spdk")
       expect(sshable).to receive(:cmd).with("sudo systemctl start spdk")
       vm_host = instance_double(VmHost)
       expect(vm_host).to receive(:used_hugepages_1g).and_return(0)
