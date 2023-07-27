@@ -13,6 +13,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
+    Validation.validate_location(location, project&.provider)
 
     ipv6_range ||= random_private_ipv6(location).to_s
     ipv4_range ||= random_private_ipv4(location).to_s

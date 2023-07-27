@@ -20,4 +20,12 @@ class Serializers::Web::Vm < Serializers::Base
   structure(:default) do |vm|
     base(vm)
   end
+
+  structure(:detailed) do |vm|
+    base(vm).merge(
+      {
+        nics: vm.nics.map { |nic| Serializers::Web::Nic.serialize(nic) }
+      }
+    )
+  end
 end

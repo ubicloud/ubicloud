@@ -12,7 +12,8 @@ class CloverWeb
 
     r.post true do
       Authorization.authorize(@current_user.id, "Vm:create", @project.id)
-
+      ps_id = r.params["private-subnet-id"].empty? ? nil : UBID.parse(r.params["private-subnet-id"]).to_uuid
+      Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
       st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
         @project.id,
@@ -21,7 +22,8 @@ class CloverWeb
         size: r.params["size"],
         location: r.params["location"],
         boot_image: r.params["boot-image"],
-        storage_size_gib: r.params["storage-size-gib"].to_i
+        storage_size_gib: r.params["storage-size-gib"].to_i,
+        private_subnet_id: ps_id
       )
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
@@ -32,7 +34,7 @@ class CloverWeb
     r.on "create" do
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
-
+        @subnets = Serializers::Web::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
         view "vm/create"
       end
     end
