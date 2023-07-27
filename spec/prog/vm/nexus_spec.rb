@@ -358,7 +358,7 @@ RSpec.describe Prog::Vm::Nexus do
       nic = instance_double(Nic, incr_destroy: true)
       expect(nic).to receive(:update).with(vm_id: nil).and_return(true)
       expect(vm).to receive(:nics).and_return([nic])
-      expect(vm).to receive(:delete).and_return(true)
+      expect(vm).to receive(:destroy).and_return(true)
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(nx).to receive(:pop).with("vm deleted").and_return(true)
       nx.destroy

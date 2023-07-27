@@ -48,10 +48,10 @@ class CloverWeb
         end
 
         DB.transaction do
-          @project.access_tags.each { |access_tag| access_tag.applied_tags_dataset.delete }
-          @project.access_tags_dataset.delete
-          @project.access_policies_dataset.delete
-          @project.delete
+          @project.access_tags.each { |access_tag| access_tag.applied_tags_dataset.destroy }
+          @project.access_tags_dataset.destroy
+          @project.access_policies_dataset.destroy
+          @project.destroy
         end
 
         flash["notice"] = "'#{@project.name}' project is deleted."

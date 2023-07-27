@@ -172,7 +172,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "deletes and pops if nics are destroyed" do
-      expect(ps).to receive(:delete).and_return(true)
+      expect(ps).to receive(:destroy).and_return(true)
       expect(ps).to receive(:nics).and_return([]).at_least(:once)
       expect(nx).to receive(:pop).with("subnet destroyed").and_return(true)
       nx.destroy

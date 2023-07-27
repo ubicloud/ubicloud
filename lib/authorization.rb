@@ -87,8 +87,8 @@ module Authorization
     def delete_hyper_tag(project)
       DB.transaction do
         tag = hyper_tag(project)
-        AppliedTag.where(access_tag_id: tag.id).delete
-        tag.delete
+        AppliedTag.where(access_tag_id: tag.id).destroy
+        tag.destroy
       end
     end
 
@@ -126,7 +126,7 @@ module Authorization
     end
 
     def untag(access_tag)
-      AppliedTag.where(access_tag_id: access_tag.id, tagged_id: id).delete
+      AppliedTag.where(access_tag_id: access_tag.id, tagged_id: id).destroy
     end
   end
 end

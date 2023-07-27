@@ -64,7 +64,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     if ps.nics.empty?
       DB.transaction do
         ps.projects.map { ps.disassociate_with_project(_1) }
-        ps.delete
+        ps.destroy
       end
       pop "subnet destroyed"
     else
