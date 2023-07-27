@@ -30,7 +30,11 @@ module Serializers
       @@structures["#{name}::#{type}"] = blk
     end
 
-    def initialize(type)
+    def self.serialize(object)
+      new.serialize(object)
+    end
+
+    def initialize(type = :default)
       @type = type
     end
 

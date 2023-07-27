@@ -12,7 +12,7 @@ class Serializers::Api::Vm < Serializers::Base
       size: vm.size,
       unix_user: vm.unix_user,
       ip6: vm.ephemeral_net6&.nth(2),
-      projects: Serializers::Api::Project.new(:default).serialize(vm.projects)
+      projects: Serializers::Api::Project.serialize(vm.projects)
     }
   end
 

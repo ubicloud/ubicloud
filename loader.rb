@@ -66,7 +66,7 @@ autoload_normal = ->(subdirectory, include_first: false) do
 end
 
 %w[model lib clover.rb clover_web.rb clover_api.rb].each { autoload_normal.call(_1) }
-%w[scheduling prog serializers/web serializers/api].each { autoload_normal.call(_1, include_first: true) }
+%w[scheduling prog serializers serializers/web serializers/api].each { autoload_normal.call(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
 
