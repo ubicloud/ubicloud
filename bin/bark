@@ -1,10 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-#
-#
-# Exoskeleton is a process that launches a subprocess and supervises
-# or supports it in some way.
+# Bark is a process that launches a subprocess and supervises or
+# supports it in some way.
 #
 # For now, it concerns itself with forwarding logs.
 #
