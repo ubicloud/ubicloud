@@ -41,6 +41,18 @@ module ResourceMethods
     @ubid ||= UBID.from_uuidish(id).to_s.downcase
   end
 
+  NON_ARCHIVED_MODELS = ["DeletedRecord", "Semaphore"]
+  def before_destroy
+    model_name = self.class.name
+    unless NON_ARCHIVED_MODELS.include?(model_name)
+      model_values = values.merge(model_name: model_name)
+
+      DeletedRecord.create(deleted_at: Time.now, model_name: model_name, model_values: model_values)
+    end
+
+    super
+  end
+
   module ClassMethods
     # Adapted from sequel/model/inflections.rb's underscore, to convert
     # class names into symbols
