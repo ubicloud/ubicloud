@@ -7,7 +7,7 @@ RSpec.describe PrivateSubnet do
     described_class.new(
       net6: NetAddr.parse_net("fd1b:9793:dcef:cd0a::/64"),
       net4: NetAddr.parse_net("10.9.39.0/26"),
-      location: "hel1",
+      location: "hetzner-hel1",
       state: "waiting",
       name: "ps"
     )
@@ -68,12 +68,23 @@ RSpec.describe PrivateSubnet do
 
   describe "ui utility methods" do
     it "returns path" do
-      expect(private_subnet.path).to eq "/location/hel1/private-subnet/ps"
+      expect(private_subnet.path).to eq "/location/hetzner-hel1/private-subnet/ps"
     end
 
     it "returns tag name" do
       pr = instance_double(Project, ubid: "prjubid")
-      expect(private_subnet.hyper_tag_name(pr)).to eq "project/prjubid/location/hel1/private-subnet/ps"
+      expect(private_subnet.hyper_tag_name(pr)).to eq "project/prjubid/location/hetzner-hel1/private-subnet/ps"
+    end
+  end
+
+  describe "display_state" do
+    it "returns available when waiting" do
+      expect(private_subnet.display_state).to eq "available"
+    end
+
+    it "returns state if not waiting" do
+      private_subnet.state = "failed"
+      expect(private_subnet.display_state).to eq "failed"
     end
   end
 end
