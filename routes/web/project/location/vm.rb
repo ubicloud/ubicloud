@@ -15,7 +15,7 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:view", vm.id)
 
-        @vm = serialize(vm)
+        @vm = serialize(vm, :detailed)
 
         view "vm/show"
       end

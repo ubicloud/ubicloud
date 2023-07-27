@@ -31,6 +31,10 @@ class PrivateSubnet < Sequel::Model
     ubid.to_s[0..7]
   end
 
+  def display_state
+    state == "waiting" ? "available" : state
+  end
+
   include SemaphoreMethods
   semaphore :destroy, :refresh_mesh
 

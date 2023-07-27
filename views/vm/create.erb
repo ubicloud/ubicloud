@@ -56,6 +56,18 @@
               </div>
               <div class="col-span-full">
                 <%== render(
+                  "components/form/select",
+                  locals: {
+                    name: "private-subnet-id",
+                    label: "Private Subnet",
+                    options: { "": "Create new subnet" }.merge!(@subnets.to_h { |s| [s[:ubid], s[:name]] }),
+                    attributes: {
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <%== render(
                   "components/form/range_slider",
                   locals: {
                     name: "storage-size-gib",

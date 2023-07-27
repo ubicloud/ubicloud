@@ -37,6 +37,49 @@
       ]
     }
   ) %>
+  <!-- Network Interfaces Card -->
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Network Interfaces
+      </h3>
+    </div>
+  </div>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Private IPv4</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Private IPv6</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Subnet</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @vm[:nics].each do |nic| %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= nic[:name] %></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <span class="copy-content cursor-pointer" data-content="<%= nic[:private_ipv4] %>" data-message="Copied Private IPv4">
+                <%= nic[:private_ipv4] %>
+              </span>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <span class="copy-content cursor-pointer" data-content="<%= nic[:private_ipv6] %>" data-message="Copied Private IPv6">
+                <%= nic[:private_ipv6] %>
+              </span>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <a
+                href="<%= @project_data[:path] + "/location/" + @vm[:location] + "/private_subnet/" + nic[:subnet_name] %>"
+                class="text-orange-600 hover:text-orange-700"
+              ><%= nic[:subnet_name] %></a>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
   <!-- Delete Card -->
   <% if Authorization.has_permission?(@current_user.id, "Vm:delete", @vm[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
