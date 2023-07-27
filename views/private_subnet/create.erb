@@ -1,0 +1,69 @@
+<% @page_title = "Create Private Subnet" %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: "#{@project_data[:path]}/private-subnet",
+      parts: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["Private Subnets", "#{@project_data[:path]}/private-subnet"],
+        %w[Create #]
+      ]
+    }
+  ) %>
+  <%== render("components/page_header", locals: { title: "Create Private Subnet" }) %>
+</div>
+
+<div class="grid gap-6">
+  <form action="<%= "#{@project_data[:path]}/private-subnet" %>" method="POST">
+    <!-- YYY: need a better way to manage coupling of routes and erbs -->
+    <%== csrf_tag("#{@project_data[:path]}/private-subnet") %>
+    <!-- Create Card -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your private subnet.</p>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "name",
+                    label: "Name",
+                    attributes: {
+                      required: true,
+                      placeholder: "Enter name"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <%== render(
+                  "components/form/radio_small_cards",
+                  locals: {
+                    name: "location",
+                    label: "Location",
+                    options: Option.locations_for_provider(@project_data.dig(:provider, :name)).to_h { |l| [l.name, l.display_name] },
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="/private-subnet" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>

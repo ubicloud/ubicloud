@@ -32,7 +32,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def display_state
-    state == "waiting" ? "available" : state
+    (state == "waiting") ? "available" : state
   end
 
   include SemaphoreMethods
