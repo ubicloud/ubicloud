@@ -180,14 +180,14 @@ class VmSetup
 
       # Route ephemeral address to tap.
       r "ip -n #{q_vm} link set dev #{tapname} up"
-      r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev #{tapname}"
+      r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(mac)} dev #{tapname}"
 
       # Route private subnet addresses to tap.
       ip6 = NetAddr::IPv6Net.parse(net6)
 
       # Allocate ::1 in the guest network for DHCPv6.
       r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{tapname}"
-      r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(guest_mac)} dev #{tapname}"
+      r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(mac)} dev #{tapname}"
     end
   end
 
@@ -634,24 +634,6 @@ SERVICE
     ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
       "%0.2X" % _1
     }.join(":").downcase
-  end
-
-  def guest_mac
-    # YYY: Should make this static and saved by control plane, it's
-    # not that hard to do, can spare licensed software users some
-    # issues:
-    # https://stackoverflow.com/questions/55686021/static-mac-addresses-for-ec2-instance
-    # https://techcommunity.microsoft.com/t5/itops-talk-blog/understanding-static-mac-address-licensing-in-azure/ba-p/1386187
-    #
-    # Also necessary because Cloud Hypervisor, at time of writing,
-    # does not offer robust PCIe slot mapping of devices.  The MAC
-    # address is the most effective stable identifier for the guest in
-    # this case.
-    @guest_mac ||= begin
-      vp.read_guest_mac
-    rescue Errno::ENOENT
-      gen_mac.tap { vp.write_guest_mac(_1) }
-    end
   end
 
   # By reading the mac address from an interface, compute its ipv6
