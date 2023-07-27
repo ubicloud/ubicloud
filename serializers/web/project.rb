@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../base"
-
 class Serializers::Web::Project < Serializers::Base
   def self.base(p)
     {

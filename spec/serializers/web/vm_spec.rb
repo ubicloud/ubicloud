@@ -4,7 +4,7 @@ require_relative "../../spec_helper"
 
 RSpec.describe Serializers::Web::Vm do
   let(:vm) { Vm.new(name: "test-vm", size: "m5a.2x").tap { _1.id = "a410a91a-dc31-4119-9094-3c6a1fb49601" } }
-  let(:ser) { described_class.new(:default) }
+  let(:ser) { described_class.new }
 
   it "can serialize with the default structure" do
     data = ser.serialize(vm)

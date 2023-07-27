@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require_relative "../base"
-
 class Serializers::Web::AccessPolicy < Serializers::Base
   def self.base(ap)
     {
