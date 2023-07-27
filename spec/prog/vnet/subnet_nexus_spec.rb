@@ -8,7 +8,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   let(:st) { Strand.new }
   let(:p) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
   let(:ps) {
-    PrivateSubnet.create_with_id(name: "ps", location: "hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+    PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "1.1.1.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
   }
 
@@ -28,7 +28,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:associate_with_project).with(p).and_return(true)
       expect(PrivateSubnet).to receive(:create).with(
         name: "default-ps",
-        location: "hel1",
+        location: "hetzner-hel1",
         net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "10.0.0.0/26",
         state: "waiting"
@@ -38,7 +38,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       described_class.assemble(
         p.id,
         name: "default-ps",
-        location: "hel1",
+        location: "hetzner-hel1",
         ipv6_range: "fd10:9b0b:6b4b:8fbb::/64"
       )
     end
@@ -48,7 +48,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:associate_with_project).with(p).and_return(true)
       expect(PrivateSubnet).to receive(:create).with(
         name: "default-ps",
-        location: "hel1",
+        location: "hetzner-hel1",
         net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "10.0.0.0/26",
         state: "waiting"
@@ -58,7 +58,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       described_class.assemble(
         p.id,
         name: "default-ps",
-        location: "hel1",
+        location: "hetzner-hel1",
         ipv4_range: "10.0.0.0/26"
       )
     end
@@ -129,28 +129,28 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe ".random_private_ipv4" do
     it "returns a random private ipv4 range" do
-      expect(described_class.random_private_ipv4("hel1")).to be_a NetAddr::IPv4Net
+      expect(described_class.random_private_ipv4("hetzner-hel1")).to be_a NetAddr::IPv4Net
     end
 
     it "finds a new subnet if the one it found is taken" do
       expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/12").twice
       expect(SecureRandom).to receive(:random_number).with(16383).and_return(1, 2)
-      expect(PrivateSubnet).to receive(:where).with(net4: "172.16.0.128/26", location: "hel1").and_return([true])
-      expect(PrivateSubnet).to receive(:where).with(net4: "172.16.0.192/26", location: "hel1").and_return([])
-      expect(described_class.random_private_ipv4("hel1").to_s).to eq("172.16.0.192/26")
+      expect(PrivateSubnet).to receive(:where).with(net4: "172.16.0.128/26", location: "hetzner-hel1").and_return([true])
+      expect(PrivateSubnet).to receive(:where).with(net4: "172.16.0.192/26", location: "hetzner-hel1").and_return([])
+      expect(described_class.random_private_ipv4("hetzner-hel1").to_s).to eq("172.16.0.192/26")
     end
   end
 
   describe ".random_private_ipv6" do
     it "returns a random private ipv6 range" do
-      expect(described_class.random_private_ipv6("hel1")).to be_a NetAddr::IPv6Net
+      expect(described_class.random_private_ipv6("hetzner-hel1")).to be_a NetAddr::IPv6Net
     end
 
     it "finds a new subnet if the one it found is taken" do
       expect(SecureRandom).to receive(:bytes).with(7).and_return("a" * 7, "b" * 7)
-      expect(PrivateSubnet).to receive(:where).with(net6: "fd61:6161:6161:6161::/64", location: "hel1").and_return([true])
-      expect(PrivateSubnet).to receive(:where).with(net6: "fd62:6262:6262:6262::/64", location: "hel1").and_return([])
-      expect(described_class.random_private_ipv6("hel1").to_s).to eq("fd62:6262:6262:6262::/64")
+      expect(PrivateSubnet).to receive(:where).with(net6: "fd61:6161:6161:6161::/64", location: "hetzner-hel1").and_return([true])
+      expect(PrivateSubnet).to receive(:where).with(net6: "fd62:6262:6262:6262::/64", location: "hetzner-hel1").and_return([])
+      expect(described_class.random_private_ipv6("hetzner-hel1").to_s).to eq("fd62:6262:6262:6262::/64")
     end
   end
 

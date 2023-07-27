@@ -9,7 +9,7 @@ RSpec.describe Prog::Vnet::NicNexus do
 
   let(:p) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
   let(:ps) {
-    PrivateSubnet.create_with_id(name: "ps", location: "hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+    PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "10.0.0.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
   }
 
@@ -157,7 +157,7 @@ RSpec.describe Prog::Vnet::NicNexus do
 
   describe "#destroy" do
     let(:ps) {
-      PrivateSubnet.create_with_id(name: "ps", location: "hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+      PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "1.1.1.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
@@ -201,7 +201,7 @@ RSpec.describe Prog::Vnet::NicNexus do
 
   describe "#detach_vm" do
     let(:ps) {
-      PrivateSubnet.create_with_id(name: "ps", location: "hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+      PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "1.1.1.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
