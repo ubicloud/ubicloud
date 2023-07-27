@@ -51,7 +51,7 @@ SQL
         # since incr is entitled to be run at *any time* (including
         # after exitval is set) and any such incements will prevent
         # deletion of a Strand via foreign_key
-        Semaphore.where(strand_id: id).delete
+        Semaphore.where(strand_id: id).destroy
         return
       end
 
@@ -126,8 +126,8 @@ SQL
       update(exitval: ext.exitval, retval: nil)
       if parent_id.nil?
         # No parent Strand to reap here, so self-reap.
-        Semaphore.where(strand_id: id).delete
-        delete
+        Semaphore.where(strand_id: id).destroy
+        destroy
         @deleted = true
       end
 

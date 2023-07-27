@@ -317,15 +317,15 @@ SQL
         nic.incr_destroy
       end
 
-      vm.assigned_vm_address_dataset.delete
-      vm.vm_storage_volumes_dataset.delete
+      vm.assigned_vm_address_dataset.destroy
+      vm.vm_storage_volumes_dataset.destroy
 
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores
       )
       vm.projects.map { vm.dissociate_with_project(_1) }
 
-      vm.delete
+      vm.destroy
     end
 
     pop "vm deleted"

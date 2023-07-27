@@ -180,14 +180,14 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "destroys nic" do
-      expect(ipsec_tunnels[0]).to receive(:delete).and_return(true)
-      expect(ipsec_tunnels[1]).to receive(:delete).and_return(true)
+      expect(ipsec_tunnels[0]).to receive(:destroy).and_return(true)
+      expect(ipsec_tunnels[1]).to receive(:destroy).and_return(true)
       expect(nic).to receive(:src_ipsec_tunnels_dataset).and_return(ipsec_tunnels[0])
       expect(nic).to receive(:dst_ipsec_tunnels_dataset).and_return(ipsec_tunnels[1])
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:incr_refresh_mesh).and_return(true)
       expect(nx).to receive(:pop).with("nic deleted").and_return(true)
-      expect(nic).to receive(:delete).and_return(true)
+      expect(nic).to receive(:destroy).and_return(true)
       nx.destroy
     end
 
@@ -226,9 +226,9 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "detaches vm and refreshes mesh" do
       expect(nic).to receive(:update).with(vm_id: nil).and_return(true)
       expect(nic).to receive(:src_ipsec_tunnels_dataset).and_return(ipsec_tunnels[0])
-      expect(ipsec_tunnels[0]).to receive(:delete).and_return(true)
+      expect(ipsec_tunnels[0]).to receive(:destroy).and_return(true)
       expect(nic).to receive(:dst_ipsec_tunnels_dataset).and_return(ipsec_tunnels[1])
-      expect(ipsec_tunnels[1]).to receive(:delete).and_return(true)
+      expect(ipsec_tunnels[1]).to receive(:destroy).and_return(true)
 
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:incr_refresh_mesh).and_return(true)

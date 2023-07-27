@@ -75,10 +75,10 @@ class Prog::Vnet::NicNexus < Prog::Base
     end
 
     DB.transaction do
-      nic.src_ipsec_tunnels_dataset.delete
-      nic.dst_ipsec_tunnels_dataset.delete
+      nic.src_ipsec_tunnels_dataset.destroy
+      nic.dst_ipsec_tunnels_dataset.destroy
       nic.private_subnet.incr_refresh_mesh
-      nic.delete
+      nic.destroy
     end
 
     pop "nic deleted"
@@ -87,8 +87,8 @@ class Prog::Vnet::NicNexus < Prog::Base
   def detach_vm
     DB.transaction do
       nic.update(vm_id: nil)
-      nic.src_ipsec_tunnels_dataset.delete
-      nic.dst_ipsec_tunnels_dataset.delete
+      nic.src_ipsec_tunnels_dataset.destroy
+      nic.dst_ipsec_tunnels_dataset.destroy
       nic.private_subnet.incr_refresh_mesh
       decr_detach_vm
     end
