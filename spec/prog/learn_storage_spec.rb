@@ -41,6 +41,24 @@ EOS
       ).to eq(5 * 1024)
     end
 
+    it "can parse size with decimal point" do
+      expect(
+        ls.parse_size_gib("/var", <<EOS)
+            Size
+            1.8T
+EOS
+      ).to eq(1843)
+    end
+
+    it "fails to parse size with invalid chars" do
+      expect {
+        ls.parse_size_gib("/var", <<EOS)
+            Size
+            1x8T
+EOS
+      }.to raise_error RuntimeError, "BUG: unexpected storage size unit: x8T"
+    end
+
     it "crashes if an unfamiliar unit is provided" do
       expect {
         ls.parse_size_gib("/var", <<EOS)
