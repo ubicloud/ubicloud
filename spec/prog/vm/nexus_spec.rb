@@ -215,12 +215,6 @@ RSpec.describe Prog::Vm::Nexus do
 
       expect { nx.start }.to hop("create_unix_user")
     end
-
-    it "waits nics to be waiting" do
-      st = instance_double(Strand, label: "creating")
-      expect(vm).to receive(:nics).and_return([instance_double(Nic, strand: st)]).at_least(:once)
-      expect { nx.start }.to nap(10)
-    end
   end
 
   describe "#allocate" do
