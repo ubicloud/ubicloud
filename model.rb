@@ -89,3 +89,31 @@ if ENV["RACK_ENV"] == "development" || ENV["RACK_ENV"] == "test"
   LOGGER.level = Logger::FATAL if ENV["RACK_ENV"] == "test"
   DB.loggers << LOGGER
 end
+
+module SequelExtensions
+  def delete(force: false, &block)
+    rodaauth_in_callstack = !caller.grep(/rodauth/).empty?
+    destroy_in_callstack = !caller.grep(/sequel\/model\/base.*_destroy_delete/).empty?
+    unless rodaauth_in_callstack || destroy_in_callstack || force
+      raise "Calling delete is discouraged as it skips hooks such as before_destroy, which " \
+            "we use to archive records. Use destroy instead. If you know what you are doing " \
+            "and still want to use delete, you can pass force: true to trigger delete."
+    end
+
+    if is_a?(Sequel::Dataset)
+      super(&block)
+    else
+      super()
+    end
+  end
+end
+
+module Sequel
+  class Dataset
+    prepend SequelExtensions
+  end
+
+  class Model
+    prepend SequelExtensions
+  end
+end
