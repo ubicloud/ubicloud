@@ -187,10 +187,6 @@ SQL
   def start
     register_deadline(:wait, 10 * 60)
 
-    unless vm.nics.all? { |n| n.strand.label == "wait" }
-      nap 10
-    end
-
     vm_host_id = allocate
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network

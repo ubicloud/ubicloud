@@ -19,7 +19,7 @@ class Prog::Vnet::NicNexus < Prog::Base
         encryption_key: gen_encryption_key, name: name,
         private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
       subnet.add_nic(nic)
-      Strand.create(prog: "Vnet::NicNexus", label: "wait_vnet") { _1.id = ubid.to_uuid }
+      Strand.create(prog: "Vnet::NicNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
   end
 
@@ -29,14 +29,6 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   def nic
     @nic ||= Nic[strand.id]
-  end
-
-  def wait_vnet
-    unless nic.private_subnet.strand.label == "wait"
-      nap 1
-    end
-
-    hop :wait
   end
 
   def wait
