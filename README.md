@@ -1,15 +1,31 @@
-![The Sky Above The Clouds GitHub](https://github.com/ubicloud/ubicloud/assets/2545443/3ced9942-8054-48e5-84b1-6ffabc05dc63)
+<p align="center">
+  <img src="https://github.com/ubicloud/ubicloud/assets/2545443/45d2b775-dacf-45e8-93c4-ba16d312396a">
+</p>
+
+---
 
 # Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml)
 
-Ubicloud is an open source portable cloud. It provides IaaS cloud features in
-common hardware and network environments, such as those available in Hetzner,
-OVH, Datapacket, Equinix Metal, AWS Bare Metal, and others.
+Ubicloud is an open, free, and portable cloud. Think of it as an open alternative to
+cloud providers, like what Linux is to proprietary operating systems.
+
+Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, OVH, 
+and AWS Bare Metal. You can set it up yourself on these providers or you can use our 
+managed service. We're currently in public alpha.
 
 ## Quick start
 
-Start up Ubicloud's control plane and connect to its dashboard. The first time
-you connect, you'll need to sign up.
+### Managed platform
+
+You can use Ubicloud without installing anything. When you do this, we pass along the 
+underlying provider's benefits to you, such as price or location.
+
+https://console.ubicloud.com
+
+### Build your own cloud
+
+You can also build your own cloud. To do this, start up Ubicloud's control plane and 
+connect to its cloud console.
 
 ```
 git clone git@github.com:ubicloud/ubicloud.git
@@ -24,24 +40,48 @@ docker-compose -f demo/docker-compose.yml up
 ```
 
 The control plane is responsible for cloudifying bare metal Linux machines.
-When you click to "Create a Virtual Machine", you'll see example providers. The
-easiest way to build your own cloud is to lease instances from one of those
+The easiest way to build your own cloud is to lease instances from one of those
 providers. For example: https://www.hetzner.com/sb
 
-Once you do, click add VM Hosts from the ubicloud dashboard. Ubicloud uses SSH
-to manage Linux machines; and will provide you with a public SSH key. You'll
-need to add this SSH key to your Linux machine's authorized keys, typically
-located in `/root/.ssh/authorized_keys`.
+Once you lease instance(s), run the following script for each instance to cloudify
+the instance. By default, the script cloudifies bare metal instances leased from 
+Hetzner. After you cloudify your instances, you can provision and manage cloud 
+resources on these machines.
 
-![Cloudify Linux Machine](https://github.com/ubicloud/ubicloud/assets/993199/b7d8badf-424b-4486-bc8d-0da8740f995c)
+```
+# Enter hostname/IP and provider, and install SSH key as instructed by script
+docker exec -it ubicloud-app ./demo/cloudify_server
+```
 
-Once you add a VM Host, Ubicloud will cloudify that machine. You can then
-provision and manage cloud services on those machines.
+Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP 
+doesn't support IPv6, please use a VPN or tunnel broker such Mullvad or Hurricane 
+Electric's https://tunnelbroker.net/ to connect. Alternatively, you could lease
+IPv4 addresses from your provider and add them to your control plane.
 
-Later when you create VMs, Ubicloud will assign them IPv6
-addresses. If your ISP doesn't support IPv6, please use a VPN or
-tunnel broker such Mullvad or Hurricane Electric's
-https://tunnelbroker.net/ to connect.
+## Why use it
+
+Public cloud providers like AWS, Azure, and Google Cloud made life easier for 
+start-ups and enterprises. But they are closed source, have you rent computers 
+at a huge premium, and lock you in. Ubicloud offers an open alternative, reduces 
+your costs, and returns control of your infrastructure back to you. All without
+sacrificing the cloud's convenience.
+
+Today, AWS offers about two hundred cloud services. Ultimately, we will implement 
+10% of the cloud services that make up 80% of that consumption.
+
+Example workloads and reasons to use Ubicloud today include:
+
+* You have an ephemeral workload like a CI/CD pipeline (we're integrating with
+GitHub Actions), or you'd like to run compute/memory heavy tests. Our managed
+cloud is ~3x cheaper than AWS, so you save on costs.
+
+* You want a portable and simple app deployment service like 
+[MRSK](https://github.com/mrsked/mrsk). We're moving Ubicloud's control plane
+from Heroku to MRSK; and we want to provide open and portable services for
+MRSK's dependencies in the process.
+
+* You have bare metal machines sitting somewhere. You'd like to build your own
+cloud for portability, security, or compliance reasons.
 
 ## Status
 
@@ -49,61 +89,73 @@ Ubicloud is in public alpha. You can provide us your feedback, get help, or ask
 us to support your network environment in the
 [Community Forum](https://github.com/ubicloud/ubicloud/discussions).
 
-You can also find our cloud services and their statuses below.
+We follow an established architectural pattern in building public cloud services. 
+A control plane manages a data plane, where the data plane leverages open source 
+software.  You can find our current cloud components / services below.
 
-- [Elastic Compute](doc/vm.md): Public Alpha
-- [Virtual Networking](doc/net.md): Public Alpha
-- Blob Storage via MinIO Hosting: Draft
-- Attribute-Based Access Control (ABAC) Authorization: Draft
-- IPv4 Support: Draft
+* **Elastic Compute**: Our control plane communicates with Linux bare metal servers
+using SSH. We use [Cloud
+Hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) as our virtual
+machine monitor (VMM); and each instance of the VMM is contained within Linux
+namespaces for further isolation / security.
 
-## Why use it
+* **Virtual Networking**: We use [IPsec](https://en.wikipedia.org/wiki/IPsec)
+tunneling to establish an encrypted and private network environment. We support IPv4
+and IPv6 in a dual-stack setup and provide both public and private networking. For
+security, each customer’s VMs operate in their own networking namespace. Everything
+in virtual networking is layer 3 and up.
 
-In the past decade, there has been a massive shift to the cloud. AWS, Azure, and
-Google Cloud offer services that make life easier for start-ups and
-enterprises alike. But these offerings have you rent computers at a premium. If
-you want to run your own hardware or even just have a clear migration path to do
-so in the future, you need to consider how locked in you are to these commercial
-platforms. Ideally, before the bills swallow your business.
+* **Block Storage, non replicated**: We use Storage Performance Development Toolkit
+([SPDK](https://spdk.io)) to provide virtualized block storage to VMs. SPDK enables
+us to add enterprise features such as snapshot and replication in the future. We
+follow security best practices and encrypt the data encryption key itself.
 
-Ubicloud aims to run common cloud services anywhere. Whether that's low-cost
-bare metal providers like Hetzner or OVH, or on your colocated hardware. This
-gives you enormous portability. With that portability, you can benefit from cost
-savings, avoid vendor lock-in, and meet your security & compliance needs.
+* **Attribute-Based Access Control (ABAC)**: With ABAC, you can define attributes,
+roles, and permissions for users and give them fine-grained access to resources. You
+can read more about our [ABAC design here](doc/authorization.md).
 
-Today, AWS provides about two hundred cloud services. Ultimately, we will
-implement 10% of the cloud services that make up 80% of that consumption.
+* **What's Next?**: We're planning to work on the elastic load balancer or simple
+storage service next. If you have a workload that would benefit from a specific cloud
+service, please get in touch with us through our [Community
+Forum](https://github.com/ubicloud/ubicloud/discussions).
 
-## How it works
+* Control plane: Manages data plane services and resources. This is a Ruby program
+that stores its data in Postgres. We use the [Roda](https://roda.jeremyevans.net/)
+framework to serve HTTP requests and [Sequel](http://sequel.jeremyevans.net/) to
+access the database. We manage web authentication with
+[RodAuth](http://rodauth.jeremyevans.net/). We communicate with data plane servers
+using SSH, via the library [net-ssh](https://github.com/net-ssh/net-ssh). For our
+tests, we use [RSpec](https://rspec.info/).
 
-Ubicloud follows an established architectural pattern in building public
-cloud services. A control plane manages a data plane, where the data plane
-usually leverages open source software.
+* Cloud console: Server-side web app served by the Roda framework. For the visual
+design, we use [Tailwind CSS](https://tailwindcss.com) with components from
+[Tailwind UI](https://tailwindui.com). We also use jQuery for interactivity.
 
-We implement our control plane in Ruby and have it communicate with Linux bare
-metal servers using SSH. We use Cloud Hypervisor to run virtual machines; and
-implement virtualized networking using IPsec. Our blob storage system is a
-managed MinIO cluster. We use SPDK for network block devices.
+If you’d like to start hacking with Ubicloud, any method of obtaining Ruby and Postgres 
+versions is acceptable. If you have no opinion on this, our development team uses `asdf-vm` 
+as [documented here in detail](DEVELOPERS.md).
 
-For the control plane, we have a Ruby program that connects to Postgres. We base
-the source code organization on the [Roda-Sequel
-Stack](https://github.com/jeremyevans/roda-sequel-stack) with some
-modifications. As the name indicates, we use
-[Roda](https://roda.jeremyevans.net/) for HTTP code and
-[Sequel](http://sequel.jeremyevans.net/) for database queries.
+## FAQ
 
-We manage web authentication with [RodAuth](http://rodauth.jeremyevans.net/).
+### Do you have any experience with building this sort of thing?
 
-We communicate with servers using SSH, via the library
-[net-ssh](https://github.com/net-ssh/net-ssh).
+Our founding team comes from Azure; and worked at Amazon and Heroku before that.
+We also have start-up experience. We were co-founders and founding team members 
+at [Citus Data](https://github.com/citusdata/citus), [which got acquired by 
+Microsoft](https://news.ycombinator.com/item?id=18990469).
 
-For our tests, we use [RSpec](https://rspec.info/). We also automatically lint
-and format the code using [RuboCop](https://rubocop.org/).
+### How is this different than OpenStack?
 
-For the web console's visual design, we use [Tailwind
-CSS](https://tailwindcss.com) with components from [Tailwind
-UI](https://tailwindui.com). We also use jQuery for interactivity.
+We see three differences. First, Ubicloud is available as a managed service (vs boxed
+software). This way, you can get started in minutes rather than weeks. Since Ubicloud
+is designed for multi-tenancy, it comes with built-in with features such as encryption 
+at rest and in transit, virtual networking, secrets rotation, etc.
 
-Any method of obtaining of Ruby and Postgres versions is acceptable,
-but if you have no opinion on this, our development team uses `asdf-vm` as
-[documented here in detail.](DEVELOPERS.md)
+Second, we're initially targeting developers. This -we hope- will give us fast feedback 
+cycles and enable us to have 6 key services in GA form in the next two years. OpenStack 
+is still primarily used for 3 cloud services.
+
+Last, we're designing for simplicity. With OpenStack, you pick between 10 hypervisors, 
+10 S3 implementations, and 5 block storage implementations. The software needs to work 
+in a way where all of these implementations are compatible with each other. That leads
+to consultant-ware. We'll take a more opinionated approach with Ubicloud.
