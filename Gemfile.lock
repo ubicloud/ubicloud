@@ -95,7 +95,7 @@ GEM
       timeout
     net-smtp (0.3.3)
       net-protocol
-    net-ssh (7.1.0)
+    net-ssh (7.2.0)
     netaddr (2.0.6)
     nio4r (2.5.9)
     nokogiri (1.15.3-arm64-darwin)
