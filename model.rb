@@ -47,6 +47,13 @@ module ResourceMethods
     unless NON_ARCHIVED_MODELS.include?(model_name)
       model_values = values.merge(model_name: model_name)
 
+      encryption_metadata = self.class.instance_variable_get(:@column_encryption_metadata)
+      unless encryption_metadata.empty?
+        encryption_metadata.keys.each do |key|
+          model_values.delete(key)
+        end
+      end
+
       DeletedRecord.create(deleted_at: Time.now, model_name: model_name, model_values: model_values)
     end
 
