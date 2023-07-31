@@ -215,6 +215,21 @@ RSpec.describe Prog::Vm::Nexus do
 
       expect { nx.start }.to hop("create_unix_user")
     end
+
+    it "fails if there is no ip address available but the vm is ip4 enabled" do
+      vmh_id = "46ca6ded-b056-4723-bd91-612959f52f6f"
+      vmh = VmHost.new(
+        net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
+        ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
+      ) { _1.id = vmh_id }
+
+      expect(nx).to receive(:allocate).and_return(vmh_id)
+      expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
+      expect(vmh).to receive(:ip4_random_vm_network).and_return([nil, nil])
+      expect(vm).to receive(:ip4_enabled).and_return(true).at_least(:once)
+
+      expect { nx.start }.to raise_error(RuntimeError, /no ip4 addresses left/)
+    end
   end
 
   describe "#allocate" do

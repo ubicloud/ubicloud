@@ -68,6 +68,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         choose option: "hetzner-hel1"
+        uncheck "Enable Public IPv4"
         choose option: "ubuntu-jammy"
         choose option: "c5a.2x"
 
@@ -78,6 +79,30 @@ RSpec.describe Clover, "vm" do
         expect(Vm.count).to eq(1)
         expect(Vm.first.projects.first.id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).not_to be_nil
+        expect(Vm.first.ip4_enabled).to be_falsey
+      end
+
+      it "can create new virtual machine with public ipv4" do
+        project
+
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        choose option: "hetzner-hel1"
+        check "Enable Public IPv4"
+        choose option: "ubuntu-jammy"
+        choose option: "c5a.2x"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_content "'#{name}' will be ready in a few minutes"
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.projects.first.id).to eq(project.id)
+        expect(Vm.first.private_subnets.first.id).not_to be_nil
+        expect(Vm.first.ip4_enabled).to be_truthy
       end
 
       it "can create new virtual machine with chosen private subnet" do

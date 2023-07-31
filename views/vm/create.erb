@@ -68,6 +68,17 @@
               </div>
               <div class="col-span-full">
                 <%== render(
+                  "components/form/checkbox",
+                  locals: {
+                    name: "enable-ip4",
+                    label: "Enable Public IPv4",
+                    value: "1",
+                    selected: "1"
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <%== render(
                   "components/form/range_slider",
                   locals: {
                     name: "storage-size-gib",
