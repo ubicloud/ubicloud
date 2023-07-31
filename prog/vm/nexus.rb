@@ -339,6 +339,9 @@ SQL
 
     decr_start_after_host_reboot
 
+    # trigger setting up private subnet connections
+    incr_refresh_mesh
+
     hop :wait
   end
 end
