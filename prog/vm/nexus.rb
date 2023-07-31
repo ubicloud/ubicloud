@@ -11,7 +11,8 @@ class Prog::Vm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnet_id: nil, nic_id: nil, storage_size_gib: 20, storage_encrypted: false)
+    private_subnet_id: nil, nic_id: nil, storage_size_gib: 20, storage_encrypted: false,
+    enable_ip4: false)
 
     project = Project[project_id]
     unless project || Config.development?
@@ -66,7 +67,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
-        name: name, size: size, location: location, boot_image: boot_image) { _1.id = ubid.to_uuid }
+        name: name, size: size, location: location, boot_image: boot_image, ip4_enabled: enable_ip4) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
       vm.associate_with_project(project)
@@ -189,7 +190,10 @@ SQL
 
     vm_host_id = allocate
     vm_host = VmHost[vm_host_id]
-    ip4, address = vm_host.ip4_random_vm_network
+    ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
+
+    fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
+
     vm.update(vm_host_id: vm_host_id, ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
       local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s)
     AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4

@@ -23,7 +23,8 @@ class CloverWeb
         location: r.params["location"],
         boot_image: r.params["boot-image"],
         storage_size_gib: r.params["storage-size-gib"].to_i,
-        private_subnet_id: ps_id
+        private_subnet_id: ps_id,
+        enable_ip4: r.params.key?("enable-ip4")
       )
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
