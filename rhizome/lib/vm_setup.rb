@@ -638,8 +638,10 @@ DNSMASQ_SERVICE
 [Unit]
 Description=#{@vm_name}
 After=network.target
+After=spdk.service
 After=#{@vm_name}-dnsmasq.service
 Requires=#{@vm_name}-dnsmasq.service
+Requires=spdk.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
