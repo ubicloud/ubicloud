@@ -14,13 +14,13 @@ class Account < Sequel::Model(:accounts)
 
   def create_project_with_default_policy(name, provider: Option::Provider::HETZNER, policy_body: nil)
     Validation.validate_provider(provider)
-    project = Project.create(name: name, provider: provider) { _1.id = UBID.generate(UBID::TYPE_PROJECT).to_uuid }
+    project = Project.create_with_id(name: name, provider: provider)
     project.associate_with_project(project)
     associate_with_project(project)
     project.add_access_policy(
+      id: AccessPolicy.generate_uuid,
       name: "default",
-      body: policy_body || Authorization.generate_default_acls(hyper_tag_name, project.hyper_tag_name),
-      id: UBID.generate(UBID::TYPE_ACCESS_POLICY).to_uuid
+      body: policy_body || Authorization.generate_default_acls(hyper_tag_name, project.hyper_tag_name)
     )
     project
   end

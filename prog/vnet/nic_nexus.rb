@@ -8,7 +8,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
 
-    ubid = UBID.generate(UBID::TYPE_NIC)
+    ubid = Nic.generate_ubid
     name ||= Nic.ubid_to_name(ubid)
 
     ipv6_addr ||= subnet.random_private_ipv6.to_s

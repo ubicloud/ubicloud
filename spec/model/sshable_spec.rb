@@ -9,7 +9,7 @@ RSpec.describe Sshable do
 
   subject(:sa) {
     described_class.new(
-      id: UBID.generate(UBID::TYPE_SSHABLE).to_uuid,
+      id: described_class.generate_uuid,
       host: "test.localhost",
       raw_private_key_1: key
     )
