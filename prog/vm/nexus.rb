@@ -11,7 +11,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnet_id: nil, nic_id: nil, storage_size_gib: 20, storage_encrypted: false,
+    private_subnet_id: nil, nic_id: nil, storage_size_gib: 20, storage_encrypted: true,
     enable_ip4: false)
 
     project = Project[project_id]
