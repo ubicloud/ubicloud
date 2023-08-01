@@ -70,7 +70,7 @@ RSpec.describe Clover, "vm" do
         choose option: "hetzner-hel1"
         uncheck "Enable Public IPv4"
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "standard-2"
 
         expect(BillingRecord).to receive(:create_with_id)
         click_button "Create"
@@ -94,7 +94,7 @@ RSpec.describe Clover, "vm" do
         choose option: "hetzner-hel1"
         check "Enable Public IPv4"
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "standard-2"
 
         click_button "Create"
 
@@ -119,7 +119,7 @@ RSpec.describe Clover, "vm" do
         choose option: "hetzner-hel1"
         select match: :prefer_exact, text: ps.name
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "standard-2"
 
         expect(BillingRecord).to receive(:create_with_id)
         click_button "Create"
@@ -140,7 +140,7 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: "invalid name"
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "standard-2"
 
         click_button "Create"
 
@@ -158,7 +158,7 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: vm.name
         choose option: "hetzner-hel1"
         choose option: "ubuntu-jammy"
-        choose option: "c5a.2x"
+        choose option: "standard-2"
 
         click_button "Create"
 

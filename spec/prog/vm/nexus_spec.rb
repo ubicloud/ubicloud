@@ -18,7 +18,7 @@ RSpec.describe Prog::Vm::Nexus do
     ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
     disk.key_encryption_key_1 = kek
-    vm = Vm.new(size: "m5a.2x", name: "dummy-vm", location: "hetzner-hel1").tap {
+    vm = Vm.new(size: "standard-2", name: "dummy-vm", location: "hetzner-hel1").tap {
       _1.id = Vm.generate_uuid
       _1.vm_storage_volumes.append(disk)
       disk.vm = _1
@@ -27,7 +27,7 @@ RSpec.describe Prog::Vm::Nexus do
       project_id: SecureRandom.uuid,
       resource_id: vm.id,
       resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.line, vm.location).id,
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location).id,
       amount: vm.product.cores
     )
     vm
@@ -219,7 +219,7 @@ RSpec.describe Prog::Vm::Nexus do
           "ssh_public_key" => "test_ssh_key",
           "max_vcpus" => 1,
           "cpu_topology" => "1:1:1:1",
-          "mem_gib" => 4,
+          "mem_gib" => 8,
           "local_ipv4" => "169.254.0.0",
           "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]]
         })
@@ -304,8 +304,8 @@ RSpec.describe Prog::Vm::Nexus do
               total_nodes: 4,
               total_cores: 80,
               total_cpus: 80,
-              total_mem_gib: 320,
-              total_hugepages_1g: 316,
+              total_mem_gib: 640,
+              total_hugepages_1g: 640 - 8,
               total_storage_gib: 500,
               available_storage_gib: 200}.merge(args)
       sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
@@ -340,8 +340,8 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "prefers the host with a more snugly fitting RAM ratio, even if busy" do
       snug = new_host(used_cores: 78).save_changes
-      new_host(total_mem_gib: 640).save_changes
-      expect(nx.allocation_dataset.map { _1[:mem_ratio] }).to eq([4, 8])
+      new_host(total_mem_gib: snug.total_mem_gib * 2).save_changes
+      expect(nx.allocation_dataset.map { _1[:mem_ratio] }).to eq([8, 16])
       expect(nx.allocate).to eq snug.id
     end
 

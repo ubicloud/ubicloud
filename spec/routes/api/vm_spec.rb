@@ -62,7 +62,7 @@ RSpec.describe Clover, "vm" do
           public_key: "ssh key",
           name: "test-vm",
           unix_user: "ubi",
-          size: "c5a.2x",
+          size: "standard-2",
           boot_image: "ubuntu-jammy"
         }
 
