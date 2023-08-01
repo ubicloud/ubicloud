@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+class Serializers::Web::PaymentMethod < Serializers::Base
+  def self.base(pm)
+    {
+      id: pm.id,
+      ubid: pm.ubid,
+      last4: pm.stripe_data["card"]["last4"],
+      brand: pm.stripe_data["card"]["brand"],
+      exp_month: pm.stripe_data["card"]["exp_month"],
+      exp_year: pm.stripe_data["card"]["exp_year"],
+      order: pm.order
+    }
+  end
+
+  structure(:default) do |pm|
+    base(pm)
+  end
+end

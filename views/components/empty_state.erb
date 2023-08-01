@@ -3,12 +3,18 @@
   <h3 class="mt-2 text-sm font-semibold text-gray-900"><%= title %></h3>
   <p class="mt-1 text-sm text-gray-500"><%= description %></p>
   <div class="mt-6">
-    <a
-      href="<%= button_link %>"
-      class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
-    >
-      <%== render("components/icon", locals: { name: "hero-plus", classes: "ml-0.5 mr-1.5 h-5 w-5" }) %>
-      <%= button_title %>
-    </a>
+    <% if defined?(button_link) && button_link %>
+      <a
+        href="<%= button_link %>"
+        class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
+      >
+        <%== render("components/icon", locals: { name: "hero-plus", classes: "ml-0.5 mr-1.5 h-5 w-5" }) %>
+        <%= button_title %>
+      </a>
+    <% else %>
+      <div class="flex justify-center">
+        <%== render("components/form/submit_button", locals: { text: button_title }) %>
+      </div>
+    <% end %>
   </div>
 </div>

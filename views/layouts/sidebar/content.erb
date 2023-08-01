@@ -87,6 +87,17 @@
                 icon: "hero-key"
               }
             ) %>
+            <% if Config.stripe_secret_key %>
+              <%== render(
+                "layouts/sidebar/item",
+                locals: {
+                  name: "Billing",
+                  url: "#{@project_data[:path]}/billing",
+                  is_active: request.path.start_with?("#{@project_data[:path]}/billing"),
+                  icon: "hero-banknotes"
+                }
+              ) %>
+            <% end %>
             <%== render(
               "layouts/sidebar/item",
               locals: {
@@ -98,9 +109,7 @@
             ) %>
           </ul>
         </li>
-
       <% end %>
-
       <li class="-mx-6 mt-auto">
         <%== render("layouts/sidebar/project_switcher") %>
       </li>

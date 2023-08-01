@@ -45,6 +45,8 @@ module Config
   optional :clover_session_secret, base64, clear: true
   optional :clover_column_encryption_key, base64, clear: true
   optional :pagerduty_key, string, clear: true
+  optional :stripe_public_key, string, clear: true
+  optional :stripe_secret_key, string, clear: true
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
