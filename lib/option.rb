@@ -27,10 +27,10 @@ module Option
     ["almalinux-9.1", "AlmaLinux 9.1"]
   ].map { |args| BootImage.new(*args) }.freeze
 
-  VmSize = Struct.new(:name, :display_name, :vcpu, :memory)
-  VmSizes = [
-    ["c5a.2x", "c5a.2x", 2, 2],
-    ["c5a.4x", "c5a.4x", 4, 4],
-    ["c5a.6x", "c5a.6x", 6, 6]
-  ].map { |args| VmSize.new(*args) }.freeze
+  VmSize = Struct.new(:name, :vcpu, :memory) do
+    alias_method :display_name, :name
+  end
+  VmSizes = [2, 4, 8, 16].map {
+    VmSize.new("standard-#{_1}", _1, _1 * 4)
+  }.freeze
 end

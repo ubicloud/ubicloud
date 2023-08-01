@@ -8,30 +8,37 @@ RSpec.describe Vm do
   describe "#product" do
     it "crashes if a bogus product is passed" do
       vm.size = "bogustext"
-      expect { vm.product }.to raise_error RuntimeError, "BUG: cannot parse vm size"
+      expect { vm.product }.to raise_error RuntimeError, "BUG: cannot parse product"
     end
   end
 
   describe "#mem_gib" do
-    it "handles the 'm5a' instance line" do
-      vm.size = "m5a.2x"
-      expect(vm.mem_gib).to eq 4
+    it "handles standard-2" do
+      vm.size = "standard-2"
+      expect(vm.mem_gib).to eq 8
     end
 
-    it "handles the 'c5a' instance line" do
-      vm.size = "c5a.2x"
-      expect(vm.mem_gib).to eq 2
+    it "handles standard-16" do
+      vm.size = "standard-16"
+      expect(vm.mem_gib).to eq 64
     end
 
-    it "crashes if a bogus size is passed" do
-      vm.size = "nope.10x"
-      expect { vm.mem_gib }.to raise_error RuntimeError, "BUG: unrecognized product line"
+    context "with invalid input" do
+      it "crashes with a bogus size is passed" do
+        vm.size = "standard-3"
+        expect { vm.mem_gib }.to raise_error RuntimeError, "BUG: unrecognized product scale"
+      end
+
+      it "crashes with a bogus line is passed" do
+        vm.size = "generalpurpose-1"
+        expect { vm.mem_gib }.to raise_error RuntimeError, "BUG: unrecognized product prefix"
+      end
     end
   end
 
   describe "#cloud_hypervisor_cpu_topology" do
     it "scales a single-socket hyperthreaded system" do
-      vm.size = "m5a.4x"
+      vm.size = "standard-4"
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 12,
@@ -43,7 +50,7 @@ RSpec.describe Vm do
     end
 
     it "scales a dual-socket hyperthreaded system" do
-      vm.size = "m5a.4x"
+      vm.size = "standard-4"
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 24,
@@ -77,7 +84,7 @@ RSpec.describe Vm do
     end
 
     it "crashes if cores allocated per die is not uniform number" do
-      vm.size = "m5a.4x"
+      vm.size = "standard-4"
 
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
@@ -91,9 +98,6 @@ RSpec.describe Vm do
     end
 
     context "with a dual socket Ampere Altra" do
-      # YYY: Hacked up to pretend Ampere Altras have hyperthreading
-      # for demonstration on small metal instances.
-
       before do
         expect(vm).to receive(:vm_host).and_return(instance_double(
           # Based on a dual-socket Ampere Altra running in quad-node
@@ -111,12 +115,12 @@ RSpec.describe Vm do
         # grained configuration, such an allocation we prefer to grant
         # locality so the VM guest doesn't have to think about NUMA
         # until this size.
-        vm.size = "m5a.40x"
+        expect(vm).to receive(:product).and_return(described_class::Product.new("bogus", 20)).at_least(:once)
         expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:20:1:1")
       end
 
-      it "can compute bizarre, multi-node topologies for bizarre allocations" do
-        vm.size = "m5a.180x"
+      it "can compute multi-node topologies for stranger allocations" do
+        expect(vm).to receive(:product).and_return(described_class::Product.new("bogus", 90)).at_least(:once)
         expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:15:3:2")
       end
     end

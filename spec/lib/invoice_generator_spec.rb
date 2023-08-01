@@ -8,7 +8,7 @@ RSpec.describe InvoiceGenerator do
       resource_id: vm.id,
       resource_name: vm.name,
       span: span,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.line, vm.location).id,
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location).id,
       amount: vm.product.cores
     )
   end
@@ -16,7 +16,7 @@ RSpec.describe InvoiceGenerator do
   def check_invoice_for_single_vm(invoices, project, vm, duration)
     expect(invoices.count).to eq(1)
 
-    br = BillingRate.from_resource_properties("VmCores", vm.product.line, vm.location)
+    br = BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location)
     cost = (vm.product.cores * (duration / 60) * br.unit_price)
     expect(invoices.first).to eq({
       project_id: project.id,
@@ -27,7 +27,7 @@ RSpec.describe InvoiceGenerator do
         line_items: [{
           location: br.location,
           resource_type: "VmCores",
-          resource_family: vm.product.line,
+          resource_family: vm.product.prefix,
           amount: vm.product.cores,
           cost: cost
         }],
@@ -41,7 +41,7 @@ RSpec.describe InvoiceGenerator do
     Account.create_with_id(email: "auth1@example.com")
     Project.create_with_id(name: "cool-project", provider: "hetzner")
   }
-  let(:vm1) { Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", size: "c5a.2x", location: "hetzner-hel1", boot_image: "x") }
+  let(:vm1) { Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", size: "standard-2", location: "hetzner-hel1", boot_image: "x") }
 
   let(:day) { 60 * 60 * 24 }
   let(:begin_time) { Time.parse("2023-06-01") }

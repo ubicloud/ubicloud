@@ -9,7 +9,7 @@ require "base64"
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :refresh_mesh, :start_after_host_reboot
 
-  def self.assemble(public_key, project_id, name: nil, size: "m5a.2x",
+  def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_size_gib: 20, storage_encrypted: true,
     enable_ip4: false)
@@ -93,7 +93,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id: project_id,
         resource_id: vm.id,
         resource_name: vm.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.line, location).id,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, location).id,
         amount: vm.product.cores
       )
 

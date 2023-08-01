@@ -38,41 +38,42 @@ class Vm < Sequel::Model
     assigned_vm_address&.ip
   end
 
-  Product = Struct.new(:line, :cores)
+  Product = Struct.new(:prefix, :cores) do |klass|
+    klass.define_singleton_method :parse do |s|
+      fail "BUG: cannot parse product" unless s =~ /\A(\w+)-(\d+)\z/
+      prefix = $1
+      two_times_cores = Integer($2)
+
+      fail "BUG: unrecognized product prefix" unless prefix == "standard"
+      fail "BUG: unrecognized product scale" unless [2, 4, 8, 16].include? two_times_cores
+
+      # Define suffix integer as 2 * numcores. This coincides with
+      # SMT-enabled x86 processors, to give people the right idea if
+      # they compare the product code integer to the preponderance of
+      # spec sheets on the web.
+      #
+      # With non-SMT processors, maybe we'll keep it that way too,
+      # even though it doesn't describe any attribute about the
+      # processor.  But, it does allow "standard-2" is compared to
+      # another "standard-2" variant regardless of SMT,
+      # e.g. "standard-2-arm", instead of making people interpreting
+      # the code adjust the scale factor to do the comparison
+      # themselves.
+      #
+      # Another weakness of this approach, besides it being indirect
+      # in description of non-SMT processors, is having "standard-2"
+      # be the smallest unit of product is also noisier than
+      # "standard-1".
+      new(prefix, two_times_cores / 2)
+    end
+  end
 
   def product
-    return @product if @product
-    fail "BUG: cannot parse vm size" unless size =~ /\A(.*)\.(\d+)x\z/
-    line = $1
-
-    # YYY: Hack to deal with the presentation currently being in
-    # "vcpu" which has a pretty specific meaning being ambigious to
-    # threads or actual cores.
-    #
-    # The presentation is currently helpful because our bare metal
-    # sizes are quite small, supporting only 1, 2, 3 cores (reserving
-    # one for ourselves) and 2, 4, 6 vcpu.  So the product line is
-    # ambiguous as to whether it's ordinal or descriptive (it's
-    # descriptive).  To convey the right thing in demonstration, use
-    # vcpu counts.  It would have been nice to have gotten bigger
-    # hardware in time to avoid that and standardize on cores.
-    #
-    # As an aside, although we probably want to reserve a core an I/O
-    # process of some kind (e.g. SPDK, reserving the entire memory
-    # quota for it may be overkill.
-    cores = Integer($2) / 2
-    @product = Product.new(line, cores)
+    @product ||= Product.parse(size)
   end
 
   def mem_gib_ratio
-    @mem_gib_ratio ||= case product.line
-    when "m5a"
-      4
-    when "c5a"
-      2
-    else
-      fail "BUG: unrecognized product line"
-    end
+    8
   end
 
   def mem_gib
