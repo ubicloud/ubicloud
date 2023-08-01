@@ -27,6 +27,7 @@ gem "pry"
 gem "excon"
 gem "jwt"
 gem "pagerduty", ">= 4.0"
+gem "stripe"
 gem "countries"
 
 group :development do

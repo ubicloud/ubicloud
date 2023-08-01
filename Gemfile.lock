@@ -223,6 +223,7 @@ GEM
     standard-performance (1.1.2)
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.18.0)
+    stripe (8.6.0)
     syntax_tree (6.1.1)
       prettier_print (>= 1.2.0)
     tilt (2.2.0)
@@ -286,6 +287,7 @@ DEPENDENCIES
   sequel_pg (>= 1.8)
   simplecov
   standard (>= 1.24.3)
+  stripe
   tilt (>= 2.0.9)
   warning
   webmock

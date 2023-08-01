@@ -1,0 +1,198 @@
+<% @page_title = "Project Billing" %>
+
+<% if @billing_info_data %>
+  <div class="space-y-1">
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: @project_data[:path],
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
+      }
+    ) %>
+    <%== render("components/page_header", locals: { title: "Project Billing" }) %>
+  </div>
+
+  <div class="grid gap-6">
+    <!-- Billing Info Update Card -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
+        <%== csrf_tag("#{@project_data[:path]}/billing") %>
+
+        <div class="px-4 py-5 sm:p-6">
+          <div class="space-y-12">
+            <div>
+              <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-8">
+                <div class="sm:col-span-4">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "name",
+                      label: "Billing Name",
+                      value: @billing_info_data[:name],
+                      attributes: {
+                        required: true,
+                        placeholder: "Individual or Company Name"
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="sm:col-span-4">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "email",
+                      label: "Billing Email",
+                      value: @billing_info_data[:email],
+                      attributes: {
+                        required: true,
+                        placeholder: "Billing Email"
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="sm:col-span-4 md:col-span-2">
+                  <%== render(
+                    "components/form/country_select",
+                    locals: {
+                      selected: @billing_info_data[:country],
+                      attributes: {
+                        required: true
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="sm:col-span-4 md:col-span-2">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "state",
+                      label: "State",
+                      value: @billing_info_data[:state],
+                      attributes: {
+                        placeholder: "State"
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="sm:col-span-4 md:col-span-2">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "city",
+                      label: "City",
+                      value: @billing_info_data[:city],
+                      attributes: {
+                        placeholder: "City"
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="sm:col-span-4 md:col-span-2">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "postal_code",
+                      label: "Postal Code",
+                      value: @billing_info_data[:postal_code],
+                      attributes: {
+                        placeholder: "Postal Code"
+                      }
+                    }
+                  ) %>
+                </div>
+                <div class="col-span-full">
+                  <%== render(
+                    "components/form/textarea",
+                    locals: {
+                      name: "address",
+                      label: "Address",
+                      value: @billing_info_data[:address],
+                      attributes: {
+                        required: true
+                      }
+                    }
+                  ) %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-4 py-5 sm:p-6">
+          <div class="flex items-center justify-end gap-x-6">
+            <%== render("components/form/submit_button", locals: { text: "Update" }) %>
+          </div>
+        </div>
+      </form>
+    </div>
+    <!-- Payment Methods Card -->
+    <div>
+      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Payment Methods
+          </h3>
+        </div>
+        <div class="mt-4 flex md:ml-4 md:mt-0">
+          <a
+            href="<%= @project_data[:path] %>/billing/payment-method/create"
+            class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
+          >
+            Add Payment Method
+          </a>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-gray-300">
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <% if @payment_methods.count > 0 %>
+              <% @payment_methods.each do |pm| %>
+                <tr id="payment-method-<%= pm[:ubid]%>">
+                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                    <%= pm[:brand].capitalize %>
+                    ending in
+                    <%= pm[:last4] %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    Expires
+                    <%= pm[:exp_month] %>/<%= pm[:exp_year] %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex justify-end">
+                    <button
+                      type="button"
+                      data-url="<%= @project_data[:path] + "/billing/payment-method/" + pm[:ubid] %>?project_id=<%= @project.ubid %>"
+                      data-csrf="<%= csrf_token(@project_data[:path] + "/billing/payment-method/" + pm[:ubid], "DELETE") %>"
+                      data-confirmation="<%= pm[:last4] %>"
+                      data-redirect="<%= request.path %>"
+                      class="delete-btn inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              <% end %>
+            <% else %>
+              <tr>
+                <td colspan="2"><div class="text-center text-xl p-4">No payment methods. Add new payment method to able create resources in project.</div></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<% else %>
+  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
+    <%== csrf_tag("#{@project_data[:path]}/billing") %>
+
+    <%== render(
+      "components/empty_state",
+      locals: {
+        icon: "hero-banknotes",
+        title: "No billing information",
+        description: "Get started by adding new billing information.",
+        button_title: "Add new billing information"
+      }
+    ) %>
+  </form>
+<% end %>

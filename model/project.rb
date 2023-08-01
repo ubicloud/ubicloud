@@ -5,6 +5,7 @@ require_relative "../model"
 class Project < Sequel::Model
   one_to_many :access_tags
   one_to_many :access_policies
+  one_to_one :billing_info, key: :id, primary_key: :billing_info_id
 
   many_to_many :vms, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :private_subnets, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
