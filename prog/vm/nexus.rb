@@ -20,7 +20,7 @@ class Prog::Vm::Nexus < Prog::Base
     end
     Validation.validate_location(location, project&.provider)
 
-    ubid = UBID.generate(UBID::TYPE_VM)
+    ubid = Vm.generate_ubid
     name ||= Vm.ubid_to_name(ubid)
 
     Validation.validate_name(name)

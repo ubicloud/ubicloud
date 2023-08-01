@@ -152,7 +152,7 @@ end
   def bud(prog, new_frame = nil, label = "start")
     new_frame = (new_frame || {}).merge("subject_id" => @subject_id)
     strand.add_child(
-      id: UBID.generate(UBID::TYPE_STRAND).to_uuid,
+      id: Strand.generate_uuid,
       prog: Strand.prog_verify(prog),
       label: label,
       stack: Sequel.pg_jsonb_wrap([new_frame])

@@ -14,7 +14,7 @@ RSpec.describe Prog::Vm::Nexus do
   let(:vm) {
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
     Vm.new(size: "m5a.2x").tap {
-      _1.id = UBID.generate(UBID::TYPE_VM).to_uuid
+      _1.id = Vm.generate_uuid
       _1.vm_storage_volumes.append(disk)
       disk.vm = _1
     }

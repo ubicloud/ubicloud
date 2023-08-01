@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe Strand do
   let(:st) {
-    described_class.new(id: UBID.generate(UBID::TYPE_STRAND).to_uuid,
+    described_class.new(id: described_class.generate_uuid,
       prog: "Test",
       label: "start")
   }

@@ -77,8 +77,16 @@ module ResourceMethods
       Object.const_get("UBID::TYPE_#{ClassMethods.uppercase_underscore(name)}")
     end
 
+    def generate_ubid
+      UBID.generate(ubid_type)
+    end
+
+    def generate_uuid
+      generate_ubid.to_uuid
+    end
+
     def create_with_id(*args, **kwargs)
-      create(*args, **kwargs) { _1.id = UBID.generate(ubid_type).to_uuid }
+      create(*args, **kwargs) { _1.id = generate_uuid }
     end
   end
 end

@@ -9,7 +9,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       fail "No existing project"
     end
 
-    ubid = UBID.generate(UBID::TYPE_PRIVATE_SUBNET)
+    ubid = PrivateSubnet.generate_ubid
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
