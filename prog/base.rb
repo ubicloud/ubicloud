@@ -165,11 +165,10 @@ end
   end
 
   def reap
-    exited_children = strand.children_dataset.where(Sequel.~(exitval: nil))
-    exited_children_count = exited_children.count
-    exited_children.destroy
-    # Clear cache if anything was deleted.
-    strand.associations.delete(:children) if exited_children_count > 0
+    strand.children_dataset.where(Sequel.~(exitval: nil)).returning.delete(force: true).tap {
+      # Clear cache if anything was deleted.
+      strand.associations.delete(:children) unless _1.empty?
+    }
   end
 
   def leaf?
