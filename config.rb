@@ -75,4 +75,5 @@ module Config
   optional :hetzner_password, string, clear: true
   override :providers, "hetzner", array(string)
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
+  override :managed_service, false, bool
 end
