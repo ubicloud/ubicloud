@@ -8,9 +8,24 @@ class IpsecTunnel < Sequel::Model
 
   include ResourceMethods
 
+  def cmd_src_nic(cmd)
+    src_nic.vm.vm_host.sshable.cmd(cmd)
+  end
+
+  def cmd_dst_nic(cmd)
+    dst_nic.vm.vm_host.sshable.cmd(cmd)
+  end
+
   def refresh
     create_ipsec_tunnel
     create_private_routes
+  end
+
+  def add_new_state
+    spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
+    spi4 = "0x" + SecureRandom.bytes(4).unpack1("H*")
+
+    src_nic.vm.vm_host.sshable.cmd("")
   end
 
   def create_ipsec_tunnel
@@ -30,7 +45,7 @@ class IpsecTunnel < Sequel::Model
     key = src_nic.encryption_key
 
     # setup source ipsec tunnels
-    src_nic.vm.vm_host.sshable.cmd("sudo bin/setup-ipsec " \
+    cmd_src_nic("sudo bin/setup-ipsec " \
       "#{src_namespace} #{src_clover_ephemeral} " \
       "#{dst_clover_ephemeral} #{src_private_addr_6} " \
       "#{dst_private_addr_6} #{src_private_addr_4} " \
@@ -38,7 +53,7 @@ class IpsecTunnel < Sequel::Model
       "#{spi} #{spi4} #{key}")
 
     # setup destination ipsec tunnels
-    dst_nic.vm.vm_host.sshable.cmd("sudo bin/setup-ipsec " \
+    cmd_dst_nic("sudo bin/setup-ipsec " \
       "#{dst_namespace} #{src_clover_ephemeral} " \
       "#{dst_clover_ephemeral} #{src_private_addr_6} " \
       "#{dst_private_addr_6} #{src_private_addr_4} " \
@@ -58,7 +73,7 @@ class IpsecTunnel < Sequel::Model
 
   def create_private_routes
     [dst_nic.private_ipv6, dst_nic.private_ipv4].each do |dst_ip|
-      src_nic.vm.vm_host.sshable.cmd("sudo ip -n #{vm_name(src_nic)} route replace #{dst_ip.to_s.shellescape} dev vethi#{vm_name(src_nic)}")
+      cmd_src_nic("sudo ip -n #{vm_name(src_nic)} route replace #{dst_ip.to_s.shellescape} dev vethi#{vm_name(src_nic)}")
     end
   end
 end

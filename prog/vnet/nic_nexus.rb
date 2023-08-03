@@ -63,7 +63,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   def rekey_nics
     nic.src_ipsec_tunnels.each do |tunnel|
-      bud Prog::Vnet::RekeyTunnel, tunnel.id
+      bud Prog::Vnet::RekeyTunnel
     end
     hop :wait_rekey_nics
   end
