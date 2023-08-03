@@ -2,6 +2,7 @@
 
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
+  semaphore :reboot
 
   def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil)
     DB.transaction do
@@ -104,6 +105,55 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def wait
+    when_reboot_set? do
+      hop :reboot
+    end
+
     nap 30
+  end
+
+  def reboot
+    boot_id = get_boot_id
+    vm_host.update(last_boot_id: boot_id)
+
+    vm_host.vms.each { |vm|
+      vm.update(display_state: "rebooting")
+    }
+
+    sshable.cmd("sudo systemctl reboot")
+
+    decr_reboot
+
+    hop :wait_reboot
+  end
+
+  def wait_reboot
+    begin
+      sshable.cmd("echo 1")
+    rescue
+      nap 15
+    end
+
+    hop :verify_boot_id_changed
+  end
+
+  def verify_boot_id_changed
+    boot_id = get_boot_id
+    raise "reboot failed" if boot_id == vm_host.last_boot_id
+    vm_host.update(last_boot_id: boot_id)
+
+    hop :start_vms
+  end
+
+  def start_vms
+    vm_host.vms.each { |vm|
+      vm.incr_start_after_host_reboot
+    }
+
+    hop :wait
+  end
+
+  def get_boot_id
+    sshable.cmd("cat /proc/sys/kernel/random/boot_id").strip
   end
 end

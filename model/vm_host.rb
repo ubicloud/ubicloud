@@ -12,6 +12,8 @@ class VmHost < Sequel::Model
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
 
   include ResourceMethods
+  include SemaphoreMethods
+  semaphore :reboot
 
   def host_prefix
     net6.netmask.prefix_len

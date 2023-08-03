@@ -201,4 +201,63 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.wait }.to nap(30)
     end
   end
+
+  describe "host reboot" do
+    let(:vms) { [instance_double(Vm), instance_double(Vm)] }
+    let(:vm_host) {
+      host = instance_double(VmHost)
+      allow(host).to receive(:vms).and_return(vms)
+      host
+    }
+    let(:sshable) { instance_double(Sshable) }
+
+    before do
+      allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+    end
+
+    it "reboot transitions to wait_reboot" do
+      expect(nx).to receive(:get_boot_id).and_return("xyz")
+      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
+      expect(vms).to all receive(:update).with(display_state: "rebooting")
+      expect(sshable).to receive(:cmd).with("sudo systemctl reboot")
+      expect(nx).to receive(:hop).with(:wait_reboot)
+      expect(nx).to receive(:decr_reboot)
+      nx.reboot
+    end
+
+    it "wait_reboot naps if ssh fails" do
+      expect(sshable).to receive(:cmd).with("echo 1").and_raise("not connected")
+      expect { nx.wait_reboot }.to nap(15)
+    end
+
+    it "wait_reboot transitions to verify_boot_id_changed if ssh succeeds" do
+      expect(sshable).to receive(:cmd).with("echo 1").and_return("1")
+      expect { nx.wait_reboot }.to hop("verify_boot_id_changed")
+    end
+
+    it "verify_boot_id_changed hops to start_vms if successful" do
+      expect(nx).to receive(:get_boot_id).and_return("xyz")
+      expect(vm_host).to receive(:last_boot_id).and_return("abc")
+      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
+      expect(nx).to receive(:hop).with(:start_vms)
+      nx.verify_boot_id_changed
+    end
+
+    it "verify_boot_id_changed fails if boot_id hasn't changed" do
+      expect(nx).to receive(:get_boot_id).and_return("abc")
+      expect(vm_host).to receive(:last_boot_id).and_return("abc")
+      expect { nx.verify_boot_id_changed }.to raise_error RuntimeError, "reboot failed"
+    end
+
+    it "start_vms starts vms & hops to wait" do
+      expect(vms).to all receive(:incr_start_after_host_reboot)
+      expect(nx).to receive(:hop).with(:wait)
+      nx.start_vms
+    end
+
+    it "can get boot id" do
+      expect(sshable).to receive(:cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("xyz\n")
+      expect(nx.get_boot_id).to eq("xyz")
+    end
+  end
 end
