@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::Vnet::NicNexus < Prog::Base
-  semaphore :destroy, :refresh_mesh, :detach_vm
+  semaphore :destroy, :refresh_mesh, :detach_vm, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger
 
   def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil)
     unless (subnet = PrivateSubnet[private_subnet_id])
@@ -41,7 +41,59 @@ class Prog::Vnet::NicNexus < Prog::Base
       hop :detach_vm
     end
 
+    when_start_rekey_set? do
+      hop :start_rekey
+    end
+
     nap 30
+  end
+
+  def start_rekey
+    bud Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
+    hop :wait_rekey_inbound
+  end
+
+  def wait_rekey_inbound
+    reap
+    if leaf?
+      decr_start_rekey
+      hop :wait_rekey_outbound_trigger
+    end
+    donate
+  end
+
+  def wait_rekey_outbound_trigger
+    when_trigger_outbound_update_set? do
+      bud Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
+      hop :wait_rekey_outbound
+    end
+    donate
+  end
+
+  def wait_rekey_outbound
+    reap
+    if leaf?
+      decr_trigger_outbound_update
+      hop :wait_rekey_old_state_drop_trigger
+    end
+    donate
+  end
+
+  def wait_rekey_old_state_drop_trigger
+    when_old_state_drop_trigger_set? do
+      bud Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
+      hop :wait_rekey_old_state_drop
+    end
+    donate
+  end
+
+  def wait_rekey_old_state_drop
+    reap
+    if leaf?
+      decr_old_state_drop_trigger
+      hop :wait
+    end
+    donate
   end
 
   def refresh_mesh

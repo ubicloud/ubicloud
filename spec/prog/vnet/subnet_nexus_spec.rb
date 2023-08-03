@@ -64,6 +64,20 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
+  describe ".gen_spi" do
+    it "generates a random spi" do
+      expect(SecureRandom).to receive(:bytes).with(4).and_return("e3af3a04")
+      expect(nx.gen_spi).to eq("0x6533616633613034")
+    end
+  end
+
+  describe ".gen_reqid" do
+    it "generates a random reqid" do
+      expect(SecureRandom).to receive(:random_number).with(100000).and_return(10)
+      expect(nx.gen_reqid).to eq(11)
+    end
+  end
+
   describe "#wait" do
     it "hops to destroy if when_destroy_set?" do
       expect(nx).to receive(:when_destroy_set?).and_yield
@@ -80,10 +94,112 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       }.to hop("refresh_mesh")
     end
 
+    it "hops to refresh_keys if when_refresh_keys_set?" do
+      expect(nx).to receive(:when_refresh_keys_set?).and_yield
+      expect(ps).to receive(:update).with(state: "refreshing_keys").and_return(true)
+      expect {
+        nx.wait
+      }.to hop("refresh_keys")
+    end
+
     it "naps if nothing to do" do
       expect {
         nx.wait
       }.to nap(30)
+    end
+  end
+
+  describe "#refresh_keys" do
+    let(:nic) {
+      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133")
+    }
+
+    it "refreshes keys and hops to wait_refresh_keys" do
+      expect(ps).to receive(:nics).and_return([nic]).twice
+      expect(nx).to receive(:gen_spi).and_return("0xe3af3a04").twice
+      expect(nx).to receive(:gen_reqid).and_return(86879)
+      expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819")
+      expect(nic).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
+        {
+          spi4: "0xe3af3a04",
+          spi6: "0xe3af3a04",
+          reqid: 86879
+        }).and_return(true)
+      expect(nic).to receive(:incr_start_rekey).and_return(true)
+      expect {
+        nx.refresh_keys
+      }.to hop("wait_inbound_setup")
+    end
+  end
+
+  describe "#wait_inbound_setup" do
+    let(:nic) {
+      st = instance_double(Strand, label: "start")
+      instance_double(Nic, strand: st)
+    }
+
+    it "donates if state creation is ongoing" do
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_inbound_setup }.to nap(0)
+    end
+
+    it "hops to wait_policy_updated if state creation is done" do
+      expect(nic.strand).to receive(:label).and_return("wait_rekey_outbound_trigger")
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:incr_trigger_outbound_update).and_return(true)
+      expect {
+        nx.wait_inbound_setup
+      }.to hop("wait_outbound_setup")
+    end
+  end
+
+  describe "#wait_outbound_setup" do
+    let(:nic) {
+      st = instance_double(Strand, label: "wait_rekey_outbound")
+      instance_double(Nic, strand: st)
+    }
+
+    it "donates if policy update is ongoing" do
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_outbound_setup }.to nap(0)
+    end
+
+    it "hops to wait_state_dropped if policy update is done" do
+      expect(nic.strand).to receive(:label).and_return("wait_rekey_old_state_drop_trigger")
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:incr_old_state_drop_trigger).and_return(true)
+      expect {
+        nx.wait_outbound_setup
+      }.to hop("wait_old_state_drop")
+    end
+  end
+
+  describe "#wait_old_state_drop" do
+    let(:nic) {
+      st = instance_double(Strand, label: "wait_rekey_old_state_drop")
+      instance_double(Nic, strand: st)
+    }
+
+    it "donates if policy update is ongoing" do
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_old_state_drop }.to nap(0)
+    end
+
+    it "hops to wait if all is done" do
+      expect(nic.strand).to receive(:label).and_return("wait")
+      expect(ps).to receive(:update).with(state: "waiting").and_return(true)
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
+      expect(nx).to receive(:decr_refresh_keys).and_return(true)
+      expect {
+        nx.wait_old_state_drop
+      }.to hop("wait")
     end
   end
 
