@@ -13,11 +13,11 @@ def dev_project
   ac.projects.first || ac.create_project_with_default_policy("default")
 end
 
+def udec(*args)
+  UBID.decode(*args)
+end
+
 $0 = "clover-#{ENV["RACK_ENV"]}"
 opts = Pry::CLI.parse_options
 Pry.config.prompt_name = $0
 Pry::CLI.start(opts)
-
-def udec(*args)
-  UBID.decode(*args)
-end
