@@ -46,7 +46,10 @@ class Prog::Test < Prog::Base
   end
 
   def reaper
-    reap
+    # below loop is only for ensuring we are able to process reaped strands
+    reap.each do |st|
+      st.fetch(:exitval)
+    end
     donate
   end
 
