@@ -480,6 +480,8 @@ RSpec.describe Prog::Vm::Nexus do
       )
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm[0-9a-z]+/)
       expect(nx).to receive(:incr_refresh_mesh)
+      expect(vm).to receive(:update).with(display_state: "starting")
+      expect(vm).to receive(:update).with(display_state: "running")
 
       expect { nx.start_after_host_reboot }.to hop("wait")
     end
