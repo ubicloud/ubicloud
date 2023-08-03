@@ -36,7 +36,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   include SemaphoreMethods
-  semaphore :destroy, :refresh_mesh
+  semaphore :destroy, :refresh_mesh, :refresh_keys
 
   def self.random_subnet
     PRIVATE_SUBNET_RANGES.sample
