@@ -61,6 +61,20 @@ class Prog::Vnet::NicNexus < Prog::Base
     hop :wait
   end
 
+  def rekey_nics
+    nic.src_ipsec_tunnels.each do |tunnel|
+      bud Prog::Vnet::RekeyTunnel, tunnel.id
+    end
+    hop :wait_rekey_nics
+  end
+
+  def wait_rekey_nics
+    if leaf?
+      hop :wait
+    end
+    donate
+  end
+
   def destroy
     if nic.vm
       fail "Cannot destroy nic with active vm, first clean up the attached resources"
