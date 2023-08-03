@@ -10,7 +10,7 @@ class Nic < Sequel::Model
   one_to_one :strand, key: :id, class: Strand
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :destroy, :refresh_mesh, :detach_vm
+  semaphore :destroy, :refresh_mesh, :detach_vm, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger
 
   plugin :column_encryption do |enc|
     enc.column :encryption_key

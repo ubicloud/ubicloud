@@ -85,6 +85,98 @@ RSpec.describe Prog::Vnet::NicNexus do
         nx.wait
       }.to hop("detach_vm")
     end
+
+    it "hops to start rekey if needed" do
+      expect(nx).to receive(:when_start_rekey_set?).and_yield
+      expect {
+        nx.wait
+      }.to hop("start_rekey")
+    end
+  end
+
+  describe "#rekey" do
+    it "buds rekey with setup_inbound and hops to wait_rekey_inbound" do
+      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound).and_return(true)
+      expect {
+        nx.start_rekey
+      }.to hop("wait_rekey_inbound")
+    end
+
+    it "reaps and donates if setup_inbound is continuing" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect(nx).to receive(:reap).and_return(true)
+      expect(nx).to receive(:donate).and_return(true)
+      nx.wait_rekey_inbound
+    end
+
+    it "reaps and hops to wait_rekey_outbound_trigger if setup_inbound is completed" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect(nx).to receive(:reap).and_return(true)
+      expect(nx).to receive(:decr_start_rekey).and_return(true)
+      expect {
+        nx.wait_rekey_inbound
+      }.to hop("wait_rekey_outbound_trigger")
+    end
+
+    it "if outbound setup is not triggered, just donate" do
+      expect(nx).to receive(:when_trigger_outbound_update_set?).and_return(false)
+      expect(nx).to receive(:donate).and_return(true)
+      nx.wait_rekey_outbound_trigger
+    end
+
+    it "if outbound setup is triggered, hops to setup_outbound" do
+      expect(nx).to receive(:when_trigger_outbound_update_set?).and_yield
+      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound).and_return(true)
+      expect {
+        nx.wait_rekey_outbound_trigger
+      }.to hop("wait_rekey_outbound")
+    end
+
+    it "wait_rekey_outbound reaps and donates if setup_outbound is continuing" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect(nx).to receive(:reap).and_return(true)
+      expect(nx).to receive(:donate).and_return(true)
+      nx.wait_rekey_outbound
+    end
+
+    it "wait_rekey_outbound reaps and hops to wait_rekey_old_state_drop_trigger if setup_outbound is completed" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect(nx).to receive(:reap).and_return(true)
+      expect(nx).to receive(:decr_trigger_outbound_update).and_return(true)
+      expect {
+        nx.wait_rekey_outbound
+      }.to hop("wait_rekey_old_state_drop_trigger")
+    end
+
+    it "wait_rekey_old_state_drop_trigger donates if trigger is not set" do
+      expect(nx).to receive(:when_old_state_drop_trigger_set?).and_return(false)
+      expect(nx).to receive(:donate).and_return(true)
+      nx.wait_rekey_old_state_drop_trigger
+    end
+
+    it "wait_rekey_old_state_drop_trigger hops to wait_rekey_old_state_drop if trigger is set" do
+      expect(nx).to receive(:when_old_state_drop_trigger_set?).and_yield
+      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state).and_return(true)
+      expect {
+        nx.wait_rekey_old_state_drop_trigger
+      }.to hop("wait_rekey_old_state_drop")
+    end
+
+    it "wait_rekey_old_state_drop reaps and donates if drop_old_state is continuing" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect(nx).to receive(:reap).and_return(true)
+      expect(nx).to receive(:donate).and_return(true)
+      nx.wait_rekey_old_state_drop
+    end
+
+    it "wait_rekey_old_state_drop reaps and hops to wait if drop_old_state is completed" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect(nx).to receive(:reap).and_return(true)
+      expect(nx).to receive(:decr_old_state_drop_trigger).and_return(true)
+      expect {
+        nx.wait_rekey_old_state_drop
+      }.to hop("wait")
+    end
   end
 
   describe "#refresh_mesh" do
