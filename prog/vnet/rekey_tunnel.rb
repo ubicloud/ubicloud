@@ -28,8 +28,6 @@ class Prog::Vnet::RekeyTunnel < Prog::Base
     strand.stack.last["dir"] = "fwd"
     bud self.class, strand.stack.last, :setup_state
     
-    puts "STACK IN START: #{strand.stack}"
-
     hop :wait_setups
   end
 
