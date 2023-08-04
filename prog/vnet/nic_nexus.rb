@@ -63,12 +63,19 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   def rekey_nics
     nic.src_ipsec_tunnels.each do |tunnel|
+      strand.stack.last["subject_id"] = tunnel.id
+      puts "STACK IN NIC: #{strand.stack}"
+      
+      # somehow pass tunnel.id
       bud Prog::Vnet::RekeyTunnel
     end
+
+    strand.stack.last["subject_id"] = nic.id
     hop :wait_rekey_nics
   end
 
   def wait_rekey_nics
+    reap
     if leaf?
       hop :wait
     end

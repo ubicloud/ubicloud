@@ -6,112 +6,112 @@ class Prog::Vnet::RekeyTunnel < Prog::Base
   def start
     ipsec_tunnel = nic.src_ipsec_tunnels.first
     outs = ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm policy").split("\n")
-    old_spi = outs[outs.find_index("src 172.26.207.141/32 dst 172.26.207.155/32 ")+3].split(" ")[3]
-    puts "SPI: #{old_spi}"
+    old_spi = outs[outs.find_index("src #{ipsec_tunnel.src_nic.private_ipv4} dst #{ipsec_tunnel.dst_nic.private_ipv4} ")+3].split(" ")[3]
 
     new_spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
     new_key = "0x" + SecureRandom.bytes(36).unpack1("H*")
+    new_reqid = SecureRandom.random_number(100000) + 1
 
-    frame["old_spi"] = old_spi
-    frame["new_spi"] = new_spi
-    frame["new_key"] = new_key
+    strand.stack.last["old_spi"] = old_spi
+    strand.stack.last["new_spi"] = new_spi
+    strand.stack.last["new_key"] = new_key
+    strand.stack.last["new_reqid"] = new_reqid
 
-    bud self.class, frame, :setup_src_end
-    bud self.class, frame, :setup_dst_end
+    bud self.class, strand.stack.last, :setup_src_state
+    bud self.class, strand.stack.last, :setup_dst_state
     
+    puts "STACK IN START: #{strand.stack}"
+
     hop :wait_setups
   end
 
   def wait_setups
-    # reap
-    # hop :delete_policies if leaf?
+    reap
+    hop :drop_old_states if leaf?
     donate
   end
 
-  def setup_src_end
-    puts "srcOLD SPI: #{frame["old_spi"]}"
-    puts "srcNEW SPI: #{frame["new_spi"]}"
-    puts "srcNEW KEY: #{frame["new_key"]}"
-    pop "setup src end"
+  def drop_old_states
+    puts "STACK : #{strand.stack}"
+    ipsec_tunnel = nic.src_ipsec_tunnels.first
+    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm state delete " \
+      "src #{subdivide_network(nic.vm.ephemeral_net6).network} " \
+      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+      "proto esp spi #{strand.stack.last["old_spi"]}")
+
+    ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state delete " \
+      "src #{subdivide_network(nic.vm.ephemeral_net6).network} " \
+      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+      "proto esp spi #{strand.stack.last["old_spi"]}")
+
+    pop "rekeying is complete"
   end
 
-  def setup_dst_end
-    puts "OLD SPI: #{frame["old_spi"]}"
-    puts "NEW SPI: #{frame["new_spi"]}"
-    puts "NEW KEY: #{frame["new_key"]}"
-    pop "setup dst end"
+  def setup_src_state
+    new_spi = strand.stack.last["new_spi"]
+    new_key = strand.stack.last["new_key"]
+    new_reqid = strand.stack.last["new_reqid"]
+
+    ipsec_tunnel = nic.src_ipsec_tunnels.first
+    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(nic)} xfrm state add " \
+      "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+      "proto esp spi #{new_spi} reqid #{new_reqid} mode tunnel " \
+      "aead 'rfc4106(gcm(aes))' #{new_key} 128 " \
+      "sel src 0.0.0.0/0 dst 0.0.0.0/0")
+
+    hop :setup_src_policy
   end
 
-  def delete_policies
+  def setup_src_policy
+    ipsec_tunnel = nic.src_ipsec_tunnels.first
+    new_spi = strand.stack.last["new_spi"]
+    new_reqid = strand.stack.last["new_reqid"]
+
+    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(nic)} xfrm policy update " \
+      "src #{nic.private_ipv4} " \
+      "dst #{ipsec_tunnel.dst_nic.private_ipv4} dir out " \
+      "tmpl src #{subdivide_network(nic.vm.ephemeral_net6).network} " \
+      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+      "spi #{new_spi} proto esp reqid #{new_reqid} mode tunnel")
+
+    pop "setup tunnel src end"
+  end
+
+  def setup_dst_state
+    new_spi = strand.stack.last["new_spi"]
+    new_key = strand.stack.last["new_key"]
+    new_reqid = strand.stack.last["new_reqid"]
+
+    ipsec_tunnel = nic.src_ipsec_tunnels.first
+    ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state add " \
+      "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+      "proto esp spi #{new_spi} reqid #{new_reqid} mode tunnel " \
+      "aead 'rfc4106(gcm(aes))' #{new_key} 128 " \
+      "sel src 0.0.0.0/0 dst 0.0.0.0/0")
+
+    hop :setup_dst_policy
+  end
+
+  def setup_dst_policy
+    ipsec_tunnel = nic.src_ipsec_tunnels.first
+    new_spi = strand.stack.last["new_spi"]
+    new_reqid = strand.stack.last["new_reqid"]
+
+    ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm policy update " \
+      "src #{nic.private_ipv4} " \
+      "dst #{ipsec_tunnel.dst_nic.private_ipv4} dir fwd " \
+      "tmpl src #{subdivide_network(nic.vm.ephemeral_net6).network} " \
+      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+      "spi #{new_spi} proto esp reqid #{new_reqid} mode tunnel")
+
+    pop "setup tunnel dst end"
   end
 
   def subdivide_network(net)
     prefix = net.netmask.prefix_len + 1
     halved = net.resize(prefix)
     halved.next_sib
-  end
-
-  def old_spi
-    @old_spi
-  end
-
-  def create_new_state
-    puts "OLD SPI: #{old_spi}"
-    donate
-
-    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm state add " \
-    "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6)} " \
-    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6)} " \
-    "proto esp spi #{new_spi} reqid #{SecureRandom.random_number(10)} mode tunnel " \
-    "aead 'rfc4106(gcm(aes))' #{new_key} 128")
-
-  ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state add " \
-    "src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6)} " \
-    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6)} " \
-    "proto esp spi #{new_spi} reqid #{SecureRandom.random_number(10)} mode tunnel " \
-    "aead 'rfc4106(gcm(aes))' #{new_key} 128")
-
-    puts "HELLLOOOO"
-  ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm policy add " \
-    "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-    "tmpl src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-    "proto esp spi #{new_spi} mode tunnel reqid #{SecureRandom.random_number(10)} dir out")
-puts "HEETETET"
-  ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm policy add " \
-    "src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-    "tmpl src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-    "proto esp spi #{new_spi} mode tunnel reqid #{SecureRandom.random_number(10)} dir fwd")
-
-  ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm state delete" \
-    " src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-    "proto esp spi #{old_spi} reqid 1 mode tunnel ")
-
-  ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state delete" \
-    " src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-    "proto esp spi #{old_spi} reqid 1 mode tunnel ")
-
-
-    hop :create_new_policy
-  end
-
-  def create_new_policy
-    ipsec_tunnel.create_new_policy
-    hop :delete_old_state
-  end
-
-  def delete_old_state
-    ipsec_tunnel.delete_old_state
-    hop :delete_old_policy
-  end
-
-  def delete_old_policy
-    ipsec_tunnel.delete_old_policy
-    pop "rekeyed tunnel"
   end
 end
