@@ -33,6 +33,9 @@ gem "stripe"
 gem "countries"
 gem "octokit"
 gem "argon2-kdf"
+gem "rodauth-omniauth", "~> 0.3.4"
+gem "omniauth-github", "~> 2.0"
+gem "omniauth-google-oauth2", "~> 1.2"
 
 group :development do
   gem "awesome_print"
@@ -80,3 +83,4 @@ gem "acme-client", "~> 2.0"
 gem "prawn", "~> 2.5"
 
 gem "prawn-table", "~> 0.2.2"
+

@@ -371,4 +371,44 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_content("project has some resources. Delete all related resources first")
     end
   end
+
+  describe "social login" do
+    before do
+      OmniAuth.config.logger = Logger.new(IO::NULL)
+      expect(Config).to receive(:omniauth_github_id).and_return("12345").at_least(:once)
+      OmniAuth.config.test_mode = true
+      OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(
+        provider: "github",
+        uid: "123456790",
+        info: {
+          name: "John Doe",
+          email: TEST_USER_EMAIL
+        }
+      )
+    end
+
+    it "can create new account" do
+      visit "/login"
+      click_button "GitHub"
+
+      user = Account[email: TEST_USER_EMAIL]
+      expect(user).not_to be_nil
+      expect(DB[:account_identities].first(account_id: user.id, provider: "github", uid: "123456790")).not_to be_nil
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - #{user.projects.first.name} Dashboard")
+    end
+
+    it "can login existing account" do
+      user = create_account
+      DB[:account_identities].insert(account_id: user.id, provider: "github", uid: "123456790")
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account.count).to eq(1)
+      expect(DB[:account_identities].count).to eq(1)
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - #{user.projects.first.name} Dashboard")
+    end
+  end
 end
