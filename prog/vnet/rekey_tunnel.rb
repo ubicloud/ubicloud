@@ -12,44 +12,37 @@ class Prog::Vnet::RekeyTunnel < Prog::Base
     new_spi = "0x" + SecureRandom.bytes(4).unpack1("H*")
     new_key = "0x" + SecureRandom.bytes(36).unpack1("H*")
 
-    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm state add " \
-      "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6)} " \
-      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6)} " \
-      "proto esp spi #{new_spi} reqid #{SecureRandom.random_number(10)} mode tunnel " \
-      "aead 'rfc4106(gcm(aes))' #{new_key} 128")
+    frame["old_spi"] = old_spi
+    frame["new_spi"] = new_spi
+    frame["new_key"] = new_key
 
-    ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state add " \
-      "src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6)} " \
-      "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6)} " \
-      "proto esp spi #{new_spi} reqid #{SecureRandom.random_number(10)} mode tunnel " \
-      "aead 'rfc4106(gcm(aes))' #{new_key} 128")
+    bud self.class, frame, :setup_src_end
+    bud self.class, frame, :setup_dst_end
+    
+    hop :wait_setups
+  end
 
-      puts "HELLLOOOO"
-    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm policy add " \
-      "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-      "tmpl src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-      "proto esp spi #{new_spi} mode tunnel reqid #{SecureRandom.random_number(10)} dir out")
-puts "HEETETET"
-    ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm policy add " \
-      "src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-      "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-      "tmpl src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-      "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-      "proto esp spi #{new_spi} mode tunnel reqid #{SecureRandom.random_number(10)} dir fwd")
+  def wait_setups
+    # reap
+    # hop :delete_policies if leaf?
+    donate
+  end
 
-    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm state delete" \
-      " src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-      "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-      "proto esp spi #{old_spi} reqid 1 mode tunnel ")
+  def setup_src_end
+    puts "srcOLD SPI: #{frame["old_spi"]}"
+    puts "srcNEW SPI: #{frame["new_spi"]}"
+    puts "srcNEW KEY: #{frame["new_key"]}"
+    pop "setup src end"
+  end
 
-    ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state delete" \
-      " src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
-      "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
-      "proto esp spi #{old_spi} reqid 1 mode tunnel ")
+  def setup_dst_end
+    puts "OLD SPI: #{frame["old_spi"]}"
+    puts "NEW SPI: #{frame["new_spi"]}"
+    puts "NEW KEY: #{frame["new_key"]}"
+    pop "setup dst end"
+  end
 
-    hop :create_new_state
+  def delete_policies
   end
 
   def subdivide_network(net)
@@ -65,6 +58,45 @@ puts "HEETETET"
   def create_new_state
     puts "OLD SPI: #{old_spi}"
     donate
+
+    ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm state add " \
+    "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6)} " \
+    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6)} " \
+    "proto esp spi #{new_spi} reqid #{SecureRandom.random_number(10)} mode tunnel " \
+    "aead 'rfc4106(gcm(aes))' #{new_key} 128")
+
+  ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state add " \
+    "src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6)} " \
+    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6)} " \
+    "proto esp spi #{new_spi} reqid #{SecureRandom.random_number(10)} mode tunnel " \
+    "aead 'rfc4106(gcm(aes))' #{new_key} 128")
+
+    puts "HELLLOOOO"
+  ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm policy add " \
+    "src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+    "tmpl src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+    "proto esp spi #{new_spi} mode tunnel reqid #{SecureRandom.random_number(10)} dir out")
+puts "HEETETET"
+  ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm policy add " \
+    "src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+    "tmpl src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+    "proto esp spi #{new_spi} mode tunnel reqid #{SecureRandom.random_number(10)} dir fwd")
+
+  ipsec_tunnel.cmd_src_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.src_nic)} xfrm state delete" \
+    " src #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+    "dst #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+    "proto esp spi #{old_spi} reqid 1 mode tunnel ")
+
+  ipsec_tunnel.cmd_dst_nic("sudo ip -n #{ipsec_tunnel.vm_name(ipsec_tunnel.dst_nic)} xfrm state delete" \
+    " src #{subdivide_network(ipsec_tunnel.dst_nic.vm.ephemeral_net6).network} " \
+    "dst #{subdivide_network(ipsec_tunnel.src_nic.vm.ephemeral_net6).network} " \
+    "proto esp spi #{old_spi} reqid 1 mode tunnel ")
+
+
     hop :create_new_policy
   end
 
