@@ -96,18 +96,9 @@ class Prog::Vm::HostNexus < Prog::Base
   def wait_setup_spdk
     reap
     if leaf?
-      vm_host.update(allocation_state: "accepting")
-      hop :wait
-    end
-    donate
-  end
-
-  def wait
-    when_reboot_set? do
       hop :reboot
     end
-
-    nap 30
+    donate
   end
 
   def reboot
@@ -140,6 +131,37 @@ class Prog::Vm::HostNexus < Prog::Base
     raise "reboot failed" if boot_id == vm_host.last_boot_id
     vm_host.update(last_boot_id: boot_id)
 
+    hop :verify_spdk
+  end
+
+  def verify_spdk
+    is_active = sshable.cmd("systemctl is-active spdk.service").strip
+    fail "SPDK failed to start" unless is_active == "active"
+
+    hop :verify_hugepages
+  end
+
+  def verify_hugepages
+    host_meminfo = sshable.cmd("cat /proc/meminfo")
+    fail "Couldn't set hugepage size to 1G" unless host_meminfo.match?(/^Hugepagesize:\s+1048576 kB$/)
+
+    total_hugepages_match = host_meminfo.match(/^HugePages_Total:\s+(\d+)$/)
+    fail "Couldn't extract total hugepage count" unless total_hugepages_match
+
+    free_hugepages_match = host_meminfo.match(/^HugePages_Free:\s+(\d+)$/)
+    fail "Couldn't extract free hugepage count" unless free_hugepages_match
+
+    total_hugepages = Integer(total_hugepages_match.captures.first)
+    free_hugepages = Integer(free_hugepages_match.captures.first)
+
+    total_vm_mem_gib = vm_host.vms.sum { |vm| vm.mem_gib }
+    fail "Not enough hugepages for VMs" unless free_hugepages >= total_vm_mem_gib
+
+    vm_host.update(
+      total_hugepages_1g: total_hugepages,
+      used_hugepages_1g: total_hugepages - free_hugepages + total_vm_mem_gib
+    )
+
     hop :start_vms
   end
 
@@ -148,7 +170,17 @@ class Prog::Vm::HostNexus < Prog::Base
       vm.incr_start_after_host_reboot
     }
 
+    vm_host.update(allocation_state: "accepting")
+
     hop :wait
+  end
+
+  def wait
+    when_reboot_set? do
+      hop :reboot
+    end
+
+    nap 30
   end
 
   def get_boot_id
