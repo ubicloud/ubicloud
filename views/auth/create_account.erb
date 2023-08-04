@@ -34,9 +34,12 @@
     <%== render("components/form/submit_button", locals: { text: "Create Account" }) %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to existing account</a>
   </div>
+</form>
 
-  <% if Config.managed_service %>
-  <div class="flex items-center justify-center">
+<%== render("auth/social_buttons") %>
+
+<% if Config.managed_service %>
+  <div class="flex items-center justify-center mt-6">
     <p class="text-sm text-gray-500 text-center">By signing up you agree to our
       <a
         href="https://ubicloud.com/terms-of-service"
@@ -44,5 +47,4 @@
         class="font-medium text-orange-500 hover:text-orange-600 underline underline-offset-2"
       >terms of service</a>.</p>
   </div>
-  <% end %>
-</form>
+<% end %>

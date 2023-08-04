@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe Clover do
   it "handles CSRF token errors" do
     visit "/login"
-    find("input[name=_csrf]", visible: false).set("")
+    find(".rodauth input[name=_csrf]", visible: false).set("")
     click_button "Sign in"
 
     expect(page.status_code).to eq(400)

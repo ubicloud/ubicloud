@@ -91,7 +91,7 @@ class Clover < Roda
     csp.default_src :none
     csp.style_src :self, "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css"
     csp.img_src :self, "data: image/svg+xml"
-    csp.form_action :self, "https://checkout.stripe.com"
+    csp.form_action :self, "https://checkout.stripe.com", "https://github.com/login/oauth/authorize", "https://accounts.google.com/o/oauth2/auth"
     csp.script_src :self, "https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js", "https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js", "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js", "https://challenges.cloudflare.com/turnstile/v0/api.js"
     csp.frame_src :self, "https://challenges.cloudflare.com"
     csp.connect_src :self
@@ -272,7 +272,7 @@ class Clover < Roda
       :lockout, :login, :logout, :remember, :reset_password,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
-      :otp, :webauthn, :recovery_codes
+      :otp, :webauthn, :recovery_codes, :omniauth
 
     title_instance_variable :@page_title
     check_csrf? false
@@ -345,6 +345,35 @@ class Clover < Roda
       Validation.validate_account_name(account[:name])
     end
     after_create_account do
+      account = Account[account_id]
+      account.create_project_with_default_policy("Default")
+      ProjectInvitation.where(email: account.email).each do |inv|
+        account.associate_with_project(inv.project)
+        if (managed_policy = Authorization::ManagedPolicy.from_name(inv.policy))
+          managed_policy.apply(inv.project, [account], append: true)
+        end
+        inv.destroy
+      end
+    end
+
+    # :nocov:
+    if Config.omniauth_github_id
+      require "omniauth-github"
+      omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret
+    end
+    if Config.omniauth_google_id
+      require "omniauth-google-oauth2"
+      omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: :google
+    end
+    # :nocov:
+
+    before_omniauth_create_account do
+      account[:id] = Account.generate_uuid
+      account[:name] = omniauth_name
+      Validation.validate_account_name(account[:name])
+    end
+
+    after_omniauth_create_account do
       account = Account[account_id]
       account.create_project_with_default_policy("Default")
       ProjectInvitation.where(email: account.email).each do |inv|
