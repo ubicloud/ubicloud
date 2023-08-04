@@ -182,9 +182,7 @@ RSpec.describe Prog::Vm::HostNexus do
       vmh = instance_double(VmHost)
       nx.instance_variable_set(:@vm_host, vmh)
 
-      expect(vmh).to receive(:update).with(allocation_state: "accepting")
-
-      expect { nx.wait_setup_spdk }.to hop("wait")
+      expect { nx.wait_setup_spdk }.to hop("reboot")
     end
 
     it "donates its time if child strands are still running" do
@@ -237,15 +235,8 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "wait_reboot transitions to verify_boot_id_changed if ssh succeeds" do
       expect(sshable).to receive(:cmd).with("echo 1").and_return("1")
-      expect { nx.wait_reboot }.to hop("verify_boot_id_changed")
-    end
-
-    it "verify_boot_id_changed hops to start_vms if successful" do
-      expect(nx).to receive(:get_boot_id).and_return("xyz")
-      expect(vm_host).to receive(:last_boot_id).and_return("abc")
-      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
-      expect(nx).to receive(:hop).with(:start_vms)
-      nx.verify_boot_id_changed
+      expect(nx).to receive(:hop).with(:verify_boot_id_changed)
+      nx.wait_reboot
     end
 
     it "verify_boot_id_changed fails if boot_id hasn't changed" do
@@ -254,15 +245,86 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.verify_boot_id_changed }.to raise_error RuntimeError, "reboot failed"
     end
 
+    it "verify_boot_id_changed hops to verify_spdk if successful" do
+      expect(nx).to receive(:get_boot_id).and_return("xyz")
+      expect(vm_host).to receive(:last_boot_id).and_return("abc")
+      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
+      expect(nx).to receive(:hop).with(:verify_spdk)
+      nx.verify_boot_id_changed
+    end
+
+    it "verify_spdk hops to verify_hugepages if spdk started" do
+      expect(sshable).to receive(:cmd).with("systemctl is-active spdk.service").and_return("active\n")
+      expect(nx).to receive(:hop).with(:verify_hugepages)
+      nx.verify_spdk
+    end
+
+    it "verify_spdk fails if spdk not started" do
+      expect(sshable).to receive(:cmd).with("systemctl is-active spdk.service").and_return("inactive\n")
+      expect { nx.verify_spdk }.to raise_error RuntimeError, "SPDK failed to start"
+    end
+
     it "start_vms starts vms & hops to wait" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
       expect(nx).to receive(:hop).with(:wait)
+      expect(vm_host).to receive(:update).with(allocation_state: "accepting")
       nx.start_vms
     end
 
     it "can get boot id" do
       expect(sshable).to receive(:cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("xyz\n")
       expect(nx.get_boot_id).to eq("xyz")
+    end
+  end
+
+  describe "#verify_hugepages" do
+    let(:vms) {
+      vm1 = instance_double(Vm)
+      vm2 = instance_double(Vm)
+      allow(vm1).to receive(:mem_gib).and_return(1)
+      allow(vm2).to receive(:mem_gib).and_return(2)
+      [vm1, vm2]
+    }
+    let(:vm_host) {
+      host = instance_double(VmHost)
+      allow(host).to receive(:vms).and_return(vms)
+      host
+    }
+    let(:sshable) { instance_double(Sshable) }
+
+    before do
+      allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+    end
+
+    it "fails if hugepagesize!=1G" do
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").and_return("Hugepagesize: 2048 kB\n")
+      expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't set hugepage size to 1G"
+    end
+
+    it "fails if total hugepages couldn't be extracted" do
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").and_return("Hugepagesize: 1048576 kB\n")
+      expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't extract total hugepage count"
+    end
+
+    it "fails if free hugepages couldn't be extracted" do
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5")
+      expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't extract free hugepage count"
+    end
+
+    it "fails if not enough hugepages for VMs" do
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2")
+      expect { nx.verify_hugepages }.to raise_error RuntimeError, "Not enough hugepages for VMs"
+    end
+
+    it "updates vm_host with hugepage stats and hops" do
+      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 4")
+      expect(vm_host).to receive(:update)
+        .with(total_hugepages_1g: 5, used_hugepages_1g: 4)
+      expect(nx).to receive(:hop).with(:start_vms)
+      nx.verify_hugepages
     end
   end
 end
