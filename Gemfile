@@ -30,7 +30,7 @@ gem "pagerduty", ">= 4.0"
 
 group :development do
   gem "brakeman"
-  gem "erb-formatter", github: "fdr/erb-formatter", ref: "5ecacb2cd5544a41de969bc86b57a98523f0ce06"
+  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
   gem "foreman"
   gem "pry-byebug"
   gem "rackup"

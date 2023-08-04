@@ -1,10 +1,10 @@
 GIT
-  remote: https://github.com/fdr/erb-formatter.git
-  revision: 5ecacb2cd5544a41de969bc86b57a98523f0ce06
-  ref: 5ecacb2cd5544a41de969bc86b57a98523f0ce06
+  remote: https://github.com/ubicloud/erb-formatter.git
+  revision: a9ff0001a1eb028e2186b222aeb02b07c04f9808
+  ref: a9ff0001a1eb028e2186b222aeb02b07c04f9808
   specs:
-    erb-formatter (0.4.2)
-      syntax_tree (~> 5.0)
+    erb-formatter (0.4.3)
+      syntax_tree (~> 6.0)
 
 GEM
   remote: https://rubygems.org/
@@ -221,7 +221,7 @@ GEM
     standard-performance (1.1.2)
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.18.0)
-    syntax_tree (5.3.0)
+    syntax_tree (6.1.1)
       prettier_print (>= 1.2.0)
     tilt (2.2.0)
     timeout (0.4.0)
