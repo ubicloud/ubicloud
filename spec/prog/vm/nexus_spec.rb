@@ -12,7 +12,12 @@ RSpec.describe Prog::Vm::Nexus do
 
   let(:st) { Strand.new }
   let(:vm) {
+    kek = StorageKeyEncryptionKey.new(
+      algorithm: "aes-256-gcm", key: "key",
+      init_vector: "iv", auth_data: "somedata"
+    ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
+    disk.key_encryption_key_1 = kek
     Vm.new(size: "m5a.2x").tap {
       _1.id = Vm.generate_uuid
       _1.vm_storage_volumes.append(disk)
@@ -182,7 +187,7 @@ RSpec.describe Prog::Vm::Nexus do
           "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]]
         })
       end
-      expect(sshable).to receive(:cmd).with(/sudo bin\/prepvm/, {stdin: "{\"storage\":{}}"})
+      expect(sshable).to receive(:cmd).with(/sudo bin\/prepvm/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
 
       expect { nx.prep }.to hop("trigger_refresh_mesh")
     end
@@ -376,7 +381,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "can start a vm after reboot" do
       expect(sshable).to receive(:cmd).with(
         /sudo bin\/recreate-unpersisted \/vm\/vm[0-9a-z]+\/prep.json/,
-        {stdin: "{\"storage\":{}}"}
+        {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
       )
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm[0-9a-z]+/)
       expect(nx).to receive(:incr_refresh_mesh)
