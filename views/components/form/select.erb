@@ -2,9 +2,10 @@
 <% label = defined?(label) ? label : nil %>
 <% options = (defined?(options) && options) ? options : {} %>
 <% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
+<% placeholder = defined?(placeholder) ? placeholder : nil %>
 <% error = defined?(error) ? error : flash.dig("errors", name) %>
 <% description = defined?(description) ? description : nil %>
-<% attributes = defined?(attributes) ? attributes : {} %>
+<% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
@@ -18,6 +19,11 @@
     <%= atr_key %>="<%= atr_value %>"
     <% end%>
   >
+    <% if placeholder %>
+      <option value>
+        <%= placeholder %>
+      </option>
+    <% end %>
     <% options.each do |opt_val, opt_text| %>
       <option value="<%= opt_val %>" <%= (opt_val == selected) ? "selected" : "" %>>
         <%= opt_text %>

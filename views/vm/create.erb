@@ -60,9 +60,8 @@
                   locals: {
                     name: "private-subnet-id",
                     label: "Private Subnet",
-                    options: { "": "Create new subnet" }.merge!(@subnets.to_h { |s| [s[:ubid], s[:name]] }),
-                    attributes: {
-                    }
+                    placeholder: "Create new subnet",
+                    options: @subnets.to_h { |s| [s[:ubid], s[:name]] }
                   }
                 ) %>
               </div>
