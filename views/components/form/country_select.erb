@@ -1,0 +1,26 @@
+<% name = (defined?(name) && name) ? name : "country" %>
+<% label = (defined?(label) && label) ? label : "Country" %>
+<% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
+<% error = defined?(error) ? error : flash.dig("errors", name) %>
+<% description = defined?(description) ? description : nil %>
+<% attributes = defined?(attributes) ? attributes : {} %>
+
+<%== render(
+  "components/form/select",
+  locals: {
+    name: name,
+    label: label,
+    selected: selected,
+    placeholder: "Select a Country",
+    options:
+      ISO3166::Country
+        .all
+        .reject { Config.sanctioned_countries.include?(_1.alpha2) }
+        .sort_by(&:common_name)
+        .map { |c| [c.alpha2, c.common_name] }
+        .to_h,
+    error: error,
+    description: description,
+    attributes: attributes
+  }
+) %>
