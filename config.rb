@@ -46,8 +46,10 @@ module Config
   optional :clover_column_encryption_key, base64, clear: true
   optional :pagerduty_key, string, clear: true
 
+  # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
   override :mail_from, (production? ? nil : "dev@example.com"), string
+  # :nocov:
   # Some email services use a secret token for both user and password,
   # so clear them both.
   optional :smtp_user, string, clear: true
@@ -61,7 +63,6 @@ module Config
   override :db_pool, 5, int
   override :deployment, "production", string
   override :force_ssl, true, bool
-  override :app_env, "production", string
   override :port, 3000, int
   override :pretty_json, false, bool
   override :puma_max_threads, 16, int

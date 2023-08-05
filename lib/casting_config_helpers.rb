@@ -66,14 +66,6 @@ module CastingConfigHelpers
     end
   end
 
-  def rack_env
-    if env == "development" || env == "test"
-      "development"
-    else
-      "deployment"
-    end
-  end
-
   private
 
   def cast(value, method)
@@ -86,10 +78,5 @@ module CastingConfigHelpers
     if value.is_a?(TrueClass) || value.is_a?(FalseClass) || value.is_a?(NilClass)
       instance_eval "def #{name}?; !!@#{name} end", __FILE__, __LINE__
     end
-  end
-
-  # This method helps with transition from PLINY_ENV to APP_ENV.
-  def env
-    app_env
   end
 end
