@@ -24,7 +24,7 @@ RSpec.describe Prog::Vm::Nexus do
       disk.vm = _1
     }
   }
-  let(:p) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
+  let(:p) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
     let(:ps) {
@@ -44,6 +44,19 @@ RSpec.describe Prog::Vm::Nexus do
       expect {
         described_class.assemble("some_ssh_key", "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
       }.to raise_error RuntimeError, "No existing project"
+    end
+
+    it "fails if project's provider and location's provider not matched" do
+      expect {
+        described_class.assemble("some_ssh_key", p.id, location: "dp-istanbul-mars")
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
+    end
+
+    it "accepts all locations if project not provided" do
+      expect(Config).to receive(:development?).and_return(true).twice
+      expect {
+        described_class.assemble("some_ssh_key", nil, location: "dp-istanbul-mars")
+      }.to change(Vm, :count).from(0).to(1)
     end
 
     it "creates Subnet and Nic if not passed" do
@@ -123,6 +136,20 @@ RSpec.describe Prog::Vm::Nexus do
       expect {
         described_class.assemble("some_ssh_key", p.id, private_subnet_id: ps.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
+    end
+
+    it "creates without encryption key if storage_encrypted not" do
+      st = described_class.assemble("some_ssh_key", p.id, storage_encrypted: false)
+      expect(StorageKeyEncryptionKey.count).to eq(0)
+      expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
+      expect(described_class.new(st).storage_secrets.count).to eq(0)
+    end
+
+    it "creates with encryption key if storage_encrypted" do
+      st = described_class.assemble("some_ssh_key", p.id, storage_encrypted: true)
+      expect(StorageKeyEncryptionKey.count).to eq(1)
+      expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
+      expect(described_class.new(st).storage_secrets.count).to eq(1)
     end
   end
 
@@ -217,6 +244,23 @@ RSpec.describe Prog::Vm::Nexus do
         expect(args[:ephemeral_net6]).to match(/2a01:4f9:2b:35a:.*/)
         expect(args[:vm_host_id]).to match vmh_id
       end
+
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "allocates the vm to a host with IPv4 address" do
+      vmh_id = "46ca6ded-b056-4723-bd91-612959f52f6f"
+      vmh = VmHost.new(
+        net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
+        ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
+      ) { _1.id = vmh_id }
+      address = Address.new(cidr: "0.0.0.0/30", routed_to_host_id: vmh_id)
+      expect(nx).to receive(:allocate).and_return(vmh_id)
+      expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
+      expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
+      expect(vm).to receive(:ip4_enabled).and_return(true).twice
+      expect(AssignedVmAddress).to receive(:create_with_id)
+      expect(vm).to receive(:update)
 
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -333,6 +377,11 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:when_refresh_mesh_set?).and_yield
       expect { nx.wait }.to hop("refresh_mesh")
     end
+
+    it "hops to start_after_host_reboot when needed" do
+      expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
+      expect { nx.wait }.to hop("start_after_host_reboot")
+    end
   end
 
   describe "#refresh_mesh" do
@@ -359,14 +408,60 @@ RSpec.describe Prog::Vm::Nexus do
       st.stack.first["deadline_at"] = Time.now + 1
     end
 
+    context "when has vm_host" do
+      let(:sshable) { instance_double(Sshable) }
+      let(:vm_host) { instance_double(VmHost, sshable: sshable) }
+
+      before do
+        expect(vm).to receive(:vm_host).and_return(vm_host)
+      end
+
+      it "absorbs an already deleted errors as a success" do
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/).and_raise(
+          Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+        )
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
+          Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+        )
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
+        expect(vm).to receive(:destroy).and_return(true)
+
+        expect { nx.destroy }.to exit({"msg" => "vm deleted"})
+      end
+
+      it "raises other stop errors" do
+        ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/).and_raise(ex)
+
+        expect { nx.destroy }.to raise_error ex
+      end
+
+      it "raises other stop-dnsmasq errors" do
+        ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(ex)
+        expect { nx.destroy }.to raise_error ex
+      end
+
+      it "deletes and pops when all commands are succeeded" do
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
+
+        expect(vm).to receive(:destroy)
+
+        expect { nx.destroy }.to exit({"msg" => "vm deleted"})
+      end
+    end
+
     it "detaches from nic" do
-      nic = instance_double(Nic, incr_destroy: true)
-      expect(nic).to receive(:update).with(vm_id: nil).and_return(true)
+      nic = instance_double(Nic)
+      expect(nic).to receive(:update).with(vm_id: nil)
+      expect(nic).to receive(:incr_destroy)
       expect(vm).to receive(:nics).and_return([nic])
-      expect(vm).to receive(:destroy).and_return(true)
-      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(nx).to receive(:pop).with("vm deleted").and_return(true)
-      nx.destroy
+      expect(vm).to receive(:destroy)
+
+      expect { nx.destroy }.to exit({"msg" => "vm deleted"})
     end
   end
 
