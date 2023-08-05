@@ -40,7 +40,7 @@ SH
       Sequel.~(raw_private_key_2: nil)
     ).update(raw_private_key_1: Sequel[:raw_private_key_2], raw_private_key_2: nil)
 
-    fail unless changed_records == 1
+    fail "Unexpected number of changed records: #{changed_records}" unless changed_records == 1
 
     hop :test_rotation
   end
@@ -51,8 +51,8 @@ SH
     Net::SSH.start(sshable.host, "rhizome",
       Sshable::COMMON_SSH_ARGS.merge(key_data: sshable.keys.map(&:private_key))) do |sess|
       ret = sess.exec!("echo key rotated successfully")
-      fail unless ret.exitstatus.zero?
-      fail unless ret == "key rotated successfully\n"
+      fail "Unexpected exit status: #{ret.exitstatus}" unless ret.exitstatus.zero?
+      fail "Unexpected output message: #{ret}" unless ret == "key rotated successfully\n"
     end
 
     pop "key rotated successfully"
