@@ -166,6 +166,26 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "name is already taken"
       end
 
+      it "can not create virtual machine if project has no valid payment method" do
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_content "Project doesn't have valid billing information"
+
+        fill_in "Name", with: "dummy-vm"
+        choose option: "hetzner-hel1"
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_content "Project doesn't have valid billing information"
+      end
+
       it "can not create vm in a project when does not have permissions" do
         project_wo_permissions
         visit "#{project_wo_permissions.path}/vm/create"
