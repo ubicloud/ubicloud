@@ -82,6 +82,22 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(400)
         expect(JSON.parse(last_response.body)["error"]["details"]["name"]).to eq("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
       end
+
+      it "invalid payment method" do
+        expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+        expect(Project).to receive(:from_ubid).and_return(project)
+
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm", {
+          public_key: "ssh key",
+          name: "test-vm",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy"
+        }
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["billing_info"]).to eq("Project doesn't have valid billing information")
+      end
     end
 
     describe "show" do

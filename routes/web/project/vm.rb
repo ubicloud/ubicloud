@@ -12,6 +12,7 @@ class CloverWeb
 
     r.post true do
       Authorization.authorize(@current_user.id, "Vm:create", @project.id)
+      fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
       ps_id = r.params["private-subnet-id"].empty? ? nil : UBID.parse(r.params["private-subnet-id"]).to_uuid
       Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
@@ -43,6 +44,8 @@ class CloverWeb
             monthly: br["unit_price"].to_f * 60 * 24 * 30
           }
         end
+        @has_valid_payment_method = @project.has_valid_payment_method?
+
         view "vm/create"
       end
     end

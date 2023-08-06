@@ -12,6 +12,7 @@ class CloverApi
 
     r.post true do
       Authorization.authorize(@current_user.id, "Vm:create", @project.id)
+      fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
       st = Prog::Vm::Nexus.assemble(
         r.params["public_key"],

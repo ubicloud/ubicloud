@@ -25,6 +25,12 @@ class Project < Sequel::Model
     access_tags_dataset.where(hyper_tag_table: Account.table_name.to_s).select_map(:hyper_tag_id)
   end
 
+  def has_valid_payment_method?
+    return true unless Config.stripe_secret_key
+    # TODO: More complex checks expiration date etc.
+    !!billing_info&.payment_methods&.any?
+  end
+
   def path
     "/project/#{ubid}"
   end
