@@ -163,24 +163,26 @@ $("input[name=location]").on("change", function (event) {
 function setupLocationBasedPrices() {
   let selectedLocation = $("input[name=location]:checked")
   let prices = selectedLocation.length ? selectedLocation.data("details") : {};
+  let count = {}
   $("input.location-based-price").each(function(i, obj) {
     let name = $(this).attr("name");
     let value = $(this).val();
     let resource_type = $(this).data("resource-type");
     let resource_family = $(this).data("resource-family");
     let amount = $(this).data("amount");
-
-    let count = 0
+    let is_default = $(this).data("default");
     if (monthlyPrice = prices?.[resource_type]?.[resource_family]?.["monthly"]) {
       let monthly = monthlyPrice * amount;
-      $(this).parent().show();
-      $("." + value  + "-monthly-price").text(`$${monthly.toFixed(2)}`);
-      count++;
+      $(`.${name}-${value}`).show();
+      $(`.${name}-${value}-monthly-price`).text(`$${monthly.toFixed(2)}`);
+      count[name] = (count[name] || 0) + 1;
     } else {
-      $(this).parent().hide();
-      $(this).prop('checked', false);
+      $(`.${name}-${value}`).hide();
+      if (!is_default) {
+        $(this).prop('checked', false);
+      }
     }
-    if (count) {
+    if (count[name]) {
       $("#" + name + "-description").hide();
     } else {
       $("#" + name + "-description").show();
