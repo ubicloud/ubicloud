@@ -56,13 +56,14 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
+        expect(BillingRecord).to receive(:create)
+
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm", {
           public_key: "ssh key",
           name: "test-vm",
           unix_user: "ubi",
           size: "c5a.2x",
           boot_image: "ubuntu-jammy"
-
         }
 
         expect(last_response.status).to eq(200)
@@ -76,7 +77,6 @@ RSpec.describe Clover, "vm" do
           unix_user: "ubi",
           size: "c5a.2x",
           boot_image: "ubuntu-jammy"
-
         }
 
         expect(last_response.status).to eq(400)

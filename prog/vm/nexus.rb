@@ -89,6 +89,14 @@ class Prog::Vm::Nexus < Prog::Base
         key_encryption_key_1_id: storage_encrypted ? key_encryption_key.id : nil
       )
 
+      BillingRecord.create_with_id(
+        project_id: project_id,
+        resource_id: vm.id,
+        resource_name: vm.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.line, location).id,
+        amount: vm.product.cores
+      )
+
       Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
     end
   end
@@ -264,6 +272,7 @@ SQL
 
   def wait
     when_destroy_set? do
+      vm.active_billing_record.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...Time.now))
       hop :destroy
     end
 
