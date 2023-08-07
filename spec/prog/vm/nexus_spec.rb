@@ -18,11 +18,19 @@ RSpec.describe Prog::Vm::Nexus do
     ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
     disk.key_encryption_key_1 = kek
-    Vm.new(size: "m5a.2x").tap {
+    vm = Vm.new(size: "m5a.2x", name: "dummy-vm", location: "hetzner-hel1").tap {
       _1.id = Vm.generate_uuid
       _1.vm_storage_volumes.append(disk)
       disk.vm = _1
     }
+    BillingRecord.create_with_id(
+      project_id: SecureRandom.uuid,
+      resource_id: vm.id,
+      resource_name: vm.name,
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.line, vm.location).id,
+      amount: vm.product.cores
+    )
+    vm
   }
   let(:p) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
@@ -54,6 +62,8 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "accepts all locations if project not provided" do
       expect(Config).to receive(:development?).and_return(true).twice
+      expect(BillingRate).to receive(:from_resource_properties).and_return(BillingRate.first)
+      expect(BillingRecord).to receive(:create_with_id)
       expect {
         described_class.assemble("some_ssh_key", nil, location: "dp-istanbul-mars")
       }.to change(Vm, :count).from(0).to(1)

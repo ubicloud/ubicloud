@@ -17,5 +17,5 @@ end
 
 # Load Sequel Database/Global extensions here
 # DB.extension :date_arithmetic
-DB.extension :pg_json
-DB.extension :pg_auto_parameterize if DB.adapter_scheme == :postgres && Sequel::Postgres::USES_PG
+DB.extension :pg_json, :pg_auto_parameterize, :pg_timestamptz, :pg_range
+Sequel.extension :pg_range_ops
