@@ -300,7 +300,7 @@ RSpec.describe Clover, "project" do
 
         expect(page.body).to eq({message: "'#{project.name}' project is deleted."}.to_json)
 
-        expect(Project[project.id]).to be_nil
+        expect(Project[project.id].visible).to be_falsey
         expect(AccessTag.where(project_id: project.id).count).to eq(0)
         expect(AccessPolicy.where(project_id: project.id).count).to eq(0)
       end

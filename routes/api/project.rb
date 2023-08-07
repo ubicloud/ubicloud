@@ -5,7 +5,7 @@ class CloverApi
     @serializer = Serializers::Api::Project
 
     r.get true do
-      projects = Project.authorized(@current_user.id, "Project:view").all
+      projects = Project.authorized(@current_user.id, "Project:view").all.filter(&:visible)
 
       serialize(projects)
     end
@@ -18,6 +18,7 @@ class CloverApi
 
     r.on String do |project_ubid|
       @project = Project.from_ubid(project_ubid)
+      @project = nil unless @project&.visible
 
       unless @project
         response.status = 404

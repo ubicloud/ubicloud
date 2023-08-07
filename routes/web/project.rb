@@ -5,7 +5,7 @@ class CloverWeb
     @serializer = Serializers::Web::Project
 
     r.get true do
-      @projects = serialize(@current_user.projects)
+      @projects = serialize(@current_user.projects.filter(&:visible))
 
       view "project/index"
     end
@@ -24,6 +24,7 @@ class CloverWeb
 
     r.on String do |project_ubid|
       @project = Project.from_ubid(project_ubid)
+      @project = nil unless @project&.visible
 
       unless @project
         response.status = 404
@@ -51,7 +52,10 @@ class CloverWeb
           @project.access_tags.each { |access_tag| access_tag.applied_tags_dataset.destroy }
           @project.access_tags_dataset.destroy
           @project.access_policies_dataset.destroy
-          @project.destroy
+
+          # We still keep the project object for billing purposes.
+          # These need to be cleaned up manually once in a while.
+          @project.update(visible: false)
         end
 
         flash["notice"] = "'#{@project.name}' project is deleted."
