@@ -149,8 +149,8 @@ end
        stack: [new_frame] + strand.stack, retval: nil})
   end
 
-  def bud(prog, new_frame = nil, label = "start")
-    new_frame = (new_frame || {}).merge("subject_id" => @subject_id)
+  def bud(prog, new_frame = {}, label = "start")
+    new_frame = {"subject_id" => @subject_id}.merge(new_frame)
     strand.add_child(
       id: Strand.generate_uuid,
       prog: Strand.prog_verify(prog),
