@@ -11,7 +11,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnet_id: nil, nic_id: nil, storage_size_gib: 20, storage_encrypted: true,
+    private_subnet_id: nil, nic_id: nil, storage_size_gib: nil, storage_encrypted: true,
     enable_ip4: false)
 
     project = Project[project_id]
@@ -19,6 +19,8 @@ class Prog::Vm::Nexus < Prog::Base
       fail "No existing project"
     end
     Validation.validate_location(location, project&.provider)
+    vm_size = Validation.validate_vm_size(size)
+    storage_size_gib ||= vm_size.storage_size_gib
 
     ubid = Vm.generate_ubid
     name ||= Vm.ubid_to_name(ubid)

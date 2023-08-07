@@ -80,28 +80,11 @@
                 ) %>
               </div>
               <div class="col-span-full">
-                <%== render(
-                  "components/form/range_slider",
-                  locals: {
-                    name: "storage-size-gib",
-                    label: "Storage Size",
-                    range_labels: (1..10).map { "#{_1 * 10}GB" },
-                    value: 40,
-                    attributes: {
-                      min: 10,
-                      max: 100,
-                      step: 10,
-                      required: true
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-full">
                 <div class="space-y-2">
                   <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size</label>
                   <fieldset class="radio-small-cards" id="size-radios">
                     <legend class="sr-only">Server size</legend>
-                    <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4">
+                    <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                       <% Option::VmSizes.each do |size| %>
                         <label>
                           <input
@@ -123,10 +106,15 @@
                             <span class="flex flex-col">
                               <span class="text-md font-semibold"><%= size.display_name %></span>
                               <span class="text-sm opacity-80">
-                                <span class="block sm:inline"><%= size.vcpu %>
+                                <span class="block sm:inline">
+                                  <%= size.vcpu %>
                                   vCPUs /
                                   <%= size.memory %>
-                                  GB</span>
+                                  GB
+                                </span>
+                                <span class="hidden sm:mx-0.5 sm:inline" aria-hidden="true">&middot;</span>
+                                <span class="block sm:inline"><%= size.storage_size_gib %>
+                                  GB disk</span>
                               </span>
                             </span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">

@@ -98,6 +98,16 @@ RSpec.describe Prog::Vm::Nexus do
       described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location: "hetzner-hel1")
     end
 
+    it "creates with default storage size from vm size" do
+      st = described_class.assemble("some_ssh_key", prj.id)
+      expect(st.vm.storage_size_gib).to eq(Option::VmSizes.first.storage_size_gib)
+    end
+
+    it "creates with custom storage size if provided" do
+      st = described_class.assemble("some_ssh_key", prj.id, storage_size_gib: 40)
+      expect(st.vm.storage_size_gib).to eq(40)
+    end
+
     it "fails if given nic_id is not valid" do
       expect {
         described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)

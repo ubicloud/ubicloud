@@ -14,6 +14,7 @@ class CloverWeb
       Authorization.authorize(@current_user.id, "Vm:create", @project.id)
       ps_id = r.params["private-subnet-id"].empty? ? nil : UBID.parse(r.params["private-subnet-id"]).to_uuid
       Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
+
       st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
         @project.id,
@@ -22,7 +23,6 @@ class CloverWeb
         size: r.params["size"],
         location: r.params["location"],
         boot_image: r.params["boot-image"],
-        storage_size_gib: r.params["storage-size-gib"].to_i,
         private_subnet_id: ps_id,
         enable_ip4: r.params.key?("enable-ip4")
       )
