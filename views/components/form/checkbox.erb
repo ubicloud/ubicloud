@@ -1,38 +1,43 @@
 <% name = defined?(name) ? name : nil %>
 <% label = defined?(label) ? label : nil %>
-<% value = (defined?(value) && value) ? value : nil %>
+<% options = (defined?(options) && options) ? options : {} %>
 <% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
 <% error = (defined?(error) && error) ? error : rodauth.field_error(name) || flash.dig("errors", name) %>
 <% description = (defined?(description) && description) ? description : nil %>
 <% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
 
 <div class="space-y-2 text-gray-900">
+  <% if label %>
+    <label for="<%= name %>" class="block text-sm font-medium leading-6"><%== label %></label>
+  <% end %>
   <fieldset>
     <div class="space-y-5">
-      <div class="relative flex items-start">
-        <div class="flex h-6 items-center">
-          <input
-            id="<%= name %>"
-            name="<%= name %>"
-            type="checkbox"
-            value="<%= value %>"
-            class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
-            <%= (value == selected) ? "checked" : "" %>
-            <% attributes.each do |atr_key, atr_value| %>
-            <%= atr_key %>="<%= atr_value %>"
-            <% end%>
-          >
+      <% options.each do |opt_val, opt_text, opt_classes, opt_attrs| %>
+        <div class="relative flex items-start">
+          <div class="flex h-6 items-center">
+            <input
+              id="<%= name %>-<%= opt_val %>"
+              name="<%= name %>"
+              type="checkbox"
+              value="<%= opt_val %>"
+              class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600 <%= opt_classes %>"
+              <%= (opt_val == selected) ? "checked" : "" %>
+              <% (opt_attrs || {}).each do |opt_atr_key, opt_atr_value| %>
+                <%= opt_atr_key %>="<%= opt_atr_value %>"
+              <% end%>
+            >
+          </div>
+          <div class="ml-3 text-sm leading-6">
+            <label for="<%= name %>-<%= opt_val %>" class="font-medium text-gray-900"><%= opt_text %></label>
+          </div>
         </div>
-        <div class="ml-3 text-sm leading-6">
-          <label for="<%= name %>" class="font-medium text-gray-900"><%= label %></label>
-          <% if error %>
-            <p class="text-red-600" id="<%= name %>-error"><%= error %></p>
-          <% end %>
-          <% if description %>
-            <p class="text-gray-500" id="<%= name %>-description"><%== description %></p>
-          <% end %>
-        </div>
-      </div>
+      <% end %>
     </div>
   </fieldset>
+  <% if error %>
+    <p class="text-sm text-red-600 leading-6"><%= error %></p>
+  <% end %>
+  <% if description %>
+    <p class="text-sm text-gray-500 leading-6"><%== description %></p>
+  <% end %>
 </div>
