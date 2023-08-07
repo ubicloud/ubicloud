@@ -40,6 +40,16 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_vm_size" do
+      it "valid vm size" do
+        expect(described_class.validate_vm_size("standard-2").name).to eq("standard-2")
+      end
+
+      it "invalid vm size" do
+        expect { described_class.validate_vm_size("standard-3") }.to raise_error described_class::ValidationFailed
+      end
+    end
+
     describe "#validate_location" do
       it "valid locations" do
         [

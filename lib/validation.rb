@@ -32,4 +32,11 @@ module Validation
     msg = "\"#{location}\" is not a valid location for provider \"#{provider}\". Available locations: #{available_locs}"
     fail ValidationFailed.new({provider: msg}) unless available_locs.include?(location)
   end
+
+  def self.validate_vm_size(size)
+    unless (vm_size = Option::VmSizes.find { _1.name == size })
+      fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available providers: #{Option::VmSizes.map(&:name)}"})
+    end
+    vm_size
+  end
 end
