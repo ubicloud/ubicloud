@@ -31,11 +31,13 @@ class Prog::Vnet::NicNexus < Prog::Base
     @nic ||= Nic[strand.id]
   end
 
-  def wait
+  def before_run
     when_destroy_set? do
-      hop :destroy
+      hop :destroy if strand.label != "destroy"
     end
+  end
 
+  def wait
     when_refresh_mesh_set? do
       hop :refresh_mesh
     end

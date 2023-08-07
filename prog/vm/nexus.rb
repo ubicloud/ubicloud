@@ -193,6 +193,15 @@ SQL
     vm_host_id
   end
 
+  def before_run
+    when_destroy_set? do
+      if strand.label != "destroy"
+        vm.active_billing_record.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...Time.now))
+        hop :destroy
+      end
+    end
+  end
+
   def start
     register_deadline(:wait, 10 * 60)
 
@@ -271,11 +280,6 @@ SQL
   end
 
   def wait
-    when_destroy_set? do
-      vm.active_billing_record.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...Time.now))
-      hop :destroy
-    end
-
     when_refresh_mesh_set? do
       hop :refresh_mesh
     end

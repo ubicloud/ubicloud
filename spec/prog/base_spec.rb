@@ -88,6 +88,15 @@ RSpec.describe Prog::Base do
     }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
   end
 
+  it "calls before_run if it is available" do
+    st = Strand.create_with_id(prog: "Prog::Vm::Nexus", label: "wait")
+    prg = instance_double(Prog::Vm::Nexus)
+    expect(st).to receive(:load).and_return(prg)
+    expect(prg).to receive(:before_run)
+    expect(prg).to receive(:wait).and_raise(Prog::Base::Nap.new(30))
+    st.unsynchronized_run
+  end
+
   context "when rendering FlowControl strings" do
     it "can render hop" do
       expect(
