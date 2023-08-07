@@ -58,6 +58,19 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
   end
 
+  describe "#before_run" do
+    it "hops to destroy when needed" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the destroy state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+  end
+
   describe "#wait" do
     it "naps if nothing to do" do
       expect {
@@ -70,13 +83,6 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect {
         nx.wait
       }.to hop("refresh_mesh")
-    end
-
-    it "hops to destroy if needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect {
-        nx.wait
-      }.to hop("destroy")
     end
 
     it "hops to detach vm if needed" do

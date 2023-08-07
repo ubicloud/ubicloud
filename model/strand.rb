@@ -100,7 +100,9 @@ SQL
 
     DB.transaction do
       SemSnap.use(id) do |snap|
-        load(snap).public_send(label)
+        prg = load(snap)
+        prg.public_send(:before_run) if prg.respond_to?(:before_run)
+        prg.public_send(label)
       end
     rescue Prog::Base::Nap => e
       save_changes
