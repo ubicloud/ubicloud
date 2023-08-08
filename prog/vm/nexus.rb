@@ -199,6 +199,9 @@ SQL
     when_destroy_set? do
       if strand.label != "destroy"
         vm.active_billing_record.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...Time.now))
+        if (vm_adr = vm.assigned_vm_address)
+          vm_adr.active_billing_record.update(span: Sequel.pg_range(vm_adr.active_billing_record.span.begin...Time.now))
+        end
         hop :destroy
       end
     end
@@ -213,9 +216,24 @@ SQL
 
     fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
 
-    vm.update(vm_host_id: vm_host_id, ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
-      local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s)
-    AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
+    DB.transaction do
+      vm.update(
+        vm_host_id: vm_host_id,
+        ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
+        local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s
+      )
+
+      if ip4
+        vm_adr = AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id)
+        BillingRecord.create_with_id(
+          project_id: vm.projects.first.id,
+          resource_id: vm_adr.id,
+          resource_name: vm_adr.ip,
+          billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location).id,
+          amount: 1
+        )
+      end
+    end
     hop :create_unix_user
   end
 

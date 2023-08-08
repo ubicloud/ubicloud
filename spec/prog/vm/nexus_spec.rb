@@ -275,11 +275,15 @@ RSpec.describe Prog::Vm::Nexus do
         ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
       ) { _1.id = vmh_id }
       address = Address.new(cidr: "0.0.0.0/30", routed_to_host_id: vmh_id)
+      assigned_address = AssignedVmAddress.new(ip: "0.0.0.0")
+
       expect(nx).to receive(:allocate).and_return(vmh_id)
       expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
       expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
-      expect(AssignedVmAddress).to receive(:create_with_id)
+      expect(vm).to receive(:projects).and_return([prj])
+      expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
+      expect(BillingRecord).to receive(:create_with_id)
       expect(vm).to receive(:update)
 
       expect { nx.start }.to hop("create_unix_user")
@@ -393,6 +397,17 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "stops billing before hops to destroy" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(vm.active_billing_record).to receive(:update)
+      assigned_adr = instance_double(AssignedVmAddress)
+      br = instance_double(BillingRecord, span: Sequel.pg_range(Time.now...Time.now))
+      expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
+      expect(assigned_adr).to receive(:active_billing_record).and_return(br).twice
+      expect(br).to receive(:update)
+      expect { nx.before_run }.to hop("destroy")
     end
   end
 
