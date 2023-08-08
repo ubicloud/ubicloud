@@ -108,8 +108,10 @@
                             type="radio"
                             name="size"
                             value="<%= size.name %>"
-                            class="peer sr-only"
-                            data-details="<%= {family: size.name.split(".").first, vcpu: size.vcpu}.to_json %>"
+                            class="peer sr-only location-based-price"
+                            data-resource-type="VmCores"
+                            data-resource-family="<%= size.name.split("-").first %>"
+                            data-amount="<%= size.vcpu / 2 %>"
                             required
                             <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
                           >
@@ -128,7 +130,7 @@
                               </span>
                             </span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium price">-</span>
+                              <span class="font-medium <%= size.name %>-monthly-price">-</span>
                               <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
                             </span>
                           </span>
