@@ -1,6 +1,6 @@
 $(function() {
   setupPolicyEditor();
-  setupVmSizes();
+  setupLocationBasedPrices();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -156,29 +156,34 @@ function jsonHighlight(str) {
   });
 }
 
-$("input[type=radio]").on("change", function (event) {
-  setupVmSizes();
+$("input[name=location]").on("change", function (event) {
+  setupLocationBasedPrices();
 });
 
-function setupVmSizes() {
+function setupLocationBasedPrices() {
   let selectedLocation = $("input[name=location]:checked")
   let prices = selectedLocation.length ? selectedLocation.data("details") : {};
-  $("input[name=size]").each(function(i, obj) {
-    let details = $(this).data("details");
-    let sizeCount = 0
-    if (pricePerCore = prices?.VmCores?.[details?.family]) {
-      let monthly = pricePerCore * details.vcpu * 60 * 24 * 30;
+  $("input.location-based-price").each(function(i, obj) {
+    let name = $(this).attr("name");
+    let value = $(this).val();
+    let resource_type = $(this).data("resource-type");
+    let resource_family = $(this).data("resource-family");
+    let amount = $(this).data("amount");
+
+    let count = 0
+    if (monthlyPrice = prices?.[resource_type]?.[resource_family]?.["monthly"]) {
+      let monthly = monthlyPrice * amount;
       $(this).parent().show();
-      $(this).parent().find(".price").text(`$${monthly.toFixed(2)}`);
-      sizeCount++;
+      $("." + value  + "-monthly-price").text(`$${monthly.toFixed(2)}`);
+      count++;
     } else {
       $(this).parent().hide();
       $(this).prop('checked', false);
     }
-    if (sizeCount) {
-      $("#size-description").hide();
+    if (count) {
+      $("#" + name + "-description").hide();
     } else {
-      $("#size-description").show();
+      $("#" + name + "-description").show();
     }
   });
 }
