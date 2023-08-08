@@ -65,7 +65,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(BillingRate).to receive(:from_resource_properties).and_return(BillingRate.first)
       expect(BillingRecord).to receive(:create_with_id)
       expect {
-        described_class.assemble("some_ssh_key", nil, location: "dp-istanbul-mars")
+        described_class.assemble("some_ssh_key", nil, location: "hetzner-hel1")
       }.to change(Vm, :count).from(0).to(1)
     end
 
