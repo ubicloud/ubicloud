@@ -20,7 +20,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
       ps.associate_with_project(project)
-      Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
+      Strand.create(prog: "Vnet::SubnetNexus", label: "wait", stack: "[{}]") { _1.id = ubid.to_uuid }
     end
   end
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe SemSnap do
-  let(:st) { Strand.create_with_id(prog: "Test", label: "start") }
+  let(:st) { Strand.create_with_id(prog: "Test", label: "start", stack: "[{}]") }
 
   it "can decrement semaphores" do
     described_class.use(st.id) do |snap|

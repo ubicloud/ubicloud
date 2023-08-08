@@ -184,6 +184,7 @@ end
   end
 
   def register_deadline(deadline_target, deadline_in)
+    p "registering deadline"
     current_frame = strand.stack.first
     if (deadline_at = current_frame["deadline_at"]).nil? ||
         Time.parse(deadline_at.to_s) > Time.now + deadline_in ||

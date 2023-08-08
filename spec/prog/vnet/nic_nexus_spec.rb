@@ -34,7 +34,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic"
       ).and_return(true)
-      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
+      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait", stack: "[{}]").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(ps.id, ipv6_addr: "fd10:9b0b:6b4b:8fbb::/128", name: "demonic")
     end
 
@@ -53,7 +53,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         name: "demonic"
       ).and_return(true)
       expect(ps).to receive(:add_nic).and_return(true)
-      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
+      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait", stack: "[{}]").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(ps.id, ipv4_addr: "10.0.0.12/32", name: "demonic")
     end
   end

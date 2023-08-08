@@ -200,7 +200,7 @@ RSpec.describe UBID do
     host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
     expect(host_adr.ubid).to start_with UBID::TYPE_ASSIGNED_HOST_ADDRESS
 
-    strand = Strand.create_with_id(prog: "x", label: "y")
+    strand = Strand.create_with_id(prog: "x", label: "y", stack: "[{}]")
     expect(strand.ubid).to start_with UBID::TYPE_STRAND
 
     semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
@@ -231,7 +231,7 @@ RSpec.describe UBID do
     adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
     vm_adr = AssignedVmAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
     host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)
-    strand = Strand.create_with_id(prog: "x", label: "y")
+    strand = Strand.create_with_id(prog: "x", label: "y", stack: "[{}]")
     semaphore = Semaphore.create_with_id(strand_id: strand.id, name: "z")
     page = Page.create_with_id(summary: "x")
 

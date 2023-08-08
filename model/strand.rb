@@ -20,6 +20,16 @@ class Strand < Sequel::Model
     one_to_one _1.intern, key: :id
   end
 
+  def initialize(*args, **kwargs)
+    p [args, kwargs]
+    super(*args, **kwargs)
+
+    if stack.first["deadline_at"]
+      puts Kernel.caller
+      fail stack.inspect
+    end
+  end
+
   def lease
     self.class.lease(id) do
       yield
@@ -77,6 +87,7 @@ SQL
   end
 
   def unsynchronized_run
+    p "unsynchronized running"
     if label == stack.first["deadline_target"].to_s
       stack.first.delete("deadline_target")
       stack.first.delete("deadline_at")

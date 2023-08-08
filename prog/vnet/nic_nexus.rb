@@ -19,7 +19,7 @@ class Prog::Vnet::NicNexus < Prog::Base
         encryption_key: gen_encryption_key, name: name,
         private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
       subnet.add_nic(nic)
-      Strand.create(prog: "Vnet::NicNexus", label: "wait") { _1.id = ubid.to_uuid }
+      Strand.create(prog: "Vnet::NicNexus", label: "wait", stack: "[{}]") { _1.id = ubid.to_uuid }
     end
   end
 

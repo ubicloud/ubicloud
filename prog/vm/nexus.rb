@@ -97,7 +97,7 @@ class Prog::Vm::Nexus < Prog::Base
         amount: vm.product.cores
       )
 
-      Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
+      Strand.create(prog: "Vm::Nexus", label: "start", stack: "[{}]") { _1.id = vm.id }
     end
   end
 

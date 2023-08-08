@@ -34,7 +34,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         state: "waiting"
       ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv4).and_return("10.0.0.0/26")
-      expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
+      expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait", stack: "[{}]").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(
         p.id,
         name: "default-ps",
@@ -54,7 +54,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         state: "waiting"
       ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
-      expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
+      expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait", stack: "[{}]").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(
         p.id,
         name: "default-ps",
