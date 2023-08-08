@@ -53,8 +53,7 @@ RSpec.describe Validation do
       it "invalid locations" do
         [
           ["hetzner-hel2", nil],
-          ["hetzner-hel2", "hetzner"],
-          ["dp-mars-istanbul", "hetzner"]
+          ["hetzner-hel2", "hetzner"]
         ].each do |location, provider|
           expect { described_class.validate_location(location, provider) }.to raise_error described_class::ValidationFailed
         end

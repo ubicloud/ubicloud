@@ -3,18 +3,15 @@
 module Option
   Provider = Struct.new(:name, :display_name) do
     self::HETZNER = "hetzner"
-    self::DATAPACKET = "dp"
   end
   Providers = [
-    [Provider::HETZNER, "Hetzner"],
-    [Provider::DATAPACKET, "DataPacket"]
+    [Provider::HETZNER, "Hetzner"]
   ].map { |args| [args[0], Provider.new(*args)] }.to_h.freeze
 
   Location = Struct.new(:provider, :name, :display_name)
   Locations = [
     [Providers[Provider::HETZNER], "hetzner-hel1", "Finland"],
-    [Providers[Provider::HETZNER], "hetzner-fsn1", "Germany"],
-    [Providers[Provider::DATAPACKET], "dp-istanbul-mars", "Istanbul"]
+    [Providers[Provider::HETZNER], "hetzner-fsn1", "Germany"]
   ].map { |args| Location.new(*args) }.freeze
 
   def self.locations_for_provider(provider)
