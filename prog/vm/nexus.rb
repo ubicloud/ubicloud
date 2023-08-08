@@ -334,7 +334,8 @@ SQL
       vm.vm_storage_volumes_dataset.destroy
 
       VmHost.dataset.where(id: vm.vm_host_id).update(
-        used_cores: Sequel[:used_cores] - vm.cores
+        used_cores: Sequel[:used_cores] - vm.cores,
+        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib
       )
       vm.projects.map { vm.dissociate_with_project(_1) }
 
