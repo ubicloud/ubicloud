@@ -46,28 +46,24 @@ class Prog::Vm::HostNexus < Prog::Base
 
   def wait_prep
     reap.each do |st|
-      case st.fetch(:prog)
+      case st.prog
       when "LearnMemory"
-        fail "BUG: mem_gib not set" unless (mem_gib = st.dig(:exitval, "mem_gib"))
+        mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
       when "LearnCores"
         kwargs = {
-          total_sockets: st.dig(:exitval, "total_sockets"),
-          total_nodes: st.dig(:exitval, "total_nodes"),
-          total_cores: st.dig(:exitval, "total_cores"),
-          total_cpus: st.dig(:exitval, "total_cpus")
+          total_sockets: st.exitval.fetch("total_sockets"),
+          total_nodes: st.exitval.fetch("total_nodes"),
+          total_cores: st.exitval.fetch("total_cores"),
+          total_cpus: st.exitval.fetch("total_cpus")
         }
-
-        fail "BUG: one of the LearnCores fields is not set" if kwargs.value?(nil)
 
         vm_host.update(**kwargs)
       when "LearnStorage"
         kwargs = {
-          total_storage_gib: st.dig(:exitval, "total_storage_gib"),
-          available_storage_gib: st.dig(:exitval, "available_storage_gib")
+          total_storage_gib: st.exitval.fetch("total_storage_gib"),
+          available_storage_gib: st.exitval.fetch("available_storage_gib")
         }
-
-        fail "BUG: one of the LearnStorage fields is not set" if kwargs.value?(nil)
 
         vm_host.update(**kwargs)
       end
