@@ -6,15 +6,24 @@ updates:
       interval: 'daily'
     allow:
       - dependency-type: "all"
+    groups:
+      ruby-dependencies:
+        pattern: "*"
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
       interval: 'daily'
     allow:
       - dependency-type: "all"
+    groups:
+      js-dependencies:
+        pattern: "*"
   - package-ecosystem: 'docker'
     directory: '/'
     schedule:
       interval: 'daily'
     allow:
       - dependency-type: "all"
+    groups:
+      docker-dependencies:
+        pattern: "*"
