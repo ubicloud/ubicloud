@@ -32,7 +32,7 @@ RSpec.describe Prog::Vm::Nexus do
     )
     vm
   }
-  let(:p) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+  let(:prj) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
     let(:ps) {
@@ -56,7 +56,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "fails if project's provider and location's provider not matched" do
       expect {
-        described_class.assemble("some_ssh_key", p.id, location: "dp-istanbul-mars")
+        described_class.assemble("some_ssh_key", prj.id, location: "dp-istanbul-mars")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
     end
 
@@ -71,7 +71,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "creates Subnet and Nic if not passed" do
       expect {
-        described_class.assemble("some_ssh_key", p.id)
+        described_class.assemble("some_ssh_key", prj.id)
       }.to change(PrivateSubnet, :count).from(0).to(1)
         .and change(Nic, :count).from(0).to(1)
     end
@@ -81,10 +81,10 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Prog::Vnet::NicNexus).to receive(:assemble).and_return(nic)
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:update).and_return(nic)
-      expect(Project).to receive(:[]).with(p.id).and_return(p)
-      expect(p).to receive(:private_subnets).and_return([ps]).at_least(:once)
+      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
+      expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
 
-      described_class.assemble("some_ssh_key", p.id, private_subnet_id: ps.id)
+      described_class.assemble("some_ssh_key", prj.id, private_subnet_id: ps.id)
     end
 
     it "adds the VM to a private subnet if nic_id is passed" do
@@ -93,20 +93,20 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:update).and_return(nic)
       expect(Prog::Vnet::SubnetNexus).not_to receive(:assemble)
       expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
-      expect(Project).to receive(:[]).with(p.id).and_return(p)
-      expect(p.private_subnets).to receive(:any?).and_return(true)
-      described_class.assemble("some_ssh_key", p.id, nic_id: nic.id, location: "hetzner-hel1")
+      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
+      expect(prj.private_subnets).to receive(:any?).and_return(true)
+      described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location: "hetzner-hel1")
     end
 
     it "fails if given nic_id is not valid" do
       expect {
-        described_class.assemble("some_ssh_key", p.id, nic_id: nic.id)
+        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
     it "fails if given subnet_id is not valid" do
       expect {
-        described_class.assemble("some_ssh_key", p.id, private_subnet_id: nic.id)
+        described_class.assemble("some_ssh_key", prj.id, private_subnet_id: nic.id)
       }.to raise_error RuntimeError, "Given subnet doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
     end
 
@@ -114,7 +114,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:vm_id).and_return("57afa8a7-2357-4012-9632-07fbe13a3133")
       expect {
-        described_class.assemble("some_ssh_key", p.id, nic_id: nic.id)
+        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is assigned to a VM already"
     end
 
@@ -123,40 +123,40 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:location).and_return("hel2")
       expect {
-        described_class.assemble("some_ssh_key", p.id, nic_id: nic.id)
+        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is created in a different location"
     end
 
     it "fails if subnet of nic belongs to another project" do
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(Project).to receive(:[]).with(p.id).and_return(p)
-      expect(p).to receive(:private_subnets).and_return([ps]).at_least(:once)
-      expect(p.private_subnets).to receive(:any?).and_return(false)
+      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
+      expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
+      expect(prj.private_subnets).to receive(:any?).and_return(false)
       expect {
-        described_class.assemble("some_ssh_key", p.id, nic_id: nic.id)
+        described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id)
       }.to raise_error RuntimeError, "Given nic is not available in the given project"
     end
 
     it "fails if subnet belongs to another project" do
       expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps)
-      expect(Project).to receive(:[]).with(p.id).and_return(p)
-      expect(p).to receive(:private_subnets).and_return([ps]).at_least(:once)
-      expect(p.private_subnets).to receive(:any?).and_return(false)
+      expect(Project).to receive(:[]).with(prj.id).and_return(prj)
+      expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
+      expect(prj.private_subnets).to receive(:any?).and_return(false)
       expect {
-        described_class.assemble("some_ssh_key", p.id, private_subnet_id: ps.id)
+        described_class.assemble("some_ssh_key", prj.id, private_subnet_id: ps.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
     it "creates without encryption key if storage_encrypted not" do
-      st = described_class.assemble("some_ssh_key", p.id, storage_encrypted: false)
+      st = described_class.assemble("some_ssh_key", prj.id, storage_encrypted: false)
       expect(StorageKeyEncryptionKey.count).to eq(0)
       expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
       expect(described_class.new(st).storage_secrets.count).to eq(0)
     end
 
     it "creates with encryption key if storage_encrypted" do
-      st = described_class.assemble("some_ssh_key", p.id, storage_encrypted: true)
+      st = described_class.assemble("some_ssh_key", prj.id, storage_encrypted: true)
       expect(StorageKeyEncryptionKey.count).to eq(1)
       expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
       expect(described_class.new(st).storage_secrets.count).to eq(1)
