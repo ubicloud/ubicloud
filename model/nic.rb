@@ -12,10 +12,6 @@ class Nic < Sequel::Model
   include SemaphoreMethods
   semaphore :destroy, :refresh_mesh, :detach_vm
 
-  def self.ubid_type
-    UBID::TYPE_NIC
-  end
-
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
   end
