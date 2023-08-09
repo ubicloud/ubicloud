@@ -95,6 +95,8 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "refreshes mesh and hops to wait_refresh_mesh" do
       expect(ps).to receive(:nics).and_return([nic])
       expect(nic).to receive(:incr_refresh_mesh).and_return(true)
+      expect(SecureRandom).to receive(:bytes).with(36).and_return("cr\x99tnpn\x8F\x89\xCBma2\x01\x1C\xF9\xA3\xCD\xF7\xC0\xEF@w\xA9\x85\x7F\x1E\xB3T\xE3~\xB7\xFD7l\x91")
+      expect(nic).to receive(:update).with(encryption_key: "0x637299746e706e8f89cb6d6132011cf9a3cdf7c0ef4077a9857f1eb354e37eb7fd376c91").and_return(true)
       expect {
         nx.refresh_mesh
       }.to hop("wait_refresh_mesh")
@@ -118,8 +120,9 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "hops back to wait if nics are done" do
       expect(ss).to receive(:set?).and_return(false)
       expect(SemSnap).to receive(:new).with(nic.id).and_return(ss)
-      expect(ps).to receive(:nics).and_return([nic])
+      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(ps).to receive(:update).with(state: "waiting").and_return(true)
+      expect(nic).to receive(:update).with(encryption_key: nil).and_return(true)
       expect(nx).to receive(:decr_refresh_mesh).and_return(true)
       expect {
         nx.wait_refresh_mesh

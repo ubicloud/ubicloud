@@ -16,15 +16,10 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac,
-        encryption_key: gen_encryption_key, name: name,
-        private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
+        name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
       subnet.add_nic(nic)
       Strand.create(prog: "Vnet::NicNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
-  end
-
-  def self.gen_encryption_key
-    "0x" + SecureRandom.bytes(36).unpack1("H*")
   end
 
   def nic
