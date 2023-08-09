@@ -27,7 +27,7 @@ RSpec.describe Prog::Vm::Nexus do
       project_id: SecureRandom.uuid,
       resource_id: vm.id,
       resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location).id,
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location)["id"],
       amount: vm.product.cores
     )
     vm
@@ -62,7 +62,6 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "accepts all locations if project not provided" do
       expect(Config).to receive(:development?).and_return(true).twice
-      expect(BillingRate).to receive(:from_resource_properties).and_return(BillingRate.first)
       expect(BillingRecord).to receive(:create_with_id)
       expect {
         described_class.assemble("some_ssh_key", nil, location: "hetzner-hel1")

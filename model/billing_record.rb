@@ -3,7 +3,6 @@
 require_relative "../model"
 
 class BillingRecord < Sequel::Model
-  many_to_one :billing_rate
   many_to_one :project
 
   include ResourceMethods
@@ -20,5 +19,9 @@ class BillingRecord < Sequel::Model
     duration_begin = [span.begin, begin_time].max
     duration_end = span.unbounded_end? ? end_time : [span.end, end_time].min
     (duration_end - duration_begin) / 60
+  end
+
+  def billing_rate
+    @billing_rate ||= BillingRate.from_id(billing_rate_id)
   end
 end

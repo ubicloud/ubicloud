@@ -1,0 +1,4 @@
+- { id: 139d9a67-8182-8578-a303-235cabd5161c, resource_type: VmCores,   resource_family: standard, location: hetzner-fsn1, unit_price: 0.000501389 }
+- { id: 08c502f7-df5d-8978-9896-feafa0ec5c40, resource_type: VmCores,   resource_family: standard, location: hetzner-hel1, unit_price: 0.000475000 }
+- { id: 118b7e2d-fa8d-8d78-910d-1f62fcc657ec, resource_type: IPAddress, resource_family: IPv4,     location: hetzner-fsn1, unit_price: 0.000069444 }
+- { id: 1bde2200-545a-8d78-960e-08a303111e3d, resource_type: IPAddress, resource_family: IPv4,     location: hetzner-hel1, unit_price: 0.000069444 }

@@ -95,7 +95,7 @@ class Prog::Vm::Nexus < Prog::Base
         project_id: project_id,
         resource_id: vm.id,
         resource_name: vm.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, location).id,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, location)["id"],
         amount: vm.product.cores
       )
 
@@ -229,7 +229,7 @@ SQL
           project_id: vm.projects.first.id,
           resource_id: vm_adr.id,
           resource_name: vm_adr.ip,
-          billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location).id,
+          billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
           amount: 1
         )
       end
