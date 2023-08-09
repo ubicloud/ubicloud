@@ -337,7 +337,8 @@ SQL
 
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib
+        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib,
+        available_storage_gib: Sequel[:available_storage_gib] + vm.storage_size_gib
       )
       vm.projects.map { vm.dissociate_with_project(_1) }
 
