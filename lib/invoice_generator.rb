@@ -55,7 +55,7 @@ class InvoiceGenerator
   end
 
   def active_billing_records
-    active_billing_records = BillingRecord.eager(:billing_rate, :project)
+    active_billing_records = BillingRecord.eager(:project)
       .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
       .all
 
@@ -64,12 +64,12 @@ class InvoiceGenerator
         project_id: br.project_id,
         project_name: br.project.name,
         resource_id: br.resource_id,
-        location: br.billing_rate.location,
+        location: br.billing_rate["location"],
         resource_name: br.resource_name,
-        resource_type: br.billing_rate.resource_type,
-        resource_family: br.billing_rate.resource_family,
+        resource_type: br.billing_rate["resource_type"],
+        resource_family: br.billing_rate["resource_family"],
         amount: br.amount,
-        cost: (br.amount * br.duration(@begin_time, @end_time) * br.billing_rate.unit_price)
+        cost: (br.amount * br.duration(@begin_time, @end_time) * br.billing_rate["unit_price"])
       }
     end
   end

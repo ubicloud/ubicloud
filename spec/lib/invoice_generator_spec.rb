@@ -8,7 +8,7 @@ RSpec.describe InvoiceGenerator do
       resource_id: vm.id,
       resource_name: vm.name,
       span: span,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location).id,
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location)["id"],
       amount: vm.product.cores
     )
   end
@@ -17,7 +17,7 @@ RSpec.describe InvoiceGenerator do
     expect(invoices.count).to eq(1)
 
     br = BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location)
-    cost = (vm.product.cores * (duration / 60) * br.unit_price)
+    cost = (vm.product.cores * (duration / 60) * br["unit_price"])
     expect(invoices.first).to eq({
       project_id: project.id,
       project_name: project.name,
@@ -25,7 +25,7 @@ RSpec.describe InvoiceGenerator do
         resource_id: vm.id,
         resource_name: vm.name,
         line_items: [{
-          location: br.location,
+          location: br["location"],
           resource_type: "VmCores",
           resource_family: vm.product.prefix,
           amount: vm.product.cores,
