@@ -12,6 +12,10 @@ class Nic < Sequel::Model
   include SemaphoreMethods
   semaphore :destroy, :refresh_mesh, :detach_vm
 
+  plugin :column_encryption do |enc|
+    enc.column :encryption_key
+  end
+
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
   end

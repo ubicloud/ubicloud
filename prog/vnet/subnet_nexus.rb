@@ -42,14 +42,27 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   def refresh_mesh
-    ps.nics.map(&:incr_refresh_mesh)
+    DB.transaction do
+      ps.nics.each do |nic|
+        nic.update(encryption_key: "0x" + SecureRandom.bytes(36).unpack1("H*"))
+        nic.incr_refresh_mesh
+      end
+    end
+
     hop :wait_refresh_mesh
   end
 
   def wait_refresh_mesh
     unless ps.nics.any? { SemSnap.new(_1.id).set?("refresh_mesh") }
-      ps.update(state: "waiting")
-      decr_refresh_mesh
+      DB.transaction do
+        ps.update(state: "waiting")
+        ps.nics.each do |nic|
+          nic.update(encryption_key: nil)
+        end
+
+        decr_refresh_mesh
+      end
+
       hop :wait
     end
 

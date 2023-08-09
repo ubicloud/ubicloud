@@ -23,12 +23,10 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.12/32")
       expect(ps).not_to receive(:random_private_ipv6)
       expect(described_class).to receive(:gen_mac).and_return("00:11:22:33:44:55")
-      expect(described_class).to receive(:gen_encryption_key).and_return("0x30613961313636632d653765372d343434372d616232392d376561343432623562623065")
       expect(Nic).to receive(:create).with(
         private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
         private_ipv4: "10.0.0.12/32",
         mac: "00:11:22:33:44:55",
-        encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic"
       ).and_return(true)
@@ -41,12 +39,10 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(ps).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/128")
       expect(ps).not_to receive(:random_private_ipv4)
       expect(described_class).to receive(:gen_mac).and_return("00:11:22:33:44:55")
-      expect(described_class).to receive(:gen_encryption_key).and_return("0x30613961313636632d653765372d343434372d616232392d376561343432623562623065")
       expect(Nic).to receive(:create).with(
         private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
         private_ipv4: "10.0.0.12/32",
         mac: "00:11:22:33:44:55",
-        encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic"
       ).and_return(true)
