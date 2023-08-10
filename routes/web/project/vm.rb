@@ -37,7 +37,7 @@ class CloverWeb
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
         @subnets = Serializers::Web::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
         @prices = BillingRate.rates.each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
-          hash[br["location"]][br["resource_tyoe"]][br["resource_family"]] = {
+          hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
             hourly: br["unit_price"].to_f * 60,
             monthly: br["unit_price"].to_f * 60 * 24 * 30
           }
