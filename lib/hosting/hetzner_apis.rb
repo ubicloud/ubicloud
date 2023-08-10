@@ -61,7 +61,6 @@ class Hosting::HetznerApis
 
   def find_matching_ips(result)
     host_address = @host.vm_host.sshable.host
-
     (
       # Aggregate single-ip addresses.
       result[:ips].filter_map do |ip|
