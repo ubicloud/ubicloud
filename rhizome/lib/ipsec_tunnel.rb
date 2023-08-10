@@ -81,8 +81,7 @@ class IPSecTunnel
       "dst #{@dst_private_subnet} dir #{@direction} " \
       "tmpl src #{@src_clover_ephemeral} " \
       "dst #{@dst_clover_ephemeral} " \
-      "spi #{@spi} proto esp reqid 1 " \
-      "mode tunnel"
+      "proto esp reqid #{(@direction == "out") ? 1 : 0} mode tunnel"
   end
 
   def add_policy_command4
@@ -91,7 +90,6 @@ class IPSecTunnel
       "dst #{@dst_private_subnet4} dir #{@direction} " \
       "tmpl src #{@src_clover_ephemeral} " \
       "dst #{@dst_clover_ephemeral} " \
-      "spi #{@spi4} proto esp reqid 1 " \
-      "mode tunnel"
+      "proto esp reqid #{(@direction == "out") ? 1 : 0} mode tunnel"
   end
 end
