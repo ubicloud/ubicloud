@@ -1,10 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "./routes/base"
-
 class CloverApi < Roda
-  Unreloader.require "./routes/base.rb"
-
   include CloverBase
 
   plugin :default_headers,

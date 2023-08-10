@@ -1,12 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "./routes/base"
-
 require "tilt/sass"
 
 class CloverWeb < Roda
-  Unreloader.require "./routes/base.rb"
-
   include CloverBase
 
   opts[:check_dynamic_arity] = false
