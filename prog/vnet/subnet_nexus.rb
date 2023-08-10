@@ -40,6 +40,10 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop :refresh_keys
     end
 
+    if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
+      private_subnet.incr_refresh_keys
+    end
+
     nap 30
   end
 
@@ -94,7 +98,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   def wait_old_state_drop
     if private_subnet.nics.all? { |nic| nic.strand.label == "wait" }
-      private_subnet.update(state: "waiting")
+      private_subnet.update(state: "waiting", last_rekey_at: Time.now)
       private_subnet.nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
       end
