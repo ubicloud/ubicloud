@@ -102,6 +102,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       }.to hop("refresh_keys")
     end
 
+    it "increments refresh_keys if it passed more than a day" do
+      expect(ps).to receive(:last_rekey_at).and_return(Time.now - 60 * 60 * 24 - 1)
+      expect(ps).to receive(:incr_refresh_keys).and_return(true)
+      expect { nx.wait }.to nap(30)
+    end
+
     it "naps if nothing to do" do
       expect {
         nx.wait
@@ -192,8 +198,10 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "hops to wait if all is done" do
+      t = Time.now
+      expect(Time).to receive(:now).and_return(t)
       expect(nic.strand).to receive(:label).and_return("wait")
-      expect(ps).to receive(:update).with(state: "waiting").and_return(true)
+      expect(ps).to receive(:update).with(state: "waiting", last_rekey_at: t).and_return(true)
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
       expect(nx).to receive(:decr_refresh_keys).and_return(true)
