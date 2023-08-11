@@ -80,7 +80,7 @@
                     name: "private-subnet-id",
                     label: "Private Subnet",
                     placeholder: "Create new subnet",
-                    options: @subnets.to_h { |s| [s[:ubid], s[:name]] }
+                    options: @subnets.map { |s| [s[:ubid], s[:name], "location-based-option #{s[:location]}"] }
                   }
                 ) %>
               </div>
