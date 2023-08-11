@@ -78,11 +78,22 @@ RSpec.describe Clover, "project" do
       end
     end
 
-    it "can view project dashboard" do
-      visit "#{project.path}/dashboard"
+    describe "dashboard" do
+      it "can view project dashboard always" do
+        visit "#{project_wo_permissions.path}/dashboard"
 
-      expect(page.title).to eq("Ubicloud - #{project.name} Dashboard")
-      expect(page).to have_content project.name
+        expect(page.title).to eq("Ubicloud - #{project_wo_permissions.name} Dashboard")
+        expect(page).to have_content project_wo_permissions.name
+      end
+
+      it "raises forbidden when user isn't added to project" do
+        new_project = Project.create_with_id(name: "new-project")
+        visit "#{new_project.path}/dashboard"
+
+        expect(page.title).to eq("Ubicloud - Forbidden")
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content "Forbidden"
+      end
     end
 
     describe "details" do

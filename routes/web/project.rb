@@ -63,7 +63,11 @@ class CloverWeb
       end
 
       r.get "dashboard" do
-        Authorization.authorize(@current_user.id, "Project:view", @project.id)
+        # Even if user doesn't have access to the project details if it's added to the project,
+        # we still show the dashboard.
+        unless @project.user_ids.include?(@current_user.id)
+          fail Authorization::Unauthorized
+        end
 
         view "project/dashboard"
       end
