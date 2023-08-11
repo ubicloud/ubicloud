@@ -6,7 +6,7 @@ require "time"
 
 class Strand < Sequel::Model
   Strand.plugin :defaults_setter, cache: true
-  Strand.default_values[:stack] = [{}]
+  Strand.default_values[:stack] = proc { [{}] }
 
   LEASE_EXPIRATION = 120
   many_to_one :parent, key: :parent_id, class: self
