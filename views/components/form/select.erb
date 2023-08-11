@@ -24,8 +24,8 @@
         <%= placeholder %>
       </option>
     <% end %>
-    <% options.each do |opt_val, opt_text| %>
-      <option value="<%= opt_val %>" <%= (opt_val == selected) ? "selected" : "" %>>
+    <% options.each do |opt_val, opt_text, opt_classes| %>
+      <option value="<%= opt_val %>" class="<%= opt_classes %>" <%= (opt_val == selected) ? "selected" : "" %>>
         <%= opt_text %>
       </option>
     <% end %>

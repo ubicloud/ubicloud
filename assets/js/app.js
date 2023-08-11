@@ -1,6 +1,7 @@
 $(function() {
   setupPolicyEditor();
   setupLocationBasedPrices();
+  setupLocationBasedOptions();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -158,6 +159,7 @@ function jsonHighlight(str) {
 
 $("input[name=location]").on("change", function (event) {
   setupLocationBasedPrices();
+  setupLocationBasedOptions();
 });
 
 function setupLocationBasedPrices() {
@@ -188,4 +190,12 @@ function setupLocationBasedPrices() {
       $("#" + name + "-description").show();
     }
   });
+}
+
+function setupLocationBasedOptions() {
+  let selectedLocation = $("input[name=location]:checked").val();
+  $(".location-based-option").hide().prop('disabled', true).prop('checked', false).prop('selected', false);
+  if (selectedLocation) {
+    $(`.location-based-option.${selectedLocation}`).show().prop('disabled', false);
+  }
 }
