@@ -105,7 +105,9 @@ module CloverBase
   end
 
   def base_url
+    # :nocov:
     port = ":#{request.port}" if request.port != Rack::Request::DEFAULT_PORTS[request.scheme]
+    # :nocov:
     "#{request.scheme}://#{request.host}#{port}"
   end
 
@@ -130,14 +132,6 @@ module CloverBase
         end
         Unreloader.autoload(route_path, delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
       end
-    end
-
-    def freeze
-      # :nocov:
-      Sequel::Model.freeze_descendents unless Config.test?
-      # :nocov:
-      DB.freeze
-      super
     end
   end
 end
