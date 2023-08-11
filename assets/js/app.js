@@ -2,6 +2,7 @@ $(function() {
   setupPolicyEditor();
   setupLocationBasedPrices();
   setupLocationBasedOptions();
+  setupAutoRefresh();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -198,4 +199,13 @@ function setupLocationBasedOptions() {
   if (selectedLocation) {
     $(`.location-based-option.${selectedLocation}`).show().prop('disabled', false);
   }
+}
+
+function setupAutoRefresh() {
+  $("div.auto-refresh").each(function() {
+    const interval = $(this).data("interval");
+    setTimeout(function() {
+      location.reload();
+    }, interval * 1000);
+  });
 }
