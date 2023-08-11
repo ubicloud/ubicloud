@@ -53,7 +53,10 @@ class Clog
     #
     out = JSON.generate(dat)
 
-    # Add a newline to make debugging raw output a bit nicer.
-    $stdout.write(out[0..4094] + "\n")
+    # Two null terminators mark the end of complete output.  If
+    # they're not present, the reading process should assume the
+    # received value is not JSON produced from this process.  Add a
+    # newline to make debugging raw output a bit nicer.
+    $stdout.write((out + "\0\0")[0..4094] + "\n")
   end
 end

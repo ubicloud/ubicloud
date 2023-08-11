@@ -27,6 +27,11 @@
 # bytes, in our case, looking like a newline terminatd JSON may be
 # good enough.
 require "fcntl"
+require "json"
+require 'socket'
+require 'uri'
+require_relative "../lib/clog"
+require_relative "../lib/log_poster"
 
 # Unfortunately PIPE_BUF is a macro, and not in any standard
 # `extern`'d word of memory.  So I use the Linux default for the time
@@ -48,6 +53,14 @@ end
 pid = Process.spawn(*ARGV, close_others: true, in: $stdin, out: w_out, err: w_err)
 [$stdin, w_out, w_err].each(&:close)
 
+def prestructured?(s)
+  s[-3..-1] == "\0\0\n"
+end
+
+lp_uri = URI(ENV.delete("LOGPOST_URI"))
+lp_uri.query = URI.encode_www_form(URI.decode_www_form(lp_uri.query || "") + [["hostname", Socket.gethostname]])
+poster = LogPoster.new(lp_uri.to_s, JSON.parse(ENV.delete("LOGPOST_HEADERS")))
+
 th = Thread.new do
   loop do
     result = IO.select(live_fds)
@@ -57,14 +70,28 @@ th = Thread.new do
       next unless (read = fd.read_nonblock(ASSUMED_PIPE_BUF, exception: false))
       next true if read == :wait_readable
 
+      human_readable = if read.start_with?("{") && read.end_with?("}\0\0\n")
+                         read[0..-4] + "\n"
+                       else
+                         read
+                       end
+
       case fd
       when r_out
-        $stdout.write(read)
+        $stdout.write(human_readable)
       when r_err
-        $stderr.write(read)
+        $stderr.write(human_readable)
       else
         fail "BUG"
       end
+
+      send = if prestructured?(read)
+               read
+             else
+               JSON.generate(Clog.boilerplate.merge({line: read}))
+             end
+
+      poster.buffer_send(send)
 
       true
     end
