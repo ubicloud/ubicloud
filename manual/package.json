@@ -1,22 +1,17 @@
 {
-  "name": "@example/with-tailwindcss",
+  "name": "manual",
   "type": "module",
   "version": "0.0.1",
-  "private": true,
   "scripts": {
-    "dev": "npx astro dev",
-    "start": "npx astro dev",
-    "build": "npx astro build",
-    "preview": "npx astro preview",
-    "astro": "npx astro"
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/tailwind": ">=4.0.0",
-    "@types/canvas-confetti": ">=1.6.0",
-    "astro": ">=2.10.6",
-    "autoprefixer": ">=10.4.14",
-    "canvas-confetti": ">=1.6.0",
-    "postcss": ">=8.4.24",
-    "tailwindcss": ">=3.3.2"
+    "@astrojs/starlight": "^0.7.1",
+    "astro": "^2.10.5",
+    "sharp": "^0.32.3"
   }
 }
