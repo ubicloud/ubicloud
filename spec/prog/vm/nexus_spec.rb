@@ -456,6 +456,7 @@ RSpec.describe Prog::Vm::Nexus do
 
       before do
         expect(vm).to receive(:vm_host).and_return(vm_host)
+        expect(vm).to receive(:update).with(display_state: "deleting")
       end
 
       it "absorbs an already deleted errors as a success" do
@@ -501,6 +502,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:update).with(vm_id: nil)
       expect(nic).to receive(:incr_destroy)
       expect(vm).to receive(:nics).and_return([nic])
+      expect(vm).to receive(:update).with(display_state: "deleting")
       expect(vm).to receive(:destroy)
 
       expect { nx.destroy }.to exit({"msg" => "vm deleted"})

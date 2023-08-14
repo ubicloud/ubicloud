@@ -5,7 +5,7 @@ class CloverApi
     @serializer = Serializers::Api::Vm
 
     r.get true do
-      vms = @project.vms_dataset.where(location: @location).authorized(@current_user.id, "Vm:view").all
+      vms = @project.vms_dataset.where(location: @location).authorized(@current_user.id, "Vm:view").eager(:semaphores).all
 
       serialize(vms)
     end

@@ -5,7 +5,7 @@ class CloverWeb
     @serializer = Serializers::Web::Vm
 
     r.get true do
-      @vms = serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").all)
+      @vms = serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores).all)
 
       view "vm/index"
     end

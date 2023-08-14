@@ -38,6 +38,11 @@ class Vm < Sequel::Model
     assigned_vm_address&.ip
   end
 
+  def display_state
+    return "deleting" if destroy_set?
+    super
+  end
+
   Product = Struct.new(:prefix, :cores) do |klass|
     klass.define_singleton_method :parse do |s|
       fail "BUG: cannot parse product" unless s =~ /\A(\w+)-(\d+)\z/
