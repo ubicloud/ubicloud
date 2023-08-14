@@ -21,9 +21,7 @@
   </head>
 
   <body class="h-full">
-    <% if @error %>
-      <%== yield %>
-    <% elsif rodauth.authenticated? %>
+    <% if rodauth.authenticated? %>
       <div>
         <%== render("layouts/sidebar/desktop") %>
         <%== render("layouts/sidebar/mobile") %>
@@ -40,6 +38,8 @@
         </div>
       </div>
       <%== render("layouts/notifications") %>
+    <% elsif @error %>
+      <%== yield %>
     <% else %>
       <div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div class="sm:mx-auto sm:w-full sm:max-w-md">
