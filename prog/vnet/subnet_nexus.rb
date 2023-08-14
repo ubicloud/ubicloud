@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::Vnet::SubnetNexus < Prog::Base
+  subject_is :private_subnet
   semaphore :refresh_mesh, :destroy
 
   def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil)
@@ -24,17 +25,13 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def ps
-    @ps ||= PrivateSubnet[strand.id]
-  end
-
   def wait
     when_destroy_set? do
       hop :destroy
     end
 
     when_refresh_mesh_set? do
-      ps.update(state: "refreshing_mesh")
+      private_subnet.update(state: "refreshing_mesh")
       hop :refresh_mesh
     end
 
@@ -43,7 +40,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   def refresh_mesh
     DB.transaction do
-      ps.nics.each do |nic|
+      private_subnet.nics.each do |nic|
         nic.update(encryption_key: "0x" + SecureRandom.bytes(36).unpack1("H*"))
         nic.incr_refresh_mesh
       end
@@ -53,10 +50,10 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   def wait_refresh_mesh
-    unless ps.nics.any? { SemSnap.new(_1.id).set?("refresh_mesh") }
+    unless private_subnet.nics.any? { SemSnap.new(_1.id).set?("refresh_mesh") }
       DB.transaction do
-        ps.update(state: "waiting")
-        ps.nics.each do |nic|
+        private_subnet.update(state: "waiting")
+        private_subnet.nics.each do |nic|
           nic.update(encryption_key: nil)
         end
 
@@ -70,18 +67,18 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   def destroy
-    if ps.nics.any? { |n| !n.vm_id.nil? }
+    if private_subnet.nics.any? { |n| !n.vm_id.nil? }
       fail "Cannot destroy subnet with active nics, first clean up the attached resources"
     end
 
-    if ps.nics.empty?
+    if private_subnet.nics.empty?
       DB.transaction do
-        ps.projects.each { |p| ps.dissociate_with_project(p) }
-        ps.destroy
+        private_subnet.projects.each { |p| private_subnet.dissociate_with_project(p) }
+        private_subnet.destroy
       end
       pop "subnet destroyed"
     else
-      ps.nics.map { |n| n.incr_destroy }
+      private_subnet.nics.map { |n| n.incr_destroy }
       nap 1
     end
   end
