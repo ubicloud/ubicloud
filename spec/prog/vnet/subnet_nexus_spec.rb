@@ -13,7 +13,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   }
 
   before do
-    nx.instance_variable_set(:@ps, ps)
+    nx.instance_variable_set(:@private_subnet, ps)
   end
 
   describe ".assemble" do
