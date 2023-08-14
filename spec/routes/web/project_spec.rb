@@ -94,6 +94,17 @@ RSpec.describe Clover, "project" do
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
       end
+
+      it "not show on sidebar when does not have permissions" do
+        visit "#{project_wo_permissions.path}/dashboard"
+
+        within find_by_id("desktop-menu") do
+          expect { click_link "Users" }.to raise_error Capybara::ElementNotFound
+          expect { click_link "Access Policy" }.to raise_error Capybara::ElementNotFound
+          expect { click_link "Billing" }.to raise_error Capybara::ElementNotFound
+          expect { click_link "Settings" }.to raise_error Capybara::ElementNotFound
+        end
+      end
     end
 
     describe "details" do
