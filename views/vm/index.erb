@@ -15,9 +15,9 @@
       "components/page_header",
       locals: {
         title: "Virtual Machines",
-        right_items: [
+        right_items: @project_permissions.include?("Vm:create") ? [
           "<a href='vm/create' class='inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600'>Create Virtual Machine</a>"
-        ]
+        ] : []
       }
     ) %>
   </div>
@@ -75,9 +75,11 @@
     locals: {
       icon: "hero-server-stack",
       title: "No virtual machines",
+      description: "You don't have permission to create virtual machines."
+    }.merge(@project_permissions.include?("Vm:create") ? {
       description: "Get started by creating a new virtual machine.",
       button_link: "#{@project_data[:path]}/vm/create",
       button_title: "New Virtual Machine"
-    }
+    } : {})
   ) %>
 <% end %>

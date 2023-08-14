@@ -13,18 +13,28 @@ module Authorization
     end
   end
 
+  def self.all_permissions(subject_id, object_id)
+    matched_policies(subject_id, nil, object_id).flat_map { _1[:actions] }
+  end
+
   def self.authorized_resources(subject_id, actions)
     matched_policies(subject_id, actions).map { _1[:tagged_id] }
   end
 
-  def self.matched_policies(subject_id, actions, object_id = nil)
+  def self.matched_policies(subject_id, actions = nil, object_id = nil)
     object_filter = if object_id
       Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
     else
       Sequel.lit("")
     end
 
-    DB[<<~SQL, {subject_id: subject_id, actions: Sequel.pg_array(Array(actions)), object_filter: object_filter}].all
+    actions_filter = if actions
+      Sequel.lit("AND actions ?| array[:actions]", {actions: Sequel.pg_array(Array(actions))})
+    else
+      Sequel.lit("")
+    end
+
+    DB[<<~SQL, {subject_id: subject_id, actions_filter: actions_filter, object_filter: object_filter}].all
       SELECT object_applied_tags.tagged_id, object_applied_tags.tagged_table, subjects, actions, objects
       FROM accounts AS subject
         JOIN applied_tag AS subject_applied_tags ON subject.id = subject_applied_tags.tagged_id
@@ -34,8 +44,8 @@ module Authorization
           JOIN access_tag AS object_access_tags ON subject_access_tags.project_id = object_access_tags.project_id
           JOIN applied_tag AS object_applied_tags ON object_access_tags.id = object_applied_tags.access_tag_id AND objects ? object_access_tags."name"
       WHERE subject.id = :subject_id
-        AND actions ?| array[:actions]
         AND subjects ? subject_access_tags."name"
+        :actions_filter
         :object_filter
     SQL
   end

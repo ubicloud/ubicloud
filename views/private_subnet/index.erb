@@ -14,9 +14,9 @@
       "components/page_header",
       locals: {
         title: "Private Subnets",
-        right_items: [
+        right_items: @project_permissions.include?("PrivateSubnet:create") ? [
           "<a href='private-subnet/create' class='inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600'>Create Private Subnet</a>"
-        ]
+        ] : []
       }
     ) %>
   </div>
@@ -57,9 +57,11 @@
     locals: {
       icon: "hero-globe-alt",
       title: "No private subnets",
+      description: "You don't have permission to create private subnet."
+    }.merge(@project_permissions.include?("PrivateSubnet:create") ? {
       description: "Get started by creating a new private subnet.",
       button_link: "#{@project_data[:path]}/private-subnet/create",
       button_title: "New Private Subnet"
-    }
+    } : {})
   ) %>
 <% end %>
