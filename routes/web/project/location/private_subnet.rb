@@ -24,6 +24,11 @@ class CloverWeb
       r.delete true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:delete", ps.id)
 
+        if ps.vms_dataset.count > 0
+          response.status = 400
+          return {message: "Private subnet has VMs attached, first, delete them."}.to_json
+        end
+
         ps.incr_destroy
 
         return {message: "Deleting #{ps.name}"}.to_json
