@@ -17,6 +17,9 @@ end
 
 module SemaphoreMethods
   def self.included(base)
+    base.class_eval do
+      one_to_many :semaphores, key: :strand_id
+    end
     base.extend(ClassMethods)
   end
 
@@ -26,6 +29,10 @@ module SemaphoreMethods
       names.each do |name|
         define_method "incr_#{name}" do
           Semaphore.incr(id, name)
+        end
+
+        define_method "#{name}_set?" do
+          semaphores.any? { |s| s.name == name.to_s }
         end
       end
     end

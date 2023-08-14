@@ -327,6 +327,8 @@ SQL
   def destroy
     register_deadline(nil, 5 * 60)
 
+    vm.update(display_state: "deleting")
+
     unless host.nil?
       begin
         host.sshable.cmd("sudo systemctl stop #{q_vm}")

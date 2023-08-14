@@ -3,7 +3,18 @@
 require_relative "spec_helper"
 
 RSpec.describe Vm do
-  subject(:vm) { described_class.new }
+  subject(:vm) { described_class.new(display_state: "creating") }
+
+  describe "#display_state" do
+    it "returns deleting if destroy semaphore increased" do
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "destroy")])
+      expect(vm.display_state).to eq("deleting")
+    end
+
+    it "return same if semaphores not increased" do
+      expect(vm.display_state).to eq("creating")
+    end
+  end
 
   describe "#product" do
     it "crashes if a bogus product is passed" do
