@@ -194,6 +194,19 @@ RSpec.describe Clover, "private subnet" do
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
+
+      it "can not delete private subnet when there are active VMs" do
+        private_subnet
+        n_id = Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "dummy-nic",
+          ipv6_addr: "fd38:5c12:20bf:67d4:919e::/79",
+          ipv4_addr: "172.17.226.186/32").id
+        Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm", nic_id: n_id)
+
+        visit "#{project.path}#{private_subnet.path}"
+        btn = find ".delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.body).to eq({message: "Private subnet has VMs attached, first, delete them."}.to_json)
+      end
     end
   end
 end
