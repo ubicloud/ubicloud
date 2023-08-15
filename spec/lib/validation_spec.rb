@@ -69,5 +69,34 @@ RSpec.describe Validation do
         end
       end
     end
+
+    describe "#validate_os_user_name" do
+      it "valid os user names" do
+        [
+          "abc",
+          "abc123",
+          "abc-123",
+          "abc_123",
+          "_abc",
+          "abc-_-123",
+          "a-b-c-1-2",
+          "a" * 32
+        ].each do |name|
+          expect(described_class.validate_os_user_name(name)).to be_nil
+        end
+      end
+
+      it "invalid os user names" do
+        [
+          "-abc",
+          "ABC",
+          "123abc",
+          "abc$",
+          "a" * 33
+        ].each do |name|
+          expect { described_class.validate_os_user_name(name) }.to raise_error described_class::ValidationFailed
+        end
+      end
+    end
   end
 end
