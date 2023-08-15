@@ -26,6 +26,7 @@ class Prog::Vm::Nexus < Prog::Base
     name ||= Vm.ubid_to_name(ubid)
 
     Validation.validate_name(name)
+    Validation.validate_os_user_name(unix_user)
 
     key_wrapping_algorithm = "aes-256-gcm"
     cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)

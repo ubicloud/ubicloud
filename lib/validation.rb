@@ -17,6 +17,13 @@ module Validation
   # Do not allow uppercase letters to not deal with case sensitivity
   ALLOWED_NAME_PATTERN = '\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z'
 
+  # Different operating systems have different conventions.
+  # Below are reasonable restrictions that works for most (all?) systems.
+  # - Max length 32
+  # - Only lowercase letters, numbers, hyphens and underscore
+  # - Not start with a hyphen or number
+  ALLOWED_OS_USER_NAME_PATTERN = '\A[a-z_][a-z0-9_-]{0,31}\z'
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name.match(ALLOWED_NAME_PATTERN)
@@ -38,5 +45,10 @@ module Validation
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available providers: #{Option::VmSizes.map(&:name)}"})
     end
     vm_size
+  end
+
+  def self.validate_os_user_name(os_user_name)
+    msg = "OS user name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32."
+    fail ValidationFailed.new({user: msg}) unless os_user_name.match(ALLOWED_OS_USER_NAME_PATTERN)
   end
 end
