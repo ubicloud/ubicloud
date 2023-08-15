@@ -235,7 +235,7 @@ RSpec.describe Prog::Vm::Nexus do
       end
       expect(sshable).to receive(:cmd).with(/sudo bin\/prepvm/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
 
-      expect { nx.prep }.to hop("trigger_refresh_mesh")
+      expect { nx.prep }.to hop("run")
     end
 
     it "generates local_ipv4 if not set" do
@@ -366,15 +366,6 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
-  describe "#trigger_refresh_mesh" do
-    it "triggers a refresh_mesh and hops" do
-      ps = instance_double(PrivateSubnet)
-      expect(vm).to receive(:private_subnets).and_return([ps])
-      expect(ps).to receive(:incr_refresh_mesh).and_return(true)
-      expect { nx.trigger_refresh_mesh }.to hop("run")
-    end
-  end
-
   describe "#run" do
     it "runs the vm" do
       sshable = instance_double(Sshable)
@@ -436,33 +427,9 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.wait }.to nap(30)
     end
 
-    it "hops to refresh_mesh when needed" do
-      expect(nx).to receive(:when_refresh_mesh_set?).and_yield
-      expect { nx.wait }.to hop("refresh_mesh")
-    end
-
     it "hops to start_after_host_reboot when needed" do
       expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
       expect { nx.wait }.to hop("start_after_host_reboot")
-    end
-  end
-
-  describe "#refresh_mesh" do
-    it "decrements refresh_mesh and hops to wait in development" do
-      expect(Config).to receive(:development?).and_return(false)
-      expect(nx).to receive(:decr_refresh_mesh).and_return(true)
-      expect { nx.refresh_mesh }.to hop("wait")
-    end
-
-    it "increments refresh_mesh for all the private_subnets and hops to wait in production" do
-      expect(Config).to receive(:development?).and_return(true)
-
-      ps = instance_double(PrivateSubnet)
-      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(nx.vm).to receive(:private_subnets).and_return([ps])
-      expect(ps).to receive(:incr_refresh_mesh).and_return(true)
-      expect(nx).to receive(:decr_refresh_mesh).and_return(true)
-      expect { nx.refresh_mesh }.to hop("wait")
     end
   end
 
@@ -544,7 +511,6 @@ RSpec.describe Prog::Vm::Nexus do
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
       )
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm[0-9a-z]+/)
-      expect(nx).to receive(:incr_refresh_mesh)
       expect(vm).to receive(:update).with(display_state: "starting")
       expect(vm).to receive(:update).with(display_state: "running")
 

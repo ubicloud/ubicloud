@@ -22,15 +22,15 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps)
       expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.12/32")
       expect(ps).not_to receive(:random_private_ipv6)
-      expect(described_class).to receive(:gen_mac).and_return("00:11:22:33:44:55")
+      expect(described_class).to receive(:rand).and_return(123).exactly(6).times
       expect(Nic).to receive(:create).with(
         private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
         private_ipv4: "10.0.0.12/32",
-        mac: "00:11:22:33:44:55",
+        mac: "7a:7b:7b:7b:7b:7b",
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic"
       ).and_return(true)
-      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
+      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait_vm").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(ps.id, ipv6_addr: "fd10:9b0b:6b4b:8fbb::/128", name: "demonic")
     end
 
@@ -46,8 +46,7 @@ RSpec.describe Prog::Vnet::NicNexus do
         private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
         name: "demonic"
       ).and_return(true)
-      expect(ps).to receive(:add_nic).and_return(true)
-      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
+      expect(Strand).to receive(:create).with(prog: "Vnet::NicNexus", label: "wait_vm").and_yield(Strand.new).and_return(Strand.new)
       described_class.assemble(ps.id, ipv4_addr: "10.0.0.12/32", name: "demonic")
     end
   end
@@ -65,18 +64,45 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
   end
 
+  describe "#wait_vm" do
+    it "naps if nothing to do" do
+      expect {
+        nx.wait_vm
+      }.to nap(1)
+    end
+
+    it "starts setup and pings subnet" do
+      nic = instance_double(Nic, private_subnet: ps)
+      expect(nx).to receive(:nic).and_return(nic).at_least(:once)
+      expect(nx).to receive(:when_setup_nic_set?).and_yield
+      expect(ps).to receive(:incr_add_new_nic)
+      expect {
+        nx.wait_vm
+      }.to hop("wait_setup")
+    end
+  end
+
+  describe "#wait_setup" do
+    it "naps if nothing to do" do
+      expect {
+        nx.wait_setup
+      }.to nap(1)
+    end
+
+    it "starts rekeying if setup is triggered" do
+      expect(nx).to receive(:when_start_rekey_set?).and_yield
+      expect(nx).to receive(:decr_setup_nic)
+      expect {
+        nx.wait_setup
+      }.to hop("start_rekey")
+    end
+  end
+
   describe "#wait" do
     it "naps if nothing to do" do
       expect {
         nx.wait
       }.to nap(30)
-    end
-
-    it "hops to refresh_mesh if needed" do
-      expect(nx).to receive(:when_refresh_mesh_set?).and_yield
-      expect {
-        nx.wait
-      }.to hop("refresh_mesh")
     end
 
     it "hops to detach vm if needed" do
@@ -95,6 +121,12 @@ RSpec.describe Prog::Vnet::NicNexus do
   end
 
   describe "#rekey" do
+    let(:nic) { instance_double(Nic) }
+
+    before do
+      allow(nx).to receive(:nic).and_return(nic)
+    end
+
     it "buds rekey with setup_inbound and hops to wait_rekey_inbound" do
       expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound).and_return(true)
       expect {
@@ -179,47 +211,6 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
   end
 
-  describe "#refresh_mesh" do
-    let(:nic) {
-      Nic.new(private_subnet_id: ps.id,
-        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
-        private_ipv4: "10.0.0.1",
-        mac: "00:00:00:00:00:00",
-        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { _1.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
-    }
-    let(:ipsec_tunnels) {
-      [
-        instance_double(IpsecTunnel),
-        instance_double(IpsecTunnel)
-      ]
-    }
-
-    before do
-      allow(nx).to receive(:nic).and_return(nic)
-    end
-
-    it "just decrements semaphore and hops back when not attached to a vm" do
-      expect(nx).to receive(:decr_refresh_mesh).and_return(true)
-
-      expect {
-        nx.refresh_mesh
-      }.to hop("wait")
-    end
-
-    it "refreshes tunnels" do
-      expect(nic).to receive(:vm_id).and_return("vm_id")
-      expect(nic).to receive(:src_ipsec_tunnels).and_return(ipsec_tunnels)
-      expect(ipsec_tunnels[0]).to receive(:refresh).and_return(true)
-      expect(ipsec_tunnels[1]).to receive(:refresh).and_return(true)
-      expect(nx).to receive(:decr_refresh_mesh).and_return(true)
-
-      expect {
-        nx.refresh_mesh
-      }.to hop("wait")
-    end
-  end
-
   describe "#destroy" do
     let(:ps) {
       PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
@@ -250,7 +241,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(nic).to receive(:src_ipsec_tunnels_dataset).and_return(ipsec_tunnels[0])
       expect(nic).to receive(:dst_ipsec_tunnels_dataset).and_return(ipsec_tunnels[1])
       expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(ps).to receive(:incr_refresh_mesh).and_return(true)
+      expect(ps).to receive(:incr_refresh_keys).and_return(true)
       expect(nx).to receive(:pop).with("nic deleted").and_return(true)
       expect(nic).to receive(:destroy).and_return(true)
       nx.destroy
@@ -296,9 +287,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(ipsec_tunnels[1]).to receive(:destroy).and_return(true)
 
       expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(ps).to receive(:incr_refresh_mesh).and_return(true)
-
-      # expect(nx).to receive(:decr_refresh_mesh).and_return(true)
+      expect(ps).to receive(:incr_refresh_keys).and_return(true)
 
       expect {
         nx.detach_vm
