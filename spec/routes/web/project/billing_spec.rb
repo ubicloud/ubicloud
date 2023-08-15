@@ -159,5 +159,65 @@ RSpec.describe Clover, "billing" do
       expect(page.body).to eq({message: "Deleting #{payment_method.ubid}"}.to_json)
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
+
+    describe "invoices" do
+      def billing_record(begin_time, end_time)
+        vm = Vm.create_with_id(
+          unix_user: "x",
+          public_key: "x",
+          name: "vm-1",
+          family: "standard",
+          cores: 1,
+          location: "hetzner-hel1",
+          boot_image: "x"
+        )
+        BillingRecord.create_with_id(
+          project_id: billing_info.project.id,
+          resource_id: vm.id,
+          resource_name: vm.name,
+          span: Sequel::Postgres::PGRange.new(begin_time, end_time),
+          billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
+          amount: vm.cores
+        )
+      end
+
+      it "list invoices of project" do
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
+        bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        InvoiceGenerator.new(bi.span.begin, bi.span.end, true).run
+        invoice = Invoice.first
+
+        visit "#{project.path}/billing"
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - Project Billing")
+        expect(page).to have_content invoice.name
+
+        click_link invoice.name
+      end
+
+      it "show invoice details" do
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
+        bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
+        InvoiceGenerator.new(bi.span.begin, bi.span.end, true).run
+        invoice = Invoice.first
+
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}"
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - #{invoice.name} - Invoice")
+        expect(page).to have_content invoice.name
+        expect(page).to have_content "less than $0.001"
+      end
+
+      it "raises not found when invoice not exists" do
+        visit "#{project.path}/billing/invoice/08s56d4kaj94xsmrnf5v5m3mav"
+
+        expect(page.title).to eq("Ubicloud - Resource not found")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "Resource not found"
+      end
+    end
   end
 end

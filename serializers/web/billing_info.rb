@@ -6,7 +6,8 @@ class Serializers::Web::BillingInfo < Serializers::Base
   def self.base(bi)
     {
       id: bi.id,
-      ubid: bi.ubid,
+      ubid: bi.ubid
+    }.merge(bi.stripe_data ? {
       name: bi.stripe_data["name"],
       email: bi.stripe_data["email"],
       address: [bi.stripe_data["address"]["line1"], bi.stripe_data["address"]["line2"]].compact.join(" "),
@@ -14,7 +15,7 @@ class Serializers::Web::BillingInfo < Serializers::Base
       city: bi.stripe_data["address"]["city"],
       state: bi.stripe_data["address"]["state"],
       postal_code: bi.stripe_data["address"]["postal_code"]
-    }
+    } : {})
   end
 
   structure(:default) do |bi|

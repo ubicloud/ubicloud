@@ -21,7 +21,9 @@
   </head>
 
   <body class="h-full">
-    <% if rodauth.authenticated? %>
+    <% if @full_page %>
+      <%== yield %>
+    <% elsif rodauth.authenticated? %>
       <div>
         <%== render("layouts/sidebar/desktop") %>
         <%== render("layouts/sidebar/mobile") %>
