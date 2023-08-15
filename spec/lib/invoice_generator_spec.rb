@@ -23,6 +23,13 @@ RSpec.describe InvoiceGenerator do
       project_id: project.id,
       project_name: project.name,
       billing_info: Serializers::Web::BillingInfo.serialize(project.billing_info),
+      issuer_info: {
+        address: "310 Santa Ana Avenue",
+        country: "US",
+        city: "San Francisco",
+        state: "CA",
+        postal_code: "94127"
+      },
       resources: [{
         resource_id: vm.id,
         resource_name: vm.name,

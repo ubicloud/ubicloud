@@ -20,6 +20,13 @@ class InvoiceGenerator
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
         project_content[:billing_info] = Serializers::Web::BillingInfo.serialize(project.billing_info)
+        project_content[:issuer_info] = {
+          address: "310 Santa Ana Avenue",
+          country: "US",
+          city: "San Francisco",
+          state: "CA",
+          postal_code: "94127"
+        }
 
         project_content[:resources] = []
         project_content[:subtotal] = 0

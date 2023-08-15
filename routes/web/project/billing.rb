@@ -17,6 +17,7 @@ class CloverWeb
         @billing_info_data = Serializers::Web::BillingInfo.serialize(billing_info)
         # TODO: Use list payment methods API instead of fetching them one by one.
         @payment_methods = Serializers::Web::PaymentMethod.serialize(billing_info.payment_methods)
+        @invoices = Serializers::Web::Invoice.serialize(@project.invoices_dataset.order(Sequel.desc(:created_at)).all)
       end
 
       view "project/billing"
@@ -103,6 +104,25 @@ class CloverWeb
           payment_method.destroy
 
           return {message: "Deleting #{payment_method.ubid}"}.to_json
+        end
+      end
+    end
+
+    r.on "invoice" do
+      r.is String do |invoice_ubid|
+        @serializer = Serializers::Web::Invoice
+
+        invoice = Invoice.from_ubid(invoice_ubid)
+
+        unless invoice
+          response.status = 404
+          r.halt
+        end
+
+        r.get true do
+          @full_page = r.params["print"] == "1"
+          @invoice_data = serialize(invoice)
+          view "project/invoice"
         end
       end
     end
