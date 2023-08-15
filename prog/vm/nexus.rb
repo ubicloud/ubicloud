@@ -294,8 +294,17 @@ SQL
 
   def run
     host.sshable.cmd("sudo systemctl start #{q_vm}")
-    vm.update(display_state: "running")
-    hop :wait
+    hop :wait_sshable
+  end
+
+  def wait_sshable
+    addr = vm.ephemeral_net4 || vm.ephemeral_net6.nth(2)
+    out = `ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@#{addr} 2>&1`
+    if out.include? "Host key verification failed."
+      vm.update(display_state: "running")
+      hop :wait
+    end
+    nap 1
   end
 
   def wait

@@ -380,9 +380,30 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_double(Sshable)
       host = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(host)
-      expect(vm).to receive(:update).with(display_state: "running")
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm/)
-      expect { nx.run }.to hop("wait")
+      expect { nx.run }.to hop("wait_sshable")
+    end
+  end
+
+  describe "#wait_sshable" do
+    it "naps if not sshable" do
+      expect(vm).to receive(:ephemeral_net4).and_return("10.0.0.1")
+      expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@10.0.0.1 2>&1").and_return("")
+      expect { nx.wait_sshable }.to nap(1)
+    end
+
+    it "hops to wait if sshable" do
+      expect(vm).to receive(:ephemeral_net4).and_return("10.0.0.1")
+      expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@10.0.0.1 2>&1").and_return("Host key verification failed.")
+      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+      expect { nx.wait_sshable }.to hop("wait")
+    end
+
+    it "uses ipv6 if ipv4 is not enabled" do
+      expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:3bfa::/79"))
+      expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@2a01:4f8:10a:128b:3bfa::2 2>&1").and_return("Host key verification failed.")
+      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+      expect { nx.wait_sshable }.to hop("wait")
     end
   end
 
