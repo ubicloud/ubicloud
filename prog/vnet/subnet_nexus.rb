@@ -2,7 +2,7 @@
 
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
-  semaphore :refresh_mesh, :destroy, :refresh_keys
+  semaphore :destroy, :refresh_keys, :add_new_nic
 
   def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil)
     project = Project[project_id]
@@ -20,9 +20,17 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     ipv4_range ||= random_private_ipv4(location).to_s
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
-      ps.associate_with_project(project)
+      ps.associate_with_project(project) if project
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
+  end
+
+  def to_be_added_nics
+    private_subnet.nics.select { _1.strand.label == "wait_setup" }
+  end
+
+  def active_nics
+    private_subnet.nics.select { _1.strand.label == "wait" }
   end
 
   def rekeying_nics
@@ -34,14 +42,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop :destroy
     end
 
-    when_refresh_mesh_set? do
-      private_subnet.update(state: "refreshing_mesh")
-      hop :refresh_mesh
-    end
-
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
       hop :refresh_keys
+    end
+
+    when_add_new_nic_set? do
+      private_subnet.update(state: "adding_new_nic")
+      hop :add_new_nic
     end
 
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
@@ -63,22 +71,26 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     SecureRandom.random_number(100000) + 1
   end
 
-  def refresh_keys
-    payload = {}
+  def nics_to_rekey
+    active_nics + to_be_added_nics
+  end
 
-    private_subnet.nics.each do |nic|
-      payload = {
-        spi4: gen_spi,
-        spi6: gen_spi,
-        reqid: gen_reqid
-      }
-      nic.update(encryption_key: gen_encryption_key, rekey_payload: payload)
+  def add_new_nic
+    nics_to_rekey.each do |nic|
+      nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
+      nic.incr_start_rekey
     end
+    decr_add_new_nic
+    hop :wait_inbound_setup
+  end
 
-    private_subnet.nics.each do |nic|
+  def refresh_keys
+    active_nics.each do |nic|
+      nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
     end
 
+    decr_refresh_keys
     hop :wait_inbound_setup
   end
 
@@ -103,7 +115,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   def wait_old_state_drop
     if rekeying_nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-      decr_refresh_keys unless private_subnet.nics.any? { _1.rekey_payload.nil? }
       rekeying_nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
       end
@@ -111,34 +122,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop :wait
     end
     donate
-  end
-
-  def refresh_mesh
-    DB.transaction do
-      private_subnet.nics.each do |nic|
-        nic.update(encryption_key: gen_encryption_key)
-        nic.incr_refresh_mesh
-      end
-    end
-
-    hop :wait_refresh_mesh
-  end
-
-  def wait_refresh_mesh
-    unless private_subnet.nics.any? { SemSnap.new(_1.id).set?("refresh_mesh") }
-      DB.transaction do
-        private_subnet.update(state: "waiting")
-        private_subnet.nics.each do |nic|
-          nic.update(encryption_key: nil)
-        end
-
-        decr_refresh_mesh
-      end
-
-      hop :wait
-    end
-
-    nap 1
   end
 
   def destroy

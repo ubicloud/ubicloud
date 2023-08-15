@@ -7,7 +7,7 @@ require "openssl"
 require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
-  semaphore :destroy, :refresh_mesh, :start_after_host_reboot
+  semaphore :destroy, :start_after_host_reboot
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
@@ -57,6 +57,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       unless nic
+        subnet = nil
         if private_subnet_id
           subnet = PrivateSubnet[private_subnet_id]
           raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
@@ -67,6 +68,7 @@ class Prog::Vm::Nexus < Prog::Base
         end
         nic_s = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic")
         nic = Nic[nic_s.id]
+        subnet.add_nic(nic)
       end
 
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
@@ -284,16 +286,11 @@ SQL
     host.sshable.cmd("echo #{params_json.shellescape} | sudo -u #{q_vm} tee #{params_path.shellescape}")
 
     host.sshable.cmd("sudo bin/prepvm.rb #{params_path.shellescape}", stdin: secrets_json)
-    hop :trigger_refresh_mesh
-  end
-
-  def trigger_refresh_mesh
-    vm.private_subnets.each { |ps| ps.incr_refresh_mesh }
-
     hop :run
   end
 
   def run
+    vm.nics.each { _1.incr_setup_nic }
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     hop :wait_sshable
   end
@@ -309,29 +306,11 @@ SQL
   end
 
   def wait
-    when_refresh_mesh_set? do
-      hop :refresh_mesh
-    end
-
     when_start_after_host_reboot_set? do
       hop :start_after_host_reboot
     end
 
     nap 30
-  end
-
-  def refresh_mesh
-    register_deadline(:wait, 5 * 60)
-
-    # YYY: Implement a robust mesh networking concurrency algorithm.
-    unless Config.development?
-      decr_refresh_mesh
-      hop :wait
-    end
-
-    vm.private_subnets.each { |ps| ps.incr_refresh_mesh }
-    decr_refresh_mesh
-    hop :wait
   end
 
   def destroy
@@ -392,9 +371,6 @@ SQL
     vm.update(display_state: "running")
 
     decr_start_after_host_reboot
-
-    # trigger setting up private subnet connections
-    incr_refresh_mesh
 
     hop :wait
   end
