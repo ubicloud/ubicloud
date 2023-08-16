@@ -178,4 +178,12 @@ class VmHost < Sequel::Model
       create_addresses
     end
   end
+
+  def reset
+    unless Config.development?
+      fail "BUG: reset is only allowed in development"
+    end
+
+    Hosting::Apis.reset_server(self)
+  end
 end

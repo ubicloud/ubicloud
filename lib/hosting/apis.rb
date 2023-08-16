@@ -9,4 +9,12 @@ class Hosting::Apis
       raise "unknown provider #{vm_host.provider}"
     end
   end
+
+  def self.reset_server(vm_host)
+    if vm_host.provider == HetznerHost::PROVIDER_NAME
+      vm_host.hetzner_host.api.reset(vm_host.hetzner_host.server_identifier)
+    else
+      raise "unknown provider #{vm_host.provider}"
+    end
+  end
 end

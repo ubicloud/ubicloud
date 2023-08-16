@@ -8,6 +8,33 @@ class Hosting::HetznerApis
     @host = hetzner_host
   end
 
+  def reset(server_id)
+    unless Config.hetzner_ssh_key
+      raise "hetzner_ssh_key is not set"
+    end
+
+    key_data = Config.hetzner_ssh_key.split(" ")[1]
+    decoded_data = Base64.decode64(key_data)
+    fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
+    formatted_fingerprint = fingerprint.scan(/../).join(":")
+    connection = Excon.new(@host.connection_string,
+      user: @host.user,
+      password: @host.password,
+      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+    response = connection.post(path: "/boot/#{server_id}/linux",
+      body: URI.encode_www_form(dist: "Ubuntu 22.04.2 LTS base", lang: "en", authorized_key: formatted_fingerprint))
+
+    if response.status != 200
+      raise "unexpected status #{response.status} for boot"
+    end
+
+    response = connection.post(path: "/reset/#{server_id}", body: "type=hw")
+
+    if response.status != 200
+      raise "unexpected status #{response.status} for reset"
+    end
+  end
+
   # Fetches and processes the IPs, subnets, and failovers from the Hetzner API.
   # It then calls `find_matching_ips` to retrieve IP addresses that match with the host's IP address.
   # This whole thing is needed because Hetzner API is simply not good enough to do this in one call.

@@ -11,6 +11,33 @@ RSpec.describe Hosting::HetznerApis do
   let(:hetzner_host) { instance_double(HetznerHost, connection_string: "https://robot-ws.your-server.de", user: "user1", password: "pass", vm_host: vm_host) }
   let(:hetzner_apis) { described_class.new(hetzner_host) }
 
+  describe "reset" do
+    it "can reset a server" do
+      expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
+      Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
+      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 200, body: ""})
+      expect(hetzner_apis.reset(123)).to be_nil
+    end
+
+    it "raises an error if the reset fails" do
+      expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
+      Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
+      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 400, body: ""})
+      expect { hetzner_apis.reset(123) }.to raise_error RuntimeError, "unexpected status 400 for reset"
+    end
+
+    it "raises an error if the ssh key is not set" do
+      expect(Config).to receive(:hetzner_ssh_key).and_return(nil)
+      expect { hetzner_apis.reset(123) }.to raise_error RuntimeError, "hetzner_ssh_key is not set"
+    end
+
+    it "raises an error if the boot fails" do
+      expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
+      Excon.stub({path: "/boot/123/linux", method: :post}, {status: 400, body: ""})
+      expect { hetzner_apis.reset(123) }.to raise_error RuntimeError, "unexpected status 400 for boot"
+    end
+  end
+
   describe "hetzner_pull_ips" do
     it "can pull empty data from the API" do
       stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([]))
