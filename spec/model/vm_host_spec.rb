@@ -120,6 +120,19 @@ RSpec.describe VmHost do
     vh.hetznerify("12")
   end
 
+  it "reset server fails for non development" do
+    expect(Config).to receive(:development?).and_return(false)
+    expect {
+      vh.reset
+    }.to raise_error(RuntimeError, "BUG: reset is only allowed in development")
+  end
+
+  it "resets the server in development" do
+    expect(Config).to receive(:development?).and_return(true)
+    expect(Hosting::Apis).to receive(:reset_server).with(vh)
+    vh.reset
+  end
+
   it "create_addresses fails if a failover ip of non existent server is being added" do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)

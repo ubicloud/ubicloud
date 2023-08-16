@@ -80,4 +80,5 @@ module Config
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
+  override :hetzner_ssh_key, string
 end
