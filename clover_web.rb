@@ -161,6 +161,18 @@ class CloverWeb < Roda
     change_login_route "account/change-login"
     change_login_view { view "account/change_login", "My Account" }
 
+    verify_login_change_view { view "auth/verify_login_change", "Verify Email Change" }
+    send_verify_login_change_email do |new_login|
+      user = Account[account_id]
+      scope.send_email(email_to, "Please Verify New Email Address for Ubicloud",
+        greeting: "Hello #{user.name},",
+        body: ["We received a request to change your account email to '#{new_login}'. To verify new email, click the button below.",
+          "If you did not initiate this request, no action is needed. Current email address can be used to login your account.",
+          "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+        button_title: "Verify Email",
+        button_link: verify_login_change_email_link)
+    end
+
     close_account_redirect "/login"
     close_account_route "account/close-account"
     close_account_view { view "account/close_account", "My Account" }
