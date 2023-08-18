@@ -72,7 +72,6 @@ RSpec.describe Clover, "vm" do
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
-        expect(BillingRecord).to receive(:create_with_id)
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
@@ -121,7 +120,6 @@ RSpec.describe Clover, "vm" do
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
-        expect(BillingRecord).to receive(:create_with_id)
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")

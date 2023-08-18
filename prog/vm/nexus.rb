@@ -92,14 +92,6 @@ class Prog::Vm::Nexus < Prog::Base
         key_encryption_key_1_id: storage_encrypted ? key_encryption_key.id : nil
       )
 
-      BillingRecord.create_with_id(
-        project_id: project_id,
-        resource_id: vm.id,
-        resource_name: vm.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, location)["id"],
-        amount: vm.product.cores
-      )
-
       Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
     end
   end
@@ -198,9 +190,9 @@ SQL
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
-        vm.active_billing_record.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...Time.now))
+        vm.active_billing_record&.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...Time.now))
         if (vm_adr = vm.assigned_vm_address)
-          vm_adr.active_billing_record.update(span: Sequel.pg_range(vm_adr.active_billing_record.span.begin...Time.now))
+          vm_adr.active_billing_record&.update(span: Sequel.pg_range(vm_adr.active_billing_record.span.begin...Time.now))
         end
         hop :destroy
       end
@@ -223,16 +215,7 @@ SQL
         local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s
       )
 
-      if ip4
-        vm_adr = AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id)
-        BillingRecord.create_with_id(
-          project_id: vm.projects.first.id,
-          resource_id: vm_adr.id,
-          resource_name: vm_adr.ip,
-          billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
-          amount: 1
-        )
-      end
+      AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
     end
     hop :create_unix_user
   end
@@ -295,6 +278,24 @@ SQL
 
   def run
     host.sshable.cmd("sudo systemctl start #{q_vm}")
+    BillingRecord.create_with_id(
+      project_id: vm.projects.first.id,
+      resource_id: vm.id,
+      resource_name: vm.name,
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location)["id"],
+      amount: vm.product.cores
+    )
+
+    if vm.ip4_enabled
+      BillingRecord.create_with_id(
+        project_id: vm.projects.first.id,
+        resource_id: vm.assigned_vm_address.id,
+        resource_name: vm.assigned_vm_address.ip,
+        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
+        amount: 1
+      )
+    end
+
     hop :wait_sshable
   end
 

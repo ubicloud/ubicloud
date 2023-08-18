@@ -62,7 +62,6 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "accepts all locations if project not provided" do
       expect(Config).to receive(:development?).and_return(true).twice
-      expect(BillingRecord).to receive(:create_with_id)
       expect {
         described_class.assemble("some_ssh_key", nil, location: "hetzner-hel1")
       }.to change(Vm, :count).from(0).to(1)
@@ -280,9 +279,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
       expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
-      expect(vm).to receive(:projects).and_return([prj])
       expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
-      expect(BillingRecord).to receive(:create_with_id)
       expect(vm).to receive(:update)
 
       expect { nx.start }.to hop("create_unix_user")
@@ -376,11 +373,27 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#run" do
-    it "runs the vm" do
+    it "runs the vm and creates billing records when ip4 is enabled" do
+      sshable = instance_double(Sshable)
+      host = instance_double(VmHost, sshable: sshable)
+      vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
+      expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(host)
+      expect(sshable).to receive(:cmd).with(/sudo systemctl start vm/)
+      expect(vm).to receive(:ip4_enabled).and_return(true)
+      expect(BillingRecord).to receive(:create_with_id).twice
+      expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
+      expect { nx.run }.to hop("wait_sshable")
+    end
+
+    it "runs the vm and creates billing records when ip4 is not enabled" do
       sshable = instance_double(Sshable)
       host = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(host)
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm/)
+      expect(vm).to receive(:ip4_enabled).and_return(false)
+      expect(BillingRecord).to receive(:create_with_id)
+      expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
       expect { nx.run }.to hop("wait_sshable")
     end
   end
@@ -393,7 +406,8 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait if sshable" do
-      expect(vm).to receive(:ephemeral_net4).and_return("10.0.0.1")
+      vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
+      expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@10.0.0.1 2>&1").and_return("Host key verification failed.")
       expect(vm).to receive(:update).with(display_state: "running").and_return(true)
       expect { nx.wait_sshable }.to hop("wait")
@@ -427,6 +441,23 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(br).twice
       expect(br).to receive(:update)
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "hops to destroy if billing record is not found" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(vm).to receive(:active_billing_record).and_return(nil)
+      expect(vm).to receive(:assigned_vm_address).and_return(nil)
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "hops to destroy if billing record is not found for ipv4" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(vm.active_billing_record).to receive(:update)
+      assigned_adr = instance_double(AssignedVmAddress)
+      expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
+      expect(assigned_adr).to receive(:active_billing_record).and_return(nil)
+
       expect { nx.before_run }.to hop("destroy")
     end
   end
