@@ -97,5 +97,21 @@ RSpec.describe Clover, "auth" do
 
       expect(page.title).to eq("Ubicloud - Login")
     end
+
+    it "can change email" do
+      new_email = "new@example.com"
+      visit "/account/change-login"
+
+      fill_in "New Email Address", with: new_email
+
+      click_button "Change Email"
+
+      expect(page).to have_content("An email has been sent to you with a link to verify your login change")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
+      verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
+
+      visit verify_link
+      expect(page.title).to eq("Ubicloud - Verify New Email")
+    end
   end
 end
