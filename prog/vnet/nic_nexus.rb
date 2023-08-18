@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::Vnet::NicNexus < Prog::Base
+  subject_is :nic
   semaphore :destroy, :refresh_mesh, :detach_vm, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger
 
   def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil)
@@ -20,10 +21,6 @@ class Prog::Vnet::NicNexus < Prog::Base
       subnet.add_nic(nic)
       Strand.create(prog: "Vnet::NicNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
-  end
-
-  def nic
-    @nic ||= Nic[strand.id]
   end
 
   def before_run
