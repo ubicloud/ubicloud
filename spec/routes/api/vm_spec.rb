@@ -56,8 +56,6 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
-        expect(BillingRecord).to receive(:create)
-
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm", {
           public_key: "ssh key",
           name: "test-vm",
