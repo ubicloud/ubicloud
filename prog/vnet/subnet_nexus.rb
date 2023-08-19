@@ -141,6 +141,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       fail "Cannot destroy subnet with active nics, first clean up the attached resources"
     end
 
+    decr_destroy
+
     if private_subnet.nics.empty?
       DB.transaction do
         private_subnet.projects.each { |p| private_subnet.dissociate_with_project(p) }

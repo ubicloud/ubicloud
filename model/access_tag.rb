@@ -8,3 +8,5 @@ class AccessTag < Sequel::Model
 
   include ResourceMethods
 end
+
+AccessTag.plugin :association_dependencies, applied_tags: :destroy

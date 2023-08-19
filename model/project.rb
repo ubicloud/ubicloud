@@ -35,3 +35,5 @@ class Project < Sequel::Model
     "/project/#{ubid}"
   end
 end
+
+Project.plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy
