@@ -81,4 +81,6 @@ module Config
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
   override :hetzner_ssh_key, string
+  override :ci_hetzner_hostname, string
+  override :ci_hetzner_server_id, string
 end

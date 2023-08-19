@@ -100,7 +100,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(nx).to receive(:leaf?).and_return(false)
       expect {
         nx.wait_add_subnet_addr
-      }.to nap(1)
+      }.to nap(0)
     end
 
     it "starts to wait_setup and pings subnet" do

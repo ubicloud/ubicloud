@@ -1,0 +1,57 @@
+name: E2E CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: E2E-CI
+
+    env:
+      DB_USER: clover
+      DB_PASSWORD: nonempty
+      DB_NAME: clover_test
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: ${{ env.DB_USER }}
+          POSTGRES_PASSWORD: ${{ env.DB_PASSWORD }}
+          POSTGRES_DB: ${{ env.DB_NAME }}
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+    - name: Perform superuser-only actions, then remove superuser
+      run: |
+        psql "postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}" \
+          -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
+
+    - name: Check out code
+      uses: actions/checkout@v3
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: .tool-versions
+        bundler-cache: true
+
+    - name: Apply migrations
+      env:
+        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
+      run: rake test_up
+
+    - name: Run tests
+      env:
+        RACK_ENV: test
+        CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
+        CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
+        CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
+        CI_HETZNER_HOSTNAME: ${{ secrets.CI_HETZNER_HOSTNAME }}
+        CI_HETZNER_SERVER_ID: ${{ secrets.CI_HETZNER_SERVER_ID }}
+        HETZNER_USER: ${{ secrets.HETZNER_USER }}
+        HETZNER_PASSWORD: ${{ secrets.HETZNER_PASSWORD }}
+      run: bin/ci

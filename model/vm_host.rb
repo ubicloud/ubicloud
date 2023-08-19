@@ -11,6 +11,8 @@ class VmHost < Sequel::Model
   one_to_one :hetzner_host, key: :id
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
 
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy
+
   include ResourceMethods
   include SemaphoreMethods
   semaphore :reboot

@@ -45,7 +45,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       nic.private_subnet.incr_add_new_nic
       hop_wait_setup
     end
-    nap 1
+    donate
   end
 
   label def wait_setup
@@ -120,6 +120,8 @@ class Prog::Vnet::NicNexus < Prog::Base
     if nic.vm
       fail "Cannot destroy nic with active vm, first clean up the attached resources"
     end
+
+    decr_destroy
 
     DB.transaction do
       nic.src_ipsec_tunnels_dataset.destroy

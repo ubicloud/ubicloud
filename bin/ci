@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+
+if Config.ci_hetzner_hostname.nil?
+  fail "Set CI_HETZNER_HOSTNAME env variable"
+end
+
+if Config.ci_hetzner_server_id.nil?
+  fail "Set CI_HETZNER_SERVER_ID env variable"
+end
+
+st = Prog::Test::HetznerServer.assemble(Config.ci_hetzner_hostname, Config.ci_hetzner_server_id)
+
+loop do
+  ret = st.run 300
+  if ret.is_a?(Prog::Base::Nap)
+    sleep ret.seconds
+  elsif ret.is_a?(Prog::Base::Exit)
+    puts "Exited with: #{ret}"
+    exit 0
+  else
+    puts "Unexpected return value: #{ret}"
+    exit 1
+  end
+end

@@ -8,12 +8,12 @@ class Hosting::HetznerApis
     @host = hetzner_host
   end
 
-  def reset(server_id)
-    unless Config.hetzner_ssh_key
+  def reset(server_id, hetzner_ssh_key: Config.hetzner_ssh_key)
+    unless hetzner_ssh_key
       raise "hetzner_ssh_key is not set"
     end
 
-    key_data = Config.hetzner_ssh_key.split(" ")[1]
+    key_data = hetzner_ssh_key.split(" ")[1]
     decoded_data = Base64.decode64(key_data)
     fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
     formatted_fingerprint = fingerprint.scan(/../).join(":")
@@ -32,6 +32,35 @@ class Hosting::HetznerApis
 
     if response.status != 200
       raise "unexpected status #{response.status} for reset"
+    end
+  end
+
+  def add_key(name, key)
+    connection = Excon.new(@host.connection_string,
+      user: @host.user,
+      password: @host.password,
+      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+    response = connection.post(path: "/key",
+      body: URI.encode_www_form(name: name, data: key))
+
+    if response.status != 201
+      raise "unexpected status #{response.status} for add_key"
+    end
+  end
+
+  def delete_key(key)
+    key_data = key.split(" ")[1]
+    decoded_data = Base64.decode64(key_data)
+    fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
+
+    connection = Excon.new(@host.connection_string,
+      user: @host.user,
+      password: @host.password,
+      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+    response = connection.delete(path: "/key/#{fingerprint}")
+
+    if response.status != 200
+      raise "unexpected status #{response.status} for delete_key"
     end
   end
 
