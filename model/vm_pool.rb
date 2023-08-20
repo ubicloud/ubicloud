@@ -23,8 +23,8 @@ class VmPool < Sequel::Model
 
       # the billing records are updated here because the VM will be assigned
       # to a customer.
-      picked_vm.active_billing_record.update(span: Sequel.pg_range(picked_vm.active_billing_record.span.begin...(Time.now - 1)))
-      picked_vm.assigned_vm_address&.active_billing_record&.update(span: Sequel.pg_range(picked_vm.assigned_vm_address.active_billing_record.span.begin...(Time.now - 1)))
+      picked_vm.active_billing_record.finalize(Time.now - 1)
+      picked_vm.assigned_vm_address&.active_billing_record&.finalize(Time.now - 1)
 
       # remove the VM from the pool
       picked_vm.update(pool_id: nil)

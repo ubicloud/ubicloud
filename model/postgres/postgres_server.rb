@@ -6,7 +6,7 @@ class PostgresServer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
   many_to_one :vm
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, conditions: {Sequel.function(:upper, :span) => nil}
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
 
   include ResourceMethods
   include SemaphoreMethods

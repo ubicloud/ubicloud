@@ -54,8 +54,8 @@ RSpec.describe Prog::Postgres::PostgresNexus do
 
   describe "#before_run" do
     it "hops to destroy and stops billing records when needed" do
-      br = instance_double(BillingRecord, span: (Time.now - 100)..(Time.now))
-      expect(br).to receive(:update).twice
+      br = instance_double(BillingRecord)
+      expect(br).to receive(:finalize).twice
       expect(postgres_server).to receive(:active_billing_records).and_return([br, br])
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect { nx.before_run }.to hop("destroy")

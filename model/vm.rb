@@ -10,7 +10,7 @@ class Vm < Sequel::Model
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
   one_to_many :vm_storage_volumes, key: :vm_id
-  one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, conditions: {Sequel.function(:upper, :span) => nil}
+  one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
 
   dataset_module Authorization::Dataset
 
