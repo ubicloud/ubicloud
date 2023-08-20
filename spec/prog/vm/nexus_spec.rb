@@ -415,12 +415,11 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "stops billing before hops to destroy" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm.active_billing_record).to receive(:update)
+      expect(vm.active_billing_record).to receive(:finalize)
       assigned_adr = instance_double(AssignedVmAddress)
-      br = instance_double(BillingRecord, span: Sequel.pg_range(Time.now...Time.now))
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
-      expect(assigned_adr).to receive(:active_billing_record).and_return(br).twice
-      expect(br).to receive(:update)
+      expect(assigned_adr).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
+      expect(assigned_adr.active_billing_record).to receive(:finalize)
       expect { nx.before_run }.to hop("destroy")
     end
 

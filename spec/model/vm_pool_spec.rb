@@ -48,13 +48,11 @@ RSpec.describe VmPool do
       expect(ps).to receive(:dissociate_with_project).with(prj)
       expect(vm).to receive(:dissociate_with_project).with(prj).and_call_original
       expect(vm).to receive(:update).with(pool_id: nil).and_call_original
-      billing_record = instance_double(BillingRecord, span: Sequel.pg_range(Time.now - 1...Time.now))
-      addr_billing_record = instance_double(BillingRecord, span: Sequel.pg_range(Time.now - 1...Time.now))
-      adr = instance_double(AssignedVmAddress, active_billing_record: addr_billing_record)
-      expect(vm).to receive(:active_billing_record).and_return(billing_record).at_least(:once)
+      expect(vm).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
+      adr = instance_double(AssignedVmAddress, active_billing_record: instance_double(BillingRecord))
       expect(vm).to receive(:assigned_vm_address).and_return(adr).at_least(:once)
-      expect(billing_record).to receive(:update)
-      expect(addr_billing_record).to receive(:update)
+      expect(vm.active_billing_record).to receive(:finalize)
+      expect(adr.active_billing_record).to receive(:finalize)
       expect(pool.pick_vm.id).to eq(vm.id)
     end
 
@@ -63,9 +61,8 @@ RSpec.describe VmPool do
       expect(pool).to receive_message_chain(:vms_dataset, :for_update, :where).and_return(vms_dataset) # rubocop:disable RSpec/MessageChain
       expect(vm).to receive(:dissociate_with_project).with(prj).and_call_original
       expect(vm).to receive(:update).with(pool_id: nil).and_call_original
-      billing_record = instance_double(BillingRecord, span: Sequel.pg_range(Time.now - 1...Time.now))
-      expect(vm).to receive(:active_billing_record).and_return(billing_record).at_least(:once)
-      expect(billing_record).to receive(:update)
+      expect(vm).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
+      expect(vm.active_billing_record).to receive(:finalize)
       expect(pool.pick_vm.id).to eq(vm.id)
     end
   end

@@ -60,10 +60,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
-        postgres_server.active_billing_records.each do |br|
-          br.update(span: Sequel.pg_range(br.span.begin...Time.now))
-        end
-
+        postgres_server.active_billing_records.each(&:finalize)
         hop_destroy
       end
     end

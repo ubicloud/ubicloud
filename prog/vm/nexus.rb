@@ -186,10 +186,8 @@ SQL
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
-        vm.active_billing_record&.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...Time.now))
-        if (vm_adr = vm.assigned_vm_address)
-          vm_adr.active_billing_record&.update(span: Sequel.pg_range(vm_adr.active_billing_record.span.begin...Time.now))
-        end
+        vm.active_billing_record&.finalize
+        vm.assigned_vm_address&.active_billing_record&.finalize
         hop_destroy
       end
     end
