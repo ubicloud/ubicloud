@@ -5,6 +5,12 @@ require_relative "../model"
 class BillingRecord < Sequel::Model
   many_to_one :project
 
+  dataset_module do
+    def active
+      where { {Sequel.function(:upper, :span) => nil} }
+    end
+  end
+
   include ResourceMethods
 
   def duration(begin_time, end_time)
@@ -19,6 +25,10 @@ class BillingRecord < Sequel::Model
     duration_begin = [span.begin, begin_time].max
     duration_end = span.unbounded_end? ? end_time : [span.end, end_time].min
     (duration_end - duration_begin) / 60
+  end
+
+  def finalize
+    update(span: Sequel.pg_range(span.begin...Time.now))
   end
 
   def billing_rate

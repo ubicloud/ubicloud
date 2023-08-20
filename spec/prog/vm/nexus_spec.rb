@@ -413,8 +413,8 @@ RSpec.describe Prog::Vm::Nexus do
       assigned_adr = instance_double(AssignedVmAddress)
       br = instance_double(BillingRecord, span: Sequel.pg_range(Time.now...Time.now))
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
-      expect(assigned_adr).to receive(:active_billing_record).and_return(br).twice
-      expect(br).to receive(:update)
+      expect(assigned_adr).to receive(:active_billing_record).and_return(br)
+      expect(br).to receive(:finalize)
       expect { nx.before_run }.to hop("destroy")
     end
 
