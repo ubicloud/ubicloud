@@ -56,6 +56,7 @@ class CloverWeb
 
           # We still keep the project object for billing purposes.
           # These need to be cleaned up manually once in a while.
+          # Don't forget to clean up billing info and payment methods.
           @project.update(visible: false)
         end
 

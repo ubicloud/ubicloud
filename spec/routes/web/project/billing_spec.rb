@@ -125,9 +125,27 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_content "Resource not found"
     end
 
-    it "can delete payment method" do
+    it "can't delete last payment method" do
       expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
+
+      visit "#{project.path}/billing"
+
+      # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+      # UI tests run without a JavaScript enginer.
+      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+      expect(page.status_code).to eq(400)
+      expect(page.body).to eq({message: "You can't delete the last payment method of a project."}.to_json)
+      expect(billing_info.reload.payment_methods.count).to eq(1)
+    end
+
+    it "can delete payment method" do
+      payment_method_2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
+      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return({"card" => {"brand" => "mastercard"}})
       expect(Stripe::PaymentMethod).to receive(:detach).with(payment_method.stripe_id)
 
       visit "#{project.path}/billing"
@@ -139,7 +157,7 @@ RSpec.describe Clover, "billing" do
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "Deleting #{payment_method.ubid}"}.to_json)
-      expect(billing_info.reload.payment_methods.count).to eq(0)
+      expect(billing_info.reload.payment_methods.count).to eq(1)
     end
   end
 end
