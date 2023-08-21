@@ -180,11 +180,10 @@ RSpec.describe Prog::Base do
 
     it "resolves the page once the target is reached" do
       st = Strand.create_with_id(prog: "Test", label: :napper)
-      page_id = Prog::PageNexus.assemble("dummy-summary").id
+      page_id = Prog::PageNexus.assemble("dummy-summary", st.id, st.prog, :napper).id
 
       st.stack.first["deadline_target"] = :napper
       st.stack.first["deadline_at"] = Time.now - 1
-      st.stack.first["page_id"] = page_id
 
       expect {
         st.unsynchronized_run
@@ -195,11 +194,10 @@ RSpec.describe Prog::Base do
 
     it "resolves the page once a new deadline is registered" do
       st = Strand.create_with_id(prog: "Test", label: :start)
-      page_id = Prog::PageNexus.assemble("dummy-summary").id
+      page_id = Prog::PageNexus.assemble("dummy-summary", st.id, st.prog, :napper).id
 
       st.stack.first["deadline_target"] = :napper
       st.stack.first["deadline_at"] = Time.now - 1
-      st.stack.first["page_id"] = page_id
 
       st.update(label: :set_popping_deadline2)
 
@@ -212,12 +210,13 @@ RSpec.describe Prog::Base do
       }.to change { Page.active.count }.from(1).to(0)
     end
 
-    it "doesn't try to resolve a page if it isn't exist" do
+    it "deletes the deadline information once the target is reached" do
       st = Strand.create_with_id(prog: "Test", label: :napper)
       st.stack.first["deadline_target"] = :napper
       st.stack.first["deadline_at"] = Time.now - 1
 
-      expect(st.stack.first).not_to receive(:delete).with("page_id")
+      expect(st.stack.first).to receive(:delete).with("deadline_target")
+      expect(st.stack.first).to receive(:delete).with("deadline_at")
 
       st.unsynchronized_run
     end

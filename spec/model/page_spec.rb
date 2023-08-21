@@ -5,7 +5,7 @@ require_relative "spec_helper"
 require "json"
 
 RSpec.describe Page do
-  subject(:p) { described_class.create_with_id }
+  subject(:p) { described_class.create_with_id(tag: "dummy-tag") }
 
   describe "#trigger" do
     it "triggers a page in Pagerduty if key is present" do

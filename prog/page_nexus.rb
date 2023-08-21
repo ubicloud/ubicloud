@@ -4,11 +4,13 @@ class Prog::PageNexus < Prog::Base
   subject_is :page
   semaphore :resolve
 
-  def self.assemble(summary)
+  def self.assemble(summary, *tag_parts)
     DB.transaction do
-      p = Page.create_with_id(summary: summary)
-
-      Strand.create(prog: "PageNexus", label: "start") { _1.id = p.id }
+      pg = Page.from_tag_parts(tag_parts)
+      unless pg
+        pg = Page.create_with_id(summary: summary, tag: Page.generate_tag(tag_parts))
+        Strand.create(prog: "PageNexus", label: "start") { _1.id = pg.id }
+      end
     end
   end
 
