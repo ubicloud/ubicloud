@@ -78,12 +78,12 @@ SQL
 
   def unsynchronized_run
     if label == stack.first["deadline_target"].to_s
+      if (pg = Page.from_tag_parts(id, prog, stack.first["deadline_target"]))
+        pg.incr_resolve
+      end
+
       stack.first.delete("deadline_target")
       stack.first.delete("deadline_at")
-      if stack.first["page_id"]
-        Page[stack.first["page_id"]].incr_resolve
-        stack.first.delete("page_id")
-      end
 
       modified!(:stack)
     end
@@ -92,7 +92,7 @@ SQL
       next unless (deadline_at = frame["deadline_at"])
 
       if Time.now > Time.parse(deadline_at.to_s)
-        frame["page_id"] ||= Prog::PageNexus.assemble("Strand[#{id}] has an expired deadline! #{prog} did not reach #{frame["deadline_target"]} on time").id
+        Prog::PageNexus.assemble("Strand[#{id}] has an expired deadline! #{prog} did not reach #{frame["deadline_target"]} on time", id, prog, frame["deadline_target"])
 
         modified!(:stack)
       end
