@@ -34,7 +34,12 @@
         ["Size", @vm[:size]],
         ["Storage", "#{@vm[:storage_size_gib]}GB (#{@vm[:storage_encryption]})"],
         ["IPv4", @vm[:ip4], { copieble: true }],
-        ["IPv6", @vm[:ip6], { copieble: true }]
+        ["IPv6", @vm[:ip6], { copieble: true }],
+        [
+          "SSH Command",
+          "<span class='bg-slate-100 text-rose-500 font-mono px-2 py-1 rounded'>#{h("ssh -i <PRAVATE_KEY_PATH> #{@vm[:unix_user]}@#{@vm[:ip4] || @vm[:ip6]}")}</span>",
+          { escape: false }
+        ]
       ]
     }
   ) %>

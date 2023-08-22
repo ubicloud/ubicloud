@@ -9,6 +9,8 @@
               <span class="copy-content cursor-pointer" data-content="<%= value %>" data-message="Copied <%= name %>">
                 <%= value %>
               </span>
+            <% elsif opts && opts[:escape] == false %>
+              <%== value %>
             <% else %>
               <%= value.nil? ? "-" : value %>
             <% end %>
