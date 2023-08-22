@@ -29,6 +29,19 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   def wait_vm
     when_setup_nic_set? do
+      hop :add_subnet_addr
+    end
+    nap 1
+  end
+
+  def add_subnet_addr
+    bud Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
+    hop :wait_add_subnet_addr
+  end
+
+  def wait_add_subnet_addr
+    reap
+    if leaf?
       nic.private_subnet.incr_add_new_nic
       hop :wait_setup
     end

@@ -247,10 +247,6 @@ class VmSetup
 
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{tapname}/proxy_arp'"
-
-      r "ip -n #{q_vm} addr replace 192.168.0.1/16 dev #{tapname}"
-      r "ip -n #{q_vm} addr replace 10.0.0.1/8 dev #{tapname}"
-      r "ip -n #{q_vm} addr replace 172.16.0.1/12 dev #{tapname}"
     end
   end
 
