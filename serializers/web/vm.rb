@@ -13,7 +13,8 @@ class Serializers::Web::Vm < Serializers::Base
       storage_size_gib: vm.storage_size_gib,
       storage_encryption: vm.storage_encrypted? ? "encrypted" : "not encrypted",
       ip6: vm.ephemeral_net6&.nth(2),
-      ip4: vm.ephemeral_net4
+      ip4: vm.ephemeral_net4,
+      unix_user: vm.unix_user
     }
   end
 
