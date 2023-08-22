@@ -17,7 +17,11 @@ def udec(*)
   UBID.decode(*)
 end
 
-$0 = "clover-#{ENV["RACK_ENV"]}"
 opts = Pry::CLI.parse_options
-Pry.config.prompt_name = $0
+Pry.config.prompt_name = if Config.production?
+  "\e[41m %s \e[0m" % "clover-#{Config.rack_env}"
+else
+  "clover-#{Config.rack_env}"
+end
+
 Pry::CLI.start(opts)
