@@ -111,7 +111,7 @@ class VmHost < Sequel::Model
     rand = SecureRandom.random_number(2**(32 - used_subnet.cidr.netmask.prefix_len)).to_i
     picked_subnet = used_subnet.cidr.nth(rand)
     # we check if the picked subnet is used by one of the vms
-    return ip4_random_vm_network if vm_addresses.map(&:ip).map(&:to_s).include?("#{picked_subnet}/32")
+    return ip4_random_vm_network if vm_addresses.map { _1.ip.to_s }.include?("#{picked_subnet}/32")
     [picked_subnet, used_subnet]
   end
 
