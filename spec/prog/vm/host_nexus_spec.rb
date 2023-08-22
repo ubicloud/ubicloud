@@ -35,7 +35,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
       expect(st.vm_host.assigned_subnets.count).to eq(3)
-      expect(st.vm_host.assigned_subnets.map(&:cidr).map(&:to_s).sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
+      expect(st.vm_host.assigned_subnets.map { _1.cidr.to_s }.sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
 
       expect(st.vm_host.assigned_host_addresses.count).to eq(1)
       expect(st.vm_host.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
