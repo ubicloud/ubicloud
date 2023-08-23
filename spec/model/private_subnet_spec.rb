@@ -23,23 +23,23 @@ RSpec.describe PrivateSubnet do
 
   describe "random ip generation" do
     it "returns random private ipv4" do
-      expect(SecureRandom).to receive(:random_number).with(63).and_return(5)
-      expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.5/32"
+      expect(SecureRandom).to receive(:random_number).with(59).and_return(5)
+      expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
     end
 
     it "returns random private ipv6" do
-      expect(SecureRandom).to receive(:random_number).with(32767).and_return(5)
+      expect(SecureRandom).to receive(:random_number).with(32766).and_return(5)
       expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:c::/79"
     end
 
     it "returns random private ipv4 when ip exists" do
-      expect(SecureRandom).to receive(:random_number).with(63).and_return(5, 6)
+      expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 2)
       expect(private_subnet).to receive(:nics).and_return([existing_nic]).twice
       expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.6/32"
     end
 
     it "returns random private ipv6 when ip exists" do
-      expect(SecureRandom).to receive(:random_number).with(32767).and_return(5, 6)
+      expect(SecureRandom).to receive(:random_number).with(32766).and_return(5, 6)
       expect(private_subnet).to receive(:nics).and_return([existing_nic]).twice
       expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:e::/79"
     end
