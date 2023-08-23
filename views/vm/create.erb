@@ -113,7 +113,7 @@
                             value="<%= size.name %>"
                             class="peer sr-only location-based-price"
                             data-resource-type="VmCores"
-                            data-resource-family="<%= size.name.split("-").first %>"
+                            data-resource-family="<%= size.family %>"
                             data-amount="<%= size.vcpu / 2 %>"
                             required
                             <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
