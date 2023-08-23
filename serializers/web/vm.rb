@@ -9,7 +9,7 @@ class Serializers::Web::Vm < Serializers::Base
       name: vm.name,
       state: vm.display_state,
       location: vm.location,
-      size: vm.size,
+      display_size: vm.display_size,
       storage_size_gib: vm.storage_size_gib,
       storage_encryption: vm.storage_encrypted? ? "encrypted" : "not encrypted",
       ip6: vm.ephemeral_net6&.nth(2),

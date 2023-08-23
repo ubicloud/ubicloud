@@ -150,7 +150,7 @@ RSpec.describe UBID do
   end
 
   it "generates ids with proper prefix" do
-    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", size: "x", location: "x", boot_image: "x")
+    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x")
     expect(vm.ubid).to start_with UBID::TYPE_VM
 
     sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
@@ -216,7 +216,7 @@ RSpec.describe UBID do
   end
 
   it "can decode ids" do
-    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", size: "x", location: "x", boot_image: "x")
+    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x")
     sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
