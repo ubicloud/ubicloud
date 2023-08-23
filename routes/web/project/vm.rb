@@ -38,10 +38,13 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
         @subnets = Serializers::Web::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
+
+        # We use 1 month = 730 hours for conversion. Number of hours
+        # in a month changes between 672 and 744, averaging 730.1.
         @prices = BillingRate.rates.each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
           hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
             hourly: br["unit_price"].to_f * 60,
-            monthly: br["unit_price"].to_f * 60 * 24 * 30
+            monthly: br["unit_price"].to_f * 60 * 730
           }
         end
         @has_valid_payment_method = @project.has_valid_payment_method?
