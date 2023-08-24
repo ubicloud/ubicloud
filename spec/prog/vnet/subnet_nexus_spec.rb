@@ -112,7 +112,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       active_nic = instance_double(Nic, id: "n2", strand: st_act)
       to_add_nic = instance_double(Nic, id: "n1", strand: st_wait)
       expect(ps).to receive(:nics).and_return([active_nic, to_add_nic]).at_least(:once)
-      expect(nx.nics_to_rekey.map(&:id).sort).to eq(["n1", "n2"])
+      expect(nx.nics_to_rekey.flatten.map(&:id).sort).to eq(["n1", "n2"])
     end
   end
 
@@ -154,19 +154,32 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   end
 
   describe "#add_new_nic" do
-    let(:nic) {
+    let(:nic_to_add) {
       st = instance_double(Strand, label: "wait_setup")
       instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st)
     }
+    let(:added_nic) {
+      st = instance_double(Strand, label: "wait")
+      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st)
+    }
 
-    it "adds new nics and hops to wait_inbound_setup" do
+    it "adds new nics and creates tunnels" do
+      nics_to_rekey = [added_nic, nic_to_add]
       expect(nx).to receive(:decr_add_new_nic)
-      expect(nic).to receive(:incr_start_rekey)
-      expect(nx).to receive(:nics_to_rekey).and_return([nic])
+      expect(nic_to_add).to receive(:incr_start_rekey)
+      expect(added_nic).to receive(:incr_start_rekey)
+      expect(nx).to receive(:nics_to_rekey).and_return(nics_to_rekey)
       expect(nx).to receive(:gen_spi).and_return("0xe3af3a04").at_least(:once)
-      expect(nx).to receive(:gen_reqid).and_return(86879)
-      expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819")
-      expect(nic).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
+      expect(nx).to receive(:gen_reqid).and_return(86879).at_least(:once)
+      expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819").at_least(:once)
+      expect(nx).to receive(:create_tunnels).and_return(true).at_least(:once)
+      expect(added_nic).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
+        {
+          spi4: "0xe3af3a04",
+          spi6: "0xe3af3a04",
+          reqid: 86879
+        }).and_return(true)
+      expect(nic_to_add).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
         {
           spi4: "0xe3af3a04",
           spi6: "0xe3af3a04",
@@ -208,11 +221,9 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       instance_double(Nic, strand: st, rekey_payload: {})
     }
 
-    it "donates if state creation is ongoing" do
+    it "naps 5 if state creation is ongoing" do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nx).to receive(:donate).and_call_original
-
-      expect { nx.wait_inbound_setup }.to nap(0)
+      expect { nx.wait_inbound_setup }.to nap(5)
     end
 
     it "hops to wait_policy_updated if state creation is done" do
@@ -233,9 +244,8 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
     it "donates if policy update is ongoing" do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nx).to receive(:donate).and_call_original
 
-      expect { nx.wait_outbound_setup }.to nap(0)
+      expect { nx.wait_outbound_setup }.to nap(5)
     end
 
     it "hops to wait_state_dropped if policy update is done" do
@@ -256,9 +266,8 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
     it "donates if policy update is ongoing" do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(nx).to receive(:donate).and_call_original
 
-      expect { nx.wait_old_state_drop }.to nap(0)
+      expect { nx.wait_old_state_drop }.to nap(5)
     end
 
     it "hops to wait if all is done" do
@@ -312,6 +321,37 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(PrivateSubnet).to receive(:where).with(net6: "fd61:6161:6161:6161::/64", location: "hetzner-hel1").and_return([true])
       expect(PrivateSubnet).to receive(:where).with(net6: "fd62:6262:6262:6262::/64", location: "hetzner-hel1").and_return([])
       expect(described_class.random_private_ipv6("hetzner-hel1").to_s).to eq("fd62:6262:6262:6262::/64")
+    end
+  end
+
+  describe ".create_tunnels" do
+    let(:src_nic) {
+      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b")
+    }
+    let(:dst_nic) {
+      instance_double(Nic, id: "6a187cc1-291b-8eac-bdfc-96801fa3118d")
+    }
+
+    it "creates tunnels if not existing" do
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+      nx.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+
+    it "skips existing tunnels" do
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(false)
+
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+      nx.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+
+    it "skips existing tunnels - 2" do
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(false)
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      nx.create_tunnels([src_nic, dst_nic], dst_nic)
     end
   end
 

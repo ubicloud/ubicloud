@@ -66,12 +66,4 @@ class PrivateSubnet < Sequel::Model
 
     addr
   end
-
-  def add_nic(nic)
-    nics.each do |n|
-      next if n.id == nic.id
-      IpsecTunnel.create_with_id(src_nic_id: n.id, dst_nic_id: nic.id)
-      IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: n.id)
-    end
-  end
 end
