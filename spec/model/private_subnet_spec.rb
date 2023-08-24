@@ -45,21 +45,6 @@ RSpec.describe PrivateSubnet do
     end
   end
 
-  describe "add nic" do
-    it "skips a nic if it exists" do
-      expect(private_subnet).to receive(:nics).and_return([nic])
-      expect(IpsecTunnel).not_to receive(:create)
-      private_subnet.add_nic(nic)
-    end
-
-    it "adds IpsecTunnel when a nic is added" do
-      expect(private_subnet).to receive(:nics).and_return([existing_nic])
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: existing_nic.id, dst_nic_id: nic.id)
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: nic.id, dst_nic_id: existing_nic.id)
-      private_subnet.add_nic(nic)
-    end
-  end
-
   describe "uuid to name" do
     it "returns the name" do
       expect(described_class.ubid_to_name("psetv2ff83xj6h3prt2jwavh0q")).to eq "psetv2ff"

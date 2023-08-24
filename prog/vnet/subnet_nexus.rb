@@ -25,18 +25,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def to_be_added_nics
-    private_subnet.nics.select { _1.strand.label == "wait_setup" }
-  end
-
-  def active_nics
-    private_subnet.nics.select { _1.strand.label == "wait" }
-  end
-
-  def rekeying_nics
-    private_subnet.nics.select { !_1.rekey_payload.nil? }
-  end
-
   label def wait
     when_destroy_set? do
       hop_destroy
@@ -71,15 +59,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     SecureRandom.random_number(100000) + 1
   end
 
-  def nics_to_rekey
-    active_nics + to_be_added_nics
-  end
-
   label def add_new_nic
-    nics_to_rekey.each do |nic|
+    nics_snap = nics_to_rekey
+    nics_snap.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
+      create_tunnels(nics_snap, nic)
     end
+
     decr_add_new_nic
     hop_wait_inbound_setup
   end
@@ -100,7 +87,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop_wait_outbound_setup
     end
 
-    donate
+    nap 5
   end
 
   label def wait_outbound_setup
@@ -109,7 +96,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop_wait_old_state_drop
     end
 
-    donate
+    nap 5
   end
 
   label def wait_old_state_drop
@@ -121,7 +108,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
       hop_wait
     end
-    donate
+
+    nap 5
   end
 
   label def destroy
@@ -160,5 +148,29 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     return random_private_ipv4(location) unless PrivateSubnet.where(net4: selected_addr.to_s, location: location).first.nil?
 
     selected_addr
+  end
+
+  def create_tunnels(nics, src_nic)
+    nics.each do |dst_nic|
+      next if src_nic == dst_nic
+      IpsecTunnel.create_with_id(src_nic_id: src_nic.id, dst_nic_id: dst_nic.id) unless IpsecTunnel[src_nic_id: src_nic.id, dst_nic_id: dst_nic.id]
+      IpsecTunnel.create_with_id(src_nic_id: dst_nic.id, dst_nic_id: src_nic.id) unless IpsecTunnel[src_nic_id: dst_nic.id, dst_nic_id: src_nic.id]
+    end
+  end
+
+  def to_be_added_nics
+    private_subnet.nics.select { _1.strand.label == "wait_setup" }
+  end
+
+  def active_nics
+    private_subnet.nics.select { _1.strand.label == "wait" }
+  end
+
+  def nics_to_rekey
+    active_nics + to_be_added_nics
+  end
+
+  def rekeying_nics
+    private_subnet.nics.select { !_1.rekey_payload.nil? }
   end
 end

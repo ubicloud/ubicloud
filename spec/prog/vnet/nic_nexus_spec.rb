@@ -65,13 +65,40 @@ RSpec.describe Prog::Vnet::NicNexus do
   end
 
   describe "#wait_vm" do
-    it "naps if nothing to do" do
+    let(:ps) {
+      PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+        net4: "1.1.1.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+    }
+    let(:nic) {
+      Nic.new(private_subnet_id: ps.id,
+        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        private_ipv4: "10.0.0.1",
+        mac: "00:00:00:00:00:00",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+        name: "default-nic").tap { _1.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
+    }
+
+    before do
+      allow(nx).to receive(:nic).and_return(nic)
+    end
+
+    it "naps 60 if nothing to do and vm doesn't exist" do
+      expect {
+        nx.wait_vm
+      }.to nap(60)
+    end
+
+    it "naps 1 if nothing to do and vm exists" do
+      vm = instance_double(Vm)
+      expect(nic).to receive(:vm).and_return(vm)
       expect {
         nx.wait_vm
       }.to nap(1)
     end
 
     it "starts setup and pings subnet" do
+      vm = instance_double(Vm)
+      expect(nic).to receive(:vm).and_return(vm)
       expect(nx).to receive(:when_setup_nic_set?).and_yield
       expect {
         nx.wait_vm
@@ -120,7 +147,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "naps if nothing to do" do
       expect {
         nx.wait_setup
-      }.to nap(1)
+      }.to nap(5)
     end
 
     it "starts rekeying if setup is triggered" do
@@ -171,8 +198,9 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "reaps and donates if setup_inbound is continuing" do
       expect(nx).to receive(:leaf?).and_return(false)
       expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:donate).and_return(true)
-      nx.wait_rekey_inbound
+      expect {
+        nx.wait_rekey_inbound
+      }.to nap(0)
     end
 
     it "reaps and hops to wait_rekey_outbound_trigger if setup_inbound is completed" do
@@ -186,8 +214,9 @@ RSpec.describe Prog::Vnet::NicNexus do
 
     it "if outbound setup is not triggered, just donate" do
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_return(false)
-      expect(nx).to receive(:donate).and_return(true)
-      nx.wait_rekey_outbound_trigger
+      expect {
+        nx.wait_rekey_outbound_trigger
+      }.to nap(5)
     end
 
     it "if outbound setup is triggered, hops to setup_outbound" do
@@ -216,8 +245,10 @@ RSpec.describe Prog::Vnet::NicNexus do
 
     it "wait_rekey_old_state_drop_trigger donates if trigger is not set" do
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_return(false)
-      expect(nx).to receive(:donate).and_return(true)
-      nx.wait_rekey_old_state_drop_trigger
+
+      expect {
+        nx.wait_rekey_old_state_drop_trigger
+      }.to nap(5)
     end
 
     it "wait_rekey_old_state_drop_trigger hops to wait_rekey_old_state_drop if trigger is set" do

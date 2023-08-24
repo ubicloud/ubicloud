@@ -53,7 +53,6 @@ class Prog::Vm::Nexus < Prog::Base
         raise("Given nic is not available in the given project") unless project.private_subnets.any? { |ps| ps.id == nic.private_subnet_id }
 
         subnet = nic.private_subnet
-        subnet.add_nic(nic)
       end
 
       unless nic
@@ -68,7 +67,6 @@ class Prog::Vm::Nexus < Prog::Base
         end
         nic_s = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic")
         nic = Nic[nic_s.id]
-        subnet.add_nic(nic)
       end
 
       vm = Vm.create(public_key: public_key, unix_user: unix_user,

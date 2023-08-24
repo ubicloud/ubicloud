@@ -28,6 +28,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_vm
+    nap 60 unless nic.vm
     when_setup_nic_set? do
       hop_add_subnet_addr
     end
@@ -53,7 +54,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       decr_setup_nic
       hop_start_rekey
     end
-    nap 1
+    nap 5
   end
 
   label def wait
@@ -79,6 +80,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       decr_start_rekey
       hop_wait_rekey_outbound_trigger
     end
+
     donate
   end
 
@@ -87,7 +89,8 @@ class Prog::Vnet::NicNexus < Prog::Base
       bud Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
       hop_wait_rekey_outbound
     end
-    donate
+
+    nap 5
   end
 
   label def wait_rekey_outbound
@@ -96,6 +99,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       decr_trigger_outbound_update
       hop_wait_rekey_old_state_drop_trigger
     end
+
     donate
   end
 
@@ -104,7 +108,8 @@ class Prog::Vnet::NicNexus < Prog::Base
       bud Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
       hop_wait_rekey_old_state_drop
     end
-    donate
+
+    nap 5
   end
 
   label def wait_rekey_old_state_drop
@@ -113,6 +118,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       decr_old_state_drop_trigger
       hop_wait
     end
+
     donate
   end
 
