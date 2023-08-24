@@ -18,7 +18,7 @@ env:
   PUSH_IMAGE: ${{ github.event_name == 'workflow_dispatch' }}
 jobs:
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud
 
     steps:
       - name: Check out code
