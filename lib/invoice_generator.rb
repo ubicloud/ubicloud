@@ -20,7 +20,7 @@ class InvoiceGenerator
         project_content[:project_name] = project.name
 
         project_content[:resources] = []
-        project_content[:cost] = 0
+        project_content[:subtotal] = 0
         project_records.group_by { |pr| pr[:resource_id] }.each do |resource_id, line_items|
           resource_content = {}
           resource_content[:resource_id] = resource_id
@@ -41,9 +41,23 @@ class InvoiceGenerator
           end
 
           project_content[:resources].push(resource_content)
-          project_content[:cost] += resource_content[:cost]
+          project_content[:subtotal] += resource_content[:cost]
         end
 
+        # We first apply discounts then credits, this is more beneficial for users as it
+        # would be possible to cover total cost with fewer credits.
+        project_content[:cost] = project_content[:subtotal]
+        if project.discount > 0
+          project_content[:cost] *= (100.0 - project.discount) / 100.0
+        end
+
+        credit_used = 0
+        if project.credit > 0
+          credit_used = [project_content[:cost], project.credit].min
+          project_content[:cost] -= credit_used
+        end
+
+        invoices.push(project_content)
         if @save_result
           invoice_month = @begin_time.strftime("%y%m")
           invoice_customer = project.id[-10..]
@@ -51,8 +65,22 @@ class InvoiceGenerator
           invoice_number = "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
 
           Invoice.create_with_id(project_id: project.id, invoice_number: invoice_number, content: project_content)
-        else
-          invoices.push(project_content)
+
+          if credit_used > 0
+            # We don't use project.credit here, because credit might get updated between
+            # the time we read and write. Referencing credit column here prevents such
+            # race conditions. If credit got increased, then there is no problem. If it
+            # got decreased, CHECK constraint in the DB will prevent credit balance to go
+            # negative.
+            # We also need to disable Sequel validations, because Sequel simplychecks if
+            # the new value is BigDecimal, but "Sequel[:credit] - credit_used" expression
+            # is Sequel::SQL::NumericExpression, not BigDecimal. Eventhough it resolves to
+            # BigDecimal, it fails the check.
+            # Finally, we use save_changes instead of update because it is not possible to
+            # pass validate: false to update.
+            project.credit = Sequel[:credit] - credit_used
+            project.save_changes(validate: false)
+          end
         end
       end
     end
