@@ -317,6 +317,8 @@ SQL
   label def destroy
     register_deadline(nil, 5 * 60)
 
+    decr_destroy
+
     vm.update(display_state: "deleting")
 
     unless host.nil?
