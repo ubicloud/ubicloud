@@ -29,9 +29,9 @@ RSpec.describe Prog::BootstrapRhizome do
     before { br.strand.label = "setup" }
 
     it "runs initializing shell wih public keys" do
-      sshable = instance_double(Sshable, keys: [instance_double(SshKey, public_key: "test key")])
-      expect(br).to receive(:sshable).and_return(sshable)
-      expect(br).to receive(:rootish_ssh).with <<FIXTURE
+      sshable = instance_double(Sshable, host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
+      allow(br).to receive(:sshable).and_return(sshable)
+      expect(Util).to receive(:rootish_ssh).with "hostname", "root", ["test private key"], <<FIXTURE
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
 sudo userdel -rf rhizome || true
@@ -48,41 +48,6 @@ FIXTURE
     it "exits once InstallRhizome has returned" do
       br.strand.retval = {"msg" => "installed rhizome"}
       expect { br.setup }.to exit({"msg" => "rhizome user bootstrapped and source installed"})
-    end
-  end
-
-  describe "#rootish_ssh" do
-    let(:sshable) {
-      instance_double(Sshable, host: "127.0.0.1",
-        keys: [instance_double(SshKey, private_key: "test private key")])
-    }
-
-    before do
-      expect(br).to receive(:sshable).and_return(sshable).at_least(:once)
-    end
-
-    it "executes a command using root by default" do
-      expect(Net::SSH).to receive(:start) do |&blk|
-        sess = instance_double(Net::SSH::Connection::Session)
-        expect(sess).to receive(:exec!).with("test command").and_return(
-          Net::SSH::Connection::Session::StringWithExitstatus.new("it worked", 0)
-        )
-        blk.call sess
-      end
-
-      br.rootish_ssh("test command")
-    end
-
-    it "fails if a command fails" do
-      expect(Net::SSH).to receive(:start) do |&blk|
-        sess = instance_double(Net::SSH::Connection::Session)
-        expect(sess).to receive(:exec!).with("failing command").and_return(
-          Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1)
-        )
-        blk.call sess
-      end
-
-      expect { br.rootish_ssh("failing command") }.to raise_error RuntimeError, "Could not bootstrap rhizome"
     end
   end
 end
