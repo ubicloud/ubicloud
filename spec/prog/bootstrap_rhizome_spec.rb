@@ -34,11 +34,12 @@ RSpec.describe Prog::BootstrapRhizome do
       expect(br).to receive(:rootish_ssh).with <<FIXTURE
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
+sudo userdel -rf rhizome || true
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
 sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
 sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
-echo test key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+echo test\\ key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 FIXTURE
 
       expect { br.setup }.to hop("start", "InstallRhizome")
