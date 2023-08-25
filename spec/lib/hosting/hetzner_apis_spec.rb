@@ -38,6 +38,34 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "add_key" do
+    it "can can add a key" do
+      key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
+      Excon.stub({path: "/key", method: :post}, {status: 201, body: ""})
+      expect(hetzner_apis.add_key("test_key_1", key_data)).to be_nil
+    end
+
+    it "raises an error if adding a key fails" do
+      key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
+      Excon.stub({path: "/key", method: :post}, {status: 500, body: ""})
+      expect { hetzner_apis.add_key("test_key_1", key_data) }.to raise_error RuntimeError, "unexpected status 500 for add_key"
+    end
+  end
+
+  describe "delete_key" do
+    it "can can delete a key" do
+      key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
+      Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 200, body: ""})
+      expect(hetzner_apis.delete_key(key_data)).to be_nil
+    end
+
+    it "raises an error if deleting a key fails" do
+      key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
+      Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 500, body: ""})
+      expect { hetzner_apis.delete_key(key_data) }.to raise_error RuntimeError, "unexpected status 500 for delete_key"
+    end
+  end
+
   describe "hetzner_pull_ips" do
     it "can pull empty data from the API" do
       stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([]))
