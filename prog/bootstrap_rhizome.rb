@@ -37,11 +37,12 @@ class Prog::BootstrapRhizome < Prog::Base
     rootish_ssh(<<SH)
 set -ueo pipefail
 sudo apt update && sudo apt-get -y install ruby-bundler
+sudo userdel -rf rhizome || true
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
 sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
 sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
-echo #{sshable.keys.map(&:public_key).join("\n")} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 SH
 
     push Prog::InstallRhizome
