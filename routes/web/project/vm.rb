@@ -18,8 +18,8 @@ class CloverWeb
       Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
 
       st = Prog::Vm::Nexus.assemble(
-        r.params["public-key"],
         @project.id,
+        public_key: r.params["public-key"],
         name: r.params["name"],
         unix_user: r.params["user"],
         size: r.params["size"],

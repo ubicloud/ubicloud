@@ -15,8 +15,8 @@ class CloverApi
       fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
       st = Prog::Vm::Nexus.assemble(
-        r.params["public_key"],
         @project.id,
+        public_key: r.params["public_key"],
         name: r.params["name"],
         unix_user: r.params["unix_user"],
         size: r.params["size"],

@@ -328,7 +328,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "can not delete project when it has resources" do
-        Prog::Vm::Nexus.assemble("key", project.id, name: "vm1")
+        Prog::Vm::Nexus.assemble(project.id, public_key: "key", name: "vm1")
 
         visit project.path
 

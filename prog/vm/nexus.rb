@@ -9,7 +9,7 @@ require "base64"
 class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :start_after_host_reboot
 
-  def self.assemble(public_key, project_id, name: nil, size: "standard-2",
+  def self.assemble(project_id, public_key: nil, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_size_gib: nil, storage_encrypted: true,
     enable_ip4: false)
@@ -71,9 +71,21 @@ class Prog::Vm::Nexus < Prog::Base
         subnet.add_nic(nic)
       end
 
+      unless public_key
+        ssh_key = SshKey.generate
+        public_key = ssh_key.public_key
+      end
+
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, family: vm_size.family, cores: vm_size.vcpu / 2, location: location, boot_image: boot_image, ip4_enabled: enable_ip4) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
+
+      if ssh_key
+        Sshable.create(
+          # unix_user: unix_user, # Added at branch on a fork. I didn't try to rebase it
+          raw_private_key_1: ssh_key.keypair
+        ) { _1.id = vm.id }
+      end
 
       vm.associate_with_project(project)
 
@@ -218,6 +230,8 @@ SQL
       )
 
       AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
+
+      vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6&.nth(2))
     end
     hop_create_unix_user
   end
