@@ -45,7 +45,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       nic.private_subnet.incr_add_new_nic
       hop_wait_setup
     end
-    nap 1
+    donate
   end
 
   label def wait_setup
