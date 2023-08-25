@@ -8,7 +8,7 @@ RSpec.describe Hosting::HetznerApis do
       sshable: instance_double(Sshable, host: "1.1.1.1")
     )
   }
-  let(:hetzner_host) { instance_double(HetznerHost, connection_string: "https://robot-ws.your-server.de", user: "user1", password: "pass", vm_host: vm_host) }
+  let(:hetzner_host) { instance_double(HetznerHost, connection_string: "https://robot-ws.your-server.de", server_identifier: "123", user: "user1", password: "pass", vm_host: vm_host) }
   let(:hetzner_apis) { described_class.new(hetzner_host) }
 
   describe "reset" do
@@ -39,7 +39,7 @@ RSpec.describe Hosting::HetznerApis do
   end
 
   describe "add_key" do
-    it "can can add a key" do
+    it "can add a key" do
       key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
       Excon.stub({path: "/key", method: :post}, {status: 201, body: ""})
       expect(hetzner_apis.add_key("test_key_1", key_data)).to be_nil
@@ -53,7 +53,7 @@ RSpec.describe Hosting::HetznerApis do
   end
 
   describe "delete_key" do
-    it "can can delete a key" do
+    it "can delete a key" do
       key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
       Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 200, body: ""})
       expect(hetzner_apis.delete_key(key_data)).to be_nil
@@ -63,6 +63,18 @@ RSpec.describe Hosting::HetznerApis do
       key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
       Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 500, body: ""})
       expect { hetzner_apis.delete_key(key_data) }.to raise_error RuntimeError, "unexpected status 500 for delete_key"
+    end
+  end
+
+  describe "get_main_ip4" do
+    it "can get the main ip4" do
+      Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"server_ip\": \"1.2.3.4\"}}"})
+      expect(hetzner_apis.get_main_ip4).to eq "1.2.3.4"
+    end
+
+    it "raises an error if getting the main ip4 fails" do
+      Excon.stub({path: "/server/123", method: :get}, {status: 404, body: ""})
+      expect { hetzner_apis.get_main_ip4 }.to raise_error RuntimeError, "unexpected status 404 for get_main_ip4"
     end
   end
 

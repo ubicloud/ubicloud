@@ -64,6 +64,21 @@ class Hosting::HetznerApis
     end
   end
 
+  def get_main_ip4
+    connection = Excon.new(@host.connection_string,
+      user: @host.user,
+      password: @host.password,
+      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+    response = connection.get(path: "/server/#{@host.server_identifier}")
+
+    if response.status != 200
+      raise "unexpected status #{response.status} for get_main_ip4"
+    end
+
+    response_hash = JSON.parse(response.body)
+    response_hash.dig("server", "server_ip")
+  end
+
   # Fetches and processes the IPs, subnets, and failovers from the Hetzner API.
   # It then calls `find_matching_ips` to retrieve IP addresses that match with
   # the host's IP address. This whole thing is needed because Hetzner API is
