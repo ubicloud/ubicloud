@@ -83,30 +83,30 @@ class Sshable < Sequel::Model
     Thread.current[:clover_ssh_cache] ||= {}
 
     # Cache hit.
-    if (sess = Thread.current[:clover_ssh_cache][host])
+    if (sess = Thread.current[:clover_ssh_cache][[host, unix_user]])
       return sess
     end
 
     # Cache miss.
-    sess = Net::SSH.start(host, "rhizome", **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)))
-    Thread.current[:clover_ssh_cache][host] = sess
+    sess = Net::SSH.start(host, unix_user, **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)))
+    Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
     sess
   end
 
   def invalidate_cache_entry
-    Thread.current[:clover_ssh_cache]&.delete(host)
+    Thread.current[:clover_ssh_cache]&.delete([host, unix_user])
   end
 
   def self.reset_cache
     return [] unless (cache = Thread.current[:clover_ssh_cache])
 
-    cache.filter_map do |host, sess|
+    cache.filter_map do |key, sess|
       sess.close
       nil
     rescue => e
       e
     ensure
-      cache.delete(host)
+      cache.delete(key)
     end
   end
 end

@@ -11,6 +11,7 @@ RSpec.describe Sshable do
     described_class.new(
       id: described_class.generate_uuid,
       host: "test.localhost",
+      unix_user: "testuser",
       raw_private_key_1: key
     )
   }
@@ -58,7 +59,7 @@ RSpec.describe Sshable do
       sa.connect
       expect {
         sa.invalidate_cache_entry
-      }.to change { Thread.current[:clover_ssh_cache] }.from({"test.localhost" => sess}).to({})
+      }.to change { Thread.current[:clover_ssh_cache] }.from({["test.localhost", "testuser"] => sess}).to({})
     end
 
     it "can reset caches when has cached connection" do
@@ -67,7 +68,7 @@ RSpec.describe Sshable do
       sa.connect
       expect {
         described_class.reset_cache
-      }.to change { Thread.current[:clover_ssh_cache] }.from({"test.localhost" => sess}).to({})
+      }.to change { Thread.current[:clover_ssh_cache] }.from({["test.localhost", "testuser"] => sess}).to({})
     end
 
     it "can reset caches when has no cached connection" do
