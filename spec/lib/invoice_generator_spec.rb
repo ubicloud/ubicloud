@@ -17,7 +17,7 @@ RSpec.describe InvoiceGenerator do
     expect(invoices.count).to eq(1)
 
     br = BillingRate.from_resource_properties("VmCores", vm.family, vm.location)
-    cost = (vm.cores * (duration / 60) * br["unit_price"])
+    cost = vm.cores * [672 * 60, (duration / 60)].min * br["unit_price"]
     expect(invoices.first).to eq({
       project_id: project.id,
       project_name: project.name,
@@ -43,7 +43,7 @@ RSpec.describe InvoiceGenerator do
   }
   let(:vm1) { Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", family: "standard", cores: 2, location: "hetzner-hel1", boot_image: "x") }
 
-  let(:day) { 60 * 60 * 24 }
+  let(:day) { 24 * 60 * 60 }
   let(:begin_time) { Time.parse("2023-06-01") }
   let(:end_time) { Time.parse("2023-07-01") }
 
