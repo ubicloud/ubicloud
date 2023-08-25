@@ -17,6 +17,7 @@ if (suite = ENV.delete("COVERAGE"))
     # No need to check coverage for them
     add_filter "/migrate/"
     add_filter "/spec/"
+    add_filter "/prog/test/"
     add_filter "/db.rb"
     add_filter "/model.rb"
     add_filter "/loader.rb"
