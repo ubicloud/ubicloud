@@ -88,7 +88,7 @@ class Sshable < Sequel::Model
     end
 
     # Cache miss.
-    sess = Net::SSH.start(host, unix_user, **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)))
+    sess = Net::SSH.start(host, "rhizome", **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)))
     Thread.current[:clover_ssh_cache][host] = sess
     sess
   end

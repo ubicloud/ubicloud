@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::Test::Vm < Prog::Base
-  subject_is :sshable, :vm
+  subject_is :vm
 
   label def start
     hop_verify_dd
@@ -10,9 +10,11 @@ class Prog::Test::Vm < Prog::Base
   label def verify_dd
     # Verifies basic block device health
     # See https://github.com/ubicloud/ubicloud/issues/276
-    sshable.cmd("dd if=/dev/random of=~/1.txt bs=512 count=1000000")
-    sshable.cmd("sync ~/1.txt")
-    size_info = sshable.cmd("ls -s ~/1.txt").split
+    size_info = ssh([
+      "dd if=/dev/random of=~/1.txt bs=512 count=1000000",
+      "sync ~/1.txt",
+      "ls -s ~/1.txt"
+    ]).split
 
     unless size_info[0].to_i.between?(500000, 500100)
       fail "unexpected size after dd"
@@ -22,29 +24,29 @@ class Prog::Test::Vm < Prog::Base
   end
 
   label def install_packages
-    sshable.cmd("sudo apt update")
-    sshable.cmd("sudo apt install -y build-essential")
+    ssh(["sudo apt update",
+      "sudo apt install -y build-essential"])
 
     hop_ping_google
   end
 
   label def ping_google
-    sshable.cmd("ping -c 2 google.com")
+    ssh(["ping -c 2 google.com"])
     hop_ping_vms_in_subnet
   end
 
   label def ping_vms_in_subnet
     vms_with_same_subnet.each { |x|
       # ping public IPs
-      sshable.cmd("ping -c 2 #{x.ephemeral_net4}")
-      sshable.cmd("ping -c 2 #{x.ephemeral_net6.nth(2)}")
+      ssh(["ping -c 2 #{x.ephemeral_net4}",
+        "ping -c 2 #{x.ephemeral_net6.nth(2)}"])
 
       # ping private IPs
       nic = x.nics.first
       private_ip6 = nic.private_ipv6.nth(2).to_s
       private_ip4 = nic.private_ipv4.network.to_s
-      sshable.cmd("ping -c 2 #{private_ip6}")
-      sshable.cmd("ping -c 2 #{private_ip4}")
+      ssh(["ping -c 2 #{private_ip6}",
+        "ping -c 2 #{private_ip4}"])
     }
 
     hop_ping_vms_not_in_subnet
@@ -53,8 +55,8 @@ class Prog::Test::Vm < Prog::Base
   label def ping_vms_not_in_subnet
     vms_with_different_subnet.each { |x|
       # ping public IPs should work
-      sshable.cmd("ping -c 2 #{x.ephemeral_net4}")
-      sshable.cmd("ping -c 2 #{x.ephemeral_net6.nth(2)}")
+      ssh(["ping -c 2 #{x.ephemeral_net4}",
+        "ping -c 2 #{x.ephemeral_net6.nth(2)}"])
 
       # ping private IPs shouldn't work
       nic = x.nics.first
@@ -62,15 +64,15 @@ class Prog::Test::Vm < Prog::Base
       private_ip4 = nic.private_ipv4.network.to_s
 
       begin
-        sshable.cmd("ping -c 2 #{private_ip6}")
-      rescue Sshable::SshError
+        ssh(["ping -c 2 #{private_ip6}"])
+      rescue RuntimeError
       else
         raise "Unexpected successful ping to private ip6 of a vm in different subnet"
       end
 
       begin
-        sshable.cmd("ping -c 2 #{private_ip4}")
-      rescue Sshable::SshError
+        ssh(["ping -c 2 #{private_ip4}"])
+      rescue RuntimeError
       else
         raise "Unexpected successful ping to private ip4 of a vm in different subnet"
       end
@@ -101,5 +103,21 @@ class Prog::Test::Vm < Prog::Base
     vms_in_same_project.filter { |x|
       x.private_subnets.first.id != my_subnet
     }
+  end
+
+  # YYY: this is a temporary solution until we make Sshable work with
+  # custom usernames.
+  def ssh(cmds, private_key)
+    ret = nil
+    Net::SSH.start(frame["hostname"], "ubi",
+      key_data: [private_key],
+      verify_host_key: :never,
+      number_of_password_prompts: 0) do |ssh|
+      cmds.each { |cmd|
+        ret = ssh.exec!(cmd)
+        fail "Command exited with nonzero status" unless ret.exitstatus.zero?
+      }
+    end
+    ret
   end
 end
