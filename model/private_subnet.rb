@@ -42,15 +42,26 @@ class PrivateSubnet < Sequel::Model
     PRIVATE_SUBNET_RANGES.sample
   end
 
+  # Here we are blocking the bottom 4 and top 1 addresses of each subnet
+  # The bottom first address is called the network address, that must be
+  # blocked since we use it for routing.
+  # The very last address is blocked because typically it is used as the
+  # broadcast address.
+  # We further block the bottom 3 addresses for future proofing. We may
+  # use it in future for some other purpose. AWS also does that. Here
+  # is the source;
+  # https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html
   def random_private_ipv4
-    addr = net4.nth_subnet(32, SecureRandom.random_number(2**(32 - net4.netmask.prefix_len) - 1))
+    total_hosts = 2**(32 - net4.netmask.prefix_len) - 5
+    random_offset = SecureRandom.random_number(total_hosts) + 4
+    addr = net4.nth_subnet(32, random_offset)
     return random_private_ipv4 if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
 
     addr
   end
 
   def random_private_ipv6
-    addr = net6.nth_subnet(79, SecureRandom.random_number(2**(79 - net6.netmask.prefix_len) - 1).to_i + 1)
+    addr = net6.nth_subnet(79, SecureRandom.random_number(2**(79 - net6.netmask.prefix_len) - 2).to_i + 1)
     return random_private_ipv6 if nics.any? { |nic| nic.private_ipv6.to_s == addr.to_s }
 
     addr

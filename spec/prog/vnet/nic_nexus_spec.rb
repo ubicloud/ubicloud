@@ -95,7 +95,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       allow(nx).to receive(:nic).and_return(nic)
     end
 
-    it "naps if nothing to do" do
+    it "donates if nothing to do" do
       expect(nx).to receive(:reap).and_return(true)
       expect(nx).to receive(:leaf?).and_return(false)
       expect {

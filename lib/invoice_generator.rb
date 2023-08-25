@@ -60,6 +60,10 @@ class InvoiceGenerator
       .all
 
     active_billing_records.map do |br|
+      # We cap the billable duration at 672 hours. In this way, we can
+      # charge the users same each month no matter the number of days
+      # in that month.
+      duration = [672 * 60, br.duration(@begin_time, @end_time).ceil].min
       {
         project_id: br.project_id,
         project_name: br.project.name,
@@ -69,7 +73,7 @@ class InvoiceGenerator
         resource_type: br.billing_rate["resource_type"],
         resource_family: br.billing_rate["resource_family"],
         amount: br.amount,
-        cost: (br.amount * br.duration(@begin_time, @end_time) * br.billing_rate["unit_price"])
+        cost: (br.amount * duration * br.billing_rate["unit_price"])
       }
     end
   end

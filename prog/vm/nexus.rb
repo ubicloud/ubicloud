@@ -72,7 +72,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
-        name: name, size: size, location: location, boot_image: boot_image, ip4_enabled: enable_ip4) { _1.id = ubid.to_uuid }
+        name: name, family: vm_size.family, cores: vm_size.vcpu / 2, location: location, boot_image: boot_image, ip4_enabled: enable_ip4) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
       vm.associate_with_project(project)
@@ -279,8 +279,8 @@ SQL
       project_id: vm.projects.first.id,
       resource_id: vm.id,
       resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location)["id"],
-      amount: vm.product.cores
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
+      amount: vm.cores
     )
 
     if vm.ip4_enabled

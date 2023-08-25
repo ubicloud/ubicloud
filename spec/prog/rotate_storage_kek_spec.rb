@@ -14,7 +14,7 @@ RSpec.describe Prog::RotateStorageKek do
 
   let(:vm) {
     vm_host = instance_double(VmHost)
-    vm = Vm.new(size: "m5a.2x").tap {
+    vm = Vm.new.tap {
       _1.id = Vm.generate_uuid
     }
     allow(vm_host).to receive(:sshable).and_return(sshable)

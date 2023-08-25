@@ -13,8 +13,8 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
   let(:tunnel) {
     sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
     vmh = VmHost.create(location: "test-location") { _1.id = sa.id }
-    vm_src = Vm.create_with_id(name: "hellovm", vm_host_id: vmh.id, unix_user: "root", public_key: "public-key", size: "1", location: "location", boot_image: "image")
-    vm_dst = Vm.create_with_id(name: "hellovm2", vm_host_id: vmh.id, unix_user: "root", public_key: "public-key", size: "1", location: "location", boot_image: "image")
+    vm_src = Vm.create_with_id(name: "hellovm", vm_host_id: vmh.id, unix_user: "root", public_key: "public-key", family: "standard", cores: 1, location: "location", boot_image: "image")
+    vm_dst = Vm.create_with_id(name: "hellovm2", vm_host_id: vmh.id, unix_user: "root", public_key: "public-key", family: "standard", cores: 1, location: "location", boot_image: "image")
     n_src = Nic.create_with_id(private_subnet_id: ps.id,
       private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
       private_ipv4: "10.0.0.1",

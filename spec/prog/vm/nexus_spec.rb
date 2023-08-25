@@ -18,7 +18,7 @@ RSpec.describe Prog::Vm::Nexus do
     ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
     disk.key_encryption_key_1 = kek
-    vm = Vm.new(size: "standard-2", name: "dummy-vm", location: "hetzner-hel1").tap {
+    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "hetzner-hel1").tap {
       _1.id = Vm.generate_uuid
       _1.vm_storage_volumes.append(disk)
       disk.vm = _1
@@ -27,8 +27,8 @@ RSpec.describe Prog::Vm::Nexus do
       project_id: SecureRandom.uuid,
       resource_id: vm.id,
       resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.product.prefix, vm.location)["id"],
-      amount: vm.product.cores
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
+      amount: vm.cores
     )
     vm
   }

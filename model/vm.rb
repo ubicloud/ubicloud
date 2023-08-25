@@ -43,46 +43,12 @@ class Vm < Sequel::Model
     super
   end
 
-  Product = Struct.new(:prefix, :cores) do |klass|
-    klass.define_singleton_method :parse do |s|
-      fail "BUG: cannot parse product" unless s =~ /\A(\w+)-(\d+)\z/
-      prefix = $1
-      two_times_cores = Integer($2)
-
-      fail "BUG: unrecognized product prefix" unless prefix == "standard"
-      fail "BUG: unrecognized product scale" unless [2, 4, 8, 16].include? two_times_cores
-
-      # Define suffix integer as 2 * numcores. This coincides with
-      # SMT-enabled x86 processors, to give people the right idea if
-      # they compare the product code integer to the preponderance of
-      # spec sheets on the web.
-      #
-      # With non-SMT processors, maybe we'll keep it that way too,
-      # even though it doesn't describe any attribute about the
-      # processor.  But, it does allow "standard-2" is compared to
-      # another "standard-2" variant regardless of SMT,
-      # e.g. "standard-2-arm", instead of making people interpreting
-      # the code adjust the scale factor to do the comparison
-      # themselves.
-      #
-      # Another weakness of this approach, besides it being indirect
-      # in description of non-SMT processors, is having "standard-2"
-      # be the smallest unit of product is also noisier than
-      # "standard-1".
-      new(prefix, two_times_cores / 2)
-    end
-  end
-
-  def product
-    @product ||= Product.parse(size)
-  end
-
   def mem_gib_ratio
     8
   end
 
   def mem_gib
-    product.cores * mem_gib_ratio
+    cores * mem_gib_ratio
   end
 
   # cloud-hypervisor takes topology information in this format:
@@ -138,8 +104,29 @@ class Vm < Sequel::Model
     CloudHypervisorCpuTopo.new(*topo)
   end
 
-  def cores
-    product.cores
+  def display_size
+    # With additional product families, it is likely that we hit a
+    # case where this conversion wouldn't work. We can use map or
+    # when/case block at that time.
+
+    # Define suffix integer as 2 * numcores. This coincides with
+    # SMT-enabled x86 processors, to give people the right idea if
+    # they compare the product code integer to the preponderance of
+    # spec sheets on the web.
+    #
+    # With non-SMT processors, maybe we'll keep it that way too,
+    # even though it doesn't describe any attribute about the
+    # processor.  But, it does allow "standard-2" is compared to
+    # another "standard-2" variant regardless of SMT,
+    # e.g. "standard-2-arm", instead of making people interpreting
+    # the code adjust the scale factor to do the comparison
+    # themselves.
+    #
+    # Another weakness of this approach, besides it being indirect
+    # in description of non-SMT processors, is having "standard-2"
+    # be the smallest unit of product is also noisier than
+    # "standard-1".
+    "#{family}-#{cores * 2}"
   end
 
   def self.ubid_to_name(id)
