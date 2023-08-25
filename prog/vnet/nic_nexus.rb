@@ -121,6 +121,8 @@ class Prog::Vnet::NicNexus < Prog::Base
       fail "Cannot destroy nic with active vm, first clean up the attached resources"
     end
 
+    decr_destroy
+
     DB.transaction do
       nic.src_ipsec_tunnels_dataset.destroy
       nic.dst_ipsec_tunnels_dataset.destroy
