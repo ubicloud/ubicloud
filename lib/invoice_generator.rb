@@ -13,10 +13,11 @@ class InvoiceGenerator
     invoices = []
 
     DB.transaction do
-      active_billing_records.group_by { |br| br[:project_id] }.each do |project_id, project_records|
+      active_billing_records.group_by { |br| br[:project] }.each do |project, project_records|
         project_content = {}
-        project_content[:project_id] = project_id
-        project_content[:project_name] = project_records.first[:project_name]
+
+        project_content[:project_id] = project.id
+        project_content[:project_name] = project.name
 
         project_content[:resources] = []
         project_content[:cost] = 0
@@ -44,7 +45,12 @@ class InvoiceGenerator
         end
 
         if @save_result
-          Invoice.create_with_id(project_id: project_id, content: project_content)
+          invoice_month = @begin_time.strftime("%y%m")
+          invoice_customer = project.id[-10..]
+          invoice_order = format("%04d", project.invoices.count + 1)
+          invoice_number = "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
+
+          Invoice.create_with_id(project_id: project.id, invoice_number: invoice_number, content: project_content)
         else
           invoices.push(project_content)
         end
@@ -55,7 +61,7 @@ class InvoiceGenerator
   end
 
   def active_billing_records
-    active_billing_records = BillingRecord.eager(:project)
+    active_billing_records = BillingRecord.eager(project: :invoices)
       .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
       .all
 
@@ -65,8 +71,7 @@ class InvoiceGenerator
       # in that month.
       duration = [672 * 60, br.duration(@begin_time, @end_time).ceil].min
       {
-        project_id: br.project_id,
-        project_name: br.project.name,
+        project: br.project,
         resource_id: br.resource_id,
         location: br.billing_rate["location"],
         resource_name: br.resource_name,
