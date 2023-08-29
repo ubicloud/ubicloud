@@ -26,6 +26,18 @@ class VmPath
     write(dnsmasq_service, s)
   end
 
+  def radvd_service
+    "/etc/systemd/system/#{@vm_name}-radvd.service"
+  end
+
+  def radvd_pid
+    home("radvd.pid")
+  end
+
+  def write_radvd_service(s)
+    write(radvd_service, s)
+  end
+
   def systemd_service
     File.join("/etc/systemd/system",
       IO.popen(["systemd-escape", @vm_name + ".service"]) { _1.read.chomp })
@@ -63,6 +75,7 @@ class VmPath
     public_ipv4
     nftables_conf
     prep.json
+    radvd.conf
   ].each do |file_name|
     method_name = file_name.tr(".-", "_")
     fail "BUG" if method_defined?(method_name)
