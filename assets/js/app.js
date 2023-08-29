@@ -185,11 +185,6 @@ function setupLocationBasedPrices() {
         $(this).prop('checked', false);
       }
     }
-    if (count[name]) {
-      $("#" + name + "-description").hide();
-    } else {
-      $("#" + name + "-description").show();
-    }
   });
 }
 

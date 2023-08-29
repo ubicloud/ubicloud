@@ -58,15 +58,17 @@
                 ) %>
               </div>
               <div class="col-span-full">
+                <% locations = Option
+                    .locations_for_provider(@project_data.dig(:provider, :name))
+                    .map { |l| [l.name, l.display_name, @prices[l.name].to_json] }
+                %>
                 <%== render(
                   "components/form/radio_small_cards",
                   locals: {
                     name: "location",
                     label: "Location",
-                    options:
-                      Option
-                        .locations_for_provider(@project_data.dig(:provider, :name))
-                        .map { |l| [l.name, l.display_name, @prices[l.name].to_json] },
+                    options: locations,
+                    selected: locations.first[0],
                     attributes: {
                       required: true
                     }
@@ -146,8 +148,6 @@
                       <% end %>
                     </div>
                   </fieldset>
-                  <p id="size-description" class="text-sm text-gray-500 leading-6">
-                    Select location to see available server sizes</p>
                 </div>
               </div>
               <div class="col-span-full">
