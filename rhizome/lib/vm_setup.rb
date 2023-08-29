@@ -101,6 +101,7 @@ class VmSetup
 
     FileUtils.rm_f(vp.systemd_service)
     FileUtils.rm_f(vp.dnsmasq_service)
+    FileUtils.rm_f(vp.radvd_service)
     r "systemctl daemon-reload"
 
     purge_storage
@@ -292,18 +293,67 @@ dhcp-range=#{tapname},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.p
 DHCP
     end.join("\n")
 
-    raparams = nics.map { |net6, net4, tapname, mac| "ra-param=#{tapname}" }.join("\n")
-
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
-enable-ra
 dhcp-authoritative
-#{raparams}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
+
+    raparams = nics.each_with_index.map do |(net6, net4, tapname, mac), index|
+      # What is special about index 0? Nothing. radvd is used for router
+      # advertisement of IPv6 stack. We have 2 IPv6 addresses for a VM; one is
+      # public, the other is private (sent in the nics payload). We might have
+      # multiple Nics in future but they will only have new private ip
+      # addresses. Because of that, here, we pick the very first Nic and combine
+      # their configuration into 1 interface definition. You will realize in
+      # other parts of the code that we always use the very first nic to
+      # configure public IPv6.
+      public_prefix_block = if index.zero?
+        <<~PUBLIC_PREFIX
+      # Public prefix
+      prefix #{guest_network}
+      {
+        AdvOnLink on;
+        AdvAutonomous on;
+        AdvRouterAddr on;
+        AdvValidLifetime 3600;
+        AdvPreferredLifetime 3600;
+      };
+        PUBLIC_PREFIX
+      else
+        ""
+      end
+
+      <<~RADVD
+    interface #{tapname}
+    {
+      AdvSendAdvert on;
+      MinRtrAdvInterval 30;
+      MaxRtrAdvInterval 200;
+      AdvManagedFlag on;
+      AdvOtherConfigFlag on;
+      AdvDefaultLifetime 3600;
+      #{public_prefix_block}
+      # Private prefix
+      prefix #{NetAddr::IPv6Net.parse(net6)}
+      {
+        AdvOnLink on;
+        AdvAutonomous on;
+        AdvRouterAddr on;
+        AdvValidLifetime 3600;
+        AdvPreferredLifetime 3600;
+      };
+    };
+      RADVD
+    end.join("\n")
+
+    vp.write_radvd_conf(<<RADVD_CONF)
+#{raparams}
+RADVD_CONF
+    FileUtils.chown @vm_name, @vm_name, vp.q_radvd_conf
 
     ethernets = nics.map do |net6, net4, tapname, mac|
       <<ETHERNETS
@@ -593,6 +643,38 @@ EOS
       "-i #{tap}"
     }.join(" ")
 
+    FileUtils.touch(vp.radvd_pid)
+    FileUtils.chown @vm_name, @vm_name, vp.radvd_pid
+    vp.write_radvd_service <<RADVD_SERVICE
+[Unit]
+Description=Router Advertisement Daemon for VM #{@vm_name}
+After=network.target
+After=#{@vm_name}-dnsmasq.service
+Requires=#{@vm_name}-dnsmasq.service
+
+[Service]
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+Type=simple
+ExecStartPre=/usr/local/sbin/radvd -C /vm/#{@vm_name}/radvd.conf -p /vm/#{@vm_name}/radvd.pid -u #{@vm_name} --configtest
+ExecStart=/usr/local/sbin/radvd -d 5 -C /vm/#{@vm_name}/radvd.conf -m stderr -n -p /vm/#{@vm_name}/radvd.pid -u #{@vm_name}
+ProtectSystem=strict
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_RAW CAP_SETUID CAP_SETGID
+AmbientCapabilities=CAP_NET_RAW CAP_SETUID CAP_SETGID
+ReadOnlyPaths=/
+ReadWritePaths=/vm/#{@vm_name}
+User=#{@vm_name}
+Group=#{@vm_name}
+
+[Install]
+WantedBy=multi-user.target
+RADVD_SERVICE
+
     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
 [Unit]
 Description=A lightweight DHCP and caching DNS server
@@ -635,8 +717,8 @@ DNSMASQ_SERVICE
 Description=#{@vm_name}
 After=network.target
 After=spdk.service
-After=#{@vm_name}-dnsmasq.service
-Requires=#{@vm_name}-dnsmasq.service
+After=#{@vm_name}-radvd.service
+Requires=#{@vm_name}-radvd.service
 Requires=spdk.service
 
 [Service]

@@ -332,6 +332,12 @@ SQL
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
+      begin
+        host.sshable.cmd("sudo systemctl stop #{q_vm}-radvd")
+      rescue Sshable::SshError => ex
+        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
+      end
+
       host.sshable.cmd("sudo bin/deletevm.rb #{q_vm}")
     end
 
