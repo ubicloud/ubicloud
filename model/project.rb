@@ -10,6 +10,8 @@ class Project < Sequel::Model
   many_to_many :vms, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :private_subnets, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
+  one_to_many :invoices
+
   dataset_module Authorization::Dataset
 
   plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy

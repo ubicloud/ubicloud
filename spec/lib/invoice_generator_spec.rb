@@ -102,6 +102,8 @@ RSpec.describe InvoiceGenerator do
 
     described_class.new(begin_time, end_time, true).run
     expect(Invoice.count).to eq(1)
+
+    expect(Invoice.first.invoice_number).to eq("#{begin_time.strftime("%y%m")}-#{p1.id[-10..]}-0001")
   end
 end
 
