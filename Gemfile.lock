@@ -148,7 +148,7 @@ GEM
     rodauth (2.31.0)
       roda (>= 2.6.0)
       sequel (>= 4)
-    rotp (6.2.2)
+    rotp (6.3.0)
     rqrcode (2.2.0)
       chunky_png (~> 1.0)
       rqrcode_core (~> 1.0)
