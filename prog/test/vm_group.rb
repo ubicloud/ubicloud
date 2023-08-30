@@ -138,7 +138,7 @@ class Prog::Test::VmGroup < Prog::Base
   label def wait_subnets_destroyed
     reap
 
-    finish if children_idle
+    hop_finish if children_idle
 
     donate
   end
