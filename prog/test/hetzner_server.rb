@@ -6,7 +6,7 @@ class Prog::Test::HetznerServer < Prog::Base
   def self.assemble
     server_id = Config.ci_hetzner_sacrificial_server_id
     if server_id.nil? || server_id.empty?
-      fail "CI_HLETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
+      fail "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
     end
     Strand.create_with_id(
       prog: "Test::HetznerServer",
