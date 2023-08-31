@@ -35,21 +35,51 @@ RSpec.describe VmSetup do
   end
 
   describe "#setup_volume" do
-    it "can setup a storage volume" do
+    it "can setup an unencrypted non-boot volume" do
+      disk_file = "/var/storage/test/0/disk.raw"
+      device_id = "some_device_id"
+      size_gib = 5
+
+      expect(vs).to receive(:create_empty_disk_file).with(disk_file, size_gib)
+      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil)
+
+      vs.setup_volume({"boot" => false, "size_gib" => size_gib, "device_id" => device_id},
+        0, nil, nil)
+    end
+
+    it "can setup an unencrypted boot volume" do
       disk_file = "/var/storage/test/0/disk.raw"
       device_id = "some_device_id"
       boot_image = "ubuntu-jammy"
+      image_path = "/opt/ubuntu.raw"
       size_gib = 5
-      key_wrapping_secrets = {}
-      data_encryption_key = {cipher: "AES-XTS", k: "123", e: "456"}
 
-      expect(vs).to receive(:setup_disk_file).and_return(disk_file)
-      expect(vs).to receive(:setup_data_encryption_key).with(0, key_wrapping_secrets).and_return(data_encryption_key)
-      expect(vs).to receive(:copy_image).with(disk_file, boot_image, size_gib, data_encryption_key)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, data_encryption_key)
+      expect(vs).to receive(:download_boot_image).with(boot_image).and_return(image_path)
+      expect(vs).to receive(:verify_boot_disk_size).with(image_path, 5)
+      expect(vs).to receive(:unencrypted_image_copy).with(disk_file, image_path, size_gib)
+      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil)
 
       vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
-        0, boot_image, key_wrapping_secrets)
+        0, boot_image, nil)
+    end
+
+    it "can setup an encrypted boot volume" do
+      disk_file = "/var/storage/test/0/disk.raw"
+      device_id = "some_device_id"
+      boot_image = "ubuntu-jammy"
+      image_path = "/opt/ubuntu.raw"
+      secrets = key_wrapping_secrets
+      encryption_key = "key"
+      size_gib = 5
+
+      expect(vs).to receive(:setup_data_encryption_key).with(0, secrets).and_return(encryption_key)
+      expect(vs).to receive(:download_boot_image).with(boot_image).and_return(image_path)
+      expect(vs).to receive(:verify_boot_disk_size).with(image_path, 5)
+      expect(vs).to receive(:encrypted_image_copy).with(disk_file, image_path, size_gib, encryption_key)
+      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, encryption_key)
+
+      vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
+        0, boot_image, secrets)
     end
   end
 
@@ -69,68 +99,79 @@ RSpec.describe VmSetup do
     end
   end
 
-  describe "#setup_disk_file" do
-    it "can setup a disk" do
+  describe "#create_empty_disk_file" do
+    it "can creat an empty disk file" do
       disk_file = "/var/storage/test/0/disk.raw"
       expect(FileUtils).to receive(:touch).with(disk_file)
-      expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
-      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
-      expect(vs).to receive(:r).with(/setfacl.*#{disk_file}/)
       expect(vs).to receive(:r).with("truncate -s 5G #{disk_file}")
-      expect(
-        vs.setup_disk_file({"boot" => true, "size_gib" => 5, "device_id" => "disk0"}, 0)
-      ).to eq(disk_file)
+      expect(vs).to receive(:set_disk_file_permissions).with(disk_file)
+
+      vs.create_empty_disk_file(disk_file, 5)
     end
   end
 
-  describe "#copy_image" do
-    it "fails if requested size is too small" do
-      boot_image = "ubuntu-jammy"
-      image_path = "/opt/#{boot_image}.raw"
-      disk_file = "/var/storage/test/disk_0.raw"
-      expect(vs).to receive(:download_boot_image).and_return image_path
-      expect(File).to receive(:size).with(image_path).and_return(5 * 2**30)
-      expect {
-        vs.copy_image(disk_file, boot_image, 2, nil)
-      }.to raise_error RuntimeError, "Image size greater than requested disk size"
+  describe "#set_disk_file_permissions" do
+    it "can set disk file permissions" do
+      disk_file = "/var/storage/test/0/disk.raw"
+      expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
+      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
+      expect(vs).to receive(:r).with(/setfacl.*#{disk_file}/)
+
+      vs.set_disk_file_permissions(disk_file)
+    end
+  end
+
+  describe "#verify_boot_disk_size" do
+    it "can verify boot disk size" do
+      image_path = "/opt/image"
+      expect(File).to receive(:size).and_return(2 * 2**30)
+      vs.verify_boot_disk_size(image_path, 5)
     end
 
-    it "copies non-encrypted image" do
-      boot_image = "ubuntu-jammy"
-      image_path = "/opt/#{boot_image}.raw"
-      disk_file = "/var/storage/test/disk_0.raw"
-      expect(vs).to receive(:download_boot_image).and_return image_path
-      expect(File).to receive(:size).with(image_path).and_return(2 * 2**30)
-      expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob aio0 --bs=[0-9]+$/, stdin: /{.*}/)
-      vs.copy_image(disk_file, boot_image, 10, nil)
+    it "fails if disk size is less than image file size" do
+      image_path = "/opt/image"
+      expect(File).to receive(:size).and_return(2 * 2**30)
+      expect { vs.verify_boot_disk_size(image_path, 1) }.to raise_error RuntimeError, "Image size greater than requested disk size"
     end
+  end
 
-    it "copies encrypted image" do
-      boot_image = "ubuntu-jammy"
-      image_path = "/opt/#{boot_image}.raw"
+  describe "#encrypted_image_copy" do
+    it "can copy an encrypted image" do
+      image_path = "/opt/ubuntu.raw"
       disk_file = "/var/storage/test/disk_0.raw"
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(vs).to receive(:download_boot_image).and_return image_path
-      expect(File).to receive(:size).with(image_path).and_return(2 * 2**30)
+      expect(vs).to receive(:create_empty_disk_file).with(disk_file, 10)
       expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+$/, stdin: /{.*}/)
-      vs.copy_image(disk_file, boot_image, 10, encryption_key)
+      vs.encrypted_image_copy(disk_file, image_path, 10, encryption_key)
+    end
+  end
+
+  describe "#unencrypted_image_copy" do
+    it "can copy an unencrypted image" do
+      image_path = "/opt/ubuntu.raw"
+      disk_file = "/var/storage/test/disk_0.raw"
+      expect(vs).to receive(:r).with("cp --reflink=auto #{image_path} #{disk_file}")
+      expect(vs).to receive(:r).with("truncate -s 10G #{disk_file.shellescape}")
+      expect(vs).to receive(:set_disk_file_permissions).with(disk_file)
+      vs.unencrypted_image_copy(disk_file, image_path, 10)
     end
   end
 
   describe "#download_boot_image" do
     it "can download an image" do
-      expect(File).to receive(:exist?).with("/opt/ubuntu-jammy.raw").and_return(false)
+      expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
       expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/opt/ubuntu-jammy.qcow2.tmp")
+        expect(path).to eq("/tmp/ubuntu-jammy.qcow2.tmp")
       end.and_yield
-      expect(vs).to receive(:r).with("curl -L10 -o /opt/ubuntu-jammy.qcow2.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /opt/ubuntu-jammy.qcow2.tmp /opt/ubuntu-jammy.raw")
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
+      expect(vs).to receive(:r).with("curl -L10 -o /tmp/ubuntu-jammy.qcow2.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /tmp/ubuntu-jammy.qcow2.tmp /var/storage/images/ubuntu-jammy.raw")
 
       vs.download_boot_image("ubuntu-jammy")
     end
 
     it "can use an image that's already downloaded" do
-      expect(File).to receive(:exist?).with("/opt/almalinux-9.1.raw").and_return(true)
+      expect(File).to receive(:exist?).with("/var/storage/images/almalinux-9.1.raw").and_return(true)
       vs.download_boot_image("almalinux-9.1")
     end
   end

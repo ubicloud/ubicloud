@@ -361,13 +361,20 @@ EOS
   def setup_volume(storage_volume, disk_index, boot_image, key_wrapping_secrets)
     encrypted = !key_wrapping_secrets.nil?
     encryption_key = setup_data_encryption_key(disk_index, key_wrapping_secrets) if encrypted
+    disk_size_gib = storage_volume["size_gib"]
 
-    disk_file = setup_disk_file(storage_volume, disk_index)
-
+    disk_file = vp.disk(disk_index)
     if storage_volume["boot"]
-      copy_image(disk_file, boot_image,
-        storage_volume["size_gib"],
-        encryption_key)
+      image_path = download_boot_image(boot_image)
+      verify_boot_disk_size(image_path, disk_size_gib)
+
+      if encrypted
+        encrypted_image_copy(disk_file, image_path, disk_size_gib, encryption_key)
+      else
+        unencrypted_image_copy(disk_file, image_path, disk_size_gib)
+      end
+    else
+      create_empty_disk_file(disk_file, disk_size_gib)
     end
 
     bdev = storage_volume["device_id"]
@@ -447,14 +454,14 @@ EOS
     sek.read_encrypted_dek(key_file)
   end
 
-  def copy_image(disk_file, boot_image, disk_size_gib, encryption_key)
-    image_path = download_boot_image(boot_image)
-    encrypted = !encryption_key.nil?
+  def unencrypted_image_copy(disk_file, image_path, disk_size_gib)
+    r "cp --reflink=auto #{image_path.shellescape} #{disk_file.shellescape}"
+    r "truncate -s #{disk_size_gib}G #{disk_file.shellescape}"
 
-    size = File.size(image_path)
+    set_disk_file_permissions(disk_file)
+  end
 
-    fail "Image size greater than requested disk size" unless size <= disk_size_gib * 2**30
-
+  def encrypted_image_copy(disk_file, image_path, disk_size_gib, encryption_key)
     # Note that spdk_dd doesn't interact with the main spdk process. It is a
     # tool which starts the spdk infra as a separate process, creates bdevs
     # from config, does the copy, and exits. Since it is a separate process
@@ -470,33 +477,27 @@ EOS
         filename: disk_file,
         readonly: false
       }
-    }]
-
-    if encrypted
-      bdev_conf.append({
+    },
+      {
         method: "bdev_crypto_create",
         params: {
           base_bdev_name: "aio0",
           name: "crypt0",
           key_name: "super_key"
         }
-      })
-    end
+      }]
 
-    accel_conf = []
-    if encrypted
-      accel_conf.append(
-        {
-          method: "accel_crypto_key_create",
-          params: {
-            name: "super_key",
-            cipher: encryption_key[:cipher],
-            key: encryption_key[:key],
-            key2: encryption_key[:key2]
-          }
+    accel_conf = [
+      {
+        method: "accel_crypto_key_create",
+        params: {
+          name: "super_key",
+          cipher: encryption_key[:cipher],
+          key: encryption_key[:key],
+          key2: encryption_key[:key2]
         }
-      )
-    end
+      }
+    ]
 
     spdk_config_json = {
       subsystems: [
@@ -511,32 +512,29 @@ EOS
       ]
     }.to_json
 
-    target_bdev = if encrypted
-      "crypt0"
-    else
-      "aio0"
-    end
-
     # spdk_dd uses the same spdk app infra, so it will bind to an rpc socket,
     # which we won't use. But its path shouldn't conflict with other VM setups,
     # so it doesn't error out in concurrent VM creations.
     rpc_socket = "/var/tmp/spdk_dd.sock.#{@vm_name}"
 
+    create_empty_disk_file(disk_file, disk_size_gib)
+
     r("#{Spdk.bin("spdk_dd")} --config /dev/stdin " \
     "--disable-cpumask-locks " \
     "--rpc-socket #{rpc_socket.shellescape} " \
     "--if #{image_path.shellescape} " \
-    "--ob #{target_bdev.shellescape} " \
+    "--ob crypt0 " \
     "--bs=2097152", stdin: spdk_config_json)
   end
 
-  def setup_disk_file(storage_volume, disk_index)
-    disk_file = vp.disk(disk_index)
-    q_disk_file = disk_file.shellescape
-
+  def create_empty_disk_file(disk_file, disk_size_gib)
     FileUtils.touch(disk_file)
-    r "truncate -s #{storage_volume["size_gib"]}G #{q_disk_file}"
+    r "truncate -s #{disk_size_gib}G #{disk_file.shellescape}"
 
+    set_disk_file_permissions(disk_file)
+  end
+
+  def set_disk_file_permissions(disk_file)
     FileUtils.chown @vm_name, @vm_name, disk_file
 
     # don't allow others to read user's disk
@@ -544,7 +542,6 @@ EOS
 
     # allow spdk to access the image
     r "setfacl -m u:spdk:rw #{disk_file.shellescape}"
-    disk_file
   end
 
   def download_boot_image(boot_image)
@@ -555,8 +552,10 @@ EOS
     }
 
     download = urls.fetch(boot_image)
-    image_path = "/opt/" + boot_image + ".raw"
+    image_path = "/var/storage/images/" + boot_image + ".raw"
     unless File.exist?(image_path)
+      FileUtils.mkdir_p "/var/storage/images/"
+
       # Use of File::EXCL provokes a crash rather than a race
       # condition if two VMs are lazily getting their images at the
       # same time.
@@ -565,7 +564,7 @@ EOS
       # customer images.  As-is, it does not have all the
       # synchronization features we might want if we were to keep this
       # code longer term, but, that's not the plan.
-      temp_path = "/opt/" + boot_image + ".qcow2.tmp"
+      temp_path = "/tmp/" + boot_image + ".qcow2.tmp"
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
         r "curl -L10 -o #{temp_path.shellescape} #{download.shellescape}"
       end
@@ -576,6 +575,11 @@ EOS
     end
 
     image_path
+  end
+
+  def verify_boot_disk_size(image_path, disk_size_gib)
+    size = File.size(image_path)
+    fail "Image size greater than requested disk size" unless size <= disk_size_gib * 2**30
   end
 
   # Unnecessary if host has this set before creating the netns, but
