@@ -39,6 +39,7 @@ module Serializers
     end
 
     def serialize(object)
+      return if object.nil?
       if object.respond_to?(:map) && !object.is_a?(Hash)
         object.map { |item| serializer.call(item) }
       else
