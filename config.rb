@@ -82,4 +82,5 @@ module Config
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
   override :hetzner_ssh_key, string
+  override :minimum_invoice_charge_threshold, 1.0, float
 end
