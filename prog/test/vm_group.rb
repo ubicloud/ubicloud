@@ -3,8 +3,12 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Base
-  def self.assemble
-    Strand.create_with_id(prog: "Test::VmGroup", label: "start", stack: [{}])
+  def self.assemble(storage_encrypted: true)
+    Strand.create_with_id(
+      prog: "Test::VmGroup",
+      label: "start",
+      stack: [{"storage_encrypted" => storage_encrypted}]
+    )
   end
 
   label def start
@@ -33,18 +37,21 @@ class Prog::Test::VmGroup < Prog::Base
     vm1_s = Prog::Vm::Nexus.assemble(
       keypair_1.public_key, project.id,
       private_subnet_id: subnet1_s.id,
+      storage_encrypted: frame["storage_encrypted"],
       enable_ip4: true
     )
 
     vm2_s = Prog::Vm::Nexus.assemble(
       keypair_2.public_key, project.id,
       private_subnet_id: subnet1_s.id,
+      storage_encrypted: frame["storage_encrypted"],
       enable_ip4: true
     )
 
     vm3_s = Prog::Vm::Nexus.assemble(
       keypair_3.public_key, project.id,
       private_subnet_id: subnet2_s.id,
+      storage_encrypted: frame["storage_encrypted"],
       enable_ip4: true
     )
 

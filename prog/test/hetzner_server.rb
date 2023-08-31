@@ -85,18 +85,32 @@ class Prog::Test::HetznerServer < Prog::Base
   label def wait_setup_host
     reap
 
-    hop_test_host if children_idle
+    hop_test_host_encrypted if children_idle
 
     donate
   end
 
-  label def test_host
-    bud Prog::Test::VmGroup
+  label def test_host_encrypted
+    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: true))
 
-    hop_wait_test_host
+    hop_wait_test_host_encrypted
   end
 
-  label def wait_test_host
+  label def wait_test_host_encrypted
+    reap
+
+    hop_test_host_unencrypted if children_idle
+
+    donate
+  end
+
+  label def test_host_unencrypted
+    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: false))
+
+    hop_wait_test_host_unencrypted
+  end
+
+  label def wait_test_host_unencrypted
     reap
 
     hop_delete_key if children_idle

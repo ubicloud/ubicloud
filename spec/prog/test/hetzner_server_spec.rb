@@ -78,9 +78,9 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#wait_setup_host" do
-    it "hops to test_host if children idle" do
+    it "hops to test_host_encrypted if children idle" do
       expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_setup_host }.to hop("test_host", "Test::HetznerServer")
+      expect { hs_test.wait_setup_host }.to hop("test_host_encrypted", "Test::HetznerServer")
     end
 
     it "donates if children not idle" do
@@ -89,21 +89,39 @@ RSpec.describe Prog::Test::HetznerServer do
     end
   end
 
-  describe "#test_host" do
-    it "hops to wait_test_host" do
-      expect { hs_test.test_host }.to hop("wait_test_host", "Test::HetznerServer")
+  describe "#test_host_encrypted" do
+    it "hops to wait_test_host_encrypted" do
+      expect { hs_test.test_host_encrypted }.to hop("wait_test_host_encrypted", "Test::HetznerServer")
     end
   end
 
-  describe "#wait_test_host" do
-    it "hops to delete_key if children idle" do
+  describe "#wait_test_host_encrypted" do
+    it "hops to test_host_unencrypted if children idle" do
       expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_test_host }.to hop("delete_key", "Test::HetznerServer")
+      expect { hs_test.wait_test_host_encrypted }.to hop("test_host_unencrypted", "Test::HetznerServer")
     end
 
     it "donates if children not idle" do
       expect(hs_test).to receive(:children_idle).and_return(false)
-      expect { hs_test.wait_test_host }.to nap(0)
+      expect { hs_test.wait_test_host_encrypted }.to nap(0)
+    end
+  end
+
+  describe "#test_host_unencrypted" do
+    it "hops to wait_test_host_unencrypted" do
+      expect { hs_test.test_host_unencrypted }.to hop("wait_test_host_unencrypted", "Test::HetznerServer")
+    end
+  end
+
+  describe "#wait_test_host_unencrypted" do
+    it "hops to delete_key if children idle" do
+      expect(hs_test).to receive(:children_idle).and_return(true)
+      expect { hs_test.wait_test_host_unencrypted }.to hop("delete_key", "Test::HetznerServer")
+    end
+
+    it "donates if children not idle" do
+      expect(hs_test).to receive(:children_idle).and_return(false)
+      expect { hs_test.wait_test_host_unencrypted }.to nap(0)
     end
   end
 
