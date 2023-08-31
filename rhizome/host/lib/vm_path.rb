@@ -26,6 +26,18 @@ class VmPath
     write(dnsmasq_service, s)
   end
 
+  def kea
+    "/vm/#{@vm_name}/kea"
+  end
+
+  def kea_dhcp4_service
+    "/etc/systemd/system/#{@vm_name}-kea-dhcp4.service"
+  end
+
+  def write_kea_dhcp4_service(s)
+    write(kea_dhcp4_service, s)
+  end
+
   def radvd_service
     "/etc/systemd/system/#{@vm_name}-radvd.service"
   end
@@ -76,6 +88,7 @@ class VmPath
     nftables_conf
     prep.json
     radvd.conf
+    kea_dhcp4.conf
   ].each do |file_name|
     method_name = file_name.tr(".-", "_")
     fail "BUG" if method_defined?(method_name)

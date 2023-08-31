@@ -72,7 +72,8 @@ RSpec.describe Prog::InstallNetworkingTools do
   describe "#install_build_dependencies" do
     it "installs dependencies and pops" do
       sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with "sudo apt-get -y install make gcc pkg-config automake bison flex"
+      expect(sshable).to receive(:cmd).with "curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-2-4/setup.deb.sh' | sudo -E bash && " \
+        "sudo apt-get -y install make gcc pkg-config automake bison flex isc-kea-dhcp4"
       expect(idm).to receive(:sshable).and_return(sshable)
 
       expect { idm.install_build_dependencies }.to exit({"msg" => "installed build dependencies"})

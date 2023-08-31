@@ -102,6 +102,7 @@ class VmSetup
     FileUtils.rm_f(vp.systemd_service)
     FileUtils.rm_f(vp.dnsmasq_service)
     FileUtils.rm_f(vp.radvd_service)
+    FileUtils.rm_f(vp.kea_dhcp4_service)
     r "systemctl daemon-reload"
 
     purge_storage
@@ -286,9 +287,7 @@ EOS
     guest_network = NetAddr.parse_net(vp.read_guest_ephemeral)
     private_ip_dhcp = nics.map do |net6, net4, tapname, mac|
       vm_sub_6 = NetAddr::IPv6Net.parse(net6)
-      vm_sub_4 = NetAddr::IPv4Net.parse(net4)
       <<DHCP
-dhcp-range=#{tapname},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},#{vm_sub_4.netmask.prefix_len}
 dhcp-range=#{tapname},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
 DHCP
     end.join("\n")
@@ -301,6 +300,52 @@ dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netma
 #{private_ip_dhcp}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
+
+    kea_subnets = nics.map do |net6, net4, tapname, mac|
+      <<KEA_SUBNET
+{
+  "subnet": "#{NetAddr::IPv4Net.new(NetAddr::IPv4Net.parse(net4).network, NetAddr::Mask32.new(26))}",
+  "pools": [
+    { "pool": "#{NetAddr::IPv4Net.parse(net4).network} - #{NetAddr::IPv4Net.parse(net4).network}" }
+  ],
+  "option-data": [
+    {
+      # This is used so that the client adds the default route
+      "name": "routers",
+      "data": "#{NetAddr::IPv4Net.parse(net4).network}"
+    }
+  ]
+}
+KEA_SUBNET
+    end.join(",\n")
+
+    vp.write_kea_dhcp4_conf(<<KEA_DHCP4_CONF)
+{
+  "Dhcp4": {
+    "valid-lifetime": 3600,
+    "renew-timer": 1000,
+    "rebind-timer": 2000,
+    "lease-database": {
+        "type": "memfile",
+        "persist": true,
+        "name": "/vm/#{@vm_name}/kea/dhcp4.leases"
+    },
+    "subnet4": [
+      #{kea_subnets}
+    ],
+    "interfaces-config": {
+      # The index 2 has the interface name
+      "interfaces": ["#{nics.map { |n| n[2] }.join(",")}"],
+      "service-sockets-max-retries": 5,
+      "service-sockets-retry-wait-time": 5000
+    }
+  }
+}
+KEA_DHCP4_CONF
+
+    FileUtils.mkdir_p vp.kea
+    FileUtils.chown @vm_name, @vm_name, vp.kea
+    FileUtils.chown @vm_name, @vm_name, vp.q_kea_dhcp4_conf
 
     raparams = nics.each_with_index.map do |(net6, net4, tapname, mac), index|
       # What is special about index 0? Nothing. radvd is used for router
@@ -655,7 +700,9 @@ EOS
 Description=Router Advertisement Daemon for VM #{@vm_name}
 After=network.target
 After=#{@vm_name}-dnsmasq.service
+After=#{@vm_name}-kea-dhcp4.service
 Requires=#{@vm_name}-dnsmasq.service
+Requires=#{@vm_name}-kea-dhcp4.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
@@ -679,6 +726,35 @@ Group=#{@vm_name}
 [Install]
 WantedBy=multi-user.target
 RADVD_SERVICE
+
+    vp.write_kea_dhcp4_service <<KEA_DHCP4_SERVICE
+[Unit]
+Description=Kea DHCPv4 Server for VM #{@vm_name}
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/kea-dhcp4 -c /vm/#{@vm_name}/kea_dhcp4.conf -d
+Environment=KEA_PIDFILE_DIR=/vm/#{@vm_name}/kea
+Environment=KEA_LOCKFILE_DIR=/vm/#{@vm_name}/kea
+User=#{@vm_name}
+Group=#{@vm_name}
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
+AmbientCapabilities=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
+ProtectSystem=strict
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadOnlyPaths=/
+ReadWritePaths=/vm/#{@vm_name}/kea
+
+[Install]
+WantedBy=multi-user.target
+KEA_DHCP4_SERVICE
 
     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
 [Unit]

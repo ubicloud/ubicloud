@@ -320,20 +320,8 @@ SQL
     vm.update(display_state: "deleting")
 
     unless host.nil?
-      begin
-        host.sshable.cmd("sudo systemctl stop #{q_vm}")
-      rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
-      end
-
-      begin
-        host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
-      rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
-      end
-
-      begin
-        host.sshable.cmd("sudo systemctl stop #{q_vm}-radvd")
+      [q_vm, "#{q_vm}-dnsmasq", "#{q_vm}-radvd", "#{q_vm}-kea-dhcp4"].each do |unit|
+        host.sshable.cmd("sudo systemctl stop #{unit}")
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
