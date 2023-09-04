@@ -1,5 +1,11 @@
 # frozen_string_literal: true
 
+require_relative "lib/thread_printer"
+Signal.trap("QUIT") do
+  ThreadPrinter.run
+  Kernel.exit!(Signal.list["QUIT"] + 128)
+end
+
 require "bundler/setup"
 Bundler.setup
 
