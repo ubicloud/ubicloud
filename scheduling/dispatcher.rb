@@ -21,13 +21,6 @@ class Scheduling::Dispatcher
     ).order_by(:schedule).limit(idle_connections)
   end
 
-  def self.print_thread_dump
-    Thread.list.each do |thread|
-      puts "Thread: #{thread.inspect}"
-      puts thread.backtrace&.join("\n")
-    end
-  end
-
   def start_strand(strand)
     strand_id = strand.id.freeze
 
@@ -38,7 +31,7 @@ class Scheduling::Dispatcher
 
       if ready.nil?
         # Timed out, dump threads and exit
-        self.class.print_thread_dump
+        ThreadPrinter.run
         Kernel.exit!
 
         # rubocop:disable Lint/UnreachableCode
