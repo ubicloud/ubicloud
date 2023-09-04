@@ -15,23 +15,6 @@ RSpec.describe Scheduling::Dispatcher do
     end
   end
 
-  describe "#print_thread_dump" do
-    it "can dump threads" do
-      expect(described_class).to receive(:puts).with(/Thread: #<Thread:.*>/)
-      expect(described_class).to receive(:puts).with(/backtrace/)
-      described_class.print_thread_dump
-    end
-
-    it "can handle threads with a nil backtrace" do
-      # The documentation calls out that the backtrace is an array or
-      # nil.
-      expect(described_class).to receive(:puts).with(/Thread: #<InstanceDouble.*>/)
-      expect(described_class).to receive(:puts).with(nil)
-      expect(Thread).to receive(:list).and_return([instance_double(Thread, backtrace: nil)])
-      described_class.print_thread_dump
-    end
-  end
-
   describe "#wait_cohort" do
     it "operates when no threads are running" do
       expect { di.wait_cohort }.not_to raise_error
@@ -94,7 +77,7 @@ RSpec.describe Scheduling::Dispatcher do
     end
 
     it "can trigger thread dumps and exit if the Prog takes too long" do
-      expect(described_class).to receive(:print_thread_dump)
+      expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!)
 
       Thread.new do
