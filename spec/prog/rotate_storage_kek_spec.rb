@@ -4,8 +4,7 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::RotateStorageKek do
   subject(:rsk) {
-    described_class.new(Strand.new(prog: "RotateStorageKek",
-      stack: [{vm_storage_volume_id: "bogus"}]))
+    described_class.new(Strand.new(prog: "RotateStorageKek"))
   }
 
   let(:sshable) {

@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnMemory do
-  subject(:lm) { described_class.new(Strand.new(stack: [{sshable_id: "bogus"}])) }
+  subject(:lm) { described_class.new(Strand.new) }
 
   let(:four_units) do
     <<EOS

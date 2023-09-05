@@ -4,14 +4,13 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::InstallDnsmasq do
   subject(:idm) {
-    described_class.new(Strand.new(prog: "InstallDnsmasq",
-      stack: [{sshable_id: "bogus"}]))
+    described_class.new(Strand.new(prog: "InstallDnsmasq"))
   }
 
   describe "#start" do
     it "starts sub-programs to install dependencies and download dnsmasq concurrently" do
-      expect(idm).to receive(:bud).with(described_class, {sshable_id: "bogus"}, :install_build_dependencies)
-      expect(idm).to receive(:bud).with(described_class, {sshable_id: "bogus"}, :git_clone_dnsmasq)
+      expect(idm).to receive(:bud).with(described_class, {}, :install_build_dependencies)
+      expect(idm).to receive(:bud).with(described_class, {}, :git_clone_dnsmasq)
 
       expect { idm.start }.to hop("wait_downloads")
     end
