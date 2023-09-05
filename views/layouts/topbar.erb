@@ -7,11 +7,11 @@
   </button>
   <!-- Separator -->
   <div class="h-6 w-px bg-gray-900/10 lg:hidden"></div>
-  <img class="h-8 w-auto lg:hidden" src="/logo-orange.png" alt="Ubicloud">
+  <img class="h-5 w-auto lg:hidden" src="/logo-primary.png" alt="Ubicloud">
   <div class="flex flex-1 gap-x-4 self-stretch justify-end lg:gap-x-6">
     <div class="flex items-center gap-x-4 lg:gap-x-6">
       <% if @project_data %>
-        <div class="text-gray-900">
+        <div class="text-gray-900 text-sm text-right lg:text-base">
           <span class="font-semibold">Provider:</span>
           <%= @project_data.dig(:provider, :display_name) %>
         </div>
