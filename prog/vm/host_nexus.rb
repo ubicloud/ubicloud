@@ -26,7 +26,7 @@ class Prog::Vm::HostNexus < Prog::Base
   label def start
     register_deadline(:wait, 15 * 60)
 
-    bud Prog::BootstrapRhizome
+    bud Prog::BootstrapRhizome, {"target_folder" => "host"}
     hop_wait_bootstrap_rhizome
   end
 

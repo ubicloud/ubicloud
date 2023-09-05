@@ -29,6 +29,6 @@ sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authoriz
 echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 SH
 
-    push Prog::InstallRhizome
+    push Prog::InstallRhizome, {"target_folder" => frame["target_folder"]}
   end
 end

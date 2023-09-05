@@ -45,7 +45,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#start" do
     it "buds a bootstrap rhizome process" do
-      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome)
+      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "host"})
       expect { nx.start }.to hop("wait_bootstrap_rhizome")
     end
   end

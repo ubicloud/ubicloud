@@ -68,7 +68,7 @@ RSpec.describe VmHost do
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("InstallRhizome")
-      expect(args[:stack]).to eq([subject_id: vh.id])
+      expect(args[:stack]).to eq([subject_id: vh.id, target_folder: "host"])
     end
     vh.install_rhizome
   end

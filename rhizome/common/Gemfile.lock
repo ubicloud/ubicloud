@@ -1,0 +1,13 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    netaddr (2.0.6)
+
+PLATFORMS
+  x86_64-linux
+
+DEPENDENCIES
+  netaddr
+
+BUNDLED WITH
+   2.4.10

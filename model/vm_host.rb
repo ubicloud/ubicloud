@@ -131,7 +131,7 @@ class VmHost < Sequel::Model
 
   # Introduced for refreshing rhizome programs via REPL.
   def install_rhizome
-    Strand.create_with_id(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id}])
+    Strand.create_with_id(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host"}])
   end
 
   def sshable_address

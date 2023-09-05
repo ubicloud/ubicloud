@@ -4,7 +4,7 @@ class Prog::SetupSpdk < Prog::Base
   subject_is :sshable, :vm_host
 
   label def start
-    sshable.cmd("sudo bin/setup-spdk")
+    sshable.cmd("sudo host/bin/setup-spdk")
     hop_enable_service
   end
 

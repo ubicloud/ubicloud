@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "common"
+require_relative "../../common/lib/util"
 require "openssl"
 require "base64"
 
