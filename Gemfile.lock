@@ -22,7 +22,7 @@ GEM
       tzinfo (~> 2.0)
     addressable (2.8.5)
       public_suffix (>= 2.0.2, < 6.0)
-    argon2 (2.2.0)
+    argon2 (2.3.0)
       ffi (~> 1.15)
       ffi-compiler (~> 1.0)
     ast (2.4.2)
