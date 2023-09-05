@@ -1,0 +1,57 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+
+require_relative "../lib/util"
+
+if ARGV.count != 2
+  fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
+end
+
+STATE_MAP = {
+  "dead" => "NotStarted",
+  "running" => "InProgress",
+  "exited" => "Succeeded",
+  "failed" => "Failed"
+}
+def get_state(name)
+  state = r("systemctl show -p SubState --value #{name}.service").chomp
+
+  STATE_MAP[state] || "Unknown"
+end
+
+if ARGV[0] == "--check"
+  name = ARGV[1]
+  print(get_state(name))
+else
+  command = ARGV[0]
+  name = ARGV[1]
+
+  FileUtils.mkdir_p("var/log")
+  FileUtils.mkdir_p("var/proc")
+
+  File.open("var/proc/#{name}.lock", File::RDWR | File::CREAT) do |f|
+    break unless f.flock(File::LOCK_EX || File::LOCK_NB)
+
+    state = get_state(name)
+    case state
+    when "InProgress", "Unknown"
+      break
+    when "Succeeded"
+      r "sudo systemctl stop #{name}.service"
+    when "Failed"
+      r "sudo systemctl reset-failed #{name}.service"
+    end
+
+    dir = Dir.pwd
+    stdin = $stdin.read
+    if stdin != ""
+      safe_write_to_file("var/proc/#{name}.stdin", stdin)
+      command = "#{command} < #{dir}/var/proc/#{name}.stdin"
+    end
+
+    command = "/bin/bash -c '#{command} > #{dir}/var/log/#{name}.stdout 2> #{dir}/var/log/#{name}.stderr'"
+    r "sudo systemd-run --working-directory #{dir} --unit #{name} --remain-after-exit #{command}"
+  end
+end
