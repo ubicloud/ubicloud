@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnCores do
-  subject(:lc) { described_class.new(Strand.new(stack: [{sshable_id: "bogus"}])) }
+  subject(:lc) { described_class.new(Strand.new) }
 
   # Gin up a topologically complex processor to test summations.
   let(:eight_thread_four_core_four_numa_two_socket) do

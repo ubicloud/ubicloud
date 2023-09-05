@@ -4,8 +4,7 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::SetupSpdk do
   subject(:ss) {
-    described_class.new(Strand.new(prog: "SetupSpdk",
-      stack: [{sshable_id: "bogus"}]))
+    described_class.new(Strand.new(prog: "SetupSpdk"))
   }
 
   describe "#start" do

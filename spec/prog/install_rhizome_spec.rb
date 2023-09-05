@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::InstallRhizome do
-  subject(:ir) { described_class.new(Strand.new(stack: [{sshable_id: "bogus"}])) }
+  subject(:ir) { described_class.new(Strand.new) }
 
   let(:sshable) { instance_double(Sshable) }
 

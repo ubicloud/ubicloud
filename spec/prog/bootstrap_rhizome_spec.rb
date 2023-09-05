@@ -4,8 +4,7 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::BootstrapRhizome do
   subject(:br) {
-    described_class.new(Strand.new(prog: "BootstrapRhizome",
-      stack: [{sshable_id: "bogus"}]))
+    described_class.new(Strand.new(prog: "BootstrapRhizome"))
   }
 
   describe "#start" do

@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnStorage do
-  subject(:ls) { described_class.new(Strand.new(stack: [{sshable_id: "bogus"}])) }
+  subject(:ls) { described_class.new(Strand.new) }
 
   describe "#start" do
     it "exits, popping total storage and available storage" do
