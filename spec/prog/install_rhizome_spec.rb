@@ -30,5 +30,12 @@ RSpec.describe Prog::InstallRhizome do
       expect(sshable).to receive(:cmd).with("bundle install --gemfile host/Gemfile --path host/vendor/bundle")
       expect { ir.install_gems }.to exit({"msg" => "installed rhizome"})
     end
+
+    it "does not install gems if there is no Gemfile" do
+      expect(File).to receive(:exist?).and_return(false)
+      expect(sshable).to receive(:cmd).with("bundle install --gemfile common/Gemfile --path common/vendor/bundle")
+      expect(sshable).not_to receive(:cmd).with("bundle install --gemfile host/Gemfile --path host/vendor/bundle")
+      expect { ir.install_gems }.to exit({"msg" => "installed rhizome"})
+    end
   end
 end

@@ -37,7 +37,9 @@ class Prog::InstallRhizome < Prog::Base
 
   label def install_gems
     sshable.cmd("bundle install --gemfile common/Gemfile --path common/vendor/bundle")
-    sshable.cmd("bundle install --gemfile #{frame["target_folder"]}/Gemfile --path #{frame["target_folder"]}/vendor/bundle")
+    if File.exist?("#{Config.root}/rhizome/#{frame["target_folder"]}/Gemfile")
+      sshable.cmd("bundle install --gemfile #{frame["target_folder"]}/Gemfile --path #{frame["target_folder"]}/vendor/bundle")
+    end
     pop "installed rhizome"
   end
 end
