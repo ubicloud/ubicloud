@@ -10,7 +10,7 @@ RSpec.describe Prog::SetupSpdk do
   describe "#start" do
     it "transitions to start_service" do
       sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("sudo bin/setup-spdk")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk")
       expect(ss).to receive(:sshable).and_return(sshable)
       expect { ss.start }.to hop("enable_service")
     end

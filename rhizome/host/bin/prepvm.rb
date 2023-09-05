@@ -83,7 +83,7 @@ unless (storage_volumes = params["storage_volumes"])
 end
 
 require "fileutils"
-require_relative "../lib/common"
+require_relative "../../common/lib/util"
 require_relative "../lib/vm_setup"
 
 VmSetup.new(vm_name).prep(unix_user, ssh_public_key, nics, gua, ip4,

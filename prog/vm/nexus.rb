@@ -266,7 +266,7 @@ SQL
     # put prep.json
     host.sshable.cmd("echo #{params_json.shellescape} | sudo -u #{q_vm} tee #{params_path.shellescape}")
 
-    host.sshable.cmd("sudo bin/prepvm.rb #{params_path.shellescape}", stdin: secrets_json)
+    host.sshable.cmd("sudo host/bin/prepvm.rb #{params_path.shellescape}", stdin: secrets_json)
     hop_run
   end
 
@@ -332,7 +332,7 @@ SQL
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
-      host.sshable.cmd("sudo bin/deletevm.rb #{q_vm}")
+      host.sshable.cmd("sudo host/bin/deletevm.rb #{q_vm}")
     end
 
     DB.transaction do
@@ -366,7 +366,7 @@ SQL
       storage: storage_secrets
     })
 
-    host.sshable.cmd("sudo bin/recreate-unpersisted #{params_path.shellescape}", stdin: secrets_json)
+    host.sshable.cmd("sudo host/bin/recreate-unpersisted #{params_path.shellescape}", stdin: secrets_json)
     host.sshable.cmd("sudo systemctl start #{q_vm}")
 
     vm.update(display_state: "running")

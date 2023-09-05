@@ -1,7 +1,7 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "common"
+require_relative "../../common/lib/util"
 
 require "fileutils"
 require "netaddr"

@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::InstallRhizome do
-  subject(:ir) { described_class.new(Strand.new) }
+  subject(:ir) { described_class.new(Strand.new(stack: [{"target_folder" => "host"}])) }
 
   let(:sshable) { instance_double(Sshable) }
 
@@ -26,8 +26,8 @@ RSpec.describe Prog::InstallRhizome do
 
   describe "#install_gems" do
     it "runs some commands and exits" do
-      expect(sshable).to receive(:cmd).with("bundle config set --local path vendor/bundle")
-      expect(sshable).to receive(:cmd).with("bundle install")
+      expect(sshable).to receive(:cmd).with("bundle install --gemfile common/Gemfile --path common/vendor/bundle")
+      expect(sshable).to receive(:cmd).with("bundle install --gemfile host/Gemfile --path host/vendor/bundle")
       expect { ir.install_gems }.to exit({"msg" => "installed rhizome"})
     end
   end

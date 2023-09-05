@@ -6,7 +6,7 @@ unless (vm_name = ARGV.shift)
   exit 1
 end
 
-require_relative "../lib/common"
+require_relative "../../common/lib/util"
 require_relative "../lib/vm_setup"
 
 VmSetup.new(vm_name).purge
