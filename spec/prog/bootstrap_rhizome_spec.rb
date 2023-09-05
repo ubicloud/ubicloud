@@ -11,15 +11,22 @@ RSpec.describe Prog::BootstrapRhizome do
     before { br.strand.label = "start" }
 
     it "generates a keypair" do
-      sshable = instance_double(Sshable)
+      sshable = instance_double(Sshable, raw_private_key_1: nil)
       expect(sshable).to receive(:update) do |**args|
         key = args[:raw_private_key_1]
         expect(key).to be_instance_of String
         expect(key.length).to eq 64
       end
 
-      expect(br).to receive(:sshable).and_return(sshable)
+      expect(br).to receive(:sshable).and_return(sshable).twice
 
+      expect { br.start }.to hop("setup", "BootstrapRhizome")
+    end
+
+    it "does not generate a keypair if there is already one" do
+      sshable = instance_double(Sshable, raw_private_key_1: "bogus")
+      expect(sshable).not_to receive(:update)
+      expect(br).to receive(:sshable).and_return(sshable)
       expect { br.start }.to hop("setup", "BootstrapRhizome")
     end
   end
