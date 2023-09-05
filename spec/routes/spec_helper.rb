@@ -10,7 +10,7 @@ TEST_LOCATION = "hetzner-hel1"
 def create_account(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
   hash = Argon2::Password.new({
     t_cost: 1,
-    m_cost: 3,
+    m_cost: 5,
     secret: Config.clover_session_secret
   }).create(password)
 
