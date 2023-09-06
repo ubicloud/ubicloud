@@ -1,0 +1,6 @@
+# frozen_string_literal: true
+
+# Load Gemfiles
+Dir.glob("*/Gemfile") do |file|
+  instance_eval File.read(file)
+end
