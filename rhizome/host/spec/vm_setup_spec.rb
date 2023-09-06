@@ -255,6 +255,7 @@ RSpec.describe VmSetup do
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-radvd.service")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-kea-dhcp4.service")
+      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-kea-dhcp6.service")
       expect(vs).to receive(:r).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:r).with("umount /vm/test/hugepages")

@@ -103,6 +103,7 @@ class VmSetup
     FileUtils.rm_f(vp.dnsmasq_service)
     FileUtils.rm_f(vp.radvd_service)
     FileUtils.rm_f(vp.kea_dhcp4_service)
+    FileUtils.rm_f(vp.kea_dhcp6_service)
     r "systemctl daemon-reload"
 
     purge_storage
@@ -285,23 +286,16 @@ local-hostname: #{yq(@vm_name)}
 EOS
 
     guest_network = NetAddr.parse_net(vp.read_guest_ephemeral)
-    private_ip_dhcp = nics.map do |net6, net4, tapname, mac|
-      vm_sub_6 = NetAddr::IPv6Net.parse(net6)
-      <<DHCP
-dhcp-range=#{tapname},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
-DHCP
-    end.join("\n")
 
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
-dhcp-authoritative
-dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
-#{private_ip_dhcp}
+# dhcp-authoritative
+# dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
 
-    kea_subnets = nics.map do |net6, net4, tapname, mac|
+    kea_ip4_subnets = nics.map do |net6, net4, tapname, mac|
       <<KEA_SUBNET
 {
   "subnet": "#{NetAddr::IPv4Net.new(NetAddr::IPv4Net.parse(net4).network, NetAddr::Mask32.new(26))}",
@@ -331,7 +325,7 @@ KEA_SUBNET
         "name": "/vm/#{@vm_name}/kea/dhcp4.leases"
     },
     "subnet4": [
-      #{kea_subnets}
+      #{kea_ip4_subnets}
     ],
     "interfaces-config": {
       # The index 2 has the interface name
@@ -342,6 +336,69 @@ KEA_SUBNET
   }
 }
 KEA_DHCP4_CONF
+
+    private_pools = nics.map do |net6, net4, tapname, mac|
+<<KEA_DHCP6_PRIVATE_POOL
+      {
+        "interface": "#{tapname}",
+        "subnet": "#{NetAddr::IPv6Net.parse(net6)}",
+        "pools": [
+          {
+            "pool": "#{NetAddr::IPv6Net.parse(net6).nth(2)} - #{NetAddr::IPv6Net.parse(net6).nth(2)}"
+          }
+        ]
+      }
+KEA_DHCP6_PRIVATE_POOL
+    end.join(",\n")
+
+    vp.write_kea_dhcp6_conf(<<KEA_DHCP6_CONF)
+{
+  "Dhcp6": {
+    "valid-lifetime": 4000,
+    "renew-timer": 1000,
+    "rebind-timer": 2000,
+    "data-directory": "/vm/#{@vm_name}/kea",
+    "lease-database": {
+      "type": "memfile",
+      "persist": true,
+      "name": "/vm/#{@vm_name}/kea/dhcp6.leases"
+    },
+    "loggers": [ {
+        "name": "kea-dhcp6",
+        "output_options": [ {
+            "output": "/vm/#{@vm_name}/kea/kea-dhcp6.log"
+        } ],
+        "severity": "DEBUG",
+        "debuglevel": 99
+    } ],
+    "subnet6": [
+      # Public prefix
+      {
+        "interface": "#{nics.first[2]}",
+        "subnet": "#{guest_network}",
+        "pools": [
+          {
+              "pool": "#{guest_network.nth(2)}-#{guest_network.nth(1000)}"
+          }
+        ]
+      },
+      # Private prefix
+      #{private_pools}
+    ],
+    "interfaces-config": {
+      "interfaces": ["*"],
+      "service-sockets-max-retries": 5,
+      "service-sockets-retry-wait-time": 5000
+    },
+    "option-data": [
+      {
+         "name": "dns-servers",
+         "data": "2620:fe::fe, 2620:fe::9"
+      }
+    ]
+  }
+}
+KEA_DHCP6_CONF
 
     FileUtils.mkdir_p vp.kea
     FileUtils.chown @vm_name, @vm_name, vp.kea
@@ -400,6 +457,7 @@ KEA_DHCP4_CONF
 RADVD_CONF
     FileUtils.chown @vm_name, @vm_name, vp.q_radvd_conf
 
+    # Probably this will change
     ethernets = nics.map do |net6, net4, tapname, mac|
       <<ETHERNETS
   #{yq("enx" + mac.tr(":", "").downcase)}:
@@ -701,8 +759,10 @@ Description=Router Advertisement Daemon for VM #{@vm_name}
 After=network.target
 After=#{@vm_name}-dnsmasq.service
 After=#{@vm_name}-kea-dhcp4.service
+After=#{@vm_name}-kea-dhcp6.service
 Requires=#{@vm_name}-dnsmasq.service
 Requires=#{@vm_name}-kea-dhcp4.service
+Requires=#{@vm_name}-kea-dhcp6.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
@@ -755,6 +815,35 @@ ReadWritePaths=/vm/#{@vm_name}/kea
 [Install]
 WantedBy=multi-user.target
 KEA_DHCP4_SERVICE
+
+    vp.write_kea_dhcp6_service <<KEA_DHCP6_SERVICE
+[Unit]
+Description=Kea DHCPv6 Server for VM #{@vm_name}
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/kea-dhcp6 -c /vm/#{@vm_name}/kea_dhcp6.conf
+Environment=KEA_PIDFILE_DIR=/vm/#{@vm_name}/kea
+Environment=KEA_LOCKFILE_DIR=/vm/#{@vm_name}/kea
+User=#{@vm_name}
+Group=#{@vm_name}
+NetworkNamespacePath=/var/run/netns/#{@vm_name}
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
+AmbientCapabilities=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
+ProtectSystem=strict
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadOnlyPaths=/
+ReadWritePaths=/vm/#{@vm_name}/kea
+
+[Install]
+WantedBy=multi-user.target
+KEA_DHCP6_SERVICE
 
     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
 [Unit]

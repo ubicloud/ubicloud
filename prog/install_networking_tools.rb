@@ -43,7 +43,7 @@ class Prog::InstallNetworkingTools < Prog::Base
 
   label def install_build_dependencies
     sshable.cmd("curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-2-4/setup.deb.sh' | sudo -E bash && " \
-      "sudo apt-get -y install make gcc pkg-config automake bison flex isc-kea-dhcp4")
+      "sudo apt-get -y install make gcc pkg-config automake bison flex isc-kea-dhcp4 isc-kea-dhcp6")
     pop "installed build dependencies"
   end
 

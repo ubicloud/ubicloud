@@ -491,6 +491,9 @@ RSpec.describe Prog::Vm::Nexus do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-kea-dhcp4/).and_raise(
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-kea-dhcp6/).and_raise(
+          Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+        )
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
         expect(vm).to receive(:destroy).and_return(true)
 
@@ -528,11 +531,22 @@ RSpec.describe Prog::Vm::Nexus do
         expect { nx.destroy }.to raise_error ex
       end
 
+      it "raises other stop-kea-dhcp6 errors" do
+        ex = Sshable::SshError.new("stop", "", "unknown error", 1, nil)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-radvd/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-kea-dhcp4/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-kea-dhcp6/).and_raise(ex)
+        expect { nx.destroy }.to raise_error ex
+      end
+
       it "deletes and pops when all commands are succeeded" do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-radvd/)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-kea-dhcp4/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-kea-dhcp6/)
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
 
         expect(vm).to receive(:destroy)

@@ -320,7 +320,7 @@ SQL
     vm.update(display_state: "deleting")
 
     unless host.nil?
-      [q_vm, "#{q_vm}-dnsmasq", "#{q_vm}-radvd", "#{q_vm}-kea-dhcp4"].each do |unit|
+      [q_vm, "#{q_vm}-dnsmasq", "#{q_vm}-radvd", "#{q_vm}-kea-dhcp4", "#{q_vm}-kea-dhcp6"].each do |unit|
         host.sshable.cmd("sudo systemctl stop #{unit}")
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
