@@ -10,7 +10,7 @@ class Prog::InstallRhizome < Prog::Base
     tar = StringIO.new
     Gem::Package::TarWriter.new(tar) do |writer|
       base = Config.root + "/rhizome"
-      Dir.glob(["common/**/*", "host/**/*"], base: base).map do |file|
+      Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{frame["target_folder"]}/**/*"], base: base).map do |file|
         full_path = base + "/" + file
         stat = File.stat(full_path)
         if stat.directory?
@@ -37,8 +37,7 @@ class Prog::InstallRhizome < Prog::Base
 
   label def install_gems
     sshable.cmd("bundle config set --local path vendor/bundle")
-    sshable.cmd("bundle install --gemfile common/Gemfile")
-    sshable.cmd("bundle install --gemfile #{frame["target_folder"]}/Gemfile")
+    sshable.cmd("bundle install")
     pop "installed rhizome"
   end
 end
