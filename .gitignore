@@ -3,9 +3,6 @@ coverage
 spec/examples.txt
 demo/.env
 
-# rhizome/Gemfile is combination of all Gemfiles in subdirectories, so does rhizome/Gemfile.lock
-rhizome/*/Gemfile.lock
-
 # Frontend
 node_modules
 assets/css/app.css
