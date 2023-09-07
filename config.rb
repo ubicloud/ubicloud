@@ -85,6 +85,7 @@ module Config
   override :minimum_invoice_charge_threshold, 1.0, float
 
   # GitHub Runner App
+  optional :github_app_name, string
   optional :github_app_id, string
   optional :github_app_client_id, string, clear: true
   optional :github_app_client_secret, string, clear: true
