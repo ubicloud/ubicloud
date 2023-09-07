@@ -204,6 +204,9 @@ class CloverWeb < Roda
     r.public
     r.assets
 
+    r.on "webhook" do
+      r.hash_branches(:webhook_prefix)
+    end
     check_csrf!
 
     rodauth.load_memory
