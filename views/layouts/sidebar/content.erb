@@ -114,6 +114,26 @@
           </ul>
         </li>
       <% end %>
+      <% if @project_data && (@project_permissions & ["Project:github"]).any? %>
+              <li>
+          <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
+          <ul role="list" class="-mx-2 mt-2 space-y-1">
+            <% if Config.github_app_name %>
+              <%== render(
+                "layouts/sidebar/item",
+                locals: {
+                  name: "GitHub Runners",
+                  url: "#{@project_data[:path]}/github",
+                  is_active: request.path.start_with?("#{@project_data[:path]}/github"),
+                  icon: "github",
+                  has_permission: @project_permissions.include?("Project:github")
+                }
+              ) %>
+            <% end %>
+          </ul>
+        </li>
+
+      <% end %>
       <li class="-mx-6 mt-auto">
         <%== render("layouts/sidebar/project_switcher") %>
       </li>
