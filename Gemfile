@@ -29,6 +29,7 @@ gem "jwt"
 gem "pagerduty", ">= 4.0"
 gem "stripe"
 gem "countries"
+gem "octokit"
 
 group :development do
   gem "brakeman"
