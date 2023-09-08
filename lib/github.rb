@@ -2,6 +2,7 @@
 
 require "octokit"
 require "jwt"
+require "yaml"
 
 module Github
   def self.oauth_client
@@ -25,5 +26,9 @@ module Github
     access_token = app_client.create_app_installation_access_token(installation_id)[:token]
 
     Octokit::Client.new(access_token: access_token)
+  end
+
+  def self.runner_labels
+    @@runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
   end
 end

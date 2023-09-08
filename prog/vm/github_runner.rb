@@ -8,24 +8,26 @@ class Prog::Vm::GithubRunner < Prog::Base
   semaphore :destroy
 
   def self.assemble(installation, repository_name:, label:)
-    ssh_key = SshKey.generate
+    unless (label_data = Github.runner_labels[label])
+      fail "Invalid GitHub runner label: #{label}"
+    end
 
     DB.transaction do
       ubid = GithubRunner.generate_ubid
+      ssh_key = SshKey.generate
 
       # We use unencrypted storage for now, because provisioning 86G encrypted
       # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
       # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
       # ~10 seconds.
-      # TODO: Add more labels to allow user to choose size and location
       vm_st = Prog::Vm::Nexus.assemble(
         ssh_key.public_key,
         installation.project.id,
         name: ubid.to_s,
-        size: "standard-2",
+        size: label_data["vm_size"],
         unix_user: "runner",
-        location: "github-runners",
-        boot_image: "github-ubuntu-2204",
+        location: label_data["location"],
+        boot_image: label_data["boot_image"],
         storage_volumes: [{size_gib: 86, encrypted: false}],
         enable_ip4: true
       )
@@ -123,7 +125,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       # We use generate-jitconfig instead of registration-token because it's
       # recommended by GitHub for security reasons.
       # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
-      data = {name: github_runner.ubid.to_s, labels: ["ubicloud"], runner_group_id: 1}
+      data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1}
       response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
       github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
       # ./env.sh sets some variables for runner to run properly

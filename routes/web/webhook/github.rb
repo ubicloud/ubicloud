@@ -57,7 +57,7 @@ class CloverWeb
     unless (installation = GithubInstallation[installation_id: data["installation"]["id"]])
       return error("Unregistered installation")
     end
-    unless data["workflow_job"]["labels"].include?("ubicloud")
+    unless (label = data["workflow_job"]["labels"].find { Github.runner_labels.key?(_1) })
       return error("Unmatched label")
     end
 
@@ -65,7 +65,7 @@ class CloverWeb
       st = Prog::Vm::GithubRunner.assemble(
         installation,
         repository_name: data["repository"]["full_name"],
-        label: "ubicloud"
+        label: label
       )
       runner = GithubRunner[st.id]
 
