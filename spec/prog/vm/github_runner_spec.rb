@@ -12,7 +12,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:github_runner) {
-    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "test-label", ready_at: Time.now).tap {
+    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud", ready_at: Time.now).tap {
       _1.id = GithubRunner.generate_uuid
     }
   }
@@ -34,13 +34,34 @@ RSpec.describe Prog::Vm::GithubRunner do
       project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
-      st = described_class.assemble(installation, repository_name: "test-repo", label: "test-label")
+      st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
 
       runner = GithubRunner[st.id]
       expect(runner).not_to be_nil
       expect(runner.repository_name).to eq("test-repo")
       expect(runner.vm.unix_user).to eq("runner")
       expect(runner.vm.sshable.unix_user).to eq("runner")
+    end
+
+    it "creates github runner with custom size" do
+      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
+
+      st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-8")
+
+      runner = GithubRunner[st.id]
+      expect(runner).not_to be_nil
+      expect(runner.repository_name).to eq("test-repo")
+      expect(runner.vm.unix_user).to eq("runner")
+      expect(runner.vm.family).to eq("standard")
+      expect(runner.vm.cores).to eq(4)
+      expect(runner.vm.sshable.unix_user).to eq("runner")
+    end
+
+    it "fails if label is not valid" do
+      expect {
+        described_class.assemble(instance_double(GithubInstallation), repository_name: "test-repo", label: "ubicloud-standard-1")
+      }.to raise_error RuntimeError, "Invalid GitHub runner label: ubicloud-standard-1"
     end
   end
 
@@ -119,7 +140,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "generates runner if not runner id not set and hops" do
       expect(github_runner).to receive(:runner_id).and_return(nil)
       expect(sshable).to receive(:cmd).with("./env.sh")
-      expect(client).to receive(:post).with(/.*generate-jitconfig/, anything).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
+      expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo -u runner /home/runner/run.sh --jitconfig AABBCC' runner-script")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("InProgress")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
