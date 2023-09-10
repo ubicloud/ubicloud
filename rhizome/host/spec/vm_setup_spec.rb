@@ -171,9 +171,33 @@ RSpec.describe VmSetup do
       vs.download_boot_image("ubuntu-jammy")
     end
 
+    it "can download image with custom URL that has query params" do
+      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/tmp/github-ubuntu-2204.vhd.tmp")
+      end.and_yield
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
+      expect(vs).to receive(:r).with("curl -L10 -o /tmp/github-ubuntu-2204.vhd.tmp https://images.blob.core.windows.net/images/ubuntu2204.vhd\\?sp\\=r\\&st\\=2023-09-05T22:44:05Z\\&se\\=2023-10-07T06:44:05")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /tmp/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw")
+      expect(FileUtils).to receive(:rm_r).with("/tmp/github-ubuntu-2204.vhd.tmp")
+
+      vs.download_boot_image("github-ubuntu-2204", custom_url: "https://images.blob.core.windows.net/images/ubuntu2204.vhd?sp=r&st=2023-09-05T22:44:05Z&se=2023-10-07T06:44:05")
+    end
+
     it "can use an image that's already downloaded" do
       expect(File).to receive(:exist?).with("/var/storage/images/almalinux-9.1.raw").and_return(true)
       vs.download_boot_image("almalinux-9.1")
+    end
+
+    it "fails if custom_url not provided for custom image" do
+      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
+      expect { vs.download_boot_image("github-ubuntu-2204") }.to raise_error RuntimeError, "Must provide custom_url for github-ubuntu-2204 image"
+    end
+
+    it "fails if initial image has unsupported format" do
+      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
+      expect { vs.download_boot_image("github-ubuntu-2204", custom_url: "https://example.com/ubuntu.iso") }.to raise_error RuntimeError, "Unsupported boot_image format: .iso"
     end
   end
 

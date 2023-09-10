@@ -553,7 +553,7 @@ EOS
     r "setfacl -m u:spdk:rw #{disk_file.shellescape}"
   end
 
-  def download_boot_image(boot_image)
+  def download_boot_image(boot_image, custom_url: nil)
     urls = {
       "ubuntu-jammy" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
       "almalinux-9.1" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2",
@@ -561,12 +561,15 @@ EOS
       "github-ubuntu-2204" => nil
     }
 
-    download = urls.fetch(boot_image)
+    download = urls.fetch(boot_image) || custom_url
     image_path = "/var/storage/images/" + boot_image + ".raw"
     unless File.exist?(image_path)
+      fail "Must provide custom_url for #{boot_image} image" if download.nil?
       FileUtils.mkdir_p "/var/storage/images/"
 
-      image_ext = File.extname(download)
+      # If image URL has query parameter such as SAS token, File.extname returns
+      # it too. We need to remove them and only get extension.
+      image_ext = File.extname(download).split("?")[0]
       initial_format = case image_ext
       when ".qcow2", ".img"
         "qcow2"
