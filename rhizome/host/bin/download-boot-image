@@ -1,0 +1,14 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+unless (boot_image = ARGV.shift)
+  puts "need boot_image as argument"
+  exit 1
+end
+
+custom_url = ARGV.shift
+
+require_relative "../../common/lib/util"
+require_relative "../lib/vm_setup"
+
+VmSetup.new("").download_boot_image(boot_image, custom_url: custom_url)
