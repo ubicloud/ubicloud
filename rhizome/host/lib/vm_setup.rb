@@ -572,6 +572,8 @@ EOS
       # Images are presumed to be atomically renamed into the path,
       # i.e. no partial images will be passed to qemu-image.
       r "qemu-img convert -p -f qcow2 -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+
+      rm_if_exists(temp_path)
     end
 
     image_path
