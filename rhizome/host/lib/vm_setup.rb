@@ -557,6 +557,16 @@ EOS
     unless File.exist?(image_path)
       FileUtils.mkdir_p "/var/storage/images/"
 
+      image_ext = File.extname(download)
+      initial_format = case image_ext
+      when ".qcow2", ".img"
+        "qcow2"
+      when ".vhd"
+        "vpc"
+      else
+        fail "Unsupported boot_image format: #{image_ext}"
+      end
+
       # Use of File::EXCL provokes a crash rather than a race
       # condition if two VMs are lazily getting their images at the
       # same time.
@@ -565,14 +575,14 @@ EOS
       # customer images.  As-is, it does not have all the
       # synchronization features we might want if we were to keep this
       # code longer term, but, that's not the plan.
-      temp_path = "/tmp/" + boot_image + ".qcow2.tmp"
+      temp_path = "/tmp/" + boot_image + image_ext + ".tmp"
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
         r "curl -L10 -o #{temp_path.shellescape} #{download.shellescape}"
       end
 
       # Images are presumed to be atomically renamed into the path,
       # i.e. no partial images will be passed to qemu-image.
-      r "qemu-img convert -p -f qcow2 -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+      r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
 
       rm_if_exists(temp_path)
     end

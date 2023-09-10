@@ -161,12 +161,12 @@ RSpec.describe VmSetup do
     it "can download an image" do
       expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
       expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/tmp/ubuntu-jammy.qcow2.tmp")
+        expect(path).to eq("/tmp/ubuntu-jammy.img.tmp")
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(vs).to receive(:r).with("curl -L10 -o /tmp/ubuntu-jammy.qcow2.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /tmp/ubuntu-jammy.qcow2.tmp /var/storage/images/ubuntu-jammy.raw")
-      expect(FileUtils).to receive(:rm_r).with("/tmp/ubuntu-jammy.qcow2.tmp")
+      expect(vs).to receive(:r).with("curl -L10 -o /tmp/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /tmp/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw")
+      expect(FileUtils).to receive(:rm_r).with("/tmp/ubuntu-jammy.img.tmp")
 
       vs.download_boot_image("ubuntu-jammy")
     end
