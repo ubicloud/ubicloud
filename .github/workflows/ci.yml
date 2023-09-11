@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubicloud
+    runs-on: ubuntu-latest
 
     env:
       DB_USER: clover
