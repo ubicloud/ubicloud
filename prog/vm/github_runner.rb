@@ -93,6 +93,9 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def register_runner
     unless github_runner.runner_id
+      # runner unix user needed access to manipulate the Docker daemon.
+      # Default GitHub hosted runners have additional adm,systemd-journal groups.
+      vm.sshable.cmd("sudo usermod -a -G docker,adm,systemd-journal runner")
       # We use generate-jitconfig instead of registration-token because it's
       # recommended by GitHub for security reasons.
       # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
