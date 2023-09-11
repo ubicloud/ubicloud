@@ -8,14 +8,15 @@ module Option
     [Provider::HETZNER, "Hetzner"]
   ].map { |args| [args[0], Provider.new(*args)] }.to_h.freeze
 
-  Location = Struct.new(:provider, :name, :display_name)
+  Location = Struct.new(:provider, :name, :display_name, :visible)
   Locations = [
-    [Providers[Provider::HETZNER], "hetzner-hel1", "Finland"],
-    [Providers[Provider::HETZNER], "hetzner-fsn1", "Germany"]
+    [Providers[Provider::HETZNER], "hetzner-hel1", "Finland", true],
+    [Providers[Provider::HETZNER], "hetzner-fsn1", "Germany", true],
+    [Providers[Provider::HETZNER], "github-runners", "GitHub Runner", false]
   ].map { |args| Location.new(*args) }.freeze
 
-  def self.locations_for_provider(provider)
-    Option::Locations.select { provider.nil? || _1.provider.name == provider }
+  def self.locations_for_provider(provider, only_visible: true)
+    Option::Locations.select { (!only_visible || _1.visible) && (provider.nil? || _1.provider.name == provider) }
   end
 
   BootImage = Struct.new(:name, :display_name)

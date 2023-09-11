@@ -54,7 +54,8 @@ RSpec.describe Validation do
       it "valid locations" do
         [
           ["hetzner-hel1", nil],
-          ["hetzner-hel1", "hetzner"]
+          ["hetzner-hel1", "hetzner"],
+          ["github-runners", "hetzner"]
         ].each do |location, provider|
           expect(described_class.validate_location(location, provider)).to be_nil
         end
