@@ -289,10 +289,6 @@ EOS
 
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
-leasefile-ro
-# dhcp-authoritative
-# dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
-dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 DNSMASQ_CONF
 
     kea_ip4_subnets = nics.map do |net6, net4, tapname, mac|
@@ -338,7 +334,7 @@ KEA_SUBNET
 KEA_DHCP4_CONF
 
     private_pools = nics.map do |net6, net4, tapname, mac|
-<<KEA_DHCP6_PRIVATE_POOL
+      <<KEA_DHCP6_PRIVATE_POOL
       {
         "interface": "#{tapname}",
         "subnet": "#{NetAddr::IPv6Net.parse(net6)}",
@@ -368,8 +364,7 @@ KEA_DHCP6_PRIVATE_POOL
         "output_options": [ {
             "output": "/vm/#{@vm_name}/kea/kea-dhcp6.log"
         } ],
-        "severity": "DEBUG",
-        "debuglevel": 99
+        "severity": "INFO"
     } ],
     "subnet6": [
       # Public prefix
@@ -378,7 +373,7 @@ KEA_DHCP6_PRIVATE_POOL
         "subnet": "#{guest_network}",
         "pools": [
           {
-              "pool": "#{guest_network.nth(2)}-#{guest_network.nth(1000)}"
+              "pool": "#{guest_network.nth(2)}-#{guest_network.nth(2)}"
           }
         ]
       },
@@ -386,7 +381,7 @@ KEA_DHCP6_PRIVATE_POOL
       #{private_pools}
     ],
     "interfaces-config": {
-      "interfaces": ["*"],
+      "interfaces": ["#{nics.map { |n| n[2] }.join(",")}"],
       "service-sockets-max-retries": 5,
       "service-sockets-retry-wait-time": 5000
     },
@@ -465,6 +460,8 @@ RADVD_CONF
       macaddress: #{mac}
     dhcp6: true
     dhcp4: true
+    addresses: 
+      - #{NetAddr::IPv6Net.parse(net6).nth(2)}/80
 ETHERNETS
     end.join("\n")
 
@@ -800,8 +797,8 @@ Environment=KEA_LOCKFILE_DIR=/vm/#{@vm_name}/kea
 User=#{@vm_name}
 Group=#{@vm_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
-CapabilityBoundingSet=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
-AmbientCapabilities=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_RAW CAP_NET_BIND_SERVICE
 ProtectSystem=strict
 PrivateDevices=yes
 PrivateTmp=yes
@@ -829,8 +826,8 @@ Environment=KEA_LOCKFILE_DIR=/vm/#{@vm_name}/kea
 User=#{@vm_name}
 Group=#{@vm_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
-CapabilityBoundingSet=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
-AmbientCapabilities=CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SETUID CAP_SETGID
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_RAW CAP_NET_BIND_SERVICE
 ProtectSystem=strict
 PrivateDevices=yes
 PrivateTmp=yes
