@@ -34,24 +34,29 @@ class Prog::Test::VmGroup < Prog::Base
     keypair_2 = SshKey.generate
     keypair_3 = SshKey.generate
 
+    storage_encrypted = frame.fetch("storage_encrypted", true)
+
     vm1_s = Prog::Vm::Nexus.assemble(
       keypair_1.public_key, project.id,
       private_subnet_id: subnet1_s.id,
-      storage_encrypted: frame["storage_encrypted"],
+      storage_volumes: [
+        {encrypted: storage_encrypted},
+        {encrypted: storage_encrypted, size_gib: 5}
+      ],
       enable_ip4: true
     )
 
     vm2_s = Prog::Vm::Nexus.assemble(
       keypair_2.public_key, project.id,
       private_subnet_id: subnet1_s.id,
-      storage_encrypted: frame["storage_encrypted"],
+      storage_volumes: [{encrypted: storage_encrypted}],
       enable_ip4: true
     )
 
     vm3_s = Prog::Vm::Nexus.assemble(
       keypair_3.public_key, project.id,
       private_subnet_id: subnet2_s.id,
-      storage_encrypted: frame["storage_encrypted"],
+      storage_volumes: [{encrypted: storage_encrypted}],
       enable_ip4: true
     )
 

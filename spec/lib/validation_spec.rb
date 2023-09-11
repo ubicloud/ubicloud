@@ -99,5 +99,20 @@ RSpec.describe Validation do
         end
       end
     end
+
+    describe "#validate_storage_volumes" do
+      it "succeeds if there's at least one volume" do
+        expect(described_class.validate_storage_volumes([{encrypted: true}], 0)).to be_nil
+      end
+
+      it "fails if no volumes" do
+        expect { described_class.validate_storage_volumes([], 0) }.to raise_error described_class::ValidationFailed
+      end
+
+      it "fails if boot_disk_index out of range" do
+        expect { described_class.validate_storage_volumes([{encrypted: true}], -1) }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_storage_volumes([{encrypted: true}], 1) }.to raise_error described_class::ValidationFailed
+      end
+    end
   end
 end

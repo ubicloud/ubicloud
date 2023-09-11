@@ -26,9 +26,8 @@ class Prog::Vm::GithubRunner < Prog::Base
         unix_user: "runner",
         location: "github-runners",
         boot_image: "github-ubuntu-2204",
-        storage_size_gib: 86,
-        enable_ip4: true,
-        storage_encrypted: false
+        storage_volumes: [{size_gib: 86, encrypted: false}],
+        enable_ip4: true
       )
 
       Sshable.create(

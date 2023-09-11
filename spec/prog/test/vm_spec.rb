@@ -16,6 +16,9 @@ RSpec.describe Prog::Test::Vm do
     subnet1 = instance_double(PrivateSubnet, id: "subnet1")
     subnet2 = instance_double(PrivateSubnet, id: "subnet2")
 
+    main_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0")
+    extra_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_1")
+
     nic1 = instance_double(Nic,
       private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"),
       private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
@@ -23,7 +26,8 @@ RSpec.describe Prog::Test::Vm do
       private_subnets: [subnet1],
       ephemeral_net4: "1.1.1.1",
       ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a1::/64"),
-      nics: [nic1])
+      nics: [nic1],
+      vm_storage_volumes: [main_storage_volume, extra_storage_volume])
 
     nic2 = instance_double(Nic,
       private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a2::/64"),
@@ -78,7 +82,21 @@ RSpec.describe Prog::Test::Vm do
     it "installs packages and hops to next step" do
       expect(sshable).to receive(:cmd).with("sudo apt update")
       expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential")
-      expect { vm_test.install_packages }.to hop("ping_google", "Test::Vm")
+      expect { vm_test.install_packages }.to hop("verify_extra_disks", "Test::Vm")
+    end
+  end
+
+  describe "#verify_extra_disks" do
+    it "verifies extra disks" do
+      disk_path = "/dev/disk/by-id/disk_1"
+      mount_path = "/home/ubi/mnt0"
+      expect(sshable).to receive(:cmd).with("mkdir -p #{mount_path}")
+      expect(sshable).to receive(:cmd).with("sudo mkfs.ext4 #{disk_path}")
+      expect(sshable).to receive(:cmd).with("sudo mount #{disk_path} #{mount_path}")
+      expect(sshable).to receive(:cmd).with("sudo chown ubi #{mount_path}")
+      expect(sshable).to receive(:cmd).with("dd if=/dev/random of=#{mount_path}/1.txt bs=512 count=10000")
+      expect(sshable).to receive(:cmd).with("sync #{mount_path}/1.txt")
+      expect { vm_test.verify_extra_disks }.to hop("ping_google", "Test::Vm")
     end
   end
 

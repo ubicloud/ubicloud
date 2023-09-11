@@ -51,4 +51,11 @@ module Validation
     msg = "OS user name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32."
     fail ValidationFailed.new({user: msg}) unless os_user_name.match(ALLOWED_OS_USER_NAME_PATTERN)
   end
+
+  def self.validate_storage_volumes(storage_volumes, boot_disk_index)
+    fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
+    if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
+      fail ValidationFailed.new({boot_disk_index: "Boot disk index must be between 0 and #{storage_volumes.length - 1}"})
+    end
+  end
 end

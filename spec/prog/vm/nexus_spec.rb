@@ -102,7 +102,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates with custom storage size if provided" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_size_gib: 40)
+      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 40}])
       expect(st.vm.storage_size_gib).to eq(40)
     end
 
@@ -156,15 +156,15 @@ RSpec.describe Prog::Vm::Nexus do
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
-    it "creates without encryption key if storage_encrypted not" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_encrypted: false)
+    it "creates without encryption key if storage is not encrypted" do
+      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: false}])
       expect(StorageKeyEncryptionKey.count).to eq(0)
       expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
       expect(described_class.new(st).storage_secrets.count).to eq(0)
     end
 
-    it "creates with encryption key if storage_encrypted" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_encrypted: true)
+    it "creates with encryption key if storage is encrypted" do
+      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: true}])
       expect(StorageKeyEncryptionKey.count).to eq(1)
       expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
       expect(described_class.new(st).storage_secrets.count).to eq(1)
