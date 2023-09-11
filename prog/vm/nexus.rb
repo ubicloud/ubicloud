@@ -11,7 +11,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
-    private_subnet_id: nil, nic_id: nil, storage_size_gib: nil, storage_encrypted: true,
+    private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false)
 
     project = Project[project_id]
@@ -20,18 +20,25 @@ class Prog::Vm::Nexus < Prog::Base
     end
     Validation.validate_location(location, project&.provider)
     vm_size = Validation.validate_vm_size(size)
-    storage_size_gib ||= vm_size.storage_size_gib
+
+    storage_volumes ||= [{
+      size_gib: vm_size.storage_size_gib,
+      encrypted: true
+    }]
+
+    # allow missing fields to make testing during development more convenient.
+    storage_volumes.each do |volume|
+      volume[:size_gib] ||= vm_size.storage_size_gib
+      volume[:encrypted] = true if !volume.has_key? :encrypted
+    end
+
+    Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
 
     ubid = Vm.generate_ubid
     name ||= Vm.ubid_to_name(ubid)
 
     Validation.validate_name(name)
     Validation.validate_os_user_name(unix_user)
-
-    key_wrapping_algorithm = "aes-256-gcm"
-    cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
-    key_wrapping_key = cipher.random_key
-    key_wrapping_iv = cipher.random_iv
 
     DB.transaction do
       # Here the logic is the following;
@@ -75,22 +82,29 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm.associate_with_project(project)
 
-      if storage_encrypted
-        key_encryption_key = StorageKeyEncryptionKey.create_with_id(
-          algorithm: key_wrapping_algorithm,
-          key: Base64.encode64(key_wrapping_key),
-          init_vector: Base64.encode64(key_wrapping_iv),
-          auth_data: "#{vm.inhost_name}_0"
+      storage_volumes.each_with_index do |volume, disk_index|
+        key_encryption_key = if volume[:encrypted]
+          key_wrapping_algorithm = "aes-256-gcm"
+          cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
+          key_wrapping_key = cipher.random_key
+          key_wrapping_iv = cipher.random_iv
+
+          StorageKeyEncryptionKey.create_with_id(
+            algorithm: key_wrapping_algorithm,
+            key: Base64.encode64(key_wrapping_key),
+            init_vector: Base64.encode64(key_wrapping_iv),
+            auth_data: "#{vm.inhost_name}_#{disk_index}"
+          )
+        end
+
+        VmStorageVolume.create_with_id(
+          vm_id: vm.id,
+          boot: disk_index == boot_disk_index,
+          size_gib: volume[:size_gib],
+          disk_index: disk_index,
+          key_encryption_key_1_id: key_encryption_key&.id
         )
       end
-
-      VmStorageVolume.create_with_id(
-        vm_id: vm.id,
-        boot: true,
-        size_gib: storage_size_gib,
-        disk_index: 0,
-        key_encryption_key_1_id: storage_encrypted ? key_encryption_key.id : nil
-      )
 
       Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
     end

@@ -29,6 +29,20 @@ class Prog::Test::Vm < Prog::Base
     sshable.cmd("sudo apt update")
     sshable.cmd("sudo apt install -y build-essential")
 
+    hop_verify_extra_disks
+  end
+
+  label def verify_extra_disks
+    vm.vm_storage_volumes[1..].each_with_index { |volume, disk_index|
+      mount_path = "/home/ubi/mnt#{disk_index}"
+      sshable.cmd("mkdir -p #{mount_path}")
+      sshable.cmd("sudo mkfs.ext4 #{volume.device_path.shellescape}")
+      sshable.cmd("sudo mount #{volume.device_path.shellescape} #{mount_path}")
+      sshable.cmd("sudo chown ubi #{mount_path}")
+      sshable.cmd("dd if=/dev/random of=#{mount_path}/1.txt bs=512 count=10000")
+      sshable.cmd("sync #{mount_path}/1.txt")
+    }
+
     hop_ping_google
   end
 
