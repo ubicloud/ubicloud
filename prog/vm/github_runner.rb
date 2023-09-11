@@ -24,7 +24,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         name: ubid.to_s,
         size: "standard-2",
         unix_user: "runner",
-        location: "hetzner-hel1",
+        location: "github-runners",
         boot_image: "github-ubuntu-2204",
         storage_size_gib: 86,
         enable_ip4: true,

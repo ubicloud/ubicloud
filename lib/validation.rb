@@ -35,7 +35,7 @@ module Validation
   end
 
   def self.validate_location(location, provider = nil)
-    available_locs = Option.locations_for_provider(provider).map(&:name)
+    available_locs = Option.locations_for_provider(provider, only_visible: false).map(&:name)
     msg = "\"#{location}\" is not a valid location for provider \"#{provider}\". Available locations: #{available_locs}"
     fail ValidationFailed.new({provider: msg}) unless available_locs.include?(location)
   end

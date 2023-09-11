@@ -184,6 +184,15 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Project doesn't have valid billing information"
       end
 
+      it "can not select invisible location" do
+        project
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+
+        expect { choose option: "github-runners" }.to raise_error Capybara::ElementNotFound
+      end
+
       it "can not create vm in a project when does not have permissions" do
         project_wo_permissions
         visit "#{project_wo_permissions.path}/vm/create"
