@@ -1,4 +1,6 @@
 - { id: 139d9a67-8182-8578-a303-235cabd5161c, resource_type: VmCores,   resource_family: standard, location: hetzner-fsn1, unit_price: 0.000622768 }
 - { id: 08c502f7-df5d-8978-9896-feafa0ec5c40, resource_type: VmCores,   resource_family: standard, location: hetzner-hel1, unit_price: 0.000595982 }
+- { id: 2acc2bbf-d451-49c6-93de-db8d15311042, resource_type: VmCores,   resource_family: standard, location: github-runners, unit_price: 0.000595982 }
 - { id: 118b7e2d-fa8d-8d78-910d-1f62fcc657ec, resource_type: IPAddress, resource_family: IPv4,     location: hetzner-fsn1, unit_price: 0.000074405 }
 - { id: 1bde2200-545a-8d78-960e-08a303111e3d, resource_type: IPAddress, resource_family: IPv4,     location: hetzner-hel1, unit_price: 0.000074405 }
+- { id: 38685ec4-38eb-4460-aed3-8a36bab14175, resource_type: IPAddress, resource_family: IPv4,     location: github-runners, unit_price: 0.000074405 }
