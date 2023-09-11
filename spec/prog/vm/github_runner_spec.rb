@@ -109,6 +109,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#register_runner" do
     it "generates runner if not runner id not set and hops" do
       expect(github_runner).to receive(:runner_id).and_return(nil)
+      expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
       expect(client).to receive(:post).with(/.*generate-jitconfig/, anything).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo -u runner /home/runner/run.sh --jitconfig AABBCC' runner-script")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("InProgress")
