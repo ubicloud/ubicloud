@@ -31,15 +31,15 @@ AUTOLOAD_CONSTANTS = []
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
 autoload_normal = ->(subdirectory, include_first: false) do
+  absolute = File.join(__dir__, subdirectory)
+  rgx = Regexp.new('\A' + Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/") + '(.*)\.rb\z')
+  last_namespace = nil
+
   # Copied from sequel/model/inflections.rb's camelize, to convert
   # file paths into module and class names.
   camelize = ->(s) do
     s.gsub(/\/(.?)/) { |x| "::#{x[-1..].upcase}" }.gsub(/(^|_)(.)/) { |x| x[-1..].upcase }
   end
-
-  absolute = File.join(__dir__, subdirectory)
-  rgx = Regexp.new('\A' + Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/") + '(.*)\.rb\z')
-  last_namespace = nil
 
   Unreloader.autoload(absolute) do |f|
     full_name = camelize.call((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
