@@ -152,7 +152,7 @@ GEM
     refrigerator (1.6.0)
     regexp_parser (2.8.1)
     rexml (3.2.6)
-    roda (3.71.0)
+    roda (3.72.0)
       rack
     rodauth (2.31.0)
       roda (>= 2.6.0)
