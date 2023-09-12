@@ -93,6 +93,11 @@ class Prog::Test < Prog::Base
     push Prog::Test, {}, :set_popping_deadline2
   end
 
+  label def set_popping_deadline_via_bud
+    bud Prog::Test, {}, :set_popping_deadline2
+    hop_reaper
+  end
+
   label def set_popping_deadline2
     register_deadline(:pusher2, -1)
     hop_popper
