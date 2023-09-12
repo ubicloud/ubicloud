@@ -66,6 +66,33 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def start
     nap 5 unless vm.strand.label == "wait"
     vm.sshable.update(host: vm.ephemeral_net4)
+    hop_setup_environment
+  end
+
+  label def setup_environment
+    # runner unix user needed access to manipulate the Docker daemon.
+    # Default GitHub hosted runners have additional adm,systemd-journal groups.
+    vm.sshable.cmd("sudo usermod -a -G docker,adm,systemd-journal runner")
+
+    # Some configuration files such as $PATH related to the user's home directory
+    # need to be changed. GitHub recommends to run post-generation scripts after
+    # initial boot.
+    # The important point, scripts use latest record at /etc/passwd as default user.
+    # So we need to run these scripts before bootstrap_rhizome to use runner user,
+    # instead of rhizome user.
+    # https://github.com/actions/runner-images/blob/main/docs/create-image-and-azure-resources.md#post-generation-scripts
+    vm.sshable.cmd("sudo su -c \"find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'\"")
+
+    # Post-generation scripts write some variables at /etc/environment file.
+    # We need to reconnect machine to load environment variables again.
+    vm.sshable.invalidate_cache_entry
+
+    # runner script doesn't use global $PATH variable by default. It gets path from
+    # secure_path at /etc/sudoers. Also script load .env file, so we are able to
+    # overwrite default path value of runner script with $PATH.
+    # https://github.com/microsoft/azure-pipelines-agent/issues/3461
+    vm.sshable.cmd("echo \"PATH=$PATH\" >> .env")
+
     hop_bootstrap_rhizome
   end
 
@@ -93,15 +120,14 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def register_runner
     unless github_runner.runner_id
-      # runner unix user needed access to manipulate the Docker daemon.
-      # Default GitHub hosted runners have additional adm,systemd-journal groups.
-      vm.sshable.cmd("sudo usermod -a -G docker,adm,systemd-journal runner")
       # We use generate-jitconfig instead of registration-token because it's
       # recommended by GitHub for security reasons.
       # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
       data = {name: github_runner.ubid.to_s, labels: ["ubicloud"], runner_group_id: 1}
       response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
       github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
+      # ./env.sh sets some variables for runner to run properly
+      vm.sshable.cmd("./env.sh")
       vm.sshable.cmd("common/bin/daemonizer 'sudo -u runner /home/runner/run.sh --jitconfig #{response[:encoded_jit_config].shellescape}' runner-script")
     end
 

@@ -67,8 +67,17 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(sshable).to receive(:update).with(host: "1.1.1.1")
-      expect { nx.start }.to hop("bootstrap_rhizome")
+      expect { nx.start }.to hop("setup_environment")
     end
+  end
+
+  it "hops to bootstrap_rhizome" do
+    expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
+    expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
+    expect(sshable).to receive(:invalidate_cache_entry)
+    expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> .env")
+
+    expect { nx.setup_environment }.to hop("bootstrap_rhizome")
   end
 
   describe "#bootstrap_rhizome" do
@@ -109,7 +118,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#register_runner" do
     it "generates runner if not runner id not set and hops" do
       expect(github_runner).to receive(:runner_id).and_return(nil)
-      expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
+      expect(sshable).to receive(:cmd).with("./env.sh")
       expect(client).to receive(:post).with(/.*generate-jitconfig/, anything).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo -u runner /home/runner/run.sh --jitconfig AABBCC' runner-script")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("InProgress")
