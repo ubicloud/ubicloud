@@ -184,6 +184,23 @@ RSpec.describe Prog::Base do
       }.to change { Page.active.count }.from(1).to(0)
     end
 
+    it "resolves the page of the budded prog when pop" do
+      st = Strand.create_with_id(prog: "Test", label: :set_popping_deadline_via_bud)
+      st.unsynchronized_run
+      st.unsynchronized_run
+      expect {
+        st.unsynchronized_run
+      }.to change { Page.active.count }.from(0).to(1)
+
+      expect {
+        st.unsynchronized_run
+
+        page_id = Page.first.id
+        Strand[page_id].unsynchronized_run
+        Strand[page_id].unsynchronized_run
+      }.to change { Page.active.count }.from(1).to(0)
+    end
+
     it "resolves the page once the target is reached" do
       st = Strand.create_with_id(prog: "Test", label: :napper)
       page_id = Prog::PageNexus.assemble("dummy-summary", st.id, st.prog, :napper).id

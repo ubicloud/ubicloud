@@ -86,6 +86,9 @@ end
     else
       fail "BUG: expect no stacks exceeding depth 1 with no back-link" if strand.stack.length > 1
 
+      pg = Page.from_tag_parts(strand.id, strand.prog, strand.stack.first["deadline_target"])
+      pg&.incr_resolve
+
       # Child strand with zero or one stack frames, set exitval. Clear
       # retval to avoid confusion, as it would have been set in a
       # previous intra-strand stack pop.
