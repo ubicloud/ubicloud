@@ -8,6 +8,7 @@ require "netaddr"
 require "json"
 require "openssl"
 require "base64"
+require "uri"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "spdk"
@@ -569,7 +570,7 @@ EOS
 
       # If image URL has query parameter such as SAS token, File.extname returns
       # it too. We need to remove them and only get extension.
-      image_ext = File.extname(download).split("?")[0]
+      image_ext = File.extname(URI.parse(download).path)
       initial_format = case image_ext
       when ".qcow2", ".img"
         "qcow2"
@@ -584,7 +585,12 @@ EOS
       # same time.
       temp_path = "/tmp/" + boot_image + image_ext + ".tmp"
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-        r "curl -L10 -o #{temp_path.shellescape} #{download.shellescape}"
+        if download.match?(/^https:\/\/.+\.blob\.core\.windows\.net/)
+          install_azcopy
+          r "AZCOPY_CONCURRENCY_VALUE=5 azcopy copy #{download.shellescape} #{temp_path.shellescape}"
+        else
+          r "curl -L10 -o #{temp_path.shellescape} #{download.shellescape}"
+        end
       end
 
       # Images are presumed to be atomically renamed into the path,
@@ -595,6 +601,16 @@ EOS
     end
 
     image_path
+  end
+
+  def install_azcopy
+    r "which azcopy"
+  rescue CommandFail
+    r "curl -L10 -o azcopy_v10.tar.gz 'https://aka.ms/downloadazcopy-v10-linux'"
+    r "tar --strip-components=1 --exclude=*.txt -xzvf azcopy_v10.tar.gz"
+    r "rm azcopy_v10.tar.gz"
+    r "mv azcopy /usr/bin/azcopy"
+    r "chmod +x /usr/bin/azcopy"
   end
 
   def verify_boot_disk_size(image_path, disk_size_gib)
