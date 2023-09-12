@@ -171,13 +171,14 @@ RSpec.describe VmSetup do
       vs.download_boot_image("ubuntu-jammy")
     end
 
-    it "can download image with custom URL that has query params" do
+    it "can download image with custom URL that has query params using azcopy" do
       expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/tmp/github-ubuntu-2204.vhd.tmp")
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(vs).to receive(:r).with("curl -L10 -o /tmp/github-ubuntu-2204.vhd.tmp https://images.blob.core.windows.net/images/ubuntu2204.vhd\\?sp\\=r\\&st\\=2023-09-05T22:44:05Z\\&se\\=2023-10-07T06:44:05")
+      expect(vs).to receive(:r).with("which azcopy")
+      expect(vs).to receive(:r).with("AZCOPY_CONCURRENCY_VALUE=5 azcopy copy https://images.blob.core.windows.net/images/ubuntu2204.vhd\\?sp\\=r\\&st\\=2023-09-05T22:44:05Z\\&se\\=2023-10-07T06:44:05 /tmp/github-ubuntu-2204.vhd.tmp")
       expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /tmp/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw")
       expect(FileUtils).to receive(:rm_r).with("/tmp/github-ubuntu-2204.vhd.tmp")
 
