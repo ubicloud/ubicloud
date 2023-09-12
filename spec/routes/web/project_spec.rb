@@ -309,6 +309,16 @@ RSpec.describe Clover, "project" do
         expect(page.status_code).to eq(404)
         expect(page).to have_content "Resource not found"
       end
+
+      it "shows all default actions at documentation" do
+        visit "#{project.path}/policy"
+
+        default_actions = Authorization.generate_default_acls(nil, nil)[:acls].flat_map { _1[:actions] }
+
+        within "table" do
+          default_actions.each { expect(page).to have_content(_1) }
+        end
+      end
     end
 
     describe "delete" do
