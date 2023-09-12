@@ -30,9 +30,21 @@ AUTOLOAD_CONSTANTS = []
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
-autoload_normal = ->(subdirectory, include_first: false) do
+autoload_normal = ->(subdirectory, include_first: false, flat: false) do
   absolute = File.join(__dir__, subdirectory)
-  rgx = Regexp.new('\A' + Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/") + '(.*)\.rb\z')
+  rgx = if flat
+    # No matter how deep the file system traversal, this Regexp
+    # only matches the filename in its capturing group,
+    # i.e. it's like File.basename.
+    Regexp.new('\A.*?([^/]*)\.rb\z')
+  else
+    # Capture the relative path of a traversed file, by using
+    # Regexp.escape on the prefix that should *not* be
+    # interpreted as modules/namespaces.  Since this is works on
+    # absolute paths, the ignored content will often be like
+    # "/home/myuser/..."
+    Regexp.new('\A' + Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/") + '(.*)\.rb\z')
+  end
   last_namespace = nil
 
   # Copied from sequel/model/inflections.rb's camelize, to convert
@@ -71,7 +83,8 @@ autoload_normal = ->(subdirectory, include_first: false) do
   end
 end
 
-%w[model lib clover.rb clover_web.rb clover_api.rb routes/clover_base.rb].each { autoload_normal.call(_1) }
+autoload_normal.call("model", flat: true)
+%w[lib clover.rb clover_web.rb clover_api.rb routes/clover_base.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers serializers/web serializers/api].each { autoload_normal.call(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
