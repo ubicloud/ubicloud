@@ -95,6 +95,15 @@ class Prog::Vm::GithubRunner < Prog::Base
     # https://github.com/microsoft/azure-pipelines-agent/issues/3461
     vm.sshable.cmd("echo \"PATH=$PATH\" >> .env")
 
+    # Docker containers can't resolve DNS addresses by default on our networking
+    # setup. We will investigate it in depth, and try to find more generic solution.
+    # Related issue: https://github.com/ubicloud/ubicloud/issues/507
+    # Until proper fix, we add custom systemd-resolved configuration.
+    # Docker gets resolve.conf content from systemd-resolved service.
+    vm.sshable.cmd("sudo mkdir -p /etc/systemd/resolved.conf.d")
+    vm.sshable.cmd("sudo sh -c 'echo \"[Resolve]\nDNS=9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9\" > /etc/systemd/resolved.conf.d/Ubicloud.conf'")
+    vm.sshable.cmd("sudo systemctl restart systemd-resolved.service")
+
     hop_bootstrap_rhizome
   end
 

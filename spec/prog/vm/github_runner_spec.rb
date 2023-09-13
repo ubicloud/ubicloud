@@ -97,6 +97,9 @@ RSpec.describe Prog::Vm::GithubRunner do
     expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
     expect(sshable).to receive(:invalidate_cache_entry)
     expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> .env")
+    expect(sshable).to receive(:cmd).with("sudo mkdir -p /etc/systemd/resolved.conf.d")
+    expect(sshable).to receive(:cmd).with("sudo sh -c 'echo \"[Resolve]\nDNS=9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9\" > /etc/systemd/resolved.conf.d/Ubicloud.conf'")
+    expect(sshable).to receive(:cmd).with("sudo systemctl restart systemd-resolved.service")
 
     expect { nx.setup_environment }.to hop("bootstrap_rhizome")
   end
