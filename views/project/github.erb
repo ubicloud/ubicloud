@@ -1,5 +1,7 @@
 <% @page_title = "GitHub Runners" %>
 
+<%== render("components/billing_warning") %>
+
 <% if @installations.count > 0 %>
   <div class="space-y-1">
     <%== render(

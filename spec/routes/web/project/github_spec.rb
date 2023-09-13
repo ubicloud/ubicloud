@@ -49,6 +49,23 @@ RSpec.describe Clover, "github" do
       expect(page.driver.request.session["login_redirect"]).to eq("/apps/runner-app/installations/new")
     end
 
+    it "can not connect GitHub account if project has no valid payment method" do
+      expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+      expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+
+      visit "#{project.path}/github"
+
+      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page).to have_content "Project doesn't have valid billing information"
+
+      click_link "Connect New Account"
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page).to have_content "Project doesn't have valid billing information"
+      expect(page.driver.request.session["login_redirect"]).not_to eq("/apps/runner-app/installations/new")
+    end
+
     it "can list installations" do
       ins1 = GithubInstallation.create_with_id(installation_id: 111, name: "test-user", type: "User", project_id: project.id)
       ins2 = GithubInstallation.create_with_id(installation_id: 222, name: "test-org", type: "Organization", project_id: project.id)
