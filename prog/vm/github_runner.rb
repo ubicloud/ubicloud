@@ -184,9 +184,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     rescue Octokit::NotFound
     end
 
-    vm.private_subnets.each { _1.incr_destroy }
-    vm.sshable.destroy
-    vm.incr_destroy
+    if vm
+      vm.private_subnets.each { _1.incr_destroy }
+      vm.sshable.destroy
+      vm.incr_destroy
+    end
 
     hop_wait_vm_destroy
   end
