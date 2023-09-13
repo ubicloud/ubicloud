@@ -65,7 +65,7 @@ GEM
     docile (1.4.0)
     ed25519 (1.3.0)
     erubi (1.12.0)
-    excon (0.102.0)
+    excon (0.103.0)
     faraday (2.7.11)
       base64
       faraday-net_http (>= 2.0, < 3.1)
