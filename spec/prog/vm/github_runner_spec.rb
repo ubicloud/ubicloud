@@ -229,6 +229,18 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
     end
+
+    it "does not destroy vm if it's already destroyed" do
+      expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+      expect(github_runner).to receive(:vm).and_return(nil)
+      expect(sshable).not_to receive(:destroy)
+      expect(vm).not_to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
   end
 
   describe "#wait_vm_destroy" do
