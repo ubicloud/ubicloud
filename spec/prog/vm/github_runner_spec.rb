@@ -76,6 +76,12 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
+
+    it "does not hop to destroy if already in the wait_vm_destroy state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_vm_destroy")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
   end
 
   describe "#start" do
