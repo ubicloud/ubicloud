@@ -23,6 +23,10 @@ class BillingRate
       "#{resource_family}-#{(amount * 2).to_i} Virtual Machine"
     when "IPAddress"
       "#{resource_family} Address"
+    when "PostgresCores"
+      "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database"
+    when "PostgresStorage"
+      "#{amount} GiB Storage for PostgreSQL Database"
     else
       fail "BUG: Unknown resource type for line item description"
     end
