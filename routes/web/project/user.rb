@@ -18,7 +18,6 @@ class CloverWeb
 
       user&.associate_with_project(@project)
 
-      # TODO(enes): Move notifications to separate classes
       send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
         greeting: "Hello,",
         body: ["You're invited by '#{@current_user.name}' to join the '#{@project.name}' project on Ubicloud.",

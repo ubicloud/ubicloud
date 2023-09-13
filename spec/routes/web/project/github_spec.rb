@@ -45,7 +45,6 @@ RSpec.describe Clover, "github" do
 
       click_link "Connect New Account"
 
-      # TODO: Find a way to test values of session
       expect(page.status_code).to eq(200)
       expect(page.driver.request.session["login_redirect"]).to eq("/apps/runner-app/installations/new")
     end

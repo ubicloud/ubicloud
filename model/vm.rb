@@ -129,16 +129,15 @@ class Vm < Sequel::Model
     "#{family}-#{cores * 2}"
   end
 
+  # Various names in linux, like interface names, are obliged to be
+  # short, so truncate the ubid. This does introduce the spectre of
+  # collisions.  When the time comes, we'll have to ensure it doesn't
+  # happen on a single host, pushing into the allocation process.
   def self.ubid_to_name(id)
     id.to_s[0..7]
   end
 
   def inhost_name
-    # YYY: various names in linux, like interface names, are obliged
-    # to be short, so alas, probably can't reproduce entropy from
-    # vm.id to be collision free and there will need to be a second
-    # addressing scheme scoped to each VmHost.  But for now, assume
-    # entropy.
     self.class.ubid_to_name(UBID.from_uuidish(id))
   end
 

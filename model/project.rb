@@ -32,7 +32,6 @@ class Project < Sequel::Model
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
-    # TODO: More complex checks expiration date etc.
     !!billing_info&.payment_methods&.any?
   end
 

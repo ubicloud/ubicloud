@@ -570,11 +570,6 @@ EOS
       # Use of File::EXCL provokes a crash rather than a race
       # condition if two VMs are lazily getting their images at the
       # same time.
-      #
-      # YYY: Need to replace this with something that can handle
-      # customer images.  As-is, it does not have all the
-      # synchronization features we might want if we were to keep this
-      # code longer term, but, that's not the plan.
       temp_path = "/tmp/" + boot_image + image_ext + ".tmp"
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
         r "curl -L10 -o #{temp_path.shellescape} #{download.shellescape}"
@@ -621,10 +616,6 @@ Type=simple
 ExecStartPre=/usr/local/sbin/dnsmasq --test
 ExecStart=/usr/local/sbin/dnsmasq -k -h -C /vm/#{@vm_name}/dnsmasq.conf --log-debug #{tapnames} --user=#{@vm_name} --group=#{@vm_name}
 ExecReload=/bin/kill -HUP $MAINPID
-# YYY: These are not enough capabilties, at least CAP_NET_RAW is
-# needed, as well as more for setgid
-# CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
-# AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
 ProtectSystem=strict
 PrivateDevices=yes
 PrivateTmp=yes

@@ -158,8 +158,6 @@ end
     old_label = strand.label
     new_frame = new_frame.merge("subject_id" => @subject_id, "link" => [strand.prog, old_label])
 
-    # YYY: Use in-database jsonb prepend rather than re-rendering a
-    # new value doing the prepend.
     fail Hop.new(old_prog, old_label,
       {prog: Strand.prog_verify(prog), label: label,
        stack: [new_frame] + strand.stack, retval: nil})

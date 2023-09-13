@@ -34,7 +34,6 @@
 
 <div class="grid gap-6">
   <form action="<%= "#{@project_data[:path]}/vm" %>" method="POST">
-    <!-- YYY: need a better way to manage coupling of routes and erbs -->
     <%== csrf_tag("#{@project_data[:path]}/vm") %>
     <!-- Create Card -->
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
