@@ -1,0 +1,47 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+configure_hash = JSON.parse($stdin.read)
+
+# Update postgresql.conf
+configs = configure_hash["configs"].map { |k, v| "#{k} = #{v}" }.join("\n")
+safe_write_to_file("/etc/postgresql/16/main/conf.d/001-service.conf", configs)
+
+# Update pg_hba.conf
+pg_hba_entries = <<-PG_HBA
+# PostgreSQL Client Authentication Configuration File
+# ===================================================
+#
+# Refer to the "Client Authentication" section in the PostgreSQL
+# documentation for a complete description of this file.
+
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+# Database administrative login by Unix domain socket
+local   all             postgres                                peer
+
+# "local" is for Unix domain socket connections only
+local   all             all                                     peer
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            scram-sha-256
+# IPv6 local connections:
+host    all             all             ::1/128                 scram-sha-256
+
+# Allow replication connections from localhost, by a user with the
+# replication privilege.
+local   replication     all                                     peer
+host    replication     all             127.0.0.1/32            scram-sha-256
+host    replication     all             ::1/128                 scram-sha-256
+
+# Allow connections from public internet with SCRAM authentication
+host    all             all             all                     scram-sha-256
+PG_HBA
+safe_write_to_file("/etc/postgresql/16/main/pg_hba.conf", pg_hba_entries)
+
+# Reload the postmaster to apply changes
+r "pg_ctlcluster 16 main reload || pg_ctlcluster 16 main restart"
+
+# Update superuser password
+r "sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD '#{configure_hash["superuser_password"]}'\""
