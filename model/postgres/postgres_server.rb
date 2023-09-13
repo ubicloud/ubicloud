@@ -1,4 +1,56 @@
 # frozen_string_literal: true
 
-class PostgresServer
+require_relative "../../model"
+
+class PostgresServer < Sequel::Model
+  one_to_one :strand, key: :id
+  many_to_one :project
+  many_to_one :vm
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, conditions: {Sequel.function(:upper, :span) => nil}
+
+  include ResourceMethods
+  include SemaphoreMethods
+  include Authorization::HyperTagMethods
+  include Authorization::TaggableMethods
+
+  semaphore :restart, :destroy
+
+  def hyper_tag_name(project)
+    "project/#{project.ubid}/location/#{location}/postgres/#{server_name}"
+  end
+
+  def configure_hash
+    # configs
+    # admin password
+    {
+      superuser_password: superuser_password,
+      configs: {
+        # TODO these are semi-arbitrary values. We should think more about them.
+        effective_cache_size: "#{vm.mem_gib * 1024 * 3 / 4}MB",
+        effective_io_concurrency: 200,
+        listen_addresses: "'*'",
+        log_directory: "pg_log",
+        log_filename: "'postgresql-%A.log'",
+        log_truncate_on_rotation: "true",
+        logging_collector: "on",
+        maintenance_work_mem: "#{vm.mem_gib * 1024 / 16}MB",
+        max_connections: vm.mem_gib * 25,
+        max_parallel_workers: 4,
+        max_parallel_workers_per_gather: 2,
+        max_parallel_maintenance_workers: 2,
+        max_wal_size: "5GB",
+        random_page_cost: 1.1,
+        shared_buffers: "#{vm.mem_gib * 1024 / 4}MB",
+        superuser_reserved_connections: 3,
+        tcp_keepalives_count: 4,
+        tcp_keepalives_idle: 2,
+        tcp_keepalives_interval: 2,
+        work_mem: "#{vm.mem_gib / 8}MB"
+      }
+    }
+  end
+
+  def connection_string
+    URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: vm.sshable.host).to_s
+  end
 end

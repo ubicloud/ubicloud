@@ -1,0 +1,56 @@
+# frozen_string_literal: true
+
+require_relative "../spec_helper"
+
+RSpec.describe PostgresServer do
+  subject(:pgs) {
+    described_class.create_with_id(
+      project_id: SecureRandom.uuid,
+      location: "hetzner-hel1",
+      server_name: "pg-server-name",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 100,
+      superuser_password: "dummy-password"
+    )
+  }
+
+  let(:vm) { instance_double(Vm, sshable: instance_double(Sshable, host: "1.2.3.4"), mem_gib: 8) }
+
+  before do
+    allow(pgs).to receive(:vm).and_return(vm)
+  end
+
+  it "generates configure_hash" do
+    configure_hash = {
+      superuser_password: "dummy-password",
+      configs: {
+        effective_cache_size: "6144MB",
+        effective_io_concurrency: 200,
+        listen_addresses: "'*'",
+        log_directory: "pg_log",
+        log_filename: "'postgresql-%A.log'",
+        log_truncate_on_rotation: "true",
+        logging_collector: "on",
+        maintenance_work_mem: "512MB",
+        max_connections: 200,
+        max_parallel_workers: 4,
+        max_parallel_workers_per_gather: 2,
+        max_parallel_maintenance_workers: 2,
+        max_wal_size: "5GB",
+        random_page_cost: 1.1,
+        shared_buffers: "2048MB",
+        superuser_reserved_connections: 3,
+        tcp_keepalives_count: 4,
+        tcp_keepalives_idle: 2,
+        tcp_keepalives_interval: 2,
+        work_mem: "1MB"
+      }
+    }
+
+    expect(pgs.configure_hash).to eq(configure_hash)
+  end
+
+  it "returns connection string" do
+    expect(pgs.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4")
+  end
+end

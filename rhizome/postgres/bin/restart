@@ -1,0 +1,9 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+# We don't change the user to postgres here. Instead we run the below
+# command as root, because the cluster is running from systemd, and can
+# only be restarted as root.
+r "sudo pg_ctlcluster 16 main restart"
