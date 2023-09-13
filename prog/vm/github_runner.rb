@@ -120,7 +120,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     donate
   end
 
-  # TODO: Move this to golden image too
   label def install_actions_runner
     vm.sshable.cmd("curl -o actions-runner-linux-x64-2.308.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.308.0/actions-runner-linux-x64-2.308.0.tar.gz")
     vm.sshable.cmd("echo '9f994158d49c5af39f57a65bf1438cbae4968aec1e4fec132dd7992ad57c74fa  actions-runner-linux-x64-2.308.0.tar.gz' | shasum -a 256 -c")

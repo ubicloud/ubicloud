@@ -178,11 +178,6 @@ class CloverWeb < Roda
     close_account_route "account/close-account"
     close_account_view { view "account/close_account", "My Account" }
 
-    # YYY: Should password secret and session secret be the same? Are
-    # there rotation issues? See also:
-    #
-    # https://github.com/jeremyevans/rodauth/commit/6cbf61090a355a20ab92e3420d5e17ec702f3328
-    # https://github.com/jeremyevans/rodauth/commit/d8568a325749c643c9a5c9d6d780e287f8c59c31
     argon2_secret { Config.clover_session_secret }
     require_bcrypt? false
   end
