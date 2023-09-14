@@ -1,17 +1,17 @@
 # frozen_string_literal: true
 
 class Scheduling::Dispatcher
-  attr_reader :threads
+  attr_reader :notifiers
 
   def initialize
     @apoptosis_timeout = Strand::LEASE_EXPIRATION - 29
-    @threads = []
+    @notifiers = []
   end
 
   def scan
-    idle_connections = Config.db_pool - @threads.count - 1
+    idle_connections = Config.db_pool - @notifiers.count - 1
     if idle_connections < 1
-      puts "Not enough database connections. Waiting active connections to finish their work. db_pool:#{Config.db_pool} active_threads:#{@threads.count}"
+      puts "Not enough database connections. Waiting active connections to finish their work. db_pool:#{Config.db_pool} active_threads:#{@notifiers.count}"
       return []
     end
 
@@ -38,8 +38,6 @@ class Scheduling::Dispatcher
         next
         # rubocop:enable Lint/UnreachableCode
       end
-
-      ready.first.close
     end
 
     Thread.new do
@@ -48,17 +46,21 @@ class Scheduling::Dispatcher
       # Adequate to unblock IO.select.
       w.close
     end.tap { _1.name = strand_id }
+
+    r
   end
 
   def start_cohort
     scan.each do |strand|
-      @threads << start_strand(strand)
+      @notifiers << start_strand(strand)
     end
   end
 
   def wait_cohort
-    @threads.filter! do |th|
-      th.alive?
-    end
+    return 0 if @notifiers.empty?
+    ready, _, _ = IO.select(@notifiers)
+    ready.each(&:close)
+    @notifiers.delete_if { ready.include?(_1) }
+    ready.count
   end
 end
