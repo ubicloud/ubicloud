@@ -17,17 +17,20 @@ RSpec.describe Scheduling::Dispatcher do
 
   describe "#wait_cohort" do
     it "operates when no threads are running" do
-      expect { di.wait_cohort }.not_to raise_error
+      expect(di.wait_cohort).to be_zero
     end
 
-    it "filters for live threads only" do
-      di.threads << instance_double(Thread, alive?: true)
-      want = di.threads.dup.freeze
-      di.threads << instance_double(Thread, alive?: false)
+    it "separates completed threads" do
+      complete_r, complete_w = IO.pipe
+      complete_w.close
+      incomplete_r, incomplete_w = IO.pipe
 
-      di.wait_cohort
+      di.notifiers.concat([complete_r, incomplete_r])
+      expect(di.wait_cohort).to eq 1
 
-      expect(di.threads).to eq(want)
+      expect(di.notifiers).to eq([incomplete_r])
+    ensure
+      [complete_r, complete_w, incomplete_r, incomplete_w].each(&:close)
     end
   end
 
@@ -53,10 +56,9 @@ RSpec.describe Scheduling::Dispatcher do
 
         # Ensure the test can be found by "#scan" and runs in a
         # thread.
-        s = Strand.create_with_id(prog: "Test", label: "synchronized")
+        Strand.create_with_id(prog: "Test", label: "synchronized")
         di.start_cohort
-        expect(di.threads.count).to be 1
-        expect(di.threads[0].name).to eq(s.id)
+        expect(di.notifiers.count).to be 1
 
         # Blocks until :clover_test_out has been set.
         r.read
@@ -67,7 +69,7 @@ RSpec.describe Scheduling::Dispatcher do
 
         # Expect a dead thread to get reaped by wait_cohort.
         di.wait_cohort
-        expect(di.threads).to be_empty
+        expect(di.notifiers).to be_empty
       ensure
         # Multiple transactions are required for this test across
         # threads, so we need to clean up differently than
@@ -90,7 +92,7 @@ RSpec.describe Scheduling::Dispatcher do
         Strand.create_with_id(prog: "Test", label: "wait_exit")
         di.start_cohort
         w.close
-        di.threads.each(&:join)
+        di.notifiers.each(&:read)
       ensure
         Strand.truncate(cascade: true)
       end.join

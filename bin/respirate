@@ -6,7 +6,7 @@ require_relative "../loader"
 d = Scheduling::Dispatcher.new
 
 loop do
-  d.wait_cohort
   d.start_cohort
+  next if d.wait_cohort > 0
   sleep 5
 end
