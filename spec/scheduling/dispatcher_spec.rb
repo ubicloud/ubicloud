@@ -87,7 +87,6 @@ RSpec.describe Scheduling::Dispatcher do
         th[:clover_test_in] = r
 
         di.instance_variable_set(:@apoptosis_timeout, 0)
-        di.instance_variable_set(:@dump_timeout, 0)
         Strand.create_with_id(prog: "Test", label: "wait_exit")
         di.start_cohort
         w.close

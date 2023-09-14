@@ -4,8 +4,7 @@ class Scheduling::Dispatcher
   attr_reader :threads
 
   def initialize
-    @dump_timeout = 1
-    @apoptosis_timeout = Strand::LEASE_EXPIRATION - @dump_timeout - 29
+    @apoptosis_timeout = Strand::LEASE_EXPIRATION - 29
     @threads = []
   end
 
