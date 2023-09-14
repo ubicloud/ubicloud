@@ -38,7 +38,7 @@ class Strand < Sequel::Model
   def self.lease(id)
     affected = DB[<<SQL, id].first
 UPDATE strand
-SET lease = now() + '120 seconds', schedule = now()
+SET lease = now() + '120 seconds', try = try + 1, schedule = (now() + least(2 ^ least(try, 20), 600) * random() * '1 second'::interval)
 WHERE id = ? AND (lease IS NULL OR lease < now())
 RETURNING lease, exitval IS NOT NULL AS exited
 SQL
@@ -107,10 +107,9 @@ SQL
     rescue Prog::Base::Nap => e
       save_changes
 
-      return e if e.seconds <= 0
       scheduled = DB[<<SQL, e.seconds, id].get
 UPDATE strand
-SET schedule = now() + (? * '1 second'::interval)
+SET try = 0, schedule = now() + (? * '1 second'::interval)
 WHERE id = ?
 RETURNING schedule
 SQL
