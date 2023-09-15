@@ -137,10 +137,14 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#install_actions_runner" do
     it "downloads and hops to register_runner" do
-      expect(sshable).to receive(:cmd).with(/curl -o actions-runner-linux-x64.*tar.gz/)
-      expect(sshable).to receive(:cmd).with(/echo.*| shasum -a 256 -c/)
-      expect(sshable).to receive(:cmd).with(/tar xzf.*tar.gz/)
-
+      expect(sshable).to receive(:cmd).with(<<EXPECTED)
+latest_version_label=$(curl -s -X GET 'https://api.github.com/repos/actions/runner/releases/latest' | jq -r '.tag_name')
+latest_version=$(echo ${latest_version_label:1})
+runner_file="actions-runner-linux-x64-${latest_version}.tar.gz"
+runner_url="https://github.com/actions/runner/releases/download/${latest_version_label}/${runner_file}"
+curl -o "${runner_file}" -L "${runner_url}"
+tar xzf "./${runner_file}"
+EXPECTED
       expect { nx.install_actions_runner }.to hop("register_runner")
     end
   end

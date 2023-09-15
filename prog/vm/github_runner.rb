@@ -121,9 +121,15 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def install_actions_runner
-    vm.sshable.cmd("curl -o actions-runner-linux-x64-2.308.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.308.0/actions-runner-linux-x64-2.308.0.tar.gz")
-    vm.sshable.cmd("echo '9f994158d49c5af39f57a65bf1438cbae4968aec1e4fec132dd7992ad57c74fa  actions-runner-linux-x64-2.308.0.tar.gz' | shasum -a 256 -c")
-    vm.sshable.cmd("tar xzf ./actions-runner-linux-x64-2.308.0.tar.gz")
+    # Adapted from https://github.com/actions/runner/blob/2908d82845c018193655e68f3c20a5ad03bc0efd/scripts/create-latest-svc.sh#L140
+    vm.sshable.cmd(<<CMD)
+latest_version_label=$(curl -s -X GET 'https://api.github.com/repos/actions/runner/releases/latest' | jq -r '.tag_name')
+latest_version=$(echo ${latest_version_label:1})
+runner_file="actions-runner-linux-x64-${latest_version}.tar.gz"
+runner_url="https://github.com/actions/runner/releases/download/${latest_version_label}/${runner_file}"
+curl -o "${runner_file}" -L "${runner_url}"
+tar xzf "./${runner_file}"
+CMD
 
     hop_register_runner
   end
