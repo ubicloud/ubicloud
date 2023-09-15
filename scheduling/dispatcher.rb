@@ -23,10 +23,11 @@ class Scheduling::Dispatcher
   def start_strand(strand)
     strand_id = strand.id.freeze
 
-    r, w = IO.pipe
+    apoptosis_r, apoptosis_w = IO.pipe
+    notify_r, notify_w = IO.pipe
 
     Thread.new do
-      ready, _, _ = IO.select([r], nil, nil, @apoptosis_timeout)
+      ready, _, _ = IO.select([apoptosis_r], nil, nil, @apoptosis_timeout)
 
       if ready.nil?
         # Timed out, dump threads and exit
@@ -38,16 +39,19 @@ class Scheduling::Dispatcher
         next
         # rubocop:enable Lint/UnreachableCode
       end
+
+      ready.first.close
     end
 
     Thread.new do
       strand.run Strand::LEASE_EXPIRATION / 4
     ensure
       # Adequate to unblock IO.select.
-      w.close
+      apoptosis_w.close
+      notify_w.close
     end.tap { _1.name = strand_id }
 
-    r
+    notify_r
   end
 
   def start_cohort
