@@ -262,10 +262,27 @@ RSpec.describe VmSetup do
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
       expect(vs).to receive(:r).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
-      expect(vs).to receive(:r).with("umount /vm/test/hugepages")
+      expect(vs).to receive(:unmount_hugepages)
       expect(vs).to receive(:r).with("deluser --remove-home test")
 
       vs.purge
+    end
+  end
+
+  describe "#unmount_hugepages" do
+    it "can unmount hugepages" do
+      expect(vs).to receive(:r).with("umount /vm/test/hugepages")
+      vs.unmount_hugepages
+    end
+
+    it "exits silently if hugepages isn't mounted" do
+      expect(vs).to receive(:r).with("umount /vm/test/hugepages").and_raise(CommandFail.new("", "", "/vm/test/hugepages: no mount point specified."))
+      vs.unmount_hugepages
+    end
+
+    it "fails if umount fails with an unexpected error" do
+      expect(vs).to receive(:r).with("umount /vm/test/hugepages").and_raise(CommandFail.new("", "", "/vm/test/hugepages: wait, what?"))
+      expect { vs.unmount_hugepages }.to raise_error CommandFail
     end
   end
 

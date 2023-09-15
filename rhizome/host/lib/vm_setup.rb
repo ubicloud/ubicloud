@@ -104,7 +104,7 @@ class VmSetup
     r "systemctl daemon-reload"
 
     purge_storage
-    r "umount #{vp.q_hugepages}"
+    unmount_hugepages
 
     begin
       r "deluser --remove-home #{q_vm}"
@@ -140,6 +140,12 @@ class VmSetup
     }
 
     rm_if_exists(vp.storage_root)
+  end
+
+  def unmount_hugepages
+    r "umount #{vp.q_hugepages}"
+  rescue CommandFail => ex
+    raise unless /(no mount point specified)|(not mounted)|(No such file or directory)/.match?(ex.stderr)
   end
 
   def hugepages(mem_gib)
