@@ -114,6 +114,9 @@ class VmSetup
   end
 
   def purge_storage
+    # Storage hasn't been created yet, so nothing to purge.
+    return if !File.exist?(vp.storage_root)
+
     params = JSON.parse(File.read(vp.prep_json))
     params["storage_volumes"].each { |disk|
       device_id = disk["device_id"]
