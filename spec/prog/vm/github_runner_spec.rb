@@ -98,7 +98,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
-  it "hops to bootstrap_rhizome" do
+  it "hops to install_actions_runner" do
     expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
     expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
     expect(sshable).to receive(:invalidate_cache_entry)
@@ -107,32 +107,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     expect(sshable).to receive(:cmd).with("sudo sh -c 'echo \"[Resolve]\nDNS=9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9\" > /etc/systemd/resolved.conf.d/Ubicloud.conf'")
     expect(sshable).to receive(:cmd).with("sudo systemctl restart systemd-resolved.service")
 
-    expect { nx.setup_environment }.to hop("bootstrap_rhizome")
-  end
-
-  describe "#bootstrap_rhizome" do
-    it "buds a bootstrap rhizome process" do
-      expect(nx).to receive(:register_deadline)
-      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "common", "subject_id" => vm.id, "user" => "runner"})
-      expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
-    end
-  end
-
-  describe "#wait_bootstrap_rhizome" do
-    before { expect(nx).to receive(:reap) }
-
-    it "hops to install_actions_runner if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
-
-      expect { nx.wait_bootstrap_rhizome }.to hop("install_actions_runner")
-    end
-
-    it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
-      expect { nx.wait_bootstrap_rhizome }.to nap(0)
-    end
+    expect { nx.setup_environment }.to hop("install_actions_runner")
   end
 
   describe "#install_actions_runner" do
@@ -150,8 +125,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:runner_id).and_return(nil)
       expect(sshable).to receive(:cmd).with("./env.sh")
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo -u runner /home/runner/run.sh --jitconfig AABBCC' runner-script")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("InProgress")
+      expect(sshable).to receive(:cmd).with("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./run.sh --jitconfig AABBCC")
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
 
       expect { nx.register_runner }.to hop("wait")
@@ -159,7 +134,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "does not generate runner if runner exists and destroys it" do
       expect(github_runner).to receive(:runner_id).and_return(123).at_least(:once)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("Failed")
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
       expect(client).to receive(:delete)
       expect(github_runner).to receive(:update).with(runner_id: nil, ready_at: nil)
 
@@ -168,7 +143,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "naps if script return unknown status" do
       expect(github_runner).to receive(:runner_id).and_return(123).at_least(:once)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("Unknown")
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("unknown")
 
       expect { nx.register_runner }.to nap(10)
     end
@@ -178,7 +153,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "does not destroy runner if it does not pick a job in two minutes, and busy" do
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
       expect(client).to receive(:get).and_return({busy: true})
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("InProgress")
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(15)
@@ -198,7 +173,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
       expect(github_runner).to receive(:job_id).and_return(nil)
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 1 * 60)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("InProgress")
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(15)
@@ -206,7 +181,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "destroys runner if runner-script exited with Succeeded" do
       expect(github_runner).to receive(:job_id).and_return(123)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
       expect(github_runner).to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(0)
@@ -214,7 +189,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "naps" do
       expect(github_runner).to receive(:job_id).and_return(123)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check runner-script").and_return("InProgress")
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
 
       expect { nx.wait }.to nap(15)
     end
