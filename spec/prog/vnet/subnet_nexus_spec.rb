@@ -363,7 +363,10 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "fails if there are active resources" do
       expect(ps).to receive(:nics).and_return([nic])
       expect(nic).to receive(:vm_id).and_return("vm-id")
-      expect { nx.destroy }.to raise_error RuntimeError, "Cannot destroy subnet with active nics, first clean up the attached resources"
+
+      expect do
+        expect { nx.destroy }.to nap(5)
+      end.to output("Cannot destroy subnet with active nics, first clean up the attached resources\n").to_stdout
     end
 
     it "increments the destroy semaphore of nics" do
