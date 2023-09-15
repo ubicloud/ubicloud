@@ -2,7 +2,7 @@
 
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
-  semaphore :reboot
+  semaphore :reboot, :destroy
 
   def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil)
     DB.transaction do
@@ -21,6 +21,14 @@ class Prog::Vm::HostNexus < Prog::Base
       end
 
       Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = vmh.id }
+    end
+  end
+
+  def before_run
+    when_destroy_set? do
+      if strand.label != "destroy"
+        hop_destroy
+      end
     end
   end
 
@@ -178,6 +186,25 @@ class Prog::Vm::HostNexus < Prog::Base
     end
 
     nap 30
+  end
+
+  label def destroy
+    decr_destroy
+
+    unless vm_host.allocation_state == "draining"
+      vm_host.update(allocation_state: "draining")
+      nap 5
+    end
+
+    unless vm_host.vms.empty?
+      Clog.emit("Cannot destroy the vm host with active virtual machines, first clean them up") { {vm_host: vm_host.values} }
+      nap 15
+    end
+
+    vm_host.destroy
+    sshable.destroy
+
+    pop "vm host deleted"
   end
 
   def get_boot_id

@@ -128,14 +128,21 @@ class Prog::Test::HetznerServer < Prog::Base
   label def delete_key
     hetzner_api.delete_key(hetzner_ssh_keypair.public_key)
 
-    hop_finish
+    hop_delete_host
+  end
+
+  label def delete_host
+    vm_host.incr_destroy
+    hop_wait_host_destroyed
+  end
+
+  label def wait_host_destroyed
+    reap
+    hop_finish if children_idle
+    donate
   end
 
   label def finish
-    Strand[vm_host.id].destroy
-    vm_host.destroy
-    sshable.destroy
-
     pop "HetznerServer tests finished!"
   end
 
@@ -151,9 +158,5 @@ class Prog::Test::HetznerServer < Prog::Base
 
   def vm_host
     @vm_host ||= VmHost[frame["vm_host_id"]]
-  end
-
-  def sshable
-    @sshable ||= Sshable[frame["vm_host_id"]]
   end
 end
