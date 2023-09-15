@@ -15,7 +15,7 @@ class VmHost < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :reboot
+  semaphore :reboot, :destroy
 
   def host_prefix
     net6.netmask.prefix_len

@@ -128,7 +128,25 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#delete_key" do
     it "deletes key" do
       expect(hetzner_api).to receive(:delete_key).with("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
-      expect { hs_test.delete_key }.to hop("finish", "Test::HetznerServer")
+      expect { hs_test.delete_key }.to hop("delete_host", "Test::HetznerServer")
+    end
+  end
+
+  describe "#delete_host" do
+    it "deletes host" do
+      expect { hs_test.delete_host }.to hop("wait_host_destroyed", "Test::HetznerServer")
+    end
+  end
+
+  describe "#wait_host_destroyed" do
+    it "hops to delete_key if children idle" do
+      expect(hs_test).to receive(:children_idle).and_return(true)
+      expect { hs_test.wait_host_destroyed }.to hop("finish", "Test::HetznerServer")
+    end
+
+    it "donates if children not idle" do
+      expect(hs_test).to receive(:children_idle).and_return(false)
+      expect { hs_test.wait_host_destroyed }.to nap(0)
     end
   end
 

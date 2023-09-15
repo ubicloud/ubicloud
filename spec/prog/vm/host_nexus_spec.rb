@@ -16,6 +16,14 @@ RSpec.describe Prog::Vm::HostNexus do
     }
   }
 
+  let(:vms) { [instance_double(Vm, mem_gib: 1), instance_double(Vm, mem_gib: 2)] }
+  let(:vm_host) { instance_double(VmHost, vms: vms) }
+  let(:sshable) { instance_double(Sshable) }
+
+  before do
+    allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+  end
+
   describe ".assemble" do
     it "creates addresses properly for a regular host" do
       st = described_class.assemble("127.0.0.1")
@@ -45,6 +53,19 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "#before_run" do
+    it "hops to destroy when needed" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the destroy state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+  end
+
   describe "#start" do
     it "buds a bootstrap rhizome process" do
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "host"})
@@ -71,8 +92,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#prep" do
     it "starts a number of sub-programs" do
-      nx.instance_variable_set(:@vm_host, instance_double(VmHost,
-        net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64")))
+      expect(vm_host).to receive(:net6).and_return(NetAddr.parse_net("2a01:4f9:2b:35a::/64"))
       budded = []
       expect(nx).to receive(:bud) do
         budded << _1
@@ -90,8 +110,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "learns the network from the host if it is not set a-priori" do
-      nx.instance_variable_set(:@vm_host, instance_double(VmHost, net6: nil))
-
+      expect(vm_host).to receive(:net6).and_return(nil)
       budded_learn_network = false
       expect(nx).to receive(:bud) do
         budded_learn_network ||= (_1 == Prog::LearnNetwork)
@@ -106,11 +125,9 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#wait_prep" do
     it "updates the vm_host record from the finished programs" do
       expect(nx).to receive(:leaf?).and_return(true)
-      vmh = instance_double(VmHost)
-      nx.instance_variable_set(:@vm_host, vmh)
-      expect(vmh).to receive(:update).with(total_mem_gib: 1)
-      expect(vmh).to receive(:update).with(total_cores: 4, total_cpus: 5, total_nodes: 3, total_sockets: 2)
-      expect(vmh).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
+      expect(vm_host).to receive(:update).with(total_mem_gib: 1)
+      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_nodes: 3, total_sockets: 2)
+      expect(vm_host).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
         instance_double(Strand, prog: "LearnCores", exitval: {"total_sockets" => 2, "total_nodes" => 3, "total_cores" => 4, "total_cpus" => 5}),
@@ -207,19 +224,30 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
-  describe "host reboot" do
-    let(:vms) { [instance_double(Vm), instance_double(Vm)] }
-    let(:vm_host) {
-      host = instance_double(VmHost)
-      allow(host).to receive(:vms).and_return(vms)
-      host
-    }
-    let(:sshable) { instance_double(Sshable) }
-
-    before do
-      allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+  describe "#destroy" do
+    it "updates allocation state and naps" do
+      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      expect(vm_host).to receive(:update).with(allocation_state: "draining")
+      expect { nx.destroy }.to nap(5)
     end
 
+    it "waits draining" do
+      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      expect(vm_host).to receive(:values).and_return({allocation_state: "draining"})
+      expect(Clog).to receive(:emit).with("Cannot destroy the vm host with active virtual machines, first clean them up").and_call_original
+      expect { nx.destroy }.to nap(15)
+    end
+
+    it "deletes and exists" do
+      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      expect(vm_host).to receive(:vms).and_return([])
+      expect(vm_host).to receive(:destroy)
+      expect(sshable).to receive(:destroy)
+      expect { nx.destroy }.to exit({"msg" => "vm host deleted"})
+    end
+  end
+
+  describe "host reboot" do
     it "prep_reboot transitions to reboot" do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
       expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
@@ -273,24 +301,6 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#verify_hugepages" do
-    let(:vms) {
-      vm1 = instance_double(Vm)
-      vm2 = instance_double(Vm)
-      allow(vm1).to receive(:mem_gib).and_return(1)
-      allow(vm2).to receive(:mem_gib).and_return(2)
-      [vm1, vm2]
-    }
-    let(:vm_host) {
-      host = instance_double(VmHost)
-      allow(host).to receive(:vms).and_return(vms)
-      host
-    }
-    let(:sshable) { instance_double(Sshable) }
-
-    before do
-      allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
-    end
-
     it "fails if hugepagesize!=1G" do
       expect(sshable).to receive(:cmd).with("cat /proc/meminfo").and_return("Hugepagesize: 2048 kB\n")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't set hugepage size to 1G"
