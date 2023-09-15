@@ -3,6 +3,7 @@
 <%== render("components/billing_warning") %>
 
 <% if @installations.count > 0 %>
+  <div class="auto-refresh hidden" data-interval="10"></div>
   <div class="space-y-1">
     <%== render(
       "components/breadcrumb",
