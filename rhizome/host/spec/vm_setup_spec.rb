@@ -229,6 +229,7 @@ RSpec.describe VmSetup do
         ]
       })
 
+      expect(File).to receive(:exist?).with("/var/storage/test").and_return(true)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
 
       # delete the unencrypted volume
@@ -245,6 +246,11 @@ RSpec.describe VmSetup do
 
       expect(FileUtils).to receive(:rm_r).with("/var/storage/test")
 
+      vs.purge_storage
+    end
+
+    it "exits silently if storage hasn't been created yet" do
+      expect(File).to receive(:exist?).with("/var/storage/test").and_return(false)
       vs.purge_storage
     end
   end
