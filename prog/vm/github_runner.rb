@@ -49,6 +49,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
+  SERVICE_NAME = "runner-script"
+
   def vm
     @vm ||= github_runner.vm
   end
@@ -72,6 +74,8 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def setup_environment
+    register_deadline(:wait, 10 * 60)
+
     # runner unix user needed access to manipulate the Docker daemon.
     # Default GitHub hosted runners have additional adm,systemd-journal groups.
     vm.sshable.cmd("sudo usermod -a -G docker,adm,systemd-journal runner")
@@ -104,20 +108,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     vm.sshable.cmd("sudo sh -c 'echo \"[Resolve]\nDNS=9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9\" > /etc/systemd/resolved.conf.d/Ubicloud.conf'")
     vm.sshable.cmd("sudo systemctl restart systemd-resolved.service")
 
-    hop_bootstrap_rhizome
-  end
-
-  label def bootstrap_rhizome
-    register_deadline(:wait, 10 * 60)
-
-    bud Prog::BootstrapRhizome, {"target_folder" => "common", "subject_id" => vm.id, "user" => "runner"}
-    hop_wait_bootstrap_rhizome
-  end
-
-  label def wait_bootstrap_rhizome
-    reap
-    hop_install_actions_runner if leaf?
-    donate
+    hop_install_actions_runner
   end
 
   label def install_actions_runner
@@ -138,13 +129,15 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
       # ./env.sh sets some variables for runner to run properly
       vm.sshable.cmd("./env.sh")
-      vm.sshable.cmd("common/bin/daemonizer 'sudo -u runner /home/runner/run.sh --jitconfig #{response[:encoded_jit_config].shellescape}' runner-script")
+
+      command = "./run.sh --jitconfig #{response[:encoded_jit_config].shellescape}"
+      vm.sshable.cmd("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit #{SERVICE_NAME} --remain-after-exit -- #{command}")
     end
 
-    case vm.sshable.cmd("common/bin/daemonizer --check runner-script")
-    when "Succeeded", "InProgress"
+    case vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp
+    when "exited", "running"
       hop_wait
-    when "Failed"
+    when "failed"
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       github_runner.update(runner_id: nil, ready_at: nil)
     end
@@ -162,7 +155,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       end
     end
 
-    if vm.sshable.cmd("common/bin/daemonizer --check runner-script") == "Succeeded"
+    if vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp == "exited"
       github_runner.incr_destroy
       nap 0
     end
