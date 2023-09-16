@@ -48,6 +48,10 @@ module ResourceMethods
     @ubid ||= UBID.from_uuidish(id).to_s.downcase
   end
 
+  def to_s
+    "#{self.class.name}[#{ubid}]"
+  end
+
   NON_ARCHIVED_MODELS = ["DeletedRecord", "Semaphore"]
   def before_destroy
     model_name = self.class.name

@@ -157,7 +157,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
         github_runner.incr_destroy
-        puts "Destroying GithubRunner[#{github_runner.ubid}] because it does not pick a job in two minutes"
+        puts "#{github_runner} Not pick a job in two minutes, destroying it"
         nap 0
       end
     end
