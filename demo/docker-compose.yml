@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   postgres:
-    image: postgres:15.2
+    image: postgres:15.4
     container_name: ubicloud-postgres
     env_file: .env
     ports:
