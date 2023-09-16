@@ -237,7 +237,8 @@ SQL
   label def create_unix_user
     # create vm's user and home directory
     begin
-      host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} #{q_vm}")
+      uid = rand(1100..59999)
+      host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} --uid #{uid} #{q_vm}")
     rescue Sshable::SshError => ex
       raise unless /adduser: The user `.*' already exists\./.match?(ex.stderr)
     end
