@@ -102,30 +102,19 @@ RSpec.describe Prog::Vm::GithubRunner do
     expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
     expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
     expect(sshable).to receive(:invalidate_cache_entry)
-    expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> .env")
-    expect(sshable).to receive(:cmd).with("sudo mkdir -p /etc/systemd/resolved.conf.d")
-    expect(sshable).to receive(:cmd).with("sudo sh -c 'echo \"[Resolve]\nDNS=9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9\" > /etc/systemd/resolved.conf.d/Ubicloud.conf'")
-    expect(sshable).to receive(:cmd).with("sudo systemctl restart systemd-resolved.service")
+    expect(sshable).to receive(:cmd).with("sudo mv /usr/local/share/actions-runner ./")
+    expect(sshable).to receive(:cmd).with("sudo chown -R runner:runner actions-runner")
+    expect(sshable).to receive(:cmd).with("./actions-runner/env.sh")
+    expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> ./actions-runner/.env")
 
-    expect { nx.setup_environment }.to hop("install_actions_runner")
-  end
-
-  describe "#install_actions_runner" do
-    it "downloads and hops to register_runner" do
-      expect(sshable).to receive(:cmd).with(/curl -o actions-runner-linux-x64.*tar.gz/)
-      expect(sshable).to receive(:cmd).with(/echo.*| shasum -a 256 -c/)
-      expect(sshable).to receive(:cmd).with(/tar xzf.*tar.gz/)
-
-      expect { nx.install_actions_runner }.to hop("register_runner")
-    end
+    expect { nx.setup_environment }.to hop("register_runner")
   end
 
   describe "#register_runner" do
     it "generates runner if not runner id not set and hops" do
       expect(github_runner).to receive(:runner_id).and_return(nil)
-      expect(sshable).to receive(:cmd).with("./env.sh")
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
-      expect(sshable).to receive(:cmd).with("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./run.sh --jitconfig AABBCC")
+      expect(sshable).to receive(:cmd).with("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./actions-runner/run.sh --jitconfig AABBCC")
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
 
