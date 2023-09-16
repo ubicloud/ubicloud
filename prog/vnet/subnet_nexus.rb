@@ -116,7 +116,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     register_deadline(nil, 10 * 60)
 
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
-      puts "Cannot destroy subnet with active nics, first clean up the attached resources"
+      puts "#{private_subnet} Cannot destroy subnet with active nics, first clean up the attached resources"
       nap 5
     end
 

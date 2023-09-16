@@ -192,7 +192,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect do
         expect { nx.wait }.to nap(0)
-      end.to output("Destroying GithubRunner[#{github_runner.ubid}] because it does not pick a job in two minutes\n").to_stdout
+      end.to output("GithubRunner[#{github_runner.ubid}] Not pick a job in two minutes, destroying it\n").to_stdout
     end
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do

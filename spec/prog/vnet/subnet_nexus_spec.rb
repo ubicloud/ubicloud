@@ -366,7 +366,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
       expect do
         expect { nx.destroy }.to nap(5)
-      end.to output("Cannot destroy subnet with active nics, first clean up the attached resources\n").to_stdout
+      end.to output("PrivateSubnet[#{ps.ubid}] Cannot destroy subnet with active nics, first clean up the attached resources\n").to_stdout
     end
 
     it "increments the destroy semaphore of nics" do
