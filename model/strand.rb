@@ -20,6 +20,10 @@ class Strand < Sequel::Model
     one_to_one _1.intern, key: :id
   end
 
+  def subject
+    UBID.decode(ubid)
+  end
+
   def take_lease_and_reload
     affected = DB[<<SQL, id].first
 UPDATE strand
