@@ -235,13 +235,12 @@ SQL
   end
 
   label def create_unix_user
+    host.sshable.cmd("sudo userdel --remove --force #{q_vm} || true")
+    host.sshable.cmd("sudo groupdel -f #{q_vm} || true")
+
     # create vm's user and home directory
-    begin
-      uid = rand(1100..59999)
-      host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} --uid #{uid} #{q_vm}")
-    rescue Sshable::SshError => ex
-      raise unless /adduser: The user `.*' already exists\./.match?(ex.stderr)
-    end
+    uid = rand(1100..59999)
+    host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} --uid #{uid} #{q_vm}")
 
     hop_prep
   end
