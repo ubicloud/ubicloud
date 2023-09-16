@@ -172,32 +172,15 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#create_unix_user" do
-    let(:sshable) { instance_double(Sshable) }
-    let(:vm_host) { instance_double(VmHost, sshable: sshable) }
-
-    before do
-      expect(vm).to receive(:vm_host).and_return(vm_host)
-    end
-
     it "runs adduser" do
+      sshable = instance_double(Sshable)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(sshable).to receive(:cmd).with(/sudo.*userdel.*#{nx.vm_name}/)
+      expect(sshable).to receive(:cmd).with(/sudo.*groupdel.*#{nx.vm_name}/)
       expect(sshable).to receive(:cmd).with(/sudo.*adduser.*#{nx.vm_name}/)
 
       expect { nx.create_unix_user }.to hop("prep")
-    end
-
-    it "absorbs an already-exists error as a success" do
-      expect(sshable).to receive(:cmd).with(/sudo.*adduser.*#{nx.vm_name}/).and_raise(
-        Sshable::SshError.new("adduser", "", "adduser: The user `vmabc123' already exists.", 1, nil)
-      )
-
-      expect { nx.create_unix_user }.to hop("prep")
-    end
-
-    it "raises other errors" do
-      ex = Sshable::SshError.new("allocate a lot", "", "out of memory", 1, nil)
-      expect(sshable).to receive(:cmd).with(/sudo.*adduser.*#{nx.vm_name}/).and_raise(ex)
-
-      expect { nx.create_unix_user }.to raise_error ex
     end
   end
 
