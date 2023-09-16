@@ -93,28 +93,21 @@ class Prog::Vm::GithubRunner < Prog::Base
     # We need to reconnect machine to load environment variables again.
     vm.sshable.invalidate_cache_entry
 
+    # We placed the script in the "/usr/local/share/" directory while generating
+    # the golden image. However, it needs to be moved to the home directory because
+    # the runner creates some configuration files at the script location. The "runner"
+    # user doesn't have write permission for the "/usr/local/share/" directory.
+    vm.sshable.cmd("sudo mv /usr/local/share/actions-runner ./")
+    vm.sshable.cmd("sudo chown -R runner:runner actions-runner")
+
+    # ./env.sh sets some variables for runner to run properly
+    vm.sshable.cmd("./actions-runner/env.sh")
+
     # runner script doesn't use global $PATH variable by default. It gets path from
     # secure_path at /etc/sudoers. Also script load .env file, so we are able to
     # overwrite default path value of runner script with $PATH.
     # https://github.com/microsoft/azure-pipelines-agent/issues/3461
-    vm.sshable.cmd("echo \"PATH=$PATH\" >> .env")
-
-    # Docker containers can't resolve DNS addresses by default on our networking
-    # setup. We will investigate it in depth, and try to find more generic solution.
-    # Related issue: https://github.com/ubicloud/ubicloud/issues/507
-    # Until proper fix, we add custom systemd-resolved configuration.
-    # Docker gets resolve.conf content from systemd-resolved service.
-    vm.sshable.cmd("sudo mkdir -p /etc/systemd/resolved.conf.d")
-    vm.sshable.cmd("sudo sh -c 'echo \"[Resolve]\nDNS=9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9\" > /etc/systemd/resolved.conf.d/Ubicloud.conf'")
-    vm.sshable.cmd("sudo systemctl restart systemd-resolved.service")
-
-    hop_install_actions_runner
-  end
-
-  label def install_actions_runner
-    vm.sshable.cmd("curl -o actions-runner-linux-x64-2.308.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.308.0/actions-runner-linux-x64-2.308.0.tar.gz")
-    vm.sshable.cmd("echo '9f994158d49c5af39f57a65bf1438cbae4968aec1e4fec132dd7992ad57c74fa  actions-runner-linux-x64-2.308.0.tar.gz' | shasum -a 256 -c")
-    vm.sshable.cmd("tar xzf ./actions-runner-linux-x64-2.308.0.tar.gz")
+    vm.sshable.cmd("echo \"PATH=$PATH\" >> ./actions-runner/.env")
 
     hop_register_runner
   end
@@ -127,10 +120,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1}
       response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
       github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
-      # ./env.sh sets some variables for runner to run properly
-      vm.sshable.cmd("./env.sh")
 
-      command = "./run.sh --jitconfig #{response[:encoded_jit_config].shellescape}"
+      command = "./actions-runner/run.sh --jitconfig #{response[:encoded_jit_config].shellescape}"
       vm.sshable.cmd("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit #{SERVICE_NAME} --remain-after-exit -- #{command}")
     end
 
