@@ -7,6 +7,7 @@ require "openssl"
 require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
+  subject_is :vm
   semaphore :destroy, :start_after_host_reboot
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
@@ -122,32 +123,16 @@ class Prog::Vm::Nexus < Prog::Base
     File.join("", "vm", vm_name)
   end
 
-  def vm
-    @vm ||= Vm[strand.id]
-  end
-
   def host
     @host ||= vm.vm_host
   end
 
-  def unix_user
-    @unix_user ||= vm.unix_user
-  end
-
-  def public_key
-    @public_key ||= vm.public_key
-  end
-
-  def q_net6
-    vm.ephemeral_net6.to_s.shellescape
-  end
-
-  def q_net4
-    vm.ip4.to_s || ""
-  end
-
   def local_ipv4
     vm.local_vetho_ip&.to_s&.shellescape || ""
+  end
+
+  def params_path
+    @params_path ||= File.join(vm_home, "prep.json")
   end
 
   def storage_volumes
@@ -245,10 +230,6 @@ SQL
     hop_prep
   end
 
-  def params_path
-    @params_path ||= File.join(vm_home, "prep.json")
-  end
-
   label def prep
     topo = vm.cloud_hypervisor_cpu_topology
 
@@ -256,11 +237,11 @@ SQL
     # shouldn't be stored in the host for security reasons.
     params_json = JSON.pretty_generate({
       "vm_name" => vm_name,
-      "public_ipv6" => q_net6,
-      "public_ipv4" => q_net4,
+      "public_ipv6" => vm.ephemeral_net6.to_s,
+      "public_ipv4" => vm.ip4.to_s || "",
       "local_ipv4" => local_ipv4,
-      "unix_user" => unix_user,
-      "ssh_public_key" => public_key,
+      "unix_user" => vm.unix_user,
+      "ssh_public_key" => vm.public_key,
       "nics" => vm.nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
       "boot_image" => vm.boot_image,
       "max_vcpus" => topo.max_vcpus,
