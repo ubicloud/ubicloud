@@ -240,7 +240,7 @@ GEM
     standard-performance (1.2.0)
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.19.0)
-    stripe (9.2.0)
+    stripe (9.3.0)
     syntax_tree (6.1.1)
       prettier_print (>= 1.2.0)
     tilt (2.3.0)
