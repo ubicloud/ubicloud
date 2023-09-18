@@ -184,7 +184,7 @@ RSpec.describe Clover, "billing" do
       it "list invoices of project" do
         expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        InvoiceGenerator.new(bi.span.begin, bi.span.end, true).run
+        InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run
         invoice = Invoice.first
 
         visit "#{project.path}/billing"
@@ -200,7 +200,7 @@ RSpec.describe Clover, "billing" do
         expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
-        InvoiceGenerator.new(bi.span.begin, bi.span.end, true).run
+        InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run
         invoice = Invoice.first
 
         visit "#{project.path}/billing/invoice/#{invoice.ubid}"
