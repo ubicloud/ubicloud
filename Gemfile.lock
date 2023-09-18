@@ -194,7 +194,7 @@ GEM
     rubocop-erb (0.3.0)
       better_html
       rubocop (~> 1.45)
-    rubocop-factory_bot (2.23.1)
+    rubocop-factory_bot (2.24.0)
       rubocop (~> 1.33)
     rubocop-performance (1.19.0)
       rubocop (>= 1.7.0, < 2.0)
