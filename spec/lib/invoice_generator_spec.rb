@@ -120,12 +120,23 @@ RSpec.describe InvoiceGenerator do
     check_invoice_for_single_vm(invoices, p1, vm1, 30 * day)
   end
 
+  it "generates invoice for a single project" do
+    p2 = Project.create_with_id(name: "cool-project", provider: "hetzner")
+    vm2 = Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", family: "standard", cores: 2, location: "hetzner-hel1", boot_image: "x")
+
+    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, end_time))
+    generate_vm_billing_record(p2, vm2, Sequel::Postgres::PGRange.new(begin_time, end_time))
+
+    invoices = described_class.new(begin_time, end_time, project_id: p1.id).run
+    expect(invoices.count).to eq(1)
+  end
+
   it "creates invoice record in the database only if save_result is set" do
     generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
-    described_class.new(begin_time, end_time, false).run
+    described_class.new(begin_time, end_time, save_result: false).run
     expect(Invoice.count).to eq(0)
 
-    described_class.new(begin_time, end_time, true).run
+    described_class.new(begin_time, end_time, save_result: true).run
     expect(Invoice.count).to eq(1)
 
     expect(Invoice.first.invoice_number).to eq("#{begin_time.strftime("%y%m")}-#{p1.id[-10..]}-0001")
@@ -148,7 +159,7 @@ RSpec.describe InvoiceGenerator do
 
     cost_before, credit_before = described_class.new(begin_time, end_time).run.first.values_at(:cost, :credit)
     p1.update(credit: 10)
-    cost_after, credit_after = described_class.new(begin_time, end_time, true).run.first.values_at(:cost, :credit)
+    cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true).run.first.values_at(:cost, :credit)
 
     expect(cost_after).to eq(cost_before - 10)
     expect(credit_before).to eq(0)
@@ -161,7 +172,7 @@ RSpec.describe InvoiceGenerator do
 
     before = described_class.new(begin_time, end_time).run.first
     p1.update(credit: 10, discount: 10)
-    after = described_class.new(begin_time, end_time, true).run.first
+    after = described_class.new(begin_time, end_time, save_result: true).run.first
 
     expect(after[:cost]).to eq(before[:cost] * 0.9 - 10)
     expect(after[:discount]).to eq(before[:cost] * 0.1)

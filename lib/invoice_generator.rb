@@ -4,10 +4,11 @@ require "time"
 require "stripe"
 
 class InvoiceGenerator
-  def initialize(begin_time, end_time, save_result = false)
+  def initialize(begin_time, end_time, save_result: false, project_id: nil)
     @begin_time = begin_time
     @end_time = end_time
     @save_result = save_result
+    @project_id = project_id
   end
 
   def run
@@ -104,8 +105,7 @@ class InvoiceGenerator
   def active_billing_records
     active_billing_records = BillingRecord.eager(project: [:billing_info, :invoices])
       .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
-      .all
-
+    active_billing_records = active_billing_records.where(project_id: @project_id) if @project_id
     active_billing_records.map do |br|
       # We cap the billable duration at 672 hours. In this way, we can
       # charge the users same each month no matter the number of days
