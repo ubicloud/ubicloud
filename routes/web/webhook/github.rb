@@ -86,7 +86,8 @@ class CloverWeb
         job_id: data["workflow_job"]["id"],
         job_name: data["workflow_job"]["name"],
         run_id: data["workflow_job"]["run_id"],
-        workflow_name: data["workflow_job"]["workflow_name"]
+        workflow_name: data["workflow_job"]["workflow_name"],
+        head_branch: data["workflow_job"]["head_branch"]
       )
 
       success("GithubRunner[#{runner.ubid}] picked job #{runner.job_id}")
