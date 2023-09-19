@@ -247,6 +247,17 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "$%0.02f" % invoice_current.content["cost"]
       end
 
+      it "show invoice full page for generating PDF" do
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
+        bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
+
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}?print=1"
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud-2023-06-#{invoice.invoice_number}")
+      end
+
       it "raises not found when invoice not exists" do
         visit "#{project.path}/billing/invoice/08s56d4kaj94xsmrnf5v5m3mav"
 

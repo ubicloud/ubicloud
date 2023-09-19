@@ -6,6 +6,7 @@ class Serializers::Web::Invoice < Serializers::Base
       ubid: inv.ubid,
       path: inv.path,
       name: inv.name,
+      filename: "Ubicloud-#{inv.begin_time.strftime("%Y-%m")}-#{inv.invoice_number}",
       date: inv.created_at.strftime("%B %d, %Y"),
       begin_time: inv.begin_time.strftime("%b %d, %Y"),
       end_time: inv.end_time.strftime("%b %d, %Y"),

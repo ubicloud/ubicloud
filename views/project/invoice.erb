@@ -1,4 +1,4 @@
-<% @page_title = "#{@invoice_data[:name]} - Invoice" %>
+<% @page_title = @full_page ? @invoice_data[:filename] : "#{@invoice_data[:name]} - Invoice" %>
 
 <% if @full_page %>
   <div class="print-page"></div>
