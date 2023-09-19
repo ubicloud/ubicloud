@@ -43,7 +43,7 @@ WHERE id = ? AND (lease IS NULL OR lease < now())
 RETURNING lease, exitval IS NOT NULL AS exited
 SQL
     return false unless affected
-    lease = affected.fetch(:lease)
+    lease_time = affected.fetch(:lease)
 
     begin
       if affected.fetch(:exited)
@@ -57,7 +57,7 @@ SQL
 
       yield
     ensure
-      num_updated = DB[<<SQL, id, lease].update
+      num_updated = DB[<<SQL, id, lease_time].update
 UPDATE strand
 SET lease = NULL
 WHERE id = ? AND lease = ?
