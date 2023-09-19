@@ -15,6 +15,7 @@ class Serializers::Web::GithubRunner < Serializers::Base
       job_name: runner.job_name,
       job_url: runner.job_url,
       workflow_name: runner.workflow_name,
+      head_branch: runner.head_branch,
 
       vm: runner.vm ? {
         name: runner.vm.name,
