@@ -8,45 +8,79 @@ class Prog::Vm::GithubRunner < Prog::Base
   semaphore :destroy
 
   def self.assemble(installation, repository_name:, label:)
-    unless (label_data = Github.runner_labels[label])
+    unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
     end
 
     DB.transaction do
-      ubid = GithubRunner.generate_ubid
-      ssh_key = SshKey.generate
+      vm = pick_vm(label, installation.project)
 
-      # We use unencrypted storage for now, because provisioning 86G encrypted
-      # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
-      # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
-      # ~10 seconds.
-      vm_st = Prog::Vm::Nexus.assemble(
-        ssh_key.public_key,
-        installation.project.id,
-        name: ubid.to_s,
-        size: label_data["vm_size"],
-        unix_user: "runner",
-        location: label_data["location"],
-        boot_image: label_data["boot_image"],
-        storage_volumes: [{size_gib: 86, encrypted: false}],
-        enable_ip4: true
-      )
-
-      Sshable.create(
-        unix_user: "runner",
-        host: "temp_#{vm_st.id}",
-        raw_private_key_1: ssh_key.keypair
-      ) { _1.id = vm_st.id }
-
-      github_runner = GithubRunner.create(
+      github_runner = GithubRunner.create_with_id(
         installation_id: installation.id,
         repository_name: repository_name,
         label: label,
-        vm_id: vm_st.id
-      ) { _1.id = ubid.to_uuid }
+        vm_id: vm.id
+      )
+      vm.update(name: github_runner.ubid.to_s)
 
       Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = github_runner.id }
     end
+  end
+
+  def self.pick_vm(label, project)
+    label_data = Github.runner_labels[label]
+    pool = VmPool.where(
+      vm_size: label_data["vm_size"],
+      boot_image: label_data["boot_image"],
+      location: label_data["location"]
+    ).first
+
+    if (vm = pool&.pick_vm)
+      vm.associate_with_project(project)
+
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: vm.id,
+        resource_name: vm.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
+        amount: vm.cores
+      )
+
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: vm.assigned_vm_address.id,
+        resource_name: vm.assigned_vm_address.ip,
+        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
+        amount: 1
+      )
+
+      return vm
+    end
+
+    ubid = GithubRunner.generate_ubid
+    ssh_key = SshKey.generate
+    # We use unencrypted storage for now, because provisioning 86G encrypted
+    # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
+    # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
+    # ~10 seconds.
+    vm_st = Prog::Vm::Nexus.assemble(
+      ssh_key.public_key,
+      project.id,
+      name: ubid.to_s,
+      size: label_data["vm_size"],
+      unix_user: "runner",
+      location: label_data["location"],
+      boot_image: label_data["boot_image"],
+      storage_volumes: [{size_gib: 86, encrypted: false}],
+      enable_ip4: true
+    )
+
+    Sshable.create(
+      unix_user: "runner",
+      host: "temp_#{vm_st.id}",
+      raw_private_key_1: ssh_key.keypair
+    ) { _1.id = vm_st.id }
+    vm_st.vm
   end
 
   SERVICE_NAME = "runner-script"
