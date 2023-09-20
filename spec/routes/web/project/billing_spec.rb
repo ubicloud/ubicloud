@@ -211,6 +211,42 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "less than $0.001"
       end
 
+      it "show current invoice when no usage" do
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
+
+        visit "#{project.path}/billing"
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - Project Billing")
+        expect(page).to have_content "current"
+        expect(page).to have_content "not finalized"
+
+        click_link href: "#{project.path}/billing/invoice/current"
+        expect(page).to have_content "Current Usage Summary"
+        expect(page).to have_content "No resources"
+      end
+
+      it "list current invoice with last month usage" do
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
+        br_previous = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
+        br_current = billing_record(Time.parse("2023-07-01"), Time.parse("2023-07-15"))
+        invoice_previous = InvoiceGenerator.new(br_previous.span.begin, br_previous.span.end, save_result: true).run.first
+        invoice_current = InvoiceGenerator.new(br_current.span.begin, br_current.span.end, project_id: project.id).run.first
+
+        visit "#{project.path}/billing"
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - Project Billing")
+        expect(page).to have_content "current"
+        expect(page).to have_content "not finalized"
+        expect(page).to have_content "$%0.02f" % invoice_current.content["cost"]
+        expect(page).to have_content "$%0.02f" % invoice_previous.content["cost"]
+
+        click_link href: "#{project.path}/billing/invoice/current"
+        expect(page).to have_content "Current Usage Summary"
+        expect(page).to have_content "$%0.02f" % invoice_current.content["cost"]
+      end
+
       it "raises not found when invoice not exists" do
         visit "#{project.path}/billing/invoice/08s56d4kaj94xsmrnf5v5m3mav"
 

@@ -95,7 +95,7 @@ class InvoiceGenerator
             project.save_changes(validate: false)
           end
         else
-          invoice = Invoice.new(project_id: project.id, invoice_number: invoice_number, content: JSON.parse(project_content.to_json), begin_time: @begin_time, end_time: @end_time, created_at: Time.now)
+          invoice = Invoice.new(project_id: project.id, content: JSON.parse(project_content.to_json), begin_time: @begin_time, end_time: @end_time, created_at: Time.now, status: "current")
         end
 
         invoices.push(invoice)

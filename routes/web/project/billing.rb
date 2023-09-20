@@ -16,7 +16,7 @@ class CloverWeb
       if (billing_info = @project.billing_info)
         @billing_info_data = Serializers::Web::BillingInfo.serialize(billing_info)
         @payment_methods = Serializers::Web::PaymentMethod.serialize(billing_info.payment_methods)
-        @invoices = Serializers::Web::Invoice.serialize(@project.invoices_dataset.order(Sequel.desc(:created_at)).all)
+        @invoices = Serializers::Web::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
       end
 
       view "project/billing"
@@ -111,7 +111,7 @@ class CloverWeb
       r.is String do |invoice_ubid|
         @serializer = Serializers::Web::Invoice
 
-        invoice = Invoice.from_ubid(invoice_ubid)
+        invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice.from_ubid(invoice_ubid)
 
         unless invoice
           response.status = 404

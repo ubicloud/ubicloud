@@ -19,8 +19,6 @@
       data: [
         ["ID", @project_data[:ubid]],
         ["Name", @project_data[:name]],
-        @project_data[:discount] > 0 && ["Discount", "#{@project_data[:discount]}%"],
-        @project_data[:credit] > 0 && ["Remaning Credit", "$%0.02f" % @project_data[:credit]],
         ["Provider", @project_data.dig(:provider, :display_name)]
       ]
     }

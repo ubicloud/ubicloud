@@ -11,7 +11,7 @@ class Project < Sequel::Model
   many_to_many :vms, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :private_subnets, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
-  one_to_many :invoices
+  one_to_many :invoices, order: Sequel.desc(:created_at)
 
   dataset_module Authorization::Dataset
 
@@ -37,5 +37,24 @@ class Project < Sequel::Model
 
   def path
     "/project/#{ubid}"
+  end
+
+  def current_invoice
+    begin_time = invoices.first&.end_time || Time.new(Time.now.year, Time.now.month, 1)
+    end_time = Time.now
+
+    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_id: id).run.first)
+      return invoice
+    end
+
+    content = {
+      "resources" => [],
+      "subtotal" => 0.0,
+      "credit" => 0.0,
+      "discount" => 0.0,
+      "cost" => 0.0
+    }
+
+    Invoice.new(project_id: id, content: content, begin_time: begin_time, end_time: end_time, created_at: Time.now, status: "current")
   end
 end
