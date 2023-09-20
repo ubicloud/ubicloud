@@ -91,4 +91,5 @@ module Config
   optional :github_app_client_secret, string, clear: true
   optional :github_app_private_key, string, clear: true
   optional :github_app_webhook_secret, string, clear: true
+  optional :vm_pool_project_id, string
 end

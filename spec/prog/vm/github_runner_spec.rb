@@ -65,6 +65,47 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
+  describe ".pick_vm" do
+    it "provisions a VM if the pool is not existing" do
+      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      expect(VmPool).to receive(:where).and_return([])
+      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
+      vm = described_class.pick_vm("ubicloud-standard-4", project)
+      expect(vm).not_to be_nil
+      expect(vm.sshable.unix_user).to eq("runner")
+      expect(vm.family).to eq("standard")
+      expect(vm.cores).to eq(2)
+    end
+
+    it "provisions a new vm if pool is valid but there is no vm" do
+      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners")
+      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners").and_return([git_runner_pool])
+      expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
+      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
+      vm = described_class.pick_vm("ubicloud-standard-4", project)
+      expect(vm).not_to be_nil
+      expect(vm.sshable.unix_user).to eq("runner")
+      expect(vm.family).to eq("standard")
+      expect(vm.cores).to eq(2)
+    end
+
+    it "uses the existing vm if pool can pick one" do
+      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners")
+      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners").and_return([git_runner_pool])
+      expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
+      expect(vm).to receive(:associate_with_project).with(project).and_return(true)
+      expect(BillingRecord).to receive(:create_with_id).and_return(nil)
+      expect(BillingRecord).to receive(:create_with_id).and_return(nil)
+      adr = instance_double(AssignedVmAddress, id: "id", ip: "1.1.1.1")
+      expect(vm).to receive(:assigned_vm_address).and_return(adr).at_least(:once)
+      vm = described_class.pick_vm("ubicloud-standard-4", project)
+      expect(vm).not_to be_nil
+      expect(vm.name).to eq("dummy-vm")
+    end
+  end
+
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield

@@ -8,45 +8,102 @@ class Prog::Vm::GithubRunner < Prog::Base
   semaphore :destroy
 
   def self.assemble(installation, repository_name:, label:)
-    unless (label_data = Github.runner_labels[label])
+    unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
     end
 
     DB.transaction do
-      ubid = GithubRunner.generate_ubid
-      ssh_key = SshKey.generate
+      vm = pick_vm(label, installation.project)
 
-      # We use unencrypted storage for now, because provisioning 86G encrypted
-      # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
-      # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
-      # ~10 seconds.
+      github_runner = GithubRunner.create_with_id(
+        installation_id: installation.id,
+        repository_name: repository_name,
+        label: label,
+        vm_id: vm.id
+      )
+      vm.update(name: github_runner.ubid.to_s)
+
+      Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = github_runner.id }
+    end
+  end
+
+  def self.create_new_pool_vm(label_data)
+    ssh_key = SshKey.generate
+    DB.transaction do
       vm_st = Prog::Vm::Nexus.assemble(
         ssh_key.public_key,
-        installation.project.id,
-        name: ubid.to_s,
+        Config.vm_pool_project_id,
         size: label_data["vm_size"],
         unix_user: "runner",
         location: label_data["location"],
         boot_image: label_data["boot_image"],
         storage_volumes: [{size_gib: 86, encrypted: false}],
-        enable_ip4: true
+        enable_ip4: true,
+        in_pool: true
       )
-
       Sshable.create(
         unix_user: "runner",
         host: "temp_#{vm_st.id}",
         raw_private_key_1: ssh_key.keypair
       ) { _1.id = vm_st.id }
-
-      github_runner = GithubRunner.create(
-        installation_id: installation.id,
-        repository_name: repository_name,
-        label: label,
-        vm_id: vm_st.id
-      ) { _1.id = ubid.to_uuid }
-
-      Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = github_runner.id }
     end
+  end
+
+  def self.pick_vm(label, project)
+    label_data = Github.runner_labels[label]
+    vm = Vm.for_update.where(in_pool: true, vm_size: label_data["vm_size"], boot_image: label_data["boot_image"], location: label_data["location"], display_state: "running").first
+
+    if vm
+      vm.dissociate_with_project(vm.projects.first)
+      vm.active_billing_record.update(span: Sequel.pg_range(vm.active_billing_record.span.begin...(Time.now - 1)))
+      vm.assigned_vm_address&.active_billing_record&.update(span: Sequel.pg_range(vm.assigned_vm_address.active_billing_record.span.begin...(Time.now - 1)))
+      vm.update(in_pool: false)
+      
+      vm.associate_with_project(project)
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: vm.id,
+        resource_name: vm.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
+        amount: vm.cores
+      )
+
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: vm.assigned_vm_address.id,
+        resource_name: vm.assigned_vm_address.ip,
+        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
+        amount: 1
+      )
+
+      create_new_pool_vm(label_data)
+      return vm
+    end
+
+    ubid = GithubRunner.generate_ubid
+    ssh_key = SshKey.generate
+    # We use unencrypted storage for now, because provisioning 86G encrypted
+    # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
+    # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
+    # ~10 seconds.
+    vm_st = Prog::Vm::Nexus.assemble(
+      ssh_key.public_key,
+      project.id,
+      name: ubid.to_s,
+      size: label_data["vm_size"],
+      unix_user: "runner",
+      location: label_data["location"],
+      boot_image: label_data["boot_image"],
+      storage_volumes: [{size_gib: 86, encrypted: false}],
+      enable_ip4: true
+    )
+
+    Sshable.create(
+      unix_user: "runner",
+      host: "temp_#{vm_st.id}",
+      raw_private_key_1: ssh_key.keypair
+    ) { _1.id = vm_st.id }
+    vm_st.vm
   end
 
   SERVICE_NAME = "runner-script"
