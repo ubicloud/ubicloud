@@ -7,7 +7,7 @@ class Invoice < Sequel::Model
   include ResourceMethods
 
   def path
-    "/invoice/#{ubid}"
+    "/invoice/#{id ? ubid : "current"}"
   end
 
   def name

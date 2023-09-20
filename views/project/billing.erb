@@ -13,11 +13,40 @@
   </div>
 
   <div class="grid gap-6">
+    <!-- Summary -->
+    <div>
+      <dl class="grid grid-cols-2 gap-5 <%= (@project_data[:discount] > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
+        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+          <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @invoices.first[:subtotal] %></dd>
+        </div>
+        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+          <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= (@invoices.count > 1) ? @invoices[1][:subtotal] : "-" %></dd>
+        </div>
+        <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+          <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= "$%0.02f" % @project_data[:credit] %></dd>
+        </div>
+        <% if @project_data[:discount] > 0 %>
+          <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
+            <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
+            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project_data[:discount] %>%</dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
     <!-- Billing Info Update Card -->
+    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Billing Details
+        </h3>
+      </div>
+    </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
         <%== csrf_tag("#{@project_data[:path]}/billing") %>
-
         <div class="px-4 py-5 sm:p-6">
           <div class="space-y-12">
             <div>
@@ -199,26 +228,37 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
-            <% if @invoices.count > 0 %>
-              <% @invoices.each do |inv| %>
-                <tr id="invoice-<%= inv[:ubid]%>">
-                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                    <a href="<%= @project_data[:path] + "/billing" + inv[:path] %>" class="text-orange-600 hover:text-orange-700">
-                      <%= inv[:name] %>
-                    </a>
-                    <span class="text-xs text-gray-400 italic">#<%= inv[:invoice_number] %></span>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%= inv[:total] %>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%= inv[:status] %>
-                  </td>
-                </tr>
-              <% end %>
-            <% else %>
+            <% @invoices.each do |inv| %>
+              <tr id="invoice-<%= inv[:ubid]%>">
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <a href="<%= @project_data[:path] + "/billing" + inv[:path] %>" class="text-orange-600 hover:text-orange-700">
+                    <%= inv[:name] %>
+                  </a>
+                  <span class="text-xs text-gray-400 italic">
+                    <% if inv[:invoice_number] %>
+                      #<%= inv[:invoice_number] %>
+                    <% else %>
+                      (not finalized)
+                    <% end %>
+                  </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <%= inv[:total] %>
+                  <% if inv[:total] != inv[:subtotal] %>
+                    <span class="text-xs italic">(<%= inv[:subtotal] %>)</span>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <%= inv[:status] %>
+                </td>
+              </tr>
+            <% end %>
+            <% if @invoices.count == 1 %>
               <tr>
-                <td colspan="3"><div class="text-center text-xl p-4">No invoices. Invoice for current month will be created at the first day of next month.</div></td>
+                <td colspan="3">
+                  <div class="text-center text-lg p-4">No invoices finalized yet. Invoice for the current month will be created on the first day of next
+                    month.</div>
+                </td>
               </tr>
             <% end %>
           </tbody>
