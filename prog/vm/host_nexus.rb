@@ -180,7 +180,27 @@ class Prog::Vm::HostNexus < Prog::Base
       hop_reboot
     end
 
+    begin
+      sshable.cmd("echo 1")
+    rescue
+      hop_unavailable
+    end
+
     nap 30
+  end
+
+  label def unavailable
+    register_deadline(:wait, 5 * 60)
+    vm_host.update(allocation_state: "unavailable")
+
+    begin
+      sshable.cmd("echo 1")
+    rescue
+      nap 10
+    end
+
+    vm_host.update(allocation_state: "accepting")
+    hop_wait
   end
 
   def get_boot_id
