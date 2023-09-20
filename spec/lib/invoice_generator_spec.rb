@@ -19,35 +19,45 @@ RSpec.describe InvoiceGenerator do
     br = BillingRate.from_resource_properties("VmCores", vm.family, vm.location)
     duration_mins = [672 * 60, (duration / 60).ceil].min
     cost = vm.cores * duration_mins * br["unit_price"]
-    expect(invoices.first).to eq({
-      project_id: project.id,
-      project_name: project.name,
-      billing_info: Serializers::Web::BillingInfo.serialize(project.billing_info),
-      issuer_info: {
-        address: "310 Santa Ana Avenue",
-        country: "US",
-        city: "San Francisco",
-        state: "CA",
-        postal_code: "94127"
+    expect(invoices.first.content).to eq({
+      "project_id" => project.id,
+      "project_name" => project.name,
+      "billing_info" => project.billing_info ? {
+        "id" => project.billing_info.id,
+        "ubid" => project.billing_info.ubid,
+        "name" => "ACME Inc.",
+        "email" => nil,
+        "address" => "",
+        "country" => "NL",
+        "city" => nil,
+        "state" => nil,
+        "postal_code" => nil
+      } : nil,
+      "issuer_info" => {
+        "address" => "310 Santa Ana Avenue",
+        "country" => "US",
+        "city" => "San Francisco",
+        "state" => "CA",
+        "postal_code" => "94127"
       },
-      resources: [{
-        resource_id: vm.id,
-        resource_name: vm.name,
-        line_items: [{
-          location: br["location"],
-          resource_type: "VmCores",
-          resource_family: vm.family,
-          description: "standard-#{vm.cores * 2} Virtual Machine",
-          amount: vm.cores.to_f,
-          duration: duration_mins,
-          cost: cost
+      "resources" => [{
+        "resource_id" => vm.id,
+        "resource_name" => vm.name,
+        "line_items" => [{
+          "location" => br["location"],
+          "resource_type" => "VmCores",
+          "resource_family" => vm.family,
+          "description" => "standard-#{vm.cores * 2} Virtual Machine",
+          "amount" => vm.cores.to_f,
+          "duration" => duration_mins,
+          "cost" => cost
         }],
-        cost: cost
+        "cost" => cost
       }],
-      subtotal: cost,
-      discount: 0,
-      credit: 0,
-      cost: cost
+      "subtotal" => cost,
+      "discount" => 0,
+      "credit" => 0,
+      "cost" => cost
     })
   end
 
@@ -145,9 +155,9 @@ RSpec.describe InvoiceGenerator do
   it "handles discounts" do
     generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
-    cost_before, discount_before = described_class.new(begin_time, end_time).run.first.values_at(:cost, :discount)
+    cost_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
     p1.update(discount: 10)
-    cost_after, discount_after = described_class.new(begin_time, end_time).run.first.values_at(:cost, :discount)
+    cost_after, discount_after = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
 
     expect(cost_after).to eq(cost_before * 0.9)
     expect(discount_before).to eq(0)
@@ -157,9 +167,9 @@ RSpec.describe InvoiceGenerator do
   it "handles credits" do
     generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
-    cost_before, credit_before = described_class.new(begin_time, end_time).run.first.values_at(:cost, :credit)
+    cost_before, credit_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
     p1.update(credit: 10)
-    cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true).run.first.values_at(:cost, :credit)
+    cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true).run.first.content.values_at("cost", "credit")
 
     expect(cost_after).to eq(cost_before - 10)
     expect(credit_before).to eq(0)
@@ -170,13 +180,13 @@ RSpec.describe InvoiceGenerator do
   it "handles discounts and credits at the same time" do
     generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
-    before = described_class.new(begin_time, end_time).run.first
+    before = described_class.new(begin_time, end_time).run.first.content
     p1.update(credit: 10, discount: 10)
-    after = described_class.new(begin_time, end_time, save_result: true).run.first
+    after = described_class.new(begin_time, end_time, save_result: true).run.first.content
 
-    expect(after[:cost]).to eq(before[:cost] * 0.9 - 10)
-    expect(after[:discount]).to eq(before[:cost] * 0.1)
-    expect(after[:credit]).to eq(10)
+    expect(after["cost"]).to eq(before["cost"] * 0.9 - 10)
+    expect(after["discount"]).to eq(before["cost"] * 0.1)
+    expect(after["credit"]).to eq(10)
     expect(p1.reload.credit).to eq(0)
   end
 end
