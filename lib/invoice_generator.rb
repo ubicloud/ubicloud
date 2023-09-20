@@ -67,18 +67,17 @@ class InvoiceGenerator
 
         project_content[:credit] = 0
         if project.credit > 0
-          project_content[:credit] = [project_content[:cost], project.credit].min
+          project_content[:credit] = [project_content[:cost], project.credit.to_f].min
           project_content[:cost] -= project_content[:credit]
         end
 
-        invoices.push(project_content)
         if @save_result
           invoice_month = @begin_time.strftime("%y%m")
           invoice_customer = project.id[-10..]
           invoice_order = format("%04d", project.invoices.count + 1)
           invoice_number = "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
 
-          Invoice.create_with_id(project_id: project.id, invoice_number: invoice_number, content: project_content, begin_time: @begin_time, end_time: @end_time)
+          invoice = Invoice.create_with_id(project_id: project.id, invoice_number: invoice_number, content: project_content, begin_time: @begin_time, end_time: @end_time)
 
           if project_content[:credit] > 0
             # We don't use project.credit here, because credit might get updated between
@@ -95,7 +94,11 @@ class InvoiceGenerator
             project.credit = Sequel[:credit] - project_content[:credit]
             project.save_changes(validate: false)
           end
+        else
+          invoice = Invoice.new(project_id: project.id, invoice_number: invoice_number, content: JSON.parse(project_content.to_json), begin_time: @begin_time, end_time: @end_time, created_at: Time.now)
         end
+
+        invoices.push(invoice)
       end
     end
 
