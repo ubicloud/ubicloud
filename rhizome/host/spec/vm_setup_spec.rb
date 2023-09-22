@@ -289,6 +289,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:unmount_hugepages)
       expect(vs).to receive(:r).with("deluser --remove-home test")
+      expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
 
       vs.purge
     end
