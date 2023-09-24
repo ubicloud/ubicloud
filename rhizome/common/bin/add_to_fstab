@@ -1,0 +1,29 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+
+require_relative "../lib/util"
+
+if ARGV.count != 6
+  fail "Wrong number of arguments. Expected 6, Given #{ARGV.count}"
+end
+
+device, dir, type, options, dump, fsck = ARGV
+
+File.open("/etc/fstab", File::RDONLY) do |f|
+  f.flock(File::LOCK_EX)
+
+  content = f.read
+  rows = content.split("\n").reject { _1.start_with?("#") }
+  matches = rows.select { _1.match(/\A#{device}\s|\s#{dir}\s/) }
+  if matches.count == 0
+    content += "\n#{device} #{dir} #{type} #{options} #{dump} #{fsck}"
+    safe_write_to_file("/etc/fstab", content)
+    break
+  end
+
+  if matches.count > 1 || matches.first !~ /\A#{device}\s#{dir}\s#{type}\s#{options}\s#{dump}\s#{fsck}\z/
+    fail "device path and/or mount point already exist in /etc/fstab"
+  end
+end
