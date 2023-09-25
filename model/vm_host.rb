@@ -129,11 +129,6 @@ class VmHost < Sequel::Model
     selected_addr
   end
 
-  # Introduced for refreshing rhizome programs via REPL.
-  def install_rhizome
-    Strand.create_with_id(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host"}])
-  end
-
   def sshable_address
     assigned_host_addresses.find { |a| a.ip.version == 4 }
   end
@@ -172,6 +167,19 @@ class VmHost < Sequel::Model
         end
       end
     end
+  end
+
+  # Operational Functions
+
+  # Introduced for refreshing rhizome programs via REPL.
+  def install_rhizome
+    Strand.create_with_id(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host"}])
+  end
+
+  # Introduced for downloading a new boot image via REPL.
+  # Use with caution as the vm_host will not accept a new vm during the image download.
+  def download_boot_image(image_name, custom_url = nil)
+    Strand.create_with_id(schedule: Time.now, prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url}])
   end
 
   def hetznerify(server_id)

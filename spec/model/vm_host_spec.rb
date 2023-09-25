@@ -73,6 +73,15 @@ RSpec.describe VmHost do
     vh.install_rhizome
   end
 
+  it "has a shortcut to download a new boot image" do
+    vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
+    expect(Strand).to receive(:create) do |args|
+      expect(args[:prog]).to eq("DownloadBootImage")
+      expect(args[:stack]).to eq([subject_id: vh.id, image_name: "my-image", custom_url: "https://example.com/my-image.raw"])
+    end
+    vh.download_boot_image("my-image", "https://example.com/my-image.raw")
+  end
+
   it "assigned_subnets returns the assigned subnets" do
     expect(vh).to receive(:assigned_subnets).and_return([address])
     expect(vh).to receive(:vm_addresses).and_return([])
