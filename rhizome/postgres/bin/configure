@@ -11,6 +11,13 @@ configs = configure_hash["configs"].map { |k, v| "#{k} = #{v}" }.join("\n")
 safe_write_to_file("/etc/postgresql/16/main/conf.d/001-service.conf", configs)
 
 # Update pg_hba.conf
+private_subnets = configure_hash["private_subnets"].flat_map {
+  [
+    "host    all             all             #{_1["net4"]}                     scram-sha-256",
+    "host    all             all             #{_1["net6"]}                     scram-sha-256"
+  ]
+}.join("\n")
+
 pg_hba_entries = <<-PG_HBA
 # PostgreSQL Client Authentication Configuration File
 # ===================================================
@@ -34,6 +41,9 @@ host    all             all             ::1/128                 scram-sha-256
 local   replication     all                                     peer
 host    replication     all             127.0.0.1/32            scram-sha-256
 host    replication     all             ::1/128                 scram-sha-256
+
+# Allow connections from private subnet with SCRAM authentication
+#{private_subnets}
 
 # Allow connections from public internet with SCRAM authentication
 host    all             all             all                     scram-sha-256
