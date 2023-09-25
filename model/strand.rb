@@ -35,10 +35,13 @@ class Strand < Sequel::Model
     end
   end
 
+  # :nocov:
+  SCHEDULE = Config.development? ? "(now() + least(5, try) * '1 second'::interval)" : "(now() + least(2 ^ least(try, 20), 600) * random() * '1 second'::interval)"
+  # :nocov:
   def self.lease(id)
     affected = DB[<<SQL, id].first
 UPDATE strand
-SET lease = now() + '120 seconds', try = try + 1, schedule = (now() + least(2 ^ least(try, 20), 600) * random() * '1 second'::interval)
+SET lease = now() + '120 seconds', try = try + 1, schedule = #{SCHEDULE}
 WHERE id = ? AND (lease IS NULL OR lease < now())
 RETURNING lease, exitval IS NOT NULL AS exited
 SQL
