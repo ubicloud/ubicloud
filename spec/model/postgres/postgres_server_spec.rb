@@ -14,7 +14,20 @@ RSpec.describe PostgresServer do
     )
   }
 
-  let(:vm) { instance_double(Vm, sshable: instance_double(Sshable, host: "1.2.3.4"), mem_gib: 8) }
+  let(:vm) {
+    instance_double(
+      Vm,
+      sshable: instance_double(Sshable, host: "1.2.3.4"),
+      mem_gib: 8,
+      private_subnets: [
+        instance_double(
+          PrivateSubnet,
+          net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
+          net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+        )
+      ]
+    )
+  }
 
   before do
     allow(pgs).to receive(:vm).and_return(vm)
@@ -44,7 +57,13 @@ RSpec.describe PostgresServer do
         tcp_keepalives_idle: 2,
         tcp_keepalives_interval: 2,
         work_mem: "1MB"
-      }
+      },
+      private_subnets: [
+        {
+          net4: "172.0.0.0/26",
+          net6: "fdfa:b5aa:14a3:4a3d::/64"
+        }
+      ]
     }
 
     expect(pgs.configure_hash).to eq(configure_hash)

@@ -46,6 +46,12 @@ class PostgresServer < Sequel::Model
         tcp_keepalives_idle: 2,
         tcp_keepalives_interval: 2,
         work_mem: "#{vm.mem_gib / 8}MB"
+      },
+      private_subnets: vm.private_subnets.map {
+        {
+          net4: _1.net4.to_s,
+          net6: _1.net6.to_s
+        }
       }
     }
   end
