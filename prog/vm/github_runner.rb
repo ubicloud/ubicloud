@@ -54,9 +54,11 @@ class Prog::Vm::GithubRunner < Prog::Base
         amount: 1
       )
 
+      puts "Pool is used for #{label}"
       return vm
     end
 
+    puts "Pool is empty for #{label}, creating a new VM"
     ubid = GithubRunner.generate_ubid
     ssh_key = SshKey.generate
     # We use unencrypted storage for now, because provisioning 86G encrypted
