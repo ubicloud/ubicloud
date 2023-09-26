@@ -37,7 +37,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       st = nil
       expect {
         st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
-      }.to output("Pool is empty for ubicloud, creating a new VM\n").to_stdout
+      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud, creating a new VM\n").to_stdout
 
       runner = GithubRunner[st.id]
       expect(runner).not_to be_nil
@@ -52,7 +52,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       st = nil
       expect {
         st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-8")
-      }.to output("Pool is empty for ubicloud-standard-8, creating a new VM\n").to_stdout
+      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-8, creating a new VM\n").to_stdout
 
       runner = GithubRunner[st.id]
       expect(runner).not_to be_nil
@@ -78,7 +78,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm = nil
       expect {
         vm = described_class.pick_vm("ubicloud-standard-4", project)
-      }.to output("Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
+      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
       expect(vm.family).to eq("standard")
@@ -94,7 +94,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm = nil
       expect {
         vm = described_class.pick_vm("ubicloud-standard-4", project)
-      }.to output("Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
+      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
       expect(vm.family).to eq("standard")
@@ -118,7 +118,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm = nil
       expect {
         vm = described_class.pick_vm("ubicloud-standard-4", project)
-      }.to output("Pool is used for ubicloud-standard-4\n").to_stdout
+      }.to output("Project[#{project.ubid}] Pool is used for ubicloud-standard-4\n").to_stdout
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")
     end
