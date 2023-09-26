@@ -171,7 +171,7 @@ SQL
 
   def allocate
     vm_host_id = allocation_dataset.limit(1).get(:id)
-    fail "no space left on any eligible hosts" unless vm_host_id
+    fail "#{vm} no space left on any eligible hosts for #{vm.location}" unless vm_host_id
 
     # N.B. check constraint required to address concurrency.  By
     # injecting a crash from overbooking, it gives us the opportunity
