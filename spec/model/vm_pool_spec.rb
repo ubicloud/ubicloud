@@ -42,6 +42,10 @@ RSpec.describe VmPool do
     it "returns the vm if there is one in running state" do
       vms_dataset = [vm]
       expect(pool).to receive_message_chain(:vms_dataset, :for_update, :where).and_return(vms_dataset) # rubocop:disable RSpec/MessageChain
+
+      ps = instance_double(PrivateSubnet)
+      expect(vm).to receive(:private_subnets).and_return([ps])
+      expect(ps).to receive(:dissociate_with_project).with(prj)
       expect(vm).to receive(:dissociate_with_project).with(prj).and_call_original
       expect(vm).to receive(:update).with(pool_id: nil).and_call_original
       billing_record = instance_double(BillingRecord, span: Sequel.pg_range(Time.now - 1...Time.now))
