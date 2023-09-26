@@ -19,6 +19,7 @@ class VmPool < Sequel::Model
       return nil unless picked_vm
 
       picked_vm.dissociate_with_project(picked_vm.projects.first)
+      picked_vm.private_subnets.each { |ps| ps.dissociate_with_project(picked_vm.projects.first) }
 
       # the billing records are updated here because the VM will be assigned
       # to a customer.

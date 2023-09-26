@@ -37,6 +37,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     if (vm = pool&.pick_vm)
       vm.associate_with_project(project)
+      vm.private_subnets.each { |ps| ps.associate_with_project(project) }
 
       BillingRecord.create_with_id(
         project_id: project.id,

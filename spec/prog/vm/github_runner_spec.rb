@@ -106,6 +106,10 @@ RSpec.describe Prog::Vm::GithubRunner do
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners")
       expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners").and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
+
+      ps = instance_double(PrivateSubnet)
+      expect(vm).to receive(:private_subnets).and_return([ps])
+      expect(ps).to receive(:associate_with_project).with(project).and_return(true)
       expect(vm).to receive(:associate_with_project).with(project).and_return(true)
       expect(BillingRecord).to receive(:create_with_id).and_return(nil)
       expect(BillingRecord).to receive(:create_with_id).and_return(nil)
