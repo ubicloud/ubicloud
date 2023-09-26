@@ -2,18 +2,44 @@
 # frozen_string_literal: true
 
 require_relative "../loader"
+require "time"
 
-st = Prog::Test::HetznerServer.assemble
+def main
+  st = Prog::Test::HetznerServer.assemble
 
-loop do
-  ret = st.run 300
-  if ret.is_a?(Prog::Base::Nap)
-    sleep ret.seconds
-  elsif ret.is_a?(Prog::Base::Exit)
-    puts "Exited with: #{ret}"
-    exit 0
-  else
-    puts "Unexpected return value: #{ret}"
-    exit 1
+  strand_states = update_status({})
+
+  loop do
+    ret = st.run
+    strand_states = update_status(strand_states)
+
+    if ret.is_a?(Prog::Base::Nap)
+      sleep ret.seconds
+    elsif ret.is_a?(Prog::Base::Exit)
+      log "Exited with: #{ret}"
+      exit 0
+    end
   end
 end
+
+def update_status(previous)
+  current = Strand.all.map { |x| [x[:id], {prog: x[:prog], label: x[:label]}] }.to_h
+  previous.each_pair { |key, value|
+    if !current.has_key? key
+      log "Strand deleted: id=#{key}, prog=#{value[:prog]}, label=#{value[:label]}"
+    elsif current[key] != value
+      log "Strand updated: id=#{key}, prog=#{value[:prog]}, label=#{value[:label]} => #{current[key][:label]}"
+    end
+  }
+  current.each_pair { |key, value|
+    if !previous.has_key? key
+      log "Strand created: id=#{key}, prog=#{value[:prog]}, label=#{value[:label]}"
+    end
+  }
+end
+
+def log(msg)
+  puts "#{Time.now.utc.iso8601} #{msg}"
+end
+
+main
