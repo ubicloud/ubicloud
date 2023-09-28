@@ -9,7 +9,7 @@ jobs:
   run-ci:
     runs-on: ubicloud
     environment: E2E-CI
-    timeout-minutes: 30
+    timeout-minutes: 45
     concurrency: e2e_environment
 
     env:
