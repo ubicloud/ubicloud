@@ -5,6 +5,12 @@ require_relative "../loader"
 
 d = Scheduling::Dispatcher.new
 
+if Config.heartbeat_url
+  puts "Starting heartbeat prog"
+  # We always insert the heartbeat using the same UBID ("stheartbeatheartbheartheaz")
+  Strand.dataset.insert_conflict.insert(id: "8b958d2d-cad4-5f3a-5634-b8b958d45caf", schedule: Time.now, prog: "Heartbeat", label: "wait")
+end
+
 loop do
   d.start_cohort
   next if d.wait_cohort > 0

@@ -48,6 +48,7 @@ module Config
   optional :stripe_public_key, string, clear: true
   optional :stripe_secret_key, string, clear: true
   optional :postgres_service_project_id, string
+  optional :heartbeat_url, string
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
