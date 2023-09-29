@@ -109,11 +109,15 @@ class Prog::Vm::HostNexus < Prog::Base
       vm.update(display_state: "rebooting")
     }
 
-    sshable.cmd("sudo systemctl reboot")
-
     decr_reboot
 
-    hop_wait_reboot
+    begin
+      sshable.cmd("sudo reboot")
+    rescue Net::SSH::Disconnect, Errno::ECONNRESET, IOError
+      hop_wait_reboot
+    end
+
+    raise "reboot failed: unexpected ssh command success"
   end
 
   label def wait_reboot
