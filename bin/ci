@@ -13,7 +13,8 @@ def main
   loop do
     begin
       ret = st.run
-    rescue RuntimeError => e
+    # rubocop:disable Lint/RescueException
+    rescue Exception => e
       log "Exception: #{e}"
       # retry 5 times, for total of 7:45 minutes before announcing failure
       # sometimes there's some transient network failures which will resolved if retried.
@@ -27,6 +28,7 @@ def main
         raise
       end
     end
+    # rubocop:enable Lint/RescueException
 
     strand_states = update_status(strand_states)
     retries = 0
