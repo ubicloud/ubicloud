@@ -222,9 +222,18 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
       expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
       expect(vms).to all receive(:update).with(display_state: "rebooting")
-      expect(sshable).to receive(:cmd).with("sudo systemctl reboot")
+      expect(sshable).to receive(:cmd).with("sudo reboot").and_raise(Errno::ECONNRESET)
       expect(nx).to receive(:decr_reboot)
       expect { nx.reboot }.to hop("wait_reboot")
+    end
+
+    it "reboot fails if the ssh command succeeds" do
+      expect(nx).to receive(:get_boot_id).and_return("xyz")
+      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
+      expect(vms).to all receive(:update).with(display_state: "rebooting")
+      expect(sshable).to receive(:cmd).with("sudo reboot")
+      expect(nx).to receive(:decr_reboot)
+      expect { nx.reboot }.to raise_error RuntimeError, "reboot failed: unexpected ssh command success"
     end
 
     it "wait_reboot naps if ssh fails" do
