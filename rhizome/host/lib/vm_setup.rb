@@ -51,17 +51,19 @@ class VmSetup
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets, nics)
   end
 
-  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_volumes, storage_secrets)
+  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_volumes, storage_secrets, boot_image)
     setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed)
     hugepages(mem_gib)
 
     storage_volumes.each { |volume|
       disk_index = volume["disk_index"]
       device_id = volume["device_id"]
+      use_ubi = volume["use_ubi"]
+      image_path = base_image_path(boot_image)
       disk_file = vp.disk(disk_index)
       key_wrapping_secrets = storage_secrets[device_id]
       encryption_key = read_data_encryption_key(disk_index, key_wrapping_secrets) if key_wrapping_secrets
-      setup_spdk_bdev(device_id, disk_file, encryption_key)
+      setup_spdk_bdev(device_id, disk_file, encryption_key, use_ubi, image_path)
       setup_spdk_vhost(disk_index, device_id)
     }
   end
@@ -372,12 +374,18 @@ EOS
     encrypted = !key_wrapping_secrets.nil?
     encryption_key = setup_data_encryption_key(disk_index, key_wrapping_secrets) if encrypted
     disk_size_gib = storage_volume["size_gib"]
+    use_ubi = storage_volume["use_ubi"]
 
     disk_file = vp.disk(disk_index)
-    if storage_volume["boot"]
-      image_path = download_boot_image(boot_image)
-      verify_boot_disk_size(image_path, disk_size_gib)
+    image_path = nil
 
+    if storage_volume["boot"]
+      image_path = base_image_path(boot_image)
+      download_boot_image(boot_image)
+      verify_boot_disk_size(image_path, disk_size_gib)
+    end
+
+    if storage_volume["boot"] && !use_ubi
       if encrypted
         encrypted_image_copy(disk_file, image_path, disk_size_gib, encryption_key)
       else
@@ -388,12 +396,13 @@ EOS
     end
 
     bdev = storage_volume["device_id"]
-    setup_spdk_bdev(bdev, disk_file, encryption_key)
+    setup_spdk_bdev(bdev, disk_file, encryption_key, use_ubi, image_path)
   end
 
-  def setup_spdk_bdev(bdev, disk_file, encryption_key)
-    q_bdev = bdev.shellescape
+  def setup_spdk_bdev(bdev, disk_file, encryption_key, use_ubi, base_image)
     q_disk_file = disk_file.shellescape
+    base_bdev = use_ubi ? "#{bdev}_base" : bdev
+    q_base_bdev = base_bdev.shellescape
 
     if encryption_key
       q_keyname = "#{bdev}_key".shellescape
@@ -404,9 +413,13 @@ EOS
         "-e #{encryption_key[:key2].shellescape} " \
         "-n #{q_keyname}"
       r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_aio_bdev} 512"
-      r "#{Spdk.rpc_py} bdev_crypto_create -n #{q_keyname} #{q_aio_bdev} #{q_bdev}"
+      r "#{Spdk.rpc_py} bdev_crypto_create -n #{q_keyname} #{q_aio_bdev} #{q_base_bdev}"
     else
-      r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_bdev} 512"
+      r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_base_bdev} 512"
+    end
+
+    if use_ubi
+      r "#{Spdk.rpc_py} bdev_ubi_create -n #{bdev.shellescape} -b #{q_base_bdev} -i #{base_image.shellescape} -z 1"
     end
   end
 
@@ -554,6 +567,10 @@ EOS
     r "setfacl -m u:spdk:rw #{disk_file.shellescape}"
   end
 
+  def base_image_path(name)
+    "/var/storage/images/" + name + ".raw"
+  end
+
   def download_boot_image(boot_image, custom_url: nil)
     urls = {
       "ubuntu-jammy" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
@@ -563,7 +580,7 @@ EOS
     }
 
     download = urls.fetch(boot_image) || custom_url
-    image_path = "/var/storage/images/" + boot_image + ".raw"
+    image_path = base_image_path(boot_image)
     unless File.exist?(image_path)
       fail "Must provide custom_url for #{boot_image} image" if download.nil?
       FileUtils.mkdir_p "/var/storage/images/"
@@ -599,8 +616,6 @@ EOS
 
       rm_if_exists(temp_path)
     end
-
-    image_path
   end
 
   def install_azcopy

@@ -10,7 +10,7 @@ r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev l
 
 # spdk binaries
 FileUtils.cd Spdk.install_prefix do
-  r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/7adbcfb/spdk-7adbcfb.tar.gz"
+  r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/ubi0.1/spdk-ubi.tar.gz"
   r "tar -xzf /tmp/spdk.tar.gz"
 end
 

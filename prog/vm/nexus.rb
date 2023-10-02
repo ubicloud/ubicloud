@@ -31,6 +31,7 @@ class Prog::Vm::Nexus < Prog::Base
     storage_volumes.each do |volume|
       volume[:size_gib] ||= vm_size.storage_size_gib
       volume[:encrypted] = true if !volume.has_key? :encrypted
+      volume[:use_ubi] ||= false
     end
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
@@ -143,7 +144,8 @@ class Prog::Vm::Nexus < Prog::Base
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
         "disk_index" => s.disk_index,
-        "encrypted" => !s.key_encryption_key_1.nil?
+        "encrypted" => !s.key_encryption_key_1.nil?,
+        "use_ubi" => s.use_ubi
       }
     }
   end

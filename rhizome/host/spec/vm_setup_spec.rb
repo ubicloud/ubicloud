@@ -41,9 +41,9 @@ RSpec.describe VmSetup do
       size_gib = 5
 
       expect(vs).to receive(:create_empty_disk_file).with(disk_file, size_gib)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil)
+      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil, false, nil)
 
-      vs.setup_volume({"boot" => false, "size_gib" => size_gib, "device_id" => device_id},
+      vs.setup_volume({"boot" => false, "size_gib" => size_gib, "device_id" => device_id, "use_ubi" => false},
         0, nil, nil)
     end
 
@@ -54,12 +54,13 @@ RSpec.describe VmSetup do
       image_path = "/opt/ubuntu.raw"
       size_gib = 5
 
-      expect(vs).to receive(:download_boot_image).with(boot_image).and_return(image_path)
+      expect(vs).to receive(:download_boot_image).with(boot_image)
+      expect(vs).to receive(:base_image_path).with(boot_image).and_return(image_path)
       expect(vs).to receive(:verify_boot_disk_size).with(image_path, 5)
       expect(vs).to receive(:unencrypted_image_copy).with(disk_file, image_path, size_gib)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil)
+      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil, false, image_path)
 
-      vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
+      vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id, "use_ubi" => false},
         0, boot_image, nil)
     end
 
@@ -73,10 +74,11 @@ RSpec.describe VmSetup do
       size_gib = 5
 
       expect(vs).to receive(:setup_data_encryption_key).with(0, secrets).and_return(encryption_key)
-      expect(vs).to receive(:download_boot_image).with(boot_image).and_return(image_path)
+      expect(vs).to receive(:download_boot_image).with(boot_image)
+      expect(vs).to receive(:base_image_path).with(boot_image).and_return(image_path)
       expect(vs).to receive(:verify_boot_disk_size).with(image_path, 5)
       expect(vs).to receive(:encrypted_image_copy).with(disk_file, image_path, size_gib, encryption_key)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, encryption_key)
+      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, encryption_key, nil, image_path)
 
       vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
         0, boot_image, secrets)
@@ -207,7 +209,7 @@ RSpec.describe VmSetup do
       bdev = "bdev_name"
       disk_file = "/path/to/disk/file"
       expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev} 512$/)
-      vs.setup_spdk_bdev(bdev, disk_file, nil)
+      vs.setup_spdk_bdev(bdev, disk_file, nil, false, nil)
     end
 
     it "can setup an encrypted volume" do
@@ -217,7 +219,16 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:r).with(/.*rpc.py.*accel_crypto_key_create -c aes_xts -k key1value -e key2value/)
       expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev}_aio 512$/)
       expect(vs).to receive(:r).with(/.*rpc.py.*bdev_crypto_create.*#{bdev}_aio #{bdev}$/)
-      vs.setup_spdk_bdev(bdev, disk_file, encryption_key)
+      vs.setup_spdk_bdev(bdev, disk_file, encryption_key, false, nil)
+    end
+
+    it "can setup a volume using ubi" do
+      bdev = "bdev_name"
+      disk_file = "/path/to/disk/file"
+      image_path = "/var/storage/images/xyz.raw"
+      expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev}_base 512$/)
+      expect(vs).to receive(:r).with(/.*rpc.py.*bdev_ubi_create -n #{bdev} -b #{bdev}_base -i #{image_path} -z 1$/)
+      vs.setup_spdk_bdev(bdev, disk_file, nil, true, image_path)
     end
   end
 
@@ -315,25 +326,28 @@ RSpec.describe VmSetup do
   describe "#recreate_unpersisted" do
     it "can recreate unpersisted state" do
       storage_volumes = [
-        {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
-        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true}
+        {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false, "use_ubi" => false},
+        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true, "use_ubi" => true}
       ]
       storage_secrets = {
         "test_1" => "storage_secrets"
       }
+      boot_image = "xyz"
+      image_path = "/var/storage/images/xyz.raw"
 
       expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false)
 
-      expect(vs).to receive(:setup_spdk_bdev).with("test_0", "/var/storage/test/0/disk.raw", nil)
+      allow(vs).to receive(:base_image_path).with(boot_image).and_return(image_path)
+      expect(vs).to receive(:setup_spdk_bdev).with("test_0", "/var/storage/test/0/disk.raw", nil, false, image_path)
       expect(vs).to receive(:setup_spdk_vhost).with(0, "test_0")
 
       expect(vs).to receive(:read_data_encryption_key).with(1, "storage_secrets").and_return("dek")
-      expect(vs).to receive(:setup_spdk_bdev).with("test_1", "/var/storage/test/1/disk.raw", "dek")
+      expect(vs).to receive(:setup_spdk_bdev).with("test_1", "/var/storage/test/1/disk.raw", "dek", true, image_path)
       expect(vs).to receive(:setup_spdk_vhost).with(1, "test_1")
 
       expect(vs).to receive(:hugepages).with(4)
 
-      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, storage_volumes, storage_secrets)
+      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, storage_volumes, storage_secrets, boot_image)
     end
   end
 

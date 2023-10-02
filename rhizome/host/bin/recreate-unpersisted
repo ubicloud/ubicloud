@@ -55,9 +55,15 @@ unless (storage_volumes = params["storage_volumes"])
   exit 1
 end
 
+unless (boot_image = params["boot_image"])
+  puts "need boot_image in parameters json"
+  exit 1
+end
+
 require_relative "../lib/vm_setup"
 
 VmSetup.new(vm_name).recreate_unpersisted(
   gua, ip4, local_ip4, nics, mem_gib,
-  ndp_needed, storage_volumes, storage_secrets
+  ndp_needed, storage_volumes, storage_secrets,
+  boot_image
 )
