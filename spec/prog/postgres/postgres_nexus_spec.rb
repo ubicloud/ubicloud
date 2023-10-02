@@ -75,6 +75,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     end
 
     it "update sshable host and hops" do
+      expect(postgres_server).to receive(:incr_initial_provisioning)
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(sshable).to receive(:update).with(host: "1.1.1.1")
@@ -149,9 +150,8 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect { nx.install_postgres }.to nap(5)
     end
 
-    it "hops to configure if install_postgres command is succeeded and increments restart semaphore" do
+    it "hops to configure if install_postgres command is succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Succeeded")
-      expect(postgres_server).to receive(:incr_restart)
       expect { nx.install_postgres }.to hop("configure")
     end
 
@@ -175,9 +175,16 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect { nx.configure }.to nap(5)
     end
 
-    it "hops to create_billing_record if configure command is succeeded" do
+    it "hops to restart if configure command is succeeded during the initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Succeeded")
-      expect { nx.configure }.to hop("create_billing_record")
+      expect { nx.configure }.to hop("restart")
+    end
+
+    it "hops to wait if configure command is succeeded at times other than the initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Succeeded")
+      expect { nx.configure }.to hop("wait")
     end
 
     it "naps if script return unknown status" do
@@ -186,9 +193,25 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     end
   end
 
+  describe "#restart" do
+    it "restarts and hops to create_billing_record during the initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(nx).to receive(:decr_restart)
+      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
+      expect { nx.restart }.to hop("create_billing_record")
+    end
+
+    it "restarts and hops to wait at times other than the initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?)
+      expect(nx).to receive(:decr_restart)
+      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
+      expect { nx.restart }.to hop("wait")
+    end
+  end
+
   describe "#create_billing_record" do
     it "creates billing record for cores and storage then hops" do
-      expect(nx).to receive(:when_restart_set?)
+      expect(nx).to receive(:decr_initial_provisioning)
 
       expect(BillingRecord).to receive(:create_with_id).with(
         project_id: postgres_server.project_id,
@@ -207,19 +230,6 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       )
 
       expect { nx.create_billing_record }.to hop("wait")
-    end
-
-    it "hops to restart if restart semaphore is incremented" do
-      expect(nx).to receive(:when_restart_set?).and_yield
-      expect { nx.create_billing_record }.to hop("restart")
-    end
-  end
-
-  describe "#restart" do
-    it "restarts and hops to wait" do
-      expect(nx).to receive(:decr_restart)
-      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
-      expect { nx.restart }.to hop("wait")
     end
   end
 

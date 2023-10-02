@@ -13,7 +13,7 @@ class PostgresServer < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :restart, :destroy
+  semaphore :initial_provisioning, :restart, :destroy
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{location}/postgres/#{server_name}"
