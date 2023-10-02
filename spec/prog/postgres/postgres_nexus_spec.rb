@@ -230,8 +230,6 @@ RSpec.describe Prog::Postgres::PostgresNexus do
   end
 
   describe "#destroy" do
-    before { expect(nx).to receive(:reap).at_least(:once) }
-
     it "triggers vm deletion and waits until it is deleted" do
       expect(sshable).to receive(:destroy)
       expect(vm).to receive(:private_subnets).and_return([])

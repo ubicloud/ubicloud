@@ -166,7 +166,6 @@ class Prog::Postgres::PostgresNexus < Prog::Base
 
   label def destroy
     register_deadline(nil, 5 * 60)
-    reap
 
     decr_destroy
 
