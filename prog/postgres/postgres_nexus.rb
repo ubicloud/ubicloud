@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :restart, :destroy
+  semaphore :initial_provisioning, :restart, :destroy
 
   def self.assemble(project_id, location, server_name, vm_size, storage_size_gib)
     unless (project = Project[project_id])
@@ -72,6 +72,8 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   label def start
     nap 5 unless vm.strand.label == "wait"
     vm.sshable.update(host: vm.ephemeral_net4)
+
+    postgres_server.incr_initial_provisioning
     hop_bootstrap_rhizome
   end
 
@@ -109,7 +111,6 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   label def install_postgres
     case vm.sshable.cmd("common/bin/daemonizer --check install_postgres")
     when "Succeeded"
-      postgres_server.incr_restart
       hop_configure
     when "Failed", "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install_postgres' install_postgres")
@@ -121,13 +122,26 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   label def configure
     case vm.sshable.cmd("common/bin/daemonizer --check configure")
     when "Succeeded"
-      hop_create_billing_record
+      when_initial_provisioning_set? do
+        hop_restart
+      end
+      hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure' configure", stdin: JSON.generate(configure_hash))
     end
 
     nap 5
+  end
+
+  label def restart
+    decr_restart
+    vm.sshable.cmd("sudo postgres/bin/restart")
+
+    when_initial_provisioning_set? do
+      hop_create_billing_record
+    end
+    hop_wait
   end
 
   label def create_billing_record
@@ -147,16 +161,8 @@ class Prog::Postgres::PostgresNexus < Prog::Base
       amount: postgres_server.target_storage_size_gib
     )
 
-    when_restart_set? do
-      hop_restart
-    end
+    decr_initial_provisioning
 
-    hop_wait
-  end
-
-  label def restart
-    decr_restart
-    vm.sshable.cmd("sudo postgres/bin/restart")
     hop_wait
   end
 
