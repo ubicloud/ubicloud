@@ -105,6 +105,7 @@ class Prog::Vm::Nexus < Prog::Base
           boot: disk_index == boot_disk_index,
           size_gib: volume[:size_gib],
           disk_index: disk_index,
+          use_ubi: volume[:use_ubi],
           key_encryption_key_1_id: key_encryption_key&.id
         )
       end
