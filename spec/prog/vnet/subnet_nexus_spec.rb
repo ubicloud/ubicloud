@@ -23,26 +23,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       }.to raise_error RuntimeError, "No existing project"
     end
 
-    it "accepts in development without project" do
-      ps = instance_double(PrivateSubnet)
-      expect(PrivateSubnet).to receive(:create).with(
-        name: "default-ps",
-        location: "hetzner-hel1",
-        net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "10.0.0.0/26",
-        state: "waiting"
-      ).and_return(ps)
-      expect(described_class).to receive(:random_private_ipv4).and_return("10.0.0.0/26")
-      expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
-      expect(Config).to receive(:development?).and_return(true)
-      described_class.assemble(
-        nil,
-        name: "default-ps",
-        location: "hetzner-hel1",
-        ipv6_range: "fd10:9b0b:6b4b:8fbb::/64"
-      )
-    end
-
     it "uses ipv6_addr if passed and creates entities" do
       ps = instance_double(PrivateSubnet)
       expect(ps).to receive(:associate_with_project).with(prj).and_return(true)

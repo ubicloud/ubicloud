@@ -60,13 +60,6 @@ RSpec.describe Prog::Vm::Nexus do
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
     end
 
-    it "accepts all locations if project not provided" do
-      expect(Config).to receive(:development?).and_return(true).twice
-      expect {
-        described_class.assemble("some_ssh_key", nil, location: "hetzner-hel1")
-      }.to change(Vm, :count).from(0).to(1)
-    end
-
     it "creates Subnet and Nic if not passed" do
       expect {
         described_class.assemble("some_ssh_key", prj.id)
