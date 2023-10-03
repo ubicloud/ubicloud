@@ -96,12 +96,12 @@ class Prog::Vm::HostNexus < Prog::Base
   label def wait_setup_spdk
     reap
     if leaf?
-      hop_reboot
+      hop_prep_reboot
     end
     donate
   end
 
-  label def reboot
+  label def prep_reboot
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
@@ -111,30 +111,22 @@ class Prog::Vm::HostNexus < Prog::Base
 
     decr_reboot
 
-    begin
-      sshable.cmd("sudo reboot")
-    rescue Net::SSH::Disconnect, Errno::ECONNRESET, IOError
-      hop_wait_reboot
-    end
-
-    raise "reboot failed: unexpected ssh command success"
+    hop_reboot
   end
 
-  label def wait_reboot
+  label def reboot
     begin
-      sshable.cmd("echo 1")
-    rescue
-      nap 15
+      q_last_boot_id = vm_host.last_boot_id.shellescape
+      new_boot_id = sshable.cmd("sudo host/bin/reboot-host #{q_last_boot_id}").strip
+    rescue Net::SSH::Disconnect, Net::SSH::ConnectionTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, IOError
+      nap 30
     end
 
-    hop_verify_boot_id_changed
-  end
+    # If we didn't get a valid new boot id, nap. This can happen if reboot-host
+    # issues a reboot and returns without closing the ssh connection.
+    nap 30 if new_boot_id.length == 0
 
-  label def verify_boot_id_changed
-    boot_id = get_boot_id
-    raise "reboot failed" if boot_id == vm_host.last_boot_id
-    vm_host.update(last_boot_id: boot_id)
-
+    vm_host.update(last_boot_id: new_boot_id)
     hop_verify_spdk
   end
 

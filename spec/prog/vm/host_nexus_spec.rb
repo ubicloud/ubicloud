@@ -176,13 +176,13 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#wait_setup_spdk" do
-    it "enters the wait state and toggled the VM acceptance state if all tasks are done" do
+    it "hops to prep_reboot if all tasks are done" do
       expect(nx).to receive(:reap).and_return([])
       expect(nx).to receive(:leaf?).and_return true
       vmh = instance_double(VmHost)
       nx.instance_variable_set(:@vm_host, vmh)
 
-      expect { nx.wait_setup_spdk }.to hop("reboot")
+      expect { nx.wait_setup_spdk }.to hop("prep_reboot")
     end
 
     it "donates its time if child strands are still running" do
@@ -218,45 +218,34 @@ RSpec.describe Prog::Vm::HostNexus do
       allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
     end
 
-    it "reboot transitions to wait_reboot" do
+    it "prep_reboot transitions to reboot" do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
       expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
       expect(vms).to all receive(:update).with(display_state: "rebooting")
-      expect(sshable).to receive(:cmd).with("sudo reboot").and_raise(Errno::ECONNRESET)
       expect(nx).to receive(:decr_reboot)
-      expect { nx.reboot }.to hop("wait_reboot")
+      expect { nx.prep_reboot }.to hop("reboot")
     end
 
-    it "reboot fails if the ssh command succeeds" do
-      expect(nx).to receive(:get_boot_id).and_return("xyz")
-      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
-      expect(vms).to all receive(:update).with(display_state: "rebooting")
-      expect(sshable).to receive(:cmd).with("sudo reboot")
-      expect(nx).to receive(:decr_reboot)
-      expect { nx.reboot }.to raise_error RuntimeError, "reboot failed: unexpected ssh command success"
+    it "reboot naps if reboot-host fails causes IOError" do
+      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_raise(IOError)
+
+      expect { nx.reboot }.to nap(30)
     end
 
-    it "wait_reboot naps if ssh fails" do
-      expect(sshable).to receive(:cmd).with("echo 1").and_raise("not connected")
-      expect { nx.wait_reboot }.to nap(15)
+    it "reboot naps if reboot-host returns empty string" do
+      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_return ""
+
+      expect { nx.reboot }.to nap(30)
     end
 
-    it "wait_reboot transitions to verify_boot_id_changed if ssh succeeds" do
-      expect(sshable).to receive(:cmd).with("echo 1").and_return("1")
-      expect { nx.wait_reboot }.to hop("verify_boot_id_changed")
-    end
+    it "reboot updates last_boot_id and hops to verify_spdk" do
+      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
+      expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
 
-    it "verify_boot_id_changed fails if boot_id hasn't changed" do
-      expect(nx).to receive(:get_boot_id).and_return("abc")
-      expect(vm_host).to receive(:last_boot_id).and_return("abc")
-      expect { nx.verify_boot_id_changed }.to raise_error RuntimeError, "reboot failed"
-    end
-
-    it "verify_boot_id_changed hops to verify_spdk if successful" do
-      expect(nx).to receive(:get_boot_id).and_return("xyz")
-      expect(vm_host).to receive(:last_boot_id).and_return("abc")
-      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
-      expect { nx.verify_boot_id_changed }.to hop("verify_spdk")
+      expect { nx.reboot }.to hop("verify_spdk")
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
