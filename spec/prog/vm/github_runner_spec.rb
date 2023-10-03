@@ -158,6 +158,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   it "hops to install_actions_runner" do
+    expect(nx).to receive(:install_ssh_listen_only_nftables_chain)
     expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
     expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
     expect(sshable).to receive(:invalidate_cache_entry)
@@ -285,6 +286,179 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:destroy)
 
       expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+    end
+  end
+
+  describe "nftables" do
+    let(:ip_netns_detail_json_fixture) do
+      <<JSON
+[
+  {
+    "ifindex": 1,
+    "ifname": "lo",
+    "flags": [
+      "LOOPBACK"
+    ],
+    "mtu": 65536,
+    "qdisc": "noop",
+    "operstate": "DOWN",
+    "linkmode": "DEFAULT",
+    "group": "default",
+    "txqlen": 1000,
+    "link_type": "loopback",
+    "address": "00:00:00:00:00:00",
+    "broadcast": "00:00:00:00:00:00",
+    "promiscuity": 0,
+    "min_mtu": 0,
+    "max_mtu": 0,
+    "inet6_addr_gen_mode": "eui64",
+    "num_tx_queues": 1,
+    "num_rx_queues": 1,
+    "gso_max_size": 65536,
+    "gso_max_segs": 65535
+  },
+  {
+    "ifindex": 2,
+    "link_index": 3,
+    "ifname": "vethivmezdgrk",
+    "flags": [
+      "BROADCAST",
+      "MULTICAST",
+      "UP",
+      "LOWER_UP"
+    ],
+    "mtu": 1500,
+    "qdisc": "noqueue",
+    "operstate": "UP",
+    "linkmode": "DEFAULT",
+    "group": "default",
+    "txqlen": 1000,
+    "link_type": "ether",
+    "address": "76:91:b2:bd:d0:d3",
+    "broadcast": "ff:ff:ff:ff:ff:ff",
+    "link_netnsid": 0,
+    "promiscuity": 0,
+    "min_mtu": 68,
+    "max_mtu": 65535,
+    "linkinfo": {
+      "info_kind": "veth"
+    },
+    "inet6_addr_gen_mode": "eui64",
+    "num_tx_queues": 8,
+    "num_rx_queues": 8,
+    "gso_max_size": 65536,
+    "gso_max_segs": 65535
+  },
+  {
+    "ifindex": 3,
+    "ifname": "nc1sww90p6",
+    "flags": [
+      "BROADCAST",
+      "MULTICAST",
+      "UP",
+      "LOWER_UP"
+    ],
+    "mtu": 1500,
+    "qdisc": "fq_codel",
+    "operstate": "UP",
+    "linkmode": "DEFAULT",
+    "group": "default",
+    "txqlen": 1000,
+    "link_type": "ether",
+    "address": "8a:5d:4a:ba:86:5f",
+    "broadcast": "ff:ff:ff:ff:ff:ff",
+    "promiscuity": 0,
+    "min_mtu": 68,
+    "max_mtu": 65521,
+    "linkinfo": {
+      "info_kind": "tun",
+      "info_data": {
+        "type": "tap",
+        "pi": false,
+        "vnet_hdr": true,
+        "multi_queue": false,
+        "persist": true,
+        "user": "vmezdgrk"
+      }
+    },
+    "inet6_addr_gen_mode": "eui64",
+    "num_tx_queues": 1,
+    "num_rx_queues": 1,
+    "gso_max_size": 65536,
+    "gso_max_segs": 65535
+  }
+]
+JSON
+    end
+
+    it "computes all host-routed mac addresses" do
+      host_ssh = instance_double(Sshable)
+      expect(nx.vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: host_ssh)).at_least(:once)
+      expect(host_ssh).to receive(:cmd).with(
+        "sudo -- ip --detail --json --netns 00000000 link"
+      ).and_return(ip_netns_detail_json_fixture)
+
+      expect(nx.vm.vm_host).to receive(:sshable).and_return(host_ssh)
+      expect(nx.tun_mac_addresses).to eq ["8a:5d:4a:ba:86:5f"]
+    end
+
+    it "can run a command to install an nft chain" do
+      expect(nx).to receive(:template_ssh_only_listen_nftable_conf).and_return("bogus sample nftables conf")
+      expect(nx.vm.sshable).to receive(:cmd).with("sudo nft --file -", stdin: "bogus sample nftables conf")
+      nx.install_ssh_listen_only_nftables_chain
+    end
+
+    it "templates a nftables conf" do
+      expect(nx).to receive(:tun_mac_addresses).and_return(["8a:5d:4a:ba:86:5f"])
+      expect(nx.template_ssh_only_listen_nftable_conf).to eq <<TEMPLATED
+# An nftables idiom for idempotent re-create of a named entity: merge
+# in an empty table (a no-op if the table already exists) and then
+# delete, before creating with a new definition.
+table inet clover_github_actions;
+delete table inet clover_github_actions;
+
+table inet clover_github_actions {
+  chain input {
+    type filter hook input priority 0;
+
+    # If a conntrack has been instantiated for a flow, allow the
+    # packet through.
+
+    # The trick in the rest of all this is to allow only the
+    # current host to initiate the creation of entries in the
+    # conntrack table, and they cannot be initiated from other
+    # hosts on the Internet, with a notable exception for SSH.
+    ct state vmap { established : accept, related : accept, invalid : drop }
+
+    # Needed for neighbor solicitation at least to establish new
+    # connections on IPv6, including DNS queries to IPv6 servers,
+    # but on consideration of the goal of blocking attacks on
+    # vulnerable GitHub Action payloads, it's okay to enable the
+    # full ICMP suite for IPv4 and IPv6.
+    meta l4proto { icmp, icmpv6 } accept
+
+    # An exception to the "no connections initiated from the
+    # Internet" rule, allow port 22/SSH to receive packets from the
+    # internet without a conntrack state already established.
+    # This is how Clover connects and controls the runner, so it's
+    # obligatory.
+    tcp dport 22 accept
+
+    # Allow all other traffic that doesn't come from the host
+    # forwarding, e.g. between interfaces on the system, as in
+    # some uses of containers.  Our control over that is limited,
+    # we want to not be debugging our interactions with GitHub's
+    # pretty involved definition if we can avoid it.  Thus,
+    # correlating it with a feature of the host's routing is one
+    # way to narrowly define the behavior we want.
+    ether saddr != {"8a:5d:4a:ba:86:5f"} accept
+
+    # Finally, if passing no other conditions, drop all traffic
+    # that comes from the host router hop.
+    ether saddr {"8a:5d:4a:ba:86:5f"} drop
+  }
+}
+TEMPLATED
     end
   end
 end
