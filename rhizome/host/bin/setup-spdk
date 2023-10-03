@@ -9,7 +9,7 @@ require "fileutils"
 r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev"
 
 # liburing
-install_liburing = File.join(__dir__, 'install-liburing')
+install_liburing = File.join(__dir__, "install-liburing")
 r install_liburing
 
 # spdk binaries
