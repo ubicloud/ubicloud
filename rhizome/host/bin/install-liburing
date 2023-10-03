@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# Spdk requires liburing 2.2. The liburing available in apt repositories
+# for Ubuntu 22.04 is 2.1, so we need to install it from source.
+
+GIT_REPO_LIBURING=https://github.com/axboe/liburing.git
+liburing_dir=/usr/local/src/liburing
+
+if [[ -d $liburing_dir ]]; then
+    echo "liburing source already present, not cloning"
+else
+    mkdir -p $liburing_dir
+    git clone "${GIT_REPO_LIBURING}" "$liburing_dir"
+fi
+
+git -C "$liburing_dir" checkout liburing-2.2
+cd "$liburing_dir" && ./configure --libdir=/usr/lib64 --libdevdir=/usr/lib64 && make install
+echo /usr/lib64 > /etc/ld.so.conf.d/spdk-liburing.conf
+ldconfig

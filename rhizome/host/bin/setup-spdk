@@ -8,6 +8,10 @@ require "fileutils"
 # spdk dependencies
 r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev"
 
+# liburing
+install_liburing = File.join(__dir__, 'install-liburing')
+r install_liburing
+
 # spdk binaries
 FileUtils.cd Spdk.install_prefix do
   r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/ubi0.1/spdk-ubi.tar.gz"
