@@ -52,6 +52,3 @@ safe_write_to_file("/etc/postgresql/16/main/pg_hba.conf", pg_hba_entries)
 
 # Reload the postmaster to apply changes
 r "pg_ctlcluster 16 main reload || pg_ctlcluster 16 main restart"
-
-# Update superuser password
-r "sudo -u postgres psql -c \"ALTER USER postgres WITH PASSWORD '#{configure_hash["superuser_password"]}'\""

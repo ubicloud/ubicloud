@@ -11,7 +11,7 @@ Sequel.migration do
       column :server_name, :text, collate: '"C"', null: false, unique: true
       column :target_vm_size, :text, collate: '"C"', null: false
       column :target_storage_size_gib, :bigint, null: false
-      column :superuser_password, :text, collate: '"C"', null: false # TODO encrypt this
+      column :superuser_password, :text, collate: '"C"', null: false
       column :vm_id, :vm, type: :uuid
     end
   end

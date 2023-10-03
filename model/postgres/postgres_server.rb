@@ -15,15 +15,16 @@ class PostgresServer < Sequel::Model
 
   semaphore :initial_provisioning, :restart, :destroy
 
+  plugin :column_encryption do |enc|
+    enc.column :superuser_password
+  end
+
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{location}/postgres/#{server_name}"
   end
 
   def configure_hash
-    # configs
-    # admin password
     {
-      superuser_password: superuser_password,
       configs: {
         # TODO these are semi-arbitrary values. We should think more about them.
         effective_cache_size: "#{vm.mem_gib * 1024 * 3 / 4}MB",

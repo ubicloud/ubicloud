@@ -123,7 +123,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     case vm.sshable.cmd("common/bin/daemonizer --check configure")
     when "Succeeded"
       when_initial_provisioning_set? do
-        hop_restart
+        hop_update_superuser_password
       end
       hop_wait
     when "Failed", "NotStarted"
@@ -132,6 +132,27 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     end
 
     nap 5
+  end
+
+  label def update_superuser_password
+    encrypted_password = DB.synchronize do |conn|
+      # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
+      # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
+      # database to do the encryption.
+      conn.encrypt_password(postgres_server.superuser_password, "postgres", "scram-sha-256")
+    end
+    commands = <<SQL
+BEGIN;
+SET LOCAL log_statement = 'none';
+ALTER ROLE postgres WITH PASSWORD #{DB.literal(encrypted_password)};
+COMMIT;
+SQL
+    vm.sshable.cmd("sudo -u postgres psql", stdin: commands)
+
+    when_initial_provisioning_set? do
+      hop_restart
+    end
+    hop_wait
   end
 
   label def restart

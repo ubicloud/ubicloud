@@ -175,10 +175,10 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect { nx.configure }.to nap(5)
     end
 
-    it "hops to restart if configure command is succeeded during the initial provisioning" do
+    it "hops to update_superuser_password if configure command is succeeded during the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Succeeded")
-      expect { nx.configure }.to hop("restart")
+      expect { nx.configure }.to hop("update_superuser_password")
     end
 
     it "hops to wait if configure command is succeeded at times other than the initial provisioning" do
@@ -190,6 +190,22 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     it "naps if script return unknown status" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Unknown")
       expect { nx.configure }.to nap(5)
+    end
+  end
+
+  describe "#update_superuser_password" do
+    it "updates password and hops to restart during the initial provisioning" do
+      expect(postgres_server).to receive(:superuser_password).and_return("pass")
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect { nx.update_superuser_password }.to hop("restart")
+    end
+
+    it "updates password and hops to wait at times other than the initial provisioning" do
+      expect(postgres_server).to receive(:superuser_password).and_return("pass")
+      expect(nx).to receive(:when_initial_provisioning_set?)
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect { nx.update_superuser_password }.to hop("wait")
     end
   end
 
