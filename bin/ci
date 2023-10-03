@@ -17,7 +17,7 @@ def main
     rescue Exception => e
       log "Exception: #{e}"
       # retry 5 times, for total of 7:45 minutes before announcing failure
-      # sometimes there's some transient network failures which will resolved if retried.
+      # sometimes there's some transient network failures which will be resolved if retried.
       if retries < 5
         sleep_duration = 15 * 2**retries
         log "Retrying in #{sleep_duration} seconds ..."
