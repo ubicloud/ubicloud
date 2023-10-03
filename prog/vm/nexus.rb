@@ -15,11 +15,10 @@ class Prog::Vm::Nexus < Prog::Base
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil)
 
-    project = Project[project_id]
-    unless project || Config.development?
+    unless (project = Project[project_id])
       fail "No existing project"
     end
-    Validation.validate_location(location, project&.provider)
+    Validation.validate_location(location, project.provider)
     vm_size = Validation.validate_vm_size(size)
 
     storage_volumes ||= [{

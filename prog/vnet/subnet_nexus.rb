@@ -5,8 +5,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   semaphore :destroy, :refresh_keys, :add_new_nic
 
   def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil)
-    project = Project[project_id]
-    unless project || Config.development?
+    unless (project = Project[project_id])
       fail "No existing project"
     end
 
@@ -14,13 +13,13 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
-    Validation.validate_location(location, project&.provider)
+    Validation.validate_location(location, project.provider)
 
     ipv6_range ||= random_private_ipv6(location).to_s
     ipv4_range ||= random_private_ipv4(location).to_s
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
-      ps.associate_with_project(project) if project
+      ps.associate_with_project(project)
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
   end
