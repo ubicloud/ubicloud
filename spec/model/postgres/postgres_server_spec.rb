@@ -35,7 +35,6 @@ RSpec.describe PostgresServer do
 
   it "generates configure_hash" do
     configure_hash = {
-      superuser_password: "dummy-password",
       configs: {
         effective_cache_size: "6144MB",
         effective_io_concurrency: 200,
