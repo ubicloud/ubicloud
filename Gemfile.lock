@@ -118,7 +118,7 @@ GEM
       sawyer (~> 0.9)
     pagerduty (4.0.0)
     parallel (1.23.0)
-    parser (3.2.2.3)
+    parser (3.2.2.4)
       ast (~> 2.4.1)
       racc
     pg (1.5.4)
