@@ -43,4 +43,16 @@ RSpec.describe Hosting::Apis do
       expect { described_class.reset_server(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
     end
   end
+
+  describe "pull_dc" do
+    it "can set dc of a server" do
+      expect(hetzner_apis).to receive(:pull_dc).with(123).and_return("dc1")
+      described_class.pull_data_center(vm_host)
+    end
+
+    it "raises an error if the provider is unknown" do
+      expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
+      expect { described_class.pull_data_center(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
+    end
+  end
 end
