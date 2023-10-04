@@ -167,4 +167,14 @@ class Hosting::HetznerApis
       end
     )
   end
+
+  def pull_dc(server_id)
+    connection = Excon.new(@host.connection_string, user: @host.user, password: @host.password)
+    response = connection.get(path: "/server/#{server_id}")
+    if response.status != 200
+      raise "unexpected status #{response.status}"
+    end
+    json_server = JSON.parse(response.body)
+    json_server.dig("server", "dc")
+  end
 end

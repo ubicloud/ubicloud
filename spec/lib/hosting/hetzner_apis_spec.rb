@@ -78,6 +78,18 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "pull_dc" do
+    it "can get the dc info" do
+      Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"dc\": \"fsn1-dc8\"}}"})
+      expect(hetzner_apis.pull_dc(123)).to eq "fsn1-dc8"
+    end
+
+    it "raises an error if getting the dc info fails" do
+      Excon.stub({path: "/server/123", method: :get}, {status: 400, body: ""})
+      expect { hetzner_apis.pull_dc(123) }.to raise_error RuntimeError, "unexpected status 400"
+    end
+  end
+
   describe "hetzner_pull_ips" do
     it "can pull empty data from the API" do
       stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([]))
