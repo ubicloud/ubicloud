@@ -36,33 +36,23 @@ RSpec.describe Prog::Vm::GithubRunner do
       project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
-      st = nil
-      expect {
-        st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
-      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud, creating a new VM\n").to_stdout
+      st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
 
       runner = GithubRunner[st.id]
       expect(runner).not_to be_nil
       expect(runner.repository_name).to eq("test-repo")
-      expect(runner.vm.unix_user).to eq("runner")
-      expect(runner.vm.sshable.unix_user).to eq("runner")
+      expect(runner.label).to eq("ubicloud")
     end
 
     it "creates github runner with custom size" do
       project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
-      st = nil
-      expect {
-        st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-8")
-      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-8, creating a new VM\n").to_stdout
+      st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-8")
 
       runner = GithubRunner[st.id]
       expect(runner).not_to be_nil
       expect(runner.repository_name).to eq("test-repo")
-      expect(runner.vm.unix_user).to eq("runner")
-      expect(runner.vm.family).to eq("standard")
-      expect(runner.vm.cores).to eq(4)
-      expect(runner.vm.sshable.unix_user).to eq("runner")
+      expect(runner.label).to eq("ubicloud-standard-8")
     end
 
     it "fails if label is not valid" do
@@ -73,13 +63,19 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe ".pick_vm" do
+    let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+
+    before do
+      expect(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project))
+      expect(github_runner).to receive(:label).and_return("ubicloud-standard-4").at_least(:once)
+    end
+
     it "provisions a VM if the pool is not existing" do
-      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       vm = nil
       expect {
-        vm = described_class.pick_vm("ubicloud-standard-4", project)
+        vm = nx.pick_vm
       }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
@@ -88,14 +84,13 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
-      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners")
       expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners").and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       vm = nil
       expect {
-        vm = described_class.pick_vm("ubicloud-standard-4", project)
+        vm = nx.pick_vm
       }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
@@ -104,7 +99,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses the existing vm if pool can pick one" do
-      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners")
       expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners").and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
@@ -119,7 +113,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:assigned_vm_address).and_return(adr).at_least(:once)
       vm = nil
       expect {
-        vm = described_class.pick_vm("ubicloud-standard-4", project)
+        vm = nx.pick_vm
       }.to output("Project[#{project.ubid}] Pool is used for ubicloud-standard-4\n").to_stdout
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")
@@ -146,16 +140,27 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#start" do
+    it "picks vm and hops" do
+      expect(nx).to receive(:pick_vm).and_return(vm)
+      expect(github_runner).to receive(:update).with(vm_id: vm.id)
+      expect(vm).to receive(:update).with(name: github_runner.ubid)
+      expect { nx.start }.to hop("wait_vm")
+    end
+  end
+
+  describe "#wait_vm" do
     it "naps if vm not ready" do
       expect(vm).to receive(:strand).and_return(Strand.new(label: "prep"))
-      expect { nx.start }.to nap(5)
+      expect(nx).not_to receive(:pick_vm)
+      expect { nx.wait_vm }.to nap(5)
     end
 
     it "update sshable host and hops" do
+      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(sshable).to receive(:update).with(host: "1.1.1.1")
-      expect { nx.start }.to hop("setup_environment")
+      expect { nx.wait_vm }.to hop("setup_environment")
     end
   end
 
