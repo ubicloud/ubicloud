@@ -172,16 +172,13 @@ SQL
     vm_host_id = allocation_dataset.limit(1).get(:id)
     fail "#{vm} no space left on any eligible hosts for #{vm.location}" unless vm_host_id
 
-    # N.B. check constraint required to address concurrency.  By
-    # injecting a crash from overbooking, it gives us the opportunity
-    # to try again.
-    VmHost.dataset
-      .where(id: vm_host_id)
+    fail "concurrent allocation_state modification requires re-allocation" if VmHost.dataset
+      .where(id: vm_host_id, allocation_state: "accepting")
       .update(
         used_cores: Sequel[:used_cores] + vm.cores,
         used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib,
         available_storage_gib: Sequel[:available_storage_gib] - vm.storage_size_gib
-      )
+      ).zero?
 
     vm_host_id
   end

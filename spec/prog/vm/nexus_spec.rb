@@ -299,6 +299,19 @@ RSpec.describe Prog::Vm::Nexus do
       VmHost.new(**args) { _1.id = sa.id }
     end
 
+    it "fails if there was a concurrent modification to allocation_state" do
+      vmh = new_host.tap { _1.allocation_state = "draining" }.save_changes
+      ds = instance_double(Sequel::Dataset)
+
+      expect(ds).to receive(:limit).with(1).and_return(ds)
+      expect(ds).to receive(:get).with(:id).and_return(vmh.id)
+      expect(nx).to receive(:allocation_dataset).and_return(ds)
+
+      expect {
+        nx.allocate
+      }.to raise_error(RuntimeError, "concurrent allocation_state modification requires re-allocation")
+    end
+
     it "fails if there are no VmHosts" do
       expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
