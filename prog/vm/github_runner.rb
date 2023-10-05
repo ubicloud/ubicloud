@@ -156,11 +156,32 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def register_runner
     unless github_runner.runner_id
-      # We use generate-jitconfig instead of registration-token because it's
-      # recommended by GitHub for security reasons.
-      # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
-      data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1}
-      response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
+      begin
+        # We use generate-jitconfig instead of registration-token because it's
+        # recommended by GitHub for security reasons.
+        # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
+        data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1}
+        response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
+      rescue Octokit::Conflict => e
+        unless e.message.include?("Already exists")
+          raise e
+        end
+        # If the runner already exists and the model lacks a 'runner_id'
+        # column, this suggests that the process terminated prematurely before
+        # the 'runner_id' column could be updated. We need to locate the
+        # 'runner_id' using the name and delete it.
+        # After this, we can register the runner again.
+        runners = github_client.paginate("/repos/#{github_runner.repository_name}/actions/runners") do |data, last_response|
+          data[:runners].concat last_response.data[:runners]
+        end
+        unless (runner = runners[:runners].find { _1[:name] == github_runner.ubid.to_s })
+          fail "BUG: Failed with runner already exists error but couldn't find it"
+        end
+        Clog.emit("Deleting GithubRunner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner[:id]})} }
+        github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner[:id]}")
+        nap 0
+      end
+
       github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
 
       command = "./actions-runner/run.sh --jitconfig #{response[:encoded_jit_config].shellescape}"
