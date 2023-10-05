@@ -13,21 +13,19 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     DB.transaction do
-      vm = pick_vm(label, installation.project)
-
       github_runner = GithubRunner.create_with_id(
         installation_id: installation.id,
         repository_name: repository_name,
-        label: label,
-        vm_id: vm.id
+        label: label
       )
-      vm.update(name: github_runner.ubid.to_s)
 
       Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = github_runner.id }
     end
   end
 
-  def self.pick_vm(label, project)
+  def pick_vm
+    label = github_runner.label
+    project = github_runner.installation.project
     label_data = Github.runner_labels[label]
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
@@ -35,32 +33,31 @@ class Prog::Vm::GithubRunner < Prog::Base
       location: label_data["location"]
     ).first
 
-    if (vm = pool&.pick_vm)
-      vm.associate_with_project(project)
-      vm.private_subnets.each { |ps| ps.associate_with_project(project) }
+    if (picked_vm = pool&.pick_vm)
+      picked_vm.associate_with_project(project)
+      picked_vm.private_subnets.each { |ps| ps.associate_with_project(project) }
 
       BillingRecord.create_with_id(
         project_id: project.id,
-        resource_id: vm.id,
-        resource_name: vm.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
-        amount: vm.cores
+        resource_id: picked_vm.id,
+        resource_name: picked_vm.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", picked_vm.family, picked_vm.location)["id"],
+        amount: picked_vm.cores
       )
 
       BillingRecord.create_with_id(
         project_id: project.id,
-        resource_id: vm.assigned_vm_address.id,
-        resource_name: vm.assigned_vm_address.ip,
-        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
+        resource_id: picked_vm.assigned_vm_address.id,
+        resource_name: picked_vm.assigned_vm_address.ip,
+        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", picked_vm.location)["id"],
         amount: 1
       )
 
       puts "#{project} Pool is used for #{label}"
-      return vm
+      return picked_vm
     end
 
     puts "#{project} Pool is empty for #{label}, creating a new VM"
-    ubid = GithubRunner.generate_ubid
     ssh_key = SshKey.generate
     # We use unencrypted storage for now, because provisioning 86G encrypted
     # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
@@ -69,7 +66,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     vm_st = Prog::Vm::Nexus.assemble(
       ssh_key.public_key,
       project.id,
-      name: ubid.to_s,
+      name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
       unix_user: "runner",
       location: label_data["location"],
@@ -105,6 +102,13 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def start
+    picked_vm = pick_vm
+    github_runner.update(vm_id: picked_vm.id)
+    picked_vm.update(name: github_runner.ubid.to_s)
+    hop_wait_vm
+  end
+
+  label def wait_vm
     nap 5 unless vm.strand.label == "wait"
     vm.sshable.update(host: vm.ephemeral_net4)
     hop_setup_environment
