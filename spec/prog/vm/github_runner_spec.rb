@@ -181,7 +181,38 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.register_runner }.to hop("wait")
     end
 
-    it "does not generate runner if runner exists and destroys it" do
+    it "deletes the runner if the generate request fails due to 'already exists with the same name' error." do
+      expect(github_runner).to receive(:runner_id).and_return(nil)
+      expect(client).to receive(:post)
+        .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
+        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
+      expect(client).to receive(:paginate)
+        .and_yield({runners: [{name: github_runner.ubid.to_s, id: 123}]}, instance_double(Sawyer::Response, data: {runners: []}))
+        .and_return({runners: [{name: github_runner.ubid.to_s, id: 123}]})
+      expect(client).to receive(:delete).with("/repos/#{github_runner.repository_name}/actions/runners/123")
+      expect(Clog).to receive(:emit).with("Deleting GithubRunner because it already exists").and_call_original
+      expect { nx.register_runner }.to nap(0)
+    end
+
+    it "naps if the generate request fails due to 'already exists with the same name' error but couldn't find the runner" do
+      expect(github_runner).to receive(:runner_id).and_return(nil)
+      expect(client).to receive(:post)
+        .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
+        .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
+      expect(client).to receive(:paginate).and_return({runners: []})
+      expect(client).not_to receive(:delete)
+      expect { nx.register_runner }.to raise_error RuntimeError, "BUG: Failed with runner already exists error but couldn't find it"
+    end
+
+    it "naps if the generate request fails due to 'Octokit::Conflict' but it's not already exists error" do
+      expect(github_runner).to receive(:runner_id).and_return(nil)
+      expect(client).to receive(:post)
+        .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
+        .and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
+      expect { nx.register_runner }.to raise_error Octokit::Conflict
+    end
+
+    it "deletes the runner if the script fails" do
       expect(github_runner).to receive(:runner_id).and_return(123).at_least(:once)
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
       expect(client).to receive(:delete)
