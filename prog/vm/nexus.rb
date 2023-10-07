@@ -8,7 +8,7 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
@@ -324,8 +324,18 @@ SQL
     nap 30
   end
 
+  label def prevent_destroy
+    register_deadline(:destroy, 24 * 60 * 60)
+    nap 30
+  end
+
   label def destroy
     decr_destroy
+
+    when_prevent_destroy_set? do
+      Clog.emit("Destroy prevented by the semaphore")
+      hop_prevent_destroy
+    end
 
     vm.update(display_state: "deleting")
 

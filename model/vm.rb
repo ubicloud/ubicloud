@@ -18,7 +18,7 @@ class Vm < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :destroy, :start_after_host_reboot
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy
 
   include Authorization::HyperTagMethods
 
