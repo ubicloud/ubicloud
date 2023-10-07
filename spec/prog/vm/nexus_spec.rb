@@ -501,6 +501,13 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  describe "#prevent_destroy" do
+    it "registers a deadline and naps while preventing" do
+      expect(nx).to receive(:register_deadline)
+      expect { nx.prevent_destroy }.to nap(30)
+    end
+  end
+
   describe "#destroy" do
     before do
       st.stack.first["deadline_at"] = Time.now + 1
@@ -551,6 +558,12 @@ RSpec.describe Prog::Vm::Nexus do
 
         expect { nx.destroy }.to exit({"msg" => "vm deleted"})
       end
+    end
+
+    it "prevents destroy if the semaphore set" do
+      expect(nx).to receive(:when_prevent_destroy_set?).and_yield
+      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore")
+      expect { nx.destroy }.to hop("prevent_destroy")
     end
 
     it "detaches from nic" do
