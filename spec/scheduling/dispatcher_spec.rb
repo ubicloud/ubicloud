@@ -10,7 +10,7 @@ RSpec.describe Scheduling::Dispatcher do
   describe "#scan" do
     it "exits if there's not enough database connections" do
       expect(Config).to receive(:db_pool).and_return(0).at_least(:once)
-      expect(di).to receive(:puts).with("Not enough database connections. Waiting active connections to finish their work. db_pool:0 active_threads:0")
+      expect(Clog).to receive(:emit).with("Not enough database connections.").and_call_original
       di.scan
     end
   end

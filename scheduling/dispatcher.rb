@@ -11,7 +11,9 @@ class Scheduling::Dispatcher
   def scan
     idle_connections = Config.db_pool - @notifiers.count - 1
     if idle_connections < 1
-      puts "Not enough database connections. Waiting active connections to finish their work. db_pool:#{Config.db_pool} active_threads:#{@notifiers.count}"
+      Clog.emit("Not enough database connections.") do
+        {pool: {db_pool: Config.db_pool, active_threads: @notifiers.count}}
+      end
       return []
     end
 
@@ -21,8 +23,7 @@ class Scheduling::Dispatcher
   end
 
   def start_strand(strand)
-    strand_id = strand.id.freeze
-
+    strand_ubid = strand.ubid.freeze
     apoptosis_r, apoptosis_w = IO.pipe
     notify_r, notify_w = IO.pipe
 
@@ -41,7 +42,7 @@ class Scheduling::Dispatcher
       end
 
       ready.first.close
-    end
+    end.tap { _1.name = "apoptosis:" + strand_ubid }
 
     Thread.new do
       strand.run Strand::LEASE_EXPIRATION / 4
@@ -49,7 +50,7 @@ class Scheduling::Dispatcher
       # Adequate to unblock IO.select.
       apoptosis_w.close
       notify_w.close
-    end.tap { _1.name = strand_id }
+    end.tap { _1.name = strand_ubid }
 
     notify_r
   end
