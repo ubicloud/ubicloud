@@ -29,9 +29,12 @@ RETURNING lease, exitval IS NOT NULL AS exited
 SQL
     return false unless affected
     lease_time = affected.fetch(:lease)
+    exited = affected.fetch(:exited)
+
+    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, exited: exited}} }
 
     begin
-      if affected.fetch(:exited)
+      if exited
         # Clear any semaphores that get added to a exited Strand prog,
         # since incr is entitled to be run at *any time* (including
         # after exitval is set) and any such incements will prevent
@@ -52,6 +55,7 @@ UPDATE strand
 SET lease = NULL
 WHERE id = ? AND lease = ?
 SQL
+        Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} }
         unless num_updated == 1
           fail "BUG: lease violated"
         end
@@ -77,6 +81,8 @@ SQL
   end
 
   def unsynchronized_run
+    Clog.emit("starting strand") { {strand: values} }
+
     if label == stack.first["deadline_target"].to_s
       if (pg = Page.from_tag_parts(id, prog, stack.first["deadline_target"]))
         pg.incr_resolve
@@ -136,6 +142,8 @@ SQL
     else
       fail "BUG: Prog #{prog}##{label} did not provide flow control"
     end
+  ensure
+    Clog.emit("finished strand") { {strand: values} }
   end
 
   def run(seconds = 0)

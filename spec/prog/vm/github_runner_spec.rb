@@ -213,10 +213,9 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
       expect(client).to receive(:get).and_return({busy: false})
       expect(github_runner).to receive(:incr_destroy)
+      expect(Clog).to receive(:emit).with("Destroying GithubRunner because it does not pick a job in two minutes").and_call_original
 
-      expect do
-        expect { nx.wait }.to nap(0)
-      end.to output("GithubRunner[#{github_runner.ubid}] Not pick a job in two minutes, destroying it\n").to_stdout
+      expect { nx.wait }.to nap(0)
     end
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
