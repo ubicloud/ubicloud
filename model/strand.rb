@@ -21,24 +21,6 @@ class Strand < Sequel::Model
   end
 
   def lease
-    self.class.lease(id) do
-      yield
-    end
-  end
-
-  def self.prog_verify(prog)
-    case prog.name
-    when /\AProg::(.*)\z/
-      $1
-    else
-      fail "BUG: prog must be in Prog module"
-    end
-  end
-
-  # :nocov:
-  SCHEDULE = Config.development? ? "(now() + least(5, try) * '1 second'::interval)" : "(now() + least(2 ^ least(try, 20), 600) * random() * '1 second'::interval)"
-  # :nocov:
-  def self.lease(id)
     affected = DB[<<SQL, id].first
 UPDATE strand
 SET lease = now() + '120 seconds', try = try + 1, schedule = #{SCHEDULE}
@@ -67,13 +49,26 @@ WHERE id = ? AND lease = ?
 SQL
       # Avoid leasing integrity check error if the record disappears
       # entirely.
-      unless num_updated == 1 || !@deleted
+      if num_updated != 1 && !(num_updated.zero? && @deleted)
         # :nocov:
         fail "BUG: lease violated"
         # :nocov:
       end
     end
   end
+
+  def self.prog_verify(prog)
+    case prog.name
+    when /\AProg::(.*)\z/
+      $1
+    else
+      fail "BUG: prog must be in Prog module"
+    end
+  end
+
+  # :nocov:
+  SCHEDULE = Config.development? ? "(now() + least(5, try) * '1 second'::interval)" : "(now() + least(2 ^ least(try, 20), 600) * random() * '1 second'::interval)"
+  # :nocov:
 
   def load(snap = nil)
     Object.const_get("::Prog::" + prog).new(self, snap)
