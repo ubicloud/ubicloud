@@ -42,17 +42,19 @@ SQL
 
       yield
     ensure
-      num_updated = DB[<<SQL, id, lease_time].update
+      if @deleted
+        unless DB["SELECT FROM strand WHERE id = ?", id].empty?
+          fail "BUG: strand with @deleted set still exists in the database"
+        end
+      else
+        num_updated = DB[<<SQL, id, lease_time].update
 UPDATE strand
 SET lease = NULL
 WHERE id = ? AND lease = ?
 SQL
-      # Avoid leasing integrity check error if the record disappears
-      # entirely.
-      if num_updated != 1 && !(num_updated.zero? && @deleted)
-        # :nocov:
-        fail "BUG: lease violated"
-        # :nocov:
+        unless num_updated == 1
+          fail "BUG: lease violated"
+        end
       end
     end
   end
