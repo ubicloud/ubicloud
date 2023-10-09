@@ -20,7 +20,7 @@ class Strand < Sequel::Model
     one_to_one _1.intern, key: :id
   end
 
-  def lease
+  def take_lease
     affected = DB[<<SQL, id].first
 UPDATE strand
 SET lease = now() + '120 seconds', try = try + 1, schedule = #{SCHEDULE}
@@ -139,7 +139,7 @@ SQL
   def run(seconds = 0)
     fail "already deleted" if @deleted
     deadline = Time.now + seconds
-    lease do
+    take_lease do
       loop do
         ret = unsynchronized_run
         now = Time.now
