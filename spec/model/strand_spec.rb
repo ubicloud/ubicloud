@@ -31,6 +31,42 @@ RSpec.describe Strand do
         expect(st.take_lease { :never_happens }).to be_nil
       }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
     end
+
+    it "does an integrity check that deleted records are gone" do
+      st.label = "hop_exit"
+      st.save_changes
+      original = DB.method(:[])
+      expect(DB).to receive(:[]) do |*args, **kwargs|
+        case args
+        when ["SELECT FROM strand WHERE id = ?", st.id]
+          instance_double(Sequel::Dataset, empty?: false)
+        else
+          original.call(*args, **kwargs)
+        end
+      end.at_least(:once)
+
+      expect { st.run }.to raise_error RuntimeError, "BUG: strand with @deleted set still exists in the database"
+    end
+
+    it "does an integrity check that the lease was modified as expected" do
+      st.label = "napper"
+      st.save_changes
+      original = DB.method(:[])
+      expect(DB).to receive(:[]) do |*args, **kwargs|
+        case args[0]
+        when <<SQL
+UPDATE strand
+SET lease = NULL
+WHERE id = ? AND lease = ?
+SQL
+          instance_double(Sequel::Dataset, update: 0)
+        else
+          original.call(*args, **kwargs)
+        end
+      end.at_least(:once)
+
+      expect { st.run }.to raise_error RuntimeError, "BUG: lease violated"
+    end
   end
 
   it "can load a prog" do
