@@ -124,7 +124,8 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def destroy
     if nic.vm
-      fail "Cannot destroy nic with active vm, first clean up the attached resources"
+      Clog.emit("Cannot destroy nic with active vm, first clean up the attached resources") { {nic: nic.values} }
+      nap 5
     end
 
     decr_destroy
