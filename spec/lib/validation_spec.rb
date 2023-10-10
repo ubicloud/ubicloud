@@ -114,5 +114,35 @@ RSpec.describe Validation do
         expect { described_class.validate_storage_volumes([{encrypted: true}], 1) }.to raise_error described_class::ValidationFailed
       end
     end
+
+    describe "#validate_minio_username" do
+      it "valid minio user names" do
+        [
+          "abc",
+          "abc123",
+          "abc-123",
+          "abc_123",
+          "_abc",
+          "abc-_-123",
+          "a-b-c-1-2",
+          "a" * 32
+        ].each do |name|
+          expect(described_class.validate_minio_username(name)).to be_nil
+        end
+      end
+
+      it "invalid os user names" do
+        [
+          "ab",
+          "-abc",
+          "ABC",
+          "123abc",
+          "abc$",
+          "a" * 33
+        ].each do |name|
+          expect { described_class.validate_minio_username(name) }.to raise_error described_class::ValidationFailed
+        end
+      end
+    end
   end
 end

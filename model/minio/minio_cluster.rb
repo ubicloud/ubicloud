@@ -3,8 +3,11 @@
 require_relative "../../model"
 
 class MinioCluster < Sequel::Model
-  one_to_many :minio_pools, key: :cluster_id do |ds|
+  one_to_many :pools, key: :cluster_id, class: :MinioPool do |ds|
     ds.order(:start_index)
+  end
+  many_through_many :servers, [[:minio_pool, :cluster_id, :id], [:minio_server, :minio_pool_id, :id]], class: :MinioServer do |ds|
+    ds.order(:index)
   end
   one_to_one :strand, key: :id
   many_to_one :private_subnet, key: :private_subnet_id
@@ -14,7 +17,7 @@ class MinioCluster < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :restart, :destroy
+  semaphore :destroy
 
   plugin :column_encryption do |enc|
     enc.column :admin_password
@@ -25,16 +28,9 @@ class MinioCluster < Sequel::Model
   end
 
   def generate_etc_hosts_entry
-    minio_pools.map do |pool|
-      pool.minio_servers.map do |server|
-        "#{server.private_ipv4_address} #{server.hostname}"
-      end.join("\n")
+    servers.map do |server|
+      "#{server.private_ipv4_address} #{server.hostname}"
     end.join("\n")
-  end
-
-  # YYY: handle this via join table
-  def minio_servers
-    minio_pools.map(&:minio_servers).flatten
   end
 
   def per_pool_storage_size
@@ -50,6 +46,6 @@ class MinioCluster < Sequel::Model
   end
 
   def connection_strings
-    minio_servers.map { "http://#{_1.vm.ephemeral_net4}:9000" }
+    servers.map { "http://#{_1.vm.ephemeral_net4}:9000" }
   end
 end
