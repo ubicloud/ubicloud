@@ -94,12 +94,12 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "creates with default storage size from vm size" do
       st = described_class.assemble("some_ssh_key", prj.id)
-      expect(st.vm.storage_size_gib).to eq(Option::VmSizes.first.storage_size_gib)
+      expect(st.subject.storage_size_gib).to eq(Option::VmSizes.first.storage_size_gib)
     end
 
     it "creates with custom storage size if provided" do
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 40}])
-      expect(st.vm.storage_size_gib).to eq(40)
+      expect(st.subject.storage_size_gib).to eq(40)
     end
 
     it "fails if given nic_id is not valid" do
@@ -155,14 +155,14 @@ RSpec.describe Prog::Vm::Nexus do
     it "creates without encryption key if storage is not encrypted" do
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: false}])
       expect(StorageKeyEncryptionKey.count).to eq(0)
-      expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
+      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
       expect(described_class.new(st).storage_secrets.count).to eq(0)
     end
 
     it "creates with encryption key if storage is encrypted" do
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: true}])
       expect(StorageKeyEncryptionKey.count).to eq(1)
-      expect(st.vm.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
+      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
       expect(described_class.new(st).storage_secrets.count).to eq(1)
     end
   end

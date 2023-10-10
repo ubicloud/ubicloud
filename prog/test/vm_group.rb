@@ -81,9 +81,9 @@ class Prog::Test::VmGroup < Prog::Base
     strand.add_child(vm1_s)
     strand.add_child(vm2_s)
     strand.add_child(vm3_s)
-    strand.add_child(Strand[vm1_s.vm.nics.first.id])
-    strand.add_child(Strand[vm2_s.vm.nics.first.id])
-    strand.add_child(Strand[vm3_s.vm.nics.first.id])
+    strand.add_child(Strand[vm1_s.subject.nics.first.id])
+    strand.add_child(Strand[vm2_s.subject.nics.first.id])
+    strand.add_child(Strand[vm3_s.subject.nics.first.id])
 
     current_frame = strand.stack.first
     current_frame["vms"] = [vm1_s.id, vm2_s.id, vm3_s.id]

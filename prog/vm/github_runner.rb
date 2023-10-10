@@ -80,7 +80,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       host: "temp_#{vm_st.id}",
       raw_private_key_1: ssh_key.keypair
     ) { _1.id = vm_st.id }
-    vm_st.vm
+    vm_st.subject
   end
 
   SERVICE_NAME = "runner-script"

@@ -82,7 +82,7 @@ RSpec.describe Clover, "github" do
 
     it "can list active runners" do
       runner1 = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 1, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4")
-      vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").vm
+      vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").subject
       runner2 = GithubRunner.create_with_id(
         installation_id: installation.id,
         label: "ubicloud",

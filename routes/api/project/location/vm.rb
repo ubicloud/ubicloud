@@ -24,7 +24,7 @@ class CloverApi
         boot_image: r.params["boot_image"]
       )
 
-      serialize(st.vm)
+      serialize(st.subject)
     end
 
     r.is String do |vm_name|
