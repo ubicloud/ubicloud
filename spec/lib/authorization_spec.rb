@@ -10,7 +10,7 @@ RSpec.describe Authorization do
     ]
   }
   let(:projects) { (0..1).map { users[_1].create_project_with_default_policy("project-#{_1}") } }
-  let(:vms) { (0..3).map { Prog::Vm::Nexus.assemble("key", projects[_1 / 2].id, name: "vm#{_1}") }.map(&:vm) }
+  let(:vms) { (0..3).map { Prog::Vm::Nexus.assemble("key", projects[_1 / 2].id, name: "vm#{_1}") }.map(&:subject) }
   let(:access_policy) { projects[0].access_policies.first }
 
   after do

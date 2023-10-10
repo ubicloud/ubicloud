@@ -31,7 +31,7 @@ class CloverWeb
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
 
-      r.redirect "#{@project.path}#{st.vm.path}"
+      r.redirect "#{@project.path}#{st.subject.path}"
     end
 
     r.on "create" do

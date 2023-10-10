@@ -29,12 +29,12 @@ RSpec.describe Prog::Vm::HostNexus do
       st = described_class.assemble("127.0.0.1")
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
-      expect(st.vm_host.assigned_subnets.count).to eq(1)
-      expect(st.vm_host.assigned_subnets.first.cidr.to_s).to eq("127.0.0.1/32")
+      expect(st.subject.assigned_subnets.count).to eq(1)
+      expect(st.subject.assigned_subnets.first.cidr.to_s).to eq("127.0.0.1/32")
 
-      expect(st.vm_host.assigned_host_addresses.count).to eq(1)
-      expect(st.vm_host.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
-      expect(st.vm_host.provider).to be_nil
+      expect(st.subject.assigned_host_addresses.count).to eq(1)
+      expect(st.subject.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
+      expect(st.subject.provider).to be_nil
     end
 
     it "creates addresses properly for a hetzner host" do
@@ -43,13 +43,13 @@ RSpec.describe Prog::Vm::HostNexus do
       st = described_class.assemble("127.0.0.1", provider: "hetzner", hetzner_server_identifier: "1")
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
-      expect(st.vm_host.assigned_subnets.count).to eq(3)
-      expect(st.vm_host.assigned_subnets.map { _1.cidr.to_s }.sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
+      expect(st.subject.assigned_subnets.count).to eq(3)
+      expect(st.subject.assigned_subnets.map { _1.cidr.to_s }.sort).to eq(["127.0.0.1/32", "30.30.30.32/29", "2a01:4f8:10a:128b::/64"].sort)
 
-      expect(st.vm_host.assigned_host_addresses.count).to eq(1)
-      expect(st.vm_host.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
-      expect(st.vm_host.provider).to eq("hetzner")
-      expect(st.vm_host.data_center).to eq("fsn1-dc14")
+      expect(st.subject.assigned_host_addresses.count).to eq(1)
+      expect(st.subject.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
+      expect(st.subject.provider).to eq("hetzner")
+      expect(st.subject.data_center).to eq("fsn1-dc14")
     end
   end
 

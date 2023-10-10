@@ -10,7 +10,7 @@ RSpec.describe Clover, "vm" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
 
   let(:vm) do
-    vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").vm
+    vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject
     vm.update(ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
     vm.reload # without reload ephemeral_net6 is string and can't call .network
   end
