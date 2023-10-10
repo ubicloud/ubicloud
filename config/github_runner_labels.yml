@@ -3,3 +3,11 @@
 - { name: ubicloud-standard-4, vm_size: standard-4, boot_image: github-ubuntu-2204, location: github-runners }
 - { name: ubicloud-standard-8, vm_size: standard-8, boot_image: github-ubuntu-2204, location: github-runners }
 - { name: ubicloud-standard-16, vm_size: standard-16, boot_image: github-ubuntu-2204, location: github-runners }
+- { name: ubicloud-standard-2-ubuntu-2204, vm_size: standard-2, boot_image: github-ubuntu-2204, location: github-runners }
+- { name: ubicloud-standard-4-ubuntu-2204, vm_size: standard-4, boot_image: github-ubuntu-2204, location: github-runners }
+- { name: ubicloud-standard-8-ubuntu-2204, vm_size: standard-8, boot_image: github-ubuntu-2204, location: github-runners }
+- { name: ubicloud-standard-16-ubuntu-2204, vm_size: standard-16, boot_image: github-ubuntu-2204, location: github-runners }
+- { name: ubicloud-standard-2-ubuntu-2004, vm_size: standard-2, boot_image: github-ubuntu-2004, location: github-runners }
+- { name: ubicloud-standard-4-ubuntu-2004, vm_size: standard-4, boot_image: github-ubuntu-2004, location: github-runners }
+- { name: ubicloud-standard-8-ubuntu-2004, vm_size: standard-8, boot_image: github-ubuntu-2004, location: github-runners }
+- { name: ubicloud-standard-16-ubuntu-2004, vm_size: standard-16, boot_image: github-ubuntu-2004, location: github-runners }
