@@ -314,9 +314,7 @@ RSpec.describe Prog::Vnet::NicNexus do
 
     it "fails if there is vm attached" do
       expect(nic).to receive(:vm).and_return(true)
-      expect {
-        nx.destroy
-      }.to raise_error RuntimeError, "Cannot destroy nic with active vm, first clean up the attached resources"
+      expect { nx.destroy }.to nap(5)
     end
   end
 
