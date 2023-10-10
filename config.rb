@@ -94,4 +94,9 @@ module Config
   optional :github_app_private_key, string, clear: true
   optional :github_app_webhook_secret, string, clear: true
   optional :vm_pool_project_id, string
+
+  # Minio
+  override :minio_host_name, "storage.ubicloud.com", string
+  optional :minio_service_project_id, string
+  override :minio_version, "minio_20231007150738.0.0_amd64"
 end

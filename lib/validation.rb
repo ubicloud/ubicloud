@@ -24,9 +24,17 @@ module Validation
   # - Not start with a hyphen or number
   ALLOWED_OS_USER_NAME_PATTERN = '\A[a-z_][a-z0-9_-]{0,31}\z'
 
+  # Minio user name, we are using ALLOWED_OS_USER_NAME_PATTERN with min length of 3
+  ALLOWED_MINIO_USERNAME_PATTERN = '\A[a-z_][a-z0-9_-]{2,31}\z'
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name.match(ALLOWED_NAME_PATTERN)
+  end
+
+  def self.validate_minio_username(username)
+    msg = "Minio user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32, min length of 3."
+    fail ValidationFailed.new({username: msg}) unless username.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
   def self.validate_provider(provider)

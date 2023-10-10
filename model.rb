@@ -14,6 +14,7 @@ Sequel::Model.plugin :subclasses unless ENV["RACK_ENV"] == "development"
 Sequel::Model.plugin :column_encryption do |enc|
   enc.key 0, Config.clover_column_encryption_key
 end
+Sequel::Model.plugin :many_through_many
 
 module SemaphoreMethods
   def self.included(base)

@@ -7,21 +7,18 @@ class MinioServer < Sequel::Model
   many_to_one :project
   many_to_one :vm, key: :vm_id, class: :Vm
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, conditions: {Sequel.function(:upper, :span) => nil}
-  many_to_one :minio_pool, key: :minio_pool_id
+  many_to_one :pool, key: :minio_pool_id, class: :MinioPool
+  one_through_many :cluster, [[:minio_server, :id, :minio_pool_id], [:minio_pool, :id, :cluster_id]], class: :MinioCluster
+
+  dataset_module Authorization::Dataset
 
   include ResourceMethods
   include SemaphoreMethods
-  include Authorization::HyperTagMethods
-  include Authorization::TaggableMethods
 
-  semaphore :restart, :destroy, :minio_start
-
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{minio_cluster.location}/minio_server/#{name}"
-  end
+  semaphore :destroy
 
   def hostname
-    "#{minio_cluster.name}#{index}.#{Config.minio_host_name}"
+    "#{cluster.name}#{index}.#{Config.minio_host_name}"
   end
 
   def private_ipv4_address
@@ -29,23 +26,14 @@ class MinioServer < Sequel::Model
   end
 
   def name
-    "#{minio_cluster.name}-#{minio_pool.start_index}-#{index}"
-  end
-
-  # YYY: handle this via join table
-  def minio_cluster
-    minio_pool.minio_cluster
+    "#{cluster.name}-#{pool.start_index}-#{index}"
   end
 
   def minio_volumes
-    return "/minio/dat1" if minio_cluster.target_total_server_count == 1 && minio_cluster.target_total_driver_count == 1
-    return "/minio/dat{1...#{minio_cluster.target_total_driver_count}}" if minio_cluster.target_total_server_count == 1
-    minio_cluster.minio_pools.map do |pool|
+    return "/minio/dat1" if cluster.target_total_server_count == 1 && cluster.target_total_driver_count == 1
+    return "/minio/dat{1...#{cluster.target_total_driver_count}}" if cluster.target_total_server_count == 1
+    cluster.pools.map do |pool|
       pool.volumes_url
     end.join(" ")
-  end
-
-  def waiting?
-    strand.label == "wait"
   end
 end
