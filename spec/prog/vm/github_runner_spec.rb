@@ -171,18 +171,15 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#register_runner" do
-    it "generates runner if not runner id not set and hops" do
-      expect(github_runner).to receive(:runner_id).and_return(nil)
+    it "registers runner hops" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
       expect(sshable).to receive(:cmd).with("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./actions-runner/run.sh --jitconfig AABBCC")
-      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
 
       expect { nx.register_runner }.to hop("wait")
     end
 
     it "deletes the runner if the generate request fails due to 'already exists with the same name' error." do
-      expect(github_runner).to receive(:runner_id).and_return(nil)
       expect(client).to receive(:post)
         .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
         .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
@@ -195,7 +192,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "naps if the generate request fails due to 'already exists with the same name' error but couldn't find the runner" do
-      expect(github_runner).to receive(:runner_id).and_return(nil)
       expect(client).to receive(:post)
         .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
         .and_raise(Octokit::Conflict.new({body: "409 - Already exists - A runner with the name *** already exists."}))
@@ -205,27 +201,10 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "naps if the generate request fails due to 'Octokit::Conflict' but it's not already exists error" do
-      expect(github_runner).to receive(:runner_id).and_return(nil)
       expect(client).to receive(:post)
         .with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label]))
         .and_raise(Octokit::Conflict.new({body: "409 - Another issue"}))
       expect { nx.register_runner }.to raise_error Octokit::Conflict
-    end
-
-    it "deletes the runner if the script fails" do
-      expect(github_runner).to receive(:runner_id).and_return(123).at_least(:once)
-      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
-      expect(client).to receive(:delete)
-      expect(github_runner).to receive(:update).with(runner_id: nil, ready_at: nil)
-
-      expect { nx.register_runner }.to nap(10)
-    end
-
-    it "naps if script return unknown status" do
-      expect(github_runner).to receive(:runner_id).and_return(123).at_least(:once)
-      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("unknown")
-
-      expect { nx.register_runner }.to nap(10)
     end
   end
 
@@ -243,6 +222,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:job_id).and_return(nil)
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
       expect(client).to receive(:get).and_return({busy: false})
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:incr_destroy)
       expect(Clog).to receive(:emit).with("Destroying GithubRunner because it does not pick a job in two minutes").and_call_original
 
@@ -258,15 +238,22 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.wait }.to nap(15)
     end
 
-    it "destroys runner if runner-script exited with Succeeded" do
-      expect(github_runner).to receive(:job_id).and_return(123)
+    it "destroys the runner if the runner-script is succeeded" do
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
       expect(github_runner).to receive(:incr_destroy)
 
       expect { nx.wait }.to nap(0)
     end
 
-    it "naps" do
+    it "registers the runner again if the runner-script is failed" do
+      expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
+      expect(client).to receive(:delete)
+      expect(github_runner).to receive(:update).with(runner_id: nil, ready_at: nil)
+
+      expect { nx.wait }.to hop("register_runner")
+    end
+
+    it "naps if the runner-script is running" do
       expect(github_runner).to receive(:job_id).and_return(123)
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
 
