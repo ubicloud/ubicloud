@@ -10,13 +10,22 @@ RSpec.describe Prog::Base do
       parent.reload
     }.to change { parent.load.leaf? }.from(true).to(false)
 
+    child_id = parent.children.first.id
+    Semaphore.incr(child_id, :should_get_deleted)
+
     expect {
       # Execution donated to child sets the exitval.
       parent.run
 
       # Parent notices exitval is set and reaps the child.
       parent.run
-    }.to change { parent.load.leaf? }.from(false).to(true)
+    }.to change { parent.load.leaf? }.from(false).to(true).and change {
+      Semaphore.where(strand_id: child_id).empty?
+    }.from(false).to(true).and change {
+      parent.children.empty?
+    }.from(false).to(true).and change {
+      Strand[child_id].nil?
+    }.from(false).to(true)
   end
 
   describe "#pop" do
