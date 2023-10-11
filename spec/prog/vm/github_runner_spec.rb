@@ -162,7 +162,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
     expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
     expect(sshable).to receive(:invalidate_cache_entry)
-    expect(sshable).to receive(:cmd).with("sudo mv /usr/local/share/actions-runner ./")
+    expect(sshable).to receive(:cmd).with("sudo cp -a /usr/local/share/actions-runner ./")
     expect(sshable).to receive(:cmd).with("sudo chown -R runner:runner actions-runner")
     expect(sshable).to receive(:cmd).with("./actions-runner/env.sh")
     expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> ./actions-runner/.env")
