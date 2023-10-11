@@ -82,7 +82,8 @@ SQL
   end
 
   def unsynchronized_run
-    Clog.emit("starting strand") { {strand: values} }
+    start_time = Time.now
+    Clog.emit("starting strand") { {strand: values, time: start_time} }
 
     if label == stack.first["deadline_target"].to_s
       if (pg = Page.from_tag_parts(id, prog, stack.first["deadline_target"]))
@@ -144,7 +145,8 @@ SQL
       fail "BUG: Prog #{prog}##{label} did not provide flow control"
     end
   ensure
-    Clog.emit("finished strand") { {strand: values} }
+    finish_time = Time.now
+    Clog.emit("finished strand") { {strand: values, time: finish_time, duration: finish_time - start_time} }
   end
 
   def run(seconds = 0)
