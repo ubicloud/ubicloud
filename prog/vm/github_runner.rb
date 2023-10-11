@@ -155,50 +155,49 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def register_runner
-    unless github_runner.runner_id
-      begin
-        # We use generate-jitconfig instead of registration-token because it's
-        # recommended by GitHub for security reasons.
-        # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
-        data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1}
-        response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
-      rescue Octokit::Conflict => e
-        unless e.message.include?("Already exists")
-          raise e
-        end
-        # If the runner already exists and the model lacks a 'runner_id'
-        # column, this suggests that the process terminated prematurely before
-        # the 'runner_id' column could be updated. We need to locate the
-        # 'runner_id' using the name and delete it.
-        # After this, we can register the runner again.
-        runners = github_client.paginate("/repos/#{github_runner.repository_name}/actions/runners") do |data, last_response|
-          data[:runners].concat last_response.data[:runners]
-        end
-        unless (runner = runners[:runners].find { _1[:name] == github_runner.ubid.to_s })
-          fail "BUG: Failed with runner already exists error but couldn't find it"
-        end
-        Clog.emit("Deleting GithubRunner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner[:id]})} }
-        github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner[:id]}")
-        nap 5
-      end
+    # We use generate-jitconfig instead of registration-token because it's
+    # recommended by GitHub for security reasons.
+    # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
+    data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1}
+    response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
+    github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
 
-      github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
+    # We initiate an API call and a SSH connection under the same label to avoid
+    # having to store the encoded_jit_config.
+    command = "./actions-runner/run.sh --jitconfig #{response[:encoded_jit_config].shellescape}"
+    vm.sshable.cmd("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit #{SERVICE_NAME} --remain-after-exit -- #{command}")
 
-      command = "./actions-runner/run.sh --jitconfig #{response[:encoded_jit_config].shellescape}"
-      vm.sshable.cmd("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit #{SERVICE_NAME} --remain-after-exit -- #{command}")
+    hop_wait
+  rescue Octokit::Conflict => e
+    unless e.message.include?("Already exists")
+      raise e
     end
-
-    case vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp
-    when "exited", "running"
-      hop_wait
-    when "failed"
-      github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      github_runner.update(runner_id: nil, ready_at: nil)
+    # If the runner already exists at GitHub side, this suggests that the
+    # process terminated prematurely before start the runner script and hop wait.
+    # We need to locate the 'runner_id' using the name and delete it.
+    # After this, we can register the runner again.
+    runners = github_client.paginate("/repos/#{github_runner.repository_name}/actions/runners") do |data, last_response|
+      data[:runners].concat last_response.data[:runners]
     end
-    nap 10
+    unless (runner = runners[:runners].find { _1[:name] == github_runner.ubid.to_s })
+      fail "BUG: Failed with runner already exists error but couldn't find it"
+    end
+    Clog.emit("Deleting GithubRunner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner[:id]})} }
+    github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner[:id]}")
+    nap 5
   end
 
   label def wait
+    case vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp
+    when "exited"
+      github_runner.incr_destroy
+      nap 0
+    when "failed"
+      github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
+      github_runner.update(runner_id: nil, ready_at: nil)
+      hop_register_runner
+    end
+
     # If the runner doesn't pick a job in two minutes, destroy it
     if github_runner.job_id.nil? && Time.now > github_runner.ready_at + 60 * 2
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
@@ -207,11 +206,6 @@ class Prog::Vm::GithubRunner < Prog::Base
         Clog.emit("Destroying GithubRunner because it does not pick a job in two minutes") { {github_runner: github_runner.values} }
         nap 0
       end
-    end
-
-    if vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp == "exited"
-      github_runner.incr_destroy
-      nap 0
     end
 
     nap 15
