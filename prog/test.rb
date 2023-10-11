@@ -14,12 +14,12 @@ class Prog::Test < Prog::Base
   end
 
   label def pusher2
-    pop frame[:test_level] if retval
+    pop frame["test_level"] if retval
     push Prog::Test, {test_level: "3"}, :pusher3
   end
 
   label def pusher3
-    pop frame[:test_level]
+    pop frame["test_level"]
   end
 
   label def synchronized

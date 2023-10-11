@@ -34,7 +34,7 @@ RSpec.describe Prog::Base do
   end
 
   it "can push prog and frames on the stack" do
-    st = Strand.create_with_id(prog: "Test", label: :pusher1)
+    st = Strand.create_with_id(prog: "Test", label: "pusher1")
     expect {
       st.run
     }.to change { st.label }.from("pusher1").to("pusher2")

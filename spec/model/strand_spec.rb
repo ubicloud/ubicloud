@@ -12,8 +12,8 @@ RSpec.describe Strand do
   context "when leasing" do
     it "can take a lease only if one is not already taken" do
       st.save_changes
-      did_it = st.take_lease {
-        expect(st.take_lease {
+      did_it = st.take_lease_and_reload {
+        expect(st.take_lease_and_reload {
                  :never_happens
                }).to be false
 
@@ -28,7 +28,7 @@ RSpec.describe Strand do
       Semaphore.incr(st.id, :bogus)
 
       expect {
-        expect(st.take_lease { :never_happens }).to be_nil
+        expect(st.take_lease_and_reload { :never_happens }).to be_nil
       }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
     end
 
@@ -78,7 +78,7 @@ SQL
     st.label = "hop_entry"
     expect(st).to receive(:load).and_return Prog::Test.new(st)
     expect {
-      st.run
+      st.unsynchronized_run
     }.to change(st, :label).from("hop_entry").to("hop_exit")
   end
 
