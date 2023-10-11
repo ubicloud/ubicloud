@@ -22,16 +22,6 @@ RSpec.describe Strand do
       expect(did_it).to be :did_it
     end
 
-    it "deletes semaphores if the strand has exited" do
-      st.exitval = {status: "exited"}
-      st.save_changes
-      Semaphore.incr(st.id, :bogus)
-
-      expect {
-        expect(st.take_lease_and_reload { :never_happens }).to be_nil
-      }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
-    end
-
     it "does an integrity check that deleted records are gone" do
       st.label = "hop_exit"
       st.save_changes

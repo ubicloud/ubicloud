@@ -24,26 +24,16 @@ class Strand < Sequel::Model
     affected = DB[<<SQL, id].first
 UPDATE strand
 SET lease = now() + '120 seconds', try = try + 1, schedule = #{SCHEDULE}
-WHERE id = ? AND (lease IS NULL OR lease < now())
-RETURNING lease, exitval IS NOT NULL AS exited
+WHERE id = ? AND (lease IS NULL OR lease < now()) AND exitval IS NULL
+RETURNING lease
 SQL
     return false unless affected
     lease_time = affected.fetch(:lease)
-    exited = affected.fetch(:exited)
 
-    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, exited: exited}} }
+    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time}} }
     reload
 
     begin
-      if exited
-        # Clear any semaphores that get added to a exited Strand prog,
-        # since incr is entitled to be run at *any time* (including
-        # after exitval is set) and any such incements will prevent
-        # deletion of a Strand via foreign_key
-        Semaphore.where(strand_id: id).destroy
-        return
-      end
-
       yield
     ensure
       if @deleted

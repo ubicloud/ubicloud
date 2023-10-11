@@ -179,11 +179,20 @@ end
   end
 
   def reap
-    exited_children = strand.children_dataset.where(Sequel.~(exitval: nil)).all
+    deleted = strand.children.filter_map { |child|
+      next unless child.exitval
 
-    # Clear cache if anything was deleted.
-    strand.associations.delete(:children) if exited_children.count > 0
-    exited_children.each(&:destroy)
+      # Clear any semaphores that get added to a exited Strand prog,
+      # since incr is entitled to be run at *any time* (including
+      # after exitval is set, though it doesn't do anything) and any
+      # such incements will prevent deletion of a Strand via
+      # foreign_key
+      Semaphore.where(strand_id: child.id).destroy
+      child.destroy
+    }
+
+    strand.children.delete_if { deleted.include?(_1) }
+    deleted
   end
 
   def leaf?
