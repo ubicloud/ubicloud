@@ -200,6 +200,7 @@ SQL
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
 
+    Clog.emit("vm allocated") { {allocation: {vm_host_id: vm_host_id, ip4: ip4, address: address&.cidr&.to_s, routed_to: address&.routed_to_host_id}} }
     fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
 
     DB.transaction do
