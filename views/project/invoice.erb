@@ -93,7 +93,7 @@
             <tr>
               <th scope="col" class="py-3 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">RESOURCE</th>
               <th scope="col" class="px-3 py-3 text-left text-sm font-semibold text-gray-900">DESCRIPTION</th>
-              <th scope="col" class="px-3 py-3 text-left text-sm font-semibold text-gray-900">USAGE</th>
+              <th scope="col" class="px-3 py-3 text-right text-sm font-semibold text-gray-900">USAGE</th>
               <th scope="col" class="py-3 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6">AMOUNT</th>
             </tr>
           </thead>
@@ -103,8 +103,8 @@
               <tr>
                 <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= item[:name] %></td>
                 <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500"><%= item[:description] %></td>
-                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500"><%= item[:duration] %> minutes</td>
-                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-right text-sm text-gray-500 sm:pr-6"><%= item[:cost] %></td>
+                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500 text-right"><%= item[:duration] %> minutes</td>
+                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-right text-sm text-gray-500 sm:pr-6"><%= item[:cost_humanized] %></td>
               </tr>
             <% end %>
             <% else %>

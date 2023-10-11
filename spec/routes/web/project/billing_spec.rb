@@ -199,7 +199,9 @@ RSpec.describe Clover, "billing" do
       it "show invoice details" do
         expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
+        10.times do
+          billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
+        end
         InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run
         invoice = Invoice.first
 
@@ -208,7 +210,7 @@ RSpec.describe Clover, "billing" do
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - #{invoice.name} - Invoice")
         expect(page).to have_content invoice.name
-        expect(page).to have_content "less than $0.001"
+        expect(page).to have_content "Aggregated"
       end
 
       it "show current invoice when no usage" do
@@ -245,6 +247,7 @@ RSpec.describe Clover, "billing" do
         click_link href: "#{project.path}/billing/invoice/current"
         expect(page).to have_content "Current Usage Summary"
         expect(page).to have_content "$%0.02f" % invoice_current.content["cost"]
+        expect(page).to have_content "less than $0.001"
       end
 
       it "show invoice full page for generating PDF" do
