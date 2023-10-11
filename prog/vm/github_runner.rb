@@ -179,7 +179,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         end
         Clog.emit("Deleting GithubRunner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner[:id]})} }
         github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner[:id]}")
-        nap 0
+        nap 5
       end
 
       github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)

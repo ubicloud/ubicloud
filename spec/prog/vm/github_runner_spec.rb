@@ -191,7 +191,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         .and_return({runners: [{name: github_runner.ubid.to_s, id: 123}]})
       expect(client).to receive(:delete).with("/repos/#{github_runner.repository_name}/actions/runners/123")
       expect(Clog).to receive(:emit).with("Deleting GithubRunner because it already exists").and_call_original
-      expect { nx.register_runner }.to nap(0)
+      expect { nx.register_runner }.to nap(5)
     end
 
     it "naps if the generate request fails due to 'already exists with the same name' error but couldn't find the runner" do
