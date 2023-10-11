@@ -19,6 +19,10 @@ class Serializers::Web::Invoice < Serializers::Base
     }
   end
 
+  def self.humanized_cost(cost)
+    (cost < 0.001) ? "less than $0.001" : "$%0.03f" % cost
+  end
+
   structure(:default) do |inv|
     base(inv)
   end
@@ -43,7 +47,20 @@ class Serializers::Web::Invoice < Serializers::Base
               name: resource["resource_name"],
               description: line_item["description"],
               duration: line_item["duration"].to_i,
-              cost: (line_item["cost"] < 0.001) ? "less than $0.001" : "$%0.03f" % line_item["cost"]
+              cost: line_item["cost"],
+              cost_humanized: humanized_cost(line_item["cost"])
+            }
+          end
+        end.group_by { _1[:description] }.flat_map do |description, line_items|
+          if line_items.count <= 5
+            line_items
+          else
+            {
+              name: "#{line_items.count} x #{description} (Aggregated)",
+              description: description,
+              duration: line_items.sum { _1[:duration] },
+              cost: line_items.sum { _1[:cost] },
+              cost_humanized: humanized_cost(line_items.sum { _1[:cost] })
             }
           end
         end.sort_by { _1[:description] }
