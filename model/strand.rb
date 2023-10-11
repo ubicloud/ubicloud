@@ -20,7 +20,7 @@ class Strand < Sequel::Model
     one_to_one _1.intern, key: :id
   end
 
-  def take_lease
+  def take_lease_and_reload
     affected = DB[<<SQL, id].first
 UPDATE strand
 SET lease = now() + '120 seconds', try = try + 1, schedule = #{SCHEDULE}
@@ -32,6 +32,7 @@ SQL
     exited = affected.fetch(:exited)
 
     Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, exited: exited}} }
+    reload
 
     begin
       if exited
@@ -149,7 +150,7 @@ SQL
   def run(seconds = 0)
     fail "already deleted" if @deleted
     deadline = Time.now + seconds
-    take_lease do
+    take_lease_and_reload do
       loop do
         ret = unsynchronized_run
         now = Time.now
