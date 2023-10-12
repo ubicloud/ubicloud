@@ -198,6 +198,9 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def register_runner
+    # Do not register runner if the runner-script service is already running.
+    hop_wait unless vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp == "dead"
+
     # We use generate-jitconfig instead of registration-token because it's
     # recommended by GitHub for security reasons.
     # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
@@ -214,9 +217,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     hop_wait
   rescue Octokit::Conflict => e
-    unless e.message.include?("Already exists")
-      raise e
-    end
+    raise unless e.message.include?("Already exists")
     # If the runner already exists at GitHub side, this suggests that the
     # process terminated prematurely before start the runner script and hop wait.
     # We need to locate the 'runner_id' using the name and delete it.
