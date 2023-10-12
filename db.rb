@@ -4,7 +4,7 @@ require "netaddr"
 require "sequel/core"
 require_relative "config"
 
-DB = Sequel.connect(Config.clover_database_url).tap do |db|
+DB = Sequel.connect(Config.clover_database_url, max_connections: Config.db_pool - 1, pool_timeout: Config.database_timeout).tap do |db|
   # Replace dangerous (for cidrs) Ruby IPAddr type that is otherwise
   # used by sequel_pg.  Has come up more than once in the bug tracker:
   #
