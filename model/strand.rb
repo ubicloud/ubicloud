@@ -83,7 +83,8 @@ SQL
 
   def unsynchronized_run
     start_time = Time.now
-    Clog.emit("starting strand") { {strand: values, time: start_time} }
+    prog_label = "#{prog}.#{label}"
+    Clog.emit("starting strand") { {strand: values, time: start_time, prog_label: prog_label} }
 
     if label == stack.first["deadline_target"].to_s
       if (pg = Page.from_tag_parts(id, prog, stack.first["deadline_target"]))
@@ -146,7 +147,7 @@ SQL
     end
   ensure
     finish_time = Time.now
-    Clog.emit("finished strand") { {strand: values, time: finish_time, duration: finish_time - start_time} }
+    Clog.emit("finished strand") { {strand: values, time: finish_time, duration: finish_time - start_time, prog_label: prog_label} }
   end
 
   def run(seconds = 0)
