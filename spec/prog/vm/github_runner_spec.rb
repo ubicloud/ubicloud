@@ -18,7 +18,9 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:vm) {
-    Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "hetzner-hel1")
+    Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "hetzner-hel1").tap {
+      _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
+    }
   }
   let(:sshable) { instance_double(Sshable) }
   let(:client) { instance_double(Octokit::Client) }
@@ -412,7 +414,7 @@ JSON
       host_ssh = instance_double(Sshable)
       expect(nx.vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: host_ssh)).at_least(:once)
       expect(host_ssh).to receive(:cmd).with(
-        "sudo -- ip --detail --json --netns 00000000 link"
+        "sudo -- ip --detail --json --netns 9qf22jbv link"
       ).and_return(ip_netns_detail_json_fixture)
 
       expect(nx.vm.vm_host).to receive(:sshable).and_return(host_ssh)
