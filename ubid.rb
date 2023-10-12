@@ -100,7 +100,7 @@ class UBID
   end
 
   def self.from_uuidish(uuidish)
-    value = uuidish.to_s.tr("-", "").to_i(16)
+    value = Integer(uuidish.to_s.tr("-", ""), 16)
     new(value)
   end
 

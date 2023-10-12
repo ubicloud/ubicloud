@@ -3,7 +3,7 @@
 class Serializers::Web::Invoice < Serializers::Base
   def self.base(inv)
     {
-      ubid: inv.ubid,
+      ubid: inv.id ? inv.ubid : "current",
       path: inv.path,
       name: inv.name,
       filename: "Ubicloud-#{inv.begin_time.strftime("%Y-%m")}-#{inv.invoice_number}",
