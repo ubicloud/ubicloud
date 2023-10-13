@@ -139,7 +139,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # the golden image. However, it needs to be moved to the home directory because
     # the runner creates some configuration files at the script location. The "runner"
     # user doesn't have write permission for the "/usr/local/share/" directory.
-    vm.sshable.cmd("sudo cp -a /usr/local/share/actions-runner ./")
+    vm.sshable.cmd("sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./")
     vm.sshable.cmd("sudo chown -R runner:runner actions-runner")
 
     # ./env.sh sets some variables for runner to run properly
