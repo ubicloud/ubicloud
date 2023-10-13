@@ -16,6 +16,7 @@ RSpec.describe DnsZone do
 
   before do
     allow(dns_zone).to receive(:dns_servers).and_return([dns_server])
+    allow(dns_zone).to receive(:incr_refresh_dns_servers)
   end
 
   context "when inserting new record" do
