@@ -9,8 +9,11 @@ class DnsZone < Sequel::Model
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
 
   include ResourceMethods
+  include SemaphoreMethods
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
+
+  semaphore :refresh_dns_servers
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/dns-zone/#{ubid}"
@@ -19,6 +22,8 @@ class DnsZone < Sequel::Model
   def insert_record(record_name:, type:, ttl:, data:)
     record_name = add_dot_if_missing(record_name)
     DnsRecord.create_with_id(dns_zone_id: id, name: record_name, type: type, ttl: ttl, data: data)
+
+    incr_refresh_dns_servers
   rescue Sequel::UniqueConstraintViolation => ex
     raise unless ex.message.include?("duplicate key value violates unique constraint")
   end
@@ -31,6 +36,10 @@ class DnsZone < Sequel::Model
     records = records.where(type: type) if type
     records = records.where(data: data) if data
     records.update(tombstoned: true)
+
+    DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records.map(&:id)).delete(force: true)
+
+    incr_refresh_dns_servers
   end
 
   def add_dot_if_missing(record_name)
