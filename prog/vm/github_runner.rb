@@ -111,17 +111,20 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def wait_vm
     nap 5 unless vm.strand.label == "wait"
     vm.sshable.update(host: vm.ephemeral_net4)
-    hop_setup_environment
-  end
-
-  label def setup_environment
     register_deadline(:wait, 10 * 60)
 
+    hop_install_nftables_rules
+  end
+
+  label def install_nftables_rules
     # Prevent other ports listening to traffic unless they send
     # traffic first, i.e. "outbound only" connections, save SSH that
     # clover uses to manipulate things.
     install_ssh_listen_only_nftables_chain
+    hop_setup_environment
+  end
 
+  label def setup_environment
     # runner unix user needed access to manipulate the Docker daemon.
     # Default GitHub hosted runners have additional adm,systemd-journal groups.
     vm.sshable.cmd("sudo usermod -a -G docker,adm,systemd-journal runner")

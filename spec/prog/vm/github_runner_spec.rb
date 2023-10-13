@@ -160,21 +160,30 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(sshable).to receive(:update).with(host: "1.1.1.1")
-      expect { nx.wait_vm }.to hop("setup_environment")
+      expect { nx.wait_vm }.to hop("install_nftables_rules")
     end
   end
 
-  it "hops to install_actions_runner" do
-    expect(nx).to receive(:install_ssh_listen_only_nftables_chain)
-    expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
-    expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
-    expect(sshable).to receive(:invalidate_cache_entry)
-    expect(sshable).to receive(:cmd).with("sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./")
-    expect(sshable).to receive(:cmd).with("sudo chown -R runner:runner actions-runner")
-    expect(sshable).to receive(:cmd).with("./actions-runner/env.sh")
-    expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> ./actions-runner/.env")
+  describe "#install_nftables_rules" do
+    it "hops to setup_environment" do
+      expect(nx).to receive(:install_ssh_listen_only_nftables_chain)
 
-    expect { nx.setup_environment }.to hop("register_runner")
+      expect { nx.install_nftables_rules }.to hop("setup_environment")
+    end
+  end
+
+  describe "#setup_environment" do
+    it "hops to register_runner" do
+      expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
+      expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
+      expect(sshable).to receive(:invalidate_cache_entry)
+      expect(sshable).to receive(:cmd).with("sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./")
+      expect(sshable).to receive(:cmd).with("sudo chown -R runner:runner actions-runner")
+      expect(sshable).to receive(:cmd).with("./actions-runner/env.sh")
+      expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> ./actions-runner/.env")
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
   end
 
   describe "#register_runner" do
