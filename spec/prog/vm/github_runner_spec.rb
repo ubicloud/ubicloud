@@ -175,13 +175,15 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#setup_environment" do
     it "hops to register_runner" do
-      expect(sshable).to receive(:cmd).with("sudo usermod -a -G docker,adm,systemd-journal runner")
-      expect(sshable).to receive(:cmd).with(/\/opt\/post-generation/)
-      expect(sshable).to receive(:invalidate_cache_entry)
-      expect(sshable).to receive(:cmd).with("sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./")
-      expect(sshable).to receive(:cmd).with("sudo chown -R runner:runner actions-runner")
-      expect(sshable).to receive(:cmd).with("./actions-runner/env.sh")
-      expect(sshable).to receive(:cmd).with("echo \"PATH=$PATH\" >> ./actions-runner/.env")
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        sudo usermod -a -G docker,adm,systemd-journal runner
+        sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
+        source /etc/environment
+        sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
+        sudo chown -R runner:runner actions-runner
+        ./actions-runner/env.sh
+        echo "PATH=$PATH" >> ./actions-runner/.env
+      COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
     end

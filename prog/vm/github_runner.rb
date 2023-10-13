@@ -126,38 +126,43 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def setup_environment
-    # runner unix user needed access to manipulate the Docker daemon.
-    # Default GitHub hosted runners have additional adm,systemd-journal groups.
-    vm.sshable.cmd("sudo usermod -a -G docker,adm,systemd-journal runner")
+    command = <<~COMMAND
+      # runner unix user needed access to manipulate the Docker daemon.
+      # Default GitHub hosted runners have additional adm,systemd-journal groups.
+      sudo usermod -a -G docker,adm,systemd-journal runner
 
-    # Some configuration files such as $PATH related to the user's home directory
-    # need to be changed. GitHub recommends to run post-generation scripts after
-    # initial boot.
-    # The important point, scripts use latest record at /etc/passwd as default user.
-    # So we need to run these scripts before bootstrap_rhizome to use runner user,
-    # instead of rhizome user.
-    # https://github.com/actions/runner-images/blob/main/docs/create-image-and-azure-resources.md#post-generation-scripts
-    vm.sshable.cmd("sudo su -c \"find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'\"")
+      # Some configuration files such as $PATH related to the user's home directory
+      # need to be changed. GitHub recommends to run post-generation scripts after
+      # initial boot.
+      # The important point, scripts use latest record at /etc/passwd as default user.
+      # So we need to run these scripts before bootstrap_rhizome to use runner user,
+      # instead of rhizome user.
+      # https://github.com/actions/runner-images/blob/main/docs/create-image-and-azure-resources.md#post-generation-scripts
+      sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
 
-    # Post-generation scripts write some variables at /etc/environment file.
-    # We need to reconnect machine to load environment variables again.
-    vm.sshable.invalidate_cache_entry
+      # Post-generation scripts write some variables at /etc/environment file.
+      # We need to reload environment variables again.
+      source /etc/environment
 
-    # We placed the script in the "/usr/local/share/" directory while generating
-    # the golden image. However, it needs to be moved to the home directory because
-    # the runner creates some configuration files at the script location. The "runner"
-    # user doesn't have write permission for the "/usr/local/share/" directory.
-    vm.sshable.cmd("sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./")
-    vm.sshable.cmd("sudo chown -R runner:runner actions-runner")
+      # We placed the script in the "/usr/local/share/" directory while generating
+      # the golden image. However, it needs to be moved to the home directory because
+      # the runner creates some configuration files at the script location. The "runner"
+      # user doesn't have write permission for the "/usr/local/share/" directory.
+      sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
+      sudo chown -R runner:runner actions-runner
 
-    # ./env.sh sets some variables for runner to run properly
-    vm.sshable.cmd("./actions-runner/env.sh")
+      # ./env.sh sets some variables for runner to run properly
+      ./actions-runner/env.sh
 
-    # runner script doesn't use global $PATH variable by default. It gets path from
-    # secure_path at /etc/sudoers. Also script load .env file, so we are able to
-    # overwrite default path value of runner script with $PATH.
-    # https://github.com/microsoft/azure-pipelines-agent/issues/3461
-    vm.sshable.cmd("echo \"PATH=$PATH\" >> ./actions-runner/.env")
+      # runner script doesn't use global $PATH variable by default. It gets path from
+      # secure_path at /etc/sudoers. Also script load .env file, so we are able to
+      # overwrite default path value of runner script with $PATH.
+      # https://github.com/microsoft/azure-pipelines-agent/issues/3461
+      echo "PATH=$PATH" >> ./actions-runner/.env
+    COMMAND
+
+    # Remove comments and empty lines before sending them to the machine
+    vm.sshable.cmd(command.gsub(/^(#.*)?\n/, ""))
 
     hop_register_runner
   end
