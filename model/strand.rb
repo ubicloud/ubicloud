@@ -101,7 +101,7 @@ SQL
       next unless (deadline_at = frame["deadline_at"])
 
       if Time.now > Time.parse(deadline_at.to_s)
-        Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{prog} did not reach #{frame["deadline_target"]} on time", id, prog, frame["deadline_target"])
+        Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{prog}.#{label} did not reach #{frame["deadline_target"]} on time", id, prog, frame["deadline_target"])
 
         modified!(:stack)
       end
