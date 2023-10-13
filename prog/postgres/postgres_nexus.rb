@@ -78,6 +78,11 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     register_deadline(:wait, 10 * 60)
 
     bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi"}
+    hop_create_dns_record
+  end
+
+  label def create_dns_record
+    dns_zone.insert_record(record_name: postgres_server.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
     hop_wait_bootstrap_rhizome
   end
 
@@ -200,9 +205,14 @@ SQL
       nap 5
     end
 
+    dns_zone.delete_record(record_name: postgres_server.hostname)
     postgres_server.dissociate_with_project(postgres_server.project)
     postgres_server.destroy
 
     pop "postgres server is deleted"
+  end
+
+  def dns_zone
+    @@dns_zone ||= DnsZone.where(project_id: Config.postgres_service_project_id, name: "postgres.ubicloud.com").first
   end
 end

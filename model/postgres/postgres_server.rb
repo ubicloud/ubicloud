@@ -57,7 +57,11 @@ class PostgresServer < Sequel::Model
     }
   end
 
+  def hostname
+    "#{server_name}.postgres.ubicloud.com"
+  end
+
   def connection_string
-    URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: vm.sshable.host).to_s
+    URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s
   end
 end

@@ -69,6 +69,6 @@ RSpec.describe PostgresServer do
   end
 
   it "returns connection string" do
-    expect(pgs.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4")
+    expect(pgs.connection_string).to eq("postgres://postgres:dummy-password@pg-server-name.postgres.ubicloud.com")
   end
 end
