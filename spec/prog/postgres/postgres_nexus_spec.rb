@@ -87,7 +87,18 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     it "buds a bootstrap rhizome process" do
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi"})
-      expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
+      expect { nx.bootstrap_rhizome }.to hop("create_dns_record")
+    end
+  end
+
+  describe "#create_dns_record" do
+    it "creates dns records and hops" do
+      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(postgres_server).to receive(:hostname).and_return("pg-server-name.postgres.ubicloud.com.")
+      dns_zone = instance_double(DnsZone)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-server-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
+      expect(nx).to receive(:dns_zone).and_return(dns_zone)
+      expect { nx.create_dns_record }.to hop("wait_bootstrap_rhizome")
     end
   end
 
@@ -257,6 +268,10 @@ RSpec.describe Prog::Postgres::PostgresNexus do
 
   describe "#destroy" do
     it "triggers vm deletion and waits until it is deleted" do
+      dns_zone = instance_double(DnsZone)
+      expect(postgres_server).to receive(:hostname)
+      expect(dns_zone).to receive(:delete_record)
+      expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(sshable).to receive(:destroy)
       expect(vm).to receive(:private_subnets).and_return([])
       expect(vm).to receive(:incr_destroy)
@@ -272,6 +287,15 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect(postgres_server).to receive(:destroy)
 
       expect { nx.destroy }.to exit({"msg" => "postgres server is deleted"})
+    end
+  end
+
+  describe "#dns_zone" do
+    it "fetches dns zone from database only once" do
+      expect(DnsZone).to receive(:where).exactly(:once).and_return([true])
+
+      nx.dns_zone
+      nx.dns_zone
     end
   end
 end
