@@ -15,7 +15,9 @@ class VmPool < Sequel::Model
     DB.transaction do
       # first lock the whole pool in the join table so that no other thread can
       # pick a vm from this pool
-      picked_vm = vms_dataset.for_update.where(display_state: "running").first
+      vms_dataset.for_update.all
+      pick_vm_id_q = vms_dataset.left_join(:github_runner, vm_id: :id).where(Sequel[:github_runner][:vm_id] => nil, Sequel[:vm][:display_state] => "running").select(Sequel[:vm][:id])
+      picked_vm = Vm.where(id: pick_vm_id_q).first
       return nil unless picked_vm
 
       picked_vm.dissociate_with_project(picked_vm.projects.first)
@@ -26,8 +28,6 @@ class VmPool < Sequel::Model
       picked_vm.active_billing_record.finalize(Time.now - 1)
       picked_vm.assigned_vm_address&.active_billing_record&.finalize(Time.now - 1)
 
-      # remove the VM from the pool
-      picked_vm.update(pool_id: nil)
       picked_vm
     end
   end
