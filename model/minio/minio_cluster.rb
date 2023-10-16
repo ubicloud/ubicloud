@@ -1,0 +1,55 @@
+# frozen_string_literal: true
+
+require_relative "../../model"
+
+class MinioCluster < Sequel::Model
+  one_to_many :minio_pools, key: :cluster_id do |ds|
+    ds.order(:start_index)
+  end
+  one_to_one :strand, key: :id
+  many_to_one :private_subnet, key: :private_subnet_id
+
+  include ResourceMethods
+  include SemaphoreMethods
+  include Authorization::HyperTagMethods
+  include Authorization::TaggableMethods
+
+  semaphore :restart, :destroy
+
+  plugin :column_encryption do |enc|
+    enc.column :admin_password
+  end
+
+  def hyper_tag_name(project)
+    "project/#{project.ubid}/location/#{location}/minio_cluster/#{name}"
+  end
+
+  def generate_etc_hosts_entry
+    minio_pools.map do |pool|
+      pool.minio_servers.map do |server|
+        "#{server.private_ipv4_address} #{server.hostname}"
+      end.join("\n")
+    end.join("\n")
+  end
+
+  # YYY: handle this via join table
+  def minio_servers
+    minio_pools.map(&:minio_servers).flatten
+  end
+
+  def per_pool_storage_size
+    (target_total_storage_size_gib / target_total_pool_count).to_i
+  end
+
+  def per_pool_server_count
+    (target_total_server_count / target_total_pool_count).to_i
+  end
+
+  def per_pool_driver_count
+    (target_total_driver_count / target_total_pool_count).to_i
+  end
+
+  def connection_strings
+    minio_servers.map { "http://#{_1.vm.ephemeral_net4}:9000" }
+  end
+end
