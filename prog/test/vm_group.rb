@@ -151,7 +151,6 @@ class Prog::Test::VmGroup < Prog::Base
   label def destroy_vms
     frame["vms"].each { |vm_id|
       Vm[vm_id].incr_destroy
-      Sshable[vm_id].destroy
     }
 
     hop_wait_vms_destroyed

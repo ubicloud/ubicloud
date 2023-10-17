@@ -237,7 +237,6 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     if vm
       vm.private_subnets.each { _1.incr_destroy }
-      vm.sshable.destroy
       vm.incr_destroy
     end
 
