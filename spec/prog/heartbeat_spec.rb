@@ -16,6 +16,12 @@ RSpec.describe Prog::Heartbeat do
       expect { hb.wait }.to raise_error Sequel::DatabaseConnectionError
     end
 
+    it "naps if it can't send request in expected time" do
+      stub_request(:get, "http://localhost:3000").and_raise(Excon::Error::Timeout)
+      expect(Clog).to receive(:emit).with("heartbeat request timed out")
+      expect { hb.wait }.to nap(10)
+    end
+
     it "pushes a heartbeat and naps" do
       stub_request(:get, "http://localhost:3000").to_return(status: 200)
 
