@@ -27,8 +27,8 @@ class BillingRecord < Sequel::Model
     (duration_end - duration_begin) / 60
   end
 
-  def finalize(end_time = Time.now)
-    update(span: Sequel.pg_range(span.begin...end_time))
+  def finalize
+    self.class.where(id: id).update(span: Sequel.lit("tstzrange(lower(span), now())"))
   end
 
   def billing_rate

@@ -25,8 +25,8 @@ class VmPool < Sequel::Model
 
       # the billing records are updated here because the VM will be assigned
       # to a customer.
-      picked_vm.active_billing_record.finalize(Time.now - 1)
-      picked_vm.assigned_vm_address&.active_billing_record&.finalize(Time.now - 1)
+      picked_vm.active_billing_record.finalize
+      picked_vm.assigned_vm_address&.active_billing_record&.finalize
 
       picked_vm
     end
