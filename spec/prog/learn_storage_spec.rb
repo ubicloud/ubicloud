@@ -8,74 +8,22 @@ RSpec.describe Prog::LearnStorage do
   describe "#start" do
     it "exits, popping total storage and available storage" do
       sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("df -h --output=size /var").and_return(<<EOS)
-      Size
-      500G
+      expect(sshable).to receive(:cmd).with("df -B1 --output=size,avail /var").and_return(<<EOS)
+1B-blocks     Avail
+494384795648 299711037440
 EOS
-      expect(sshable).to receive(:cmd).with("df -h --output=avail /var").and_return(<<EOS)
-      Avail
-       200G
-EOS
+
       expect(ls).to receive(:sshable).and_return(sshable).at_least(:once)
-      expect(ls).to receive(:pop).with(total_storage_gib: 500, available_storage_gib: 195)
+      expect(ls).to receive(:pop).with(total_storage_gib: 460, available_storage_gib: 274)
       ls.start
     end
   end
 
-  describe "#parse_size_gib" do
-    it "can parse gigabytes" do
-      expect(
-        ls.parse_size_gib("/var", <<EOS)
-            Size
-            460G
-EOS
-      ).to eq(460)
-    end
-
-    it "can parse terabytes" do
-      expect(
-        ls.parse_size_gib("/var", <<EOS)
-            Size
-            5T
-EOS
-      ).to eq(5 * 1024)
-    end
-
-    it "can parse size with decimal point" do
-      expect(
-        ls.parse_size_gib("/var", <<EOS)
-            Size
-            1.8T
-EOS
-      ).to eq(1843)
-    end
-
-    it "fails to parse size with invalid chars" do
+  describe Prog::LearnStorage::ParseDf do
+    it "returns nil when parsing bad input" do
       expect {
-        ls.parse_size_gib("/var", <<EOS)
-            Size
-            1x8T
-EOS
-      }.to raise_error RuntimeError, "BUG: unexpected storage size unit: x8T"
-    end
-
-    it "crashes if an unfamiliar unit is provided" do
-      expect {
-        ls.parse_size_gib("/var", <<EOS)
-        Size
-        460M
-EOS
-      }.to raise_error RuntimeError, "BUG: unexpected storage size unit: M"
-    end
-
-    it "crashes if more than one size is provided" do
-      expect {
-        ls.parse_size_gib("/var", <<EOS)
-          Size
-          460G
-          420G
-EOS
-      }.to raise_error RuntimeError, "BUG: expected one size for /var, but received: [460, 420]"
+        described_class.parse("")
+      }.to raise_error RuntimeError, "BUG: unexpected output from df"
     end
   end
 end
