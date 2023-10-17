@@ -195,7 +195,10 @@ SQL
 
   label def start
     register_deadline(:wait, 10 * 60)
+    hop_allocate_vm
+  end
 
+  label def allocate_vm
     vm_host_id = allocate
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
