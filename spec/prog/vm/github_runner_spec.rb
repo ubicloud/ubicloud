@@ -292,7 +292,6 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
-      expect(sshable).to receive(:destroy)
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
@@ -303,7 +302,6 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
       expect(github_runner).to receive(:vm).and_return(nil)
-      expect(sshable).not_to receive(:destroy)
       expect(vm).not_to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")

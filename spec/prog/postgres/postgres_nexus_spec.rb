@@ -344,12 +344,10 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect(postgres_resource).to receive(:hostname)
       expect(dns_zone).to receive(:delete_record)
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
-      expect(sshable).to receive(:destroy)
       expect(vm).to receive(:private_subnets).and_return([])
       expect(vm).to receive(:incr_destroy)
       expect { nx.destroy }.to nap(5)
 
-      expect(vm).to receive(:sshable).and_return(nil)
       expect(vm).to receive(:private_subnets).and_return([])
       expect(vm).to receive(:incr_destroy)
       expect { nx.destroy }.to nap(5)

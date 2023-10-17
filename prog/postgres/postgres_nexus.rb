@@ -241,7 +241,6 @@ SQL
 
     if vm
       vm.private_subnets.each { _1.incr_destroy }
-      vm.sshable&.destroy
       vm.incr_destroy
       nap 5
     end

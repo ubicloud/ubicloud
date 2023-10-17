@@ -12,6 +12,8 @@ class Vm < Sequel::Model
   one_to_many :vm_storage_volumes, key: :vm_id
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
 
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy
+
   dataset_module Authorization::Dataset
 
   include ResourceMethods
