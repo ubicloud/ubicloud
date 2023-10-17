@@ -396,14 +396,19 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait if sshable" do
+      expect(vm).to receive(:created_at).and_return(Time.now)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhhqmsyfvzpy2q9gqb5h0mpde2"))
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@10.0.0.1 2>&1").and_return("Host key verification failed.")
       expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+      expect(Clog).to receive(:emit).with("vm provisioned").and_call_original
       expect { nx.wait_sshable }.to hop("wait")
     end
 
     it "uses ipv6 if ipv4 is not enabled" do
+      expect(vm).to receive(:created_at).and_return(Time.now)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhhqmsyfvzpy2q9gqb5h0mpde2"))
       expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:3bfa::/79"))
       expect(nx).to receive(:`).with("ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@2a01:4f8:10a:128b:3bfa::2 2>&1").and_return("Host key verification failed.")
       expect(vm).to receive(:update).with(display_state: "running").and_return(true)

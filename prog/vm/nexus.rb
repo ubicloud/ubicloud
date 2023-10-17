@@ -299,6 +299,7 @@ SQL
     out = `ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@#{addr} 2>&1`
     if out.include? "Host key verification failed."
       vm.update(display_state: "running")
+      Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
       hop_wait
     end
     nap 1
