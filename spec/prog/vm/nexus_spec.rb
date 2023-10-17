@@ -432,7 +432,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "hops to destroy if billing record is not found for ipv4" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm.active_billing_record).to receive(:update)
+      expect(vm.active_billing_record).to receive(:finalize)
       assigned_adr = instance_double(AssignedVmAddress)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(nil)
