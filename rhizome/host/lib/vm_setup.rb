@@ -313,6 +313,7 @@ dhcp-authoritative
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
+dhcp-option=26,1400
 DNSMASQ_CONF
 
     ethernets = nics.map do |net6, net4, tapname, mac|
