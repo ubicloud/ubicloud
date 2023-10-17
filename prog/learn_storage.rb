@@ -11,9 +11,19 @@ class Prog::LearnStorage < Prog::Base
     end
   end
 
+  def df_command(path) = "df -B1 --output=size,avail #{path}"
+
   label def start
-    q_storage_root = "/var".shellescape.freeze
-    parsed = ParseDf.parse(sshable.cmd("df -B1 --output=size,avail #{q_storage_root}"))
+    q_var_root = "/var".shellescape.freeze
+    q_storage_root = "/var/storage".shellescape.freeze
+
+    # For GitHub runner hosts, we mount /var/storage from a separate btrfs disk
+    # partition. As a result, /var does not include the size of /var/storage,
+    # which has more storage. We can't check the size of /var/storage directly,
+    # because it might not there for other hosts at this step. Until we unify
+    # our hosts with ext4 disks, we check /var/storage only if exists.
+    output = sshable.cmd("if [ -d #{q_storage_root} ]; then #{df_command(q_storage_root)}; else #{df_command(q_var_root)}; fi")
+    parsed = ParseDf.parse(output)
 
     # reserve 5G for future host related stuff
     available_storage_gib = [0, parsed.avail_gib - 5].max

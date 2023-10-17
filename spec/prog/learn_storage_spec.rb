@@ -8,7 +8,7 @@ RSpec.describe Prog::LearnStorage do
   describe "#start" do
     it "exits, popping total storage and available storage" do
       sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("df -B1 --output=size,avail /var").and_return(<<EOS)
+      expect(sshable).to receive(:cmd).with("if [ -d /var/storage ]; then df -B1 --output=size,avail /var/storage; else df -B1 --output=size,avail /var; fi").and_return(<<EOS)
 1B-blocks     Avail
 494384795648 299711037440
 EOS
