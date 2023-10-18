@@ -113,7 +113,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   label def install_postgres
     case vm.sshable.cmd("common/bin/daemonizer --check install_postgres")
     when "Succeeded"
-      hop_refresh_server_certificate
+      hop_initialize_certificates
     when "Failed", "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install_postgres' install_postgres")
     end
@@ -121,43 +121,40 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     nap 5
   end
 
-  label def refresh_server_certificate
-    if postgres_server.server_cert &&
-        OpenSSL::X509::Certificate.new(postgres_server.server_cert).not_after > Time.now + 60 * 60 * 24 * 30
-      hop_wait
-    end
-
-    # create a root certificate if it is not created yet
-    if postgres_server.root_cert.nil?
-      postgres_server.root_cert, postgres_server.root_cert_key = Util.create_certificate(
-        subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority",
-        extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
-        duration: 60 * 60 * 24 * 365 * 10 # ~10 years
-      ).map(&:to_pem)
-    end
-
-    root_cert = OpenSSL::X509::Certificate.new(postgres_server.root_cert)
-    root_cert_key = OpenSSL::PKey::EC.new(postgres_server.root_cert_key)
-
-    postgres_server.server_cert, postgres_server.server_cert_key = Util.create_certificate(
-      subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate",
-      extensions: ["subjectAltName=DNS:#{postgres_server.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
-      duration: 60 * 60 * 24 * 30 * 6, # ~6 months
-      issuer_cert: root_cert,
-      issuer_key: root_cert_key
-    ).map(&:to_pem)
+  label def initialize_certificates
+    # Each root will be valid for 10 years and will be used to generate server
+    # certificates between its 4th and 9th years. To simulate this behaviour
+    # without excessive branching, we create the very first root certificate
+    # with only 5 year validity. So it would look like it is created 5 years
+    # ago.
+    postgres_server.root_cert_1, postgres_server.root_cert_key_1 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 5)
+    postgres_server.root_cert_2, postgres_server.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
+    create_server_certificate
 
     postgres_server.save_changes
+    hop_configure
+  end
 
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.server_cert)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.server_cert_key)
-    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
-
-    when_initial_provisioning_set? do
-      hop_configure
+  label def refresh_certificates
+    # We stop using root_cert_1 to sign server certificates at the beginning
+    # of 9th year of its validity. However it is possible that it is used to
+    # sign a server just at the beginning of the 9 year mark, thus it needs
+    # to be in the list of trusted roots until that server certificate expires.
+    # 10 year - (9 year + 6 months) - (1 month padding) = 5 months. So we will
+    # rotate the root_cert_1 with root_cert_2 if the remaining time is less
+    # than 5 months.
+    if OpenSSL::X509::Certificate.new(postgres_server.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+      postgres_server.root_cert_1, postgres_server.root_cert_key_1 = postgres_server.root_cert_2, postgres_server.root_cert_key_2
+      postgres_server.root_cert_2, postgres_server.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
     end
 
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
+    if OpenSSL::X509::Certificate.new(postgres_server.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
+      create_server_certificate
+    end
+
+    postgres_server.certificate_last_checked_at = Time.now
+    postgres_server.save_changes
+
     hop_wait
   end
 
@@ -230,6 +227,10 @@ SQL
   end
 
   label def wait
+    if postgres_server.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+      hop_refresh_certificates
+    end
+
     nap 30
   end
 
@@ -254,5 +255,36 @@ SQL
 
   def dns_zone
     @@dns_zone ||= DnsZone.where(project_id: Config.postgres_service_project_id, name: "postgres.ubicloud.com").first
+  end
+
+  def create_root_certificate(duration:)
+    Util.create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority",
+      extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
+      duration: duration
+    ).map(&:to_pem)
+  end
+
+  def create_server_certificate
+    root_cert = OpenSSL::X509::Certificate.new(postgres_server.root_cert_1)
+    root_cert_key = OpenSSL::PKey::EC.new(postgres_server.root_cert_key_1)
+    if root_cert.not_after < Time.now + 60 * 60 * 24 * 365 * 1
+      root_cert = OpenSSL::X509::Certificate.new(postgres_server.root_cert_2)
+      root_cert_key = OpenSSL::PKey::EC.new(postgres_server.root_cert_key_2)
+    end
+
+    postgres_server.server_cert, postgres_server.server_cert_key = Util.create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate",
+      extensions: ["subjectAltName=DNS:#{postgres_server.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
+      duration: 60 * 60 * 24 * 30 * 6, # ~6 months
+      issuer_cert: root_cert,
+      issuer_key: root_cert_key
+    ).map(&:to_pem)
+    postgres_server.save_changes
+
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.server_cert)
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.server_cert_key)
+    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
   end
 end
