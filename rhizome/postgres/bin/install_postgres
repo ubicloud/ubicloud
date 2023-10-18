@@ -9,6 +9,8 @@ r "apt-get update"
 r "apt-get -y install postgresql-common"
 
 r "echo \"initdb_options = '--data-checksums'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
+r "echo \"ssl_cert_file = '/var/lib/postgresql/16/main/server.crt'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
+r "echo \"ssl_key_file = '/var/lib/postgresql/16/main/server.key'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
 
 r "apt-get -y install postgresql-16"
 

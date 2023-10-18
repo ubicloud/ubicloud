@@ -113,12 +113,52 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   label def install_postgres
     case vm.sshable.cmd("common/bin/daemonizer --check install_postgres")
     when "Succeeded"
-      hop_configure
+      hop_refresh_server_certificate
     when "Failed", "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install_postgres' install_postgres")
     end
 
     nap 5
+  end
+
+  label def refresh_server_certificate
+    if postgres_server.server_cert &&
+        OpenSSL::X509::Certificate.new(postgres_server.server_cert).not_after > Time.now + 60 * 60 * 24 * 30
+      hop_wait
+    end
+
+    # create a root certificate if it is not created yet
+    if postgres_server.root_cert.nil?
+      postgres_server.root_cert, postgres_server.root_cert_key = Util.create_certificate(
+        subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority",
+        extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
+        duration: 60 * 60 * 24 * 365 * 10 # ~10 years
+      ).map(&:to_pem)
+    end
+
+    root_cert = OpenSSL::X509::Certificate.new(postgres_server.root_cert)
+    root_cert_key = OpenSSL::PKey::EC.new(postgres_server.root_cert_key)
+
+    postgres_server.server_cert, postgres_server.server_cert_key = Util.create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate",
+      extensions: ["subjectAltName=DNS:#{postgres_server.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
+      duration: 60 * 60 * 24 * 30 * 6, # ~6 months
+      issuer_cert: root_cert,
+      issuer_key: root_cert_key
+    ).map(&:to_pem)
+
+    postgres_server.save_changes
+
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.server_cert)
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.server_cert_key)
+    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
+
+    when_initial_provisioning_set? do
+      hop_configure
+    end
+
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
+    hop_wait
   end
 
   label def configure

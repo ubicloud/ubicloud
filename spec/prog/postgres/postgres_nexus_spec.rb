@@ -7,7 +7,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
 
   let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
-  let(:postgres_server) { instance_double(PostgresServer, id: "0eb058bb-960e-46fe-aab7-3717f164ab25", project_id: project.id, server_name: "pg-server-name", location: "hetzner-hel1", target_storage_size_gib: 100) }
+  let(:postgres_server) { instance_double(PostgresServer, id: "0eb058bb-960e-46fe-aab7-3717f164ab25", ubid: "pgubid", project_id: project.id, server_name: "pg-server-name", location: "hetzner-hel1", target_storage_size_gib: 100) }
   let(:vm) { instance_double(Vm, id: "788525ed-d6f0-4937-a844-323d4fd91946", cores: 1) }
   let(:sshable) { instance_double(Sshable) }
 
@@ -161,14 +161,66 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect { nx.install_postgres }.to nap(5)
     end
 
-    it "hops to configure if install_postgres command is succeeded" do
+    it "hops to refresh_server_certificate if install_postgres command is succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Succeeded")
-      expect { nx.install_postgres }.to hop("configure")
+      expect { nx.install_postgres }.to hop("refresh_server_certificate")
     end
 
     it "naps if script return unknown status" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Unknown")
       expect { nx.install_postgres }.to nap(5)
+    end
+  end
+
+  describe "#refresh_server_certificate" do
+    let(:postgres_server) {
+      PostgresServer.create_with_id(
+        project_id: "c9764635-03c6-4d1e-8634-6c86e1b69150",
+        location: "hetzner-hel1",
+        server_name: "pg-server-name",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 100,
+        superuser_password: "dummy-password"
+      )
+    }
+
+    it "hops to wait if the server certificate is recent enough" do
+      expect(postgres_server).to receive(:server_cert).and_return("some-cert").twice
+      expect(OpenSSL::X509::Certificate).to receive(:new).and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 31))
+      expect { nx.refresh_server_certificate }.to hop("wait")
+    end
+
+    it "creates a root cert if there is none" do
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority")).and_call_original
+      expect(Util).to receive(:create_certificate).and_call_original
+      expect(sshable).to receive(:cmd).at_least(:once)
+      expect { nx.refresh_server_certificate }.to hop("wait")
+    end
+
+    it "uses existing root cert if there one" do
+      postgres_server.root_cert, postgres_server.root_cert_key = Util.create_certificate(
+        subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority",
+        extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
+        duration: 60 * 60 * 24 * 365 * 10
+      ).map(&:to_pem)
+
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate")).and_call_original
+      expect(Util).not_to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority"))
+      expect(sshable).to receive(:cmd).at_least(:once)
+      expect { nx.refresh_server_certificate }.to hop("wait")
+    end
+
+    it "hops to configure after creating certificates during the initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority")).and_call_original
+      expect(Util).to receive(:create_certificate).and_call_original
+      expect(sshable).to receive(:cmd).at_least(:once)
+      expect { nx.refresh_server_certificate }.to hop("configure")
+    end
+
+    it "naps if script return unknown status" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Unknown")
+      expect { nx.configure }.to nap(5)
     end
   end
 

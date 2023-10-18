@@ -17,6 +17,8 @@ class PostgresServer < Sequel::Model
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
+    enc.column :root_cert_key
+    enc.column :server_cert_key
   end
 
   def hyper_tag_name(project)
