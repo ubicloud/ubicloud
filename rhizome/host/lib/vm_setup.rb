@@ -319,7 +319,7 @@ DNSMASQ_CONF
       <<ETHERNETS
   #{yq("enx" + mac.tr(":", "").downcase)}:
     match:
-      macaddress: #{mac}
+      macaddress: "#{mac}"
     dhcp6: true
     dhcp4: true
 ETHERNETS
