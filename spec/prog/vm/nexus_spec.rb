@@ -16,12 +16,15 @@ RSpec.describe Prog::Vm::Nexus do
       algorithm: "aes-256-gcm", key: "key",
       init_vector: "iv", auth_data: "somedata"
     ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
-    disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
-    disk.key_encryption_key_1 = kek
+    disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
+    disk_1.key_encryption_key_1 = kek
+    disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1)
     vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "hetzner-hel1").tap {
       _1.id = Vm.generate_uuid
-      _1.vm_storage_volumes.append(disk)
-      disk.vm = _1
+      _1.vm_storage_volumes.append(disk_1)
+      _1.vm_storage_volumes.append(disk_2)
+      disk_1.vm = _1
+      disk_2.vm = _1
     }
     BillingRecord.create_with_id(
       project_id: SecureRandom.uuid,
@@ -340,7 +343,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "does not match if there is not enough storage capacity" do
       new_host(available_storage_gib: 10).save_changes
-      expect(vm.storage_size_gib).to eq(20)
+      expect(vm.storage_size_gib).to eq(35)
       expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
 
