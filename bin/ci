@@ -16,6 +16,12 @@ def main
     # rubocop:disable Lint/RescueException
     rescue Exception => e
       log "Exception: #{e}"
+
+      if e.is_a?(Sshable::SshError)
+        puts "Stdout: #{e.stdout}"
+        puts "Stderr: #{e.stderr}"
+      end
+
       # retry 5 times, for total of 7:45 minutes before announcing failure
       # sometimes there's some transient network failures which will be resolved if retried.
       if retries < 5
