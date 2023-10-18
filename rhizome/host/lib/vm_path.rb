@@ -107,4 +107,12 @@ class VmPath
   def data_encryption_key(disk_index)
     storage(disk_index, "data_encryption_key.json")
   end
+
+  def image_root
+    "/var/storage/images/"
+  end
+
+  def image_path(name)
+    File.join(image_root, name + ".raw")
+  end
 end

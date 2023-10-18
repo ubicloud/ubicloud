@@ -139,6 +139,7 @@ class Prog::Vm::Nexus < Prog::Base
     @storage_volumes ||= vm.vm_storage_volumes.map { |s|
       {
         "boot" => s.boot,
+        "image" => s.boot ? vm.boot_image : nil,
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
         "disk_index" => s.disk_index,

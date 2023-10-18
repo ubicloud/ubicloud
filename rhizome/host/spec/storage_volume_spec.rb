@@ -1,0 +1,218 @@
+# frozen_string_literal: true
+
+require_relative "../lib/storage_volume"
+require "openssl"
+require "base64"
+
+RSpec.describe StorageVolume do
+  subject(:unencrypted_sv) {
+    params = {
+      "disk_index" => 2,
+      "device_id" => "xyz01",
+      "encrypted" => false,
+      "size_gib" => 12,
+      "image" => "kubuntu"
+    }
+    described_class.new("test", params)
+  }
+
+  let(:encrypted_sv) {
+    params = {
+      "disk_index" => 2,
+      "device_id" => "xyz01",
+      "encrypted" => true,
+      "size_gib" => 12,
+      "image" => "kubuntu"
+    }
+    described_class.new("test", params)
+  }
+  let(:image_path) {
+    "/var/storage/images/kubuntu.raw"
+  }
+  let(:disk_file) {
+    "/var/storage/test/2/disk.raw"
+  }
+
+  describe "#prep" do
+    it "can prep a non-imaged unencrypted disk" do
+      vol = described_class.new("test", {"disk_index" => 1, "encrypted" => false})
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1/")
+      expect(vol).to receive(:create_empty_disk_file).with(no_args)
+      vol.prep(nil)
+    end
+
+    it "can prep a non-imaged encrypted disk" do
+      key_wrapping_secrets = "key_wrapping_secrets"
+      vol = described_class.new("test", {"disk_index" => 1, "encrypted" => true})
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1/")
+      expect(vol).to receive(:setup_data_encryption_key).with(key_wrapping_secrets)
+      expect(vol).to receive(:create_empty_disk_file).with(no_args)
+      vol.prep(key_wrapping_secrets)
+    end
+
+    it "can prep an encrypted imaged disk" do
+      encryption_key = "test_key"
+      key_wrapping_secrets = "key_wrapping_secrets"
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2/")
+      expect(encrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
+      expect(encrypted_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
+      expect(encrypted_sv).to receive(:encrypted_image_copy).with(encryption_key)
+      encrypted_sv.prep(key_wrapping_secrets)
+    end
+
+    it "can prep an unencrypted imaged disk" do
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2/")
+      expect(unencrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
+      expect(unencrypted_sv).to receive(:unencrypted_image_copy).with(no_args)
+      unencrypted_sv.prep(nil)
+    end
+  end
+
+  describe "#start" do
+    it "can start an encrypted storage volume" do
+      encryption_key = "test_key"
+      key_wrapping_secrets = "key_wrapping_secrets"
+      expect(encrypted_sv).to receive(:read_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
+      expect(encrypted_sv).to receive(:setup_spdk_bdev).with(encryption_key)
+      expect(encrypted_sv).to receive(:setup_spdk_vhost).with(no_args)
+      encrypted_sv.start(key_wrapping_secrets)
+    end
+
+    it "can start an uencrypted storage volume" do
+      expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil)
+      expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args)
+      unencrypted_sv.start(nil)
+    end
+  end
+
+  describe "#purge" do
+    it "can purge an encrypted disk" do
+      rpc_py = "/opt/spdk/scripts/rpc.py -s /home/spdk/spdk.sock"
+
+      expect(encrypted_sv).to receive(:r).with("#{rpc_py} vhost_delete_controller test_2")
+      expect(encrypted_sv).to receive(:r).with("#{rpc_py} bdev_crypto_delete xyz01")
+      expect(encrypted_sv).to receive(:r).with("#{rpc_py} bdev_aio_delete xyz01_aio")
+      expect(encrypted_sv).to receive(:r).with("#{rpc_py} accel_crypto_key_destroy -n xyz01_key")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_2")
+
+      encrypted_sv.purge
+    end
+
+    it "can purge an unencrypted disk" do
+      rpc_py = "/opt/spdk/scripts/rpc.py -s /home/spdk/spdk.sock"
+
+      expect(unencrypted_sv).to receive(:r).with("#{rpc_py} vhost_delete_controller test_2")
+      expect(unencrypted_sv).to receive(:r).with("#{rpc_py} bdev_aio_delete xyz01")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_2")
+
+      unencrypted_sv.purge
+    end
+  end
+
+  describe "#setup_data_encryption_key" do
+    it "can setup data encryption key" do
+      key_file = "/var/storage/test/2/data_encryption_key.json"
+      key_wrapping_secrets = "key_wrapping_secrets"
+      expect(FileUtils).to receive(:chown).with("test", "test", key_file)
+      expect(FileUtils).to receive(:chmod).with("u=rw,g=,o=", key_file)
+      expect(File).to receive(:open).with(key_file, "w")
+      expect(encrypted_sv).to receive(:sync_parent_dir).with(key_file)
+      encrypted_sv.setup_data_encryption_key(key_wrapping_secrets)
+    end
+  end
+
+  describe "#read_data_encryption_key" do
+    it "can read data encryption key" do
+      key_file = "/var/storage/test/2/data_encryption_key.json"
+      dek = "123"
+      key_wrapping_secrets = "key_wrapping_secrets"
+      sek = instance_double(StorageKeyEncryption)
+      expect(sek).to receive(:read_encrypted_dek).with(key_file).and_return(dek)
+      expect(StorageKeyEncryption).to receive(:new).with(key_wrapping_secrets).and_return(sek)
+      expect(encrypted_sv.read_data_encryption_key(key_wrapping_secrets)).to eq(dek)
+    end
+  end
+
+  describe "#unencrypted_image_copy" do
+    it "can copy an image to an unencrypted volume" do
+      expect(unencrypted_sv).to receive(:r).with("cp --reflink=auto #{image_path} #{disk_file}")
+      expect(unencrypted_sv).to receive(:r).with("truncate -s 12G #{disk_file.shellescape}")
+      expect(unencrypted_sv).to receive(:set_disk_file_permissions)
+      unencrypted_sv.unencrypted_image_copy
+    end
+  end
+
+  describe "#encrypted_image_copy" do
+    it "can copy an image to an encrypted volume" do
+      encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
+      expect(encrypted_sv).to receive(:create_empty_disk_file).with(no_args)
+      expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+$/, stdin: /{.*}/)
+      encrypted_sv.encrypted_image_copy(encryption_key)
+    end
+  end
+
+  describe "#create_empty_disk_file" do
+    it "can create an empty disk file" do
+      expect(FileUtils).to receive(:touch).with(disk_file)
+      expect(encrypted_sv).to receive(:r).with("truncate -s 12G #{disk_file}")
+      expect(encrypted_sv).to receive(:set_disk_file_permissions)
+
+      encrypted_sv.create_empty_disk_file
+    end
+  end
+
+  describe "#set_disk_file_permissions" do
+    it "can set disk file permissions" do
+      expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
+      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
+      expect(encrypted_sv).to receive(:r).with(/setfacl.*#{disk_file}/)
+
+      encrypted_sv.set_disk_file_permissions
+    end
+  end
+
+  describe "#setup_spdk_bdev" do
+    it "can setup encrypted spdk bdev" do
+      bdev = "xyz01"
+      encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
+      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*accel_crypto_key_create -c aes_xts -k key1value -e key2value/)
+      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev}_aio 512$/)
+      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*bdev_crypto_create.*#{bdev}_aio #{bdev}$/)
+      encrypted_sv.setup_spdk_bdev(encryption_key)
+    end
+
+    it "can setup unencrypted spdk bdev" do
+      bdev = "xyz01"
+      expect(unencrypted_sv).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev} 512$/)
+      unencrypted_sv.setup_spdk_bdev(nil)
+    end
+  end
+
+  describe "#setup_spdk_vhost" do
+    it "can setup spdk vhost" do
+      device_id = "xyz01"
+      spdk_vhost_sock = "/var/storage/vhost/test_2"
+      vm_vhost_sock = "/var/storage/test/2/vhost.sock"
+
+      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*vhost_create_blk_controller test_2 #{device_id}/)
+      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
+      expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
+      expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)
+      expect(encrypted_sv).to receive(:r).with(/setfacl.*#{spdk_vhost_sock}/)
+
+      encrypted_sv.setup_spdk_vhost
+    end
+  end
+
+  describe "#verify_imaged_disk_size" do
+    it "can verify imaged disk size" do
+      expect(File).to receive(:size).and_return(2 * 2**30)
+      encrypted_sv.verify_imaged_disk_size
+    end
+
+    it "fails if disk size is less than image file size" do
+      expect(File).to receive(:size).and_return(15 * 2**30)
+      expect { encrypted_sv.verify_imaged_disk_size }.to raise_error RuntimeError, "Image size greater than requested disk size"
+    end
+  end
+end

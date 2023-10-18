@@ -34,129 +34,6 @@ RSpec.describe VmSetup do
     }
   end
 
-  describe "#setup_volume" do
-    it "can setup an unencrypted non-boot volume" do
-      disk_file = "/var/storage/test/0/disk.raw"
-      device_id = "some_device_id"
-      size_gib = 5
-
-      expect(vs).to receive(:create_empty_disk_file).with(disk_file, size_gib)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil)
-
-      vs.setup_volume({"boot" => false, "size_gib" => size_gib, "device_id" => device_id},
-        0, nil, nil)
-    end
-
-    it "can setup an unencrypted boot volume" do
-      disk_file = "/var/storage/test/0/disk.raw"
-      device_id = "some_device_id"
-      boot_image = "ubuntu-jammy"
-      image_path = "/opt/ubuntu.raw"
-      size_gib = 5
-
-      expect(vs).to receive(:download_boot_image).with(boot_image).and_return(image_path)
-      expect(vs).to receive(:verify_boot_disk_size).with(image_path, 5)
-      expect(vs).to receive(:unencrypted_image_copy).with(disk_file, image_path, size_gib)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, nil)
-
-      vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
-        0, boot_image, nil)
-    end
-
-    it "can setup an encrypted boot volume" do
-      disk_file = "/var/storage/test/0/disk.raw"
-      device_id = "some_device_id"
-      boot_image = "ubuntu-jammy"
-      image_path = "/opt/ubuntu.raw"
-      secrets = key_wrapping_secrets
-      encryption_key = "key"
-      size_gib = 5
-
-      expect(vs).to receive(:setup_data_encryption_key).with(0, secrets).and_return(encryption_key)
-      expect(vs).to receive(:download_boot_image).with(boot_image).and_return(image_path)
-      expect(vs).to receive(:verify_boot_disk_size).with(image_path, 5)
-      expect(vs).to receive(:encrypted_image_copy).with(disk_file, image_path, size_gib, encryption_key)
-      expect(vs).to receive(:setup_spdk_bdev).with(device_id, disk_file, encryption_key)
-
-      vs.setup_volume({"boot" => true, "size_gib" => size_gib, "device_id" => device_id},
-        0, boot_image, secrets)
-    end
-  end
-
-  describe "#setup_spdk_vhost" do
-    it "can setup spdk vhost" do
-      device_id = "some_device_id"
-      spdk_vhost_sock = "/var/storage/vhost/test_0"
-      vm_vhost_sock = "/var/storage/test/0/vhost.sock"
-
-      expect(vs).to receive(:r).with(/.*rpc.py.*vhost_create_blk_controller test_0 #{device_id}/)
-      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
-      expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
-      expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)
-      expect(vs).to receive(:r).with(/setfacl.*#{spdk_vhost_sock}/)
-
-      vs.setup_spdk_vhost(0, device_id)
-    end
-  end
-
-  describe "#create_empty_disk_file" do
-    it "can creat an empty disk file" do
-      disk_file = "/var/storage/test/0/disk.raw"
-      expect(FileUtils).to receive(:touch).with(disk_file)
-      expect(vs).to receive(:r).with("truncate -s 5G #{disk_file}")
-      expect(vs).to receive(:set_disk_file_permissions).with(disk_file)
-
-      vs.create_empty_disk_file(disk_file, 5)
-    end
-  end
-
-  describe "#set_disk_file_permissions" do
-    it "can set disk file permissions" do
-      disk_file = "/var/storage/test/0/disk.raw"
-      expect(FileUtils).to receive(:chown).with("test", "test", disk_file)
-      expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", disk_file)
-      expect(vs).to receive(:r).with(/setfacl.*#{disk_file}/)
-
-      vs.set_disk_file_permissions(disk_file)
-    end
-  end
-
-  describe "#verify_boot_disk_size" do
-    it "can verify boot disk size" do
-      image_path = "/opt/image"
-      expect(File).to receive(:size).and_return(2 * 2**30)
-      vs.verify_boot_disk_size(image_path, 5)
-    end
-
-    it "fails if disk size is less than image file size" do
-      image_path = "/opt/image"
-      expect(File).to receive(:size).and_return(2 * 2**30)
-      expect { vs.verify_boot_disk_size(image_path, 1) }.to raise_error RuntimeError, "Image size greater than requested disk size"
-    end
-  end
-
-  describe "#encrypted_image_copy" do
-    it "can copy an encrypted image" do
-      image_path = "/opt/ubuntu.raw"
-      disk_file = "/var/storage/test/disk_0.raw"
-      encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(vs).to receive(:create_empty_disk_file).with(disk_file, 10)
-      expect(vs).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+$/, stdin: /{.*}/)
-      vs.encrypted_image_copy(disk_file, image_path, 10, encryption_key)
-    end
-  end
-
-  describe "#unencrypted_image_copy" do
-    it "can copy an unencrypted image" do
-      image_path = "/opt/ubuntu.raw"
-      disk_file = "/var/storage/test/disk_0.raw"
-      expect(vs).to receive(:r).with("cp --reflink=auto #{image_path} #{disk_file}")
-      expect(vs).to receive(:r).with("truncate -s 10G #{disk_file.shellescape}")
-      expect(vs).to receive(:set_disk_file_permissions).with(disk_file)
-      vs.unencrypted_image_copy(disk_file, image_path, 10)
-    end
-  end
-
   describe "#download_boot_image" do
     it "can download an image" do
       expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
@@ -202,72 +79,34 @@ RSpec.describe VmSetup do
     end
   end
 
-  describe "#setup_spdk_bdev" do
-    it "can setup a non-encrypted volume" do
-      bdev = "bdev_name"
-      disk_file = "/path/to/disk/file"
-      expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev} 512$/)
-      vs.setup_spdk_bdev(bdev, disk_file, nil)
-    end
-
-    it "can setup an encrypted volume" do
-      bdev = "bdev_name"
-      disk_file = "/path/to/disk/file"
-      encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(vs).to receive(:r).with(/.*rpc.py.*accel_crypto_key_create -c aes_xts -k key1value -e key2value/)
-      expect(vs).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev}_aio 512$/)
-      expect(vs).to receive(:r).with(/.*rpc.py.*bdev_crypto_create.*#{bdev}_aio #{bdev}$/)
-      vs.setup_spdk_bdev(bdev, disk_file, encryption_key)
-    end
-  end
-
-  describe "#setup_data_encryption_key" do
-    it "can setup data encryption key" do
-      key_file = "/var/storage/test/3/data_encryption_key.json"
-      expect(FileUtils).to receive(:chown).with("test", "test", key_file)
-      expect(FileUtils).to receive(:chmod).with("u=rw,g=,o=", key_file)
-      expect(File).to receive(:open).with(key_file, "w")
-      expect(vs).to receive(:sync_parent_dir).with(key_file)
-      vs.setup_data_encryption_key(3, key_wrapping_secrets)
-    end
-  end
-
   describe "#purge_storage" do
     it "can purge storage" do
-      rpc_py = "/opt/spdk/scripts/rpc.py -s /home/spdk/spdk.sock"
-      params = JSON.generate({
-        storage_volumes: [
-          {
-            boot: true,
-            size_gib: 20,
-            device_id: "test_0",
-            disk_index: 0,
-            encrypted: false
-          },
-          {
-            boot: false,
-            size_gib: 20,
-            device_id: "test_1",
-            disk_index: 1,
-            encrypted: true
-          }
-        ]
-      })
+      vol_1_params = {
+        "size_gib" => 20,
+        "device_id" => "test_0",
+        "disk_index" => 0,
+        "encrypted" => false
+      }
+      vol_2_params = {
+        "size_gib" => 20,
+        "device_id" => "test_1",
+        "disk_index" => 1,
+        "encrypted" => true
+      }
+      params = JSON.generate({storage_volumes: [vol_1_params, vol_2_params]})
 
       expect(File).to receive(:exist?).with("/var/storage/test").and_return(true)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
 
       # delete the unencrypted volume
-      expect(vs).to receive(:r).with("#{rpc_py} vhost_delete_controller test_0")
-      expect(vs).to receive(:r).with("#{rpc_py} bdev_aio_delete test_0")
-      expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_0")
+      sv_1 = instance_double(StorageVolume)
+      expect(StorageVolume).to receive(:new).with("test", vol_1_params).and_return(sv_1)
+      expect(sv_1).to receive(:purge)
 
       # delete the encrypted volume
-      expect(vs).to receive(:r).with("#{rpc_py} vhost_delete_controller test_1")
-      expect(vs).to receive(:r).with("#{rpc_py} bdev_crypto_delete test_1")
-      expect(vs).to receive(:r).with("#{rpc_py} bdev_aio_delete test_1_aio")
-      expect(vs).to receive(:r).with("#{rpc_py} accel_crypto_key_destroy -n test_1_key")
-      expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_1")
+      sv_2 = instance_double(StorageVolume)
+      expect(StorageVolume).to receive(:new).with("test", vol_2_params).and_return(sv_2)
+      expect(sv_2).to receive(:purge)
 
       expect(FileUtils).to receive(:rm_r).with("/var/storage/test")
 
@@ -314,26 +153,52 @@ RSpec.describe VmSetup do
 
   describe "#recreate_unpersisted" do
     it "can recreate unpersisted state" do
-      storage_volumes = [
+      expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false)
+      expect(vs).to receive(:hugepages).with(4)
+      expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
+
+      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets")
+    end
+  end
+
+  describe "#storage" do
+    let(:storage_params) {
+      [
         {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
         {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true}
       ]
-      storage_secrets = {
+    }
+    let(:storage_secrets) {
+      {
         "test_1" => "storage_secrets"
       }
+    }
+    let(:storage_volumes) {
+      [
+        instance_double(StorageVolume),
+        instance_double(StorageVolume)
+      ]
+    }
 
-      expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false)
+    before do
+      expect(StorageVolume).to receive(:new).with("test", storage_params[0]).and_return(storage_volumes[0])
+      expect(StorageVolume).to receive(:new).with("test", storage_params[1]).and_return(storage_volumes[1])
+    end
 
-      expect(vs).to receive(:setup_spdk_bdev).with("test_0", "/var/storage/test/0/disk.raw", nil)
-      expect(vs).to receive(:setup_spdk_vhost).with(0, "test_0")
+    it "can setup storage (prep)" do
+      expect(storage_volumes[0]).to receive(:start).with(nil)
+      expect(storage_volumes[0]).to receive(:prep).with(nil)
+      expect(storage_volumes[1]).to receive(:start).with(storage_secrets["test_1"])
+      expect(storage_volumes[1]).to receive(:prep).with(storage_secrets["test_1"])
 
-      expect(vs).to receive(:read_data_encryption_key).with(1, "storage_secrets").and_return("dek")
-      expect(vs).to receive(:setup_spdk_bdev).with("test_1", "/var/storage/test/1/disk.raw", "dek")
-      expect(vs).to receive(:setup_spdk_vhost).with(1, "test_1")
+      vs.storage(storage_params, storage_secrets, true)
+    end
 
-      expect(vs).to receive(:hugepages).with(4)
+    it "can setup storage (no prep)" do
+      expect(storage_volumes[0]).to receive(:start).with(nil)
+      expect(storage_volumes[1]).to receive(:start).with(storage_secrets["test_1"])
 
-      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, storage_volumes, storage_secrets)
+      vs.storage(storage_params, storage_secrets, false)
     end
   end
 
