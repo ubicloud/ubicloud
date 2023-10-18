@@ -161,9 +161,9 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect { nx.install_postgres }.to nap(5)
     end
 
-    it "hops to refresh_server_certificate if install_postgres command is succeeded" do
+    it "hops to initialize_certificates if install_postgres command is succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Succeeded")
-      expect { nx.install_postgres }.to hop("refresh_server_certificate")
+      expect { nx.install_postgres }.to hop("initialize_certificates")
     end
 
     it "naps if script return unknown status" do
@@ -172,7 +172,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     end
   end
 
-  describe "#refresh_server_certificate" do
+  describe "#initialize_certificates" do
     let(:postgres_server) {
       PostgresServer.create_with_id(
         project_id: "c9764635-03c6-4d1e-8634-6c86e1b69150",
@@ -184,43 +184,57 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       )
     }
 
-    it "hops to wait if the server certificate is recent enough" do
-      expect(postgres_server).to receive(:server_cert).and_return("some-cert").twice
-      expect(OpenSSL::X509::Certificate).to receive(:new).and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 31))
-      expect { nx.refresh_server_certificate }.to hop("wait")
-    end
+    it "hops to configure after creating certificates" do
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)).and_call_original
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)).and_call_original
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate", duration: 60 * 60 * 24 * 30 * 6)).and_call_original
 
-    it "creates a root cert if there is none" do
-      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority")).and_call_original
-      expect(Util).to receive(:create_certificate).and_call_original
       expect(sshable).to receive(:cmd).at_least(:once)
-      expect { nx.refresh_server_certificate }.to hop("wait")
+      expect { nx.initialize_certificates }.to hop("configure")
+    end
+  end
+
+  describe "#refresh_certificates" do
+    let(:postgres_server) {
+      PostgresServer.create_with_id(
+        project_id: "c9764635-03c6-4d1e-8634-6c86e1b69150",
+        location: "hetzner-hel1",
+        server_name: "pg-server-name",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 100,
+        superuser_password: "dummy-password",
+        root_cert_1: "root cert 1",
+        root_cert_2: "root cert 2",
+        server_cert: "server cert"
+      )
+    }
+
+    it "rotates root certificate if root_cert_1 is close to expiration" do
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 30 * 4))
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 30 * 4))
+      expect(nx).to receive(:create_root_certificate).with(hash_including(duration: 60 * 60 * 24 * 365 * 10))
+
+      expect { nx.refresh_certificates }.to hop("wait")
     end
 
-    it "uses existing root cert if there one" do
-      postgres_server.root_cert, postgres_server.root_cert_key = Util.create_certificate(
-        subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority",
-        extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
-        duration: 60 * 60 * 24 * 365 * 10
-      ).map(&:to_pem)
+    it "rotates server certificate if it is close to expiration" do
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
+      expect(nx).to receive(:create_server_certificate)
 
-      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate")).and_call_original
-      expect(Util).not_to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority"))
+      expect { nx.refresh_certificates }.to hop("wait")
+    end
+
+    it "rotates server certificate using root_cert_2 if root_cert_1 is close to expiration" do
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").twice.and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 360))
+      root_cert_2 = instance_double(OpenSSL::X509::Certificate)
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 2").and_return(root_cert_2)
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
+
+      expect(Util).to receive(:create_certificate).with(hash_including(issuer_cert: root_cert_2)).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "server cert")])
       expect(sshable).to receive(:cmd).at_least(:once)
-      expect { nx.refresh_server_certificate }.to hop("wait")
-    end
 
-    it "hops to configure after creating certificates during the initial provisioning" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority")).and_call_original
-      expect(Util).to receive(:create_certificate).and_call_original
-      expect(sshable).to receive(:cmd).at_least(:once)
-      expect { nx.refresh_server_certificate }.to hop("configure")
-    end
-
-    it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Unknown")
-      expect { nx.configure }.to nap(5)
+      expect { nx.refresh_certificates }.to hop("wait")
     end
   end
 
@@ -314,7 +328,13 @@ RSpec.describe Prog::Postgres::PostgresNexus do
 
   describe "#wait" do
     it "naps" do
+      expect(postgres_server).to receive(:certificate_last_checked_at).and_return(Time.now)
       expect { nx.wait }.to nap(30)
+    end
+
+    it "hops to refresh_certificates if the certificate is checked more than 1 months ago" do
+      expect(postgres_server).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
+      expect { nx.wait }.to hop("refresh_certificates")
     end
   end
 
