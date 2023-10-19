@@ -57,29 +57,20 @@ class Prog::Vm::GithubRunner < Prog::Base
       return picked_vm
     end
 
-    ssh_key = SshKey.generate
     # We use unencrypted storage for now, because provisioning 86G encrypted
     # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
     # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
     # ~10 seconds.
-    vm_st = Prog::Vm::Nexus.assemble(
-      ssh_key.public_key,
+    vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+      "runner",
       project.id,
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
-      unix_user: "runner",
       location: label_data["location"],
       boot_image: label_data["boot_image"],
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
       enable_ip4: true
     )
-
-    Sshable.create(
-      unix_user: "runner",
-      host: "temp_#{vm_st.id}",
-      raw_private_key_1: ssh_key.keypair
-    ) { _1.id = vm_st.id }
-
     Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
     vm_st.subject
   end
@@ -112,9 +103,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def wait_vm
     nap 5 unless vm.strand.label == "wait"
-    vm.sshable.update(host: vm.ephemeral_net4)
     register_deadline(:wait, 10 * 60)
-
     hop_install_nftables_rules
   end
 

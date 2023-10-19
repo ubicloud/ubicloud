@@ -111,6 +111,16 @@ class Prog::Vm::Nexus < Prog::Base
     end
   end
 
+  def self.assemble_with_sshable(unix_user, *, **kwargs)
+    ssh_key = SshKey.generate
+    kwargs[:unix_user] = unix_user
+    st = assemble(ssh_key.public_key, *, **kwargs)
+    Sshable.create(unix_user: unix_user, host: "temp_#{st.id}", raw_private_key_1: ssh_key.keypair) {
+      _1.id = st.id
+    }
+    st
+  end
+
   def vm_name
     @vm_name ||= vm.inhost_name
   end
@@ -228,9 +238,8 @@ SQL
 
       AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
     end
-
+    vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6.nth(2))
     register_deadline(:wait, 10 * 60)
-
     hop_create_unix_user
   end
 

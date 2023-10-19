@@ -18,10 +18,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     end
 
     DB.transaction do
-      ssh_key = SshKey.generate
-
-      vm_st = Prog::Vm::Nexus.assemble(
-        ssh_key.public_key,
+      vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+        "minio-user",
         Config.minio_service_project_id,
         location: minio_pool.cluster.location,
         size: minio_pool.cluster.target_vm_size,
@@ -30,15 +28,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         ] + Array.new(minio_pool.per_server_driver_count) { {encrypted: false, size_gib: (minio_pool.per_server_storage_size / minio_pool.per_server_driver_count).floor} },
         boot_image: "ubuntu-jammy",
         enable_ip4: true,
-        unix_user: "minio-user",
         private_subnet_id: minio_pool.cluster.private_subnet.id
       )
-
-      Sshable.create(
-        unix_user: "minio-user",
-        host: "temp_#{vm_st.id}",
-        raw_private_key_1: ssh_key.keypair
-      ) { _1.id = vm_st.id }
 
       minio_server = MinioServer.create_with_id(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index)
 
@@ -61,7 +52,6 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   label def start
     nap 5 unless vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
-    vm.sshable.update(host: vm.ephemeral_net4)
     bud Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"}
 
     hop_wait_bootstrap_rhizome

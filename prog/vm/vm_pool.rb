@@ -29,25 +29,16 @@ class Prog::Vm::VmPool < Prog::Base
   end
 
   label def create_new_vm
-    ssh_key = SshKey.generate
-    DB.transaction do
-      vm_st = Prog::Vm::Nexus.assemble(
-        ssh_key.public_key,
-        Config.vm_pool_project_id,
-        size: vm_pool.vm_size,
-        unix_user: "runner",
-        location: vm_pool.location,
-        boot_image: vm_pool.boot_image,
-        storage_volumes: [{size_gib: vm_pool.storage_size_gib, encrypted: false}],
-        enable_ip4: true,
-        pool_id: vm_pool.id
-      )
-      Sshable.create(
-        unix_user: "runner",
-        host: "temp_#{vm_st.id}",
-        raw_private_key_1: ssh_key.keypair
-      ) { _1.id = vm_st.id }
-    end
+    Prog::Vm::Nexus.assemble_with_sshable(
+      "runner",
+      Config.vm_pool_project_id,
+      size: vm_pool.vm_size,
+      location: vm_pool.location,
+      boot_image: vm_pool.boot_image,
+      storage_volumes: [{size_gib: vm_pool.storage_size_gib, encrypted: false}],
+      enable_ip4: true,
+      pool_id: vm_pool.id
+    )
 
     hop_wait
   end

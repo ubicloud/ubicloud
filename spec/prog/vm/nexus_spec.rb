@@ -166,6 +166,23 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  describe ".assemble_with_sshable" do
+    it "calls .assemble with generated ssh key" do
+      st_id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5"
+      expect(SshKey).to receive(:generate).and_return(instance_double(SshKey, public_key: "public", keypair: "pair"))
+      expect(described_class).to receive(:assemble) do |public_key, project_id, **kwargs|
+        expect(public_key).to eq("public")
+        expect(project_id).to eq(prj.id)
+        expect(kwargs[:name]).to be_nil
+        expect(kwargs[:size]).to eq("new_size")
+        expect(kwargs[:unix_user]).to eq("test_user")
+      end.and_return(Strand.new(id: st_id))
+      expect(Sshable).to receive(:create).with({unix_user: "test_user", host: "temp_#{st_id}", raw_private_key_1: "pair"})
+
+      described_class.assemble_with_sshable("test_user", prj.id, size: "new_size")
+    end
+  end
+
   describe "#create_unix_user" do
     it "runs adduser" do
       sshable = instance_double(Sshable)
@@ -242,6 +259,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(args[:ephemeral_net6]).to match(/2a01:4f9:2b:35a:.*/)
         expect(args[:vm_host_id]).to match vmh_id
       end
+      expect(vm).to receive(:sshable).and_return(nil)
 
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -253,7 +271,7 @@ RSpec.describe Prog::Vm::Nexus do
         ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
       ) { _1.id = vmh_id }
       address = Address.new(cidr: "0.0.0.0/30", routed_to_host_id: vmh_id)
-      assigned_address = AssignedVmAddress.new(ip: "0.0.0.0")
+      assigned_address = AssignedVmAddress.new(ip: NetAddr::IPv4Net.parse("10.0.0.1"))
 
       expect(nx).to receive(:allocate).and_return(vmh_id)
       expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
@@ -261,6 +279,9 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
       expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
       expect(vm).to receive(:update)
+      expect(vm).to receive(:assigned_vm_address).and_return(assigned_address)
+      expect(vm).to receive(:sshable).and_return(instance_double(Sshable)).at_least(:once)
+      expect(vm.sshable).to receive(:update).with(host: assigned_address.ip.network)
 
       expect { nx.start }.to hop("create_unix_user")
     end
