@@ -11,6 +11,11 @@ if Config.heartbeat_url
   Strand.dataset.insert_conflict.insert(id: "8b958d2d-cad4-5f3a-5634-b8b958d45caf", schedule: Time.now, prog: "Heartbeat", label: "wait")
 end
 
+if Config.github_app_id
+  # We always insert this strand using the same UBID ("stredelivergith0bfail0reaz")
+  Strand.dataset.insert_conflict.insert(id: "c39ae087-6ec4-033a-d440-b7a821061caf", schedule: Time.now, prog: "RedeliverGithubFailures", label: "wait", stack: [{last_check_at: Time.now}])
+end
+
 loop do
   d.start_cohort
   next if d.wait_cohort > 0

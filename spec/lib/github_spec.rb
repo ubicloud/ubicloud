@@ -54,6 +54,20 @@ RSpec.describe Github do
     ])
   end
 
+  it ".failed_deliveries with max page" do
+    time = Time.now
+    app_client = instance_double(Octokit::Client)
+    expect(described_class).to receive(:app_client).and_return(app_client)
+    expect(app_client).to receive(:get).with("/app/hook/deliveries?per_page=100").and_return([
+      {guid: "3", status: "Fail", delivered_at: time + 3}
+    ])
+    expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: "next_url")}))
+    expect(Clog).to receive(:emit).with("failed deliveries page limit reached")
+    expect(Clog).to receive(:emit).with("fetched deliveries")
+    failed_deliveries = described_class.failed_deliveries(time, 1)
+    expect(failed_deliveries).to eq([{guid: "3", status: "Fail", delivered_at: time + 3}])
+  end
+
   it ".redeliver_failed_deliveries" do
     time = Time.now
     app_client = instance_double(Octokit::Client)
