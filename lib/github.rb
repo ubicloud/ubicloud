@@ -32,12 +32,20 @@ module Github
     @@runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
   end
 
-  def self.failed_deliveries(since)
+  def self.failed_deliveries(since, max_page = 20)
     client = Github.app_client
     all_deliveries = client.get("/app/hook/deliveries?per_page=100")
+    page = 1
     while (next_url = client.last_response.rels[:next]&.href) && (since < all_deliveries.last[:delivered_at])
+      if page >= max_page
+        Clog.emit("failed deliveries page limit reached") { {deliveries: {max_page: max_page, since: since}} }
+        break
+      end
+      page += 1
       all_deliveries += client.get(next_url)
     end
+
+    Clog.emit("fetched deliveries") { {deliveries: {total: all_deliveries.count, page: page, since: since}} }
 
     all_deliveries
       .reject { _1[:delivered_at] < since }
@@ -47,13 +55,14 @@ module Github
       .map { |group| group.max_by { _1[:delivered_at] } }
   end
 
-  def self.redeliver_failed_deliveries(since)
+  def self.redeliver_failed_deliveries(*)
     client = Github.app_client
-    failed_deliveries = Github.failed_deliveries(since)
+    failed_deliveries = Github.failed_deliveries(*)
     failed_deliveries.each do |delivery|
-      Clog.emit("redelivering failed delivery") { {delivery: delivery} }
+      Clog.emit("redelivering failed delivery") { {delivery: delivery.to_h} }
       client.post("/app/hook/deliveries/#{delivery[:id]}/attempts")
     end
-    Clog.emit("redelivered failed deliveries")
+    Clog.emit("redelivered failed deliveries") { {deliveries: {failed: failed_deliveries.count}} }
+    failed_deliveries
   end
 end
