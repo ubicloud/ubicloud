@@ -52,12 +52,21 @@ RSpec.describe Prog::Vm::VmPool do
       }.to nap(30)
     end
 
-    it "hops to create_new_vm, if vm count is less" do
+    it "hops to create_new_vm, if vm count is less than the size and there are no waiting GithubRunners" do
       pool.update(size: 1)
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
       expect {
         nx.wait
       }.to hop("create_new_vm")
+    end
+
+    it "waits even if the vm count is less when there are waiting GithubRunners" do
+      pool.update(size: 1)
+      expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
+      expect(GithubRunner).to receive_message_chain(:join, :where, :count).and_return(1) # rubocop:disable RSpec/MessageChain
+      expect {
+        nx.wait
+      }.to nap(30)
     end
   end
 
