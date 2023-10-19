@@ -96,6 +96,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
+        register_deadline(nil, 10 * 60)
         hop_destroy
       end
     end
@@ -216,8 +217,6 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
-
     decr_destroy
 
     # Waiting 404 Not Found response for get runner request
