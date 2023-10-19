@@ -123,6 +123,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx).to receive(:register_deadline)
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -277,7 +278,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "destroys resources and hops if runner deregistered" do
-      expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
@@ -288,7 +288,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "does not destroy vm if it's already destroyed" do
-      expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)

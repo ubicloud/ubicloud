@@ -189,6 +189,7 @@ SQL
       if strand.label != "destroy"
         vm.active_billing_record&.finalize
         vm.assigned_vm_address&.active_billing_record&.finalize
+        register_deadline(nil, 5 * 60)
         hop_destroy
       end
     end
@@ -307,6 +308,7 @@ SQL
 
   label def wait
     when_start_after_host_reboot_set? do
+      register_deadline(:wait, 5 * 60)
       hop_start_after_host_reboot
     end
 
@@ -314,8 +316,6 @@ SQL
   end
 
   label def destroy
-    register_deadline(nil, 5 * 60)
-
     decr_destroy
 
     vm.update(display_state: "deleting")
@@ -358,8 +358,6 @@ SQL
   end
 
   label def start_after_host_reboot
-    register_deadline(:wait, 5 * 60)
-
     vm.update(display_state: "starting")
 
     secrets_json = JSON.generate({
