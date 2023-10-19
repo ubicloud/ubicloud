@@ -30,14 +30,10 @@ class Prog::Test::VmGroup < Prog::Base
     strand.add_child(subnet1_s)
     strand.add_child(subnet2_s)
 
-    keypair_1 = SshKey.generate
-    keypair_2 = SshKey.generate
-    keypair_3 = SshKey.generate
-
     storage_encrypted = frame.fetch("storage_encrypted", true)
 
-    vm1_s = Prog::Vm::Nexus.assemble(
-      keypair_1.public_key, project.id,
+    vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
+      "ubi", project.id,
       private_subnet_id: subnet1_s.id,
       storage_volumes: [
         {encrypted: storage_encrypted},
@@ -46,37 +42,19 @@ class Prog::Test::VmGroup < Prog::Base
       enable_ip4: true
     )
 
-    vm2_s = Prog::Vm::Nexus.assemble(
-      keypair_2.public_key, project.id,
+    vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
+      "ubi", project.id,
       private_subnet_id: subnet1_s.id,
       storage_volumes: [{encrypted: storage_encrypted}],
       enable_ip4: true
     )
 
-    vm3_s = Prog::Vm::Nexus.assemble(
-      keypair_3.public_key, project.id,
+    vm3_s = Prog::Vm::Nexus.assemble_with_sshable(
+      "ubi", project.id,
       private_subnet_id: subnet2_s.id,
       storage_volumes: [{encrypted: storage_encrypted}],
       enable_ip4: true
     )
-
-    Sshable.create(
-      unix_user: "ubi",
-      host: "temp_#{vm1_s.id}",
-      raw_private_key_1: keypair_1.keypair
-    ) { _1.id = vm1_s.id }
-
-    Sshable.create(
-      unix_user: "ubi",
-      host: "temp_#{vm2_s.id}",
-      raw_private_key_1: keypair_2.keypair
-    ) { _1.id = vm2_s.id }
-
-    Sshable.create(
-      unix_user: "ubi",
-      host: "temp_#{vm3_s.id}",
-      raw_private_key_1: keypair_3.keypair
-    ) { _1.id = vm3_s.id }
 
     strand.add_child(vm1_s)
     strand.add_child(vm2_s)

@@ -74,11 +74,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.start }.to nap(5)
     end
 
-    it "update sshable host and hops" do
+    it "hops if vm is ready" do
       expect(postgres_resource).to receive(:incr_initial_provisioning)
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
-      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(sshable).to receive(:update).with(host: "1.1.1.1")
       expect { nx.start }.to hop("bootstrap_rhizome")
     end
   end

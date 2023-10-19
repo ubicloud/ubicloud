@@ -71,10 +71,8 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
       expect(nx).to receive(:register_deadline)
-      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"})
       expect { nx.start }.to hop("wait_bootstrap_rhizome")
-      expect(vm.sshable.host).to eq "1.1.1.1"
     end
   end
 

@@ -150,11 +150,9 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.wait_vm }.to nap(5)
     end
 
-    it "update sshable host and hops" do
+    it "hops if vm is ready" do
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
-      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(sshable).to receive(:update).with(host: "1.1.1.1")
       expect { nx.wait_vm }.to hop("install_nftables_rules")
     end
   end

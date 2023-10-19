@@ -24,9 +24,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     DB.transaction do
       ubid = PostgresResource.generate_ubid
 
-      ssh_key = SshKey.generate
-      vm_st = Prog::Vm::Nexus.assemble(
-        ssh_key.public_key,
+      vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+        "ubi",
         Config.postgres_service_project_id,
         location: location,
         name: ubid.to_s,
@@ -38,12 +37,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         boot_image: "ubuntu-jammy",
         enable_ip4: true
       )
-
-      Sshable.create(
-        unix_user: "ubi",
-        host: "temp_#{vm_st.id}",
-        raw_private_key_1: ssh_key.keypair
-      ) { _1.id = vm_st.id }
 
       postgres_resource = PostgresResource.create(
         project_id: project_id, location: location, server_name: server_name,
@@ -68,7 +61,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   label def start
     nap 5 unless vm.strand.label == "wait"
-    vm.sshable.update(host: vm.ephemeral_net4)
 
     postgres_resource.incr_initial_provisioning
     hop_bootstrap_rhizome
