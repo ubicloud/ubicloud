@@ -52,7 +52,13 @@ class Prog::Vm::VmPool < Prog::Base
   end
 
   label def wait
-    hop_create_new_vm if vm_pool.vms.count < vm_pool.size
+    if (need_vm = vm_pool.size - vm_pool.vms.count) > 0
+      # Here we are trying to figure out the system's overall need for VMs at the
+      # moment. We don't want to provision a VM if there are already too many
+      # waiting to be provisioned for other github runners.
+      vm_waiting_runners = GithubRunner.join(:strand, id: :id).where(Sequel[:strand][:label] => "wait_vm").count
+      hop_create_new_vm if need_vm - vm_waiting_runners > 0
+    end
     nap 30
   end
 
