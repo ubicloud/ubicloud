@@ -1,4 +1,4 @@
-FROM node:20.8-alpine3.17 as frontend-builder
+FROM node:21.0-alpine3.17 as frontend-builder
 WORKDIR /app
 COPY tailwind.config.js package.json package-lock.json ./
 COPY views/ ./views/
