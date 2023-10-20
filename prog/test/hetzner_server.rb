@@ -91,7 +91,7 @@ class Prog::Test::HetznerServer < Prog::Base
   end
 
   label def test_host_encrypted
-    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: true))
+    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true))
 
     hop_wait_test_host_encrypted
   end
@@ -105,7 +105,7 @@ class Prog::Test::HetznerServer < Prog::Base
   end
 
   label def test_host_unencrypted
-    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: false))
+    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false))
 
     hop_wait_test_host_unencrypted
   end
