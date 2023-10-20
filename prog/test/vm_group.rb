@@ -3,11 +3,11 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Base
-  def self.assemble(storage_encrypted: true)
+  def self.assemble(storage_encrypted: true, test_reboot: true)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
-      stack: [{"storage_encrypted" => storage_encrypted}]
+      stack: [{"storage_encrypted" => storage_encrypted, "test_reboot" => test_reboot}]
     )
   end
 
@@ -92,10 +92,10 @@ class Prog::Test::VmGroup < Prog::Base
     strand.modified!(:stack)
     strand.save_changes
 
-    hop_wait_children_created
+    hop_wait_children_ready
   end
 
-  label def wait_children_created
+  label def wait_children_ready
     reap
 
     hop_children_ready if children_idle
@@ -117,9 +117,35 @@ class Prog::Test::VmGroup < Prog::Base
   label def wait_subtests
     reap
 
-    hop_destroy_vms if children_idle
+    if children_idle
+      if frame["test_reboot"]
+        hop_test_reboot
+      else
+        hop_destroy_vms
+      end
+    end
 
     donate
+  end
+
+  label def test_reboot
+    host.incr_reboot
+    hop_wait_reboot
+  end
+
+  label def wait_reboot
+    st = host.strand
+
+    if st.label == "wait" && st.semaphores.empty?
+      # Run VM tests again, but avoid rebooting again
+      current_frame = strand.stack.first
+      current_frame["test_reboot"] = false
+      strand.modified!(:stack)
+      strand.save_changes
+      hop_wait_children_ready
+    end
+
+    nap 30
   end
 
   label def destroy_vms
@@ -165,5 +191,10 @@ class Prog::Test::VmGroup < Prog::Base
     active_semaphores = strand.children_dataset.join(:semaphore, strand_id: :id)
 
     active_children.count == 0 and active_semaphores.count == 0
+  end
+
+  def host
+    vm_id = frame["vms"].first
+    Vm[vm_id].vm_host
   end
 end

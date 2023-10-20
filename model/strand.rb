@@ -11,6 +11,7 @@ class Strand < Sequel::Model
   LEASE_EXPIRATION = 120
   many_to_one :parent, key: :parent_id, class: self
   one_to_many :children, key: :parent_id, class: self
+  one_to_many :semaphores
 
   NAVIGATE = %w[vm vm_host sshable].freeze
 
