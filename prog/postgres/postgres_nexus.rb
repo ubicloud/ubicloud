@@ -82,9 +82,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_mount_data_disk if leaf?
-    donate
+    when_children_done? { hop_mount_data_disk }
   end
 
   label def mount_data_disk

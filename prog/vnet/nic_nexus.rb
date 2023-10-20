@@ -41,12 +41,10 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_add_subnet_addr
-    reap
-    if leaf?
+    when_children_done? do
       nic.private_subnet.incr_add_new_nic
       hop_wait_setup
     end
-    donate
   end
 
   label def wait_setup
@@ -75,13 +73,10 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_rekey_inbound
-    reap
-    if leaf?
+    when_children_done? do
       decr_start_rekey
       hop_wait_rekey_outbound_trigger
     end
-
-    donate
   end
 
   label def wait_rekey_outbound_trigger
@@ -94,13 +89,10 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_rekey_outbound
-    reap
-    if leaf?
+    when_children_done? do
       decr_trigger_outbound_update
       hop_wait_rekey_old_state_drop_trigger
     end
-
-    donate
   end
 
   label def wait_rekey_old_state_drop_trigger
@@ -113,13 +105,10 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_rekey_old_state_drop
-    reap
-    if leaf?
+    when_children_done? do
       decr_old_state_drop_trigger
       hop_wait
     end
-
-    donate
   end
 
   label def destroy

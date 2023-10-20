@@ -199,6 +199,13 @@ end
     strand.children.empty?
   end
 
+  def when_children_done?(reaper = nil)
+    reaped_children = reap
+    reaped_children.each { reaper.call(_1) } if reaper
+    yield if leaf?
+    donate
+  end
+
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
     fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol

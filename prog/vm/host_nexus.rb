@@ -40,9 +40,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_prep if leaf?
-    donate
+    when_children_done? { hop_prep }
   end
 
   label def prep
@@ -56,7 +54,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_prep
-    reap.each do |st|
+    reaper = proc do |st|
       case st.prog
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
@@ -79,11 +77,7 @@ class Prog::Vm::HostNexus < Prog::Base
         vm_host.update(**kwargs)
       end
     end
-
-    if leaf?
-      hop_setup_hugepages
-    end
-    donate
+    when_children_done?(reaper) { hop_setup_hugepages }
   end
 
   label def setup_hugepages
@@ -92,9 +86,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_setup_hugepages
-    reap
-    hop_setup_spdk if leaf?
-    donate
+    when_children_done? { hop_setup_spdk }
   end
 
   label def setup_spdk
@@ -103,11 +95,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def wait_setup_spdk
-    reap
-    if leaf?
-      hop_prep_reboot
-    end
-    donate
+    when_children_done? { hop_prep_reboot }
   end
 
   label def prep_reboot

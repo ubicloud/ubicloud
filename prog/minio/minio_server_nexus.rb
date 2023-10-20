@@ -68,9 +68,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def wait_bootstrap_rhizome
-    reap
-    hop_setup if leaf?
-    donate
+    when_children_done? { hop_setup }
   end
 
   label def setup
@@ -81,11 +79,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def wait_setup
-    reap
-    if leaf?
-      hop_minio_start
-    end
-    donate
+    when_children_done? { hop_minio_start }
   end
 
   label def minio_start

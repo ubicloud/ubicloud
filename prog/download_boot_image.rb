@@ -43,22 +43,17 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def wait_learn_storage
-    reap.each do |st|
+    reaper = proc do |st|
       case st.prog
       when "LearnStorage"
         kwargs = {
           total_storage_gib: st.exitval.fetch("total_storage_gib"),
           available_storage_gib: st.exitval.fetch("available_storage_gib")
         }
-
         vm_host.update(**kwargs)
       end
     end
-
-    if leaf?
-      hop_activate_host
-    end
-    donate
+    when_children_done?(reaper) { hop_activate_host }
   end
 
   label def activate_host
