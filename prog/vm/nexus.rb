@@ -368,6 +368,7 @@ SQL
 
     host.sshable.cmd("sudo host/bin/recreate-unpersisted #{params_path.shellescape}", stdin: secrets_json)
     host.sshable.cmd("sudo systemctl start #{q_vm}")
+    vm.nics.each { _1.incr_repopulate }
 
     vm.update(display_state: "running")
 

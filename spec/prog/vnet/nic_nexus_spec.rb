@@ -179,6 +179,50 @@ RSpec.describe Prog::Vnet::NicNexus do
         nx.wait
       }.to hop("start_rekey")
     end
+
+    it "hops to repopulate if needed" do
+      expect(nx).to receive(:when_repopulate_set?).and_yield
+      expect {
+        nx.wait
+      }.to hop("repopulate")
+    end
+  end
+
+  describe "#repopulate" do
+    it "buds RekeyNicTunnel with add_subnet_addr" do
+      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr)
+      expect {
+        nx.repopulate
+      }.to hop("wait_repopulate")
+    end
+  end
+
+  describe "#wait_repopulate" do
+    let(:nic) { instance_double(Nic) }
+
+    before do
+      allow(nx).to receive(:nic).and_return(nic)
+    end
+
+    it "donates if nothing to do" do
+      expect(nx).to receive(:reap).and_return(true)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect {
+        nx.wait_repopulate
+      }.to nap(0)
+    end
+
+    it "starts to wait and increments refresh_keys if bud is complete" do
+      ps = instance_double(PrivateSubnet)
+      expect(nic).to receive(:private_subnet).and_return(ps)
+      expect(ps).to receive(:incr_refresh_keys)
+
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect(nx).to receive(:reap).and_return(true)
+      expect {
+        nx.wait_repopulate
+      }.to hop("wait")
+    end
   end
 
   describe "#rekey" do
