@@ -13,7 +13,7 @@ end
 
 if Config.github_app_id
   # We always insert this strand using the same UBID ("stredelivergith0bfail0reaz")
-  Strand.dataset.insert_conflict.insert(id: "c39ae087-6ec4-033a-d440-b7a821061caf", schedule: Time.now, prog: "RedeliverGithubFailures", label: "wait", stack: [{last_check_at: Time.now}])
+  Strand.dataset.insert_conflict.insert(id: "c39ae087-6ec4-033a-d440-b7a821061caf", schedule: Time.now, prog: "RedeliverGithubFailures", label: "wait", stack: [{last_check_at: Time.now}].to_json)
 end
 
 loop do
