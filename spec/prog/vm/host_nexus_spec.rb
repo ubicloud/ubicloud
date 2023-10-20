@@ -218,9 +218,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.wait }.to nap(30)
     end
 
-    it "hops to reboot when needed" do
+    it "hops to prep_reboot when needed" do
       expect(nx).to receive(:when_reboot_set?).and_yield
-      expect { nx.wait }.to hop("reboot")
+      expect { nx.wait }.to hop("prep_reboot")
     end
   end
 

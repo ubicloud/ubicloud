@@ -182,7 +182,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def wait
     when_reboot_set? do
-      hop_reboot
+      hop_prep_reboot
     end
 
     nap 30
