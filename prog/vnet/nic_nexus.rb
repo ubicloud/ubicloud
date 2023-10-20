@@ -2,7 +2,7 @@
 
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
-  semaphore :destroy, :detach_vm, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger, :setup_nic
+  semaphore :destroy, :detach_vm, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger, :setup_nic, :repopulate
 
   def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil)
     unless (subnet = PrivateSubnet[private_subnet_id])
@@ -62,11 +62,31 @@ class Prog::Vnet::NicNexus < Prog::Base
       hop_detach_vm
     end
 
+    when_repopulate_set? do
+      hop_repopulate
+    end
+
     when_start_rekey_set? do
       hop_start_rekey
     end
 
     nap 30
+  end
+
+  label def repopulate
+    bud Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
+    hop_wait_repopulate
+  end
+
+  label def wait_repopulate
+    reap
+    if leaf?
+      decr_repopulate
+      nic.private_subnet.incr_refresh_keys
+      hop_wait
+    end
+
+    donate
   end
 
   label def start_rekey
