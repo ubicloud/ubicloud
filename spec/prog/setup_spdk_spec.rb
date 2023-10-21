@@ -22,8 +22,7 @@ RSpec.describe Prog::SetupSpdk do
       expect(sshable).to receive(:cmd).with("sudo systemctl enable home-spdk-hugepages.mount")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable spdk")
       expect(ss).to receive(:sshable).and_return(sshable).at_least(:once)
-      expect(ss).to receive(:pop).with("SPDK was setup")
-      ss.enable_service
+      expect { ss.enable_service }.to exit({"msg" => "SPDK was setup"})
     end
   end
 end

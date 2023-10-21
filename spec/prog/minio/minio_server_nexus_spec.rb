@@ -73,9 +73,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx).to receive(:register_deadline)
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"})
-      expect {
-        nx.start
-      }.to hop("wait_bootstrap_rhizome")
+      expect { nx.start }.to hop("wait_bootstrap_rhizome")
       expect(vm.sshable.host).to eq "1.1.1.1"
     end
   end
@@ -157,8 +155,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:incr_destroy)
       expect(nx.minio_server).to receive(:destroy)
-      expect(nx).to receive(:pop).with("minio server destroyed")
-      nx.destroy
+      expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
     end
   end
 
@@ -175,15 +172,13 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
     it "does not hop to destroy if destroy is not set" do
       expect(nx).to receive(:when_destroy_set?).and_return(false)
-      expect(nx).not_to receive(:hop_destroy)
-      nx.before_run
+      expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if strand label is destroy" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
-      expect(nx).not_to receive(:hop_destroy)
-      nx.before_run
+      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 end

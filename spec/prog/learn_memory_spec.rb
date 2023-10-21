@@ -20,8 +20,7 @@ EOS
       sshable = instance_double(Sshable)
       expect(sshable).to receive(:cmd).with("sudo /usr/sbin/dmidecode -t memory | fgrep Size:").and_return(four_units)
       expect(lm).to receive(:sshable).and_return(sshable)
-      expect(lm).to receive(:pop).with(mem_gib: 64)
-      lm.start
+      expect { lm.start }.to exit({mem_gib: 64})
     end
   end
 

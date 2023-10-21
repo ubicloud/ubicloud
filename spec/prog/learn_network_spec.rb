@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnNetwork do
-  subject(:lm) { described_class.new(Strand.new(stack: [])) }
+  subject(:lm) { described_class.new(Strand.new(stack: [{}])) }
 
   let(:ip6_interface_output) do
     <<JSON
@@ -44,8 +44,7 @@ JSON
       expect(vm_host).to receive(:update).with(ip6: "2a01:4f8:173:1ed3::2", net6: "2a01:4f8:173:1ed3::/64")
       expect(lm).to receive(:sshable).and_return(sshable)
       expect(lm).to receive(:vm_host).and_return(vm_host)
-      expect(lm).to receive(:pop).with("learned network information")
-      lm.start
+      expect { lm.start }.to exit({"msg" => "learned network information"})
     end
   end
 

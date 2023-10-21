@@ -99,25 +99,19 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   describe "#wait" do
     it "hops to destroy if when_destroy_set?" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect {
-        nx.wait
-      }.to hop("destroy")
+      expect { nx.wait }.to hop("destroy")
     end
 
     it "hops to refresh_keys if when_refresh_keys_set?" do
       expect(nx).to receive(:when_refresh_keys_set?).and_yield
       expect(ps).to receive(:update).with(state: "refreshing_keys").and_return(true)
-      expect {
-        nx.wait
-      }.to hop("refresh_keys")
+      expect { nx.wait }.to hop("refresh_keys")
     end
 
     it "hops to add_new_nic if when_add_new_nic_set?" do
       expect(nx).to receive(:when_add_new_nic_set?).and_yield
       expect(ps).to receive(:update).with(state: "adding_new_nic").and_return(true)
-      expect {
-        nx.wait
-      }.to hop("add_new_nic")
+      expect { nx.wait }.to hop("add_new_nic")
     end
 
     it "increments refresh_keys if it passed more than a day" do
@@ -127,9 +121,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "naps if nothing to do" do
-      expect {
-        nx.wait
-      }.to nap(30)
+      expect { nx.wait }.to nap(30)
     end
   end
 
@@ -165,9 +157,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
           spi6: "0xe3af3a04",
           reqid: 86879
         }).and_return(true)
-      expect {
-        nx.add_new_nic
-      }.to hop("wait_inbound_setup")
+      expect { nx.add_new_nic }.to hop("wait_inbound_setup")
     end
   end
 
@@ -189,9 +179,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
           reqid: 86879
         }).and_return(true)
       expect(nic).to receive(:incr_start_rekey).and_return(true)
-      expect {
-        nx.refresh_keys
-      }.to hop("wait_inbound_setup")
+      expect { nx.refresh_keys }.to hop("wait_inbound_setup")
     end
   end
 
@@ -210,9 +198,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nic.strand).to receive(:label).and_return("wait_rekey_outbound_trigger")
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_trigger_outbound_update).and_return(true)
-      expect {
-        nx.wait_inbound_setup
-      }.to hop("wait_outbound_setup")
+      expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
     end
   end
 
@@ -232,9 +218,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nic.strand).to receive(:label).and_return("wait_rekey_old_state_drop_trigger")
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_old_state_drop_trigger).and_return(true)
-      expect {
-        nx.wait_outbound_setup
-      }.to hop("wait_old_state_drop")
+      expect { nx.wait_outbound_setup }.to hop("wait_old_state_drop")
     end
   end
 
@@ -258,9 +242,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:rekey_payload).and_return({})
       expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
-      expect {
-        nx.wait_old_state_drop
-      }.to hop("wait")
+      expect { nx.wait_old_state_drop }.to hop("wait")
     end
 
     it "doesn't decrement refresh_keys if there are missed nics" do
@@ -271,9 +253,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(nx).to receive(:rekeying_nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
       expect(nx).not_to receive(:decr_refresh_keys)
-      expect {
-        nx.wait_old_state_drop
-      }.to hop("wait")
+      expect { nx.wait_old_state_drop }.to hop("wait")
     end
   end
 
@@ -359,8 +339,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:nics).and_return([]).at_least(:once)
       expect(ps).to receive(:projects).and_return([prj]).at_least(:once)
       expect(ps).to receive(:dissociate_with_project).with(prj).and_return(true)
-      expect(nx).to receive(:pop).with("subnet destroyed").and_return(true)
-      nx.destroy
+      expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
   end
 end

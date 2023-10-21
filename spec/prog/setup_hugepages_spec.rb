@@ -17,8 +17,7 @@ RSpec.describe Prog::SetupHugepages do
       expect(sshable).to receive(:cmd).with("sudo update-grub")
       expect(sh).to receive(:sshable).and_return(sshable).at_least(:once)
       expect(sh).to receive(:vm_host).and_return(vm_host).at_least(:once)
-      expect(sh).to receive(:pop).with("hugepages installed")
-      sh.start
+      expect { sh.start }.to exit({"msg" => "hugepages installed"})
     end
   end
 end

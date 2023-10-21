@@ -51,9 +51,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
     it "creates new minio servers and hops to wait_servers" do
       described_class.assemble(minio_cluster.id, 0)
 
-      expect {
-        nx.start
-      }.to hop("wait_servers")
+      expect { nx.start }.to hop("wait_servers")
       expect(MinioServer.count).to eq 1
       expect(MinioServer.first.pool.name).to eq "minio-cluster-name-0"
     end
@@ -64,26 +62,20 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       st = instance_double(Strand, label: "start")
       ms = instance_double(MinioServer, strand: st)
       expect(nx.minio_pool).to receive(:servers).and_return([ms])
-      expect {
-        nx.wait_servers
-      }.to nap(5)
+      expect { nx.wait_servers }.to nap(5)
     end
 
     it "hops to wait if all servers are waiting" do
       st = instance_double(Strand, label: "wait")
       ms = instance_double(MinioServer, strand: st)
       expect(nx.minio_pool).to receive(:servers).and_return([ms])
-      expect {
-        nx.wait_servers
-      }.to hop("wait")
+      expect { nx.wait_servers }.to hop("wait")
     end
   end
 
   describe "#wait" do
     it "naps" do
-      expect {
-        nx.wait
-      }.to nap(30)
+      expect { nx.wait }.to nap(30)
     end
   end
 
@@ -93,26 +85,21 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       ms = instance_double(MinioServer)
       expect(ms).to receive(:incr_destroy)
       expect(nx.minio_pool).to receive(:servers).and_return([ms])
-      expect {
-        nx.destroy
-      }.to hop("wait_servers_destroyed")
+      expect { nx.destroy }.to hop("wait_servers_destroyed")
     end
   end
 
   describe "#wait_servers_destroyed" do
     it "naps if there are still minio servers" do
       expect(nx.minio_pool).to receive(:servers).and_return([true])
-      expect {
-        nx.wait_servers_destroyed
-      }.to nap(5)
+      expect { nx.wait_servers_destroyed }.to nap(5)
     end
 
     it "pops if all minio servers are destroyed" do
       expect(nx.minio_pool).to receive(:servers).and_return([])
       expect(nx.minio_pool).to receive(:destroy)
-      expect(nx).to receive(:pop).with("pool destroyed")
 
-      nx.wait_servers_destroyed
+      expect { nx.wait_servers_destroyed }.to exit({"msg" => "pool destroyed"})
     end
   end
 
@@ -121,30 +108,24 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       st = described_class.assemble(minio_cluster.id, 0)
       st.update(label: "start")
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect {
-        nx.before_run
-      }.to hop("destroy")
+      expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if strand is destroy" do
       st = described_class.assemble(minio_cluster.id, 0)
       st.update(label: "destroy")
-      expect {
-        nx.before_run
-      }.not_to hop("destroy")
+      expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if destroy is not set" do
       expect(nx).to receive(:when_destroy_set?).and_return(false)
-      expect(nx).not_to receive(:hop_destroy)
-      nx.before_run
+      expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if strand label is destroy" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
-      expect(nx).not_to receive(:hop_destroy)
-      nx.before_run
+      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 end
