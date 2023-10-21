@@ -44,7 +44,6 @@ module Config
   optional :versioning_app_name, string
   optional :clover_session_secret, base64, clear: true
   optional :clover_column_encryption_key, base64, clear: true
-  optional :pagerduty_key, string, clear: true
   optional :stripe_public_key, string, clear: true
   optional :stripe_secret_key, string, clear: true
   optional :postgres_service_project_id, string
@@ -99,4 +98,8 @@ module Config
   override :minio_host_name, "minio.ubicloud.com", string
   optional :minio_service_project_id, string
   override :minio_version, "minio_20231007150738.0.0_amd64"
+
+  # Pagerduty
+  optional :pagerduty_key, string, clear: true
+  optional :pagerduty_log_link, string
 end

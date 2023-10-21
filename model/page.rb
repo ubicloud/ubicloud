@@ -23,8 +23,13 @@ class Page < Sequel::Model
   def trigger
     return unless Config.pagerduty_key
 
+    links = []
+    details.fetch("related_resources", []).each do |ubid|
+      links << {href: Config.pagerduty_log_link.gsub("<ubid>", ubid), text: "View #{ubid} Logs"} if Config.pagerduty_log_link
+    end
+
     incident = pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
-    incident.trigger(summary: summary, severity: "error", source: "clover")
+    incident.trigger(summary: summary, severity: "error", source: "clover", custom_details: details, links: links)
   end
 
   def resolve
