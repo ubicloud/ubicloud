@@ -39,7 +39,6 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     if nic.src_ipsec_tunnels.empty? && nic.dst_ipsec_tunnels.empty?
       nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} xfrm state deleteall")
       pop "drop_old_state is complete early"
-      return
     end
 
     new_spis = [nic.rekey_payload["spi4"], nic.rekey_payload["spi6"]]

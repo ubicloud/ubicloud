@@ -6,7 +6,7 @@ class Prog::Base
   def initialize(strand, snap = nil)
     @snap = snap || SemSnap.new(strand.id)
     @strand = strand
-    @subject_id = frame&.dig("subject_id") || @strand.id
+    @subject_id = frame.dig("subject_id") || @strand.id
   end
 
   def self.subject_is(*names)

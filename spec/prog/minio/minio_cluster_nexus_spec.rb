@@ -60,9 +60,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     end
 
     it "creates a subnet and minio pools" do
-      expect {
-        nx.start
-      }.to hop("wait_pools")
+      expect { nx.start }.to hop("wait_pools")
       expect(nx.minio_cluster.pools.count).to eq 1
       expect(nx.minio_cluster.private_subnet_id).not_to be_nil
     end
@@ -75,16 +73,12 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     end
 
     it "hops to configure_dns_records if all pools are waiting" do
-      expect {
-        nx.wait_pools
-      }.to hop("configure_dns_records")
+      expect { nx.wait_pools }.to hop("configure_dns_records")
     end
 
     it "naps if not all pools are waiting" do
       allow(nx.minio_cluster.pools.first.strand).to receive(:label).and_return("start")
-      expect {
-        nx.wait_pools
-      }.to nap(5)
+      expect { nx.wait_pools }.to nap(5)
     end
   end
 
@@ -103,9 +97,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
 
   describe "#wait" do
     it "naps" do
-      expect {
-        nx.wait
-      }.to nap(30)
+      expect { nx.wait }.to nap(30)
     end
   end
 
@@ -119,24 +111,19 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       mp = instance_double(MinioPool, incr_destroy: nil)
       expect(mp).to receive(:incr_destroy)
       expect(nx.minio_cluster).to receive(:pools).and_return([mp])
-      expect {
-        nx.destroy
-      }.to hop("wait_pools_destroyed")
+      expect { nx.destroy }.to hop("wait_pools_destroyed")
     end
   end
 
   describe "#wait_pools_destroyed" do
     it "naps if there are still minio pools" do
       expect(nx.minio_cluster).to receive(:pools).and_return([true])
-      expect {
-        nx.wait_pools_destroyed
-      }.to nap(10)
+      expect { nx.wait_pools_destroyed }.to nap(10)
     end
 
     it "increments destroy semaphore of subnet and minio cluster and pops" do
       expect(nx.minio_cluster).to receive(:destroy)
-      expect(nx).to receive(:pop).with("destroyed")
-      nx.wait_pools_destroyed
+      expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
     end
 
     it "increments private subnet destroy if exists" do
@@ -144,30 +131,25 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(ps).to receive(:incr_destroy)
       expect(nx.minio_cluster).to receive(:private_subnet).and_return(ps)
       expect(nx.minio_cluster).to receive(:destroy)
-      expect(nx).to receive(:pop).with("destroyed")
-      nx.wait_pools_destroyed
+      expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
     end
   end
 
   describe "#before_run" do
     it "hops to destroy if destroy is set" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect {
-        nx.before_run
-      }.to hop("destroy")
+      expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if destroy is not set" do
       expect(nx).to receive(:when_destroy_set?).and_return(false)
-      expect(nx).not_to receive(:hop_destroy)
-      nx.before_run
+      expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if strand label is destroy" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
-      expect(nx).not_to receive(:hop_destroy)
-      nx.before_run
+      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 

@@ -12,10 +12,8 @@ RSpec.describe Prog::LearnStorage do
 1B-blocks     Avail
 494384795648 299711037440
 EOS
-
       expect(ls).to receive(:sshable).and_return(sshable).at_least(:once)
-      expect(ls).to receive(:pop).with(total_storage_gib: 460, available_storage_gib: 274)
-      ls.start
+      expect { ls.start }.to exit({total_storage_gib: 460, available_storage_gib: 274})
     end
   end
 

@@ -31,9 +31,7 @@ RSpec.describe Prog::Vm::VmPool do
       st.update(label: "create_new_vm")
       expect(SshKey).to receive(:generate).and_call_original
       expect(nx).to receive(:vm_pool).and_return(VmPool[st.id]).at_least(:once)
-      expect {
-        nx.create_new_vm
-      }.to hop("wait")
+      expect { nx.create_new_vm }.to hop("wait")
       pool = VmPool[st.id]
       expect(pool.vms.count).to eq(1)
       expect(pool.vms.first.sshable).not_to be_nil
@@ -47,17 +45,13 @@ RSpec.describe Prog::Vm::VmPool do
 
     it "waits if nothing to do" do
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      expect {
-        nx.wait
-      }.to nap(30)
+      expect { nx.wait }.to nap(30)
     end
 
     it "hops to create_new_vm, if vm count is less than the size and there are no waiting GithubRunners" do
       pool.update(size: 1)
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      expect {
-        nx.wait
-      }.to hop("create_new_vm")
+      expect { nx.wait }.to hop("create_new_vm")
     end
 
     it "waits even if the vm count is less when there are waiting GithubRunners" do
@@ -80,9 +74,7 @@ RSpec.describe Prog::Vm::VmPool do
       expect(nx).to receive(:vm_pool).and_return(pool)
       expect(pool).to receive(:vms).and_return([vm])
       expect(vm).to receive(:incr_destroy)
-      expect {
-        nx.destroy
-      }.to hop("wait_vms_destroy")
+      expect { nx.destroy }.to hop("wait_vms_destroy")
     end
   end
 
@@ -95,17 +87,14 @@ RSpec.describe Prog::Vm::VmPool do
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
       expect(pool).to receive(:destroy)
       expect(pool).to receive(:vms).and_return([])
-      expect(nx).to receive(:pop).with("pool destroyed")
 
-      nx.wait_vms_destroy
+      expect { nx.wait_vms_destroy }.to exit({"msg" => "pool destroyed"})
     end
 
     it "naps if there are still vms" do
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
       expect(pool).to receive(:vms).and_return([true])
-      expect {
-        nx.wait_vms_destroy
-      }.to nap(10)
+      expect { nx.wait_vms_destroy }.to nap(10)
     end
   end
 

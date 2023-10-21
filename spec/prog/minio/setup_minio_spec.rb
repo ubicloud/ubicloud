@@ -46,33 +46,24 @@ RSpec.describe Prog::Minio::SetupMinio do
   describe ".install_minio" do
     it "pops if minio is installed" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check install_minio").and_return("Succeeded")
-      expect(nx).to receive(:pop).with("minio is installed")
-      expect {
-        nx.install_minio
-      }.to nap(5)
+      expect { nx.install_minio }.to exit({"msg" => "minio is installed"})
     end
 
     it "installs minio if failed" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check install_minio").and_return("Failed")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'minio/bin/install_minio minio_20231007150738.0.0_amd64' install_minio")
-      expect {
-        nx.install_minio
-      }.to nap(5)
+      expect { nx.install_minio }.to nap(5)
     end
 
     it "naps if check returns unknown" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check install_minio").and_return("Unknown")
-      expect {
-        nx.install_minio
-      }.to nap(5)
+      expect { nx.install_minio }.to nap(5)
     end
 
     it "installs minio if NotStarted" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check install_minio").and_return("NotStarted")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'minio/bin/install_minio minio_20231007150738.0.0_amd64' install_minio")
-      expect {
-        nx.install_minio
-      }.to nap(5)
+      expect { nx.install_minio }.to nap(5)
     end
   end
 
@@ -89,8 +80,7 @@ SH
 192.168.0.0 minio-cluster-name0.minio.ubicloud.com
 SH
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo chown -R minio-user:minio-user /etc/default/minio")
-      expect(nx).to receive(:pop).with("minio is configured")
-      nx.configure_minio
+      expect { nx.configure_minio }.to exit({"msg" => "minio is configured"})
     end
   end
 
@@ -103,26 +93,19 @@ SH
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/dummy /minio/dat1 xfs defaults 0 0")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo mount /dev/dummy /minio/dat1")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo chown -R minio-user:minio-user /minio")
-      expect(nx).to receive(:pop).with("data disks are mounted")
-      expect {
-        nx.mount_data_disks
-      }.to nap(5)
+      expect { nx.mount_data_disks }.to exit({"msg" => "data disks are mounted"})
     end
 
     it "formats data disks" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disks").and_return("Failed")
       expect(nx.minio_server.vm).to receive_message_chain(:vm_storage_volumes_dataset, :order_by, :where, :all).and_return([instance_double(VmStorageVolume, boot: false, device_path: "/dev/dummy")]) # rubocop:disable RSpec/MessageChain
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo mkfs --type xfs /dev/dummy' format_disks")
-      expect {
-        nx.mount_data_disks
-      }.to nap(5)
+      expect { nx.mount_data_disks }.to nap(5)
     end
 
     it "naps if check returns unknown" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disks").and_return("Unknown")
-      expect {
-        nx.mount_data_disks
-      }.to nap(5)
+      expect { nx.mount_data_disks }.to nap(5)
     end
   end
 end

@@ -43,8 +43,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       allow(tunnel.src_nic.vm).to receive_messages(ephemeral_net6: NetAddr.parse_net("2a01:4f8:10a:128b:4919::/80"), inhost_name: "hellovm")
       expect(tunnel.src_nic).to receive(:ubid_to_tap_name).and_return("ncname")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm addr replace 1.1.1.0/26 dev ncname")
-      expect(nx).to receive(:pop).with("add_subnet_addr is complete")
-      nx.add_subnet_addr
+      expect { nx.add_subnet_addr }.to exit({"msg" => "add_subnet_addr is complete"})
     end
   end
 
@@ -62,8 +61,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy add src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 0 mode tunnel").and_return(true)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd").and_return("")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy add src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 0 mode tunnel").and_return(true)
-      expect(nx).to receive(:pop).with("inbound_setup is complete").and_return(true)
-      nx.setup_inbound
+      expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})
     end
 
     it "skips policies if they exist" do
@@ -71,14 +69,12 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' 0x736f6d655f656e6372797074696f6e5f6b6579 128 ").and_return(true)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir fwd").and_return("not_empty")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir fwd").and_return("not_empty")
-      expect(nx).to receive(:pop).with("inbound_setup is complete").and_return(true)
-      nx.setup_inbound
+      expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})
     end
 
     it "skips tunnel if its src_nic doesn't have rekey_payload" do
       expect(tunnel.src_nic).to receive(:rekey_payload).and_return(nil)
-      expect(nx).to receive(:pop).with("inbound_setup is complete")
-      nx.setup_inbound
+      expect { nx.setup_inbound }.to exit({"msg" => "inbound_setup is complete"})
     end
   end
 
@@ -98,14 +94,12 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy update src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm route replace fd10:9b0b:6b4b:8fbb:def::/128 dev vethihellovm")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm route replace 10.0.0.2/32 dev vethihellovm")
-      expect(nx).to receive(:pop).with("outbound_setup is complete").and_return(true)
-      nx.setup_outbound
+      expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
     end
 
     it "skips tunnel if its src_nic doesn't have rekey_payload" do
       expect(tunnel.src_nic).to receive(:rekey_payload).and_return(nil)
-      expect(nx).to receive(:pop).with("outbound_setup is complete")
-      nx.setup_outbound
+      expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
     end
   end
 
@@ -146,16 +140,14 @@ sel src 0.0.0.0/0 dst 0.0.0.0/0"
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state").and_return(states_data)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x059e11e6").and_return(true)
-      expect(nx).to receive(:pop).with("drop_old_state is complete").and_return(true)
-      nx.drop_old_state
+      expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete"})
     end
 
     it "skips if there is no tunnel" do
       expect(tunnel.src_nic).to receive(:src_ipsec_tunnels).and_return([])
       expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([])
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state deleteall")
-      expect(nx).to receive(:pop).with("drop_old_state is complete early")
-      nx.drop_old_state
+      expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete early"})
     end
 
     it "skips if the dst tunnel nic is not rekeying" do
@@ -165,8 +157,7 @@ sel src 0.0.0.0/0 dst 0.0.0.0/0"
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state").and_return(states_data)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x059e11e6").and_return(true)
-      expect(nx).to receive(:pop).with("drop_old_state is complete").and_return(true)
-      nx.drop_old_state
+      expect { nx.drop_old_state }.to exit({"msg" => "drop_old_state is complete"})
     end
   end
 end

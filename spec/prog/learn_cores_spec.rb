@@ -103,8 +103,7 @@ JSON
         eight_thread_four_core_four_numa_two_socket
       )
       expect(lc).to receive(:sshable).and_return(sshable)
-      expect(lc).to receive(:pop).with(total_sockets: 2, total_cores: 4, total_nodes: 4, total_cpus: 8)
-      lc.start
+      expect { lc.start }.to exit({total_sockets: 2, total_cores: 4, total_nodes: 4, total_cpus: 8})
     end
   end
 end
