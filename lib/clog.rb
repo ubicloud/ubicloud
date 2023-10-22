@@ -3,6 +3,8 @@
 require "json"
 
 class Clog
+  Fail = Class.new(RuntimeError)
+
   @@mutex = Mutex.new
 
   def self.emit(message)
@@ -29,5 +31,10 @@ class Clog
       puts raw
     end
     nil
+  end
+
+  def self.fail(message, &block)
+    emit(message, &block)
+    Kernel.fail Fail.new(message)
   end
 end

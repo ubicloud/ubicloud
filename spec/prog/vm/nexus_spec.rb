@@ -357,13 +357,13 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if there are no VmHosts" do
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+      expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
     end
 
     it "only matches when location matches" do
       vm.location = "somewhere-normal"
       vmh = new_host(location: "somewhere-weird").save_changes
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+      expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
 
       vm.location = "somewhere-weird"
       expect(nx.allocate).to eq vmh.id
@@ -372,13 +372,13 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "does not match if there is not enough ram capacity" do
       new_host(total_mem_gib: 1).save_changes
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+      expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
     end
 
     it "does not match if there is not enough storage capacity" do
       new_host(available_storage_gib: 10).save_changes
       expect(vm.storage_size_gib).to eq(35)
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+      expect { nx.allocate }.to raise_error RuntimeError, "no space left on any eligible hosts"
     end
 
     it "prefers the host with a more snugly fitting RAM ratio, even if busy" do

@@ -181,7 +181,7 @@ SQL
 
   def allocate
     vm_host_id = allocation_dataset.limit(1).get(:id)
-    fail "#{vm} no space left on any eligible hosts for #{vm.location}" unless vm_host_id
+    Clog.fail("no space left on any eligible hosts") { {vm: vm.values} } unless vm_host_id
 
     fail "concurrent allocation_state modification requires re-allocation" if VmHost.dataset
       .where(id: vm_host_id, allocation_state: "accepting")
