@@ -272,7 +272,6 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "waits draining" do
       expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect(vm_host).to receive(:values).and_return({allocation_state: "draining"})
       expect(Clog).to receive(:emit).with("Cannot destroy the vm host with active virtual machines, first clean them up").and_call_original
       expect { nx.destroy }.to nap(15)
     end

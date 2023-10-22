@@ -269,7 +269,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.incr_destroy
       nap 15
     when "failed"
-      Clog.emit("The runner script failed") { {github_runner: github_runner.values} }
+      Clog.emit("The runner script failed") { github_runner }
       github_runner.provision_spare_runner
       github_runner.incr_destroy
       nap 0
@@ -281,7 +281,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
-        Clog.emit("The runner does not pick a job") { {github_runner: github_runner.values} }
+        Clog.emit("The runner does not pick a job") { github_runner }
         github_runner.incr_destroy
         nap 0
       end
@@ -297,7 +297,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     begin
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       if response[:busy]
-        Clog.emit("The runner is still running a job") { {github_runner: github_runner.values} }
+        Clog.emit("The runner is still running a job") { github_runner }
         nap 15
       end
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
@@ -328,7 +328,7 @@ class Prog::Vm::GithubRunner < Prog::Base
           # Exclude the "Started" line because it contains sensitive information.
           vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
         rescue Sshable::SshError
-          Clog.emit("Failed to move serial.log or running journalctl") { {github_runner: github_runner.values} }
+          Clog.emit("Failed to move serial.log or running journalctl") { github_runner }
         end
       end
       vm.incr_destroy

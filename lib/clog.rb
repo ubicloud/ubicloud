@@ -7,11 +7,13 @@ class Clog
 
   def self.emit(message)
     out = if block_given?
-      case v = yield
+      case metadata = yield
       when Hash
-        v
+        metadata
+      when Sequel::Model
+        serialize_model(metadata)
       else
-        {invalid_type: v.class.to_s}
+        {invalid_type: metadata.class.to_s}
       end
     else
       {}
@@ -30,5 +32,9 @@ class Clog
       $stdout.write(raw)
     end
     nil
+  end
+
+  private_class_method def self.serialize_model(model)
+    {model.class.table_name => model.values.except(*model.class.redacted_columns)}
   end
 end
