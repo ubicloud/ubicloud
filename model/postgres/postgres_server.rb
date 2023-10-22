@@ -48,7 +48,9 @@ class PostgresServer < Sequel::Model
         tcp_keepalives_count: 4,
         tcp_keepalives_idle: 2,
         tcp_keepalives_interval: 2,
-        work_mem: "#{vm.mem_gib / 8}MB"
+        work_mem: "#{vm.mem_gib / 8}MB",
+        ssl_cert_file: "'/var/lib/postgresql/16/main/server.crt'",
+        ssl_key_file: "'/var/lib/postgresql/16/main/server.key'"
       },
       private_subnets: vm.private_subnets.map {
         {
