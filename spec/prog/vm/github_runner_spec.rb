@@ -73,10 +73,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "provisions a VM if the pool is not existing" do
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
-      vm = nil
-      expect {
-        vm = nx.pick_vm
-      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
+      expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
+      vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
       expect(vm.family).to eq("standard")
@@ -88,10 +86,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
-      vm = nil
-      expect {
-        vm = nx.pick_vm
-      }.to output("Project[#{project.ubid}] Pool is empty for ubicloud-standard-4, creating a new VM\n").to_stdout
+      expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
+      vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
       expect(vm.family).to eq("standard")
@@ -111,10 +107,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(BillingRecord).to receive(:create_with_id).and_return(nil)
       adr = instance_double(AssignedVmAddress, id: "id", ip: "1.1.1.1")
       expect(vm).to receive(:assigned_vm_address).and_return(adr).at_least(:once)
-      vm = nil
-      expect {
-        vm = nx.pick_vm
-      }.to output("Project[#{project.ubid}] Pool is used for ubicloud-standard-4\n").to_stdout
+      expect(Clog).to receive(:emit).with("Pool is used").and_call_original
+      vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")
     end
