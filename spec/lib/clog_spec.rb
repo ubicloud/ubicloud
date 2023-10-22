@@ -25,4 +25,9 @@ RSpec.describe Clog do
     expect($stdout).to receive(:write).with('{"invalid_type":"Integer","message":"ngmi","time":"' + now.to_s + '"}' + "\n")
     described_class.emit("ngmi") { 1 }
   end
+
+  it "returns the key with redacted values for Sequel::Model" do
+    expect($stdout).to receive(:write).with('{"vm":{"id":"123"},"message":"model","time":"' + now.to_s + '"}' + "\n")
+    described_class.emit("model") { Vm.new(public_key: "redacted_key").tap { _1.id = "123" } }
+  end
 end
