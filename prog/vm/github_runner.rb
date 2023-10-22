@@ -267,7 +267,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
         github_runner.incr_destroy
-        Clog.emit("Destroying GithubRunner because it does not pick a job in two minutes") { {github_runner: github_runner.values} }
+        Clog.emit("Destroying GithubRunner because it does not pick a job in two minutes") { github_runner }
         nap 0
       end
     end
