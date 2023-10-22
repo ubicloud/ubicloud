@@ -73,4 +73,11 @@ RSpec.describe PostgresServer do
   it "returns connection string" do
     expect(pgs.connection_string).to eq("postgres://postgres:dummy-password@pg-server-name.postgres.ubicloud.com")
   end
+
+  it "hides sensitive and long columns" do
+    inspect_output = pgs.inspect
+    ["superuser_password", "root_cert_1", "root_cert_key_1", "root_cert_1", "root_cert_key_2", "server_cert", "server_cert_key"].each do |column_key|
+      expect(inspect_output).not_to include column_key
+    end
+  end
 end

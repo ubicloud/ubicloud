@@ -68,4 +68,9 @@ class PostgresServer < Sequel::Model
   def connection_string
     URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s
   end
+
+  def inspect_values
+    hidden_columns = [:superuser_password, :root_cert_1, :root_cert_key_1, :root_cert_2, :root_cert_key_2, :server_cert, :server_cert_key]
+    @values.except(*hidden_columns).inspect
+  end
 end
