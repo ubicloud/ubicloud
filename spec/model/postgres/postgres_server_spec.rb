@@ -55,7 +55,9 @@ RSpec.describe PostgresServer do
         tcp_keepalives_count: 4,
         tcp_keepalives_idle: 2,
         tcp_keepalives_interval: 2,
-        work_mem: "1MB"
+        work_mem: "1MB",
+        ssl_cert_file: "'/var/lib/postgresql/16/main/server.crt'",
+        ssl_key_file: "'/var/lib/postgresql/16/main/server.key'"
       },
       private_subnets: [
         {
