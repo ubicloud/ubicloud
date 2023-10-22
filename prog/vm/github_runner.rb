@@ -53,12 +53,10 @@ class Prog::Vm::GithubRunner < Prog::Base
         billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", picked_vm.location)["id"],
         amount: 1
       )
-
-      puts "#{project} Pool is used for #{label}"
+      Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
 
-    puts "#{project} Pool is empty for #{label}, creating a new VM"
     ssh_key = SshKey.generate
     # We use unencrypted storage for now, because provisioning 86G encrypted
     # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
@@ -81,6 +79,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       host: "temp_#{vm_st.id}",
       raw_private_key_1: ssh_key.keypair
     ) { _1.id = vm_st.id }
+
+    Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
     vm_st.subject
   end
 
