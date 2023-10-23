@@ -280,6 +280,24 @@ RSpec.describe Prog::Vm::Nexus do
 
       expect { nx.start }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
+
+    it "creates a page if no capacity left and naps" do
+      expect(nx).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts")).twice
+      expect { nx.start }.to nap(30)
+      expect(Page.active.count).to eq(1)
+      expect(Page.from_tag_parts("NoCapacity", vm.location)).not_to be_nil
+
+      # Second run does not generate another page
+      expect { nx.start }.to nap(30)
+      expect(Page.active.count).to eq(1)
+    end
+
+    it "re-raises exceptions other than lack of capacity" do
+      expect(nx).to receive(:allocate).and_raise(RuntimeError.new("will not allocate because allocating is too mainstream and I'm too cool for that"))
+      expect {
+        nx.start
+      }.to raise_error(RuntimeError, "will not allocate because allocating is too mainstream and I'm too cool for that")
+    end
   end
 
   describe "#allocate" do
