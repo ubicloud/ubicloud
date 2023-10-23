@@ -91,6 +91,53 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#prep" do
+    it "buds a prep host process and install dnsmasq" do
+      expect(nx).to receive(:bud).with(Prog::Vm::PrepHost)
+      expect(nx).to receive(:bud).with(Prog::InstallDnsmasq)
+      expect { nx.prep }.to hop("wait_prep")
+    end
+  end
+
+  describe "#wait_prep" do
+    it "hops to download_boot_images if there are no sub-programs running" do
+      expect(nx).to receive(:reap).and_return([])
+      expect(nx).to receive(:leaf?).and_return true
+
+      expect { nx.wait_prep }.to hop("download_boot_images")
+    end
+
+    it "donates if there are sub-programs running" do
+      expect(nx).to receive(:reap).and_return([])
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_prep }.to nap(0)
+    end
+  end
+
+  describe "#download_boot_images" do
+    it "buds a download boot image process for each boot image" do
+      expect(nx).to receive(:bud).with(Prog::DownloadBootImage, {"image_name" => "ubuntu-jammy", "should_learn_storage" => false}, :download)
+      expect(nx).to receive(:bud).with(Prog::DownloadBootImage, {"image_name" => "almalinux-9.1", "should_learn_storage" => false}, :download)
+      expect { nx.download_boot_images }.to hop("wait_download_boot_images")
+    end
+  end
+
+  describe "#wait_download_boot_images" do
+    it "hops to learn_host if there are no sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return true
+      expect { nx.wait_download_boot_images }.to hop("learn_host")
+    end
+
+    it "donates if there are sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_download_boot_images }.to nap(0)
+    end
+  end
+
+  describe "#learn_host" do
     it "starts a number of sub-programs" do
       expect(vm_host).to receive(:net6).and_return(NetAddr.parse_net("2a01:4f9:2b:35a::/64"))
       budded = []
@@ -98,14 +145,12 @@ RSpec.describe Prog::Vm::HostNexus do
         budded << _1
       end.at_least(:once)
 
-      expect { nx.prep }.to hop("wait_prep")
+      expect { nx.learn_host }.to hop("wait_learn_host")
 
       expect(budded).to eq([
-        Prog::Vm::PrepHost,
         Prog::LearnMemory,
         Prog::LearnCores,
-        Prog::LearnStorage,
-        Prog::InstallDnsmasq
+        Prog::LearnStorage
       ])
     end
 
@@ -116,13 +161,13 @@ RSpec.describe Prog::Vm::HostNexus do
         budded_learn_network ||= (_1 == Prog::LearnNetwork)
       end.at_least(:once)
 
-      expect { nx.prep }.to hop("wait_prep")
+      expect { nx.learn_host }.to hop("wait_learn_host")
 
       expect(budded_learn_network).to be true
     end
   end
 
-  describe "#wait_prep" do
+  describe "#wait_learn_host" do
     it "updates the vm_host record from the finished programs" do
       expect(nx).to receive(:leaf?).and_return(true)
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
@@ -135,29 +180,29 @@ RSpec.describe Prog::Vm::HostNexus do
         instance_double(Strand, prog: "ArbitraryOtherProg")
       ])
 
-      expect { nx.wait_prep }.to hop("setup_hugepages")
+      expect { nx.wait_learn_host }.to hop("setup_hugepages")
     end
 
     it "crashes if an expected field is not set for LearnMemory" do
       expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnMemory", exitval: {})])
-      expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"mem_gib\""
+      expect { nx.wait_learn_host }.to raise_error KeyError, "key not found: \"mem_gib\""
     end
 
     it "crashes if an expected field is not set for LearnCores" do
       expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnCores", exitval: {})])
-      expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"total_sockets\""
+      expect { nx.wait_learn_host }.to raise_error KeyError, "key not found: \"total_sockets\""
     end
 
     it "crashes if an expected field is not set for LearnStorage" do
       expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnStorage", exitval: {})])
-      expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"total_storage_gib\""
+      expect { nx.wait_learn_host }.to raise_error KeyError, "key not found: \"total_storage_gib\""
     end
 
     it "donates to children if they are not exited yet" do
       expect(nx).to receive(:reap).and_return([])
       expect(nx).to receive(:leaf?).and_return(false)
       expect(nx).to receive(:donate).and_call_original
-      expect { nx.wait_prep }.to nap(0)
+      expect { nx.wait_learn_host }.to nap(0)
     end
   end
 

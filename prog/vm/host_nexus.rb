@@ -47,15 +47,38 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def prep
     bud Prog::Vm::PrepHost
-    bud Prog::LearnNetwork unless vm_host.net6
-    bud Prog::LearnMemory
-    bud Prog::LearnCores
-    bud Prog::LearnStorage
     bud Prog::InstallDnsmasq
     hop_wait_prep
   end
 
   label def wait_prep
+    reap
+    hop_download_boot_images if leaf?
+    donate
+  end
+
+  label def download_boot_images
+    Option::BootImages.each do |image|
+      bud Prog::DownloadBootImage, {"image_name" => image.name, "should_learn_storage" => false}, :download
+    end
+    hop_wait_download_boot_images
+  end
+
+  label def wait_download_boot_images
+    reap
+    hop_learn_host if leaf?
+    donate
+  end
+
+  label def learn_host
+    bud Prog::LearnNetwork unless vm_host.net6
+    bud Prog::LearnMemory
+    bud Prog::LearnCores
+    bud Prog::LearnStorage
+    hop_wait_learn_host
+  end
+
+  label def wait_learn_host
     reap.each do |st|
       case st.prog
       when "LearnMemory"

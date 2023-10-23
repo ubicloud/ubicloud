@@ -8,7 +8,11 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def custom_url
-    @custom_url ||= frame.fetch("custom_url")
+    @custom_url ||= frame.fetch("custom_url", nil)
+  end
+
+  def should_learn_storage?
+    @should_learn_storage ||= frame.fetch("should_learn_storage", true)
   end
 
   label def start
@@ -27,9 +31,10 @@ class Prog::DownloadBootImage < Prog::Base
   label def download
     case sshable.cmd("common/bin/daemonizer --check download_#{image_name.shellescape}")
     when "Succeeded"
-      hop_learn_storage
+      hop_learn_storage if should_learn_storage?
+      pop "#{image_name} downloaded"
     when "NotStarted"
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{image_name.shellescape} #{custom_url.shellescape}' download_#{image_name.shellescape}")
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{image_name.shellescape} #{custom_url&.shellescape}' download_#{image_name.shellescape}")
     when "Failed"
       puts "#{vm_host} Failed to download '#{image_name}' image"
     end

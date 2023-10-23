@@ -40,6 +40,13 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
+    it "starts to download image if it's not started yet and custom_url nil" do
+      expect(dbi).to receive(:custom_url).and_return(nil)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image my-image ' download_my-image")
+      expect { dbi.download }.to nap(15)
+    end
+
     it "waits manual intervation if it's failed" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("Failed")
       expect {
@@ -52,9 +59,15 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
-    it "hops if it's succeeded" do
+    it "hops if it's succeeded and should_learn_storage" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("Succeeded")
       expect { dbi.download }.to hop("learn_storage")
+    end
+
+    it "pops if it's succeeded and not should_learn_storage" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("Succeeded")
+      expect(dbi).to receive(:should_learn_storage?).and_return(false)
+      expect { dbi.download }.to exit({"msg" => "my-image downloaded"})
     end
   end
 
