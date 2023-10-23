@@ -8,10 +8,15 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
   semaphore :refresh_dns_servers
 
   label def wait
+    if dns_zone.last_purged_at < Time.now - 60 * 60 * 1 # ~1 hour
+      hop_purge_tombstoned_records
+    end
+
     when_refresh_dns_servers_set? do
       register_deadline(:wait, 5 * 60)
       hop_refresh_dns_servers
     end
+
     nap 10
   end
 
@@ -39,6 +44,24 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
 
       DB[:seen_dns_records_by_dns_servers].multi_insert(records_to_rectify.map { {dns_record_id: _1.id, dns_server_id: dns_server.id} })
     end
+
+    hop_wait
+  end
+
+  label def purge_tombstoned_records
+    dns_server_ids = dns_zone.dns_servers.map(&:id)
+    records_to_purge = dns_zone.records_dataset
+      .select(:id)
+      .join(:seen_dns_records_by_dns_servers, dns_record_id: :id, dns_server_id: dns_server_ids)
+      .where(tombstoned: true)
+      .group(:id)
+      .having { count.function.* =~ dns_server_ids.count }.all
+
+    DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id)).delete(force: true)
+    records_to_purge.map(&:destroy)
+
+    dns_zone.last_purged_at = Time.now
+    dns_zone.save_changes
 
     hop_wait
   end
