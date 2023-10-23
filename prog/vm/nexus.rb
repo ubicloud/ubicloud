@@ -196,8 +196,20 @@ SQL
   end
 
   label def start
-    register_deadline(:wait, 10 * 60)
-    vm_host_id = allocate
+    vm_host_id = begin
+      allocate
+    rescue RuntimeError => ex
+      raise unless ex.message.include?("no space left on any eligible hosts")
+
+      Prog::PageNexus.assemble("No capacity left at #{vm.location}", "NoCapacity", vm.location)
+
+      Clog.emit("No capacity left") do
+        {lack_of_capacity: {location: vm.location,
+                            queue_size: Vm.join(:strand, id: :id).where(:location => vm.location, Sequel[:strand][:label] => "start").count}}
+      end
+      nap 30
+    end
+
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
 
@@ -218,6 +230,9 @@ SQL
 
       AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
     end
+
+    register_deadline(:wait, 10 * 60)
+
     hop_create_unix_user
   end
 
