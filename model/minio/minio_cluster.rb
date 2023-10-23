@@ -48,4 +48,8 @@ class MinioCluster < Sequel::Model
   def connection_strings
     servers.map { "http://#{_1.vm.ephemeral_net4}:9000" }
   end
+
+  def hostname
+    "#{name}.#{Config.minio_host_name}"
+  end
 end

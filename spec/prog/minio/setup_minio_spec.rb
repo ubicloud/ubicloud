@@ -86,7 +86,7 @@ MINIO_ROOT_USER="minio-admin"
 MINIO_ROOT_PASSWORD="dummy-password"
 SH
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", stdin: <<SH)
-192.168.0.0 minio-cluster-name0.storage.ubicloud.com
+192.168.0.0 minio-cluster-name0.minio.ubicloud.com
 SH
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo chown -R minio-user:minio-user /etc/default/minio")
       expect(nx).to receive(:pop).with("minio is configured")

@@ -31,17 +31,17 @@ RSpec.describe MinioPool do
 
   describe "#volumes_url" do
     it "returns volumes url properly for a single drive single server pool" do
-      expect(mp.volumes_url).to eq("http://minio-cluster-name{0...0}.storage.ubicloud.com:9000/minio/dat{1...1}")
+      expect(mp.volumes_url).to eq("http://minio-cluster-name{0...0}.minio.ubicloud.com:9000/minio/dat{1...1}")
     end
 
     it "returns volumes url properly for a multi drive single server pool" do
       mp.cluster.update(target_total_driver_count: 4)
-      expect(mp.volumes_url).to eq("http://minio-cluster-name{0...0}.storage.ubicloud.com:9000/minio/dat{1...4}")
+      expect(mp.volumes_url).to eq("http://minio-cluster-name{0...0}.minio.ubicloud.com:9000/minio/dat{1...4}")
     end
 
     it "returns volumes url properly for a multi drive multi server pool" do
       mp.cluster.update(target_total_driver_count: 4, target_total_server_count: 2)
-      expect(mp.volumes_url).to eq("http://minio-cluster-name{0...1}.storage.ubicloud.com:9000/minio/dat{1...2}")
+      expect(mp.volumes_url).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
   end
 
