@@ -74,10 +74,10 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       instance_double(MinioPool, strand: st).tap { |mp| allow(nx.minio_cluster).to receive(:pools).and_return([mp]) }
     end
 
-    it "hops to wait if all pools are waiting" do
+    it "hops to configure_dns_records if all pools are waiting" do
       expect {
         nx.wait_pools
-      }.to hop("wait")
+      }.to hop("configure_dns_records")
     end
 
     it "naps if not all pools are waiting" do
@@ -85,6 +85,19 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect {
         nx.wait_pools
       }.to nap(5)
+    end
+  end
+
+  describe "#configure_dns_records" do
+    it "inserts dns records and hops to wait" do
+      dns_zone = instance_double(DnsZone)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "minio.minio.ubicloud.com", type: "A", ttl: 10, data: "1.1.1.1")
+      ms = instance_double(MinioServer, vm: instance_double(Vm, ephemeral_net4: "1.1.1.1"))
+      expect(nx.minio_cluster).to receive(:servers).and_return([ms])
+      expect(nx).to receive(:dns_zone).and_return(dns_zone)
+      expect {
+        nx.configure_dns_records
+      }.to hop("wait")
     end
   end
 
@@ -98,6 +111,9 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
 
   describe "#destroy" do
     it "increments destroy semaphore of minio pools and hops to wait_pools_destroy" do
+      dns_zone = instance_double(DnsZone)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "minio.minio.ubicloud.com")
+      expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
       mp = instance_double(MinioPool, incr_destroy: nil)
@@ -152,6 +168,15 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect(nx).not_to receive(:hop_destroy)
       nx.before_run
+    end
+  end
+
+  describe "#dns_zone" do
+    it "fetches dns zone from database only once" do
+      expect(DnsZone).to receive(:where).exactly(:once).and_return([true])
+
+      nx.dns_zone
+      nx.dns_zone
     end
   end
 end

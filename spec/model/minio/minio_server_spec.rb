@@ -29,7 +29,7 @@ RSpec.describe MinioServer do
   }
 
   it "returns hostname properly" do
-    expect(ms.hostname).to eq("minio-cluster-name0.storage.ubicloud.com")
+    expect(ms.hostname).to eq("minio-cluster-name0.minio.ubicloud.com")
   end
 
   it "returns private ipv4 address properly" do
@@ -58,7 +58,7 @@ RSpec.describe MinioServer do
 
     it "returns minio volumes properly for a multi drive multi server cluster" do
       ms.cluster.update(target_total_driver_count: 4, target_total_server_count: 2)
-      expect(ms.minio_volumes).to eq("http://minio-cluster-name{0...1}.storage.ubicloud.com:9000/minio/dat{1...2}")
+      expect(ms.minio_volumes).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
   end
 end

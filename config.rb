@@ -96,7 +96,7 @@ module Config
   optional :vm_pool_project_id, string
 
   # Minio
-  override :minio_host_name, "storage.ubicloud.com", string
+  override :minio_host_name, "minio.ubicloud.com", string
   optional :minio_service_project_id, string
   override :minio_version, "minio_20231007150738.0.0_amd64"
 end
