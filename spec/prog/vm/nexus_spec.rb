@@ -228,14 +228,9 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#start" do
-    it "registers a deadline and hops" do
-      expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("allocate_vm")
-    end
-  end
-
-  describe "#allocate_vm" do
     it "allocates the vm to a host" do
+      expect(nx).to receive(:register_deadline)
+
       vmh_id = "46ca6ded-b056-4723-bd91-612959f52f6f"
       vmh = VmHost.new(
         net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
@@ -249,7 +244,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(args[:vm_host_id]).to match vmh_id
       end
 
-      expect { nx.allocate_vm }.to hop("create_unix_user")
+      expect { nx.start }.to hop("create_unix_user")
     end
 
     it "allocates the vm to a host with IPv4 address" do
@@ -268,7 +263,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
       expect(vm).to receive(:update)
 
-      expect { nx.allocate_vm }.to hop("create_unix_user")
+      expect { nx.start }.to hop("create_unix_user")
     end
 
     it "fails if there is no ip address available but the vm is ip4 enabled" do
@@ -283,7 +278,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vmh).to receive(:ip4_random_vm_network).and_return([nil, nil])
       expect(vm).to receive(:ip4_enabled).and_return(true).at_least(:once)
 
-      expect { nx.allocate_vm }.to raise_error(RuntimeError, /no ip4 addresses left/)
+      expect { nx.start }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
   end
 
