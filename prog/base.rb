@@ -72,7 +72,7 @@ end
       # This is a multi-level stack with a back-link, i.e. one prog
       # calling another in the same Strand of execution.  The thing to
       # do here is pop the stack entry.
-      pg = Page.from_tag_parts(strand.id, strand.prog, strand.stack.first["deadline_target"])
+      pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, strand.stack.first["deadline_target"])
       pg&.incr_resolve
 
       old_prog = strand.prog
@@ -86,7 +86,7 @@ end
     else
       fail "BUG: expect no stacks exceeding depth 1 with no back-link" if strand.stack.length > 1
 
-      pg = Page.from_tag_parts(strand.id, strand.prog, strand.stack.first["deadline_target"])
+      pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, strand.stack.first["deadline_target"])
       pg&.incr_resolve
 
       # Child strand with zero or one stack frames, set exitval. Clear
@@ -213,7 +213,7 @@ end
         Time.parse(deadline_at.to_s) > Time.now + deadline_in ||
         (old_deadline_target = current_frame["deadline_target"]) != deadline_target
 
-      if old_deadline_target != deadline_target && (pg = Page.from_tag_parts(strand.id, strand.prog, old_deadline_target))
+      if old_deadline_target != deadline_target && (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, old_deadline_target))
         pg.incr_resolve
       end
 
