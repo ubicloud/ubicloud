@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
 
   semaphore :initial_provisioning, :restart, :destroy
 
-  def self.assemble(project_id, location, server_name, vm_size, storage_size_gib)
+  def self.assemble(project_id, location, server_name, vm_size, storage_size_gib, private_subnet_id: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -36,7 +36,8 @@ class Prog::Postgres::PostgresNexus < Prog::Base
           {encrypted: true, size_gib: storage_size_gib}
         ],
         boot_image: "ubuntu-jammy",
-        enable_ip4: true
+        enable_ip4: true,
+        private_subnet_id: private_subnet_id
       )
 
       Sshable.create(

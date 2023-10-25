@@ -50,6 +50,17 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect(postgres_server.vm).not_to be_nil
       expect(postgres_server.vm.sshable).not_to be_nil
     end
+
+    it "creates postgres server and vm with sshable in the given private subnet" do
+      ps_st = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id)
+      st = described_class.assemble(project.id, "hetzner-hel1", "pg-server-name", "standard-2", 100, private_subnet_id: ps_st.id)
+
+      postgres_server = PostgresServer[st.id]
+      expect(postgres_server).not_to be_nil
+      expect(postgres_server.vm).not_to be_nil
+      expect(postgres_server.vm.sshable).not_to be_nil
+      expect(postgres_server.vm.private_subnets.first.id).to eq(ps_st.id)
+    end
   end
 
   describe "#before_run" do
