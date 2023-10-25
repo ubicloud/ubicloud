@@ -2,7 +2,7 @@
 
 require_relative "../../model"
 
-class PostgresServer < Sequel::Model
+class PostgresResource < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
   many_to_one :vm

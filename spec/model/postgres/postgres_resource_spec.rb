@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe PostgresServer do
+RSpec.describe PostgresResource do
   subject(:pgs) {
     described_class.create_with_id(
       project_id: SecureRandom.uuid,

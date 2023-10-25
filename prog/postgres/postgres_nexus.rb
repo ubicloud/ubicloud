@@ -5,10 +5,10 @@ require "forwardable"
 require_relative "../../lib/util"
 
 class Prog::Postgres::PostgresNexus < Prog::Base
-  subject_is :postgres_server
+  subject_is :postgres_resource
 
   extend Forwardable
-  def_delegators :postgres_server, :vm
+  def_delegators :postgres_resource, :vm
 
   semaphore :initial_provisioning, :restart, :destroy
 
@@ -22,7 +22,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     Validation.validate_location(location, project.provider)
 
     DB.transaction do
-      ubid = PostgresServer.generate_ubid
+      ubid = PostgresResource.generate_ubid
 
       ssh_key = SshKey.generate
       vm_st = Prog::Vm::Nexus.assemble(
@@ -45,22 +45,22 @@ class Prog::Postgres::PostgresNexus < Prog::Base
         raw_private_key_1: ssh_key.keypair
       ) { _1.id = vm_st.id }
 
-      postgres_server = PostgresServer.create(
+      postgres_resource = PostgresResource.create(
         project_id: project_id, location: location, server_name: server_name,
         target_vm_size: vm_size, target_storage_size_gib: storage_size_gib,
         superuser_password: SecureRandom.base64(15).gsub(/[+\/]/, "+" => "_", "/" => "-"),
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
-      postgres_server.associate_with_project(project)
+      postgres_resource.associate_with_project(project)
 
-      Strand.create(prog: "Postgres::PostgresNexus", label: "start") { _1.id = postgres_server.id }
+      Strand.create(prog: "Postgres::PostgresNexus", label: "start") { _1.id = postgres_resource.id }
     end
   end
 
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
-        postgres_server.active_billing_records.each(&:finalize)
+        postgres_resource.active_billing_records.each(&:finalize)
         hop_destroy
       end
     end
@@ -70,7 +70,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     nap 5 unless vm.strand.label == "wait"
     vm.sshable.update(host: vm.ephemeral_net4)
 
-    postgres_server.incr_initial_provisioning
+    postgres_resource.incr_initial_provisioning
     hop_bootstrap_rhizome
   end
 
@@ -82,7 +82,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
   end
 
   label def create_dns_record
-    dns_zone.insert_record(record_name: postgres_server.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
+    dns_zone.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
     hop_wait_bootstrap_rhizome
   end
 
@@ -127,11 +127,11 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     # without excessive branching, we create the very first root certificate
     # with only 5 year validity. So it would look like it is created 5 years
     # ago.
-    postgres_server.root_cert_1, postgres_server.root_cert_key_1 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 5)
-    postgres_server.root_cert_2, postgres_server.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
+    postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 5)
+    postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
     create_server_certificate
 
-    postgres_server.save_changes
+    postgres_resource.save_changes
     hop_configure
   end
 
@@ -143,17 +143,17 @@ class Prog::Postgres::PostgresNexus < Prog::Base
     # 10 year - (9 year + 6 months) - (1 month padding) = 5 months. So we will
     # rotate the root_cert_1 with root_cert_2 if the remaining time is less
     # than 5 months.
-    if OpenSSL::X509::Certificate.new(postgres_server.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
-      postgres_server.root_cert_1, postgres_server.root_cert_key_1 = postgres_server.root_cert_2, postgres_server.root_cert_key_2
-      postgres_server.root_cert_2, postgres_server.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
+    if OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+      postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
+      postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
     end
 
-    if OpenSSL::X509::Certificate.new(postgres_server.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
+    if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
       create_server_certificate
     end
 
-    postgres_server.certificate_last_checked_at = Time.now
-    postgres_server.save_changes
+    postgres_resource.certificate_last_checked_at = Time.now
+    postgres_resource.save_changes
 
     hop_wait
   end
@@ -166,7 +166,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
       end
       hop_wait
     when "Failed", "NotStarted"
-      configure_hash = postgres_server.configure_hash
+      configure_hash = postgres_resource.configure_hash
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure' configure", stdin: JSON.generate(configure_hash))
     end
 
@@ -178,7 +178,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
       # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
       # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
       # database to do the encryption.
-      conn.encrypt_password(postgres_server.superuser_password, "postgres", "scram-sha-256")
+      conn.encrypt_password(postgres_resource.superuser_password, "postgres", "scram-sha-256")
     end
     commands = <<SQL
 BEGIN;
@@ -206,19 +206,19 @@ SQL
 
   label def create_billing_record
     BillingRecord.create_with_id(
-      project_id: postgres_server.project_id,
-      resource_id: postgres_server.id,
-      resource_name: postgres_server.server_name,
-      billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_server.location)["id"],
+      project_id: postgres_resource.project_id,
+      resource_id: postgres_resource.id,
+      resource_name: postgres_resource.server_name,
+      billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
       amount: vm.cores
     )
 
     BillingRecord.create_with_id(
-      project_id: postgres_server.project_id,
-      resource_id: postgres_server.id,
-      resource_name: postgres_server.server_name,
-      billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_server.location)["id"],
-      amount: postgres_server.target_storage_size_gib
+      project_id: postgres_resource.project_id,
+      resource_id: postgres_resource.id,
+      resource_name: postgres_resource.server_name,
+      billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
+      amount: postgres_resource.target_storage_size_gib
     )
 
     decr_initial_provisioning
@@ -227,7 +227,7 @@ SQL
   end
 
   label def wait
-    if postgres_server.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+    if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
       hop_refresh_certificates
     end
 
@@ -246,11 +246,11 @@ SQL
       nap 5
     end
 
-    dns_zone.delete_record(record_name: postgres_server.hostname)
-    postgres_server.dissociate_with_project(postgres_server.project)
-    postgres_server.destroy
+    dns_zone.delete_record(record_name: postgres_resource.hostname)
+    postgres_resource.dissociate_with_project(postgres_resource.project)
+    postgres_resource.destroy
 
-    pop "postgres server is deleted"
+    pop "postgres resource is deleted"
   end
 
   def dns_zone
@@ -259,31 +259,31 @@ SQL
 
   def create_root_certificate(duration:)
     Util.create_certificate(
-      subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority",
+      subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Root Certificate Authority",
       extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
       duration: duration
     ).map(&:to_pem)
   end
 
   def create_server_certificate
-    root_cert = OpenSSL::X509::Certificate.new(postgres_server.root_cert_1)
-    root_cert_key = OpenSSL::PKey::EC.new(postgres_server.root_cert_key_1)
+    root_cert = OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1)
+    root_cert_key = OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
     if root_cert.not_after < Time.now + 60 * 60 * 24 * 365 * 1
-      root_cert = OpenSSL::X509::Certificate.new(postgres_server.root_cert_2)
-      root_cert_key = OpenSSL::PKey::EC.new(postgres_server.root_cert_key_2)
+      root_cert = OpenSSL::X509::Certificate.new(postgres_resource.root_cert_2)
+      root_cert_key = OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_2)
     end
 
-    postgres_server.server_cert, postgres_server.server_cert_key = Util.create_certificate(
-      subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate",
-      extensions: ["subjectAltName=DNS:#{postgres_server.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
+    postgres_resource.server_cert, postgres_resource.server_cert_key = Util.create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Server Certificate",
+      extensions: ["subjectAltName=DNS:#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
       issuer_key: root_cert_key
     ).map(&:to_pem)
-    postgres_server.save_changes
+    postgres_resource.save_changes
 
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.server_cert)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.server_cert_key)
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_resource.server_cert)
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_resource.server_cert_key)
     vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
     vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
   end
