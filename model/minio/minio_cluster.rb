@@ -24,7 +24,7 @@ class MinioCluster < Sequel::Model
   end
 
   def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/minio_cluster/#{name}"
+    "project/#{project.ubid}/location/#{location}/minio-cluster/#{name}"
   end
 
   def generate_etc_hosts_entry
