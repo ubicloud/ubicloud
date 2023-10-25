@@ -2,23 +2,23 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
-require_relative "../lib/spdk"
+require_relative "../lib/spdk_path"
 require "fileutils"
 
 # spdk dependencies
 r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev"
 
 # spdk binaries
-FileUtils.cd Spdk.install_prefix do
+FileUtils.cd SpdkPath.install_prefix do
   r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/7adbcfb/spdk-7adbcfb.tar.gz"
   r "tar -xzf /tmp/spdk.tar.gz"
 end
 
-q_user = Spdk.user.shellescape
-q_hugepages_dir = Spdk.hugepages_dir.shellescape
+q_user = SpdkPath.user.shellescape
+q_hugepages_dir = SpdkPath.hugepages_dir.shellescape
 
 begin
-  r "adduser #{q_user} --disabled-password --gecos '' --home #{Spdk.home.shellescape}"
+  r "adduser #{q_user} --disabled-password --gecos '' --home #{SpdkPath.home.shellescape}"
 rescue CommandFail => ex
   raise unless /adduser: The user `.*' already exists\./.match?(ex.message)
 end
@@ -26,8 +26,8 @@ end
 r "sudo --user=#{q_user} mkdir -p #{q_hugepages_dir}"
 
 # Directory to put vhost sockets.
-FileUtils.mkdir_p(Spdk.vhost_dir)
-FileUtils.chown Spdk.user, Spdk.user, Spdk.vhost_dir
+FileUtils.mkdir_p(SpdkPath.vhost_dir)
+FileUtils.chown SpdkPath.user, SpdkPath.user, SpdkPath.vhost_dir
 
 File.write("/lib/systemd/system/home-spdk-hugepages.mount", <<SPDK_HUGEPAGES_MOUNT
 [Unit]
@@ -50,11 +50,11 @@ Description=Block Storage Service
 Requires=home-spdk-hugepages.mount
 [Service]
 Type=simple
-Environment="XDG_RUNTIME_DIR=#{Spdk.home.shellescape}"
-ExecStart=#{Spdk.bin("vhost")} -S #{Spdk.vhost_dir.shellescape} \
+Environment="XDG_RUNTIME_DIR=#{SpdkPath.home.shellescape}"
+ExecStart=#{SpdkPath.bin("vhost")} -S #{SpdkPath.vhost_dir.shellescape} \
 --huge-dir #{q_hugepages_dir} \
 --iova-mode va \
---rpc-socket #{Spdk.rpc_sock.shellescape} \
+--rpc-socket #{SpdkPath.rpc_sock.shellescape} \
 --cpumask [0] \
 --disable-cpumask-locks
 ExecReload=/bin/kill -HUP $MAINPID
