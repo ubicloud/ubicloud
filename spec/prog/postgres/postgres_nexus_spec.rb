@@ -3,18 +3,18 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresNexus do
-  subject(:nx) { described_class.new(Strand.new(id: PostgresServer.generate_uuid)) }
+  subject(:nx) { described_class.new(Strand.new(id: PostgresResource.generate_uuid)) }
 
   let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
-  let(:postgres_server) { instance_double(PostgresServer, id: "0eb058bb-960e-46fe-aab7-3717f164ab25", ubid: "pgubid", project_id: project.id, server_name: "pg-server-name", location: "hetzner-hel1", target_storage_size_gib: 100) }
+  let(:postgres_resource) { instance_double(PostgresResource, id: "0eb058bb-960e-46fe-aab7-3717f164ab25", ubid: "pgubid", project_id: project.id, server_name: "pg-server-name", location: "hetzner-hel1", target_storage_size_gib: 100) }
   let(:vm) { instance_double(Vm, id: "788525ed-d6f0-4937-a844-323d4fd91946", cores: 1) }
   let(:sshable) { instance_double(Sshable) }
 
   before do
     allow(vm).to receive(:sshable).and_return(sshable)
-    allow(postgres_server).to receive_messages(project: project, vm: vm)
-    allow(nx).to receive(:postgres_server).and_return(postgres_server)
+    allow(postgres_resource).to receive_messages(project: project, vm: vm)
+    allow(nx).to receive(:postgres_resource).and_return(postgres_resource)
   end
 
   describe ".assemble" do
@@ -42,13 +42,13 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: size"
     end
 
-    it "creates postgres server and vm with sshable" do
+    it "creates postgres resource and vm with sshable" do
       st = described_class.assemble(project.id, "hetzner-hel1", "pg-server-name", "standard-2", 100)
 
-      postgres_server = PostgresServer[st.id]
-      expect(postgres_server).not_to be_nil
-      expect(postgres_server.vm).not_to be_nil
-      expect(postgres_server.vm.sshable).not_to be_nil
+      postgres_resource = PostgresResource[st.id]
+      expect(postgres_resource).not_to be_nil
+      expect(postgres_resource.vm).not_to be_nil
+      expect(postgres_resource.vm.sshable).not_to be_nil
     end
   end
 
@@ -56,7 +56,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     it "hops to destroy and stops billing records when needed" do
       br = instance_double(BillingRecord)
       expect(br).to receive(:finalize).twice
-      expect(postgres_server).to receive(:active_billing_records).and_return([br, br])
+      expect(postgres_resource).to receive(:active_billing_records).and_return([br, br])
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect { nx.before_run }.to hop("destroy")
     end
@@ -75,7 +75,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     end
 
     it "update sshable host and hops" do
-      expect(postgres_server).to receive(:incr_initial_provisioning)
+      expect(postgres_resource).to receive(:incr_initial_provisioning)
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(sshable).to receive(:update).with(host: "1.1.1.1")
@@ -94,7 +94,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
   describe "#create_dns_record" do
     it "creates dns records and hops" do
       expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(postgres_server).to receive(:hostname).and_return("pg-server-name.postgres.ubicloud.com.")
+      expect(postgres_resource).to receive(:hostname).and_return("pg-server-name.postgres.ubicloud.com.")
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-server-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
@@ -173,8 +173,8 @@ RSpec.describe Prog::Postgres::PostgresNexus do
   end
 
   describe "#initialize_certificates" do
-    let(:postgres_server) {
-      PostgresServer.create_with_id(
+    let(:postgres_resource) {
+      PostgresResource.create_with_id(
         project_id: "c9764635-03c6-4d1e-8634-6c86e1b69150",
         location: "hetzner-hel1",
         server_name: "pg-server-name",
@@ -185,9 +185,9 @@ RSpec.describe Prog::Postgres::PostgresNexus do
     }
 
     it "hops to configure after creating certificates" do
-      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)).and_call_original
-      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)).and_call_original
-      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_server.ubid} Server Certificate", duration: 60 * 60 * 24 * 30 * 6)).and_call_original
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)).and_call_original
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)).and_call_original
+      expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Server Certificate", duration: 60 * 60 * 24 * 30 * 6)).and_call_original
 
       expect(sshable).to receive(:cmd).at_least(:once)
       expect { nx.initialize_certificates }.to hop("configure")
@@ -195,8 +195,8 @@ RSpec.describe Prog::Postgres::PostgresNexus do
   end
 
   describe "#refresh_certificates" do
-    let(:postgres_server) {
-      PostgresServer.create_with_id(
+    let(:postgres_resource) {
+      PostgresResource.create_with_id(
         project_id: "c9764635-03c6-4d1e-8634-6c86e1b69150",
         location: "hetzner-hel1",
         server_name: "pg-server-name",
@@ -240,7 +240,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
 
   describe "#configure" do
     it "triggers configure if configure command is not sent yet or failed" do
-      expect(postgres_server).to receive(:configure_hash).and_return("dummy-configure-hash").twice
+      expect(postgres_resource).to receive(:configure_hash).and_return("dummy-configure-hash").twice
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/configure' configure", stdin: JSON.generate("dummy-configure-hash")).twice
 
       # NotStarted
@@ -272,14 +272,14 @@ RSpec.describe Prog::Postgres::PostgresNexus do
 
   describe "#update_superuser_password" do
     it "updates password and hops to restart during the initial provisioning" do
-      expect(postgres_server).to receive(:superuser_password).and_return("pass")
+      expect(postgres_resource).to receive(:superuser_password).and_return("pass")
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("restart")
     end
 
     it "updates password and hops to wait at times other than the initial provisioning" do
-      expect(postgres_server).to receive(:superuser_password).and_return("pass")
+      expect(postgres_resource).to receive(:superuser_password).and_return("pass")
       expect(nx).to receive(:when_initial_provisioning_set?)
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("wait")
@@ -307,19 +307,19 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect(nx).to receive(:decr_initial_provisioning)
 
       expect(BillingRecord).to receive(:create_with_id).with(
-        project_id: postgres_server.project_id,
-        resource_id: postgres_server.id,
-        resource_name: postgres_server.server_name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_server.location)["id"],
+        project_id: postgres_resource.project_id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.server_name,
+        billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
         amount: vm.cores
       )
 
       expect(BillingRecord).to receive(:create_with_id).with(
-        project_id: postgres_server.project_id,
-        resource_id: postgres_server.id,
-        resource_name: postgres_server.server_name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_server.location)["id"],
-        amount: postgres_server.target_storage_size_gib
+        project_id: postgres_resource.project_id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.server_name,
+        billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
+        amount: postgres_resource.target_storage_size_gib
       )
 
       expect { nx.create_billing_record }.to hop("wait")
@@ -328,12 +328,12 @@ RSpec.describe Prog::Postgres::PostgresNexus do
 
   describe "#wait" do
     it "naps" do
-      expect(postgres_server).to receive(:certificate_last_checked_at).and_return(Time.now)
+      expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now)
       expect { nx.wait }.to nap(30)
     end
 
     it "hops to refresh_certificates if the certificate is checked more than 1 months ago" do
-      expect(postgres_server).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
+      expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
       expect { nx.wait }.to hop("refresh_certificates")
     end
   end
@@ -341,7 +341,7 @@ RSpec.describe Prog::Postgres::PostgresNexus do
   describe "#destroy" do
     it "triggers vm deletion and waits until it is deleted" do
       dns_zone = instance_double(DnsZone)
-      expect(postgres_server).to receive(:hostname)
+      expect(postgres_resource).to receive(:hostname)
       expect(dns_zone).to receive(:delete_record)
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(sshable).to receive(:destroy)
@@ -354,11 +354,11 @@ RSpec.describe Prog::Postgres::PostgresNexus do
       expect(vm).to receive(:incr_destroy)
       expect { nx.destroy }.to nap(5)
 
-      expect(postgres_server).to receive(:vm).and_return(nil)
-      expect(postgres_server).to receive(:dissociate_with_project)
-      expect(postgres_server).to receive(:destroy)
+      expect(postgres_resource).to receive(:vm).and_return(nil)
+      expect(postgres_resource).to receive(:dissociate_with_project)
+      expect(postgres_resource).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "postgres server is deleted"})
+      expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
     end
   end
 
