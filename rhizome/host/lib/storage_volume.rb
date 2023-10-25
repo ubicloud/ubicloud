@@ -7,7 +7,8 @@ require "json"
 require "openssl"
 require "base64"
 require_relative "vm_path"
-require_relative "spdk"
+require_relative "spdk_path"
+require_relative "spdk_rpc"
 require_relative "storage_key_encryption"
 
 class StorageVolume
@@ -23,6 +24,10 @@ class StorageVolume
 
   def vp
     @vp ||= VmPath.new(@vm_name)
+  end
+
+  def rpc_client
+    @rpc_client ||= SpdkRpc.new
   end
 
   def prep(key_wrapping_secrets)
@@ -50,21 +55,19 @@ class StorageVolume
   end
 
   def purge
-    vhost_controller = Spdk.vhost_controller(@vm_name, @disk_index)
+    vhost_controller = SpdkPath.vhost_controller(@vm_name, @disk_index)
 
-    r "#{Spdk.rpc_py} vhost_delete_controller #{vhost_controller.shellescape}"
+    rpc_client.vhost_delete_controller(vhost_controller)
 
     if @encrypted
-      q_keyname = "#{@device_id}_key".shellescape
-      q_aio_bdev = "#{@device_id}_aio".shellescape
-      r "#{Spdk.rpc_py} bdev_crypto_delete #{@device_id.shellescape}"
-      r "#{Spdk.rpc_py} bdev_aio_delete #{q_aio_bdev}"
-      r "#{Spdk.rpc_py} accel_crypto_key_destroy -n #{q_keyname}"
+      rpc_client.bdev_crypto_delete(@device_id)
+      rpc_client.bdev_aio_delete("#{@device_id}_aio")
+      rpc_client.accel_crypto_key_destroy("#{@device_id}_key")
     else
-      r "#{Spdk.rpc_py} bdev_aio_delete #{@device_id.shellescape}"
+      rpc_client.bdev_aio_delete(@device_id)
     end
 
-    rm_if_exists(Spdk.vhost_sock(vhost_controller))
+    rm_if_exists(SpdkPath.vhost_sock(vhost_controller))
   end
 
   def setup_data_encryption_key(key_wrapping_secrets)
@@ -169,7 +172,7 @@ class StorageVolume
 
     create_empty_disk_file
 
-    r("#{Spdk.bin("spdk_dd")} --config /dev/stdin " \
+    r("#{SpdkPath.bin("spdk_dd")} --config /dev/stdin " \
     "--disable-cpumask-locks " \
     "--rpc-socket #{rpc_socket.shellescape} " \
     "--if #{@image_path.shellescape} " \
@@ -196,30 +199,28 @@ class StorageVolume
 
   def setup_spdk_bdev(encryption_key)
     bdev = @device_id
-    q_bdev = bdev.shellescape
-    q_disk_file = @disk_file.shellescape
 
     if encryption_key
-      q_keyname = "#{bdev}_key".shellescape
-      q_aio_bdev = "#{bdev}_aio".shellescape
-      r "#{Spdk.rpc_py} accel_crypto_key_create " \
-        "-c #{encryption_key[:cipher].shellescape} " \
-        "-k #{encryption_key[:key].shellescape} " \
-        "-e #{encryption_key[:key2].shellescape} " \
-        "-n #{q_keyname}"
-      r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_aio_bdev} 512"
-      r "#{Spdk.rpc_py} bdev_crypto_create -n #{q_keyname} #{q_aio_bdev} #{q_bdev}"
+      key_name = "#{bdev}_key"
+      aio_bdev = "#{bdev}_aio"
+      rpc_client.accel_crypto_key_create(
+        key_name,
+        encryption_key[:cipher],
+        encryption_key[:key],
+        encryption_key[:key2]
+      )
+      rpc_client.bdev_aio_create(aio_bdev, @disk_file, 512)
+      rpc_client.bdev_crypto_create(bdev, aio_bdev, key_name)
     else
-      r "#{Spdk.rpc_py} bdev_aio_create #{q_disk_file} #{q_bdev} 512"
+      rpc_client.bdev_aio_create(bdev, @disk_file, 512)
     end
   end
 
   def setup_spdk_vhost
-    q_bdev = @device_id.shellescape
-    vhost_controller = Spdk.vhost_controller(@vm_name, @disk_index)
-    spdk_vhost_sock = Spdk.vhost_sock(vhost_controller)
+    vhost_controller = SpdkPath.vhost_controller(@vm_name, @disk_index)
+    spdk_vhost_sock = SpdkPath.vhost_sock(vhost_controller)
 
-    r "#{Spdk.rpc_py} vhost_create_blk_controller #{vhost_controller.shellescape} #{q_bdev}"
+    rpc_client.vhost_create_blk_controller(vhost_controller, @device_id)
 
     # don't allow others to access the vhost socket
     FileUtils.chmod "u=rw,g=r,o=", spdk_vhost_sock

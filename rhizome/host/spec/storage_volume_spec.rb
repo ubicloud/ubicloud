@@ -32,6 +32,14 @@ RSpec.describe StorageVolume do
   let(:disk_file) {
     "/var/storage/test/2/disk.raw"
   }
+  let(:rpc_client) {
+    instance_double(SpdkRpc)
+  }
+
+  before do
+    allow(encrypted_sv).to receive(:rpc_client).and_return(rpc_client)
+    allow(unencrypted_sv).to receive(:rpc_client).and_return(rpc_client)
+  end
 
   describe "#prep" do
     it "can prep a non-imaged unencrypted disk" do
@@ -87,22 +95,18 @@ RSpec.describe StorageVolume do
 
   describe "#purge" do
     it "can purge an encrypted disk" do
-      rpc_py = "/opt/spdk/scripts/rpc.py -s /home/spdk/spdk.sock"
-
-      expect(encrypted_sv).to receive(:r).with("#{rpc_py} vhost_delete_controller test_2")
-      expect(encrypted_sv).to receive(:r).with("#{rpc_py} bdev_crypto_delete xyz01")
-      expect(encrypted_sv).to receive(:r).with("#{rpc_py} bdev_aio_delete xyz01_aio")
-      expect(encrypted_sv).to receive(:r).with("#{rpc_py} accel_crypto_key_destroy -n xyz01_key")
+      expect(rpc_client).to receive(:vhost_delete_controller).with("test_2")
+      expect(rpc_client).to receive(:bdev_crypto_delete).with("xyz01")
+      expect(rpc_client).to receive(:bdev_aio_delete).with("xyz01_aio")
+      expect(rpc_client).to receive(:accel_crypto_key_destroy).with("xyz01_key")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_2")
 
       encrypted_sv.purge
     end
 
     it "can purge an unencrypted disk" do
-      rpc_py = "/opt/spdk/scripts/rpc.py -s /home/spdk/spdk.sock"
-
-      expect(unencrypted_sv).to receive(:r).with("#{rpc_py} vhost_delete_controller test_2")
-      expect(unencrypted_sv).to receive(:r).with("#{rpc_py} bdev_aio_delete xyz01")
+      expect(rpc_client).to receive(:vhost_delete_controller).with("test_2")
+      expect(rpc_client).to receive(:bdev_aio_delete).with("xyz01")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_2")
 
       unencrypted_sv.purge
@@ -175,15 +179,16 @@ RSpec.describe StorageVolume do
     it "can setup encrypted spdk bdev" do
       bdev = "xyz01"
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*accel_crypto_key_create -c aes_xts -k key1value -e key2value/)
-      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev}_aio 512$/)
-      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*bdev_crypto_create.*#{bdev}_aio #{bdev}$/)
+      expect(rpc_client).to receive(:accel_crypto_key_create).with("#{bdev}_key", "aes_xts", "key1value", "key2value")
+      expect(rpc_client).to receive(:bdev_aio_create).with("#{bdev}_aio", disk_file, 512)
+      expect(rpc_client).to receive(:bdev_crypto_create).with(bdev, "#{bdev}_aio", "#{bdev}_key")
       encrypted_sv.setup_spdk_bdev(encryption_key)
     end
 
     it "can setup unencrypted spdk bdev" do
       bdev = "xyz01"
-      expect(unencrypted_sv).to receive(:r).with(/.*rpc.py.*bdev_aio_create #{disk_file} #{bdev} 512$/)
+      disk_file = "/var/storage/test/2/disk.raw"
+      expect(rpc_client).to receive(:bdev_aio_create).with(bdev, disk_file, 512)
       unencrypted_sv.setup_spdk_bdev(nil)
     end
   end
@@ -194,7 +199,7 @@ RSpec.describe StorageVolume do
       spdk_vhost_sock = "/var/storage/vhost/test_2"
       vm_vhost_sock = "/var/storage/test/2/vhost.sock"
 
-      expect(encrypted_sv).to receive(:r).with(/.*rpc.py.*vhost_create_blk_controller test_2 #{device_id}/)
+      expect(rpc_client).to receive(:vhost_create_blk_controller).with("test_2", device_id)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=r,o=", spdk_vhost_sock)
       expect(FileUtils).to receive(:ln_s).with(spdk_vhost_sock, vm_vhost_sock)
       expect(FileUtils).to receive(:chown).with("test", "test", vm_vhost_sock)

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module Spdk
+module SpdkPath
   def self.user
     "spdk"
   end
@@ -35,10 +35,5 @@ module Spdk
 
   def self.bin(n)
     File.join(install_prefix, "spdk", "bin", n)
-  end
-
-  def self.rpc_py
-    bin = File.join(install_prefix, "spdk", "scripts", "rpc.py")
-    "#{bin} -s #{rpc_sock}"
   end
 end
