@@ -72,9 +72,8 @@ class Sshable < Sequel::Model
 
   # A huge number of settings are needed to isolate net-ssh from the
   # host system and provide some anti-hanging assurance (keepalive,
-  # timeout).  Set them up here, and expect callers to override when
-  # necessary.
-  COMMON_SSH_ARGS = {non_interactive: true, timeout: 30,
+  # timeout).
+  COMMON_SSH_ARGS = {non_interactive: true, timeout: 10,
                      user_known_hosts_file: [], global_known_hosts_file: [],
                      keys: [], key_data: [], use_agent: false,
                      keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5}.freeze
