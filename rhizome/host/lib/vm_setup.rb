@@ -308,6 +308,7 @@ EOS
 
     write_user_data(unix_user, public_key)
 
+    FileUtils.rm_rf(vp.cloudinit_img)
     r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_user_data} ::"
     r "mcopy -oi #{vp.q_cloudinit_img} -s #{vp.q_meta_data} ::"
