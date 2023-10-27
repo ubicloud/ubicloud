@@ -137,23 +137,12 @@ class Prog::Vm::Nexus < Prog::Base
 
   def storage_volumes
     @storage_volumes ||= vm.vm_storage_volumes.map { |s|
-      {
-        "boot" => s.boot,
-        "image" => s.boot ? vm.boot_image : nil,
-        "size_gib" => s.size_gib,
-        "device_id" => s.device_id,
-        "disk_index" => s.disk_index,
-        "encrypted" => !s.key_encryption_key_1.nil?
-      }
+      s.params_hash
     }
   end
 
   def storage_secrets
-    @storage_secrets ||= vm.vm_storage_volumes.filter_map { |s|
-      if !s.key_encryption_key_1.nil?
-        [s.device_id, s.key_encryption_key_1.secret_key_material_hash]
-      end
-    }.to_h
+    @storage_secrets ||= VmStorageVolume.storage_secrets_hash(vm.vm_storage_volumes)
   end
 
   def allocation_dataset

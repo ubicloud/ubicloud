@@ -11,9 +11,10 @@ RSpec.describe StorageVolume do
       "device_id" => "xyz01",
       "encrypted" => false,
       "size_gib" => 12,
-      "image" => "kubuntu"
+      "image" => "kubuntu",
+      "vm_inhost_name" => "test"
     }
-    described_class.new("test", params)
+    described_class.new(params)
   }
 
   let(:encrypted_sv) {
@@ -22,9 +23,10 @@ RSpec.describe StorageVolume do
       "device_id" => "xyz01",
       "encrypted" => true,
       "size_gib" => 12,
-      "image" => "kubuntu"
+      "image" => "kubuntu",
+      "vm_inhost_name" => "test"
     }
-    described_class.new("test", params)
+    described_class.new(params)
   }
   let(:image_path) {
     "/var/storage/images/kubuntu.raw"
@@ -43,7 +45,7 @@ RSpec.describe StorageVolume do
 
   describe "#prep" do
     it "can prep a non-imaged unencrypted disk" do
-      vol = described_class.new("test", {"disk_index" => 1, "encrypted" => false})
+      vol = described_class.new({"disk_index" => 1, "encrypted" => false, "vm_inhost_name" => "test"})
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1/")
       expect(vol).to receive(:create_empty_disk_file).with(no_args)
       vol.prep(nil)
@@ -51,7 +53,7 @@ RSpec.describe StorageVolume do
 
     it "can prep a non-imaged encrypted disk" do
       key_wrapping_secrets = "key_wrapping_secrets"
-      vol = described_class.new("test", {"disk_index" => 1, "encrypted" => true})
+      vol = described_class.new({"disk_index" => 1, "encrypted" => true, "vm_inhost_name" => "test"})
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1/")
       expect(vol).to receive(:setup_data_encryption_key).with(key_wrapping_secrets)
       expect(vol).to receive(:create_empty_disk_file).with(no_args)

@@ -98,7 +98,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_spdk
-    bud Prog::SetupSpdk
+    bud Prog::Storage::SetupSpdk
     hop_wait_setup_spdk
   end
 

@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative "../model/spec_helper"
+require_relative "../../model/spec_helper"
 
-RSpec.describe Prog::SetupSpdk do
+RSpec.describe Prog::Storage::SetupSpdk do
   subject(:ss) {
-    described_class.new(Strand.new(prog: "SetupSpdk"))
+    described_class.new(Strand.new(prog: "Storage::SetupSpdk"))
   }
 
   describe "#start" do

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Prog::SetupSpdk < Prog::Base
+class Prog::Storage::SetupSpdk < Prog::Base
   subject_is :sshable, :vm_host
 
   label def start

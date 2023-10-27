@@ -176,6 +176,10 @@ class VmHost < Sequel::Model
     Strand.create_with_id(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host"}])
   end
 
+  def restart_spdk
+    Strand.create_with_id(schedule: Time.now, prog: "Storage::RestartSpdk", label: "start", stack: [{subject_id: id}])
+  end
+
   # Introduced for downloading a new boot image via REPL.
   # Use with caution as the vm_host will not accept a new vm during the image download.
   def download_boot_image(image_name, custom_url = nil)

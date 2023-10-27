@@ -1,0 +1,33 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/storage_ctl"
+
+params = JSON.parse($stdin.read)
+
+unless (action = ARGV.shift)
+  puts "expected action as argument"
+  exit 1
+end
+
+storage_ctl = StorageCtl.new
+
+case action
+when "start-volumes"
+  unless (volumes = params["volumes"])
+    puts "need volumes in params"
+    exit 1
+  end
+
+  unless (storage_secrets = params["secrets"])
+    puts "need secrets in params"
+    exit 1
+  end
+
+  storage_ctl.start_volumes(volumes, storage_secrets)
+
+else
+  puts "invalid action : #{action}"
+  exit 1
+end

@@ -12,8 +12,8 @@ require_relative "spdk_rpc"
 require_relative "storage_key_encryption"
 
 class StorageVolume
-  def initialize(vm_name, params)
-    @vm_name = vm_name
+  def initialize(params)
+    @vm_name = params["vm_inhost_name"]
     @disk_index = params["disk_index"]
     @device_id = params["device_id"]
     @encrypted = params["encrypted"]
@@ -251,5 +251,9 @@ class StorageVolume
     FileUtils.chown @vm_name, @vm_name, vp.vhost_sock(@disk_index)
 
     vp.vhost_sock(@disk_index)
+  end
+
+  def deleted?
+    !File.exist? @disk_file
   end
 end

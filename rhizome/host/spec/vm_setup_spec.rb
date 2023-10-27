@@ -82,12 +82,14 @@ RSpec.describe VmSetup do
   describe "#purge_storage" do
     it "can purge storage" do
       vol_1_params = {
+        "vm_inhost_name" => "test",
         "size_gib" => 20,
         "device_id" => "test_0",
         "disk_index" => 0,
         "encrypted" => false
       }
       vol_2_params = {
+        "vm_inhost_name" => "test",
         "size_gib" => 20,
         "device_id" => "test_1",
         "disk_index" => 1,
@@ -100,12 +102,12 @@ RSpec.describe VmSetup do
 
       # delete the unencrypted volume
       sv_1 = instance_double(StorageVolume)
-      expect(StorageVolume).to receive(:new).with("test", vol_1_params).and_return(sv_1)
+      expect(StorageVolume).to receive(:new).with(vol_1_params).and_return(sv_1)
       expect(sv_1).to receive(:purge_spdk_artifacts)
 
       # delete the encrypted volume
       sv_2 = instance_double(StorageVolume)
-      expect(StorageVolume).to receive(:new).with("test", vol_2_params).and_return(sv_2)
+      expect(StorageVolume).to receive(:new).with(vol_2_params).and_return(sv_2)
       expect(sv_2).to receive(:purge_spdk_artifacts)
 
       expect(FileUtils).to receive(:rm_r).with("/var/storage/test")
@@ -164,8 +166,8 @@ RSpec.describe VmSetup do
   describe "#storage" do
     let(:storage_params) {
       [
-        {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
-        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true}
+        {"vm_inhost_name" => "test", "boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
+        {"vm_inhost_name" => "test", "boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true}
       ]
     }
     let(:storage_secrets) {
@@ -181,8 +183,8 @@ RSpec.describe VmSetup do
     }
 
     before do
-      expect(StorageVolume).to receive(:new).with("test", storage_params[0]).and_return(storage_volumes[0])
-      expect(StorageVolume).to receive(:new).with("test", storage_params[1]).and_return(storage_volumes[1])
+      expect(StorageVolume).to receive(:new).with(storage_params[0]).and_return(storage_volumes[0])
+      expect(StorageVolume).to receive(:new).with(storage_params[1]).and_return(storage_volumes[1])
     end
 
     it "can setup storage (prep)" do

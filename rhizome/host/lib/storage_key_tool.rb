@@ -2,7 +2,7 @@
 
 require_relative "../../common/lib/util"
 require_relative "vm_path"
-require_relative "../lib/storage_key_encryption"
+require_relative "storage_key_encryption"
 
 class StorageKeyTool
   def initialize(vm_name, disk_index)

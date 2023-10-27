@@ -109,7 +109,11 @@ class VmSetup
 
     params = JSON.parse(File.read(vp.prep_json))
     params["storage_volumes"].each { |params|
-      volume = StorageVolume.new(@vm_name, params)
+      # The "vm_inhost_name" field is a later addition to the params.json structure.
+      # Some older VMs may not have this field, hence we fill this field to maintain
+      # backward compatibility.
+      params["vm_inhost_name"] ||= @vm_name
+      volume = StorageVolume.new(params)
       volume.purge_spdk_artifacts
     }
 
@@ -394,7 +398,7 @@ EOS
     storage_params.map { |params|
       device_id = params["device_id"]
       key_wrapping_secrets = storage_secrets[device_id]
-      storage_volume = StorageVolume.new(@vm_name, params)
+      storage_volume = StorageVolume.new(params)
       storage_volume.prep(key_wrapping_secrets) if prep
       storage_volume.start(key_wrapping_secrets)
     }
@@ -513,7 +517,6 @@ After=network.target
 After=spdk.service
 After=#{@vm_name}-dnsmasq.service
 Requires=#{@vm_name}-dnsmasq.service
-Requires=spdk.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}

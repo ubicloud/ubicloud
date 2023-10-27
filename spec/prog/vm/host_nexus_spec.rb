@@ -189,7 +189,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#setup_spdk" do
     it "buds the spdk program" do
-      expect(nx).to receive(:bud).with(Prog::SetupSpdk)
+      expect(nx).to receive(:bud).with(Prog::Storage::SetupSpdk)
       expect { nx.setup_spdk }.to hop("wait_setup_spdk")
     end
   end
