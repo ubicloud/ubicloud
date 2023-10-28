@@ -121,11 +121,28 @@ RSpec.describe Sshable do
 
     it "can run a command" do
       [false, true].each do |repl_value|
-        stub_const("REPL", repl_value)
-        expect($stderr).to receive(:write).with("hello") if repl_value
-        expect($stderr).to receive(:write).with("world") if repl_value
-        simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-        expect(sa.cmd("echo hello")).to eq("hello")
+        [false, true].each do |log_value|
+          stub_const("REPL", repl_value)
+          if repl_value
+            # Note that in the REPL, stdout and stderr get multiplexed
+            # into stderr in real time, packet by packet.
+            expect($stderr).to receive(:write).with("hello")
+            expect($stderr).to receive(:write).with("world")
+          end
+
+          if log_value
+            expect(Clog).to receive(:emit).with("ssh cmd execution") do |&blk|
+              dat = blk.call
+              if repl_value
+                expect(dat[:ssh].slice(:stdout, :stderr)).to be_empty
+              else
+                expect(dat[:ssh].slice(:stdout, :stderr)).to eq({stdout: "hello", stderr: "world"})
+              end
+            end
+          end
+          simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+          expect(sa.cmd("echo hello", log: log_value)).to eq("hello")
+        end
       end
     end
 

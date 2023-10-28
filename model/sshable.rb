@@ -29,7 +29,8 @@ class Sshable < Sequel::Model
     }
   end
 
-  def cmd(cmd, stdin: nil)
+  def cmd(cmd, stdin: nil, log: true)
+    start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
     exit_code = nil
@@ -65,9 +66,33 @@ class Sshable < Sequel::Model
       raise
     end
 
-    ret = stdout.string.freeze
-    fail SshError.new(cmd, ret, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
-    ret
+    stdout_str = stdout.string.freeze
+    stderr_str = stderr.string.freeze
+
+    if log
+      Clog.emit("ssh cmd execution") do
+        finish = Time.now
+        embed = {start: start, finish: finish, duration: finish - start,
+                 cmd: cmd,
+                 exit_code: exit_code, exit_signal: exit_signal}
+
+        # Suppress large outputs to avoid annoyance in duplication
+        # when in the REPL.  In principle, the user of the REPL could
+        # read the Clog output and the feature of printing output in
+        # real time to $stderr could be removed, but when supervising
+        # a tty, I've found it can be useful to see data arrive in
+        # real time from SSH.
+        unless REPL
+          embed[:stderr] = stderr_str
+          embed[:stdout] = stdout_str
+        end
+
+        {ssh: embed}
+      end
+    end
+
+    fail SshError.new(cmd, stdout_str, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
+    stdout_str
   end
 
   # A huge number of settings are needed to isolate net-ssh from the
