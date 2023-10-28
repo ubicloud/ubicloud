@@ -101,12 +101,12 @@ RSpec.describe VmSetup do
       # delete the unencrypted volume
       sv_1 = instance_double(StorageVolume)
       expect(StorageVolume).to receive(:new).with("test", vol_1_params).and_return(sv_1)
-      expect(sv_1).to receive(:purge)
+      expect(sv_1).to receive(:purge_spdk_artifacts)
 
       # delete the encrypted volume
       sv_2 = instance_double(StorageVolume)
       expect(StorageVolume).to receive(:new).with("test", vol_2_params).and_return(sv_2)
-      expect(sv_2).to receive(:purge)
+      expect(sv_2).to receive(:purge_spdk_artifacts)
 
       expect(FileUtils).to receive(:rm_r).with("/var/storage/test")
 
