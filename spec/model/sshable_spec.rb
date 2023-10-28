@@ -93,29 +93,38 @@ RSpec.describe Sshable do
       expect(sa).to receive(:connect).and_return(session).at_least(:once)
     end
 
+    def simulate(cmd:, exit_status:, exit_signal:, stdout:, stderr:)
+      expect(session).to receive(:open_channel) do |&blk|
+        chan = instance_spy(Net::SSH::Connection::Channel)
+        expect(chan).to receive(:exec).with(cmd) do |&blk|
+          chan2 = instance_spy(Net::SSH::Connection::Channel)
+          expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
+            buf = instance_double(Net::SSH::Buffer)
+            expect(buf).to receive(:read_long).and_return(exit_status)
+            blk.call(nil, buf)
+          end
+
+          expect(chan2).to receive(:on_request).with("exit-signal") do |&blk|
+            buf = instance_double(Net::SSH::Buffer)
+            expect(buf).to receive(:read_long).and_return(exit_signal)
+            blk.call(nil, buf)
+          end
+          expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), stdout)
+          expect(chan2).to receive(:on_extended_data).and_yield(nil, 1, stderr)
+
+          blk.call(chan2, true)
+        end
+        blk.call(chan, true)
+        chan
+      end
+    end
+
     it "can run a command" do
       [false, true].each do |repl_value|
         stub_const("REPL", repl_value)
-        expect(session).to receive(:open_channel) do |&blk|
-          chan = instance_spy(Net::SSH::Connection::Channel)
-          expect(chan).to receive(:exec).with("echo hello") do |&blk|
-            chan2 = instance_spy(Net::SSH::Connection::Channel)
-
-            expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
-              buf = instance_double(Net::SSH::Buffer)
-              expect(buf).to receive(:read_long).and_return(0)
-              blk.call(nil, buf)
-            end
-
-            expect($stderr).to receive(:write).with("hello") if repl_value
-            expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), "hello")
-
-            blk.call(chan2, true)
-          end
-          blk.call(chan, true)
-          chan
-        end
-
+        expect($stderr).to receive(:write).with("hello") if repl_value
+        expect($stderr).to receive(:write).with("world") if repl_value
+        simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
         expect(sa.cmd("echo hello")).to eq("hello")
       end
     end
@@ -123,31 +132,7 @@ RSpec.describe Sshable do
     it "raises an error with a non-zero exit status" do
       [false, true].each do |repl_value|
         stub_const("REPL", repl_value)
-        expect(session).to receive(:open_channel) do |&blk|
-          chan = instance_spy(Net::SSH::Connection::Channel)
-          expect(chan).to receive(:exec).with("exit 1") do |&blk|
-            chan2 = instance_spy(Net::SSH::Connection::Channel)
-            expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
-              buf = instance_double(Net::SSH::Buffer)
-              expect(buf).to receive(:read_long).and_return(1)
-              blk.call(nil, buf)
-            end
-
-            expect(chan2).to receive(:on_request).with("exit-signal") do |&blk|
-              buf = instance_double(Net::SSH::Buffer)
-              expect(buf).to receive(:read_long).and_return(127)
-              blk.call(nil, buf)
-            end
-
-            expect($stderr).to receive(:write).with("hello") if repl_value
-            expect(chan2).to receive(:on_extended_data).and_yield(nil, 1, "hello")
-
-            blk.call(chan2, true)
-          end
-          blk.call(chan, true)
-          chan
-        end
-
+        simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
         expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
       end
     end
