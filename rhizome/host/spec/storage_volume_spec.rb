@@ -91,9 +91,29 @@ RSpec.describe StorageVolume do
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args)
       unencrypted_sv.start(nil)
     end
+
+    it "will retry after purging if spdk artifacts exist" do
+      expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil).and_return(nil, nil)
+      expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
+        -> { raise SpdkExists.new("Device Exists", -17) },
+        -> {}
+      )
+      expect(unencrypted_sv).to receive(:purge_spdk_artifacts)
+      unencrypted_sv.start(nil)
+    end
+
+    it "won't retry more than once" do
+      expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil).and_return(nil, nil)
+      expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
+        -> { raise SpdkExists.new("Device Exists", -17) },
+        -> { raise SpdkExists.new("Device Exists", -17) }
+      )
+      expect(unencrypted_sv).to receive(:purge_spdk_artifacts)
+      expect { unencrypted_sv.start(nil) }.to raise_error SpdkExists
+    end
   end
 
-  describe "#purge" do
+  describe "#purge_spdk_artifacts" do
     it "can purge an encrypted disk" do
       expect(rpc_client).to receive(:vhost_delete_controller).with("test_2")
       expect(rpc_client).to receive(:bdev_crypto_delete).with("xyz01")
@@ -101,7 +121,7 @@ RSpec.describe StorageVolume do
       expect(rpc_client).to receive(:accel_crypto_key_destroy).with("xyz01_key")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_2")
 
-      encrypted_sv.purge
+      encrypted_sv.purge_spdk_artifacts
     end
 
     it "can purge an unencrypted disk" do
@@ -109,7 +129,7 @@ RSpec.describe StorageVolume do
       expect(rpc_client).to receive(:bdev_aio_delete).with("xyz01")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/vhost/test_2")
 
-      unencrypted_sv.purge
+      unencrypted_sv.purge_spdk_artifacts
     end
   end
 

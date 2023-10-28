@@ -50,11 +50,24 @@ class StorageVolume
 
   def start(key_wrapping_secrets)
     encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
-    setup_spdk_bdev(encryption_key)
-    setup_spdk_vhost
+
+    retries = 0
+    begin
+      setup_spdk_bdev(encryption_key)
+      setup_spdk_vhost
+    rescue SpdkExists => e
+      # If some of SPDK artifacts exist, purge and retry. But retry only once
+      # to prevent potential retry loops.
+      if retries == 0
+        retries += 1
+        purge_spdk_artifacts
+        retry
+      end
+      raise e
+    end
   end
 
-  def purge
+  def purge_spdk_artifacts
     vhost_controller = SpdkPath.vhost_controller(@vm_name, @disk_index)
 
     rpc_client.vhost_delete_controller(vhost_controller)

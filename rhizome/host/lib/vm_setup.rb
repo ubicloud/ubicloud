@@ -110,7 +110,7 @@ class VmSetup
     params = JSON.parse(File.read(vp.prep_json))
     params["storage_volumes"].each { |params|
       volume = StorageVolume.new(@vm_name, params)
-      volume.purge
+      volume.purge_spdk_artifacts
     }
 
     rm_if_exists(vp.storage_root)
