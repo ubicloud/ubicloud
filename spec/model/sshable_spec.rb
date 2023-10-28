@@ -130,11 +130,8 @@ RSpec.describe Sshable do
     end
 
     it "raises an error with a non-zero exit status" do
-      [false, true].each do |repl_value|
-        stub_const("REPL", repl_value)
-        simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
-        expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
-      end
+      simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
+      expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
     end
 
     it "invalidates the cache if the session raises an error" do
