@@ -30,7 +30,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
-      location: label_data["location"]
+      location: label_data["location"],
+      storage_size_gib: label_data["storage_size_gib"]
     ).first
 
     if (picked_vm = pool&.pick_vm)
@@ -71,7 +72,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       unix_user: "runner",
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [{size_gib: 86, encrypted: false}],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
       enable_ip4: true
     )
 

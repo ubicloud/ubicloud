@@ -8,7 +8,8 @@ RSpec.describe VmPool do
       size: 3,
       vm_size: "standard-2",
       boot_image: "img",
-      location: "loc"
+      location: "loc",
+      storage_size_gib: 86
     )
   }
 

@@ -7,13 +7,14 @@ class Prog::Vm::VmPool < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(size:, vm_size:, boot_image:, location:)
+  def self.assemble(size:, vm_size:, boot_image:, location:, storage_size_gib:)
     DB.transaction do
       vm_pool = VmPool.create_with_id(
         size: size,
         vm_size: vm_size,
         boot_image: boot_image,
-        location: location
+        location: location,
+        storage_size_gib: storage_size_gib
       )
       Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { _1.id = vm_pool.id }
     end
@@ -37,7 +38,7 @@ class Prog::Vm::VmPool < Prog::Base
         unix_user: "runner",
         location: vm_pool.location,
         boot_image: vm_pool.boot_image,
-        storage_volumes: [{size_gib: 86, encrypted: false}],
+        storage_volumes: [{size_gib: vm_pool.storage_size_gib, encrypted: false}],
         enable_ip4: true,
         pool_id: vm_pool.id
       )
