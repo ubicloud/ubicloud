@@ -118,7 +118,7 @@ SQL
       changed_columns.delete(:schedule)
       e
     rescue Prog::Base::Hop => hp
-      update(**hp.strand_update_args)
+      update(**hp.strand_update_args.merge(try: 0))
 
       hp
     rescue Prog::Base::Exit => ext
