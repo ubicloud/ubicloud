@@ -25,14 +25,13 @@ RSpec.describe Prog::Vm::Nexus do
       _1.vm_storage_volumes.append(disk_2)
       disk_1.vm = _1
       disk_2.vm = _1
+      allow(_1).to receive(:active_billing_record).and_return(BillingRecord.new(
+        project_id: SecureRandom.uuid,
+        resource_name: _1.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", _1.family, _1.location)["id"],
+        amount: _1.cores
+      ))
     }
-    BillingRecord.create_with_id(
-      project_id: SecureRandom.uuid,
-      resource_id: vm.id,
-      resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
-      amount: vm.cores
-    )
     vm
   }
   let(:prj) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
