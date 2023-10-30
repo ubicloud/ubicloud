@@ -15,18 +15,18 @@ RSpec.describe Prog::Vm::Nexus do
     kek = StorageKeyEncryptionKey.new(
       algorithm: "aes-256-gcm", key: "key",
       init_vector: "iv", auth_data: "somedata"
-    ) { _1.id = StorageKeyEncryptionKey.generate_uuid }
+    ) { _1.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
     disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
     disk_1.key_encryption_key_1 = kek
     disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1)
     vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "hetzner-hel1").tap {
-      _1.id = Vm.generate_uuid
+      _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
       disk_1.vm = _1
       disk_2.vm = _1
       allow(_1).to receive(:active_billing_record).and_return(BillingRecord.new(
-        project_id: SecureRandom.uuid,
+        project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
         resource_name: _1.name,
         billing_rate_id: BillingRate.from_resource_properties("VmCores", _1.family, _1.location)["id"],
         amount: _1.cores
