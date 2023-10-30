@@ -49,6 +49,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::Vm::PrepHost
     bud Prog::LearnNetwork unless vm_host.net6
     bud Prog::LearnMemory
+    bud Prog::LearnArch
     bud Prog::LearnCores
     bud Prog::LearnStorage
     bud Prog::InstallDnsmasq
@@ -58,6 +59,8 @@ class Prog::Vm::HostNexus < Prog::Base
   label def wait_prep
     reap.each do |st|
       case st.prog
+      when "LearnArch"
+        vm_host.update(arch: st.exitval.fetch("arch"))
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
