@@ -19,7 +19,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
     disk_1.key_encryption_key_1 = kek
     disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1)
-    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "hetzner-hel1").tap {
+    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1").tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
@@ -336,7 +336,8 @@ RSpec.describe Prog::Vm::Nexus do
               total_mem_gib: 640,
               total_hugepages_1g: 640 - 8,
               total_storage_gib: 500,
-              available_storage_gib: 200}.merge(args)
+              available_storage_gib: 200,
+              arch: "x64"}.merge(args)
       sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
       @host_index += 1
       VmHost.new(**args) { _1.id = sa.id }
