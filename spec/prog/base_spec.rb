@@ -65,9 +65,10 @@ RSpec.describe Prog::Base do
     expect(st.retval).to eq({"msg" => "2"})
 
     st.run
-    expect(st.exitval).to eq({"msg" => "1"})
 
+    expect(st.instance_variable_get(:@deleted)).to be true
     expect { st.run }.to raise_error "already deleted"
+
     expect { st.reload }.to raise_error Sequel::NoExistingObject
   end
 

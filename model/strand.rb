@@ -122,12 +122,13 @@ SQL
 
       hp
     rescue Prog::Base::Exit => ext
-      update(exitval: ext.exitval, retval: nil)
       if parent_id.nil?
         # No parent Strand to reap here, so self-reap.
         Semaphore.where(strand_id: id).destroy
         destroy
         @deleted = true
+      else
+        update(exitval: ext.exitval, retval: nil)
       end
 
       ext

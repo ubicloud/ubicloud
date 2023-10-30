@@ -89,6 +89,6 @@ SQL
     st.save_changes
     expect {
       st.run(10)
-    }.to change { [st.label, st.exitval] }.from(["hop_entry", nil]).to(["hop_exit", {msg: "hop finished"}])
+    }.to change { st.instance_variable_get(:@deleted) }.from(nil).to(true)
   end
 end
