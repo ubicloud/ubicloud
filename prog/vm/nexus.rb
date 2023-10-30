@@ -13,7 +13,7 @@ class Prog::Vm::Nexus < Prog::Base
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil)
+    enable_ip4: false, pool_id: nil, arch: "x64")
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -78,7 +78,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, family: vm_size.family, cores: vm_size.vcpu / 2, location: location,
-        boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id) { _1.id = ubid.to_uuid }
+        boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
       vm.associate_with_project(project)
@@ -167,7 +167,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def allocation_dataset
-    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.storage_size_gib, vm.location]
+    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.storage_size_gib, vm.location, vm.arch]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
 FROM vm_host
 WHERE vm_host.used_cores + ? < least(vm_host.total_cores, vm_host.total_mem_gib / ?)
@@ -175,6 +175,7 @@ AND vm_host.used_hugepages_1g + ? < vm_host.total_hugepages_1g
 AND vm_host.available_storage_gib > ?
 AND vm_host.allocation_state = 'accepting'
 AND vm_host.location = ?
+AND vm_host.arch = ?
 ORDER BY mem_ratio, used_cores
 SQL
   end
