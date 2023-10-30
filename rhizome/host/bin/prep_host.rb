@@ -5,20 +5,20 @@ require_relative "../../common/lib/util"
 require_relative "../lib/cloud_hypervisor"
 require "fileutils"
 
-ch_dir = "/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}"
+ch_dir = CloudHypervisor::VERSION.dir
 FileUtils.mkdir_p(ch_dir)
 FileUtils.cd ch_dir do
-  r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{CloudHypervisor::VERSION}/ch-remote"
+  r "curl -L3 -o ch-remote #{CloudHypervisor::VERSION.ch_remote_url.shellescape}"
   FileUtils.chmod "a+x", "ch-remote"
-  r "curl -L3 -O https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{CloudHypervisor::VERSION}/cloud-hypervisor"
+  r "curl -L3 -o cloud-hypervisor #{CloudHypervisor::VERSION.url.shellescape}"
   FileUtils.chmod "a+x", "cloud-hypervisor"
 end
 
 # edk2 firmware
-fw_dir = File.dirname(CloudHypervisor.firmware)
+fw_dir = File.dirname(CloudHypervisor::FIRMWARE.path)
 FileUtils.mkdir_p(fw_dir)
 FileUtils.cd fw_dir do
-  r "curl -L3 -o #{CloudHypervisor.firmware.shellescape} https://github.com/fdr/edk2/releases/download/#{CloudHypervisor::FIRMWARE_VERSION}/CLOUDHV.fd"
+  r "curl -L3 -o #{CloudHypervisor::FIRMWARE.name.shellescape} #{CloudHypervisor::FIRMWARE.url.shellescape}"
 end
 
 # Err towards listing ('l') and not restarting services by default,

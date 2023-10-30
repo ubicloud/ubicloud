@@ -446,8 +446,8 @@ EOS
 
   def download_boot_image(boot_image, custom_url: nil)
     urls = {
-      "ubuntu-jammy" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img",
-      "almalinux-9.1" => "https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2",
+      "ubuntu-jammy" => "https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
+      "almalinux-9.1" => Arch.render(x64: "x86_64", arm64: "aarch64").yield_self { "https://repo.almalinux.org/almalinux/9/cloud/#{_1}/images/AlmaLinux-9-GenericCloud-latest.#{_1}.qcow2" },
       "github-ubuntu-2204" => nil,
       "github-ubuntu-2004" => nil
     }
@@ -494,7 +494,7 @@ EOS
   def install_azcopy
     r "which azcopy"
   rescue CommandFail
-    r "curl -L10 -o azcopy_v10.tar.gz 'https://aka.ms/downloadazcopy-v10-linux'"
+    r "curl -L10 -o azcopy_v10.tar.gz 'https://aka.ms/downloadazcopy-v10-linux#{Arch.render(x64: "", arm64: "-arm64")}'"
     r "tar --strip-components=1 --exclude=*.txt -xzvf azcopy_v10.tar.gz"
     r "rm azcopy_v10.tar.gz"
     r "mv azcopy /usr/bin/azcopy"
@@ -558,9 +558,9 @@ Requires=spdk.service
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
-ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor -v \
+ExecStart=#{CloudHypervisor::VERSION.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
---kernel #{CloudHypervisor.firmware} \
+--kernel #{CloudHypervisor::FIRMWARE.path} \
 #{disk_params.join("\n")}
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
@@ -568,7 +568,7 @@ ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor -v
 --memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \
 #{net_params.join(" \\\n")}
 
-ExecStop=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/ch-remote --api-socket #{vp.ch_api_sock} shutdown-vmm
+ExecStop=#{CloudHypervisor::VERSION.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
 Restart=no
 User=#{@vm_name}
 Group=#{@vm_name}

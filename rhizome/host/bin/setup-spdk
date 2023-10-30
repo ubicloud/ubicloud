@@ -1,6 +1,7 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
+require_relative "../../common/lib/arch"
 require_relative "../../common/lib/util"
 require_relative "../lib/spdk_path"
 require "fileutils"
@@ -10,7 +11,14 @@ r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev l
 
 # spdk binaries
 FileUtils.cd SpdkPath.install_prefix do
-  r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/7adbcfb/spdk-7adbcfb.tar.gz"
+  if Arch.arm64?
+    r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-arm64.tar.gz"
+  elsif Arch.x64?
+    r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/7adbcfb/spdk-7adbcfb.tar.gz"
+  else
+    fail "BUG: unexpected architecture"
+  end
+
   r "tar -xzf /tmp/spdk.tar.gz"
 end
 
