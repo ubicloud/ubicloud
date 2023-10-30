@@ -85,9 +85,19 @@ class Prog::Test::HetznerServer < Prog::Base
   label def wait_setup_host
     reap
 
-    hop_test_host_encrypted if children_idle
+    hop_run_integration_spec if children_idle
 
     donate
+  end
+
+  label def run_integration_spec
+    sshable = vm_host.sshable
+    tmp_dir = "/var/storage/tests"
+    sshable.cmd("sudo mkdir -p #{tmp_dir}")
+    sshable.cmd("sudo chmod a+rw #{tmp_dir}")
+    sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
+
+    hop_test_host_encrypted
   end
 
   label def test_host_encrypted

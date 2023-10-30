@@ -16,8 +16,11 @@ RSpec.describe Prog::Test::HetznerServer do
     Sshable.create_with_id
   }
 
+  let(:vm_host) {
+    VmHost.create(location: "l") { _1.id = sshable.id }
+  }
+
   before {
-    vm_host = VmHost.create(location: "l") { _1.id = sshable.id }
     Strand.create(prog: "Prog", label: "label") { _1.id = sshable.id }
     allow(hs_test).to receive_messages(frame: {"vm_host_id" => vm_host.id,
                                                "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
@@ -78,14 +81,28 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#wait_setup_host" do
-    it "hops to test_host_encrypted if children idle" do
+    it "hops to run_integration_spec if children idle" do
       expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_setup_host }.to hop("test_host_encrypted", "Test::HetznerServer")
+      expect { hs_test.wait_setup_host }.to hop("run_integration_spec", "Test::HetznerServer")
     end
 
     it "donates if children not idle" do
       expect(hs_test).to receive(:children_idle).and_return(false)
       expect { hs_test.wait_setup_host }.to nap(0)
+    end
+  end
+
+  describe "#run_integration_spec" do
+    it "hops to test_host_encrypted" do
+      tmp_dir = "/var/storage/tests"
+      allow(hs_test).to receive(:vm_host).and_return(vm_host)
+      allow(vm_host).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
+      expect(sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
+      expect(sshable).to receive(:cmd).with(
+        "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
+      )
+      expect { hs_test.run_integration_spec }.to hop("test_host_encrypted", "Test::HetznerServer")
     end
   end
 
