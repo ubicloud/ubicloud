@@ -192,7 +192,8 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#register_runner" do
     it "registers runner hops" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
-      expect(sshable).to receive(:cmd).with("sudo systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./actions-runner/run.sh --jitconfig AABBCC")
+      expect(sshable).to receive(:cmd).with("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./actions-runner/run.sh --jitconfig {}",
+        stdin: "AABBCC")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
 
       expect { nx.register_runner }.to hop("wait")
