@@ -119,7 +119,13 @@ RSpec.describe Clover, "github" do
       workflow_job: {
         id: 232323,
         runner_id: runner_id,
-        labels: [label]
+        labels: [label],
+
+        name: "test workflow job name",
+        job_name: "test job name",
+        run_id: 7777777,
+        workflow_name: "test workflow name",
+        head_branch: "test head branch"
       }
     }
   end
