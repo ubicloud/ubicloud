@@ -57,7 +57,10 @@ class CloverWeb
     unless (installation = GithubInstallation[installation_id: data["installation"]["id"]])
       return error("Unregistered installation")
     end
-    unless (label = data["workflow_job"]["labels"].find { Github.runner_labels.key?(_1) })
+
+    job = data.fetch("workflow_job")
+
+    unless (label = job.fetch("labels").find { Github.runner_labels.key?(_1) })
       return error("Unmatched label")
     end
 
@@ -75,7 +78,7 @@ class CloverWeb
     runner = GithubRunner.first(
       installation_id: installation.id,
       repository_name: data["repository"]["full_name"],
-      runner_id: data["workflow_job"]["runner_id"]
+      runner_id: job.fetch("runner_id")
     )
 
     return error("Unregistered runner") unless runner
@@ -83,11 +86,11 @@ class CloverWeb
     case data["action"]
     when "in_progress"
       runner.update(
-        job_id: data["workflow_job"]["id"],
-        job_name: data["workflow_job"]["name"],
-        run_id: data["workflow_job"]["run_id"],
-        workflow_name: data["workflow_job"]["workflow_name"],
-        head_branch: data["workflow_job"]["head_branch"]
+        job_id: job.fetch("id"),
+        job_name: job.fetch("name"),
+        run_id: job.fetch("run_id"),
+        workflow_name: job.fetch("workflow_name"),
+        head_branch: job.fetch("head_branch")
       )
 
       success("GithubRunner[#{runner.ubid}] picked job #{runner.job_id}")
