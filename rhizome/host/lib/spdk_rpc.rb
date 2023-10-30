@@ -4,8 +4,12 @@ require_relative "spdk_path"
 require_relative "json_rpc_client"
 
 class SpdkRpc
+  def initialize(socket = SpdkPath.rpc_sock)
+    @socket = socket
+  end
+
   def client
-    @client ||= JsonRpcClient.new(SpdkPath.rpc_sock)
+    @client ||= JsonRpcClient.new(@socket)
   end
 
   def rpc_call(name, params)
