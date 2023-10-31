@@ -8,7 +8,7 @@ RSpec.describe Prog::InstallRhizome do
   let(:sshable) { instance_double(Sshable) }
 
   before do
-    expect(ir).to receive(:sshable).and_return(sshable).at_least(:once)
+    allow(ir).to receive(:sshable).and_return(sshable)
   end
 
   describe "#start" do
@@ -21,6 +21,13 @@ RSpec.describe Prog::InstallRhizome do
         expect(kwargs[:stdin][257..261]).to eq "ustar"
       end
       expect { ir.start }.to hop("install_gems")
+    end
+
+    it "writes tar including specs" do
+      ir_spec = described_class.new(Strand.new(stack: [{"target_folder" => "host", "install_specs" => true}]))
+      expect(ir_spec).to receive(:sshable).and_return(sshable).at_least(:once)
+      expect(sshable).to receive(:cmd)
+      expect { ir_spec.start }.to hop("install_gems")
     end
   end
 

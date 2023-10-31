@@ -85,13 +85,33 @@ class Prog::Test::HetznerServer < Prog::Base
   label def wait_setup_host
     reap
 
-    hop_run_integration_spec if children_idle
+    if children_idle
+      # We shouldn't install specs by default
+      verify_specs_installation(installed: false)
+
+      # install specs
+      strand.add_child(vm_host.install_rhizome(install_specs: true))
+      hop_wait_install_specs
+    end
 
     donate
   end
 
-  label def run_integration_spec
-    sshable = vm_host.sshable
+  def verify_specs_installation(installed: true)
+    specs_count = sshable.cmd("find /home/rhizome -type f -name '*_spec.rb' -not -path \"/home/rhizome/vendor/*\" | wc -l")
+    specs_installed = (specs_count.strip != "0")
+    fail "verify_specs_installation(installed: #{installed}) failed" unless specs_installed == installed
+  end
+
+  label def wait_install_specs
+    reap
+    hop_run_integration_specs if children_idle
+    donate
+  end
+
+  label def run_integration_specs
+    verify_specs_installation(installed: true)
+
     tmp_dir = "/var/storage/tests"
     sshable.cmd("sudo mkdir -p #{tmp_dir}")
     sshable.cmd("sudo chmod a+rw #{tmp_dir}")
@@ -168,5 +188,9 @@ class Prog::Test::HetznerServer < Prog::Base
 
   def vm_host
     @vm_host ||= VmHost[frame["vm_host_id"]]
+  end
+
+  def sshable
+    @sshable ||= vm_host.sshable
   end
 end
