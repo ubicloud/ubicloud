@@ -221,8 +221,7 @@ RSpec.describe VmSetup do
       }
       expect(vs).to receive(:setup_taps_6).with(gua, [])
       expect(vs).to receive(:routes4).with(ip4, "local_ip4", [])
-      expect(vs).to receive(:write_nat4_config).with(ip4, [])
-      expect(vs).to receive(:apply_nat4_rules)
+      expect(vs).to receive(:write_nftables_conf).with(ip4, gua, [])
       expect(vs).to receive(:forwarding)
 
       expect(vps).to receive(:write_guest_ephemeral).with(guest_ephemeral.to_s)
@@ -238,8 +237,47 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:setup_taps_6).with(gua, [])
       expect(vs).to receive(:routes4).with(nil, "local_ip4", [])
       expect(vs).to receive(:forwarding)
+      expect(vs).to receive(:write_nftables_conf)
 
       vs.setup_networking(true, gua, "", "local_ip4", [], false)
+    end
+
+    it "can generate nftables config" do
+      vps = instance_spy(VmPath)
+      expect(vs).to receive(:vp).and_return(vps).at_least(:once)
+
+      gua = "fddf:53d2:4c89:2305:46a0::/79"
+      ip4 = "123.123.123.123"
+      nics = [["fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "ncaka58xyg", "3e:bd:a5:96:f7:b9"]]
+
+      expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)
+table ip raw {
+  chain prerouting {
+    type filter hook prerouting priority raw; policy accept;
+    # allow dhcp
+    udp sport 68 udp dport 67 accept
+    udp sport 67 udp dport 68 accept
+
+    # avoid ip4 spoofing
+    ether saddr 3e:bd:a5:96:f7:b9 ip saddr != 192.168.5.50/32 drop
+
+    # NAT4 rules
+    ip daddr 123.123.123.123 ip daddr set 192.168.5.50 notrack
+ip saddr 192.168.5.50 ip daddr != { 192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 } ip saddr set 123.123.123.123 notrack
+
+  }
+}
+table ip6 raw {
+  chain prerouting {
+    type filter hook prerouting priority raw; policy accept;
+    # avoid ip6 spoofing
+    ether saddr 3e:bd:a5:96:f7:b9 ip6 saddr != {fddf:53d2:4c89:2305:46a0::/80,fd48:666c:a296:ce4b:2cc6::/79,fe80::3cbd:a5ff:fe96:f7b9} drop
+    
+  }
+}
+NFTABLES_CONF
+      expect(vs).to receive(:apply_nftables)
+      vs.write_nftables_conf(ip4, gua, nics)
     end
   end
 

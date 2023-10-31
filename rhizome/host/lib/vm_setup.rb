@@ -70,7 +70,6 @@ class VmSetup
       if ip4
         vm_sub = NetAddr::IPv4Net.parse(ip4)
         vp.write_public_ipv4(vm_sub.to_s)
-        write_nat4_config(ip4, nics)
       end
     end
 
@@ -78,7 +77,7 @@ class VmSetup
     setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
     setup_taps_6(gua, nics)
     routes4(ip4, local_ip4, nics)
-    apply_nat4_rules if ip4
+    write_nftables_conf(ip4, gua, nics)
     forwarding
   end
 
@@ -234,28 +233,75 @@ class VmSetup
     end
   end
 
-  def write_nat4_config(ip4, nics)
-    return unless ip4
-    public_sub = NetAddr::IPv4Net.parse(ip4)
-    public_ipv4 = public_sub.network.to_s
+  def write_nftables_conf(ip4, gua, nics)
+    nat4_rules = generate_nat4_rules(ip4, nics.first[1])
+    nic_priv_ip4_filters = generate_ip4_filter_rules(nics)
+    guest_ephemeral = subdivide_network(NetAddr.parse_net(gua)).first
+    nic_public_ip6_filter = generate_ip6_public_filter(nics.first, guest_ephemeral)
+    nic_priv_ip6_filters = generate_ip6_private_filter_rules(nics[1..])
 
-    private_ipv4 = nics.first[1]
-    private_sub = NetAddr::IPv4Net.parse(private_ipv4)
-    private_ipv4 = private_sub.network.to_s
+    config = build_nftables_config(nat4_rules, nic_priv_ip4_filters, nic_public_ip6_filter, nic_priv_ip6_filters)
 
-    vp.write_nftables_conf(<<NFTABLES_CONF)
-table ip raw {
-  chain prerouting {
-    type filter hook prerouting priority raw; policy accept;
-    ip daddr #{public_ipv4} ip daddr set #{private_ipv4} notrack
-    ip saddr #{private_ipv4} ip daddr != { 192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 } ip saddr set #{public_ipv4} notrack
-  }
-}
-NFTABLES_CONF
+    vp.write_nftables_conf(config)
+    apply_nftables
   end
 
-  def apply_nat4_rules
-    # We first flush the ruleset to make this function idempotent
+  def generate_nat4_rules(ip4, private_ip)
+    return unless ip4
+
+    public_ipv4 = NetAddr::IPv4Net.parse(ip4).network.to_s
+    private_ipv4 = NetAddr::IPv4Net.parse(private_ip).network.to_s
+
+    <<~NAT4_RULES
+      ip daddr #{public_ipv4} ip daddr set #{private_ipv4} notrack
+      ip saddr #{private_ipv4} ip daddr != { 192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 } ip saddr set #{public_ipv4} notrack
+    NAT4_RULES
+  end
+
+  def generate_ip4_filter_rules(nics)
+    nics.map do |_, net4, _, mac|
+      "ether saddr #{mac} ip saddr != #{net4} drop"
+    end.join("\n")
+  end
+
+  def generate_ip6_public_filter(nic_first, guest_ephemeral)
+    "ether saddr #{nic_first[3]} ip6 saddr != {#{guest_ephemeral},#{nic_first[0]},#{mac_to_ipv6_link_local(nic_first[3])}} drop"
+  end
+
+  def generate_ip6_private_filter_rules(nics)
+    nics.map do |net6, _, _, mac|
+      "ether saddr #{mac} ip6 saddr != #{net6} drop"
+    end.join("\n")
+  end
+
+  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, nic_public_ip6_filter, nic_priv_ip6_filters)
+    <<~NFTABLES_CONF
+      table ip raw {
+        chain prerouting {
+          type filter hook prerouting priority raw; policy accept;
+          # allow dhcp
+          udp sport 68 udp dport 67 accept
+          udp sport 67 udp dport 68 accept
+  
+          # avoid ip4 spoofing
+          #{nic_priv_ip4_filters}
+  
+          # NAT4 rules
+          #{nat4_rules}
+        }
+      }
+      table ip6 raw {
+        chain prerouting {
+          type filter hook prerouting priority raw; policy accept;
+          # avoid ip6 spoofing
+          #{nic_public_ip6_filter}
+          #{nic_priv_ip6_filters}
+        }
+      }
+    NFTABLES_CONF
+  end
+
+  def apply_nftables
     r "ip netns exec #{q_vm} bash -c 'nft flush ruleset'"
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
