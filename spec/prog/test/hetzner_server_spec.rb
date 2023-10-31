@@ -81,9 +81,10 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#wait_setup_host" do
-    it "hops to run_integration_spec if children idle" do
+    it "hops to wait_install_specs if children idle" do
       expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_setup_host }.to hop("run_integration_spec", "Test::HetznerServer")
+      expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
+      expect { hs_test.wait_setup_host }.to hop("wait_install_specs", "Test::HetznerServer")
     end
 
     it "donates if children not idle" do
@@ -92,17 +93,49 @@ RSpec.describe Prog::Test::HetznerServer do
     end
   end
 
-  describe "#run_integration_spec" do
+  describe "#verify_specs_installation" do
+    it "succeeds when installed=false & not exists" do
+      allow(hs_test).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).and_return("0\n")
+      expect { hs_test.verify_specs_installation(installed: false) }.not_to raise_error
+    end
+
+    it "succeeds when installed=true & exists" do
+      allow(hs_test).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).and_return("5\n")
+      expect { hs_test.verify_specs_installation(installed: true) }.not_to raise_error
+    end
+
+    it "succeeds when installed=false & exists" do
+      allow(hs_test).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).and_return("5\n")
+      expect { hs_test.verify_specs_installation(installed: false) }.to raise_error RuntimeError
+    end
+  end
+
+  describe "#wait_install_specs" do
+    it "hops to run_integration_specs if children idle" do
+      expect(hs_test).to receive(:children_idle).and_return(true)
+      expect { hs_test.wait_install_specs }.to hop("run_integration_specs", "Test::HetznerServer")
+    end
+
+    it "donates if children not idle" do
+      expect(hs_test).to receive(:children_idle).and_return(false)
+      expect { hs_test.wait_install_specs }.to nap(0)
+    end
+  end
+
+  describe "#run_integration_specs" do
     it "hops to test_host_encrypted" do
       tmp_dir = "/var/storage/tests"
-      allow(hs_test).to receive(:vm_host).and_return(vm_host)
-      allow(vm_host).to receive(:sshable).and_return(sshable)
+      allow(hs_test).to receive(:sshable).and_return(sshable)
+      expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
       expect(sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
       expect(sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
       expect(sshable).to receive(:cmd).with(
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
-      expect { hs_test.run_integration_spec }.to hop("test_host_encrypted", "Test::HetznerServer")
+      expect { hs_test.run_integration_specs }.to hop("test_host_encrypted", "Test::HetznerServer")
     end
   end
 
@@ -185,6 +218,13 @@ RSpec.describe Prog::Test::HetznerServer do
     it "can create a HetznerApis instance" do
       allow(hs_test).to receive(:hetzner_api).and_call_original
       expect(hs_test.hetzner_api).not_to be_nil
+    end
+  end
+
+  describe "#sshable" do
+    it "returns the sshable" do
+      allow(vm_host).to receive(:sshable).and_return(sshable)
+      expect(hs_test.sshable).to eq(sshable)
     end
   end
 end
