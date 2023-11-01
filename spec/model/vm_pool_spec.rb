@@ -47,30 +47,6 @@ RSpec.describe VmPool do
       vms_dataset = [vm]
       expect(pool).to receive_message_chain(:vms_dataset, :left_join, :where, :select).and_return(vm.id) # rubocop:disable RSpec/MessageChain
       expect(Vm).to receive(:where).and_return(vms_dataset) # rubocop:disable RSpec/MessageChain
-
-      ps = instance_double(PrivateSubnet)
-      expect(vm).to receive(:private_subnets).and_return([ps])
-      expect(ps).to receive(:dissociate_with_project).with(prj)
-      expect(vm).to receive(:dissociate_with_project).with(prj).and_call_original
-      expect(vm).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
-      adr = instance_double(AssignedVmAddress, active_billing_record: instance_double(BillingRecord))
-      expect(vm).to receive(:assigned_vm_address).and_return(adr).at_least(:once)
-      expect(vm.active_billing_record).to receive(:finalize)
-      expect(adr.active_billing_record).to receive(:finalize)
-      expect(pool.pick_vm.id).to eq(vm.id)
-    end
-
-    it "skips updating billing of addresses if there is no address, still returns vm" do
-      locking_vms = class_double(Vm)
-      expect(pool).to receive(:vms_dataset).and_return(locking_vms).at_least(:once)
-      expect(locking_vms).to receive_message_chain(:for_update, :all).and_return([])  # rubocop:disable RSpec/MessageChain
-      vms_dataset = [vm]
-      expect(pool).to receive_message_chain(:vms_dataset, :left_join, :where, :select).and_return(vm.id) # rubocop:disable RSpec/MessageChain
-      expect(Vm).to receive(:where).and_return(vms_dataset) # rubocop:disable RSpec/MessageChain
-
-      expect(vm).to receive(:dissociate_with_project).with(prj).and_call_original
-      expect(vm).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
-      expect(vm.active_billing_record).to receive(:finalize)
       expect(pool.pick_vm.id).to eq(vm.id)
     end
   end

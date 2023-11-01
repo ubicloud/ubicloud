@@ -18,7 +18,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:vm) {
-    Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "hetzner-hel1").tap {
+    Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "github-runners").tap {
       _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
     }
   }
@@ -66,7 +66,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
     before do
-      expect(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project))
+      runner_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
       expect(github_runner).to receive(:label).and_return("ubicloud-standard-4").at_least(:once)
     end
 
@@ -80,6 +81,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.sshable.unix_user).to eq("runner")
       expect(vm.family).to eq("standard")
       expect(vm.cores).to eq(2)
+      expect(vm.projects.map(&:id)).to include(Config.github_runner_service_project_id)
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
@@ -100,15 +102,6 @@ RSpec.describe Prog::Vm::GithubRunner do
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150)
       expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
-
-      ps = instance_double(PrivateSubnet)
-      expect(vm).to receive(:private_subnets).and_return([ps])
-      expect(ps).to receive(:associate_with_project).with(project).and_return(true)
-      expect(vm).to receive(:associate_with_project).with(project).and_return(true)
-      expect(BillingRecord).to receive(:create_with_id).and_return(nil)
-      expect(BillingRecord).to receive(:create_with_id).and_return(nil)
-      adr = instance_double(AssignedVmAddress, id: "id", ip: "1.1.1.1")
-      expect(vm).to receive(:assigned_vm_address).and_return(adr).at_least(:once)
       expect(Clog).to receive(:emit).with("Pool is used").and_call_original
       vm = nx.pick_vm
       expect(vm).not_to be_nil
