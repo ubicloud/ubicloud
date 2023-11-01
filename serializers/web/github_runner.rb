@@ -16,12 +16,13 @@ class Serializers::Web::GithubRunner < Serializers::Base
       job_url: runner.job_url,
       workflow_name: runner.workflow_name,
       head_branch: runner.head_branch,
-
-      vm: runner.vm ? {
-        name: runner.vm.name,
-        path: runner.vm.path,
-        state: runner.vm.display_state
-      } : nil
+      vm_state: if runner.vm
+                  runner.vm.display_state
+                elsif runner.strand.label == "wait_vm_destroy"
+                  "deleted"
+                else
+                  "not_created"
+                end
     }
   end
 

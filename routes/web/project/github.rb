@@ -11,7 +11,7 @@ class CloverWeb
 
     r.get true do
       @installations = Serializers::Web::GithubInstallation.serialize(@project.github_installations)
-      @runners = Serializers::Web::GithubRunner.serialize(@project.github_installations_dataset.eager(runners: :vm).flat_map(&:runners).sort_by(&:created_at).reverse)
+      @runners = Serializers::Web::GithubRunner.serialize(@project.github_installations_dataset.eager(runners: [:vm, :strand]).flat_map(&:runners).sort_by(&:created_at).reverse)
       @has_valid_payment_method = @project.has_valid_payment_method?
 
       view "project/github"

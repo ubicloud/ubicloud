@@ -81,7 +81,8 @@ RSpec.describe Clover, "github" do
     end
 
     it "can list active runners" do
-      runner1 = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 1, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4")
+      runner1_st = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
+      runner1_st.update(label: "wait_vm_destroy")
       vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").subject
       runner2 = GithubRunner.create_with_id(
         installation_id: installation.id,
@@ -94,15 +95,18 @@ RSpec.describe Clover, "github" do
         workflow_name: "test-workflow",
         vm_id: vm.id
       )
+      Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
 
       visit "#{project.path}/github"
 
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runners")
-      expect(page).to have_content runner1.ubid
+      expect(page).to have_content runner1_st.ubid
       expect(page).to have_content "Runner doesn't have a job yet"
       expect(page).to have_content runner2.ubid
-      expect(page).to have_link "Vm", href: project.path + vm.path
+      expect(page).to have_content "creating"
+      expect(page).to have_content "not_created"
+      expect(page).to have_content "deleted"
       expect(page).to have_link runner2.workflow_name, href: runner2.run_url
       expect(page).to have_link runner2.job_name, href: runner2.job_url
     end
