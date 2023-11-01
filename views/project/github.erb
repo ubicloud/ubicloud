@@ -51,12 +51,7 @@
                     <%= runner[:label] %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <% if runner[:vm] %>
-                      <a href="<%= @project_data[:path] + runner[:vm][:path] %>" class="text-orange-600 hover:text-orange-700">Vm</a>
-                      <%== render("components/vm_state_label", locals: { state: runner[:vm][:state] }) %>
-                    <% else %>
-                      -
-                    <% end %>
+                    <%== render("components/vm_state_label", locals: { state: runner[:vm_state] }) %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     <%= runner[:head_branch] || "-" %>
