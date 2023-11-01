@@ -4,7 +4,7 @@ require "forwardable"
 
 require_relative "../../lib/util"
 
-class Prog::Postgres::PostgresNexus < Prog::Base
+class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   extend Forwardable
@@ -53,7 +53,7 @@ class Prog::Postgres::PostgresNexus < Prog::Base
       ) { _1.id = ubid.to_uuid }
       postgres_resource.associate_with_project(project)
 
-      Strand.create(prog: "Postgres::PostgresNexus", label: "start") { _1.id = postgres_resource.id }
+      Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
     end
   end
 

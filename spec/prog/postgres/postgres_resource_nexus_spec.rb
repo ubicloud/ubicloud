@@ -2,7 +2,7 @@
 
 require_relative "../../model/spec_helper"
 
-RSpec.describe Prog::Postgres::PostgresNexus do
+RSpec.describe Prog::Postgres::PostgresResourceNexus do
   subject(:nx) { described_class.new(Strand.new(id: PostgresResource.generate_uuid)) }
 
   let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
