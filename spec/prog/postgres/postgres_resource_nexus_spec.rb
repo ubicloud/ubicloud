@@ -227,6 +227,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
       expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
       expect(nx).to receive(:create_server_certificate)
+      expect(sshable).to receive(:cmd).at_least(:once)
 
       expect { nx.refresh_certificates }.to hop("wait")
     end

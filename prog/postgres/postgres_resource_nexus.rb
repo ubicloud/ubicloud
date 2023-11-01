@@ -129,9 +129,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # ago.
     postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 5)
     postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
-    create_server_certificate
-
+    postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
     postgres_resource.save_changes
+
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_resource.server_cert)
+    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_resource.server_cert_key)
+    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
+
     hop_configure
   end
 
@@ -149,7 +154,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
-      create_server_certificate
+      postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
+
+      vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_resource.server_cert)
+      vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_resource.server_cert_key)
+      vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
+      vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
@@ -272,18 +282,12 @@ SQL
       root_cert_key = OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_2)
     end
 
-    postgres_resource.server_cert, postgres_resource.server_cert_key = Util.create_certificate(
+    Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Server Certificate",
       extensions: ["subjectAltName=DNS:#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
       issuer_key: root_cert_key
     ).map(&:to_pem)
-    postgres_resource.save_changes
-
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_resource.server_cert)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_resource.server_cert_key)
-    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
   end
 end
