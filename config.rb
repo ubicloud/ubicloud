@@ -92,6 +92,7 @@ module Config
   optional :github_app_private_key, string, clear: true
   optional :github_app_webhook_secret, string, clear: true
   optional :vm_pool_project_id, string
+  optional :github_runner_service_project_id, string
 
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string

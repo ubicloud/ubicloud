@@ -16,19 +16,10 @@ class VmPool < Sequel::Model
       # first lock the whole pool in the join table so that no other thread can
       # pick a vm from this pool
       vms_dataset.for_update.all
-      pick_vm_id_q = vms_dataset.left_join(:github_runner, vm_id: :id).where(Sequel[:github_runner][:vm_id] => nil, Sequel[:vm][:display_state] => "running").select(Sequel[:vm][:id])
-      picked_vm = Vm.where(id: pick_vm_id_q).first
-      return nil unless picked_vm
-
-      picked_vm.dissociate_with_project(picked_vm.projects.first)
-      picked_vm.private_subnets.each { |ps| ps.dissociate_with_project(picked_vm.projects.first) }
-
-      # the billing records are updated here because the VM will be assigned
-      # to a customer.
-      picked_vm.active_billing_record.finalize
-      picked_vm.assigned_vm_address&.active_billing_record&.finalize
-
-      picked_vm
+      pick_vm_id_q = vms_dataset.left_join(:github_runner, vm_id: :id)
+        .where(Sequel[:github_runner][:vm_id] => nil, Sequel[:vm][:display_state] => "running")
+        .select(Sequel[:vm][:id])
+      Vm.where(id: pick_vm_id_q).first
     end
   end
 end

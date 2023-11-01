@@ -25,7 +25,6 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   def pick_vm
     label = github_runner.label
-    project = github_runner.installation.project
     label_data = Github.runner_labels[label]
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
@@ -35,24 +34,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     ).first
 
     if (picked_vm = pool&.pick_vm)
-      picked_vm.associate_with_project(project)
-      picked_vm.private_subnets.each { |ps| ps.associate_with_project(project) }
-
-      BillingRecord.create_with_id(
-        project_id: project.id,
-        resource_id: picked_vm.id,
-        resource_name: picked_vm.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmCores", picked_vm.family, picked_vm.location)["id"],
-        amount: picked_vm.cores
-      )
-
-      BillingRecord.create_with_id(
-        project_id: project.id,
-        resource_id: picked_vm.assigned_vm_address.id,
-        resource_name: picked_vm.assigned_vm_address.ip,
-        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", picked_vm.location)["id"],
-        amount: 1
-      )
       Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
@@ -63,7 +44,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # ~10 seconds.
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "runner",
-      project.id,
+      Config.github_runner_service_project_id,
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
       location: label_data["location"],
