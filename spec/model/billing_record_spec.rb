@@ -13,4 +13,9 @@ RSpec.describe BillingRecord do
     )
     expect(described_class.active.all).to eq([expected])
   end
+
+  it "returns duration as 1 for amount based billing rates" do
+    br = described_class.new(billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", "standard-2", "global")["id"])
+    expect(br.duration(Time.now, Time.now)).to eq(1)
+  end
 end

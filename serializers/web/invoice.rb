@@ -47,23 +47,30 @@ class Serializers::Web::Invoice < Serializers::Base
               name: resource["resource_name"],
               description: line_item["description"],
               duration: line_item["duration"].to_i,
+              amount: line_item["amount"],
               cost: line_item["cost"],
-              cost_humanized: humanized_cost(line_item["cost"])
+              cost_humanized: humanized_cost(line_item["cost"]),
+              usage: BillingRate.line_item_usage(line_item["resource_type"], line_item["resource_family"], line_item["amount"], line_item["duration"])
             }
           end
         end.group_by { _1[:description] }.flat_map do |description, line_items|
           if line_items.count <= 5
             line_items
           else
+            duration_sum = line_items.sum { _1[:duration] }
+            amount_sum = line_items.sum { _1[:amount] }
+            cost_sum = line_items.sum { _1[:cost] }
             {
               name: "#{line_items.count} x #{description} (Aggregated)",
               description: description,
-              duration: line_items.sum { _1[:duration] },
-              cost: line_items.sum { _1[:cost] },
-              cost_humanized: humanized_cost(line_items.sum { _1[:cost] })
+              duration: duration_sum,
+              amount: amount_sum,
+              cost: cost_sum,
+              cost_humanized: humanized_cost(cost_sum),
+              usage: BillingRate.line_item_usage(line_items.first["resource_type"], line_items.first["resource_family"], amount_sum, duration_sum)
             }
           end
-        end.sort_by { _1[:description] }
+        end.sort_by { _1[:name] }
       }
     )
   end
