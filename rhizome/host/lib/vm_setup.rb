@@ -234,13 +234,15 @@ class VmSetup
   end
 
   def write_nftables_conf(ip4, gua, nics)
-    nat4_rules = generate_nat4_rules(ip4, nics.first[1])
-    nic_priv_ip4_filters = generate_ip4_filter_rules(nics)
     guest_ephemeral = subdivide_network(NetAddr.parse_net(gua)).first
-    nic_public_ip6_filter = generate_ip6_public_filter(nics.first, guest_ephemeral)
-    nic_priv_ip6_filters = generate_ip6_private_filter_rules(nics[1..])
 
-    config = build_nftables_config(nat4_rules, nic_priv_ip4_filters, nic_public_ip6_filter, nic_priv_ip6_filters)
+    config = build_nftables_config(
+      generate_nat4_rules(ip4, nics.first[1]),
+      generate_ip4_filter_rules(nics),
+      generate_dhcp_filter_rule,
+      generate_ip6_public_filter(nics.first, guest_ephemeral),
+      generate_ip6_private_filter_rules(nics[1..])
+    )
 
     vp.write_nftables_conf(config)
     apply_nftables
@@ -264,6 +266,10 @@ class VmSetup
     end.join("\n")
   end
 
+  def generate_dhcp_filter_rule
+    "oifname vethi#{q_vm} udp sport { 67, 68 } udp dport { 67, 68 } drop"
+  end
+
   def generate_ip6_public_filter(nic_first, guest_ephemeral)
     "ether saddr #{nic_first[3]} ip6 saddr != {#{guest_ephemeral},#{nic_first[0]},#{mac_to_ipv6_link_local(nic_first[3])}} drop"
   end
@@ -274,7 +280,7 @@ class VmSetup
     end.join("\n")
   end
 
-  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, nic_public_ip6_filter, nic_priv_ip6_filters)
+  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, dhcp_filter_rule, nic_public_ip6_filter, nic_priv_ip6_filters)
     <<~NFTABLES_CONF
       table ip raw {
         chain prerouting {
@@ -288,6 +294,11 @@ class VmSetup
   
           # NAT4 rules
           #{nat4_rules}
+        }
+        chain postrouting {
+          type filter hook postrouting priority raw; policy accept;
+          # avoid dhcp ports to be used for spoofing
+          #{dhcp_filter_rule}
         }
       }
       table ip6 raw {

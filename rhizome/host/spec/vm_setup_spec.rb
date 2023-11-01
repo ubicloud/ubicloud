@@ -266,6 +266,11 @@ table ip raw {
 ip saddr 192.168.5.50 ip daddr != { 192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 } ip saddr set 123.123.123.123 notrack
 
   }
+  chain postrouting {
+    type filter hook postrouting priority raw; policy accept;
+    # avoid dhcp ports to be used for spoofing
+    oifname vethitest udp sport { 67, 68 } udp dport { 67, 68 } drop
+  }
 }
 table ip6 raw {
   chain prerouting {
