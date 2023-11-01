@@ -107,10 +107,92 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
+  describe ".update_billing_record" do
+    let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+
+    before do
+      allow(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project)).at_least(:once)
+    end
+
+    it "not updates billing record if the runner is destroyed before it's ready" do
+      expect(github_runner).to receive(:ready_at).and_return(nil)
+
+      expect(nx.update_billing_record).to be_nil
+      expect(BillingRecord.count).to eq(0)
+    end
+
+    it "creates new billing record when no daily record" do
+      time = Time.now
+      expect(Time).to receive(:now).and_return(time).at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(time, time)).to eq(1)
+    end
+
+    it "updates the amount of existing billing record" do
+      time = Time.now
+      expect(Time).to receive(:now).and_return(time).at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      # Create a record
+      nx.update_billing_record
+
+      expect { nx.update_billing_record }
+        .to change { BillingRecord[resource_id: project.id].amount }.from(5).to(10)
+    end
+
+    it "create a new record for a new day" do
+      today = Time.now
+      tomorrow = today + 24 * 60 * 60
+      expect(Time).to receive(:now).and_return(today).exactly(4)
+      expect(github_runner).to receive(:ready_at).and_return(today - 5 * 60).twice
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      # Create today record
+      nx.update_billing_record
+
+      expect(Time).to receive(:now).and_return(tomorrow).at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(tomorrow - 5 * 60).at_least(:once)
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      # Create tomorrow record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
+
+      expect(BillingRecord.where(resource_id: project.id).map(&:amount)).to eq([5, 5])
+    end
+
+    it "tries 3 times and creates single billing record" do
+      time = Time.now
+      expect(Time).to receive(:now).and_return(time).at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(BillingRecord).to receive(:create_with_id).and_raise(Sequel::Postgres::ExclusionConstraintViolation).exactly(3)
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+
+      expect {
+        3.times { nx.update_billing_record }
+      }.to change { BillingRecord.where(resource_id: project.id).count }.from(0).to(1)
+    end
+
+    it "tries 4 times and fails" do
+      time = Time.now
+      expect(Time).to receive(:now).and_return(time).at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(BillingRecord).to receive(:create_with_id).and_raise(Sequel::Postgres::ExclusionConstraintViolation).at_least(:once)
+
+      expect {
+        4.times { nx.update_billing_record }
+      }.to raise_error(Sequel::Postgres::ExclusionConstraintViolation)
+    end
+  end
+
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx).to receive(:register_deadline)
+      expect(nx).to receive(:update_billing_record)
       expect { nx.before_run }.to hop("destroy")
     end
 
