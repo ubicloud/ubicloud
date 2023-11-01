@@ -62,7 +62,7 @@ class PostgresResource < Sequel::Model
   end
 
   def hostname
-    "#{server_name}.postgres.ubicloud.com"
+    "#{server_name}.#{Config.postgres_service_hostname}"
   end
 
   def connection_string

@@ -71,6 +71,7 @@ RSpec.describe PostgresResource do
   end
 
   it "returns connection string" do
+    expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
     expect(pgs.connection_string).to eq("postgres://postgres:dummy-password@pg-server-name.postgres.ubicloud.com")
   end
 end
