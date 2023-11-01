@@ -60,6 +60,47 @@ class Prog::Vm::GithubRunner < Prog::Base
     vm_st.subject
   end
 
+  def update_billing_record
+    # If the runner is destroyed before it's ready, don't charge for it.
+    return unless github_runner.ready_at
+
+    project = github_runner.installation.project
+    label_data = Github.runner_labels[github_runner.label]
+    rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", label_data["vm_size"], "global")["id"]
+
+    retries = 0
+    begin
+      begin_time = Time.now.to_date.to_time
+      end_time = begin_time + 24 * 60 * 60
+      used_amount = ((Time.now - github_runner.ready_at) / 60).ceil
+      today_record = BillingRecord
+        .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
+        .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+        .first
+
+      if today_record
+        today_record.amount = Sequel[:amount] + used_amount
+        today_record.save_changes(validate: false)
+      else
+        BillingRecord.create_with_id(
+          project_id: project.id,
+          resource_id: project.id,
+          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
+          billing_rate_id: rate_id,
+          span: Sequel.pg_range(begin_time...end_time),
+          amount: used_amount
+        )
+      end
+    rescue Sequel::Postgres::ExclusionConstraintViolation
+      # The billing record has an exclusion constraint, which prevents the
+      # creation of multiple billing records for the same day. If a thread
+      # encounters this constraint, it immediately retries 4 times.
+      retries += 1
+      retry unless retries > 4
+      raise
+    end
+  end
+
   SERVICE_NAME = "runner-script"
 
   def vm
@@ -74,6 +115,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
         register_deadline(nil, 10 * 60)
+        update_billing_record
         hop_destroy
       end
     end
