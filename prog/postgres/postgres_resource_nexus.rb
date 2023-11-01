@@ -253,7 +253,7 @@ SQL
   end
 
   def dns_zone
-    @@dns_zone ||= DnsZone.where(project_id: Config.postgres_service_project_id, name: "postgres.ubicloud.com").first
+    @@dns_zone ||= DnsZone.where(project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname).first
   end
 
   def create_root_certificate(duration:)
