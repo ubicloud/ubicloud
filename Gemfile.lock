@@ -31,6 +31,22 @@ GEM
       ffi (~> 1.15)
       ffi-compiler (~> 1.0)
     ast (2.4.2)
+    aws-eventstream (1.2.0)
+    aws-partitions (1.843.0)
+    aws-sdk-core (3.185.2)
+      aws-eventstream (~> 1, >= 1.0.2)
+      aws-partitions (~> 1, >= 1.651.0)
+      aws-sigv4 (~> 1.5)
+      jmespath (~> 1, >= 1.6.1)
+    aws-sdk-kms (1.72.0)
+      aws-sdk-core (~> 3, >= 3.184.0)
+      aws-sigv4 (~> 1.1)
+    aws-sdk-s3 (1.136.0)
+      aws-sdk-core (~> 3, >= 3.181.0)
+      aws-sdk-kms (~> 1)
+      aws-sigv4 (~> 1.6)
+    aws-sigv4 (1.6.1)
+      aws-eventstream (~> 1, >= 1.0.2)
     base64 (0.1.1)
     bcrypt_pbkdf (1.1.0)
     better_html (2.0.2)
@@ -87,6 +103,7 @@ GEM
     hashdiff (1.0.1)
     i18n (1.14.1)
       concurrent-ruby (~> 1.0)
+    jmespath (1.6.2)
     json (2.6.3)
     jwt (2.7.1)
     language_server-protocol (3.17.0.3)
@@ -274,6 +291,7 @@ PLATFORMS
 
 DEPENDENCIES
   argon2
+  aws-sdk-s3
   bcrypt_pbkdf
   brakeman
   capybara

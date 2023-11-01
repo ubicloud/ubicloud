@@ -4,6 +4,7 @@ source "https://rubygems.org"
 ruby "3.2.2"
 
 gem "argon2"
+gem "aws-sdk-s3"
 gem "bcrypt_pbkdf"
 gem "ed25519"
 gem "net-ssh"
