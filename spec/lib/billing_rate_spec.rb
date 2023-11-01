@@ -24,4 +24,14 @@ RSpec.describe BillingRate do
       end
     end
   end
+
+  describe ".line_item_usage" do
+    it "returns usage by duration" do
+      expect(described_class.line_item_usage("VmCores", "standard", 5, 1)).to eq("1 minutes")
+    end
+
+    it "returns usage by amount" do
+      expect(described_class.line_item_usage("GitHubRunnerMinutes", "standard-2", 5, 1)).to eq("5 minutes")
+    end
+  end
 end

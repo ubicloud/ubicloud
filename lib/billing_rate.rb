@@ -27,8 +27,19 @@ class BillingRate
       "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database"
     when "PostgresStorage"
       "#{amount} GiB Storage for PostgreSQL Database"
+    when "GitHubRunnerMinutes"
+      "#{resource_family} GitHub Runner"
     else
       fail "BUG: Unknown resource type for line item description"
+    end
+  end
+
+  def self.line_item_usage(resource_type, resource_family, amount, duration)
+    case resource_type
+    when "GitHubRunnerMinutes"
+      "#{amount.to_i} minutes"
+    else
+      "#{duration} minutes"
     end
   end
 end
