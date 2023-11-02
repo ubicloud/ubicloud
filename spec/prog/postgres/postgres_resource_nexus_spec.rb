@@ -26,24 +26,24 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "validates input" do
       expect {
-        described_class.assemble(SecureRandom.uuid, "hetzner-hel1", "pg-server-name", "standard-2", 100)
+        described_class.assemble(project_id: "26820e05-562a-4e25-a51b-de5f78bd00af", location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
-        described_class.assemble(project.id, "hetzner-xxx", "pg-server-name", "standard-2", 100)
+        described_class.assemble(project_id: project.id, location: "hetzner-xxx", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
 
       expect {
-        described_class.assemble(project.id, "hetzner-hel1", "pg/server/name", "standard-2", 100)
+        described_class.assemble(project_id: project.id, location: "hetzner-hel1", server_name: "pg/server/name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(project.id, "hetzner-hel1", "pg-server-name", "standard-128", 100)
+        described_class.assemble(project_id: project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-128", target_storage_size_gib: 100)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: size"
     end
 
     it "creates postgres resource and vm with sshable" do
-      st = described_class.assemble(project.id, "hetzner-hel1", "pg-server-name", "standard-2", 100)
+      st = described_class.assemble(project_id: project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
 
       postgres_resource = PostgresResource[st.id]
       expect(postgres_resource).not_to be_nil

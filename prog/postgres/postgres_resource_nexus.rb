@@ -12,12 +12,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   semaphore :initial_provisioning, :restart, :destroy
 
-  def self.assemble(project_id, location, server_name, vm_size, storage_size_gib)
+  def self.assemble(project_id:, location:, server_name:, target_vm_size:, target_storage_size_gib:)
     unless (project = Project[project_id])
       fail "No existing project"
     end
 
-    Validation.validate_vm_size(vm_size)
+    Validation.validate_vm_size(target_vm_size)
     Validation.validate_name(server_name)
     Validation.validate_location(location, project.provider)
 
@@ -30,10 +30,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         Config.postgres_service_project_id,
         location: location,
         name: ubid.to_s,
-        size: vm_size,
+        size: target_vm_size,
         storage_volumes: [
           {encrypted: true, size_gib: 30},
-          {encrypted: true, size_gib: storage_size_gib}
+          {encrypted: true, size_gib: target_storage_size_gib}
         ],
         boot_image: "ubuntu-jammy",
         enable_ip4: true
@@ -47,7 +47,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       postgres_resource = PostgresResource.create(
         project_id: project_id, location: location, server_name: server_name,
-        target_vm_size: vm_size, target_storage_size_gib: storage_size_gib,
+        target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
         superuser_password: SecureRandom.base64(15).gsub(/[+\/]/, "+" => "_", "/" => "-"),
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
