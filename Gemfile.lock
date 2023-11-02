@@ -174,7 +174,7 @@ GEM
       loofah (~> 2.21)
       nokogiri (~> 1.14)
     rainbow (3.1.1)
-    rake (13.0.6)
+    rake (13.1.0)
     refrigerator (1.6.0)
     regexp_parser (2.8.2)
     rexml (3.2.6)
