@@ -306,6 +306,7 @@ DEPENDENCIES
   mail
   net-ssh
   netaddr
+  nokogiri
   octokit
   pagerduty (>= 4.0)
   pry
