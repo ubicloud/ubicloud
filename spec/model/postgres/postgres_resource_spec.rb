@@ -25,7 +25,8 @@ RSpec.describe PostgresResource do
           net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
           net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
         )
-      ]
+      ],
+      ephemeral_net4: "1.2.3.4"
     )
   }
 
@@ -71,7 +72,11 @@ RSpec.describe PostgresResource do
   end
 
   it "returns connection string" do
-    expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
+    expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").twice
     expect(pgs.connection_string).to eq("postgres://postgres:dummy-password@pg-server-name.postgres.ubicloud.com")
+  end
+
+  it "returns connection string with ip address if config is not set" do
+    expect(pgs.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4")
   end
 end

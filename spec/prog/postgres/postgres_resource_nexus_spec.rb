@@ -185,6 +185,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     }
 
     it "hops to configure after creating certificates" do
+      expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").twice
       expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)).and_call_original
       expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)).and_call_original
       expect(Util).to receive(:create_certificate).with(hash_including(subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Server Certificate", duration: 60 * 60 * 24 * 30 * 6)).and_call_original
@@ -226,6 +227,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "rotates server certificate using root_cert_2 if root_cert_1 is close to expiration" do
+      expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").twice
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").twice.and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 360))
       root_cert_2 = instance_double(OpenSSL::X509::Certificate)
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 2").and_return(root_cert_2)
