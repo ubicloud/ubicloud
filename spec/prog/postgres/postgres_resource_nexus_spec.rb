@@ -100,6 +100,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.create_dns_record }.to hop("wait_bootstrap_rhizome")
     end
+
+    it "hops even if dns zone is not configured" do
+      expect(nx).to receive(:dns_zone).and_return(nil)
+      expect { nx.create_dns_record }.to hop("wait_bootstrap_rhizome")
+    end
   end
 
   describe "#wait_bootstrap_rhizome" do
@@ -354,6 +359,15 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(vm).to receive(:incr_destroy)
       expect { nx.destroy }.to nap(5)
 
+      expect(postgres_resource).to receive(:vm).and_return(nil)
+      expect(postgres_resource).to receive(:dissociate_with_project)
+      expect(postgres_resource).to receive(:destroy)
+
+      expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
+    end
+
+    it "completes destroy even if dns zone is not configured" do
+      expect(nx).to receive(:dns_zone).and_return(nil)
       expect(postgres_resource).to receive(:vm).and_return(nil)
       expect(postgres_resource).to receive(:dissociate_with_project)
       expect(postgres_resource).to receive(:destroy)

@@ -82,7 +82,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def create_dns_record
-    dns_zone.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
+    dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
     hop_wait_bootstrap_rhizome
   end
 
@@ -245,7 +245,7 @@ SQL
       nap 5
     end
 
-    dns_zone.delete_record(record_name: postgres_resource.hostname)
+    dns_zone&.delete_record(record_name: postgres_resource.hostname)
     postgres_resource.dissociate_with_project(postgres_resource.project)
     postgres_resource.destroy
 
