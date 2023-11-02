@@ -241,7 +241,9 @@ class VmSetup
       generate_ip4_filter_rules(nics),
       generate_dhcp_filter_rule,
       generate_ip6_public_filter(nics.first, guest_ephemeral),
-      generate_ip6_private_filter_rules(nics[1..])
+      generate_ip6_private_filter_rules(nics[1..]),
+      nics.map { _1[1] }.join(", "),
+      ip4
     )
 
     vp.write_nftables_conf(config)
@@ -280,7 +282,7 @@ class VmSetup
     end.join("\n")
   end
 
-  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, dhcp_filter_rule, nic_public_ip6_filter, nic_priv_ip6_filters)
+  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, dhcp_filter_rule, nic_public_ip6_filter, nic_priv_ip6_filters, private_ipv4_list, ip4)
     <<~NFTABLES_CONF
       table ip raw {
         chain prerouting {
@@ -307,6 +309,42 @@ class VmSetup
           # avoid ip6 spoofing
           #{nic_public_ip6_filter}
           #{nic_priv_ip6_filters}
+        }
+      }
+      table inet fw_table {
+        set allowed_local_ipv4 {
+          type ipv4_addr; # For IPv4 addresses
+          flags interval;
+          elements = {
+            192.168.0.0/16, # these sets will be replaced with local ip addresses
+            10.0.0.0/8,
+            172.10.0.0/12
+          }
+        }
+
+        set allowed_ipv4_ips {
+          type ipv4_addr;
+        }
+  
+        set allowed_ipv4_port_pairs {
+            type ipv4_addr . inet_service; # For IPv4 address and port pairs
+            flags interval; # Allows to specify ranges
+        }
+
+        set private_ipv4s {
+          type ipv4_addr;
+          flags interval;
+          elements = {
+            #{private_ipv4_list}
+          }
+        }
+    
+        chain forward {
+            type filter hook forward priority filter; policy drop; # Used 'filter' for priority
+            ip saddr @allowed_local_ipv4 ip daddr @allowed_local_ipv4 counter accept
+            ip saddr #{ip4} counter accept
+            ip saddr @allowed_ipv4_ips ip daddr @private_ipv4s counter accept
+            ip saddr . th dport @allowed_ipv4_port_pairs ip daddr @private_ipv4s counter accept
         }
       }
     NFTABLES_CONF
