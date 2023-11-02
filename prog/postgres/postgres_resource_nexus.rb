@@ -8,9 +8,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   extend Forwardable
-  def_delegators :postgres_resource, :vm
+  def_delegators :postgres_resource, :server
 
-  semaphore :initial_provisioning, :restart, :destroy
+  semaphore :destroy
 
   def self.assemble(project_id:, location:, server_name:, target_vm_size:, target_storage_size_gib:)
     unless (project = Project[project_id])
@@ -22,29 +22,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     Validation.validate_location(location, project.provider)
 
     DB.transaction do
-      ubid = PostgresResource.generate_ubid
-
-      vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-        "ubi",
-        Config.postgres_service_project_id,
-        location: location,
-        name: ubid.to_s,
-        size: target_vm_size,
-        storage_volumes: [
-          {encrypted: true, size_gib: 30},
-          {encrypted: true, size_gib: target_storage_size_gib}
-        ],
-        boot_image: "ubuntu-jammy",
-        enable_ip4: true
-      )
-
-      postgres_resource = PostgresResource.create(
+      postgres_resource = PostgresResource.create_with_id(
         project_id: project_id, location: location, server_name: server_name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: SecureRandom.urlsafe_base64(15),
-        vm_id: vm_st.id
-      ) { _1.id = ubid.to_uuid }
+        superuser_password: SecureRandom.urlsafe_base64(15)
+      )
       postgres_resource.associate_with_project(project)
+
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id)
 
       Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
     end
@@ -60,57 +45,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def start
-    nap 5 unless vm.strand.label == "wait"
-
-    postgres_resource.incr_initial_provisioning
-    hop_bootstrap_rhizome
-  end
-
-  label def bootstrap_rhizome
+    nap 5 unless server.vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
-
-    bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi"}
     hop_create_dns_record
   end
 
   label def create_dns_record
-    dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
-    hop_wait_bootstrap_rhizome
-  end
-
-  label def wait_bootstrap_rhizome
-    reap
-    hop_mount_data_disk if leaf?
-    donate
-  end
-
-  label def mount_data_disk
-    case vm.sshable.cmd("common/bin/daemonizer --check format_disk")
-    when "Succeeded"
-      vm.sshable.cmd("sudo mkdir -p /dat")
-      device_path = vm.vm_storage_volumes.find { _1.boot == false }.device_path.shellescape
-
-      vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat ext4 defaults 0 0")
-      vm.sshable.cmd("sudo mount #{device_path} /dat")
-
-      hop_install_postgres
-    when "Failed", "NotStarted"
-      device_path = vm.vm_storage_volumes.find { _1.boot == false }.device_path.shellescape
-      vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{device_path}' format_disk")
-    end
-
-    nap 5
-  end
-
-  label def install_postgres
-    case vm.sshable.cmd("common/bin/daemonizer --check install_postgres")
-    when "Succeeded"
-      hop_initialize_certificates
-    when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install_postgres' install_postgres")
-    end
-
-    nap 5
+    dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
+    hop_initialize_certificates
   end
 
   label def initialize_certificates
@@ -124,12 +66,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
     postgres_resource.save_changes
 
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_resource.server_cert)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_resource.server_cert_key)
-    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
-
-    hop_configure
+    hop_wait_server
   end
 
   label def refresh_certificates
@@ -143,67 +80,23 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     if OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
       postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
+      server.incr_refresh_certificates
     end
 
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
       postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
-
-      vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_resource.server_cert)
-      vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_resource.server_cert_key)
-      vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
-      vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
+      server.incr_refresh_certificates
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
     postgres_resource.save_changes
 
-    hop_wait
+    hop_wait_server
   end
 
-  label def configure
-    case vm.sshable.cmd("common/bin/daemonizer --check configure")
-    when "Succeeded"
-      when_initial_provisioning_set? do
-        hop_update_superuser_password
-      end
-      hop_wait
-    when "Failed", "NotStarted"
-      configure_hash = postgres_resource.configure_hash
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure' configure", stdin: JSON.generate(configure_hash))
-    end
-
-    nap 5
-  end
-
-  label def update_superuser_password
-    encrypted_password = DB.synchronize do |conn|
-      # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
-      # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
-      # database to do the encryption.
-      conn.encrypt_password(postgres_resource.superuser_password, "postgres", "scram-sha-256")
-    end
-    commands = <<SQL
-BEGIN;
-SET LOCAL log_statement = 'none';
-ALTER ROLE postgres WITH PASSWORD #{DB.literal(encrypted_password)};
-COMMIT;
-SQL
-    vm.sshable.cmd("sudo -u postgres psql", stdin: commands)
-
-    when_initial_provisioning_set? do
-      hop_restart
-    end
-    hop_wait
-  end
-
-  label def restart
-    decr_restart
-    vm.sshable.cmd("sudo postgres/bin/restart")
-
-    when_initial_provisioning_set? do
-      hop_create_billing_record
-    end
-    hop_wait
+  label def wait_server
+    nap 5 if server.strand.label != "wait"
+    hop_create_billing_record
   end
 
   label def create_billing_record
@@ -212,7 +105,7 @@ SQL
       resource_id: postgres_resource.id,
       resource_name: postgres_resource.server_name,
       billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
-      amount: vm.cores
+      amount: server.vm.cores
     )
 
     BillingRecord.create_with_id(
@@ -222,8 +115,6 @@ SQL
       billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
       amount: postgres_resource.target_storage_size_gib
     )
-
-    decr_initial_provisioning
 
     hop_wait
   end
@@ -241,9 +132,8 @@ SQL
 
     decr_destroy
 
-    if vm
-      vm.private_subnets.each { _1.incr_destroy }
-      vm.incr_destroy
+    unless server.nil?
+      server.incr_destroy
       nap 5
     end
 
