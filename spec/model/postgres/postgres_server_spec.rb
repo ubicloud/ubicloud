@@ -1,0 +1,70 @@
+# frozen_string_literal: true
+
+require_relative "../spec_helper"
+
+RSpec.describe PostgresServer do
+  subject(:postgres_server) {
+    described_class.new
+  }
+
+  let(:vm) {
+    instance_double(
+      Vm,
+      mem_gib: 8,
+      private_subnets: [
+        instance_double(
+          PrivateSubnet,
+          net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
+          net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+        )
+      ]
+    )
+  }
+
+  it "generates configure_hash" do
+    expect(postgres_server).to receive(:vm).and_return(vm).at_least(:once)
+
+    configure_hash = {
+      configs: {
+        listen_addresses: "'*'",
+        max_connections: "200",
+        superuser_reserved_connections: "3",
+        shared_buffers: "2048MB",
+        work_mem: "1MB",
+        maintenance_work_mem: "512MB",
+        max_parallel_workers: "4",
+        max_parallel_workers_per_gather: "2",
+        max_parallel_maintenance_workers: "2",
+        min_wal_size: "80MB",
+        max_wal_size: "5GB",
+        random_page_cost: "1.1",
+        effective_cache_size: "6144MB",
+        effective_io_concurrency: "200",
+        tcp_keepalives_count: "4",
+        tcp_keepalives_idle: "2",
+        tcp_keepalives_interval: "2",
+        ssl: "on",
+        ssl_cert_file: "'/var/lib/postgresql/16/main/server.crt'",
+        ssl_key_file: "'/var/lib/postgresql/16/main/server.key'",
+        log_timezone: "'UTC'",
+        log_directory: "'pg_log'",
+        log_filename: "'postgresql-%A.log'",
+        log_truncate_on_rotation: "true",
+        logging_collector: "on",
+        timezone: "'UTC'",
+        lc_messages: "'C.UTF-8'",
+        lc_monetary: "'C.UTF-8'",
+        lc_numeric: "'C.UTF-8'",
+        lc_time: "'C.UTF-8'"
+      },
+      private_subnets: [
+        {
+          net4: "172.0.0.0/26",
+          net6: "fdfa:b5aa:14a3:4a3d::/64"
+        }
+      ]
+    }
+
+    expect(postgres_server.configure_hash).to eq(configure_hash)
+  end
+end
