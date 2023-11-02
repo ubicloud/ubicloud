@@ -48,7 +48,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create(
         project_id: project_id, location: location, server_name: server_name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: SecureRandom.base64(15).gsub(/[+\/]/, "+" => "_", "/" => "-"),
+        superuser_password: SecureRandom.urlsafe_base64(15),
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
       postgres_resource.associate_with_project(project)
