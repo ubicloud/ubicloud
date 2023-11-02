@@ -62,7 +62,11 @@ class PostgresResource < Sequel::Model
   end
 
   def hostname
-    "#{server_name}.#{Config.postgres_service_hostname}"
+    if Config.postgres_service_hostname
+      "#{server_name}.#{Config.postgres_service_hostname}"
+    else
+      vm.ephemeral_net4.to_s
+    end
   end
 
   def connection_string
