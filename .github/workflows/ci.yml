@@ -43,19 +43,19 @@ jobs:
 
     - name: Run erb-formatter
       run: |
-        rake linter:erb_formatter
+        bundle exec rake linter:erb_formatter
         git diff --exit-code
 
     - name: Run rubocop
-      run: rake linter:rubocop
+      run: bundle exec rake linter:rubocop
 
     - name: Run brakeman
-      run: rake linter:brakeman
+      run: bundle exec rake linter:brakeman
 
     - name: Apply migrations
       env:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-      run: rake test_up
+      run: bundle exec rake test_up
 
     - name: Run controlplane tests
       env:
