@@ -83,6 +83,8 @@ class CloverWeb
 
     return error("Unregistered runner") unless runner
 
+    runner.update(workflow_job: job.except("steps"))
+
     case data["action"]
     when "in_progress"
       runner.update(
