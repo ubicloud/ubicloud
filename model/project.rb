@@ -9,6 +9,7 @@ class Project < Sequel::Model
   one_to_many :github_installations
 
   many_to_many :vms, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :minio_clusters, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :private_subnets, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
