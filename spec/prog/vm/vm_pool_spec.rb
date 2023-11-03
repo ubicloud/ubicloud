@@ -70,10 +70,12 @@ RSpec.describe Prog::Vm::VmPool do
     }
 
     it "increments vms' destroy semaphore and hops to wait_vms_destroy" do
-      vm = instance_double(Vm)
+      ps = instance_double(PrivateSubnet)
+      vm = instance_double(Vm, private_subnets: [ps])
       expect(nx).to receive(:vm_pool).and_return(pool)
       expect(pool).to receive(:vms).and_return([vm])
       expect(vm).to receive(:incr_destroy)
+      expect(ps).to receive(:incr_destroy)
       expect { nx.destroy }.to hop("wait_vms_destroy")
     end
   end

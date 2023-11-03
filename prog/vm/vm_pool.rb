@@ -56,6 +56,7 @@ class Prog::Vm::VmPool < Prog::Base
 
   label def destroy
     vm_pool.vms.each do |vm|
+      vm.private_subnets.each { _1.incr_destroy }
       vm.incr_destroy
     end
     hop_wait_vms_destroy
