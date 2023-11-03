@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 RSpec.describe BillingRate do
+  it "each rate has a unique ID" do
+    expect(described_class.rates.map { _1["id"] }.size).to eq(described_class.rates.map { _1["id"] }.uniq.size)
+  end
+
   describe ".line_item_description" do
     it "returns for VmCores" do
       expect(described_class.line_item_description("VmCores", "standard", 4)).to eq("standard-8 Virtual Machine")
