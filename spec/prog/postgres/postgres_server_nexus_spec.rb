@@ -16,6 +16,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       ),
       timeline: instance_double(
         PostgresTimeline,
+        id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
         generate_walg_config: "walg config"
       ),
       vm: instance_double(
@@ -174,10 +175,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.install_walg }.to nap(5)
     end
 
-    it "hops to refresh_certificates if install_wal-g command is succeeded" do
+    it "hops to initialize_empty_database if install_wal-g command is succeeded and if the server is primary" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
-      expect { nx.install_walg }.to hop("refresh_certificates")
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect { nx.install_walg }.to hop("initialize_empty_database")
+    end
+
+    it "hops to initialize_database_from_backup if install_wal-g command is succeeded and if the server is not primary" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect { nx.install_walg }.to hop("initialize_database_from_backup")
     end
 
     it "naps if script return unknown status" do
@@ -186,19 +195,71 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
+  describe "#initialize_empty_database" do
+    it "triggers initialize_empty_database if initialize_empty_database command is not sent yet or failed" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database' initialize_empty_database").twice
+
+      # NotStarted
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("NotStarted")
+      expect { nx.initialize_empty_database }.to nap(5)
+
+      # Failed
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("Failed")
+      expect { nx.initialize_empty_database }.to nap(5)
+    end
+
+    it "hops to refresh_certificates if initialize_empty_database command is succeeded" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("Succeeded")
+      expect { nx.initialize_empty_database }.to hop("refresh_certificates")
+    end
+
+    it "naps if script return unknown status" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("Unknown")
+      expect { nx.initialize_empty_database }.to nap(5)
+    end
+  end
+
+  describe "#initialize_database_from_backup" do
+    it "triggers initialize_database_from_backup if initialize_database_from_backup command is not sent yet or failed" do
+      expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now).twice
+      expect(postgres_server.timeline).to receive(:last_backup_label_before_target).and_return("backup-label").twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup backup-label' initialize_database_from_backup").twice
+
+      # NotStarted
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
+      expect { nx.initialize_database_from_backup }.to nap(5)
+
+      # Failed
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("Failed")
+      expect { nx.initialize_database_from_backup }.to nap(5)
+    end
+
+    it "hops to refresh_certificates if initialize_database_from_backup command is succeeded" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("Succeeded")
+      expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
+    end
+
+    it "naps if script return unknown status" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("Unknown")
+      expect { nx.initialize_database_from_backup }.to nap(5)
+    end
+  end
+
   describe "#refresh_certificates" do
     it "pushes certificates to vm and hops to configure during initial provisioning" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /var/lib/postgresql/16/main/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /var/lib/postgresql/16/main/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /var/lib/postgresql/16/main/server.key")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
 
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_certificates }.to hop("configure")
     end
 
     it "hops to wait at times other than the initial provisioning" do
-      expect(sshable).to receive(:cmd).at_least(:once)
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /var/lib/postgresql/16/main/server.crt > /dev/null", stdin: "server_cert")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /var/lib/postgresql/16/main/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /var/lib/postgresql/16/main/server.key")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
       expect { nx.refresh_certificates }.to hop("wait")
     end
   end
@@ -217,14 +278,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure }.to nap(5)
     end
 
-    it "hops to update_superuser_password if configure command is succeeded during the initial provisioning" do
+    it "hops to update_superuser_password if configure command is succeeded during the initial provisioning and if the server is primary" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(postgres_server).to receive(:primary?).and_return(true)
       expect { nx.configure }.to hop("update_superuser_password")
+    end
+
+    it "hops to wait_recovery_completion if configure command is succeeded during the initial provisioning and if the server is not primary" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect { nx.configure }.to hop("wait_recovery_completion")
     end
 
     it "hops to wait if configure command is succeeded at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
       expect { nx.configure }.to hop("wait")
     end
@@ -260,6 +332,38 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:decr_initial_provisioning)
       expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
       expect { nx.restart }.to hop("wait")
+    end
+  end
+
+  describe "#wait_recovery_completion" do
+    it "naps if it is still in recovery and wal replay is not paused" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("t")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_get_wal_replay_pause_state()'").and_return("not paused")
+      expect { nx.wait_recovery_completion }.to nap(5)
+    end
+
+    it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("t")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_get_wal_replay_pause_state()'").and_return("paused")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -c 'SELECT pg_wal_replay_resume()'")
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "375b1399-ec21-8eda-8859-2faee6ff6613"))
+      expect(postgres_server).to receive(:timeline_id=).with("375b1399-ec21-8eda-8859-2faee6ff6613")
+      expect(postgres_server).to receive(:timeline_access=).with("push")
+      expect(postgres_server).to receive(:save_changes)
+      expect { nx.wait_recovery_completion }.to hop("configure")
+    end
+
+    it "switches to new timeline if the recovery is completed" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("f")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "375b1399-ec21-8eda-8859-2faee6ff6613"))
+      expect(postgres_server).to receive(:timeline_id=).with("375b1399-ec21-8eda-8859-2faee6ff6613")
+      expect(postgres_server).to receive(:timeline_access=).with("push")
+      expect(postgres_server).to receive(:save_changes)
+      expect { nx.wait_recovery_completion }.to hop("configure")
     end
   end
 

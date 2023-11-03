@@ -44,6 +44,17 @@ PGHOST=/var/run/postgresql
     false
   end
 
+  def backups
+    blob_storage_client
+      .list_objects(bucket_name: ubid, folder_path: "basebackups_005/")
+      .select { _1.key.end_with?("backup_stop_sentinel.json") }
+  end
+
+  def last_backup_label_before_target(target:)
+    backup = backups.sort_by(&:last_modified).reverse.find { _1.last_modified < target }
+    backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
+  end
+
   def blob_storage
     @blob_storage ||= Project[Config.postgres_service_project_id].minio_clusters.first
   end

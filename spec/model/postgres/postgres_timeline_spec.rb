@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "aws-sdk-s3"
 
 RSpec.describe PostgresTimeline do
   subject(:postgres_timeline) { described_class.create_with_id(access_key: "dummy-access-key", secret_key: "dummy-secret-key") }
@@ -72,6 +73,30 @@ PGHOST=/var/run/postgresql
       expect(sshable).to receive(:cmd).and_return("InProgress")
       expect(postgres_timeline.need_backup?).to be(false)
     end
+  end
+
+  it "returns most recent backup before given target" do
+    stub_const("Backup", Struct.new(:last_modified))
+    most_recent_backup_time = Time.now
+    expect(postgres_timeline).to receive(:backups).and_return(
+      [
+        instance_double(Backup, key: "basebackups_005/0001_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 200),
+        instance_double(Backup, key: "basebackups_005/0002_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 100),
+        instance_double(Backup, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_recent_backup_time)
+      ]
+    )
+
+    expect(postgres_timeline.last_backup_label_before_target(target: most_recent_backup_time - 50)).to eq("0002")
+  end
+
+  it "returns list of backups" do
+    expect(Project).to receive(:[]).and_return(instance_double(Project, minio_clusters: [instance_double(MinioCluster, connection_strings: ["https://blob-endpoint"])]))
+
+    s3_client = Aws::S3::Client.new(stub_responses: true)
+    s3_client.stub_responses(:list_objects_v2, {is_truncated: false, contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file"}]})
+    expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+
+    expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
   end
 
   it "returns blob storage client from cache" do

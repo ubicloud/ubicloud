@@ -9,6 +9,7 @@ r "apt-get update"
 r "apt-get -y install postgresql-common"
 
 r "echo \"initdb_options = '--data-checksums'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
+r "echo \"create_main_cluster = 'off'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
 
 r "apt-get -y install postgresql-16"
 

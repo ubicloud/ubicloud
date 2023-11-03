@@ -1,0 +1,6 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+r "pg_createcluster 16 main"

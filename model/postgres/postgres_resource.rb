@@ -7,6 +7,7 @@ class PostgresResource < Sequel::Model
   many_to_one :project
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
   one_to_one :server, class: PostgresServer, key: :resource_id
+  one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
 
   include ResourceMethods
 
