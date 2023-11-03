@@ -89,7 +89,7 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] picked job 232323"}.to_json)
-      expect(runner.reload.job_id).to eq(232323)
+      expect(runner.reload.workflow_job["id"]).to eq(232323)
     end
 
     it "destroys runner when receive completed action" do

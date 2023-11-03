@@ -13,11 +13,11 @@ class GithubRunner < Sequel::Model
   semaphore :destroy
 
   def run_url
-    "http://github.com/#{repository_name}/actions/runs/#{run_id}"
+    "http://github.com/#{repository_name}/actions/runs/#{workflow_job["run_id"]}"
   end
 
   def job_url
-    "http://github.com/#{repository_name}/actions/runs/#{run_id}/job/#{job_id}"
+    "http://github.com/#{repository_name}/actions/runs/#{workflow_job["run_id"]}/job/#{workflow_job["id"]}"
   end
 
   def runner_url
