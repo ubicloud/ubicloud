@@ -14,6 +14,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         server_cert_key: "server_cert_key",
         superuser_password: "dummy-password"
       ),
+      timeline: instance_double(
+        PostgresTimeline,
+        generate_walg_config: "walg config"
+      ),
       vm: instance_double(
         Vm,
         id: "1c7d59ee-8d46-8374-9553-6144490ecec5",
@@ -40,10 +44,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         superuser_password: "dummy-password"
       )
 
+      postgres_timeline = PostgresTimeline.create_with_id
+
       postgres_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
 
-      st = described_class.assemble(resource_id: postgres_resource.id)
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
 
       postgres_server = PostgresServer[st.id]
       expect(postgres_server).not_to be_nil
@@ -144,14 +150,39 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.install_postgres }.to nap(5)
     end
 
-    it "hops to refresh_certificates if install_postgres command is succeeded" do
+    it "hops to install_walg if install_postgres command is succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Succeeded")
-      expect { nx.install_postgres }.to hop("refresh_certificates")
+      expect { nx.install_postgres }.to hop("install_walg")
     end
 
     it "naps if script return unknown status" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Unknown")
       expect { nx.install_postgres }.to nap(5)
+    end
+  end
+
+  describe "#install_walg" do
+    it "triggers install_wal-g if install_wal-g command is not sent yet or failed" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/install-wal-g c56a2315d3a63560f0227cb0bf902da8445963c7' install_wal-g").twice
+
+      # NotStarted
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("NotStarted")
+      expect { nx.install_walg }.to nap(5)
+
+      # Failed
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Failed")
+      expect { nx.install_walg }.to nap(5)
+    end
+
+    it "hops to refresh_certificates if install_wal-g command is succeeded" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+      expect { nx.install_walg }.to hop("refresh_certificates")
+    end
+
+    it "naps if script return unknown status" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Unknown")
+      expect { nx.install_walg }.to nap(5)
     end
   end
 

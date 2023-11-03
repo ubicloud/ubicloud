@@ -29,7 +29,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       )
       postgres_resource.associate_with_project(project)
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id)
+      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble.id
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: "push")
 
       Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
     end

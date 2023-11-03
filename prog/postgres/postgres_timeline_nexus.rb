@@ -12,7 +12,11 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   def self.assemble(parent_id: nil)
     DB.transaction do
-      postgres_timeline = PostgresTimeline.create_with_id(parent_id: parent_id)
+      postgres_timeline = PostgresTimeline.create_with_id(
+        parent_id: parent_id,
+        access_key: Config.postgres_service_blob_storage_access_key,
+        secret_key: Config.postgres_service_blob_storage_secret_key
+      )
       Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { _1.id = postgres_timeline.id }
     end
   end
@@ -27,11 +31,34 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   label def start
     blob_storage_client.create_bucket(bucket_name: postgres_timeline.ubid)
+    hop_wait_leader
+  end
+
+  label def wait_leader
+    nap 5 if postgres_timeline.leader.strand.label != "wait"
     hop_wait
   end
 
   label def wait
+    if postgres_timeline.need_backup?
+      hop_take_backup
+    end
+
     nap 30
+  end
+
+  label def take_backup
+    # It is possible that we started backup but crashed before saving the state
+    # to database. Since backup taking is an expensive operation, we check if
+    # backup is truly needed.
+    if postgres_timeline.need_backup?
+      postgres_timeline.leader.vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/take-backup' take_postgres_backup")
+    end
+
+    postgres_timeline.last_backup_started_at = Time.now
+    postgres_timeline.save_changes
+
+    hop_wait
   end
 
   label def destroy

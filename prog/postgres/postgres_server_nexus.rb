@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   semaphore :initial_provisioning, :refresh_certificates, :destroy
 
-  def self.assemble(resource_id:)
+  def self.assemble(resource_id:, timeline_id:, timeline_access:)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -33,6 +33,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       postgres_server = PostgresServer.create(
         resource_id: resource_id,
+        timeline_id: timeline_id,
+        timeline_access: timeline_access,
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
 
@@ -89,9 +91,21 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def install_postgres
     case vm.sshable.cmd("common/bin/daemonizer --check install_postgres")
     when "Succeeded"
-      hop_refresh_certificates
+      hop_install_walg
     when "Failed", "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install_postgres' install_postgres")
+    end
+
+    nap 5
+  end
+
+  label def install_walg
+    case vm.sshable.cmd("common/bin/daemonizer --check install_wal-g")
+    when "Succeeded"
+      refresh_walg_credentials
+      hop_refresh_certificates
+    when "Failed", "NotStarted"
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install-wal-g c56a2315d3a63560f0227cb0bf902da8445963c7' install_wal-g")
     end
 
     nap 5
@@ -176,5 +190,10 @@ SQL
     postgres_server.destroy
 
     pop "postgres server is deleted"
+  end
+
+  def refresh_walg_credentials
+    walg_config = postgres_server.timeline.generate_walg_config
+    vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
   end
 end

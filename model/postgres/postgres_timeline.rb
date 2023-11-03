@@ -5,6 +5,7 @@ require_relative "../../model"
 class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :parent, key: :parent_id, class: self
+  one_to_one :leader, class: PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
 
   include ResourceMethods
   include SemaphoreMethods
@@ -17,6 +18,30 @@ class PostgresTimeline < Sequel::Model
 
   def bucket_name
     ubid
+  end
+
+  def generate_walg_config
+    <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{ubid}
+AWS_ENDPOINT=#{blob_storage.connection_strings.first}
+AWS_ACCESS_KEY_ID=#{access_key}
+AWS_SECRET_ACCESS_KEY=#{secret_key}
+AWS_REGION: us-east-1
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+    WALG_CONF
+  end
+
+  def need_backup?
+    return false if last_ineffective_check_at && last_ineffective_check_at > Time.now - 60 * 20
+
+    status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
+    return true if ["Failed", "NotStarted"].include?(status)
+    return true if status == "Succeeded" && (last_backup_started_at.nil? || last_backup_started_at < Time.now - 60 * 60 * 24)
+
+    self.last_ineffective_check_at = Time.now
+    save_changes
+    false
   end
 
   def blob_storage
