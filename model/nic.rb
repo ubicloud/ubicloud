@@ -24,4 +24,10 @@ class Nic < Sequel::Model
   def ubid_to_tap_name
     ubid.to_s[0..9]
   end
+
+  def add_firewall_rules
+    rules = private_subnet.firewall_rules
+    rule_cmds = "sudo ip netns exec #{vm.inhost_name} bash -c 'sudo nft add element inet fw_table allowed_ipv4_ips { #{rules.map { _1.start_ip4.to_s }.join(",")} }'"
+    vm.vm_host.sshable.cmd(rule_cmds)
+  end
 end

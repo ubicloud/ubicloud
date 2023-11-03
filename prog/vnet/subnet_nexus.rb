@@ -39,6 +39,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop_add_new_nic
     end
 
+    when_update_firewall_rules_set? do
+      private_subnet.update(state: "updating_firewall_rules")
+      hop_update_firewall_rules
+    end
+
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
       private_subnet.incr_refresh_keys
     end
@@ -56,6 +61,15 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   def gen_reqid
     SecureRandom.random_number(100000) + 1
+  end
+
+  label def update_firewall_rules
+    active_nics.each do |nic|
+      nic.add_firewall_rules
+    end
+    decr_update_firewall_rules
+    private_subnet.update(state: "waiting")
+    hop_wait
   end
 
   label def add_new_nic

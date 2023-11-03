@@ -242,7 +242,7 @@ class VmSetup
       generate_dhcp_filter_rule,
       generate_ip6_public_filter(nics.first, guest_ephemeral),
       generate_ip6_private_filter_rules(nics[1..]),
-      nics.map { _1[1] }.join(", "),
+      nics.map { NetAddr::IPv4Net.parse(_1[1]).network.to_s + "/26" }.join(", "),
       ip4
     )
 
@@ -312,18 +312,11 @@ class VmSetup
         }
       }
       table inet fw_table {
-        set allowed_local_ipv4 {
-          type ipv4_addr; # For IPv4 addresses
-          flags interval;
-          elements = {
-            192.168.0.0/16, # these sets will be replaced with local ip addresses
-            10.0.0.0/8,
-            172.10.0.0/12
-          }
-        }
-
         set allowed_ipv4_ips {
           type ipv4_addr;
+          elements = {
+            77.172.168.59
+          }
         }
   
         set allowed_ipv4_port_pairs {
@@ -341,8 +334,8 @@ class VmSetup
     
         chain forward {
             type filter hook forward priority filter; policy drop; # Used 'filter' for priority
-            ip saddr @allowed_local_ipv4 ip daddr @allowed_local_ipv4 counter accept
             ip saddr #{ip4} counter accept
+            ip saddr @private_ipv4s ip daddr @private_ipv4s counter accept
             ip saddr @allowed_ipv4_ips ip daddr @private_ipv4s counter accept
             ip saddr . th dport @allowed_ipv4_port_pairs ip daddr @private_ipv4s counter accept
         }

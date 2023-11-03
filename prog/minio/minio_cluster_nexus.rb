@@ -83,7 +83,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     DB.transaction do
       decr_destroy
-      dns_zone.delete_record(record_name: minio_cluster.hostname)
+      dns_zone&.delete_record(record_name: minio_cluster.hostname)
       minio_cluster.dissociate_with_project(minio_cluster.projects.first)
       minio_cluster.pools.each(&:incr_destroy)
     end
