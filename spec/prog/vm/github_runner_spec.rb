@@ -300,7 +300,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "destroys runner if it does not pick a job in two minutes and not busy" do
-      expect(github_runner).to receive(:job_id).and_return(nil)
+      expect(github_runner).to receive(:workflow_job).and_return(nil)
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
       expect(client).to receive(:get).and_return({busy: false})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
@@ -311,7 +311,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
-      expect(github_runner).to receive(:job_id).and_return(nil)
+      expect(github_runner).to receive(:workflow_job).and_return(nil)
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 1 * 60)
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
@@ -335,7 +335,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "naps if the runner-script is running" do
-      expect(github_runner).to receive(:job_id).and_return(123)
+      expect(github_runner).to receive(:workflow_job).and_return({"id" => 123})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
 
       expect { nx.wait }.to nap(15)

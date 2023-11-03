@@ -229,7 +229,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     # If the runner doesn't pick a job in two minutes, destroy it
-    if github_runner.job_id.nil? && Time.now > github_runner.ready_at + 60 * 2
+    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 60 * 2
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
         github_runner.incr_destroy

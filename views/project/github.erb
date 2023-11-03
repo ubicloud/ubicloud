@@ -54,13 +54,13 @@
                     <%== render("components/vm_state_label", locals: { state: runner[:vm_state] }) %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%= runner[:head_branch] || "-" %>
+                    <%= runner.dig(:workflow_job, :head_branch) || "-" %>
                   </td>
                   <td class="whitespace-nowrap py-4 pl-3 pr-4 text-sm sm:pr-6">
-                    <% if runner[:job_id] %>
-                      <a href="<%= runner[:run_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= runner[:workflow_name] %></a>
+                    <% if (workflow_job = runner[:workflow_job]) %>
+                      <a href="<%= workflow_job[:run_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= workflow_job[:workflow_name] %></a>
                       -
-                      <a href="<%= runner[:job_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= runner[:job_name] %></a>
+                      <a href="<%= workflow_job[:job_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= workflow_job[:job_name] %></a>
                     <% else %>
                       Runner doesn't have a job yet
                     <% end %>

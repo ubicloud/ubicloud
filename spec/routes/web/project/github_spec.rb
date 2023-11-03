@@ -89,10 +89,12 @@ RSpec.describe Clover, "github" do
         label: "ubicloud",
         repository_name: "my-repo",
         runner_id: 2,
-        job_id: 123,
-        job_name: "test-job",
-        run_id: 456,
-        workflow_name: "test-workflow",
+        workflow_job: {
+          "id" => 123,
+          "name" => "test-job",
+          "run_id" => 456,
+          "workflow_name" => "test-workflow"
+        },
         vm_id: vm.id
       )
       Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
@@ -107,8 +109,8 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "creating"
       expect(page).to have_content "not_created"
       expect(page).to have_content "deleted"
-      expect(page).to have_link runner2.workflow_name, href: runner2.run_url
-      expect(page).to have_link runner2.job_name, href: runner2.job_url
+      expect(page).to have_link runner2.workflow_job["workflow_name"], href: runner2.run_url
+      expect(page).to have_link runner2.workflow_job["name"], href: runner2.job_url
     end
   end
 end

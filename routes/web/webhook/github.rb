@@ -87,15 +87,7 @@ class CloverWeb
 
     case data["action"]
     when "in_progress"
-      runner.update(
-        job_id: job.fetch("id"),
-        job_name: job.fetch("name"),
-        run_id: job.fetch("run_id"),
-        workflow_name: job.fetch("workflow_name"),
-        head_branch: job.fetch("head_branch")
-      )
-
-      success("GithubRunner[#{runner.ubid}] picked job #{runner.job_id}")
+      success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
     when "completed"
       runner.incr_destroy
 
