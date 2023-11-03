@@ -67,4 +67,14 @@ RSpec.describe PostgresServer do
 
     expect(postgres_server.configure_hash).to eq(configure_hash)
   end
+
+  it "generates configure_hash with additonal fields for primaries" do
+    postgres_server.timeline_access = "push"
+    expect(postgres_server).to receive(:vm).and_return(vm).at_least(:once)
+    expect(postgres_server.configure_hash[:configs]).to include(
+      archive_mode: "on",
+      archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'",
+      archive_timeout: "60"
+    )
+  end
 end

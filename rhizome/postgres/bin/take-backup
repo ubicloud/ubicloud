@@ -1,0 +1,6 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+r "sudo -u postgres wal-g backup-push /var/lib/postgresql/16/main --config /etc/postgresql/wal-g.env"

@@ -5,6 +5,7 @@ require_relative "../../model"
 class PostgresServer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :resource, class: PostgresResource, key: :resource_id
+  many_to_one :timeline, class: PostgresTimeline, key: :timeline_id
   one_to_one :vm, key: :id, primary_key: :vm_id
 
   include ResourceMethods
@@ -46,6 +47,12 @@ class PostgresServer < Sequel::Model
       lc_time: "'C.UTF-8'"
     }
 
+    if primary?
+      configs[:archive_mode] = "on"
+      configs[:archive_timeout] = "60"
+      configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+    end
+
     {
       configs: configs,
       private_subnets: vm.private_subnets.map {
@@ -55,5 +62,9 @@ class PostgresServer < Sequel::Model
         }
       }
     }
+  end
+
+  def primary?
+    timeline_access == "push"
   end
 end

@@ -42,13 +42,50 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   describe "#start" do
     it "creates bucket and hops" do
       expect(postgres_timeline.blob_storage_client).to receive(:create_bucket).with(bucket_name: postgres_timeline.ubid)
-      expect { nx.start }.to hop("wait")
+      expect { nx.start }.to hop("wait_leader")
+    end
+  end
+
+  describe "#wait_leader" do
+    it "naps if leader not ready" do
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "start")))
+      expect { nx.wait_leader }.to nap(5)
+    end
+
+    it "hops if leader is ready" do
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait")))
+      expect { nx.wait_leader }.to hop("wait")
     end
   end
 
   describe "#wait" do
-    it "naps" do
+    it "hops to take_backup if backup is needed" do
+      expect(postgres_timeline).to receive(:need_backup?).and_return(true)
+      expect { nx.wait }.to hop("take_backup")
+    end
+
+    it "naps if there is nothing to do" do
+      expect(postgres_timeline).to receive(:need_backup?).and_return(false)
       expect { nx.wait }.to nap(30)
+    end
+  end
+
+  describe "#take_backup" do
+    it "updates last_backup_started_at even if backup is not needed" do
+      expect(postgres_timeline).to receive(:need_backup?).and_return(false)
+      expect(postgres_timeline).to receive(:last_backup_started_at=)
+      expect(postgres_timeline).to receive(:save_changes)
+      expect { nx.take_backup }.to hop("wait")
+    end
+
+    it "takes backup if it is needed" do
+      expect(postgres_timeline).to receive(:need_backup?).and_return(true)
+      sshable = instance_double(Sshable)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/take-backup' take_postgres_backup")
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, sshable: sshable)))
+      expect(postgres_timeline).to receive(:last_backup_started_at=)
+      expect(postgres_timeline).to receive(:save_changes)
+      expect { nx.take_backup }.to hop("wait")
     end
   end
 
