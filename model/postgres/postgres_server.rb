@@ -51,6 +51,9 @@ class PostgresServer < Sequel::Model
       configs[:archive_mode] = "on"
       configs[:archive_timeout] = "60"
       configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+    else
+      configs[:recovery_target_time] = "'#{resource.restore_target}'"
+      configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
     end
 
     {

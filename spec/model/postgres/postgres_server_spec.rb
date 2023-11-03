@@ -21,9 +21,12 @@ RSpec.describe PostgresServer do
     )
   }
 
-  it "generates configure_hash" do
+  before do
     expect(postgres_server).to receive(:vm).and_return(vm).at_least(:once)
+  end
 
+  it "generates configure_hash" do
+    postgres_server.timeline_access = "push"
     configure_hash = {
       configs: {
         listen_addresses: "'*'",
@@ -55,7 +58,10 @@ RSpec.describe PostgresServer do
         lc_messages: "'C.UTF-8'",
         lc_monetary: "'C.UTF-8'",
         lc_numeric: "'C.UTF-8'",
-        lc_time: "'C.UTF-8'"
+        lc_time: "'C.UTF-8'",
+        archive_mode: "on",
+        archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'",
+        archive_timeout: "60"
       },
       private_subnets: [
         {
@@ -68,13 +74,12 @@ RSpec.describe PostgresServer do
     expect(postgres_server.configure_hash).to eq(configure_hash)
   end
 
-  it "generates configure_hash with additonal fields for primaries" do
-    postgres_server.timeline_access = "push"
-    expect(postgres_server).to receive(:vm).and_return(vm).at_least(:once)
+  it "generates configure_hash with additonal fields for restoring servers" do
+    postgres_server.timeline_access = "fetch"
+    expect(postgres_server).to receive(:resource).and_return(instance_double(PostgresResource, restore_target: "2023-10-25 00:00"))
     expect(postgres_server.configure_hash[:configs]).to include(
-      archive_mode: "on",
-      archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'",
-      archive_timeout: "60"
+      recovery_target_time: "'2023-10-25 00:00'",
+      restore_command: "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
     )
   end
 end

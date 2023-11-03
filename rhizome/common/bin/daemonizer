@@ -15,15 +15,31 @@ STATE_MAP = {
   "exited" => "Succeeded",
   "failed" => "Failed"
 }
+
 def get_state(name)
   state = r("systemctl show -p SubState --value #{name}.service").chomp
 
   STATE_MAP[state] || "Unknown"
 end
 
+def clean(name)
+  state = get_state(name)
+  case state
+  when "InProgress", "Unknown"
+    fail "Cannot clean unless the service is in Succeeded or Failed state!"
+  when "Succeeded"
+    r "sudo systemctl stop #{name}.service"
+  when "Failed"
+    r "sudo systemctl reset-failed #{name}.service"
+  end
+end
+
 if ARGV[0] == "--check"
   name = ARGV[1]
   print(get_state(name))
+elsif ARGV[0] == "--clean"
+  name = ARGV[1]
+  clean(name)
 else
   command = ARGV[0]
   name = ARGV[1]
@@ -38,10 +54,8 @@ else
     case state
     when "InProgress", "Unknown"
       break
-    when "Succeeded"
-      r "sudo systemctl stop #{name}.service"
-    when "Failed"
-      r "sudo systemctl reset-failed #{name}.service"
+    when "Succeeded", "Failed"
+      clean(name)
     end
 
     dir = Dir.pwd

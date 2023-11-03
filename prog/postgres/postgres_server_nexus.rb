@@ -103,9 +103,34 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     case vm.sshable.cmd("common/bin/daemonizer --check install_wal-g")
     when "Succeeded"
       refresh_walg_credentials
-      hop_refresh_certificates
+
+      hop_initialize_empty_database if postgres_server.primary?
+      hop_initialize_database_from_backup
     when "Failed", "NotStarted"
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install-wal-g c56a2315d3a63560f0227cb0bf902da8445963c7' install_wal-g")
+    end
+
+    nap 5
+  end
+
+  label def initialize_empty_database
+    case vm.sshable.cmd("common/bin/daemonizer --check initialize_empty_database")
+    when "Succeeded"
+      hop_refresh_certificates
+    when "Failed", "NotStarted"
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database' initialize_empty_database")
+    end
+
+    nap 5
+  end
+
+  label def initialize_database_from_backup
+    case vm.sshable.cmd("common/bin/daemonizer --check initialize_database_from_backup")
+    when "Succeeded"
+      hop_refresh_certificates
+    when "Failed", "NotStarted"
+      backup_label = postgres_server.timeline.last_backup_label_before_target(target: postgres_server.resource.restore_target)
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{backup_label}' initialize_database_from_backup")
     end
 
     nap 5
@@ -115,20 +140,23 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     vm.sshable.cmd("sudo -u postgres tee /var/lib/postgresql/16/main/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
     vm.sshable.cmd("sudo -u postgres tee /var/lib/postgresql/16/main/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
     vm.sshable.cmd("sudo -u postgres chmod 600 /var/lib/postgresql/16/main/server.key")
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
 
     when_initial_provisioning_set? do
       hop_configure
     end
 
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
     hop_wait
   end
 
   label def configure
     case vm.sshable.cmd("common/bin/daemonizer --check configure_postgres")
     when "Succeeded"
+      vm.sshable.cmd("common/bin/daemonizer --clean configure_postgres")
+
       when_initial_provisioning_set? do
-        hop_update_superuser_password
+        hop_update_superuser_password if postgres_server.primary?
+        hop_wait_recovery_completion
       end
 
       hop_wait
@@ -168,6 +196,32 @@ SQL
       decr_initial_provisioning
     end
     hop_wait
+  end
+
+  label def wait_recovery_completion
+    is_in_recovery = vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").chomp == "t"
+
+    if is_in_recovery
+      is_wal_replay_paused = vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_get_wal_replay_pause_state()'").chomp == "paused"
+      if is_wal_replay_paused
+        vm.sshable.cmd("sudo -u postgres psql -c 'SELECT pg_wal_replay_resume()'")
+        is_in_recovery = false
+      end
+    end
+
+    if !is_in_recovery
+      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(parent_id: postgres_server.timeline.id).id
+      postgres_server.timeline_id = timeline_id
+      postgres_server.timeline_access = "push"
+      postgres_server.save_changes
+
+      refresh_walg_credentials
+
+      decr_initial_provisioning
+      hop_configure
+    end
+
+    nap 5
   end
 
   label def wait

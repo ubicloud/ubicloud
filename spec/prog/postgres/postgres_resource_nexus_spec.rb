@@ -31,9 +31,10 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe ".assemble" do
+    let(:customer_project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+    let(:postgres_project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+
     it "validates input" do
-      customer_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
-      postgres_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
       expect {
@@ -55,6 +56,16 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect {
         described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.not_to raise_error
+    end
+
+    it "passes timeline of parent resource if parent is passed" do
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+
+      parent_id = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100).id
+      timeline_id = PostgresResource[parent_id].timeline.id
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: timeline_id, timeline_access: "fetch"))
+
+      described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name-2", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: parent_id, restore_target: Time.now)
     end
   end
 

@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(project_id:, location:, server_name:, target_vm_size:, target_storage_size_gib:)
+  def self.assemble(project_id:, location:, server_name:, target_vm_size:, target_storage_size_gib:, parent_id: nil, restore_target: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -22,15 +22,22 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     Validation.validate_location(location, project.provider)
 
     DB.transaction do
+      superuser_password, timeline_id, timeline_access = if parent_id.nil?
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble.id, "push"]
+      else
+        parent = PostgresResource[parent_id]
+        [parent.superuser_password, parent.timeline.id, "fetch"]
+      end
+
       postgres_resource = PostgresResource.create_with_id(
         project_id: project_id, location: location, server_name: server_name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: SecureRandom.urlsafe_base64(15)
+        superuser_password: superuser_password, parent_id: parent_id,
+        restore_target: restore_target
       )
       postgres_resource.associate_with_project(project)
 
-      timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble.id
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: "push")
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access)
 
       Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
     end
