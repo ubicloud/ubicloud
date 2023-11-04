@@ -21,6 +21,13 @@ FileUtils.cd fw_dir do
   r "curl -L3 -o #{CloudHypervisor.firmware.shellescape} https://github.com/fdr/edk2/releases/download/#{CloudHypervisor::FIRMWARE_VERSION}/CLOUDHV.fd"
 end
 
+# Err towards listing ('l') and not restarting services by default,
+# otherwise a stray keystroke when using "apt install" for unrelated
+# packages can restart systemd services that interrupt customers.
+File.write("/etc/needrestart/conf.d/82-clover-default-list.conf", <<CONF)
+$nrconf{restart} = 'l';
+CONF
+
 # Host-level network packet forwarding, otherwise packets cannot leave
 # the physical interface.
 File.write("/etc/sysctl.d/72-clover-forward-packets.conf", <<CONF)
