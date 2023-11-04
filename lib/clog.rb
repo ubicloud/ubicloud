@@ -3,6 +3,8 @@
 require "json"
 
 class Clog
+  @@mutex = Mutex.new
+
   def self.emit(message)
     out = if block_given?
       case v = yield
@@ -22,7 +24,10 @@ class Clog
       out[:thread] = thread_name
     end
 
-    puts JSON.generate(out)
+    raw = JSON.generate(out).freeze
+    @@mutex.synchronize do
+      puts raw
+    end
     nil
   end
 end
