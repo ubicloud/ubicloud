@@ -139,7 +139,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.15.4-x86_64-linux)
       racc (~> 1.4)
-    octokit (7.2.0)
+    octokit (8.0.0)
       faraday (>= 1, < 3)
       sawyer (~> 0.9)
     pagerduty (4.0.0)
