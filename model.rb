@@ -53,6 +53,10 @@ module ResourceMethods
     "#{self.class.name}[#{ubid}]"
   end
 
+  def inspect_values
+    @values.except(*self.class.redacted_columns).inspect
+  end
+
   NON_ARCHIVED_MODELS = ["DeletedRecord", "Semaphore"]
   def before_destroy
     model_name = self.class.name
@@ -99,6 +103,10 @@ module ResourceMethods
 
     def create_with_id(*, **)
       create(*, **) { _1.id = generate_uuid }
+    end
+
+    def redacted_columns
+      column_encryption_metadata.keys || []
     end
   end
 end

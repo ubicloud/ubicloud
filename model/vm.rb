@@ -17,6 +17,11 @@ class Vm < Sequel::Model
   dataset_module Authorization::Dataset
 
   include ResourceMethods
+
+  def self.redacted_columns
+    super + [:public_key]
+  end
+
   include SemaphoreMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy
 

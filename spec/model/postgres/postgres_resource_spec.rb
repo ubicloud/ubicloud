@@ -19,4 +19,11 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ephemeral_net4: "1.2.3.4")))
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4")
   end
+
+  it "hides sensitive and long columns" do
+    inspect_output = postgres_resource.inspect
+    postgres_resource.class.redacted_columns.each do |column_key|
+      expect(inspect_output).not_to include column_key.to_s
+    end
+  end
 end

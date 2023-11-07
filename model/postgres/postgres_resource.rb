@@ -9,6 +9,11 @@ class PostgresResource < Sequel::Model
   one_to_one :server, class: PostgresServer, key: :resource_id
 
   include ResourceMethods
+
+  def self.redacted_columns
+    super + [:root_cert_1, :root_cert_2, :server_cert]
+  end
+
   include SemaphoreMethods
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
