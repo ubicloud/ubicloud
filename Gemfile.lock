@@ -270,7 +270,7 @@ GEM
     syntax_tree (6.2.0)
       prettier_print (>= 1.2.0)
     tilt (2.3.0)
-    timeout (0.4.0)
+    timeout (0.4.1)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     unaccent (0.4.0)
