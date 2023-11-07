@@ -30,3 +30,13 @@ updates:
       docker-dependencies:
         patterns:
           - "*"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    allow:
+      - dependency-type: "all"
+    groups:
+      github-actions-dependencies:
+        patterns:
+          - "*"
