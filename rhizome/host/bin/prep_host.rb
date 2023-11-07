@@ -5,6 +5,17 @@ require_relative "../../common/lib/util"
 require_relative "../lib/cloud_hypervisor"
 require_relative "../lib/spdk_setup"
 require "fileutils"
+require "socket"
+
+unless (hostname = ARGV.shift)
+  puts "need host name as argument"
+  exit 1
+end
+
+original_hostname = Socket.gethostname
+
+safe_write_to_file("/etc/hosts", File.read("/etc/hosts").gsub(original_hostname, hostname))
+r "sudo hostnamectl set-hostname " + hostname
 
 ch_dir = CloudHypervisor::VERSION.dir
 FileUtils.mkdir_p(ch_dir)
