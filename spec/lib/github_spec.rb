@@ -22,7 +22,9 @@ RSpec.describe Github do
     app_client = instance_double(Octokit::Client)
     expect(described_class).to receive(:app_client).and_return(app_client)
     expect(app_client).to receive(:create_app_installation_access_token).with(installation_id).and_return({token: "abcdefg"})
-    expect(Octokit::Client).to receive(:new).with(access_token: "abcdefg")
+    installation_client = instance_double(Octokit::Client)
+    expect(installation_client).to receive(:auto_paginate=).with(true)
+    expect(Octokit::Client).to receive(:new).with(access_token: "abcdefg").and_return(installation_client)
 
     described_class.installation_client(installation_id)
   end

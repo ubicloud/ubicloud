@@ -25,7 +25,9 @@ module Github
   def self.installation_client(installation_id)
     access_token = app_client.create_app_installation_access_token(installation_id)[:token]
 
-    Octokit::Client.new(access_token: access_token)
+    client = Octokit::Client.new(access_token: access_token)
+    client.auto_paginate = true
+    client
   end
 
   def self.runner_labels
