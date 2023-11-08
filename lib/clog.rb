@@ -24,9 +24,9 @@ class Clog
       out[:thread] = thread_name
     end
 
-    raw = JSON.generate(out).freeze
+    raw = (JSON.generate(out) << "\n").freeze
     @@mutex.synchronize do
-      puts raw
+      $stdout.write(raw)
     end
     nil
   end
