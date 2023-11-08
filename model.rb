@@ -54,7 +54,14 @@ module ResourceMethods
   end
 
   def inspect_values
-    @values.except(*self.class.redacted_columns).inspect
+    @values.except(*self.class.redacted_columns).map do |k, v|
+      case v
+      when NetAddr::IPv4Net, NetAddr::IPv6Net
+        [k, v.to_s]
+      else
+        [k, v]
+      end
+    end.to_h.inspect
   end
 
   NON_ARCHIVED_MODELS = ["DeletedRecord", "Semaphore"]
