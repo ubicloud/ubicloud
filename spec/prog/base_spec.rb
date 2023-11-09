@@ -28,6 +28,13 @@ RSpec.describe Prog::Base do
     }.from(false).to(true)
   end
 
+  it "keeps children array state in sync even in consecutive-run mode" do
+    parent = Strand.create_with_id(prog: "Test", label: "reap_exit_no_children")
+    Strand.create_with_id(parent_id: parent.id, prog: "Test", label: "popper")
+    expect(parent).to receive(:unsynchronized_run).twice.and_call_original
+    parent.run(10)
+  end
+
   describe "#pop" do
     it "can reject unanticipated values" do
       expect {

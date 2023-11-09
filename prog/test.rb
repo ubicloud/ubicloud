@@ -53,6 +53,12 @@ class Prog::Test < Prog::Base
     donate
   end
 
+  label def reap_exit_no_children
+    reap
+    pop({msg: "reap_exit_no_children"}) if leaf?
+    donate
+  end
+
   label def napper
     nap(123)
   end
