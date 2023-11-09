@@ -179,9 +179,11 @@ end
   end
 
   def reap
-    deleted = strand.children.filter_map { |child|
-      next unless child.exitval
+    reapable = strand.children_dataset.where(
+      Sequel.lit("(lease IS NULL OR lease < now()) AND exitval IS NOT NULL")
+    ).all
 
+    reaped_ids = reapable.map do |child|
       # Clear any semaphores that get added to a exited Strand prog,
       # since incr is entitled to be run at *any time* (including
       # after exitval is set, though it doesn't do anything) and any
@@ -189,10 +191,12 @@ end
       # foreign_key
       Semaphore.where(strand_id: child.id).destroy
       child.destroy
-    }
+      child.id
+    end.freeze
 
-    strand.children.delete_if { deleted.include?(_1) }
-    deleted
+    strand.children.delete_if { reaped_ids.include?(_1) }
+
+    reapable
   end
 
   def leaf?
