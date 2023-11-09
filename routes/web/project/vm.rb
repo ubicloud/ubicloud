@@ -45,7 +45,9 @@ class CloverWeb
         # that users won't see higher price in their invoice compared
         # to price calculator and also we charge same amount no matter
         # the number of days in a given month.
-        @prices = BillingRate.rates.each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
+        types = ["VmCores", "IPAddress"].freeze
+        @prices = BillingRate.rates.filter { types.include?(_1["resource_type"]) }
+          .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
           hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
             hourly: br["unit_price"].to_f * 60,
             monthly: br["unit_price"].to_f * 60 * 672
