@@ -179,7 +179,8 @@ end
   end
 
   def reap
-    deleted = strand.children.filter_map { |child|
+    children = strand.children
+    deleted = children.filter_map { |child|
       next unless child.exitval
 
       # Clear any semaphores that get added to a exited Strand prog,
@@ -191,7 +192,7 @@ end
       child.destroy
     }
 
-    strand.children.delete_if { deleted.include?(_1) }
+    children.delete_if { deleted.include?(_1) }
     deleted
   end
 
