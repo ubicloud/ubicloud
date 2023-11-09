@@ -518,7 +518,7 @@ Requires=spdk.service
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
-ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor \
+ExecStart=/opt/cloud-hypervisor/v#{CloudHypervisor::VERSION}/cloud-hypervisor -v \
 --api-socket path=#{vp.ch_api_sock} \
 --kernel #{CloudHypervisor.firmware} \
 #{disk_params.join("\n")}
