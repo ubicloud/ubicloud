@@ -86,14 +86,15 @@ $(".delete-btn").on("click", function (event) {
     });
 });
 
-$(".copy-content").on("click", function (event) {
-    let content = $(this).data("content");
-    let message = $(this).data("message");
-    navigator.clipboard.writeText(content);
+$(".copieble-content").on("click", ".copy-button", function (event) {
+  let parent = $(this).parent();
+  let content = parent.data("content");
+  let message = parent.data("message");
+  navigator.clipboard.writeText(content);
 
-    if (message) {
-        notification(message);
-    }
+  if (message) {
+      notification(message);
+  }
 })
 
 $(".back-btn").on("click", function (event) {

@@ -66,14 +66,10 @@
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= nic[:name] %></td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <span class="copy-content cursor-pointer" data-content="<%= nic[:private_ipv4] %>" data-message="Copied Private IPv4">
-                <%= nic[:private_ipv4] %>
-              </span>
+              <%== render("components/copieble_content", locals: { content: nic[:private_ipv4], message: "Copied Private IPv4" }) %>
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <span class="copy-content cursor-pointer" data-content="<%= nic[:private_ipv6] %>" data-message="Copied Private IPv6">
-                <%= nic[:private_ipv6] %>
-              </span>
+              <%== render("components/copieble_content", locals: { content: nic[:private_ipv6], message: "Copied Private IPv6" }) %>
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
               <a
