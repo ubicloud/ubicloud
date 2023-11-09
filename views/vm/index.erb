@@ -51,13 +51,10 @@
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <% if vm[:ip4] %>
-                  <span class="copy-content cursor-pointer" data-content="<%= vm[:ip4] %>" data-message="Copied IPv4">
-                    <%= vm[:ip4] %>
-                  </span>
+                  <%== render("components/copieble_content", locals: { content: vm[:ip4], message: "Copied IPv4" }) %>
                 <% else %>
-                  <span class="copy-content cursor-pointer" data-content="<%= vm[:ip6] %>" data-message="Copied IPv6">
-                    <%= vm[:ip6] %>
-                  </span>
+                  <%== render("components/copieble_content", locals: { content: vm[:ip6], message: "Copied IPv6" }) %>
+
                 <% end %>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">

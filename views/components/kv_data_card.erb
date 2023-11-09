@@ -6,9 +6,7 @@
           <dt class="text-sm font-medium text-gray-500"><%= name %></dt>
           <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
             <% if opts && opts[:copieble] && value %>
-              <span class="copy-content cursor-pointer" data-content="<%= value %>" data-message="Copied <%= name %>">
-                <%= value %>
-              </span>
+              <%== render("components/copieble_content", locals: { content: value, message: "Copied #{name}" }) %>
             <% elsif opts && opts[:escape] == false %>
               <%== value %>
             <% else %>
