@@ -1,21 +1,12 @@
 # frozen_string_literal: true
 
 require_relative "spdk_path"
-require_relative "json_rpc_client"
 
 class SpdkRpc
-  def initialize(socket = SpdkPath.rpc_sock)
-    @socket = socket
-  end
-
-  def client
-    @client ||= JsonRpcClient.new(@socket)
-  end
-
-  def rpc_call(name, params)
-    client.call(name, params)
-  rescue JsonRpcError => e
-    raise SpdkRpcError.from_json_rpc_error(e)
+  def initialize(socket_path = SpdkPath.rpc_sock, timeout = 5, response_size_limit = 1048576)
+    @socket_path = socket_path
+    @timeout = timeout
+    @response_size_limit = response_size_limit
   end
 
   def bdev_aio_create(name, filename, block_size)
@@ -25,11 +16,11 @@ class SpdkRpc
       block_size: block_size,
       readonly: false
     }
-    rpc_call("bdev_aio_create", params)
+    call("bdev_aio_create", params)
   end
 
   def bdev_aio_delete(name, if_exists = true)
-    rpc_call("bdev_aio_delete", {name: name})
+    call("bdev_aio_delete", {name: name})
   rescue SpdkNotFound => e
     raise e unless if_exists
   end
@@ -40,11 +31,11 @@ class SpdkRpc
       base_bdev_name: base_bdev_name,
       key_name: key_name
     }
-    rpc_call("bdev_crypto_create", params)
+    call("bdev_crypto_create", params)
   end
 
   def bdev_crypto_delete(name, if_exists = true)
-    rpc_call("bdev_crypto_delete", {name: name})
+    call("bdev_crypto_delete", {name: name})
   rescue SpdkNotFound => e
     raise e unless if_exists
   end
@@ -54,11 +45,11 @@ class SpdkRpc
       ctrlr: name,
       dev_name: bdev
     }
-    rpc_call("vhost_create_blk_controller", params)
+    call("vhost_create_blk_controller", params)
   end
 
   def vhost_delete_controller(name, if_exists = true)
-    rpc_call("vhost_delete_controller", {ctrlr: name})
+    call("vhost_delete_controller", {ctrlr: name})
   rescue SpdkNotFound => e
     raise e unless if_exists
   end
@@ -70,13 +61,74 @@ class SpdkRpc
       key: key,
       key2: key2
     }
-    rpc_call("accel_crypto_key_create", params)
+    call("accel_crypto_key_create", params)
   end
 
   def accel_crypto_key_destroy(name, if_exists = true)
-    rpc_call("accel_crypto_key_destroy", {key_name: name})
+    call("accel_crypto_key_destroy", {key_name: name})
   rescue SpdkNotFound => e
     raise e unless if_exists
+  end
+
+  def call(method, params = {})
+    # id is used to correlate the context between request and response.
+    # See https://www.jsonrpc.org/specification
+    id = rand(10000000)
+
+    payload = {
+      jsonrpc: "2.0",
+      method: method,
+      params: params,
+      id: id
+    }
+
+    unix_socket = UNIXSocket.new(@socket_path)
+    unix_socket.write_nonblock(payload.to_json + "\n")
+
+    response = JSON.parse(read_response(unix_socket))
+    if (err = response["error"])
+      raise SpdkRpcError.build(err.fetch("message"), err.fetch("code"))
+    end
+
+    unix_socket.close
+
+    response["result"]
+  end
+
+  def read_response(socket)
+    buffer = +""
+    start_time = Time.now
+
+    begin
+      # Use IO.select to wait for data with a timeout. Subtract elapsed time,
+      # since this can be called multiple times.
+      elapsed_time = Time.now - start_time
+      ready_sockets = IO.select([socket], nil, nil, @timeout - elapsed_time)
+
+      # If ready_sockets is nil, it means timeout occurred
+      unless ready_sockets
+        socket.close
+        raise "The request timed out after #{@timeout} seconds."
+      end
+
+      # Loop until the whole JSON response is received.
+      loop do
+        buffer << socket.read_nonblock(4096)
+        break if valid_json?(buffer)
+        raise "Response size limit exceeded." if buffer.length > @response_size_limit
+      end
+    rescue IO::WaitReadable
+      retry
+    end
+
+    buffer
+  end
+
+  def valid_json?(json_str)
+    JSON.parse(json_str)
+    true
+  rescue JSON::ParserError
+    false
   end
 end
 
@@ -88,22 +140,22 @@ class SpdkRpcError < StandardError
     @code = code
   end
 
-  def self.from_json_rpc_error(e)
+  def self.build(message, code)
     # Check if we can return a specific subclass.
-    case e.code
+    case code
     when -Errno::EEXIST::Errno
-      return SpdkExists.new(e.message, e.code)
+      return SpdkExists.new(message, code)
     when -Errno::ENODEV::Errno
-      return SpdkNotFound.new(e.message, e.code)
+      return SpdkNotFound.new(message, code)
     when -32602 # SPDK_JSONRPC_ERROR_INVALID_PARAMS
-      if e.message.match?(/File exists|rc -17/)
-        return SpdkExists.new(e.message, e.code)
-      elsif e.message.match?(/No key object found|No such device/)
-        return SpdkNotFound.new(e.message, e.code)
+      if message.match?(/File exists|rc -17/)
+        return SpdkExists.new(message, code)
+      elsif message.match?(/No key object found|No such device/)
+        return SpdkNotFound.new(message, code)
       end
     end
 
-    SpdkRpcError.new(e.message, e.code)
+    SpdkRpcError.new(message, code)
   end
 end
 
