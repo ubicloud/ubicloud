@@ -241,7 +241,10 @@ class VmSetup
       generate_ip4_filter_rules(nics),
       generate_dhcp_filter_rule,
       generate_ip6_public_filter(nics.first, guest_ephemeral),
-      generate_ip6_private_filter_rules(nics[1..])
+      generate_ip6_private_filter_rules(nics[1..]),
+      generate_private_ip4_list(nics),
+      generate_private_ip6_list(nics),
+      guest_ephemeral
     )
 
     vp.write_nftables_conf(config)
@@ -255,8 +258,17 @@ class VmSetup
     private_ipv4 = NetAddr::IPv4Net.parse(private_ip).network.to_s
 
     <<~NAT4_RULES
-      ip daddr #{public_ipv4} ip daddr set #{private_ipv4} notrack
-      ip saddr #{private_ipv4} ip daddr != { 192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 } ip saddr set #{public_ipv4} notrack
+    table ip nat {
+      chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        ip daddr #{public_ipv4} dnat to #{private_ipv4}
+      }
+    
+      chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
+      }
+    }
     NAT4_RULES
   end
 
@@ -264,6 +276,18 @@ class VmSetup
     nics.map do |_, net4, _, mac|
       "ether saddr #{mac} ip saddr != #{net4} drop"
     end.join("\n")
+  end
+
+  def generate_private_ip4_list(nics)
+    nics.map do |_, net4, _, _|
+      NetAddr::IPv4Net.parse(net4).network.to_s + "/26"
+    end.join(",")
+  end
+
+  def generate_private_ip6_list(nics)
+    nics.map do |net6, _, _, _|
+      NetAddr::IPv6Net.parse(net6).network.to_s + "/64"
+    end.join(",")
   end
 
   def generate_dhcp_filter_rule
@@ -280,7 +304,7 @@ class VmSetup
     end.join("\n")
   end
 
-  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, dhcp_filter_rule, nic_public_ip6_filter, nic_priv_ip6_filters)
+  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, dhcp_filter_rule, nic_public_ip6_filter, nic_priv_ip6_filters, private_ipv4_list, private_ipv6_list, guest_ephemeral)
     <<~NFTABLES_CONF
       table ip raw {
         chain prerouting {
@@ -291,9 +315,6 @@ class VmSetup
   
           # avoid ip4 spoofing
           #{nic_priv_ip4_filters}
-  
-          # NAT4 rules
-          #{nat4_rules}
         }
         chain postrouting {
           type filter hook postrouting priority raw; policy accept;
@@ -307,6 +328,46 @@ class VmSetup
           # avoid ip6 spoofing
           #{nic_public_ip6_filter}
           #{nic_priv_ip6_filters}
+        }
+      }
+      # NAT4 rules
+      #{nat4_rules}
+      table inet fw_table {
+        set allowed_ipv4_ips {
+          type ipv4_addr;
+          flags interval;
+        }
+      
+        set allowed_ipv6_ips {
+          type ipv6_addr;
+          flags interval;
+        }
+
+        set private_ipv4_ips {
+          type ipv4_addr;
+          flags interval;
+          elements = {
+            #{private_ipv4_list}
+          }
+        }
+
+        set private_ipv6_ips {
+          type ipv6_addr
+          flags interval
+          elements = { #{private_ipv6_list} }
+        }
+
+        chain forward_ingress {
+          type filter hook forward priority filter; policy drop;
+          tcp dport 22 ct state new,established,related accept
+          ip saddr @private_ipv4_ips ct state established,related,new counter accept
+          ip daddr @private_ipv4_ips ct state established,related counter accept
+          ip6 saddr @private_ipv6_ips ct state established,related,new counter accept
+          ip6 daddr @private_ipv6_ips ct state established,related counter accept
+          ip6 saddr #{guest_ephemeral} ct state established,related,new counter accept
+          ip6 daddr #{guest_ephemeral} ct state established,related counter accept
+          ip saddr @allowed_ipv4_ips ip daddr @private_ipv4_ips counter accept
+          ip6 saddr @allowed_ipv6_ips ip6 daddr #{guest_ephemeral} counter accept
         }
       }
     NFTABLES_CONF

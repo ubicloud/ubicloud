@@ -260,11 +260,6 @@ table ip raw {
 
     # avoid ip4 spoofing
     ether saddr 3e:bd:a5:96:f7:b9 ip saddr != 192.168.5.50/32 drop
-
-    # NAT4 rules
-    ip daddr 123.123.123.123 ip daddr set 192.168.5.50 notrack
-ip saddr 192.168.5.50 ip daddr != { 192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8 } ip saddr set 123.123.123.123 notrack
-
   }
   chain postrouting {
     type filter hook postrouting priority raw; policy accept;
@@ -278,6 +273,57 @@ table ip6 raw {
     # avoid ip6 spoofing
     ether saddr 3e:bd:a5:96:f7:b9 ip6 saddr != {fddf:53d2:4c89:2305:46a0::/80,fd48:666c:a296:ce4b:2cc6::/79,fe80::3cbd:a5ff:fe96:f7b9} drop
     
+  }
+}
+# NAT4 rules
+table ip nat {
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+    ip daddr 123.123.123.123 dnat to 192.168.5.50
+  }
+
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+    ip saddr 192.168.5.50 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 123.123.123.123
+  }
+}
+
+table inet fw_table {
+  set allowed_ipv4_ips {
+    type ipv4_addr;
+    flags interval;
+  }
+
+  set allowed_ipv6_ips {
+    type ipv6_addr;
+    flags interval;
+  }
+
+  set private_ipv4_ips {
+    type ipv4_addr;
+    flags interval;
+    elements = {
+      192.168.5.50/26
+    }
+  }
+
+  set private_ipv6_ips {
+    type ipv6_addr
+    flags interval
+    elements = { fd48:666c:a296:ce4b:2cc6::/64 }
+  }
+
+  chain forward_ingress {
+    type filter hook forward priority filter; policy drop;
+    tcp dport 22 ct state new,established,related accept
+    ip saddr @private_ipv4_ips ct state established,related,new counter accept
+    ip daddr @private_ipv4_ips ct state established,related counter accept
+    ip6 saddr @private_ipv6_ips ct state established,related,new counter accept
+    ip6 daddr @private_ipv6_ips ct state established,related counter accept
+    ip6 saddr fddf:53d2:4c89:2305:46a0::/80 ct state established,related,new counter accept
+    ip6 daddr fddf:53d2:4c89:2305:46a0::/80 ct state established,related counter accept
+    ip saddr @allowed_ipv4_ips ip daddr @private_ipv4_ips counter accept
+    ip6 saddr @allowed_ipv6_ips ip6 daddr fddf:53d2:4c89:2305:46a0::/80 counter accept
   }
 }
 NFTABLES_CONF
