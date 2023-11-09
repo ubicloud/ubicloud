@@ -2,7 +2,7 @@
 
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
-  semaphore :destroy, :refresh_keys, :add_new_nic
+  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
 
   def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil)
     unless (project = Project[project_id])
@@ -20,6 +20,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
       ps.associate_with_project(project)
+      FirewallRule.create_with_id(
+        ip: "0.0.0.0/0",
+        private_subnet_id: ps.id
+      )
+      FirewallRule.create_with_id(
+        ip: "::/0",
+        private_subnet_id: ps.id
+      )
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
   end
@@ -39,6 +47,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop_add_new_nic
     end
 
+    when_update_firewall_rules_set? do
+      private_subnet.update(state: "updating_firewall_rules")
+      hop_update_firewall_rules
+    end
+
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
       private_subnet.incr_refresh_keys
     end
@@ -56,6 +69,25 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   def gen_reqid
     SecureRandom.random_number(100000) + 1
+  end
+
+  label def update_firewall_rules
+    decr_update_firewall_rules
+    private_subnet.vms.each do |vm|
+      bud Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules
+    end
+
+    hop_wait_fw_rules
+  end
+
+  label def wait_fw_rules
+    reap
+    if leaf?
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+
+    donate
   end
 
   label def add_new_nic
@@ -126,6 +158,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     if private_subnet.nics.empty?
       DB.transaction do
+        private_subnet.firewall_rules.map(&:destroy)
         private_subnet.projects.each { |p| private_subnet.dissociate_with_project(p) }
         private_subnet.destroy
       end

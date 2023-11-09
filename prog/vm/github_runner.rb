@@ -71,6 +71,10 @@ class Prog::Vm::GithubRunner < Prog::Base
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
       enable_ip4: true
     )
+
+    ps = vm_st.subject.private_subnets.first
+    ps.firewall_rules.map(&:destroy)
+    ps.incr_update_firewall_rules
     Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
     vm_st.subject
   end

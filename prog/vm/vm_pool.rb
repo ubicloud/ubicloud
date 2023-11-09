@@ -29,7 +29,7 @@ class Prog::Vm::VmPool < Prog::Base
   end
 
   label def create_new_vm
-    Prog::Vm::Nexus.assemble_with_sshable(
+    st = Prog::Vm::Nexus.assemble_with_sshable(
       "runner",
       Config.vm_pool_project_id,
       size: vm_pool.vm_size,
@@ -39,6 +39,10 @@ class Prog::Vm::VmPool < Prog::Base
       enable_ip4: true,
       pool_id: vm_pool.id
     )
+
+    ps = st.subject.private_subnets.first
+    ps.firewall_rules.map(&:destroy)
+    ps.incr_update_firewall_rules
 
     hop_wait
   end

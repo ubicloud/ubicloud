@@ -74,6 +74,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
+      expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
@@ -87,6 +88,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
+      expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")

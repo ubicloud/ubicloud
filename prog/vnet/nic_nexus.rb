@@ -30,6 +30,7 @@ class Prog::Vnet::NicNexus < Prog::Base
   label def wait_vm
     nap 60 unless nic.vm
     when_setup_nic_set? do
+      nic.private_subnet.incr_update_firewall_rules
       hop_add_subnet_addr
     end
     nap 1
@@ -75,6 +76,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def repopulate
     bud Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
+    nic.private_subnet.incr_update_firewall_rules
     hop_wait_repopulate
   end
 
