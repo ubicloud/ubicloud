@@ -50,7 +50,7 @@ module Validation
 
   def self.validate_vm_size(size)
     unless (vm_size = Option::VmSizes.find { _1.name == size })
-      fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available providers: #{Option::VmSizes.map(&:name)}"})
+      fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{Option::VmSizes.map(&:name)}"})
     end
     vm_size
   end
@@ -65,5 +65,12 @@ module Validation
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
       fail ValidationFailed.new({boot_disk_index: "Boot disk index must be between 0 and #{storage_volumes.length - 1}"})
     end
+  end
+
+  def self.validate_postgres_size(size)
+    unless (postgres_size = Option::PostgresSizes.find { _1.name == size })
+      fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{Option::PostgresSizes.map(&:name)}"})
+    end
+    postgres_size
   end
 end

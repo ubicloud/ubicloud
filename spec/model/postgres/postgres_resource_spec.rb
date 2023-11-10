@@ -31,4 +31,19 @@ RSpec.describe PostgresResource do
       expect(inspect_output).not_to include column_key.to_s
     end
   end
+
+  it "returns running as display state if the database is ready" do
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+    expect(postgres_resource.display_state).to eq("running")
+  end
+
+  it "returns deleting as display state if the database is being destroyed" do
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).twice
+    expect(postgres_resource.display_state).to eq("deleting")
+  end
+
+  it "returns creating as display state for other cases" do
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server")).twice
+    expect(postgres_resource.display_state).to eq("creating")
+  end
 end

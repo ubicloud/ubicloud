@@ -1,0 +1,125 @@
+<% @page_title = "Create PostgreSQL Database" %>
+
+<%== render("components/billing_warning") %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: "#{@project_data[:path]}/postgres",
+      parts: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
+        %w[Create #]
+      ]
+    }
+  ) %>
+  <%== render("components/page_header", locals: { title: "Create PostgreSQL Database" }) %>
+</div>
+
+<div class="grid gap-6">
+  <form action="<%= "#{@project_data[:path]}/postgres" %>" method="POST">
+    <%== csrf_tag("#{@project_data[:path]}/postgres") %>
+    <!-- Create Card -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your PostgreSQL database.</p>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "name",
+                    label: "Name",
+                    attributes: {
+                      required: true,
+                      placeholder: "Enter name"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <% locations = Option
+                    .locations_for_provider(@project_data.dig(:provider, :name))
+                    .map { |l| [l.name, l.display_name, @prices[l.name].to_json] }
+                %>
+                <%== render(
+                  "components/form/radio_small_cards",
+                  locals: {
+                    name: "location",
+                    label: "Location",
+                    options: locations,
+                    selected: locations.first[0],
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-full">
+                <div class="space-y-2">
+                  <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size (Dedicated CPU)</label>
+                  <fieldset class="radio-small-cards" id="size-radios">
+                    <legend class="sr-only">Server size</legend>
+                    <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                      <% Option::PostgresSizes.each do |size| %>
+                        <label class="size-<%= size.name %>">
+                          <input
+                            type="radio"
+                            name="size"
+                            value="<%= size.name %>"
+                            class="peer sr-only location-based-price"
+                            data-resource-type="[&quot;PostgresCores&quot;, &quot;PostgresStorage&quot;]"
+                            data-resource-family="[&quot;<%= size.family %>&quot;, &quot;<%= size.family %>&quot;]"
+                            data-amount="[<%= size.vcpu / 2 %>, <%= size.storage_size_gib %>]"
+                            required
+                            <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
+                          >
+                          <span
+                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
+                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
+                          >
+                            <span class="flex flex-col">
+                              <span class="text-md font-semibold"><%= size.display_name %></span>
+                              <span class="text-sm opacity-80">
+                                <span class="block sm:inline">
+                                  <%= size.vcpu %>
+                                  vCPUs /
+                                  <%= size.memory %>
+                                  GB
+                                </span>
+                                <span class="hidden sm:mx-0.5 sm:inline" aria-hidden="true">&middot;</span>
+                                <span class="block sm:inline"><%= size.storage_size_gib %>
+                                  GB disk</span>
+                              </span>
+                            </span>
+                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
+                              <span class="font-medium size-<%= size.name %>-monthly-price">-</span>
+                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                            </span>
+                          </span>
+                        </label>
+                      <% end %>
+                    </div>
+                  </fieldset>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="/postgres" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>

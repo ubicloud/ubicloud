@@ -1,0 +1,67 @@
+<% @page_title = "PostgreSQL Databases" %>
+
+<% if @postgres_databases.count > 0 %>
+  <div class="space-y-1">
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: @project_data[:path],
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
+      }
+    ) %>
+
+    <%== render(
+      "components/page_header",
+      locals: {
+        title: "PostgreSQL Databases",
+        right_items: @project_permissions.include?("Postgres:create") ? [
+          "<a href='postgres/create' class='inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600'>Create PostgreSQL Database</a>"
+        ] : []
+      }
+    ) %>
+  </div>
+
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+              <span class="sr-only">Show</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @postgres_databases.each do |pg| %>
+            <tr>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= pg[:name] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= pg[:location] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%== render("components/pg_state_label", locals: { state: pg[:state] }) %>
+              </td>
+              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                <a href="<%= @project_data[:path] %><%= pg[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% else %>
+  <%== render(
+    "components/empty_state",
+    locals: {
+      icon: "hero-circle-stack",
+      title: "No PostgreSQL databases",
+      description: "You don't have permission to create PostgreSQL database."
+    }.merge(@project_permissions.include?("Postgres:create") ? {
+      description: "Get started by creating a new PostgreSQL database.",
+      button_link: "#{@project_data[:path]}/postgres/create",
+      button_title: "New PostgreSQL Database"
+    } : {})
+  ) %>
+<% end %>

@@ -34,6 +34,17 @@
                 icon: "hero-globe-alt"
               }
             ) %>
+            <% if @project.get_enable_postgres %>
+              <%== render(
+                "layouts/sidebar/item",
+                locals: {
+                  name: "PostgreSQL",
+                  url: "#{@project_data[:path]}/postgres",
+                  is_active: request.path.start_with?("#{@project_data[:path]}/postgres"),
+                  icon: "hero-circle-stack"
+                }
+              ) %>
+            <% end %>
           <% else %>
             <%== render(
               "layouts/sidebar/item",

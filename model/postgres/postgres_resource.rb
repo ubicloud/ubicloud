@@ -9,6 +9,8 @@ class PostgresResource < Sequel::Model
   one_to_one :server, class: PostgresServer, key: :resource_id
   one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
 
+  dataset_module Authorization::Dataset
+
   include ResourceMethods
 
   def self.redacted_columns
@@ -28,8 +30,18 @@ class PostgresResource < Sequel::Model
     enc.column :server_cert_key
   end
 
+  def path
+    "/location/#{location}/postgres/#{server_name}"
+  end
+
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{location}/postgres/#{server_name}"
+  end
+
+  def display_state
+    return "running" if ["wait", "refresh_certificates"].include?(strand.label)
+    return "deleting" if destroy_set? || strand.label == "destroy"
+    "creating"
   end
 
   def hostname
