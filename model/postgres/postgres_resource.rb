@@ -36,11 +36,11 @@ class PostgresResource < Sequel::Model
     if Config.postgres_service_hostname
       "#{server_name}.#{Config.postgres_service_hostname}"
     else
-      server.vm.ephemeral_net4.to_s
+      server&.vm&.ephemeral_net4&.to_s
     end
   end
 
   def connection_string
-    URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s
+    URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s if hostname
   end
 end
