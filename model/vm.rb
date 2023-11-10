@@ -83,7 +83,7 @@ class Vm < Sequel::Model
     threads_per_core, r = vm_host.total_cpus.divmod vm_host.total_cores
     fail "BUG" unless r.zero?
 
-    total_dies_per_package, r = vm_host.total_nodes.divmod vm_host.total_sockets
+    total_dies_per_package, r = vm_host.total_dies.divmod vm_host.total_sockets
     fail "BUG" unless r.zero?
 
     total_packages = vm_host.total_sockets
