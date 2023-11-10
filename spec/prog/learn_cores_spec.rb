@@ -12,84 +12,36 @@ RSpec.describe Prog::LearnCores do
    "cpus": [
       {
          "cpu": 0,
-         "node": 0,
          "socket": 0,
-         "core": 0,
-         "l1d:l1i:l2:l3": "0:0:0:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.0060
+         "core": 0
       },{
          "cpu": 1,
-         "node": 0,
          "socket": 0,
-         "core": 0,
-         "l1d:l1i:l2:l3": "1:1:1:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.1600
+         "core": 0
       },{
          "cpu": 2,
-         "node": 1,
          "socket": 0,
-         "core": 1,
-         "l1d:l1i:l2:l3": "2:2:2:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.0340
+         "core": 1
       },{
          "cpu": 3,
-         "node": 1,
          "socket": 0,
-         "core": 1,
-         "l1d:l1i:l2:l3": "3:3:3:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.1680
+         "core": 1
       },{
          "cpu": 4,
-         "node": 2,
          "socket": 1,
-         "core": 0,
-         "l1d:l1i:l2:l3": "0:0:0:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.0060
+         "core": 0
       },{
          "cpu": 5,
-         "node": 2,
          "socket": 1,
-         "core": 0,
-         "l1d:l1i:l2:l3": "1:1:1:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.1600
+         "core": 0
       },{
          "cpu": 6,
-         "node": 3,
          "socket": 1,
-         "core": 1,
-         "l1d:l1i:l2:l3": "2:2:2:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.0340
+         "core": 1
       },{
          "cpu": 7,
-         "node": 3,
          "socket": 1,
-         "core": 1,
-         "l1d:l1i:l2:l3": "3:3:3:0",
-         "online": true,
-         "maxmhz": 4500.0000,
-         "minmhz": 800.0000,
-         "mhz": 800.1680
+         "core": 1
       }
    ]
 }
@@ -108,7 +60,7 @@ JSON
       ).and_return("4")
 
       expect(lc).to receive(:sshable).and_return(sshable).twice
-      expect { lc.start }.to exit({total_sockets: 2, total_cores: 4, total_dies: 4, total_nodes: 4, total_cpus: 8})
+      expect { lc.start }.to exit({total_sockets: 2, total_cores: 4, total_dies: 4, total_cpus: 8})
     end
   end
 end
