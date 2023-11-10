@@ -144,5 +144,15 @@ RSpec.describe Validation do
         end
       end
     end
+
+    describe "#validate_postgres_size" do
+      it "valid postgres size" do
+        expect(described_class.validate_postgres_size("standard-2").name).to eq("standard-2")
+      end
+
+      it "invalid postgres size" do
+        expect { described_class.validate_postgres_size("standard-3") }.to raise_error described_class::ValidationFailed
+      end
+    end
   end
 end
