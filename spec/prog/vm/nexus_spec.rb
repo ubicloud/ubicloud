@@ -203,7 +203,7 @@ RSpec.describe Prog::Vm::Nexus do
 
       sshable = instance_spy(Sshable)
       vmh = instance_double(VmHost, sshable: sshable,
-        total_cpus: 80, total_cores: 80, total_nodes: 1, total_sockets: 1, ndp_needed: false)
+        total_cpus: 80, total_cores: 80, total_sockets: 1, ndp_needed: false)
       expect(vm).to receive(:vm_host).and_return(vmh)
 
       expect(sshable).to receive(:cmd).with(/echo (.|\n)* \| sudo -u vm[0-9a-z]+ tee/) do
@@ -328,7 +328,6 @@ RSpec.describe Prog::Vm::Nexus do
       args = {allocation_state: "accepting",
               location: "somewhere-normal",
               total_sockets: 1,
-              total_nodes: 4,
               total_cores: 80,
               total_cpus: 80,
               total_mem_gib: 640,
