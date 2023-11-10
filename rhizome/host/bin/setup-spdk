@@ -1,82 +1,26 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../../common/lib/arch"
 require_relative "../../common/lib/util"
 require_relative "../lib/spdk_path"
+require_relative "../lib/spdk_setup"
 require "fileutils"
 
-# spdk dependencies
-r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev"
-
-# spdk binaries
-FileUtils.cd SpdkPath.install_prefix do
-  if Arch.arm64?
-    r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-arm64.tar.gz"
-  elsif Arch.x64?
-    r "curl -L3 -o /tmp/spdk.tar.gz https://github.com/ubicloud/spdk/releases/download/7adbcfb/spdk-7adbcfb.tar.gz"
-  else
-    fail "BUG: unexpected architecture"
-  end
-
-  r "tar -xzf /tmp/spdk.tar.gz"
+unless (verb = ARGV.shift)
+  puts "expected verb as argument"
+  exit 1
 end
 
-q_user = SpdkPath.user.shellescape
-q_hugepages_dir = SpdkPath.hugepages_dir.shellescape
+spdk_setup = SpdkSetup.new
 
-begin
-  r "adduser #{q_user} --disabled-password --gecos '' --home #{SpdkPath.home.shellescape}"
-rescue CommandFail => ex
-  raise unless /adduser: The user `.*' already exists\./.match?(ex.message)
+case verb
+when "install"
+  spdk_setup.install_package
+  spdk_setup.create_hugepages_mount
+  spdk_setup.create_service
+  spdk_setup.enable_services
+when "start"
+  spdk_setup.start_services
+when "verify"
+  spdk_setup.verify_spdk
 end
-
-r "sudo --user=#{q_user} mkdir -p #{q_hugepages_dir}"
-
-# Directory to put vhost sockets.
-FileUtils.mkdir_p(SpdkPath.vhost_dir)
-FileUtils.chown SpdkPath.user, SpdkPath.user, SpdkPath.vhost_dir
-
-File.write("/lib/systemd/system/home-spdk-hugepages.mount", <<SPDK_HUGEPAGES_MOUNT
-[Unit]
-Description=SPDK hugepages mount
-
-[Mount]
-What=hugetlbfs
-Where=/home/spdk/hugepages
-Type=hugetlbfs
-Options=uid=spdk,size=1G
-
-[Install]
-WantedBy=spdk.service
-SPDK_HUGEPAGES_MOUNT
-)
-
-File.write("/lib/systemd/system/spdk.service", <<SPDK_SERVICE
-[Unit]
-Description=Block Storage Service
-Requires=home-spdk-hugepages.mount
-[Service]
-Type=simple
-Environment="XDG_RUNTIME_DIR=#{SpdkPath.home.shellescape}"
-ExecStart=#{SpdkPath.bin("vhost")} -S #{SpdkPath.vhost_dir.shellescape} \
---huge-dir #{q_hugepages_dir} \
---iova-mode va \
---rpc-socket #{SpdkPath.rpc_sock.shellescape} \
---cpumask [0] \
---disable-cpumask-locks
-ExecReload=/bin/kill -HUP $MAINPID
-LimitMEMLOCK=8400113664
-PrivateDevices=yes
-PrivateTmp=yes
-ProtectKernelTunables=yes
-ProtectControlGroups=yes
-ProtectHome=no
-NoNewPrivileges=yes
-User=spdk
-Group=spdk
-[Install]
-WantedBy=multi-user.target
-Alias=spdk.service
-SPDK_SERVICE
-)

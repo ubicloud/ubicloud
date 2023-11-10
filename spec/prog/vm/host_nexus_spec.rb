@@ -193,7 +193,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#setup_spdk" do
     it "buds the spdk program" do
-      expect(nx).to receive(:bud).with(Prog::SetupSpdk)
+      expect(nx).to receive(:bud).with(Prog::Storage::SetupSpdk)
       expect { nx.setup_spdk }.to hop("wait_setup_spdk")
     end
   end
@@ -283,13 +283,8 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
-      expect(sshable).to receive(:cmd).with("systemctl is-active spdk.service").and_return("active\n")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify")
       expect { nx.verify_spdk }.to hop("verify_hugepages")
-    end
-
-    it "verify_spdk fails if spdk not started" do
-      expect(sshable).to receive(:cmd).with("systemctl is-active spdk.service").and_return("inactive\n")
-      expect { nx.verify_spdk }.to raise_error RuntimeError, "SPDK failed to start"
     end
 
     it "start_vms starts vms & hops to wait" do
