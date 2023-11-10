@@ -9,13 +9,13 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    actionview (7.1.1)
-      activesupport (= 7.1.1)
+    actionview (7.1.2)
+      activesupport (= 7.1.2)
       builder (~> 3.1)
       erubi (~> 1.11)
       rails-dom-testing (~> 2.2)
       rails-html-sanitizer (~> 1.6)
-    activesupport (7.1.1)
+    activesupport (7.1.2)
       base64
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
@@ -32,7 +32,7 @@ GEM
       ffi-compiler (~> 1.0)
     ast (2.4.2)
     aws-eventstream (1.2.0)
-    aws-partitions (1.847.0)
+    aws-partitions (1.848.0)
     aws-sdk-core (3.186.0)
       aws-eventstream (~> 1, >= 1.0.2)
       aws-partitions (~> 1, >= 1.651.0)
