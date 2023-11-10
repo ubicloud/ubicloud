@@ -5,7 +5,7 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Vm::HostNexus do
   subject(:nx) { described_class.new(st) }
 
-  let(:st) { Strand.new }
+  let(:st) { described_class.assemble("192.168.0.1") }
   let(:hetzner_ips) {
     [
       ["127.0.0.1", "127.0.0.1", false],
@@ -193,7 +193,12 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#setup_spdk" do
     it "buds the spdk program" do
-      expect(nx).to receive(:bud).with(Prog::Storage::SetupSpdk)
+      expect(nx).to receive(:bud).with(Prog::Storage::SetupSpdk,
+        {
+          "version" => Config.spdk_version,
+          "start_service" => false,
+          "allocation_weight" => 100
+        })
       expect { nx.setup_spdk }.to hop("wait_setup_spdk")
     end
   end
@@ -283,7 +288,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify #{Config.spdk_version}")
       expect { nx.verify_spdk }.to hop("verify_hugepages")
     end
 

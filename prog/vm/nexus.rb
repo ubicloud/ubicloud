@@ -134,7 +134,8 @@ class Prog::Vm::Nexus < Prog::Base
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
         "disk_index" => s.disk_index,
-        "encrypted" => !s.key_encryption_key_1.nil?
+        "encrypted" => !s.key_encryption_key_1.nil?,
+        "spdk_version" => s.spdk_version
       }
     }
   end
@@ -176,7 +177,7 @@ SQL
     vm_host_id
   end
 
-  def create_storage_volume_records
+  def create_storage_volume_records(vm_host)
     frame["storage_volumes"].each_with_index do |volume, disk_index|
       key_encryption_key = if volume["encrypted"]
         key_wrapping_algorithm = "aes-256-gcm"
@@ -197,9 +198,24 @@ SQL
         boot: volume["boot"],
         size_gib: volume["size_gib"],
         disk_index: disk_index,
-        key_encryption_key_1_id: key_encryption_key&.id
+        key_encryption_key_1_id: key_encryption_key&.id,
+        spdk_installation_id: allocate_spdk_installation(vm_host.spdk_installations)
       )
     end
+  end
+
+  def allocate_spdk_installation(spdk_installations)
+    total_weight = spdk_installations.sum(&:allocation_weight)
+    fail "Total weight of all spdk_installations shouldn't be zero." if total_weight == 0
+
+    rand_point = rand(0..total_weight - 1)
+    weight_sum = 0
+    rand_choice = spdk_installations.each { |si|
+      weight_sum += si.allocation_weight
+      break si if weight_sum > rand_point
+    }
+
+    rand_choice.id
   end
 
   def clear_stack_storage_volumes
@@ -233,10 +249,10 @@ SQL
       nap 30
     end
 
-    create_storage_volume_records
-
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
+
+    create_storage_volume_records(vm_host)
 
     Clog.emit("vm allocated") do
       {allocation: {vm_host_ubid: vm_host.ubid, ip4: ip4, address: address&.cidr&.to_s,

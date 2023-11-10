@@ -36,7 +36,8 @@ RSpec.describe StorageVolume do
         "device_id" => "#{vm}_0",
         "encrypted" => true,
         "size_gib" => 5,
-        "image" => nil
+        "image" => nil,
+        "spdk_version" => DEFAULT_SPDK_VERSION
       })
     }
 
@@ -57,7 +58,8 @@ RSpec.describe StorageVolume do
         "device_id" => "#{vm}_1",
         "encrypted" => false,
         "size_gib" => 5,
-        "image" => nil
+        "image" => nil,
+        "spdk_version" => DEFAULT_SPDK_VERSION
       })
     }
 

@@ -85,13 +85,15 @@ RSpec.describe VmSetup do
         "size_gib" => 20,
         "device_id" => "test_0",
         "disk_index" => 0,
-        "encrypted" => false
+        "encrypted" => false,
+        "spdk_version" => "some-version"
       }
       vol_2_params = {
         "size_gib" => 20,
         "device_id" => "test_1",
         "disk_index" => 1,
-        "encrypted" => true
+        "encrypted" => true,
+        "spdk_version" => "some-version"
       }
       params = JSON.generate({storage_volumes: [vol_1_params, vol_2_params]})
 
@@ -174,10 +176,11 @@ RSpec.describe VmSetup do
       }
     }
     let(:storage_volumes) {
-      [
-        instance_double(StorageVolume),
-        instance_double(StorageVolume)
-      ]
+      v1 = instance_double(StorageVolume)
+      v2 = instance_double(StorageVolume)
+      allow(v1).to receive_messages(vhost_sock: "/var/storage/vhost/vhost.1", spdk_service: "spdk.service")
+      allow(v2).to receive_messages(vhost_sock: "/var/storage/vhost/vhost.2", spdk_service: "spdk.service")
+      [v1, v2]
     }
 
     before do

@@ -11,7 +11,12 @@ unless (verb = ARGV.shift)
   exit 1
 end
 
-spdk_setup = SpdkSetup.new
+unless (version = ARGV.shift)
+  puts "expected version as argument"
+  exit 1
+end
+
+spdk_setup = SpdkSetup.new(version)
 
 case verb
 when "install"

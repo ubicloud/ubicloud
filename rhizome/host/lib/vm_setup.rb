@@ -47,9 +47,9 @@ class VmSetup
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed)
     cloudinit(unix_user, public_key, nics)
     download_boot_image(boot_image)
-    vhost_sockets = storage(storage_volumes, storage_secrets, true)
+    storage_params = storage(storage_volumes, storage_secrets, true)
     hugepages(mem_gib)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets, nics)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics)
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets)
@@ -441,6 +441,10 @@ EOS
       storage_volume = StorageVolume.new(@vm_name, params)
       storage_volume.prep(key_wrapping_secrets) if prep
       storage_volume.start(key_wrapping_secrets)
+      {
+        vhost_sock: storage_volume.vhost_sock,
+        spdk_service: storage_volume.spdk_service
+      }
     }
   end
 
@@ -509,7 +513,7 @@ EOS
     r("ip netns exec #{q_vm} sysctl -w net.ipv4.ip_forward=1")
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets, nics)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_info, nics)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -535,9 +539,13 @@ NoNewPrivileges=yes
 ReadOnlyPaths=/
 DNSMASQ_SERVICE
 
-    disk_params = vhost_sockets.map { |socket|
-      "--disk vhost_user=true,socket=#{socket},num_queues=1,queue_size=256 \\"
+    disk_params = storage_info.map { |info|
+      "--disk vhost_user=true,socket=#{info[:vhost_sock]},num_queues=1,queue_size=256 \\"
     }
+
+    spdk_services = storage_info.map { |info| info[:spdk_service] }.uniq
+    spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
+    spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
     net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=" }
 
@@ -549,10 +557,10 @@ DNSMASQ_SERVICE
 [Unit]
 Description=#{@vm_name}
 After=network.target
-After=spdk.service
+#{spdk_after}
 After=#{@vm_name}-dnsmasq.service
+#{spdk_requires}
 Requires=#{@vm_name}-dnsmasq.service
-Requires=spdk.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}

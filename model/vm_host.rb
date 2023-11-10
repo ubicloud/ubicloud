@@ -10,8 +10,9 @@ class VmHost < Sequel::Model
   one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address
   one_to_one :hetzner_host, key: :id
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
+  one_to_many :spdk_installations, key: :vm_host_id
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy
 
   include ResourceMethods
   include SemaphoreMethods

@@ -3,7 +3,7 @@
 require_relative "spdk_path"
 
 class SpdkRpc
-  def initialize(socket_path = SpdkPath.rpc_sock, timeout = 5, response_size_limit = 1048576)
+  def initialize(socket_path, timeout = 5, response_size_limit = 1048576)
     @socket_path = socket_path
     @timeout = timeout
     @response_size_limit = response_size_limit
