@@ -129,12 +129,12 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:leaf?).and_return(true)
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
       expect(vm_host).to receive(:update).with(arch: "arm64")
-      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_nodes: 3, total_sockets: 2)
+      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_nodes: 3, total_dies: 3, total_sockets: 2)
       expect(vm_host).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
         instance_double(Strand, prog: "LearnArch", exitval: {"arch" => "arm64"}),
-        instance_double(Strand, prog: "LearnCores", exitval: {"total_sockets" => 2, "total_nodes" => 3, "total_cores" => 4, "total_cpus" => 5}),
+        instance_double(Strand, prog: "LearnCores", exitval: {"total_sockets" => 2, "total_nodes" => 3, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5}),
         instance_double(Strand, prog: "LearnStorage", exitval: {"total_storage_gib" => 300, "available_storage_gib" => 500}),
         instance_double(Strand, prog: "ArbitraryOtherProg")
       ])
