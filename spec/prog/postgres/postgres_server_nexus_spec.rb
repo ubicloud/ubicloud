@@ -379,16 +379,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#destroy" do
-    it "waits vm deletion" do
+    it "deletes resources and exits" do
       expect(postgres_server.vm).to receive(:private_subnets).and_return([])
       expect(postgres_server.vm).to receive(:incr_destroy)
-      expect(postgres_server).not_to receive(:destroy)
-
-      expect { nx.destroy }.to nap(5)
-    end
-
-    it "if vm is deleted destroys the entity and exits" do
-      expect(postgres_server).to receive(:vm).and_return(nil)
       expect(postgres_server).to receive(:destroy)
 
       expect { nx.destroy }.to exit({"msg" => "postgres server is deleted"})
