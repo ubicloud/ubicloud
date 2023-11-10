@@ -103,7 +103,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_spdk
-    bud Prog::SetupSpdk
+    bud Prog::Storage::SetupSpdk
     hop_wait_setup_spdk
   end
 
@@ -145,8 +145,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def verify_spdk
-    is_active = sshable.cmd("systemctl is-active spdk.service").strip
-    fail "SPDK failed to start" unless is_active == "active"
+    sshable.cmd("sudo host/bin/setup-spdk verify")
 
     hop_verify_hugepages
   end

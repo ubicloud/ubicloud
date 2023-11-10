@@ -3,6 +3,7 @@
 
 require_relative "../../common/lib/util"
 require_relative "../lib/cloud_hypervisor"
+require_relative "../lib/spdk_setup"
 require "fileutils"
 
 ch_dir = CloudHypervisor::VERSION.dir
@@ -43,3 +44,5 @@ r "sysctl --system"
 # For qemu-image convert and mcopy for cloud-init with the nocloud
 # driver.
 r "apt-get -y install qemu-utils mtools"
+
+SpdkSetup.prep

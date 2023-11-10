@@ -33,7 +33,11 @@ module SpdkPath
     File.join("", "opt")
   end
 
+  def self.install_path
+    File.join(install_prefix, "spdk")
+  end
+
   def self.bin(n)
-    File.join(install_prefix, "spdk", "bin", n)
+    File.join(install_path, "bin", n)
   end
 end
