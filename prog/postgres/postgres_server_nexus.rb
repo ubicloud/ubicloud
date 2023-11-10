@@ -235,12 +235,8 @@ SQL
   label def destroy
     decr_destroy
 
-    if vm
-      vm.private_subnets.each { _1.incr_destroy }
-      vm.incr_destroy
-      nap 5
-    end
-
+    vm.private_subnets.each { _1.incr_destroy }
+    vm.incr_destroy
     postgres_server.destroy
 
     pop "postgres server is deleted"
