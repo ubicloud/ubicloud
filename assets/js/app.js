@@ -182,21 +182,28 @@ function setupLocationBasedPrices() {
   $("input.location-based-price").each(function(i, obj) {
     let name = $(this).attr("name");
     let value = $(this).val();
-    let resource_type = $(this).data("resource-type");
-    let resource_family = $(this).data("resource-family");
-    let amount = $(this).data("amount");
+    let resource_type = Array.isArray($(this).data("resource-type")) ? $(this).data("resource-type") : [$(this).data("resource-type")];
+    let resource_family = Array.isArray($(this).data("resource-family")) ? $(this).data("resource-family") : [$(this).data("resource-family")];
+    let amount = Array.isArray($(this).data("amount")) ? $(this).data("amount") : [$(this).data("amount")];
     let is_default = $(this).data("default");
-    if (monthlyPrice = prices?.[resource_type]?.[resource_family]?.["monthly"]) {
-      let monthly = monthlyPrice * amount;
-      $(`.${name}-${value}`).show();
-      $(`.${name}-${value}-monthly-price`).text(`$${monthly.toFixed(2)}`);
-      count[name] = (count[name] || 0) + 1;
-    } else {
-      $(`.${name}-${value}`).hide();
-      if (!is_default) {
-        $(this).prop('checked', false);
+    
+    let monthly = 0;
+    for(var i = 0; i < resource_type.length; i++) {
+      if (monthlyPrice = prices?.[resource_type[i]]?.[resource_family[i]]?.["monthly"]) {
+        monthly += monthlyPrice * amount[i];
+      } else {
+        $(`.${name}-${value}`).hide();
+        if (!is_default) {
+          $(this).prop('checked', false);
+        }
+
+        return;
       }
     }
+
+    $(`.${name}-${value}`).show();
+    $(`.${name}-${value}-monthly-price`).text(`$${monthly.toFixed(2)}`);
+    count[name] = (count[name] || 0) + 1;
   });
 }
 
