@@ -150,10 +150,16 @@ RSpec.describe UBID do
   end
 
   it "generates ids with proper prefix" do
+    sshable = Sshable.create_with_id
+    expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
+
+    host = VmHost.create(location: "x") { _1.id = sshable.id }
+    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
+
     vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x")
     expect(vm.ubid).to start_with UBID::TYPE_VM
 
-    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
+    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id)
     expect(sv.ubid).to start_with UBID::TYPE_VM_STORAGE_VOLUME
 
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
@@ -186,11 +192,6 @@ RSpec.describe UBID do
     tun = IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: nic.id)
     expect(tun.ubid).to start_with UBID::TYPE_IPSEC_TUNNEL
 
-    sshable = Sshable.create_with_id
-    expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
-
-    host = VmHost.create(location: "x") { _1.id = sshable.id }
-
     adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
     expect(adr.ubid).to start_with UBID::TYPE_ADDRESS
 
@@ -216,8 +217,11 @@ RSpec.describe UBID do
   end
 
   it "can decode ids" do
+    sshable = Sshable.create_with_id
+    host = VmHost.create(location: "x") { _1.id = sshable.id }
+    si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
     vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x")
-    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false)
+    sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id)
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
@@ -226,8 +230,6 @@ RSpec.describe UBID do
     subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x")
     nic = Nic.create_with_id(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
     tun = IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: nic.id)
-    sshable = Sshable.create_with_id
-    host = VmHost.create(location: "x") { _1.id = sshable.id }
     adr = Address.create_with_id(cidr: "192.168.1.0/24", routed_to_host_id: host.id)
     vm_adr = AssignedVmAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
     host_adr = AssignedHostAddress.create_with_id(ip: "192.168.1.1", address_id: adr.id, host_id: host.id)

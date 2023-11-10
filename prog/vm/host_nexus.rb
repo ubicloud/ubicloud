@@ -4,7 +4,7 @@ class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
   semaphore :reboot, :destroy
 
-  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil)
+  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version)
     DB.transaction do
       ubid = VmHost.generate_ubid
 
@@ -20,7 +20,11 @@ class Prog::Vm::HostNexus < Prog::Base
         AssignedHostAddress.create_with_id(ip: sshable_hostname, address_id: vmh.id, host_id: vmh.id)
       end
 
-      Strand.create(prog: "Vm::HostNexus", label: "start") { _1.id = vmh.id }
+      Strand.create(
+        prog: "Vm::HostNexus",
+        label: "start",
+        stack: [{"spdk_version" => spdk_version}]
+      ) { _1.id = vmh.id }
     end
   end
 
@@ -103,7 +107,12 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_spdk
-    bud Prog::Storage::SetupSpdk
+    bud(Prog::Storage::SetupSpdk,
+      {
+        "version" => frame["spdk_version"],
+        "start_service" => false,
+        "allocation_weight" => 100
+      })
     hop_wait_setup_spdk
   end
 
@@ -145,7 +154,8 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def verify_spdk
-    sshable.cmd("sudo host/bin/setup-spdk verify")
+    q_version = frame["spdk_version"].shellescape
+    sshable.cmd("sudo host/bin/setup-spdk verify #{q_version}")
 
     hop_verify_hugepages
   end

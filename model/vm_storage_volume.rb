@@ -4,6 +4,7 @@ require_relative "../model"
 
 class VmStorageVolume < Sequel::Model
   many_to_one :vm
+  many_to_one :spdk_installation
   many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
 
@@ -17,5 +18,9 @@ class VmStorageVolume < Sequel::Model
 
   def device_path
     "/dev/disk/by-id/virtio-#{device_id}"
+  end
+
+  def spdk_version
+    spdk_installation.version
   end
 end

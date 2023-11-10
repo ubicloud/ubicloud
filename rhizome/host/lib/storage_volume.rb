@@ -9,6 +9,7 @@ require "base64"
 require_relative "vm_path"
 require_relative "spdk_path"
 require_relative "spdk_rpc"
+require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 
 class StorageVolume
@@ -20,6 +21,10 @@ class StorageVolume
     @disk_size_gib = params["size_gib"]
     @image_path = vp.image_path(params["image"]) if params["image"]
     @disk_file = vp.disk(@disk_index)
+
+    # Old VMs didn't have the spdk_version field. Fill that in with legacy
+    # SPDK version for backward compatibility.
+    @spdk_version = params["spdk_version"] || LEGACY_SPDK_VERSION
   end
 
   def vp
@@ -27,7 +32,7 @@ class StorageVolume
   end
 
   def rpc_client
-    @rpc_client ||= SpdkRpc.new
+    @rpc_client ||= SpdkRpc.new(SpdkPath.rpc_sock(@spdk_version))
   end
 
   def prep(key_wrapping_secrets)
@@ -185,7 +190,7 @@ class StorageVolume
 
     create_empty_disk_file
 
-    r("#{SpdkPath.bin("spdk_dd")} --config /dev/stdin " \
+    r("#{SpdkPath.bin(@spdk_version, "spdk_dd")} --config /dev/stdin " \
     "--disable-cpumask-locks " \
     "--rpc-socket #{rpc_socket.shellescape} " \
     "--if #{@image_path.shellescape} " \
@@ -251,5 +256,13 @@ class StorageVolume
     FileUtils.chown @vm_name, @vm_name, vp.vhost_sock(@disk_index)
 
     vp.vhost_sock(@disk_index)
+  end
+
+  def vhost_sock
+    @vhost_sock ||= vp.vhost_sock(@disk_index)
+  end
+
+  def spdk_service
+    @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service
   end
 end

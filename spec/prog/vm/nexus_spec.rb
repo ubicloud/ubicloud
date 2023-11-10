@@ -16,9 +16,12 @@ RSpec.describe Prog::Vm::Nexus do
       algorithm: "aes-256-gcm", key: "key",
       init_vector: "iv", auth_data: "somedata"
     ) { _1.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
+    si = SpdkInstallation.new(version: "v1") { _1.id = SpdkInstallation.generate_uuid }
     disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
+    disk_1.spdk_installation = si
     disk_1.key_encryption_key_1 = kek
     disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1)
+    disk_2.spdk_installation = si
     vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1").tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
@@ -392,10 +395,18 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#create_storage_volume_records" do
+    let(:vmh) {
+      id = VmHost.generate_uuid
+      Sshable.create { _1.id = id }
+      host = VmHost.create(location: "xyz") { _1.id = id }
+      SpdkInstallation.create(vm_host_id: id, version: "v1", allocation_weight: 100) { _1.id = id }
+      host
+    }
+
     it "creates without encryption key if storage is not encrypted" do
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: false}])
       nx = described_class.new(st)
-      nx.create_storage_volume_records
+      nx.create_storage_volume_records(vmh)
       expect(StorageKeyEncryptionKey.count).to eq(0)
       expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
       expect(nx.storage_secrets.count).to eq(0)
@@ -404,10 +415,30 @@ RSpec.describe Prog::Vm::Nexus do
     it "creates with encryption key if storage is encrypted" do
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: true}])
       nx = described_class.new(st)
-      nx.create_storage_volume_records
+      nx.create_storage_volume_records(vmh)
       expect(StorageKeyEncryptionKey.count).to eq(1)
       expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
       expect(nx.storage_secrets.count).to eq(1)
+    end
+  end
+
+  describe "#allocate_spdk_installation" do
+    it "fails if total weight is zero" do
+      si_1 = SpdkInstallation.new(allocation_weight: 0)
+      si_2 = SpdkInstallation.new(allocation_weight: 0)
+
+      expect { nx.allocate_spdk_installation([si_1, si_2]) }.to raise_error "Total weight of all spdk_installations shouldn't be zero."
+    end
+
+    it "chooses the only one if one provided" do
+      si_1 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
+      expect(nx.allocate_spdk_installation([si_1])).to eq(si_1.id)
+    end
+
+    it "doesn't return the one with zero weight" do
+      si_1 = SpdkInstallation.new(allocation_weight: 0) { _1.id = SpdkInstallation.generate_uuid }
+      si_2 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
+      expect(nx.allocate_spdk_installation([si_1, si_2])).to eq(si_2.id)
     end
   end
 

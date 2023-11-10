@@ -66,6 +66,10 @@ class UBID
   TYPE_DNS_RECORD = "dr"
   TYPE_DNS_SERVER = "ds"
   TYPE_FIREWALL_RULE = "fr"
+
+  # Common entropy-based type for everything else
+  TYPE_ETC = "et"
+
   CURRENT_TIMESTAMP_TYPES = [TYPE_STRAND, TYPE_SEMAPHORE]
 
   def self.generate(type)

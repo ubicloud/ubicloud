@@ -4,7 +4,7 @@ require_relative "../lib/spdk_rpc"
 
 RSpec.describe SpdkRpc do
   subject(:sr) {
-    described_class.new(SpdkPath.rpc_sock, 5, 100)
+    described_class.new("/path/to/spdk.sock", 5, 100)
   }
 
   describe "#bdev_aio_create" do

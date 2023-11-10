@@ -8,7 +8,7 @@ return if ENV["RUN_E2E_TESTS"] != "1"
 
 RSpec.describe SpdkRpc do
   subject(:spdk_rpc) {
-    socket = ENV["SPDK_TESTS_RPC_SOCKET"] || SpdkPath.rpc_sock
+    socket = ENV["SPDK_TESTS_RPC_SOCKET"] || SpdkPath.rpc_sock(DEFAULT_SPDK_VERSION)
     described_class.new(socket)
   }
 

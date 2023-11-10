@@ -6,6 +6,10 @@ require_relative "spdk_path"
 require "fileutils"
 
 class SpdkSetup
+  def initialize(spdk_version)
+    @spdk_version = spdk_version
+  end
+
   def self.prep
     r "apt-get -y install libaio-dev libssl-dev libnuma-dev libjson-c-dev uuid-dev libiscsi-dev"
 
@@ -21,37 +25,51 @@ class SpdkSetup
   end
 
   def install_path
-    @install_path ||= SpdkPath.install_path
+    @install_path ||= SpdkPath.install_path(@spdk_version)
   end
 
   def spdk_service
-    "spdk.service"
+    @spdk_service ||=
+      (@spdk_version == LEGACY_SPDK_VERSION) ?
+          "spdk.service" :
+          "spdk-#{@spdk_version}.service"
   end
 
   def hugepages_mount_service
-    "home-spdk-hugepages.mount"
+    @hugepages_mount_service ||= hugepages_dir.split("/")[1..].join("-") + ".mount"
   end
 
   def hugepages_dir
-    @hugepages_dir ||= SpdkPath.hugepages_dir
+    @hugepages_dir ||= SpdkPath.hugepages_dir(@spdk_version)
   end
 
   def rpc_sock
-    @rpc_sock ||= SpdkPath.rpc_sock
-  end
-
-  def vhost_binary
-    @vhost_binary ||= SpdkPath.bin("vhost")
+    @rpc_sock ||= SpdkPath.rpc_sock(@spdk_version)
   end
 
   def package_url
-    if Arch.arm64?
-      "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-arm64.tar.gz"
+    arch = if Arch.arm64?
+      :arm64
     elsif Arch.x64?
-      "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-23.09-x64.tar.gz"
+      :x64
     else
       fail "BUG: unexpected architecture"
     end
+
+    # YYY: Support v23.09-ubi-0.1 on arm64
+    {
+      ["v23.09", :arm64] => "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-arm64.tar.gz",
+      ["v23.09", :x64] => "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-23.09-x64.tar.gz",
+      ["v23.09-ubi-0.1", :x64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.1/ubicloud-spdk-ubuntu-22.04-x64.tar.gz"
+    }.fetch([@spdk_version, arch])
+  end
+
+  def has_bdev_ubi?
+    @spdk_version.match?(/^v[0-9]+\.[0-9]+-ubi-.*/)
+  end
+
+  def vhost_target
+    @vhost_target ||= has_bdev_ubi? ? "vhost_ubi" : "vhost"
   end
 
   def install_package
@@ -66,9 +84,10 @@ class SpdkSetup
 
   def create_service
     user = SpdkPath.user
+    vhost_binary = SpdkPath.bin(@spdk_version, vhost_target)
     File.write("/lib/systemd/system/#{spdk_service}", <<SPDK_SERVICE
 [Unit]
-Description=Block Storage Service
+Description=Block Storage Service #{@spdk_version}
 Requires=#{hugepages_mount_service}
 [Service]
 Type=simple
@@ -102,7 +121,7 @@ SPDK_SERVICE
 
     File.write("/lib/systemd/system/#{hugepages_mount_service}", <<SPDK_HUGEPAGES_MOUNT
 [Unit]
-Description=SPDK hugepages mount
+Description=SPDK hugepages mount #{@spdk_version}
 
 [Mount]
 What=hugetlbfs
