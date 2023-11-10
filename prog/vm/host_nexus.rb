@@ -68,6 +68,7 @@ class Prog::Vm::HostNexus < Prog::Base
         kwargs = {
           total_sockets: st.exitval.fetch("total_sockets"),
           total_nodes: st.exitval.fetch("total_nodes"),
+          total_dies: st.exitval.fetch("total_dies"),
           total_cores: st.exitval.fetch("total_cores"),
           total_cpus: st.exitval.fetch("total_cpus")
         }
