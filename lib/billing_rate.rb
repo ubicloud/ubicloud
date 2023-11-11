@@ -26,7 +26,7 @@ class BillingRate
     when "PostgresCores"
       "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database"
     when "PostgresStorage"
-      "#{amount} GiB Storage for PostgreSQL Database"
+      "#{amount.to_i} GiB Storage for PostgreSQL Database"
     when "GitHubRunnerMinutes"
       "#{resource_family} GitHub Runner"
     else
