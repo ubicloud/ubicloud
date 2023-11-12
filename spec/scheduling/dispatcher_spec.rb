@@ -36,6 +36,9 @@ RSpec.describe Scheduling::Dispatcher do
 
   describe "#start_cohort" do
     after do
+      Thread.list.each do
+        _1.join if (nm = _1.name) && nm.start_with?("apoptosis:")
+      end
       expect(Thread.list.count).to eq(1)
     end
 
@@ -96,6 +99,31 @@ RSpec.describe Scheduling::Dispatcher do
       ensure
         Strand.truncate(cascade: true)
       end.join
+    end
+
+    it "can print exceptions if they are raised" do
+      ex = begin
+        begin
+          raise StandardError.new("nested test error")
+        rescue
+          raise StandardError.new("outer test error")
+        end
+      rescue => ex
+        ex
+      end
+
+      st = instance_double(Strand, ubid: "st065wajns766jkqa7af15vm6g")
+      expect(st).to receive(:run).and_raise(ex)
+
+      # Go to the trouble of emitting those exceptions to provoke
+      # plausible crashes in serialization.
+      expect(Config).to receive(:test?).and_return(false).twice
+      expect($stdout).to receive(:write).with(a_string_matching(/outer test error/))
+      expect($stdout).to receive(:write).with(a_string_matching(/nested test error/))
+
+      notif = di.start_strand(st)
+      notif.read
+      di.wait_cohort
     end
   end
 end
