@@ -32,7 +32,7 @@ GEM
       ffi-compiler (~> 1.0)
     ast (2.4.2)
     aws-eventstream (1.2.0)
-    aws-partitions (1.848.0)
+    aws-partitions (1.849.0)
     aws-sdk-core (3.186.0)
       aws-eventstream (~> 1, >= 1.0.2)
       aws-partitions (~> 1, >= 1.651.0)
@@ -108,7 +108,7 @@ GEM
     jwt (2.7.1)
     language_server-protocol (3.17.0.3)
     lint_roller (1.1.0)
-    loofah (2.21.4)
+    loofah (2.22.0)
       crass (~> 1.0.2)
       nokogiri (>= 1.12.0)
     mail (2.8.1)
@@ -121,7 +121,7 @@ GEM
     mini_mime (1.1.5)
     minitest (5.20.0)
     mutex_m (0.2.0)
-    net-imap (0.4.4)
+    net-imap (0.4.5)
       date
       net-protocol
     net-pop (0.1.2)
@@ -178,7 +178,7 @@ GEM
     refrigerator (1.6.0)
     regexp_parser (2.8.2)
     rexml (3.2.6)
-    roda (3.73.0)
+    roda (3.74.0)
       rack
     rodauth (2.32.0)
       roda (>= 2.6.0)
