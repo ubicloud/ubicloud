@@ -58,4 +58,16 @@ class Project < Sequel::Model
 
     Invoice.new(project_id: id, content: content, begin_time: begin_time, end_time: end_time, created_at: Time.now, status: "current")
   end
+
+  def self.feature_flag(*flags)
+    flags.map(&:to_s).each do |flag|
+      define_method "set_#{flag}" do |value|
+        update(feature_flags: feature_flags.merge({flag => value}))
+      end
+
+      define_method "get_#{flag}" do
+        feature_flags[flag]
+      end
+    end
+  end
 end
