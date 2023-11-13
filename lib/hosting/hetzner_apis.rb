@@ -2,8 +2,6 @@
 
 require "excon"
 class Hosting::HetznerApis
-  FailoverSubnet = Struct.new(:ips, :subnets, :failovers)
-
   def initialize(hetzner_host)
     @host = hetzner_host
   end
