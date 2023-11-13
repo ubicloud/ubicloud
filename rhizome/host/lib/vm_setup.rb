@@ -13,6 +13,8 @@ require_relative "cloud_hypervisor"
 require_relative "storage_volume"
 
 class VmSetup
+  Nic = Struct.new(:net6, :net4, :tap, :mac)
+
   def initialize(vm_name)
     @vm_name = vm_name
   end
@@ -138,8 +140,8 @@ class VmSetup
     # /sys/class/net/vethi#{q_vm}/address at two points in time.  The
     # result is a race condition that *sometimes* worked.
     r "ip link add vetho#{q_vm} addr #{gen_mac.shellescape} type veth peer name vethi#{q_vm} addr #{gen_mac.shellescape} netns #{q_vm}"
-    nics.each do |ip6, ip4, tap, mac|
-      r "ip -n #{q_vm} tuntap add dev #{tap} mode tap user #{q_vm}"
+    nics.each do |nic|
+      r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm}"
     end
   rescue CommandFail => ex
     errors = [
@@ -185,19 +187,19 @@ class VmSetup
 
     # Allocate ::1 in the guest network for DHCPv6.
     guest_intrusion = guest_ephemeral.nth(1).to_s + "/" + guest_ephemeral.netmask.prefix_len.to_s
-    nics.each do |net6, net4, tapname, mac|
-      r "ip -n #{q_vm} addr replace #{guest_intrusion.shellescape} dev #{tapname}"
+    nics.each do |nic|
+      r "ip -n #{q_vm} addr replace #{guest_intrusion.shellescape} dev #{nic.tap}"
 
       # Route ephemeral address to tap.
-      r "ip -n #{q_vm} link set dev #{tapname} up"
-      r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(mac)} dev #{tapname}"
+      r "ip -n #{q_vm} link set dev #{nic.tap} up"
+      r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
 
       # Route private subnet addresses to tap.
-      ip6 = NetAddr::IPv6Net.parse(net6)
+      ip6 = NetAddr::IPv6Net.parse(nic.net6)
 
       # Allocate ::1 in the guest network for DHCPv6.
-      r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{tapname}"
-      r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(mac)} dev #{tapname}"
+      r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{nic.tap}"
+      r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
     end
   end
 
@@ -224,29 +226,17 @@ class VmSetup
     # default?
     r "ip -n #{q_vm} route replace #{vetho} dev vethi#{q_vm}"
 
-    nics.each do |net6, net4, tapname, mac|
-      r "ip -n #{q_vm} route replace #{vm} dev #{tapname}" if ip4
+    nics.each do |nic|
+      r "ip -n #{q_vm} route replace #{vm} dev #{nic.tap}" if ip4
       r "ip -n #{q_vm} route replace default via #{vetho} dev vethi#{q_vm}"
 
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
-      r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{tapname}/proxy_arp'"
+      r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{nic.tap}/proxy_arp'"
     end
   end
 
   def write_nftables_conf(ip4, gua, nics)
-    guest_ephemeral = subdivide_network(NetAddr.parse_net(gua)).first
-
-    config = build_nftables_config(
-      generate_nat4_rules(ip4, nics.first[1]),
-      generate_ip4_filter_rules(nics),
-      generate_dhcp_filter_rule,
-      generate_ip6_public_filter(nics.first, guest_ephemeral),
-      generate_ip6_private_filter_rules(nics[1..]),
-      generate_private_ip4_list(nics),
-      generate_private_ip6_list(nics),
-      guest_ephemeral
-    )
-
+    config = build_nftables_config(gua, nics, ip4)
     vp.write_nftables_conf(config)
     apply_nftables
   end
@@ -273,21 +263,15 @@ class VmSetup
   end
 
   def generate_ip4_filter_rules(nics)
-    nics.map do |_, net4, _, mac|
-      "ether saddr #{mac} ip saddr != #{net4} drop"
-    end.join("\n")
+    nics.map { "ether saddr #{_1.mac} ip saddr != #{_1.net4} drop" }.join("\n")
   end
 
   def generate_private_ip4_list(nics)
-    nics.map do |_, net4, _, _|
-      NetAddr::IPv4Net.parse(net4).network.to_s + "/26"
-    end.join(",")
+    nics.map { NetAddr::IPv4Net.parse(_1.net4).network.to_s + "/26" }.join(",")
   end
 
   def generate_private_ip6_list(nics)
-    nics.map do |net6, _, _, _|
-      NetAddr::IPv6Net.parse(net6).network.to_s + "/64"
-    end.join(",")
+    nics.map { NetAddr::IPv6Net.parse(_1.net6).network.to_s + "/64" }.join(",")
   end
 
   def generate_dhcp_filter_rule
@@ -295,16 +279,15 @@ class VmSetup
   end
 
   def generate_ip6_public_filter(nic_first, guest_ephemeral)
-    "ether saddr #{nic_first[3]} ip6 saddr != {#{guest_ephemeral},#{nic_first[0]},#{mac_to_ipv6_link_local(nic_first[3])}} drop"
+    "ether saddr #{nic_first.mac} ip6 saddr != {#{guest_ephemeral},#{nic_first.net6},#{mac_to_ipv6_link_local(nic_first.mac)}} drop"
   end
 
   def generate_ip6_private_filter_rules(nics)
-    nics.map do |net6, _, _, mac|
-      "ether saddr #{mac} ip6 saddr != #{net6} drop"
-    end.join("\n")
+    nics.map { "ether saddr #{_1.mac} ip6 saddr != #{_1.net6} drop" }.join("\n")
   end
 
-  def build_nftables_config(nat4_rules, nic_priv_ip4_filters, dhcp_filter_rule, nic_public_ip6_filter, nic_priv_ip6_filters, private_ipv4_list, private_ipv6_list, guest_ephemeral)
+  def build_nftables_config(gua, nics, ip4)
+    guest_ephemeral = subdivide_network(NetAddr.parse_net(gua)).first
     <<~NFTABLES_CONF
       table ip raw {
         chain prerouting {
@@ -314,24 +297,24 @@ class VmSetup
           udp sport 67 udp dport 68 accept
   
           # avoid ip4 spoofing
-          #{nic_priv_ip4_filters}
+          #{generate_ip4_filter_rules(nics)}
         }
         chain postrouting {
           type filter hook postrouting priority raw; policy accept;
           # avoid dhcp ports to be used for spoofing
-          #{dhcp_filter_rule}
+          #{generate_dhcp_filter_rule}
         }
       }
       table ip6 raw {
         chain prerouting {
           type filter hook prerouting priority raw; policy accept;
           # avoid ip6 spoofing
-          #{nic_public_ip6_filter}
-          #{nic_priv_ip6_filters}
+          #{generate_ip6_public_filter(nics.first, guest_ephemeral)}
+          #{generate_ip6_private_filter_rules(nics[1..])}
         }
       }
       # NAT4 rules
-      #{nat4_rules}
+      #{generate_nat4_rules(ip4, nics.first.net4)}
       table inet fw_table {
         set allowed_ipv4_ips {
           type ipv4_addr;
@@ -347,14 +330,14 @@ class VmSetup
           type ipv4_addr;
           flags interval;
           elements = {
-            #{private_ipv4_list}
+            #{generate_private_ip4_list(nics)}
           }
         }
 
         set private_ipv6_ips {
           type ipv6_addr
           flags interval
-          elements = { #{private_ipv6_list} }
+          elements = { #{generate_private_ip6_list(nics)} }
         }
 
         chain forward_ingress {
@@ -385,16 +368,16 @@ local-hostname: #{yq(@vm_name)}
 EOS
 
     guest_network = NetAddr.parse_net(vp.read_guest_ephemeral)
-    private_ip_dhcp = nics.map do |net6, net4, tapname, mac|
-      vm_sub_6 = NetAddr::IPv6Net.parse(net6)
-      vm_sub_4 = NetAddr::IPv4Net.parse(net4)
+    private_ip_dhcp = nics.map do |nic|
+      vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
+      vm_sub_4 = NetAddr::IPv4Net.parse(nic.net4)
       <<DHCP
-dhcp-range=#{tapname},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},#{vm_sub_4.netmask.prefix_len}
-dhcp-range=#{tapname},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
+dhcp-range=#{nic.tap},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},#{vm_sub_4.netmask.prefix_len}
+dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
 DHCP
     end.join("\n")
 
-    raparams = nics.map { |net6, net4, tapname, mac| "ra-param=#{tapname}" }.join("\n")
+    raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
 
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
@@ -408,11 +391,11 @@ dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
 dhcp-option=26,1400
 DNSMASQ_CONF
 
-    ethernets = nics.map do |net6, net4, tapname, mac|
+    ethernets = nics.map do |nic|
       <<ETHERNETS
-  #{yq("enx" + mac.tr(":", "").downcase)}:
+  #{yq("enx" + nic.mac.tr(":", "").downcase)}:
     match:
-      macaddress: "#{mac}"
+      macaddress: "#{nic.mac}"
     dhcp6: true
     dhcp4: true
 ETHERNETS
@@ -529,9 +512,7 @@ EOS
   def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, vhost_sockets, nics)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
-    tapnames = nics.map { |net6, net4, tap, mac|
-      "-i #{tap}"
-    }.join(" ")
+    tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
 
     vp.write_dnsmasq_service <<DNSMASQ_SERVICE
 [Unit]
@@ -558,9 +539,7 @@ DNSMASQ_SERVICE
       "--disk vhost_user=true,socket=#{socket},num_queues=1,queue_size=256 \\"
     }
 
-    net_params = nics.map { |net6, net4, tap, mac|
-      "--net mac=#{mac},tap=#{tap},ip=,mask="
-    }
+    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=" }
 
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings

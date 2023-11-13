@@ -50,7 +50,7 @@ unless (ssh_public_key = params["ssh_public_key"])
   exit 1
 end
 
-unless (nics = params["nics"])
+unless (nics_arr = params["nics"])
   puts "need nics in parameters json"
   exit 1
 end
@@ -86,6 +86,7 @@ require "fileutils"
 require_relative "../../common/lib/util"
 require_relative "../lib/vm_setup"
 
+nics = nics_arr.map { |args| VmSetup::Nic.new(*args) }.freeze
 VmSetup.new(vm_name).prep(unix_user, ssh_public_key, nics, gua, ip4,
   local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib,
   ndp_needed, storage_volumes, storage_secrets)
