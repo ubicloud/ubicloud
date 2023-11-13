@@ -248,7 +248,7 @@ RSpec.describe VmSetup do
 
       gua = "fddf:53d2:4c89:2305:46a0::/79"
       ip4 = "123.123.123.123"
-      nics = [["fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "ncaka58xyg", "3e:bd:a5:96:f7:b9"]]
+      nics = [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "ncaka58xyg", "3e:bd:a5:96:f7:b9")]
 
       expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)
 table ip raw {

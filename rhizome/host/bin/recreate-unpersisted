@@ -38,7 +38,7 @@ unless (local_ip4 = params["local_ipv4"])
   exit 1
 end
 
-unless (nics = params["nics"])
+unless (nics_arr = params["nics"])
   puts "need nics in parameters json"
   exit 1
 end
@@ -57,6 +57,7 @@ end
 
 require_relative "../lib/vm_setup"
 
+nics = nics_arr.map { |args| VmSetup::Nic.new(*args) }.freeze
 VmSetup.new(vm_name).recreate_unpersisted(
   gua, ip4, local_ip4, nics, mem_gib,
   ndp_needed, storage_volumes, storage_secrets
