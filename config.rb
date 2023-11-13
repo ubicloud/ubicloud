@@ -108,4 +108,7 @@ module Config
   optional :postgres_service_blob_storage_endpoint, string
   optional :postgres_service_blob_storage_access_key, string
   optional :postgres_service_blob_storage_secret_key, string
+
+  # Logging
+  optional :database_logger_level, string
 end

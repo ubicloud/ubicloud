@@ -103,11 +103,9 @@ module ResourceMethods
   end
 end
 
-if ENV["RACK_ENV"] == "development" || ENV["RACK_ENV"] == "test"
+if (level = Config.database_logger_level)
   require "logger"
-  LOGGER = Logger.new($stdout)
-  LOGGER.level = Logger::FATAL if ENV["RACK_ENV"] == "test"
-  DB.loggers << LOGGER
+  DB.loggers << Logger.new($stdout, level: level)
 end
 
 module SequelExtensions

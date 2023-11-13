@@ -52,8 +52,6 @@ RSpec.configure do |config|
   end
 
   config.before(:suite) do
-    DB.loggers << Logger.new($stdout) if DB.loggers.empty?
-
     DatabaseCleaner.strategy = :transaction
     DatabaseCleaner.clean_with(:truncation,
       # Skip tables that are filled with migrations.
