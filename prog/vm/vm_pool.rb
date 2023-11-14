@@ -41,8 +41,11 @@ class Prog::Vm::VmPool < Prog::Base
     )
 
     ps = st.subject.private_subnets.first
+    # We don't need to incr_update_firewall_rules semaphore here because the VM
+    # is just created and the firewall rules are not applied in the SubnetNexus,
+    # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
+    # increment the semaphore, already.
     ps.firewall_rules.map(&:destroy)
-    ps.incr_update_firewall_rules
 
     hop_wait
   end
