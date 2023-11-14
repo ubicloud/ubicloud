@@ -104,7 +104,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#initialize_certificates" do
-    it "hops to configure after creating certificates" do
+    it "hops to wait_server after creating certificates" do
       postgres_resource = PostgresResource.create_with_id(
         project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
         location: "hetzner-hel1",
