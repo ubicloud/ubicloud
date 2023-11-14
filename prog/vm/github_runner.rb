@@ -33,7 +33,9 @@ class Prog::Vm::GithubRunner < Prog::Base
       storage_size_gib: label_data["storage_size_gib"]
     ).first
 
-    if (picked_vm = pool&.pick_vm)
+    # Do not use the pool for arm64 runners until we decide to on their positioning.
+    # Our current use of labels with the `-arm` suffix is a temporary solution.
+    if label_data["arch"] == "x64" && (picked_vm = pool&.pick_vm)
       Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
@@ -50,7 +52,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       location: label_data["location"],
       boot_image: label_data["boot_image"],
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
-      enable_ip4: true
+      enable_ip4: true,
+      arch: label_data["arch"]
     )
 
     ps = vm_st.subject.private_subnets.first
