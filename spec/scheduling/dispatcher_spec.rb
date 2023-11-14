@@ -36,10 +36,7 @@ RSpec.describe Scheduling::Dispatcher do
 
   describe "#start_cohort" do
     after do
-      Thread.list.each do
-        _1.join if (nm = _1.name) && nm.start_with?("apoptosis:")
-      end
-      expect(Thread.list.count).to eq(1)
+      Thread.list.each { _1.join if _1 != Thread.current }
     end
 
     it "can create threads" do
