@@ -80,8 +80,8 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def update_billing_record
-    # If the runner is destroyed before it's ready, don't charge for it.
-    return unless github_runner.ready_at
+    # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
+    return unless github_runner.ready_at && github_runner.workflow_job
 
     project = github_runner.installation.project
     label_data = Github.runner_labels[github_runner.label]

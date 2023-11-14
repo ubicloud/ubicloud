@@ -137,10 +137,19 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     before do
       allow(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project)).at_least(:once)
+      allow(github_runner).to receive(:workflow_job).and_return({"id" => 123})
     end
 
     it "not updates billing record if the runner is destroyed before it's ready" do
       expect(github_runner).to receive(:ready_at).and_return(nil)
+
+      expect(nx.update_billing_record).to be_nil
+      expect(BillingRecord.count).to eq(0)
+    end
+
+    it "not updates billing record if the runner does not pick a job" do
+      expect(github_runner).to receive(:ready_at).and_return(Time.now)
+      expect(github_runner).to receive(:workflow_job).and_return(nil)
 
       expect(nx.update_billing_record).to be_nil
       expect(BillingRecord.count).to eq(0)
