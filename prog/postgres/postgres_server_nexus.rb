@@ -111,7 +111,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def configure
-    case vm.sshable.cmd("common/bin/daemonizer --check configure")
+    case vm.sshable.cmd("common/bin/daemonizer --check configure_postgres")
     when "Succeeded"
       when_initial_provisioning_set? do
         hop_update_superuser_password
@@ -120,7 +120,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure' configure", stdin: JSON.generate(configure_hash))
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure' configure_postgres", stdin: JSON.generate(configure_hash))
     end
 
     nap 5
