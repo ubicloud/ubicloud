@@ -106,7 +106,6 @@ module Config
   # Postgres
   optional :postgres_service_project_id, string
   optional :postgres_service_hostname, string
-  optional :postgres_service_blob_storage_endpoint, string
   optional :postgres_service_blob_storage_access_key, string
   optional :postgres_service_blob_storage_secret_key, string
 
