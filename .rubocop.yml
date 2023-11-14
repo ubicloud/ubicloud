@@ -74,3 +74,6 @@ RSpec/FilePath:
 RSpec/SpecFilePathFormat:
   Exclude:
     - 'spec/routes/**/*.rb'
+
+Sequel/ColumnDefault:
+  Enabled: false
