@@ -175,31 +175,31 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure" do
     it "triggers configure if configure command is not sent yet or failed" do
       expect(postgres_server).to receive(:configure_hash).and_return("dummy-configure-hash").twice
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/configure' configure", stdin: JSON.generate("dummy-configure-hash")).twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/configure' configure_postgres", stdin: JSON.generate("dummy-configure-hash")).twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("NotStarted")
       expect { nx.configure }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Failed")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Failed")
       expect { nx.configure }.to nap(5)
     end
 
     it "hops to update_superuser_password if configure command is succeeded during the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
       expect { nx.configure }.to hop("update_superuser_password")
     end
 
     it "hops to wait if configure command is succeeded at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
       expect { nx.configure }.to hop("wait")
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure").and_return("Unknown")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Unknown")
       expect { nx.configure }.to nap(5)
     end
   end
