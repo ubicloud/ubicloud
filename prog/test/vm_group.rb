@@ -17,7 +17,7 @@ class Prog::Test::VmGroup < Prog::Base
 
   label def setup_vms
     project = Project.create_with_id(name: "project 1", provider: "hetzner")
-    project.create_hyper_tag(project)
+    project.associate_with_project(project)
 
     subnet1_s = Prog::Vnet::SubnetNexus.assemble(
       project.id, name: "the-first-subnet", location: "hetzner-hel1"

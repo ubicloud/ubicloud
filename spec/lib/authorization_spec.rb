@@ -122,13 +122,13 @@ RSpec.describe Authorization do
       project = Project.create_with_id(name: "test")
       expect(project.hyper_tag(project)).to be_nil
 
-      tag = project.create_hyper_tag(project)
+      tag = project.associate_with_project(project)
       expect(project.hyper_tag(project)).to exist
 
       vms.each { _1.tag(tag) }
-      expect(AppliedTag.where(access_tag_id: tag.id).count).to eq(4)
+      expect(AppliedTag.where(access_tag_id: tag.id).count).to eq(5)
 
-      project.delete_hyper_tag(project)
+      project.dissociate_with_project(project)
       expect(project.hyper_tag(project)).to be_nil
       expect(AppliedTag.where(access_tag_id: tag.id).count).to eq(0)
     end
