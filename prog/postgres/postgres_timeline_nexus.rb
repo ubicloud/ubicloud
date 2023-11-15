@@ -30,7 +30,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def start
-    blob_storage_client.create_bucket(bucket_name: postgres_timeline.ubid)
+    blob_storage_client.create_bucket(bucket_name: postgres_timeline.ubid) if postgres_timeline.blob_storage_endpoint
     hop_wait_leader
   end
 

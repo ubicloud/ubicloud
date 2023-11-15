@@ -47,13 +47,15 @@ class PostgresServer < Sequel::Model
       lc_time: "'C.UTF-8'"
     }
 
-    if primary?
-      configs[:archive_mode] = "on"
-      configs[:archive_timeout] = "60"
-      configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
-    else
-      configs[:recovery_target_time] = "'#{resource.restore_target}'"
-      configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
+    if timeline.blob_storage_endpoint
+      if primary?
+        configs[:archive_mode] = "on"
+        configs[:archive_timeout] = "60"
+        configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+      else
+        configs[:recovery_target_time] = "'#{resource.restore_target}'"
+        configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
+      end
     end
 
     {
