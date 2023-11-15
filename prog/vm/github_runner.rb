@@ -134,14 +134,6 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def wait_vm
     nap 5 unless vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
-    hop_install_nftables_rules
-  end
-
-  label def install_nftables_rules
-    # Prevent other ports listening to traffic unless they send
-    # traffic first, i.e. "outbound only" connections, save SSH that
-    # clover uses to manipulate things.
-    install_ssh_listen_only_nftables_chain
     hop_setup_environment
   end
 
@@ -270,71 +262,5 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     github_runner.destroy
     pop "github runner deleted"
-  end
-
-  def tun_mac_addresses
-    load_ip_netns_link.filter_map { _1.dig("linkinfo", "info_kind") == "tun" && _1.fetch("address") }
-  end
-
-  def load_ip_netns_link
-    JSON.parse(vm.vm_host.sshable.cmd("sudo -- ip --detail --json --netns #{vm.inhost_name.shellescape} link"))
-  end
-
-  def install_ssh_listen_only_nftables_chain
-    vm.sshable.cmd("sudo nft --file -", stdin: template_ssh_only_listen_nftable_conf)
-  end
-
-  def template_ssh_only_listen_nftable_conf
-    internet_routing_mac_nft_set = '{"' + tun_mac_addresses.join('", "') + '"}'
-
-    <<NFTABLES_CONF
-# An nftables idiom for idempotent re-create of a named entity: merge
-# in an empty table (a no-op if the table already exists) and then
-# delete, before creating with a new definition.
-table inet clover_github_actions;
-delete table inet clover_github_actions;
-
-table inet clover_github_actions {
-  chain input {
-    type filter hook input priority 0;
-
-    # If a conntrack has been instantiated for a flow, allow the
-    # packet through.
-
-    # The trick in the rest of all this is to allow only the
-    # current host to initiate the creation of entries in the
-    # conntrack table, and they cannot be initiated from other
-    # hosts on the Internet, with a notable exception for SSH.
-    ct state vmap { established : accept, related : accept, invalid : drop }
-
-    # Needed for neighbor solicitation at least to establish new
-    # connections on IPv6, including DNS queries to IPv6 servers,
-    # but on consideration of the goal of blocking attacks on
-    # vulnerable GitHub Action payloads, it's okay to enable the
-    # full ICMP suite for IPv4 and IPv6.
-    meta l4proto { icmp, icmpv6 } accept
-
-    # An exception to the "no connections initiated from the
-    # Internet" rule, allow port 22/SSH to receive packets from the
-    # internet without a conntrack state already established.
-    # This is how Clover connects and controls the runner, so it's
-    # obligatory.
-    tcp dport 22 accept
-
-    # Allow all other traffic that doesn't come from the host
-    # forwarding, e.g. between interfaces on the system, as in
-    # some uses of containers.  Our control over that is limited,
-    # we want to not be debugging our interactions with GitHub's
-    # pretty involved definition if we can avoid it.  Thus,
-    # correlating it with a feature of the host's routing is one
-    # way to narrowly define the behavior we want.
-    ether saddr != #{internet_routing_mac_nft_set} accept
-
-    # Finally, if passing no other conditions, drop all traffic
-    # that comes from the host router hop.
-    ether saddr #{internet_routing_mac_nft_set} drop
-  }
-}
-NFTABLES_CONF
   end
 end
