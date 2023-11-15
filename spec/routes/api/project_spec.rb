@@ -64,6 +64,15 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(404)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
       end
+
+      it "not authorized" do
+        u = create_account("test@test.com")
+        p = u.create_project_with_default_policy("project-1")
+        get "/api/project/#{p.ubid}"
+
+        expect(last_response.status).to eq(403)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, you don't have permission to continue with this request.")
+      end
     end
   end
 end
