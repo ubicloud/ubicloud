@@ -34,7 +34,6 @@ RSpec.describe Project do
   end
 
   it "sets and gets feature flags" do
-    described_class.feature_flag(:enable_postgres)
     project = described_class.create_with_id(name: "dummy-name")
 
     expect(project.get_enable_postgres).to be_nil

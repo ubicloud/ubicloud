@@ -70,4 +70,6 @@ class Project < Sequel::Model
       end
     end
   end
+
+  feature_flag :enable_postgres
 end
