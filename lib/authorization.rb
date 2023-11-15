@@ -86,31 +86,20 @@ module Authorization
       AccessTag.where(project_id: project.id, hyper_tag_id: id).first
     end
 
-    def create_hyper_tag(project)
-      AccessTag.create_with_id(
-        project_id: project.id,
-        name: hyper_tag_name(project),
-        hyper_tag_id: id,
-        hyper_tag_table: self.class.table_name
-      )
-    end
-
-    def delete_hyper_tag(project)
-      DB.transaction do
-        tag = hyper_tag(project)
-        AppliedTag.where(access_tag_id: tag.id).destroy
-        tag.destroy
-      end
-    end
-
     def associate_with_project(project)
       return if project.nil?
 
       DB.transaction do
-        self_tag = create_hyper_tag(project)
+        self_tag = AccessTag.create_with_id(
+          project_id: project.id,
+          name: hyper_tag_name(project),
+          hyper_tag_id: id,
+          hyper_tag_table: self.class.table_name
+        )
         project_tag = project.hyper_tag(project)
         tag(self_tag)
         tag(project_tag) if self_tag.id != project_tag.id
+        self_tag
       end
     end
 
@@ -120,7 +109,7 @@ module Authorization
       DB.transaction do
         project_tag = project.hyper_tag(project)
         untag(project_tag)
-        delete_hyper_tag(project)
+        hyper_tag(project).destroy
       end
     end
   end
