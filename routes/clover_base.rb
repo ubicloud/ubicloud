@@ -104,6 +104,22 @@ module CloverBase
     end
   end
 
+  def fetch_location_based_prices(*resource_types)
+    # We use 1 month = 672 hours for conversion. Number of hours
+    # in a month changes between 672 and 744, We are  also capping
+    # billable hours to 672 while generating invoices. This ensures
+    # that users won't see higher price in their invoice compared
+    # to price calculator and also we charge same amount no matter
+    # the number of days in a given month.
+    BillingRate.rates.filter { resource_types.include?(_1["resource_type"]) }
+      .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
+      hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
+        hourly: br["unit_price"].to_f * 60,
+        monthly: br["unit_price"].to_f * 60 * 672
+      }
+    end
+  end
+
   def base_url
     # :nocov:
     port = ":#{request.port}" if request.port != Rack::Request::DEFAULT_PORTS[request.scheme]
