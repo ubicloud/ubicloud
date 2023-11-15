@@ -25,6 +25,10 @@ class CloverApi
         r.halt
       end
 
+      unless @project.user_ids.include?(@current_user.id)
+        fail Authorization::Unauthorized
+      end
+
       r.get true do
         Authorization.authorize(@current_user.id, "Project:view", @project.id)
 

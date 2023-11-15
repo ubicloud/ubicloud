@@ -31,6 +31,10 @@ class CloverWeb
         r.halt
       end
 
+      unless @project.user_ids.include?(@current_user.id)
+        fail Authorization::Unauthorized
+      end
+
       @project_data = serialize(@project)
       @project_permissions = Authorization.all_permissions(@current_user.id, @project.id)
 
@@ -65,12 +69,6 @@ class CloverWeb
       end
 
       r.get "dashboard" do
-        # Even if user doesn't have access to the project details if it's added to the project,
-        # we still show the dashboard.
-        unless @project.user_ids.include?(@current_user.id)
-          fail Authorization::Unauthorized
-        end
-
         view "project/dashboard"
       end
 
