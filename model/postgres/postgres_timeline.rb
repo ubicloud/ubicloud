@@ -23,7 +23,7 @@ class PostgresTimeline < Sequel::Model
   def generate_walg_config
     <<-WALG_CONF
 WALG_S3_PREFIX=s3://#{ubid}
-AWS_ENDPOINT=#{blob_storage.connection_strings.first}
+AWS_ENDPOINT=#{blob_storage_endpoint}
 AWS_ACCESS_KEY_ID=#{access_key}
 AWS_SECRET_ACCESS_KEY=#{secret_key}
 AWS_REGION: us-east-1
@@ -33,6 +33,7 @@ PGHOST=/var/run/postgresql
   end
 
   def need_backup?
+    return false if blob_storage_endpoint.nil?
     return false if last_ineffective_check_at && last_ineffective_check_at > Time.now - 60 * 20
 
     status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
@@ -59,9 +60,17 @@ PGHOST=/var/run/postgresql
     @blob_storage ||= Project[Config.postgres_service_project_id].minio_clusters.first
   end
 
+  def blob_storage_endpoint
+    @blob_storage_endpoint ||= blob_storage&.connection_strings&.first
+    if @blob_storage_endpoint.nil? && Config.production?
+      fail "BUG: Missing blob storage configuration"
+    end
+    @blob_storage_endpoint
+  end
+
   def blob_storage_client
     @blob_storage_client ||= MinioClient.new(
-      endpoint: blob_storage.connection_strings.first,
+      endpoint: blob_storage_endpoint,
       access_key: Config.postgres_service_blob_storage_access_key,
       secret_key: Config.postgres_service_blob_storage_secret_key
     )

@@ -9,6 +9,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     instance_double(
       PostgresTimeline,
       ubid: "ptp99pd7gwyp4jcvnzgrsd443g",
+      blob_storage_endpoint: "https://blob-endpoint",
       blob_storage_client: instance_double(MinioClient)
     )
   }
@@ -42,6 +43,12 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   describe "#start" do
     it "creates bucket and hops" do
       expect(postgres_timeline.blob_storage_client).to receive(:create_bucket).with(bucket_name: postgres_timeline.ubid)
+      expect { nx.start }.to hop("wait_leader")
+    end
+
+    it "hops without creating bucket if blob storage is not configures" do
+      expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return(nil)
+      expect(postgres_timeline.blob_storage_client).not_to receive(:create_bucket)
       expect { nx.start }.to hop("wait_leader")
     end
   end

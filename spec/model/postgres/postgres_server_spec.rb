@@ -26,6 +26,7 @@ RSpec.describe PostgresServer do
   end
 
   it "generates configure_hash" do
+    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage_endpoint: "https://blob-endpoint"))
     postgres_server.timeline_access = "push"
     configure_hash = {
       configs: {
@@ -75,11 +76,20 @@ RSpec.describe PostgresServer do
   end
 
   it "generates configure_hash with additonal fields for restoring servers" do
+    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage_endpoint: "https://blob-endpoint"))
     postgres_server.timeline_access = "fetch"
     expect(postgres_server).to receive(:resource).and_return(instance_double(PostgresResource, restore_target: "2023-10-25 00:00"))
     expect(postgres_server.configure_hash[:configs]).to include(
       recovery_target_time: "'2023-10-25 00:00'",
       restore_command: "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
+    )
+  end
+
+  it "does not set archival related configs if blob storage is not configured" do
+    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage_endpoint: nil))
+    postgres_server.timeline_access = "push"
+    expect(postgres_server.configure_hash[:configs]).not_to include(
+      archive_mode: "on"
     )
   end
 end
