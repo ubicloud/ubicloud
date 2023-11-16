@@ -344,24 +344,6 @@ SQL
   label def run
     vm.nics.each { _1.incr_setup_nic }
     host.sshable.cmd("sudo systemctl start #{q_vm}")
-    BillingRecord.create_with_id(
-      project_id: vm.projects.first.id,
-      resource_id: vm.id,
-      resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
-      amount: vm.cores
-    )
-
-    if vm.ip4_enabled
-      BillingRecord.create_with_id(
-        project_id: vm.projects.first.id,
-        resource_id: vm.assigned_vm_address.id,
-        resource_name: vm.assigned_vm_address.ip,
-        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
-        amount: 1
-      )
-    end
-
     hop_wait_sshable
   end
 
@@ -371,9 +353,34 @@ SQL
     if out.include? "Host key verification failed."
       vm.update(display_state: "running")
       Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
-      hop_wait
+      hop_create_billing_record
     end
     nap 1
+  end
+
+  label def create_billing_record
+    project = vm.projects.first
+    hop_wait unless project.billable
+
+    BillingRecord.create_with_id(
+      project_id: project.id,
+      resource_id: vm.id,
+      resource_name: vm.name,
+      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
+      amount: vm.cores
+    )
+
+    if vm.ip4_enabled
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: vm.assigned_vm_address.id,
+        resource_name: vm.assigned_vm_address.ip,
+        billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
+        amount: 1
+      )
+    end
+
+    hop_wait
   end
 
   label def wait
