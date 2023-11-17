@@ -49,7 +49,6 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(st.label).to eq "start"
       expect(MinioServer.first.pool).to eq minio_pool
       expect(Vm.count).to eq 1
-      expect(Vm.first.vm_storage_volumes.count).to eq 2
       expect(Vm.first.unix_user).to eq "minio-user"
       expect(Vm.first.sshable.host).to eq "temp_#{Vm.first.id}"
       expect(Vm.first.private_subnets.first.id).to eq ps.id

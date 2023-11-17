@@ -91,14 +91,18 @@ RSpec.describe Prog::Vm::Nexus do
       described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location: "hetzner-hel1")
     end
 
+    def requested_disk_size(st)
+      st.stack.first["storage_volumes"].first["size_gib"]
+    end
+
     it "creates with default storage size from vm size" do
       st = described_class.assemble("some_ssh_key", prj.id)
-      expect(st.subject.storage_size_gib).to eq(Option::VmSizes.first.storage_size_gib)
+      expect(requested_disk_size(st)).to eq(Option::VmSizes.first.storage_size_gib)
     end
 
     it "creates with custom storage size if provided" do
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 40}])
-      expect(st.subject.storage_size_gib).to eq(40)
+      expect(requested_disk_size(st)).to eq(40)
     end
 
     it "fails if given nic_id is not valid" do
@@ -149,20 +153,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect {
         described_class.assemble("some_ssh_key", prj.id, private_subnet_id: ps.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
-    end
-
-    it "creates without encryption key if storage is not encrypted" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: false}])
-      expect(StorageKeyEncryptionKey.count).to eq(0)
-      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
-      expect(described_class.new(st).storage_secrets.count).to eq(0)
-    end
-
-    it "creates with encryption key if storage is encrypted" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: true}])
-      expect(StorageKeyEncryptionKey.count).to eq(1)
-      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
-      expect(described_class.new(st).storage_secrets.count).to eq(1)
     end
   end
 
@@ -254,6 +244,8 @@ RSpec.describe Prog::Vm::Nexus do
       ) { _1.id = vmh_id }
 
       expect(nx).to receive(:allocate).and_return(vmh_id)
+      expect(nx).to receive(:create_storage_volume_records)
+      expect(nx).to receive(:clear_stack_storage_volumes)
       expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
       expect(vm).to receive(:update) do |**args|
         expect(args[:ephemeral_net6]).to match(/2a01:4f9:2b:35a:.*/)
@@ -274,6 +266,8 @@ RSpec.describe Prog::Vm::Nexus do
       assigned_address = AssignedVmAddress.new(ip: NetAddr::IPv4Net.parse("10.0.0.1"))
 
       expect(nx).to receive(:allocate).and_return(vmh_id)
+      expect(nx).to receive(:create_storage_volume_records)
+      expect(nx).to receive(:clear_stack_storage_volumes)
       expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
       expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
@@ -294,6 +288,7 @@ RSpec.describe Prog::Vm::Nexus do
       ) { _1.id = vmh_id }
 
       expect(nx).to receive(:allocate).and_return(vmh_id)
+      expect(nx).to receive(:create_storage_volume_records).and_return(vmh_id)
       expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
       expect(vmh).to receive(:ip4_random_vm_network).and_return([nil, nil])
       expect(vm).to receive(:ip4_enabled).and_return(true).at_least(:once)
@@ -393,6 +388,39 @@ RSpec.describe Prog::Vm::Nexus do
       new_host(used_cores: 70).save_changes
       expect(nx.allocation_dataset.map { _1[:used_cores] }).to eq([0, 70])
       expect(nx.allocate).to eq idle.id
+    end
+  end
+
+  describe "#create_storage_volume_records" do
+    it "creates without encryption key if storage is not encrypted" do
+      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: false}])
+      nx = described_class.new(st)
+      nx.create_storage_volume_records
+      expect(StorageKeyEncryptionKey.count).to eq(0)
+      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
+      expect(nx.storage_secrets.count).to eq(0)
+    end
+
+    it "creates with encryption key if storage is encrypted" do
+      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: true}])
+      nx = described_class.new(st)
+      nx.create_storage_volume_records
+      expect(StorageKeyEncryptionKey.count).to eq(1)
+      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
+      expect(nx.storage_secrets.count).to eq(1)
+    end
+  end
+
+  describe "#clear_stack_storage_volumes" do
+    it "removes storage volume info" do
+      strand = instance_double(Strand)
+      stack = [{"storage_volumes" => []}]
+      allow(nx).to receive(:strand).and_return(strand)
+      expect(strand).to receive(:stack).and_return(stack)
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+
+      expect { nx.clear_stack_storage_volumes }.not_to raise_error
     end
   end
 

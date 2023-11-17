@@ -27,9 +27,10 @@ class Prog::Vm::Nexus < Prog::Base
     }]
 
     # allow missing fields to make testing during development more convenient.
-    storage_volumes.each do |volume|
+    storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_gib
       volume[:encrypted] = true if !volume.has_key? :encrypted
+      volume[:boot] = disk_index == boot_disk_index
     end
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
@@ -83,31 +84,11 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm.associate_with_project(project)
 
-      storage_volumes.each_with_index do |volume, disk_index|
-        key_encryption_key = if volume[:encrypted]
-          key_wrapping_algorithm = "aes-256-gcm"
-          cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
-          key_wrapping_key = cipher.random_key
-          key_wrapping_iv = cipher.random_iv
-
-          StorageKeyEncryptionKey.create_with_id(
-            algorithm: key_wrapping_algorithm,
-            key: Base64.encode64(key_wrapping_key),
-            init_vector: Base64.encode64(key_wrapping_iv),
-            auth_data: "#{vm.inhost_name}_#{disk_index}"
-          )
-        end
-
-        VmStorageVolume.create_with_id(
-          vm_id: vm.id,
-          boot: disk_index == boot_disk_index,
-          size_gib: volume[:size_gib],
-          disk_index: disk_index,
-          key_encryption_key_1_id: key_encryption_key&.id
-        )
-      end
-
-      Strand.create(prog: "Vm::Nexus", label: "start") { _1.id = vm.id }
+      Strand.create(
+        prog: "Vm::Nexus",
+        label: "start",
+        stack: [{"storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) }}]
+      ) { _1.id = vm.id }
     end
   end
 
@@ -195,6 +176,39 @@ SQL
     vm_host_id
   end
 
+  def create_storage_volume_records
+    frame["storage_volumes"].each_with_index do |volume, disk_index|
+      key_encryption_key = if volume["encrypted"]
+        key_wrapping_algorithm = "aes-256-gcm"
+        cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
+        key_wrapping_key = cipher.random_key
+        key_wrapping_iv = cipher.random_iv
+
+        StorageKeyEncryptionKey.create_with_id(
+          algorithm: key_wrapping_algorithm,
+          key: Base64.encode64(key_wrapping_key),
+          init_vector: Base64.encode64(key_wrapping_iv),
+          auth_data: "#{vm.inhost_name}_#{disk_index}"
+        )
+      end
+
+      VmStorageVolume.create_with_id(
+        vm_id: vm.id,
+        boot: volume["boot"],
+        size_gib: volume["size_gib"],
+        disk_index: disk_index,
+        key_encryption_key_1_id: key_encryption_key&.id
+      )
+    end
+  end
+
+  def clear_stack_storage_volumes
+    current_frame = strand.stack.first
+    current_frame.delete("storage_volumes")
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
@@ -219,6 +233,8 @@ SQL
       nap 30
     end
 
+    create_storage_volume_records
+
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
 
@@ -241,6 +257,11 @@ SQL
     end
     vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6.nth(2))
     register_deadline(:wait, 10 * 60)
+
+    # We don't need storage_volume info anymore, so delete it before
+    # transitioning to the next state.
+    clear_stack_storage_volumes
+
     hop_create_unix_user
   end
 
