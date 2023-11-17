@@ -2,7 +2,7 @@
 
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
-  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
+  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules, :peered_tunnel_rekey
 
   def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil)
     unless (project = Project[project_id])
@@ -52,6 +52,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       hop_update_firewall_rules
     end
 
+    when_peered_tunnel_rekey_set? do
+      private_subnet.update(state: "rekeying")
+      hop_rekey_peered_tunnel
+    end
+
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24
       private_subnet.incr_refresh_keys
     end
@@ -69,6 +74,15 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   def gen_reqid
     SecureRandom.random_number(100000) + 1
+  end
+
+  label def rekey_peered_tunnel
+    decr_peered_tunnel_rekey
+    private_subnet.nics.each do |nic|
+      bud Prog::Vnet::RekeyNicTunnel, {subject_id: nic.id}, :setup_peered_tunnels
+    end
+
+    hop_wait
   end
 
   label def update_firewall_rules
@@ -105,7 +119,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   label def refresh_keys
     active_nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
-      nic.incr_start_rekey
     end
 
     decr_refresh_keys

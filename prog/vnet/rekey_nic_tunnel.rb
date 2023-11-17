@@ -8,10 +8,30 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     pop "add_subnet_addr is complete"
   end
 
+  label def setup_peered_tunnels
+    nic.dst_ipsec_tunnels.each do |tunnel|
+      next unless tunnel.is_peering?
+
+      policy = Xfrm.new(nic, tunnel, "fwd")
+      policy.create_state
+      policy.upsert_policy
+      policy.create_private_routes
+    end
+
+    nic.src_ipsec_tunnels.each do |tunnel|
+      next unless tunnel.is_peering?
+
+      policy = Xfrm.new(nic, tunnel, "out")
+      policy.create_state
+      policy.upsert_policy
+    end
+
+    pop "setup_peered_tunnels is complete"
+  end
+
   label def setup_inbound
     nic.dst_ipsec_tunnels.each do |tunnel|
-      args = tunnel.src_nic.rekey_payload
-      next unless args
+      next unless tunnel.src_nic.rekey_payload
 
       policy = Xfrm.new(nic, tunnel, "fwd")
       policy.create_state
@@ -23,8 +43,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
 
   label def setup_outbound
     nic.src_ipsec_tunnels.each do |tunnel|
-      args = tunnel.src_nic.rekey_payload
-      next unless args
+      next unless tunnel.src_nic.rekey_payload
 
       policy = Xfrm.new(nic, tunnel, "out")
       policy.create_state
@@ -53,10 +72,10 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     states = state_data.scan(/^src (\S+) dst (\S+).*?proto esp spi (0x[0-9a-f]+)/m)
 
     # Identify which states to drop
-    states_to_drop = states.reject { |(_, _, spi)| new_spis.include?(spi) }
-    states_to_drop.each do |src, dst, spi|
-      nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.src_ipsec_tunnels.first.vm_name(nic)} xfrm state delete src #{src} dst #{dst} proto esp spi #{spi}")
-    end
+    # states_to_drop = states.reject { |(_, _, spi)| new_spis.include?(spi) }
+    # states_to_drop.each do |src, dst, spi|
+    #   nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.src_ipsec_tunnels.first.vm_name(nic)} xfrm state delete src #{src} dst #{dst} proto esp spi #{spi}")
+    # end
 
     pop "drop_old_state is complete"
   end
@@ -73,20 +92,23 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       @reqid = tunnel.src_nic.rekey_payload["reqid"]
       @dir = direction
       @args = tunnel.src_nic.rekey_payload
+      @is_peering = tunnel.is_peering?
     end
 
     def upsert_policy
-      apply_policy(@tunnel.src_nic.private_ipv4, @tunnel.dst_nic.private_ipv4)
+      apply_policy(@tunnel.src_nic.private_ipv4, @tunnel.dst_nic.private_ipv4) unless @is_peering
       apply_policy(@tunnel.src_nic.private_ipv6, @tunnel.dst_nic.private_ipv6)
     end
 
     def create_state
-      create_xfrm_state(@tmpl_src, @tmpl_dst, @args["spi4"], true)
+      create_xfrm_state(@tmpl_src, @tmpl_dst, @args["spi4"], true) unless @is_peering
       create_xfrm_state(@tmpl_src, @tmpl_dst, @args["spi6"], false)
     end
 
     def create_private_routes
-      [@tunnel.dst_nic.private_ipv6, @tunnel.dst_nic.private_ipv4].each do |dst_ip|
+      dest_ips = [@tunnel.dst_nic.private_ipv6]
+      dest_ips << @tunnel.src_nic.private_ipv4 unless @is_peering
+      dest_ips.each do |dst_ip|
         @nic.vm.vm_host.sshable.cmd("sudo ip -n #{@namespace} route replace #{dst_ip.to_s.shellescape} dev vethi#{@namespace}")
       end
     end

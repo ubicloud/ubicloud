@@ -11,4 +11,8 @@ class IpsecTunnel < Sequel::Model
   def vm_name(nic)
     nic.vm.inhost_name.shellescape
   end
+
+  def is_peering?
+    src_nic.private_subnet.id != dst_nic.private_subnet.id
+  end
 end
