@@ -4,7 +4,8 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
   subject_is :nic
 
   label def add_subnet_addr
-    nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} addr replace #{nic.private_subnet.net4} dev #{nic.ubid_to_tap_name}")
+    addr = nic.vm.boot_image.include?("ubuntu-2004") ? (nic.private_subnet.net4.nth(1).to_s + nic.private_subnet.net4.netmask.to_s) : nic.private_subnet.net4.to_s
+    nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} addr replace #{addr} dev #{nic.ubid_to_tap_name}")
     pop "add_subnet_addr is complete"
   end
 
