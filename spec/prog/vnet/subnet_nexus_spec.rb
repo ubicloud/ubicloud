@@ -98,12 +98,26 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
-  describe "#wait" do
+  describe "#before_run" do
     it "hops to destroy if when_destroy_set?" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.wait }.to hop("destroy")
+      expect { nx.before_run }.to hop("destroy")
     end
 
+    it "hops to destroy if when_destroy_set? from wait_fw_rules" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_fw_rules").at_least(:once)
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "does not hop to destroy if strand is destroy" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+  end
+
+  describe "#wait" do
     it "hops to refresh_keys if when_refresh_keys_set?" do
       expect(nx).to receive(:when_refresh_keys_set?).and_yield
       expect(ps).to receive(:update).with(state: "refreshing_keys").and_return(true)
