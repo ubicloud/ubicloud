@@ -32,11 +32,16 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  label def wait
+  def before_run
     when_destroy_set? do
-      hop_destroy
+      if strand.label != "destroy"
+        register_deadline(nil, 10 * 60)
+        hop_destroy
+      end
     end
+  end
 
+  label def wait
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
       hop_refresh_keys
@@ -144,8 +149,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
-
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
       Clog.emit "Cannot destroy subnet with active nics, first clean up the attached resources" do
         {private_subnet: private_subnet.values}
