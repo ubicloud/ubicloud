@@ -4,9 +4,12 @@ require_relative "spec_helper"
 
 RSpec.describe Clover do
   it "handles CSRF token errors" do
-    page.driver.post("/login")
+    visit "/login"
+    find("input[name=_csrf]", visible: false).set("")
+    click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - Invalid Security Token")
+    expect(page.status_code).to eq(200)
+    expect(page).to have_content("An invalid security token submitted with this request")
   end
 
   it "handles unexpected errors" do

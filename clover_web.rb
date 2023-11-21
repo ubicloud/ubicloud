@@ -69,6 +69,9 @@ class CloverWeb < Roda
     when Validation::ValidationFailed
       flash["errors"] = (flash["errors"] || {}).merge(@error[:details])
       return redirect_back_with_inputs
+    when Roda::RodaPlugins::RouteCsrf::InvalidToken
+      flash["error"] = "An invalid security token submitted with this request, please try again"
+      return redirect_back_with_inputs
     end
 
     # :nocov:
