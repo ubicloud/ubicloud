@@ -202,7 +202,11 @@ class CloverWeb < Roda
   end
 
   hash_branch("after-login") do |r|
-    r.redirect "#{@current_user.projects.first.path}/dashboard"
+    if (project = @current_user.projects_dataset.order(:created_at).first)
+      r.redirect "#{project.path}/dashboard"
+    else
+      r.redirect "/project"
+    end
   end
 
   route do |r|
