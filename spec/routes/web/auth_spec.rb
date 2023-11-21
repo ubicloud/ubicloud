@@ -78,6 +78,17 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Reset Password")
   end
 
+  it "can login to an account without projects" do
+    create_account(with_project: false)
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - Projects")
+  end
+
   it "can not login if the account is suspended" do
     account = create_account
 
