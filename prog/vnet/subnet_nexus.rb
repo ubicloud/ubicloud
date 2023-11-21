@@ -82,7 +82,17 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       bud Prog::Vnet::RekeyNicTunnel, {subject_id: nic.id}, :setup_peered_tunnels
     end
 
-    hop_wait
+    hop_wait_rekey_peered_tunnel
+  end
+
+  label def wait_rekey_peered_tunnel
+    reap
+    if leaf?
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+
+    donate
   end
 
   label def update_firewall_rules
@@ -173,6 +183,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       DB.transaction do
         private_subnet.firewall_rules.map(&:destroy)
         private_subnet.projects.each { |p| private_subnet.dissociate_with_project(p) }
+        private_subnet.subnet_peers.map(&:incr_destroy)
         private_subnet.destroy
       end
       pop "subnet destroyed"

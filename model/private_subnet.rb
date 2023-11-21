@@ -7,6 +7,7 @@ class PrivateSubnet < Sequel::Model
   one_to_many :nics, key: :private_subnet_id
   one_to_one :strand, key: :id
   one_to_many :firewall_rules
+  one_to_many :subnet_peers, key: :peer_subnet_id
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",

@@ -8,5 +8,9 @@ Sequel.migration do
       foreign_key :provider_subnet_id, :private_subnet, type: :uuid
       foreign_key :peer_subnet_id, :private_subnet, type: :uuid
     end
+
+    alter_table(:firewall_rule) do
+      add_foreign_key :subnet_peer_id, :subnet_peer, type: :uuid, null: true, default: nil
+    end
   end
 end

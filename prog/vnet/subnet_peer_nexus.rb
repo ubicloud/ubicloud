@@ -18,6 +18,12 @@ class Prog::Vnet::SubnetPeerNexus < Prog::Base
         provider_subnet_id: provider_subnet.id,
         peer_subnet_id: peer_subnet.id
       ) { _1.id = ubid.to_uuid }
+      FirewallRule.create_with_id(
+        ip: peer_subnet.net6.to_s,
+        private_subnet_id: provider_subnet.id,
+        subnet_peer_id: ubid.to_uuid
+      )
+      provider_subnet.incr_update_firewall_rules
       Strand.create(prog: "Vnet::SubnetPeerNexus", label: "setup") { _1.id = ubid.to_uuid }
     end
   end
@@ -73,5 +79,18 @@ class Prog::Vnet::SubnetPeerNexus < Prog::Base
     end
 
     hop_wait
+  end
+
+  label def destroy
+    DB.transaction do
+      FirewallRule.where(subnet_peer_id: subnet_peer.id).destroy
+      IpsecTunnel.where(src_nic_id: subnet_peer.provider_subnet.nics.map(&:id)).destroy
+      IpsecTunnel.where(dst_nic_id: subnet_peer.provider_subnet.nics.map(&:id)).destroy
+      IpsecTunnel.where(src_nic_id: subnet_peer.peer_subnet.nics.map(&:id)).destroy
+      IpsecTunnel.where(dst_nic_id: subnet_peer.peer_subnet.nics.map(&:id)).destroy
+      subnet_peer.destroy
+    end
+
+    pop "destroy is complete"
   end
 end

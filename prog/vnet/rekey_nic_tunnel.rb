@@ -15,7 +15,6 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       policy = Xfrm.new(nic, tunnel, "fwd")
       policy.create_state
       policy.upsert_policy
-      policy.create_private_routes
     end
 
     nic.src_ipsec_tunnels.each do |tunnel|
@@ -24,6 +23,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
       policy = Xfrm.new(nic, tunnel, "out")
       policy.create_state
       policy.upsert_policy
+      policy.create_private_routes
     end
 
     pop "setup_peered_tunnels is complete"
@@ -106,9 +106,9 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     end
 
     def create_private_routes
-      dest_ips = [@tunnel.dst_nic.private_ipv6]
-      dest_ips << @tunnel.src_nic.private_ipv4 unless @is_peering
-      dest_ips.each do |dst_ip|
+      dests = [@tunnel.src_nic.private_ipv6, @tunnel.src_nic.private_ipv4]
+      dests = [@tunnel.dst_nic.private_ipv6] if @tunnel.is_peering?
+      dests.each do |dst_ip|
         @nic.vm.vm_host.sshable.cmd("sudo ip -n #{@namespace} route replace #{dst_ip.to_s.shellescape} dev vethi#{@namespace}")
       end
     end
