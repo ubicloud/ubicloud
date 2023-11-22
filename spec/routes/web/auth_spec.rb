@@ -78,6 +78,26 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Reset Password")
   end
 
+  it "can not login if the account is suspended" do
+    account = create_account
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+
+    account.suspend
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - Login")
+    expect(page).to have_content("Your account has been suspended")
+  end
+
   describe "authenticated" do
     before do
       create_account

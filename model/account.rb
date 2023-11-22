@@ -24,4 +24,9 @@ class Account < Sequel::Model(:accounts)
     )
     project
   end
+
+  def suspend
+    update(suspended_at: Time.now)
+    DB[:account_active_session_keys].where(account_id: id).delete(force: true)
+  end
 end

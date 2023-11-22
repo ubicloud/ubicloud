@@ -126,6 +126,16 @@ class CloverWeb < Roda
     already_logged_in { redirect login_redirect }
     after_login { remember_login if request.params["remember-me"] == "on" }
 
+    before_login do
+      if Account[account_id].suspended_at
+        flash["error"] = "Your account has been suspended. " \
+          "If you believe there's a mistake, or if you need further assistance, " \
+          "please reach out to our support team at support@ubicloud.com."
+
+        redirect login_route
+      end
+    end
+
     create_account_view { view "auth/create_account", "Create Account" }
     create_account_redirect { login_route }
     create_account_set_password? true
