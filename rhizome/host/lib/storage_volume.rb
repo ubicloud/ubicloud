@@ -19,6 +19,7 @@ class StorageVolume
     @device_id = params["device_id"]
     @encrypted = params["encrypted"]
     @disk_size_gib = params["size_gib"]
+    @use_bdev_ubi = (params["use_bdev_ubi"] || false)
     @image_path = vp.image_path(params["image"]) if params["image"]
     @disk_file = vp.disk(@disk_index)
 
@@ -40,14 +41,17 @@ class StorageVolume
     encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
 
     if @image_path.nil?
+      fail "bdev_ubi requires a base image" if @use_bdev_ubi
       create_empty_disk_file
       return
     end
 
     verify_imaged_disk_size
 
-    if @encrypted
-      encrypted_image_copy(encryption_key)
+    if @use_bdev_ubi
+      create_ubi_writespace(encryption_key)
+    elsif @encrypted
+      encrypted_image_copy(encryption_key, @image_path)
     else
       unencrypted_image_copy
     end
@@ -77,12 +81,18 @@ class StorageVolume
 
     rpc_client.vhost_delete_controller(vhost_controller)
 
+    non_ubi_bdev = @use_bdev_ubi ? "#{@device_id}_base" : @device_id
+
+    if @use_bdev_ubi
+      rpc_client.bdev_ubi_delete(@device_id)
+    end
+
     if @encrypted
-      rpc_client.bdev_crypto_delete(@device_id)
+      rpc_client.bdev_crypto_delete(non_ubi_bdev)
       rpc_client.bdev_aio_delete("#{@device_id}_aio")
       rpc_client.accel_crypto_key_destroy("#{@device_id}_key")
     else
-      rpc_client.bdev_aio_delete(@device_id)
+      rpc_client.bdev_aio_delete(non_ubi_bdev)
     end
 
     rm_if_exists(SpdkPath.vhost_sock(vhost_controller))
@@ -132,7 +142,7 @@ class StorageVolume
     fail "Image size greater than requested disk size" unless size <= @disk_size_gib * 2**30
   end
 
-  def encrypted_image_copy(encryption_key)
+  def encrypted_image_copy(encryption_key, input_file, block_size: 2097152, count: nil)
     # Note that spdk_dd doesn't interact with the main spdk process. It is a
     # tool which starts the spdk infra as a separate process, creates bdevs
     # from config, does the copy, and exits. Since it is a separate process
@@ -190,12 +200,23 @@ class StorageVolume
 
     create_empty_disk_file
 
+    count_param = count.nil? ? "" : "--count #{count}"
+
     r("#{SpdkPath.bin(@spdk_version, "spdk_dd")} --config /dev/stdin " \
     "--disable-cpumask-locks " \
     "--rpc-socket #{rpc_socket.shellescape} " \
-    "--if #{@image_path.shellescape} " \
+    "--if #{input_file.shellescape} " \
     "--ob crypt0 " \
-    "--bs=2097152", stdin: spdk_config_json)
+    "--bs=#{block_size} #{count_param}", stdin: spdk_config_json)
+  end
+
+  def create_ubi_writespace(encryption_key)
+    if @encrypted
+      # just clear the metadata section, i.e. first 8MB
+      encrypted_image_copy(encryption_key, "/dev/zero", block_size: 2097152, count: 4)
+    else
+      create_empty_disk_file
+    end
   end
 
   def create_empty_disk_file
@@ -216,11 +237,11 @@ class StorageVolume
   end
 
   def setup_spdk_bdev(encryption_key)
-    bdev = @device_id
+    non_ubi_bdev = @use_bdev_ubi ? "#{@device_id}_base" : @device_id
 
     if encryption_key
-      key_name = "#{bdev}_key"
-      aio_bdev = "#{bdev}_aio"
+      key_name = "#{@device_id}_key"
+      aio_bdev = "#{@device_id}_aio"
       rpc_client.accel_crypto_key_create(
         key_name,
         encryption_key[:cipher],
@@ -228,9 +249,13 @@ class StorageVolume
         encryption_key[:key2]
       )
       rpc_client.bdev_aio_create(aio_bdev, @disk_file, 512)
-      rpc_client.bdev_crypto_create(bdev, aio_bdev, key_name)
+      rpc_client.bdev_crypto_create(non_ubi_bdev, aio_bdev, key_name)
     else
-      rpc_client.bdev_aio_create(bdev, @disk_file, 512)
+      rpc_client.bdev_aio_create(non_ubi_bdev, @disk_file, 512)
+    end
+
+    if @use_bdev_ubi
+      rpc_client.bdev_ubi_create(@device_id, non_ubi_bdev, @image_path)
     end
   end
 

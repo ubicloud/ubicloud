@@ -29,6 +29,7 @@ class Prog::Vm::Nexus < Prog::Base
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_gib
+      volume[:use_bdev_ubi] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
     end
@@ -135,7 +136,8 @@ class Prog::Vm::Nexus < Prog::Base
         "device_id" => s.device_id,
         "disk_index" => s.disk_index,
         "encrypted" => !s.key_encryption_key_1.nil?,
-        "spdk_version" => s.spdk_version
+        "spdk_version" => s.spdk_version,
+        "use_bdev_ubi" => s.use_bdev_ubi
       }
     }
   end
@@ -193,24 +195,36 @@ SQL
         )
       end
 
+      spdk_installation_id =
+        allocate_spdk_installation(
+          vm_host.spdk_installations,
+          use_bdev_ubi: volume["use_bdev_ubi"]
+        )
+
       VmStorageVolume.create_with_id(
         vm_id: vm.id,
         boot: volume["boot"],
         size_gib: volume["size_gib"],
+        use_bdev_ubi: volume["use_bdev_ubi"],
         disk_index: disk_index,
         key_encryption_key_1_id: key_encryption_key&.id,
-        spdk_installation_id: allocate_spdk_installation(vm_host.spdk_installations)
+        spdk_installation_id: spdk_installation_id
       )
     end
   end
 
-  def allocate_spdk_installation(spdk_installations)
-    total_weight = spdk_installations.sum(&:allocation_weight)
-    fail "Total weight of all spdk_installations shouldn't be zero." if total_weight == 0
+  def allocate_spdk_installation(spdk_installations, use_bdev_ubi: false)
+    eligible_spdk_installations =
+      use_bdev_ubi ?
+        spdk_installations.select { |si| si.supports_bdev_ubi? } :
+        spdk_installations
+
+    total_weight = eligible_spdk_installations.sum(&:allocation_weight)
+    fail "Total weight of all eligible spdk_installations shouldn't be zero." if total_weight == 0
 
     rand_point = rand(0..total_weight - 1)
     weight_sum = 0
-    rand_choice = spdk_installations.each { |si|
+    rand_choice = eligible_spdk_installations.each { |si|
       weight_sum += si.allocation_weight
       break si if weight_sum > rand_point
     }
