@@ -64,7 +64,7 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2/")
       expect(encrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
       expect(encrypted_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
-      expect(encrypted_sv).to receive(:encrypted_image_copy).with(encryption_key)
+      expect(encrypted_sv).to receive(:encrypted_image_copy).with(encryption_key, image_path)
       encrypted_sv.prep(key_wrapping_secrets)
     end
 
@@ -170,8 +170,8 @@ RSpec.describe StorageVolume do
     it "can copy an image to an encrypted volume" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
       expect(encrypted_sv).to receive(:create_empty_disk_file).with(no_args)
-      expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+$/, stdin: /{.*}/)
-      encrypted_sv.encrypted_image_copy(encryption_key)
+      expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+\s*$/, stdin: /{.*}/)
+      encrypted_sv.encrypted_image_copy(encryption_key, image_path)
     end
   end
 

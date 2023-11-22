@@ -40,6 +40,22 @@ class SpdkRpc
     raise e unless if_exists
   end
 
+  def bdev_ubi_create(name, base_bdev_name, image_path, stripe_size_mb = 1)
+    params = {
+      name: name,
+      base_bdev: base_bdev_name,
+      image_path: image_path,
+      stripe_size_mb: stripe_size_mb
+    }
+    call("bdev_ubi_create", params)
+  end
+
+  def bdev_ubi_delete(name, if_exists = true)
+    call("bdev_ubi_delete", {name: name})
+  rescue SpdkNotFound => e
+    raise e unless if_exists
+  end
+
   def vhost_create_blk_controller(name, bdev)
     params = {
       ctrlr: name,

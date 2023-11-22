@@ -427,18 +427,25 @@ RSpec.describe Prog::Vm::Nexus do
       si_1 = SpdkInstallation.new(allocation_weight: 0)
       si_2 = SpdkInstallation.new(allocation_weight: 0)
 
-      expect { nx.allocate_spdk_installation([si_1, si_2]) }.to raise_error "Total weight of all spdk_installations shouldn't be zero."
+      expect { nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: false) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
+    end
+
+    it "fails if requested use_bdev_ubi, but no installations with bdev_ubi supports are available" do
+      si_1 = SpdkInstallation.new(allocation_weight: 100, version: "v23.09")
+      si_2 = SpdkInstallation.new(allocation_weight: 100, version: "v25.00")
+
+      expect { nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: true) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
     end
 
     it "chooses the only one if one provided" do
       si_1 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1])).to eq(si_1.id)
+      expect(nx.allocate_spdk_installation([si_1], use_bdev_ubi: false)).to eq(si_1.id)
     end
 
     it "doesn't return the one with zero weight" do
       si_1 = SpdkInstallation.new(allocation_weight: 0) { _1.id = SpdkInstallation.generate_uuid }
       si_2 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1, si_2])).to eq(si_2.id)
+      expect(nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: false)).to eq(si_2.id)
     end
   end
 
