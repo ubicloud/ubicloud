@@ -154,8 +154,10 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def verify_spdk
-    q_version = frame["spdk_version"].shellescape
-    sshable.cmd("sudo host/bin/setup-spdk verify #{q_version}")
+    vm_host.spdk_installations.each { |installation|
+      q_version = installation.version.shellescape
+      sshable.cmd("sudo host/bin/setup-spdk verify #{q_version}")
+    }
 
     hop_verify_hugepages
   end

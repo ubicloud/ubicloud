@@ -288,7 +288,12 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify #{Config.spdk_version}")
+      expect(vm_host).to receive(:spdk_installations).and_return([
+        SpdkInstallation.new(version: "v1.0"),
+        SpdkInstallation.new(version: "v3.0")
+      ])
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify v1.0")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify v3.0")
       expect { nx.verify_spdk }.to hop("verify_hugepages")
     end
 
