@@ -21,6 +21,6 @@ class GithubRunner < Sequel::Model
   end
 
   def runner_url
-    "http://github.com/#{repository_name}/settings/actions/runners/#{runner_id}"
+    "http://github.com/#{repository_name}/settings/actions/runners/#{runner_id}" if runner_id
   end
 end

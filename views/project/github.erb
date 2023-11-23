@@ -42,7 +42,11 @@
               <% @runners.each do |runner| %>
                 <tr id="github-installation-<%= runner[:id]%>">
                   <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                    <a href="<%= runner[:runner_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= runner[:ubid] %></a>
+                    <% if runner[:runner_url] %>
+                      <a href="<%= runner[:runner_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= runner[:ubid] %></a>
+                    <% else %>
+                      <%= runner[:ubid] %>
+                    <% end %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     <%= runner[:repository_name] %>
