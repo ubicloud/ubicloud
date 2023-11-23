@@ -2,29 +2,31 @@
 
 <% if rodauth.authenticated? %>
   <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        back: "/account",
-        parts: [["My Account", "/account"], ["Verify New Email", "#"]]
-      }
-    ) %>
     <%== render("components/page_header", locals: { title: "My Account" }) %>
   </div>
 
-  <div class="grid gap-6">
-    <form role="form" method="POST">
-      <%== rodauth.csrf_tag %>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <div class="px-4 py-5 sm:p-6">
-          <%== render("account/tab") %>
-          <div class="mt-6">
-            <%== render("components/form/submit_button", locals: { text: "Click to Verify New Email" }) %>
+  <main>
+    <div class="max-w-screen-xl pb-6 lg:pb-16">
+      <div class="overflow-hidden rounded-lg bg-white shadow">
+        <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+          <%== render("account/submenu") %>
+          <div class="divide-y divide-gray-200 lg:col-span-9 pb-10">
+            <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Verify New Email</h2>
+              <form role="form" method="POST">
+                <%== rodauth.csrf_tag("/" + rodauth.close_account_route) %>
+                <div class="mt-6 grid grid-cols-6 gap-6">
+                  <div class="col-span-6">
+                    <%== render("components/form/submit_button", locals: { text: "Click to Verify New Email" }) %>
+                  </div>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
-    </form>
-  </div>
+    </div>
+  </main>
 <% else %>
   <% @page_message = "Verify your new email" %>
 

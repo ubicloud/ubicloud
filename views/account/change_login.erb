@@ -1,65 +1,58 @@
 <% @page_title = "Change Email" %>
 
 <div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/account",
-      parts: [["My Account", "/account"], ["Change Email Address", "#"]]
-    }
-  ) %>
   <%== render("components/page_header", locals: { title: "My Account" }) %>
 </div>
 
-<div class="grid gap-6">
-  <form action="/<%= rodauth.change_login_route %>" role="form" method="POST">
-    <%== rodauth.csrf_tag("/" + rodauth.change_login_route) %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <%== render("account/tab") %>
-
-        <div>
-          <h2 class="text-lg font-medium leading-6 text-gray-900">Change Email Address</h2>
-        </div>
-
-        <div class="mt-6 grid grid-cols-6 gap-6">
-          <div class="col-span-6 sm:col-span-2">
-            <%== render(
-              "components/form/text",
-              locals: {
-                name: "login",
-                type: "email",
-                label: "New Email Address",
-                attributes: {
-                  required: true,
-                  autocomplete: "email"
-                }
-              }
-            ) %>
+<main>
+  <div class="max-w-screen-xl pb-6 lg:pb-16">
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+        <%== render("account/submenu") %>
+        <div class="divide-y divide-gray-200 lg:col-span-9 pb-10">
+          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <h2 class="text-lg font-medium leading-6 text-gray-900">Change Email Address</h2>
+            <form action="/<%= rodauth.change_login_route %>" role="form" method="POST">
+              <%== rodauth.csrf_tag("/" + rodauth.change_login_route) %>
+              <div class="mt-6 grid grid-cols-6 gap-6">
+                <div class="col-span-6 sm:col-span-2">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "login",
+                      type: "email",
+                      label: "New Email Address",
+                      attributes: {
+                        required: true,
+                        autocomplete: "email"
+                      }
+                    }
+                  ) %>
+                </div>
+                <% if rodauth.change_login_requires_password? %>
+                  <div class="col-span-6 sm:col-span-2">
+                    <%== render(
+                      "components/form/text",
+                      locals: {
+                        name: "password",
+                        type: "password",
+                        label: "Password",
+                        attributes: {
+                          required: true,
+                          autocomplete: "password"
+                        }
+                      }
+                    ) %>
+                  </div>
+                <% end %>
+                <div class="col-span-6">
+                  <%== render("components/form/submit_button", locals: { text: "Change Email" }) %>
+                </div>
+              </div>
+            </form>
           </div>
-          <% if rodauth.change_login_requires_password? %>
-            <div class="col-span-6 sm:col-span-2">
-              <%== render(
-                "components/form/text",
-                locals: {
-                  name: "password",
-                  type: "password",
-                  label: "Password",
-                  attributes: {
-                    required: true,
-                    autocomplete: "new-password"
-                  }
-                }
-              ) %>
-            </div>
-          <% end %>
-        </div>
-      </div>
-      <div class="px-4 py-5 sm:p-6">
-        <div class="flex items-center justify-end gap-x-6">
-          <%== render("components/form/submit_button", locals: { text: "Change Email" }) %>
         </div>
       </div>
     </div>
-  </form>
-</div>
+  </div>
+</main>
