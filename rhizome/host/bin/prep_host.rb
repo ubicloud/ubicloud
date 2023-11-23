@@ -12,10 +12,21 @@ unless (hostname = ARGV.shift)
   exit 1
 end
 
+unless (env_type = ARGV.shift)
+  puts "need environment type as argument"
+  exit 1
+end
+
 original_hostname = Socket.gethostname
 
 safe_write_to_file("/etc/hosts", File.read("/etc/hosts").gsub(original_hostname, hostname))
 r "sudo hostnamectl set-hostname " + hostname
+
+if env_type == "production"
+  bashrc_content = File.read("/root/.bashrc")
+  colored_prompt_code = '\e[0;41m[\u@\h \W]\$ \e[m'
+  safe_write_to_file("/root/.bashrc", "#{bashrc_content}\n PS1='#{colored_prompt_code}'")
+end
 
 ch_dir = CloudHypervisor::VERSION.dir
 FileUtils.mkdir_p(ch_dir)
