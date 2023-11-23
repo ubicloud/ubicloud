@@ -1,0 +1,40 @@
+<aside class="py-6 lg:col-span-2">
+  <nav class="space-y-1">
+    <% [
+        ["Change Password", "/account/change-password", "hero-key"],
+        ["Change Email", "/account/change-login", "hero-envelope"],
+        ["Close Account", "/account/close-account", "hero-x-circle"]
+      ].each do |label, url, icon, is_active| %>
+      <% if is_active || request.path == url %>
+        <a
+          href="<%= url %>"
+          class="border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+          aria-current="page"
+        >
+          <%== render(
+            "components/icon",
+            locals: {
+              name: icon,
+              classes: "text-orange-600 group-hover:text-orange-600 -ml-1 mr-3 h-6 w-6 flex-shrink-0"
+            }
+          ) %>
+          <span class="truncate"><%= label %></span>
+        </a>
+      <% else %>
+        <a
+          href="<%= url %>"
+          class="border-transparent text-gray-900 hover:bg-gray-50 hover:text-gray-900 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
+        >
+          <%== render(
+            "components/icon",
+            locals: {
+              name: icon,
+              classes: "text-gray-400 group-hover:text-gray-500 -ml-1 mr-3 h-6 w-6 flex-shrink-0"
+            }
+          ) %>
+          <span class="truncate"><%= label %></span>
+        </a>
+      <% end %>
+    <% end %>
+  </nav>
+</aside>
