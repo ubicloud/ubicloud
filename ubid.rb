@@ -96,7 +96,7 @@ class UBID
     s.delete_prefix("TYPE").split("_").map(&:capitalize).join
   end
 
-  TYPE2CLASS = constants.select { _1.start_with?("TYPE_") }
+  TYPE2CLASS = constants.select { _1.start_with?("TYPE_") }.reject { _1.to_s == "TYPE_ETC" }
     .map { [const_get(_1), Object.const_get(camelize(_1.to_s).to_s)] }.to_h
 
   def self.decode(ubid)
