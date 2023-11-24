@@ -10,6 +10,17 @@ class Clog
       case metadata = yield
       when Hash
         metadata
+      when Array
+        metadata.reduce({}) do |hash, item|
+          case item
+          when Hash
+            hash.merge(item)
+          when Sequel::Model
+            hash.merge(serialize_model(item))
+          else
+            hash.merge({invalid_type: item.class.to_s})
+          end
+        end
       when Sequel::Model
         serialize_model(metadata)
       else
