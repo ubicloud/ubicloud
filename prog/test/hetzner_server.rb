@@ -117,11 +117,37 @@ class Prog::Test::HetznerServer < Prog::Base
     sshable.cmd("sudo chmod a+rw #{tmp_dir}")
     sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
 
-    hop_test_host_encrypted
+    hop_install_bdev_ubid
+  end
+
+  label def install_bdev_ubid
+    # disable the default installation and install a bdev_ubi enabled spdk
+    SpdkInstallation.dataset.update(allocation_weight: 0)
+    strand.add_child(
+      Prog::Storage::SetupSpdk.assemble(
+        vm_host.id, "v23.09-ubi-0.1",
+        start_service: true,
+        allocation_weight: 100
+      )
+    )
+
+    hop_wait_install_bdev_ubid
+  end
+
+  label def wait_install_bdev_ubid
+    reap
+    hop_test_host_encrypted if children_idle
+    donate
   end
 
   label def test_host_encrypted
-    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true))
+    strand.add_child(
+      Prog::Test::VmGroup.assemble(
+        storage_encrypted: true,
+        test_reboot: true,
+        use_bdev_ubi: true
+      )
+    )
 
     hop_wait_test_host_encrypted
   end
@@ -135,7 +161,13 @@ class Prog::Test::HetznerServer < Prog::Base
   end
 
   label def test_host_unencrypted
-    strand.add_child(Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false))
+    strand.add_child(
+      Prog::Test::VmGroup.assemble(
+        storage_encrypted: false,
+        test_reboot: false,
+        use_bdev_ubi: true
+      )
+    )
 
     hop_wait_test_host_unencrypted
   end
