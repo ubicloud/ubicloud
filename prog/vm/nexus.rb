@@ -272,7 +272,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def create_billing_record
     vm.update(display_state: "running", provisioned_at: Time.now)
-    Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.allocated_at}} }
+    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.allocated_at}}] }
     project = vm.projects.first
     hop_wait unless project.billable
 
