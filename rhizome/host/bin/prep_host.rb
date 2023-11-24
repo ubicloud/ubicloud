@@ -22,11 +22,28 @@ original_hostname = Socket.gethostname
 safe_write_to_file("/etc/hosts", File.read("/etc/hosts").gsub(original_hostname, hostname))
 r "sudo hostnamectl set-hostname " + hostname
 
-if env_type == "production"
-  bashrc_content = File.read("/root/.bashrc")
-  colored_prompt_code = '\e[0;41m[\u@\h \W]\$ \e[m'
-  safe_write_to_file("/root/.bashrc", "#{bashrc_content}\n PS1='#{colored_prompt_code}'")
-end
+color_code = (env_type == "production") ? "\e[31m" : "\e[32m"
+
+reset_color_code = "\e[0m"
+
+bashrc_content = File.read("/root/.bashrc")
+colored_prompt_code = color_code + '[\u@\h \W]\$ ' + reset_color_code
+safe_write_to_file("/root/.bashrc", "#{bashrc_content}\n PS1='#{colored_prompt_code}'")
+
+motd_message = <<~'MOTD_MESSAGE'
+       _     _      _                 _
+ _   _| |__ (_) ___| | ___  _   _  __| |
+| | | |  _ \| |/ __| |/ _ \| | | |/ _  |
+| |_| | |_) | | (__| | (_) | |_| | (_| |
+ \__,_|_.__/|_|\___|_|\___/ \__,_|\__,_|
+MOTD_MESSAGE
+
+safe_write_to_file("/etc/update-motd.d/99-clover-motd", <<~MOTD_SCRIPT)
+#!/bin/bash
+echo '#{color_code}#{motd_message}#{reset_color_code}'
+MOTD_SCRIPT
+
+r "chmod +x /etc/update-motd.d/99-clover-motd"
 
 ch_dir = CloudHypervisor::VERSION.dir
 FileUtils.mkdir_p(ch_dir)
