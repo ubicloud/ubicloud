@@ -135,7 +135,25 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(sshable).to receive(:cmd).with(
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
-      expect { hs_test.run_integration_specs }.to hop("test_host_encrypted", "Test::HetznerServer")
+      expect { hs_test.run_integration_specs }.to hop("install_bdev_ubid", "Test::HetznerServer")
+    end
+  end
+
+  describe "#install_bdev_ubid" do
+    it "hops to wait_install_bdev_ubid" do
+      expect { hs_test.install_bdev_ubid }.to hop("wait_install_bdev_ubid", "Test::HetznerServer")
+    end
+  end
+
+  describe "#wait_install_bdev_ubid" do
+    it "hops to test_host_encrypted if children idle" do
+      expect(hs_test).to receive(:children_idle).and_return(true)
+      expect { hs_test.wait_install_bdev_ubid }.to hop("test_host_encrypted", "Test::HetznerServer")
+    end
+
+    it "donates if children not idle" do
+      expect(hs_test).to receive(:children_idle).and_return(false)
+      expect { hs_test.wait_install_bdev_ubid }.to nap(0)
     end
   end
 
