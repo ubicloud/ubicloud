@@ -58,11 +58,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     # YYY: Checking for use_bdev_ubi should be removed after transitioning
     # completely to bdev_ubi.
     if !vm_storage_params[:use_bdev_ubi] && (picked_vm = pool&.pick_vm)
-      Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
+      Clog.emit("Pool is used") { [github_runner, {runner_requested: {cores: picked_vm.cores, arch: picked_vm.arch}}] }
       return picked_vm
     end
 
-    vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+    new_vm = Prog::Vm::Nexus.assemble_with_sshable(
       "runner",
       Config.github_runner_service_project_id,
       name: github_runner.ubid.to_s,
@@ -72,18 +72,18 @@ class Prog::Vm::GithubRunner < Prog::Base
       storage_volumes: [vm_storage_params],
       enable_ip4: true,
       arch: label_data["arch"]
-    )
+    ).subject
 
-    ps = vm_st.subject.private_subnets.first
+    ps = new_vm.private_subnets.first
     # We don't need to incr_update_firewall_rules semaphore here because the VM
     # is just created and the firewall rules are not applied in the SubnetNexus,
     # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
     # increment the semaphore, already.
     ps.firewall_rules.map(&:destroy)
-    vm_st.subject.add_allow_ssh_fw_rules(ps)
+    new_vm.add_allow_ssh_fw_rules(ps)
 
-    Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
-    vm_st.subject
+    Clog.emit("Pool is empty") { [github_runner, {runner_requested: {cores: new_vm.cores, arch: new_vm.arch}}] }
+    new_vm
   end
 
   def update_billing_record
@@ -246,7 +246,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     unless (runner = runners[:runners].find { _1[:name] == github_runner.ubid.to_s })
       fail "BUG: Failed with runner already exists error but couldn't find it"
     end
-    Clog.emit("Deleting GithubRunner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner[:id]})} }
+    Clog.emit("Deleting GithubRunner because it already exists") { [github_runner, {existing_runner: {runner_id: runner[:id]}}] }
     github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner[:id]}")
     nap 5
   end

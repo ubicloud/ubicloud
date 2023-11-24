@@ -30,4 +30,10 @@ RSpec.describe Clog do
     expect($stdout).to receive(:write).with('{"vm":{"id":"123"},"message":"model","time":"' + now.to_s + '"}' + "\n")
     described_class.emit("model") { Vm.new(public_key: "redacted_key").tap { _1.id = "123" } }
   end
+
+  it "returns a combined hash when the metadata is an array" do
+    expect($stdout).to receive(:write).with('{"vm":{"id":"123"},"field1":"custom","invalid_type":"String","message":"model","time":"' + now.to_s + '"}' + "\n")
+    vm = Vm.new(public_key: "redacted_key").tap { _1.id = "123" }
+    described_class.emit("model") { [vm, {field1: "custom"}, "invalid"] }
+  end
 end
