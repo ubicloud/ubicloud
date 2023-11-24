@@ -138,11 +138,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     }.first.to_f
 
     unless utilization < 70
-      Clog.emit("Waiting for customer concurrency limit, utilization is high") { {github_runner: github_runner.values, utilization: utilization} }
+      Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
       nap rand(5..15)
     end
 
-    Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { {github_runner: github_runner.values, utilization: utilization} }
+    Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
 
     hop_allocate_vm
   end
@@ -251,14 +251,14 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner script is not started yet, we can delete the runner and
     # register it again.
     if vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp == "dead"
-      Clog.emit("Deregistering runner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner_id})} }
+      Clog.emit("Deregistering runner because it already exists") { [github_runner, {existing_runner: {runner_id: runner_id}}] }
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner_id}")
       nap 5
     end
 
     # The runner script is already started. We persist the runner_id and allow
     # wait label to decide the next step.
-    Clog.emit("The runner already exists but the runner script is started too") { {github_runner: github_runner.values.merge({runner_id: runner_id})} }
+    Clog.emit("The runner already exists but the runner script is started too") { [github_runner, {existing_runner: {runner_id: runner_id}}] }
     github_runner.update(runner_id: runner_id, ready_at: Time.now)
     hop_wait
   end
