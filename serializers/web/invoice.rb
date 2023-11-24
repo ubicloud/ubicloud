@@ -54,7 +54,7 @@ class Serializers::Web::Invoice < Serializers::Base
             }
           end
         end.group_by { _1[:description] }.flat_map do |description, line_items|
-          if line_items.count <= 5
+          if line_items.count <= 5 || description.end_with?("GitHub Runner")
             line_items
           else
             duration_sum = line_items.sum { _1[:duration] }
