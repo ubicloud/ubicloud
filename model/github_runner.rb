@@ -9,6 +9,10 @@ class GithubRunner < Sequel::Model
 
   include ResourceMethods
 
+  def self.redacted_columns
+    super + [:workflow_job]
+  end
+
   include SemaphoreMethods
   semaphore :destroy
 

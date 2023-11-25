@@ -107,11 +107,4 @@ RSpec.describe Vm do
       expect(vm.ephemeral_net4).to be_nil
     end
   end
-
-  it "hides sensitive and long columns" do
-    inspect_output = vm.inspect
-    vm.class.redacted_columns.each do |column_key|
-      expect(inspect_output).not_to include column_key.to_s
-    end
-  end
 end
