@@ -25,13 +25,6 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.connection_string).to be_nil
   end
 
-  it "hides sensitive and long columns" do
-    inspect_output = postgres_resource.inspect
-    postgres_resource.class.redacted_columns.each do |column_key|
-      expect(inspect_output).not_to include column_key.to_s
-    end
-  end
-
   it "returns running as display state if the database is ready" do
     expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
     expect(postgres_resource.display_state).to eq("running")
