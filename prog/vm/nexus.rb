@@ -30,6 +30,7 @@ class Prog::Vm::Nexus < Prog::Base
     storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_gib
       volume[:use_bdev_ubi] ||= false
+      volume[:skip_sync] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
     end
@@ -137,7 +138,8 @@ class Prog::Vm::Nexus < Prog::Base
         "disk_index" => s.disk_index,
         "encrypted" => !s.key_encryption_key_1.nil?,
         "spdk_version" => s.spdk_version,
-        "use_bdev_ubi" => s.use_bdev_ubi
+        "use_bdev_ubi" => s.use_bdev_ubi,
+        "skip_sync" => s.skip_sync
       }
     }
   end
@@ -206,6 +208,7 @@ SQL
         boot: volume["boot"],
         size_gib: volume["size_gib"],
         use_bdev_ubi: volume["use_bdev_ubi"],
+        skip_sync: volume["skip_sync"],
         disk_index: disk_index,
         key_encryption_key_1_id: key_encryption_key&.id,
         spdk_installation_id: spdk_installation_id

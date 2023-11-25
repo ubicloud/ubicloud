@@ -41,7 +41,7 @@ class Prog::Test::VmGroup < Prog::Base
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
       storage_volumes: [
-        {encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi},
+        {encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: true},
         {encrypted: storage_encrypted, size_gib: 5}
       ],
       enable_ip4: true
@@ -50,14 +50,14 @@ class Prog::Test::VmGroup < Prog::Base
     vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi}],
+      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: false}],
       enable_ip4: true
     )
 
     vm3_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet2_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi}],
+      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: false}],
       enable_ip4: true
     )
 
