@@ -54,7 +54,7 @@ puts "\n\nCloudifying '#{hostname}' server for '#{LOCATIONS[location]}' \n\n"
 strand = Prog::Vm::HostNexus.assemble(hostname, location: location)
 
 puts "Waiting public SSH keys\n\n"
-until (ssh_key = strand.reload.sshable.keys.map(&:public_key).first)
+until (ssh_key = strand.reload.subject.sshable.keys.map(&:public_key).first)
   sleep 2
 end
 puts "Add following public SSH key to '/root/.ssh/authorized_keys' on your machine\n\n"
