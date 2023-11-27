@@ -100,7 +100,7 @@ class Sshable < Sequel::Model
   # timeout).
   COMMON_SSH_ARGS = {non_interactive: true, timeout: 10,
                      user_known_hosts_file: [], global_known_hosts_file: [],
-                     keys: [], key_data: [], use_agent: false,
+                     verify_host_key: :accept_new, keys: [], key_data: [], use_agent: false,
                      keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5}.freeze
 
   def connect
