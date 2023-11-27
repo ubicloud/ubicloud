@@ -10,11 +10,8 @@ r "apt-get -y install postgresql-common"
 
 r "echo \"initdb_options = '--data-checksums'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
 r "echo \"create_main_cluster = 'off'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
+r "echo \"data_directory = '/dat/16/data'\" | sudo tee -a /etc/postgresql-common/createcluster.conf"
 
 r "apt-get -y install postgresql-16"
 
-r "mkdir -p /dat/16"
-r "ln -sf /var/lib/postgresql/16/main /dat/16/data"
-r "ln -sf /var/lib/postgresql/16/main/pg_wal /dat/16/wal"
-
-r "chown --recursive postgres /dat"
+r "chown postgres /dat"
