@@ -106,6 +106,11 @@ SQL
       end
     end
 
+    unless stack.first["last_label_changed_at"]
+      stack.first["last_label_changed_at"] = Time.now.to_s
+      modified!(:stack)
+    end
+
     DB.transaction do
       SemSnap.use(id) do |snap|
         prg = load(snap)
@@ -128,10 +133,18 @@ SQL
       changed_columns.delete(:schedule)
       e
     rescue Prog::Base::Hop => hp
+      last_changed_at = Time.parse(stack.first["last_label_changed_at"])
+      Clog.emit("hopped") { {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}} }
+      stack.first["last_label_changed_at"] = Time.now.to_s
+      modified!(:stack)
+
       update(**hp.strand_update_args.merge(try: 0))
 
       hp
     rescue Prog::Base::Exit => ext
+      last_changed_at = Time.parse(stack.first["last_label_changed_at"])
+      Clog.emit("exited") { {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}} }
+
       update(exitval: ext.exitval, retval: nil)
       if parent_id.nil?
         # No parent Strand to reap here, so self-reap.
