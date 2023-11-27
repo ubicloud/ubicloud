@@ -3,4 +3,4 @@
 
 require_relative "../../common/lib/util"
 
-r "sudo -u postgres wal-g backup-push /var/lib/postgresql/16/main --config /etc/postgresql/wal-g.env"
+r "sudo -u postgres wal-g backup-push /dat/16/data --config /etc/postgresql/wal-g.env"
