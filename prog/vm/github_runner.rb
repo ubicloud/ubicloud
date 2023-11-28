@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "net/ssh"
+require_relative "../../lib/github_storage_policy"
 
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
@@ -23,6 +24,22 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
+  def storage_params(size_gib)
+    project = github_runner.installation.project
+    storage_policy = GithubStoragePolicy.new(project.get_github_storage_policy)
+
+    # We use unencrypted storage for now, because provisioning 86G encrypted
+    # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
+    # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
+    # ~10 seconds.
+    {
+      size_gib: size_gib,
+      encrypted: false,
+      use_bdev_ubi: storage_policy.use_bdev_ubi?,
+      skip_sync: storage_policy.skip_sync?
+    }
+  end
+
   def pick_vm
     label = github_runner.label
     label_data = Github.runner_labels[label]
@@ -40,10 +57,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       return picked_vm
     end
 
-    # We use unencrypted storage for now, because provisioning 86G encrypted
-    # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
-    # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
-    # ~10 seconds.
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "runner",
       Config.github_runner_service_project_id,
@@ -51,7 +64,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
+      storage_volumes: [storage_params(label_data["storage_size_gib"])],
       enable_ip4: true,
       arch: label_data["arch"]
     )

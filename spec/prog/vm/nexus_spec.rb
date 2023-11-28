@@ -39,6 +39,17 @@ RSpec.describe Prog::Vm::Nexus do
   }
   let(:prj) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
+  before do
+    allow(nx).to receive(:frame).and_return({
+      "storage_volumes" => [{
+        "use_bdev_ubi" => false,
+        "skip_sync" => true,
+        "storage_size_gib" => 11,
+        "boot" => true
+      }]
+    })
+  end
+
   describe ".assemble" do
     let(:ps) {
       PrivateSubnet.create(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
@@ -365,6 +376,46 @@ RSpec.describe Prog::Vm::Nexus do
       vm.location = "somewhere-weird"
       expect(nx.allocate).to eq vmh.id
       expect(vmh.reload.used_cores).to eq(1)
+    end
+
+    it "does not match if bdev_ubi is requested & no bdev_ubi enabled hosts are available" do
+      new_host.save_changes
+      expect(nx).to receive(:frame).and_return({
+        "storage_volumes" => [{
+          "use_bdev_ubi" => true
+        }]
+      })
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+    end
+
+    it "matches if bdev_ubi is requested & a bdev_ubi enabled host is available" do
+      vmh = new_host.save_changes
+      SpdkInstallation.create(
+        version: "v29.01-ubi-0.1",
+        allocation_weight: 100,
+        vm_host_id: vmh.id
+      ) { _1.id = SpdkInstallation.generate_uuid }
+      expect(nx).to receive(:frame).and_return({
+        "storage_volumes" => [{
+          "use_bdev_ubi" => true
+        }]
+      })
+      expect(nx.allocate).to eq vmh.id
+    end
+
+    it "does not match if bdev_ubi is requested & a bdev_ubi enabled host is available, but with weight 0" do
+      vmh = new_host.save_changes
+      SpdkInstallation.create(
+        version: "v29.01-ubi-0.1",
+        allocation_weight: 0,
+        vm_host_id: vmh.id
+      ) { _1.id = SpdkInstallation.generate_uuid }
+      expect(nx).to receive(:frame).and_return({
+        "storage_volumes" => [{
+          "use_bdev_ubi" => true
+        }]
+      })
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
 
     it "does not match if there is not enough ram capacity" do
