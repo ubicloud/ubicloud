@@ -274,7 +274,7 @@ begin
     task :erb_formatter do
       puts "Running ERB::Formatter..."
       require "erb/formatter/command_line"
-      files = Dir.glob("views/**/[!icon]*.erb").entries
+      files = Dir.glob("views/**/*.erb").reject { _1.end_with?("icon.erb") }.entries
       ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
     end
 
