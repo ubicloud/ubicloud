@@ -141,7 +141,7 @@ class VmSetup
     # result is a race condition that *sometimes* worked.
     r "ip link add vetho#{q_vm} addr #{gen_mac.shellescape} type veth peer name vethi#{q_vm} addr #{gen_mac.shellescape} netns #{q_vm}"
     nics.each do |nic|
-      r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm}"
+      r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm} multi_queue vnet_hdr"
     end
   rescue CommandFail => ex
     errors = [
@@ -547,7 +547,7 @@ DNSMASQ_SERVICE
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
-    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=" }
+    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
 
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
