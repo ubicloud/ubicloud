@@ -153,6 +153,8 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def allocation_dataset
+    requires_bdev_ubi = frame["storage_volumes"].any? { |v| v["use_bdev_ubi"] }
+    spdk_where_clause = requires_bdev_ubi ? "AND id in (select vm_host_id from spdk_installation where version like '%ubi%' and allocation_weight > 0)" : ""
     DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.storage_size_gib, vm.location, vm.arch]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
 FROM vm_host
@@ -162,6 +164,7 @@ AND vm_host.available_storage_gib > ?
 AND vm_host.allocation_state = 'accepting'
 AND vm_host.location = ?
 AND vm_host.arch = ?
+#{spdk_where_clause}
 ORDER BY mem_ratio, used_cores
 SQL
   end

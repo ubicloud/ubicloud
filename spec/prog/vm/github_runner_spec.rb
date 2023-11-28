@@ -62,6 +62,27 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
+  describe ".storage_params" do
+    it "returns the values returned by the storage_policy" do
+      storage_policy_params = {
+        "use_bdev_ubi_rate" => 0.1,
+        "skip_sync_rate" => 0.2
+      }
+      project = Project.create_with_id(name: "sample project")
+      project.set_github_storage_policy(storage_policy_params)
+      expect(github_runner.installation).to receive(:project).and_return(project)
+      storage_policy = instance_double(GithubStoragePolicy)
+      expect(GithubStoragePolicy).to receive(:new).with(storage_policy_params).and_return(storage_policy)
+      expect(storage_policy).to receive_messages(use_bdev_ubi?: false, skip_sync?: true)
+      expect(nx.storage_params(5)).to eq({
+        size_gib: 5,
+        encrypted: false,
+        use_bdev_ubi: false,
+        skip_sync: true
+      })
+    end
+  end
+
   describe ".pick_vm" do
     let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
@@ -76,6 +97,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
+      expect(nx).to receive(:storage_params).and_return({encrypted: true, use_bdev_ubi: true, skip_sync: true})
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
@@ -91,6 +113,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
+      expect(nx).to receive(:storage_params).and_return({encrypted: false, use_bdev_ubi: false})
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
