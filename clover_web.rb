@@ -195,6 +195,10 @@ class CloverWeb < Roda
     require_bcrypt? false
   end
 
+  def csrf_tag(*)
+    "<input type=\"hidden\" name=\"#{csrf_field}\" value=\"#{csrf_token(*)}\" hidden/>"
+  end
+
   def redirect_back_with_inputs
     flash["old"] = request.params
     request.redirect env["HTTP_REFERER"]
