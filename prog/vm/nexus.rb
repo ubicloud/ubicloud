@@ -352,13 +352,15 @@ SQL
 
   label def wait_sshable
     addr = vm.ephemeral_net4 || vm.ephemeral_net6.nth(2)
-    out = `ssh -o BatchMode=yes -o ConnectTimeout=1 -o PreferredAuthentications=none user@#{addr} 2>&1`
-    if out.include? "Host key verification failed."
-      vm.update(display_state: "running")
-      Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
-      hop_create_billing_record
+    begin
+      Socket.tcp(addr.to_s, 22, connect_timeout: 5) {}
+    rescue SystemCallError
+      nap 1
     end
-    nap 1
+
+    vm.update(display_state: "running")
+    Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
+    hop_create_billing_record
   end
 
   label def create_billing_record
