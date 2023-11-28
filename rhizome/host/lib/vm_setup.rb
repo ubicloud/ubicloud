@@ -44,7 +44,7 @@ class VmSetup
   end
 
   def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets)
-    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed)
+    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     cloudinit(unix_user, public_key, nics)
     download_boot_image(boot_image)
     storage_params = storage(storage_volumes, storage_secrets, true)
@@ -52,13 +52,13 @@ class VmSetup
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics)
   end
 
-  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets)
-    setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed)
+  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, multiqueue:)
+    setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: multiqueue)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
   end
 
-  def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed)
+  def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, multiqueue:)
     ip4 = nil if ip4.empty?
     guest_ephemeral, clover_ephemeral = subdivide_network(NetAddr.parse_net(gua))
 
@@ -75,7 +75,7 @@ class VmSetup
       end
     end
 
-    interfaces(nics)
+    interfaces(nics, multiqueue)
     setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
     setup_taps_6(gua, nics)
     routes4(ip4, local_ip4, nics)
@@ -130,7 +130,7 @@ class VmSetup
     r "mount -t hugetlbfs -o uid=#{q_vm},size=#{mem_gib}G nodev #{vp.q_hugepages}"
   end
 
-  def interfaces(nics)
+  def interfaces(nics, multiqueue)
     r "ip netns add #{q_vm}"
 
     # Generate MAC addresses rather than letting Linux do it to avoid
@@ -140,8 +140,9 @@ class VmSetup
     # /sys/class/net/vethi#{q_vm}/address at two points in time.  The
     # result is a race condition that *sometimes* worked.
     r "ip link add vetho#{q_vm} addr #{gen_mac.shellescape} type veth peer name vethi#{q_vm} addr #{gen_mac.shellescape} netns #{q_vm}"
+    multiqueue_fragment = multiqueue ? " multi_queue vnet_hdr " : " "
     nics.each do |nic|
-      r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm}"
+      r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm} #{multiqueue_fragment}"
     end
   rescue CommandFail => ex
     errors = [
@@ -547,7 +548,7 @@ DNSMASQ_SERVICE
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
-    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=" }
+    net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
 
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings

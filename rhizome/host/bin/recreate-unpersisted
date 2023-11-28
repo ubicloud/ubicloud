@@ -48,6 +48,11 @@ unless (mem_gib = params["mem_gib"])
   exit 1
 end
 
+unless (max_vcpus = params["max_vcpus"])
+  puts "need max_vcpus in parameters json"
+  exit 1
+end
+
 ndp_needed = params.fetch("ndp_needed", false)
 
 unless (storage_volumes = params["storage_volumes"])
@@ -60,5 +65,6 @@ require_relative "../lib/vm_setup"
 nics = nics_arr.map { |args| VmSetup::Nic.new(*args) }.freeze
 VmSetup.new(vm_name).recreate_unpersisted(
   gua, ip4, local_ip4, nics, mem_gib,
-  ndp_needed, storage_volumes, storage_secrets
+  ndp_needed, storage_volumes, storage_secrets,
+  multiqueue: max_vcpus > 1
 )
