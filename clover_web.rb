@@ -212,6 +212,33 @@ class CloverWeb < Roda
       redirect otp_auth_path if otp_exists? && !webauthn_setup?
       redirect webauthn_auth_path if webauthn_setup? && !otp_exists?
     end
+
+    # OTP Setup
+    otp_setup_route "account/multifactor/otp-setup"
+    otp_setup_view { view "account/multifactor/otp_setup", "My Account" }
+    otp_setup_link_text "Enable"
+    otp_setup_button "Enable One-Time Password Authentication"
+    otp_setup_notice_flash "One-time password authentication is now setup, please make note of your recovery codes"
+    otp_setup_error_flash "Error setting up one-time password authentication"
+
+    after_otp_setup do
+      flash["notice"] = otp_setup_notice_flash
+      redirect "/" + recovery_codes_route
+    end
+
+    # OTP Disable
+    otp_disable_route "account/multifactor/otp-disable"
+    otp_disable_view { view "account/multifactor/otp_disable", "My Account" }
+    otp_disable_link_text "Disable"
+    otp_disable_button "Disable One-Time Password Authentication"
+    otp_disable_notice_flash "One-time password authentication has been disabled"
+    otp_disable_error_flash "Error disabling one-time password authentication"
+    otp_disable_redirect { "/" + two_factor_manage_route }
+
+    # OTP Auth
+    otp_auth_view { view "auth/otp_auth", "One-Time" }
+    otp_auth_button "Authenticate Using One-Time Password"
+    otp_auth_link_text "One-Time Password Generator"
   end
 
   def csrf_tag(*)

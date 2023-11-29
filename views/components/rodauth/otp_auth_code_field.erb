@@ -1,0 +1,13 @@
+<%== render(
+  "components/form/text",
+  locals: {
+    name: rodauth.otp_auth_param,
+    label: "#{rodauth.otp_auth_label}#{rodauth.input_field_label_suffix}",
+    value: "",
+    attributes: {
+      required: true,
+      autocomplete: "off",
+      inputmode: "numeric"
+    }
+  }
+) %>

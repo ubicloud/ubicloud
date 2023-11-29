@@ -1,0 +1,34 @@
+<% @page_title = "Disable One-Time Password" %>
+
+<div class="space-y-1">
+  <%== render("components/page_header", locals: { title: "My Account" }) %>
+</div>
+
+<main>
+  <div class="max-w-screen-xl pb-6 lg:pb-16">
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+        <%== render("account/submenu") %>
+        <div class="divide-y divide-gray-200 lg:col-span-9 pb-10">
+          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <h2 class="text-lg font-medium leading-6 text-gray-900">Disable One-Time Password Authentication</h2>
+            <form action="/<%= rodauth.otp_disable_route %>" role="form" method="POST">
+              <%== rodauth.otp_disable_additional_form_tags %>
+              <%== rodauth.csrf_tag("/" + rodauth.otp_disable_route) %>
+              <div class="mt-6 grid grid-cols-6 gap-6">
+                <% if rodauth.two_factor_modifications_require_password? %>
+                  <div class="col-span-6 sm:col-span-2">
+                    <%== render("components/rodauth/password_field") %>
+                  </div>
+                <% end %>
+                <div class="col-span-6">
+                  <%== render("components/form/submit_button", locals: { text: rodauth.otp_disable_button }) %>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
