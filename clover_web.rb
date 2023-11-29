@@ -268,6 +268,15 @@ class CloverWeb < Roda
     webauthn_auth_view { view "auth/webauthn_auth", "Security Keys" }
     webauthn_auth_button "Authenticate Using Security Keys"
     webauthn_auth_link_text "Security Keys"
+
+    # Recovery Codes
+    recovery_codes_route "account/multifactor/recovery-codes"
+    recovery_codes_view { view "account/multifactor/recovery_codes", "My Account" }
+    recovery_codes_link_text "View"
+    add_recovery_codes_view { view "account/multifactor/recovery_codes", "My Account" }
+    auto_add_recovery_codes? true
+    auto_remove_recovery_codes? true
+    recovery_auth_view { view "auth/recovery_auth", "Recovery Codes" }
   end
 
   def csrf_tag(*)

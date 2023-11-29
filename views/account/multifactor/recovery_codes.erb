@@ -1,0 +1,75 @@
+<% @page_title = "Recovery Codes" %>
+
+<div class="space-y-1">
+  <%== render("components/page_header", locals: { title: "My Account" }) %>
+</div>
+
+<main>
+  <div class="max-w-screen-xl pb-6 lg:pb-16">
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+        <%== render("account/submenu") %>
+        <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
+          <% if rodauth.two_factor_modifications_require_password? %>
+            <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Recovery Codes</h2>
+              <form action="/<%= rodauth.recovery_codes_route %>" role="form" method="POST">
+                <%== rodauth.csrf_tag("/" + rodauth.recovery_codes_route) %>
+                <div class="mt-6 grid grid-cols-6 gap-6">
+                  <div class="col-span-6 sm:col-span-2">
+                    <%== render("components/rodauth/password_field") %>
+                  </div>
+                  <div class="col-span-6">
+                    <%== render("components/form/submit_button", locals: { text: rodauth.view_recovery_codes_button }) %>
+                  </div>
+                </div>
+              </form>
+            </div>
+          <% else %>
+            <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Recovery Codes</h2>
+              <p class="mt-1 text-sm text-gray-500">
+                Copy these recovery codes to a safe location. You can also download them
+                <a
+                  class="font-medium text-orange-500 hover:text-orange-600 underline underline-offset-2"
+                  href="data:text/plain;base64,<%= Base64.encode64(rodauth.recovery_codes.join("\n")) %>"
+                  download="ubicloud-recovery-codes.txt"
+                >here</a>.
+              </p>
+              <div class="mt-6 grid grid-cols-6 gap-6">
+                <div class="col-span-6 sm:col-span-6">
+                  <% if rodauth.recovery_codes.any? %>
+                    <div class="border p-3 grid grid-cols-1 xl:grid-cols-2 gap-x-3 gap-y-2 bg-slate-100 text-rose-500 font-mono rounded">
+                      <% rodauth.recovery_codes.each do |code| %>
+                        <div><%= code %></div>
+                      <% end %>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+            <% if rodauth.can_add_recovery_codes? %>
+              <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+                <h2 class="text-lg font-medium leading-6 text-gray-900"><%== rodauth.add_recovery_codes_heading %></h2>
+                <form action="/<%= rodauth.recovery_codes_route %>" role="form" method="POST">
+                  <%== rodauth.csrf_tag("/" + rodauth.recovery_codes_route) %>
+                  <div class="mt-6 grid grid-cols-6 gap-6">
+                    <div class="col-span-6">
+                      <%== render(
+                        "components/form/submit_button",
+                        locals: {
+                          text: rodauth.add_recovery_codes_button,
+                          name: rodauth.add_recovery_codes_param
+                        }
+                      ) %>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
