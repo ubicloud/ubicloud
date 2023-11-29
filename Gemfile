@@ -56,3 +56,5 @@ group :test do
   gem "rspec"
   gem "webmock"
 end
+
+gem "webauthn", "~> 3.0"
