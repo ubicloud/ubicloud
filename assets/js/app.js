@@ -4,6 +4,7 @@ $(function() {
   setupLocationBasedOptions();
   setupAutoRefresh();
   setupPrint();
+  setupDatePicker();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -186,7 +187,7 @@ function setupLocationBasedPrices() {
     let resource_family = Array.isArray($(this).data("resource-family")) ? $(this).data("resource-family") : [$(this).data("resource-family")];
     let amount = Array.isArray($(this).data("amount")) ? $(this).data("amount") : [$(this).data("amount")];
     let is_default = $(this).data("default");
-    
+
     let monthly = 0;
     for(var i = 0; i < resource_type.length; i++) {
       if (monthlyPrice = prices?.[resource_type[i]]?.[resource_family[i]]?.["monthly"]) {
@@ -227,5 +228,39 @@ function setupAutoRefresh() {
 function setupPrint() {
   $("div.print-page").each(function() {
     window.print();
+  });
+}
+
+function setupDatePicker() {
+  if (!$.prototype.flatpickr) { return; }
+
+  $(".datepicker").each(function() {
+    let options = {
+      enableTime: true,
+      time_24hr: true,
+      altInput: true,
+      altFormat: "F j, Y H:i \\U\\T\\C",
+      dateFormat: "Y-m-d H:i",
+      monthSelectorType: "static",
+      parseDate(dateStr, dateFormat) {
+        // flatpicker uses browser timezone, but we want to customer to select UTC
+        date = new Date(dateStr);
+        return new Date(date.getUTCFullYear(), date.getUTCMonth(),
+          date.getUTCDate(), date.getUTCHours(),
+          date.getUTCMinutes(), date.getUTCSeconds());
+      }
+    };
+
+    if ($(this).data("maxdate")) {
+      options.maxDate = $(this).data("maxdate");
+    }
+    if ($(this).data("mindate")) {
+      options.minDate = $(this).data("mindate");
+    }
+    if ($(this).data("defaultdate")) {
+      options.defaultDate = $(this).data("defaultdate");
+    }
+
+    $(this).flatpickr(options);
   });
 }
