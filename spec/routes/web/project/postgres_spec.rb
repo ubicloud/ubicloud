@@ -213,6 +213,26 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(404)
         expect(page).to have_content "Resource not found"
       end
+
+      it "can restore PostgreSQL database" do
+        stub_const("Backup", Struct.new(:last_modified))
+        restore_target = Time.now.utc
+        pg.timeline.update(earliest_backup_completed_at: restore_target - 10 * 60)
+        expect(pg.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(restore_target - 10 * 60)
+        expect(PostgresResource).to receive(:[]).with(pg.id).and_return(pg)
+        expect(PostgresResource).to receive(:[]).and_call_original.at_least(:once)
+
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Fork PostgreSQL database"
+
+        fill_in "New server name", with: "restored-server"
+        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
+
+        click_button "Fork"
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - restored-server")
+      end
     end
 
     describe "delete" do

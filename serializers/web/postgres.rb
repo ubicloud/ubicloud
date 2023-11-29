@@ -22,8 +22,8 @@ class Serializers::Web::Postgres < Serializers::Base
     base(pg).merge({
       connection_string: pg.connection_string
     }).merge(pg.server.primary? ? {
-      earliest_restore_time: pg.timeline.earliest_restore_time&.iso8601,
-      latest_restore_time: pg.timeline.latest_restore_time&.iso8601
+      earliest_restore_time: pg.timeline.earliest_restore_time&.utc&.iso8601,
+      latest_restore_time: pg.timeline.latest_restore_time&.utc&.iso8601
     } : {})
   end
 end

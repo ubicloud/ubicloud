@@ -37,6 +37,44 @@
     data.push(["Connection String", @pg[:connection_string], { copieble: true, revealable: true }])
   end %>
   <%== render("components/kv_data_card", locals: { data: data }) %>
+  <!-- Fork database -->
+  <% if @pg[:earliest_restore_time] && @pg[:latest_restore_time] > @pg[:earliest_restore_time] %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restore" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restore") %>
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Fork PostgreSQL database</h2>
+              <p class="mt-1 text-sm text-gray-500">
+                When you fork your existing PostgreSQL database, a new server will be provisioned.
+              </p>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-12 sm:col-span-5">
+                <%== render("components/form/text", locals: { label: "New server name", name: "name", attributes: { required: true } }) %>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/datepicker",
+                  locals: {
+                    label: "Target Time (UTC)",
+                    name: "restore_target",
+                    default_date: @pg[:latest_restore_time],
+                    max_date: @pg[:latest_restore_time],
+                    min_date: @pg[:earliest_restore_time]
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== render("components/form/submit_button", locals: { text: "Fork" }) %>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  <% end %>
   <!-- Delete Card -->
   <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">

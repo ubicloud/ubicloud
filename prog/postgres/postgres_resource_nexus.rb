@@ -25,7 +25,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       superuser_password, timeline_id, timeline_access = if parent_id.nil?
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble.id, "push"]
       else
-        parent = PostgresResource[parent_id]
+        unless (parent = PostgresResource[parent_id])
+          fail "No existing parent"
+        end
+        restore_target = Validation.validate_date(restore_target, "restore_target")
+        parent.timeline.refresh_earliest_backup_completion_time
+        unless (earliest_restore_time = parent.timeline.earliest_restore_time) && earliest_restore_time <= restore_target &&
+            parent.timeline.latest_restore_time && restore_target <= parent.timeline.latest_restore_time
+          fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{parent.timeline.latest_restore_time}"})
+        end
         [parent.superuser_password, parent.timeline.id, "fetch"]
       end
 
