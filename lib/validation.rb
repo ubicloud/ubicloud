@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "time"
+
 module Validation
   class ValidationFailed < StandardError
     attr_reader :errors
@@ -78,5 +80,14 @@ module Validation
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid PostgreSQL database size. Available sizes: #{Option::PostgresSizes.map(&:name)}"})
     end
     postgres_size
+  end
+
+  def self.validate_date(date, param = "date")
+    # I use DateTime.parse instead of Time.parse because it uses UTC as default
+    # timezone but Time.parse uses local timezone
+    DateTime.parse(date.to_s).to_time
+  rescue ArgumentError
+    msg = "\"#{date}\" is not a valid date for \"#{param}\"."
+    fail ValidationFailed.new({param => msg})
   end
 end
