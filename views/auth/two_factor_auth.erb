@@ -1,0 +1,12 @@
+<% @page_title = "Two-factor Authentication" %>
+
+<% @page_message = "Select a two-factor authentication method" %>
+
+<div class="rodauth space-y-6 flex flex-col text-center">
+  <% if rodauth.otp_exists? %>
+    <%== render("components/button", locals: { text: rodauth.otp_auth_link_text, link: rodauth.otp_auth_path }) %>
+  <% end %>
+  <% if rodauth.webauthn_setup? %>
+    <%== render("components/button", locals: { text: rodauth.webauthn_auth_link_text, link: rodauth.webauthn_auth_path }) %>
+  <% end %>
+</div>
