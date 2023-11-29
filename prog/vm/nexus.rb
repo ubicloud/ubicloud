@@ -338,7 +338,7 @@ SQL
     host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
 
     # put prep.json
-    host.sshable.cmd("echo #{params_json.shellescape} | sudo -u #{q_vm} tee #{params_path.shellescape}")
+    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: params_json)
 
     host.sshable.cmd("sudo host/bin/prepvm.rb #{params_path.shellescape}", stdin: secrets_json)
     hop_run

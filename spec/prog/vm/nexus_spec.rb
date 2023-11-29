@@ -206,9 +206,9 @@ RSpec.describe Prog::Vm::Nexus do
         total_cpus: 80, total_cores: 80, total_sockets: 1, ndp_needed: false)
       expect(vm).to receive(:vm_host).and_return(vmh)
 
-      expect(sshable).to receive(:cmd).with(/echo (.|\n)* \| sudo -u vm[0-9a-z]+ tee/) do
+      expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
         require "json"
-        params = JSON(_1.shellsplit[1])
+        params = JSON(kwargs.fetch(:stdin))
         expect(params).to include({
           "public_ipv6" => "fe80::/64",
           "unix_user" => "test_user",
