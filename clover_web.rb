@@ -196,7 +196,7 @@ class CloverWeb < Roda
   end
 
   def csrf_tag(*)
-    "<input type=\"hidden\" name=\"#{csrf_field}\" value=\"#{csrf_token(*)}\" hidden/>"
+    render("components/form/hidden", locals: {name: csrf_field, value: csrf_token(*)})
   end
 
   def redirect_back_with_inputs
