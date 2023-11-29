@@ -70,16 +70,15 @@
           <tr id="user-<%= user[:ubid]%>" class="whitespace-nowrap text-sm font-medium">
             <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= user[:email] %></td>
             <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-              <button
-                type="button"
-                data-url="<%= "#{@project_data[:path]}/user/#{user[:ubid]}" %>"
-                data-csrf="<%= csrf_token("#{@project_data[:path]}/user/#{user[:ubid]}", "DELETE") %>"
-                data-confirmation="<%= user[:email] %>"
-                data-redirect="<%= "#{@project_data[:path]}/user" %>"
-                class="delete-btn text-rose-600 hover:text-rose-900"
-              >
-                Remove
-              </button>
+              <%== render(
+                "components/delete_button",
+                locals: {
+                  text: "Remove",
+                  url: "#{@project_data[:path]}/user/#{user[:ubid]}",
+                  confirmation: user[:email],
+                  redirect: "#{@project_data[:path]}/user"
+                }
+              ) %>
             </td>
           </tr>
         <% end %>

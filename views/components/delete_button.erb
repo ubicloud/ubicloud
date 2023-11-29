@@ -1,0 +1,18 @@
+<% csrf_url = (defined?(csrf_url) && csrf_url) ? csrf_url : url %>
+<% text = (defined?(text) && text) ? text : "Delete" %>
+
+<%== render(
+  "components/button",
+  locals: {
+    text: text,
+    icon: "hero-trash",
+    extra_class: "delete-btn",
+    type: "danger",
+    attributes: {
+      "data-url" => url,
+      "data-csrf" => csrf_token(csrf_url, "DELETE"),
+      "data-confirmation" => confirmation,
+      "data-redirect" => redirect
+    }
+  }
+) %>

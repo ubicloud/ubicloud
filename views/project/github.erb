@@ -96,12 +96,13 @@
           </h3>
         </div>
         <div class="mt-4 flex md:ml-4 md:mt-0">
-          <a
-            href="<%= @project_data[:path] %>/github/installation/create"
-            class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
-          >
-            Connect New Account
-          </a>
+          <%== render(
+            "components/button",
+            locals: {
+              text: "Connect New Account",
+              link: "#{@project_data[:path]}/github/installation/create"
+            }
+          ) %>
         </div>
       </div>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
