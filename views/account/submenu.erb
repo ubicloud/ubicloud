@@ -2,6 +2,7 @@
   <nav class="space-y-1">
     <% [
         ["Change Password", "/account/change-password", "hero-key"],
+        ["Multifactor Auth", "/account/multifactor-manage", "hero-lock-closed", request.path.start_with?("/account/multifactor")],
         ["Change Email", "/account/change-login", "hero-envelope"],
         ["Close Account", "/account/close-account", "hero-x-circle"]
       ].each do |label, url, icon, is_active| %>

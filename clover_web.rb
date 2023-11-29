@@ -91,9 +91,10 @@ class CloverWeb < Roda
   plugin :rodauth do
     enable :argon2, :change_login, :change_password, :close_account, :create_account,
       :lockout, :login, :logout, :remember, :reset_password,
-      :otp, :recovery_codes, :sms_codes,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
-      :verify_login_change, :change_password_notify, :confirm_password
+      :verify_login_change, :change_password_notify, :confirm_password,
+      :otp, :webauthn, :recovery_codes
+
     title_instance_variable :@page_title
 
     # :nocov:
@@ -195,6 +196,22 @@ class CloverWeb < Roda
 
     argon2_secret { Config.clover_session_secret }
     require_bcrypt? false
+
+    # Multifactor Manage
+    two_factor_manage_route "account/multifactor-manage"
+    two_factor_manage_view { view "account/two_factor_manage", "My Account" }
+
+    # Multifactor Auth
+    two_factor_auth_view { view "auth/two_factor_auth", "Two-factor Authentication" }
+    two_factor_auth_notice_flash { login_notice_flash }
+    # don't show error message when redirected after login
+    two_factor_need_authentication_error_flash { (flash["notice"] == login_notice_flash) ? nil : super() }
+
+    # If the single multifactor auth method is setup, redirect to it
+    before_two_factor_auth_route do
+      redirect otp_auth_path if otp_exists? && !webauthn_setup?
+      redirect webauthn_auth_path if webauthn_setup? && !otp_exists?
+    end
   end
 
   def csrf_tag(*)
