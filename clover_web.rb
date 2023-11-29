@@ -17,10 +17,10 @@ class CloverWeb < Roda
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
-    csp.style_src :self
+    csp.style_src :self, "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css"
     csp.img_src :self, "data: image/svg+xml"
     csp.form_action :self, "https://checkout.stripe.com"
-    csp.script_src :self, "https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js", "https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"
+    csp.script_src :self, "https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js", "https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js", "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"
     csp.connect_src :self
     csp.base_uri :none
     csp.frame_ancestors :none
