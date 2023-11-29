@@ -1,0 +1,44 @@
+<% @page_title = "Setup One-Time Password" %>
+
+<div class="space-y-1">
+  <%== render("components/page_header", locals: { title: "My Account" }) %>
+</div>
+
+<main>
+  <div class="max-w-screen-xl pb-6 lg:pb-16">
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+        <%== render("account/submenu") %>
+        <div class="divide-y divide-gray-200 lg:col-span-9 pb-10">
+          <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+            <h2 class="text-lg font-medium leading-6 text-gray-900">Setup One-Time Password Authentication</h2>
+            <form action="/<%= rodauth.otp_setup_route %>" role="form" method="POST">
+              <%== rodauth.otp_setup_additional_form_tags %>
+              <input type="hidden" id="otp-key" name="<%= rodauth.otp_setup_param %>" value="<%= rodauth.otp_user_key %>"/>
+              <% if rodauth.otp_keys_use_hmac? %>
+                <input type="hidden" id="otp-hmac-secretkey" name="<%= rodauth.otp_setup_raw_param %>" value="<%= rodauth.otp_key %>"/>
+              <% end %>
+              <%== rodauth.csrf_tag("/" + rodauth.otp_setup_route) %>
+              <div class="mt-6 grid grid-cols-6 gap-6">
+                <div class="col-span-6 sm:col-span-3">
+                  <%== rodauth.otp_qr_code %>
+                  <p class="mt-2 text-sm text-gray-500 text-center">
+                    If you can't scan the QR code, please enter the following secret in your authenticator app manually: </br>
+                    <span class="font-bold"><%= rodauth.otp_user_key %></span>
+                  </p>
+                </div>
+                <div class="col-span-6 sm:col-span-3 space-y-4">
+                  <%== render("components/rodauth/otp_auth_code_field") %>
+                  <% if rodauth.two_factor_modifications_require_password? %>
+                    <%== render("components/rodauth/password_field") %>
+                  <% end %>
+                  <%== render("components/form/submit_button", locals: { text: rodauth.otp_setup_button }) %>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
