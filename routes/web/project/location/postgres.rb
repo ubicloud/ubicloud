@@ -28,6 +28,25 @@ class CloverWeb
         pg.incr_destroy
         return {message: "Deleting #{pg.server_name}"}.to_json
       end
+
+      r.post "restore" do
+        Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
+        Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
+
+        st = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: @project.id,
+          location: pg.location,
+          server_name: r.params["name"],
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          parent_id: pg.id,
+          restore_target: r.params["restore_target"]
+        )
+
+        flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
+
+        r.redirect "#{@project.path}#{st.subject.path}"
+      end
     end
   end
 end
