@@ -163,12 +163,13 @@
           </h3>
         </div>
         <div class="mt-4 flex md:ml-4 md:mt-0">
-          <a
-            href="<%= @project_data[:path] %>/billing/payment-method/create"
-            class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
-          >
-            Add Payment Method
-          </a>
+          <%== render(
+            "components/button",
+            locals: {
+              text: "Add Payment Method",
+              link: "#{@project_data[:path]}/billing/payment-method/create"
+            }
+          ) %>
         </div>
       </div>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -187,16 +188,15 @@
                     <%= pm[:exp_month] %>/<%= pm[:exp_year] %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex justify-end">
-                    <button
-                      type="button"
-                      data-url="<%= @project_data[:path] + "/billing/payment-method/" + pm[:ubid] %>?project_id=<%= @project.ubid %>"
-                      data-csrf="<%= csrf_token(@project_data[:path] + "/billing/payment-method/" + pm[:ubid], "DELETE") %>"
-                      data-confirmation="<%= pm[:last4] %>"
-                      data-redirect="<%= request.path %>"
-                      class="delete-btn inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
-                    >
-                      Delete
-                    </button>
+                    <%== render(
+                      "components/delete_button",
+                      locals: {
+                        url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
+                        csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
+                        confirmation: pm[:last4],
+                        redirect: request.path
+                      }
+                    ) %>
                   </td>
                 </tr>
               <% end %>

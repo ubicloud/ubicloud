@@ -1,0 +1,39 @@
+<% type = (defined?(type) && type) ? type : "primary" %>
+<% link = (defined?(link) && link) ? link : nil %>
+<% icon = (defined?(icon) && icon) ? icon : nil %>
+<% extra_class = defined?(extra_class) ? extra_class : nil %>
+<% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
+
+<% case type %>
+<% when "primary" %>
+  <% color = "bg-orange-600 hover:bg-orange-700 focus-visible:outline-orange-600" %>
+<% when "danger" %>
+  <% color = "bg-rose-600 hover:bg-rose-700 focus-visible:outline-rose-600" %>
+<% end %>
+
+<% if link %>
+  <a
+    href="<%= link %>"
+    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> <%= extra_class %>"
+    <% attributes.each do |atr_key, atr_value| %>
+    <%= atr_key %>="<%= atr_value %>"
+    <% end%>
+  >
+    <% if icon %>
+      <%== render("components/icon", locals: { name: icon, classes: "ml-0.5 mr-1.5 h-5 w-5" }) %>
+    <% end %>
+    <%= text %>
+  </a>
+<% else %>
+  <button
+    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> <%= extra_class %>"
+    <% attributes.each do |atr_key, atr_value| %>
+    <%= atr_key %>="<%= atr_value %>"
+    <% end%>
+  >
+    <% if icon %>
+      <%== render("components/icon", locals: { name: icon, classes: "ml-0.5 mr-1.5 h-5 w-5" }) %>
+    <% end %>
+    <%= text %>
+  </button>
+<% end %>
