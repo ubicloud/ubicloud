@@ -239,6 +239,35 @@ class CloverWeb < Roda
     otp_auth_view { view "auth/otp_auth", "One-Time" }
     otp_auth_button "Authenticate Using One-Time Password"
     otp_auth_link_text "One-Time Password Generator"
+
+    # Webauthn Setup
+    webauthn_setup_route "account/multifactor/webauthn-setup"
+    webauthn_setup_view { view "account/multifactor/webauthn_setup", "My Account" }
+    webauthn_setup_link_text "Add"
+    webauthn_setup_button "Setup Security Key"
+    webauthn_setup_notice_flash "Security key is now setup, please make note of your recovery codes"
+    webauthn_setup_error_flash "Error setting up security key"
+    webauthn_key_insert_hash { |credential| super(credential).merge(name: request.params["name"]) }
+
+    after_webauthn_setup do
+      flash["notice"] = webauthn_setup_notice_flash
+      redirect "/" + recovery_codes_route
+    end
+
+    # Webauthn Remove
+    webauthn_remove_route "account/multifactor/webauthn-remove"
+    webauthn_remove_view { view "account/multifactor/webauthn_remove", "My Account" }
+    webauthn_remove_link_text "Remove"
+    webauthn_remove_button "Remove Security Key"
+    webauthn_remove_notice_flash "Security key has been removed"
+    webauthn_remove_error_flash "Error removing security key"
+    webauthn_invalid_remove_param_message "Invalid security key to remove"
+    webauthn_remove_redirect { "/" + two_factor_manage_route }
+
+    # Webauthn Auth
+    webauthn_auth_view { view "auth/webauthn_auth", "Security Keys" }
+    webauthn_auth_button "Authenticate Using Security Keys"
+    webauthn_auth_link_text "Security Keys"
   end
 
   def csrf_tag(*)
