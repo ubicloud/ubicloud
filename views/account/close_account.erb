@@ -14,28 +14,17 @@
             <h2 class="text-lg font-medium leading-6 text-gray-900">Close Account</h2>
             <p class="mt-1 text-sm text-gray-500">This action will permanently delete this account. Deleted data cannot be recovered. Use it carefully.</p>
             <form action="/<%= rodauth.close_account_route %>" role="form" method="POST">
+              <%== rodauth.close_account_additional_form_tags %>
               <%== rodauth.csrf_tag("/" + rodauth.close_account_route) %>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <% if rodauth.close_account_requires_password? %>
                   <div class="col-span-6 sm:col-span-2">
-                    <%== render(
-                      "components/form/text",
-                      locals: {
-                        name: "password",
-                        type: "password",
-                        label: "Password",
-                        attributes: {
-                          required: true,
-                          autocomplete: "password"
-                        }
-                      }
-                    ) %>
+                    <%== render("components/rodauth/password_field") %>
                   </div>
                 <% end %>
                 <div class="col-span-6">
                   <%== render("components/form/submit_button", locals: { text: "Close Account" }) %>
                 </div>
-
               </div>
             </form>
           </div>
