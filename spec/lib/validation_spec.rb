@@ -158,5 +158,18 @@ RSpec.describe Validation do
         expect { described_class.validate_postgres_size("standard-3") }.to raise_error described_class::ValidationFailed
       end
     end
+
+    describe "#validate_date" do
+      it "valid date" do
+        expect(described_class.validate_date("2023-11-30 11:41")).to eq(Time.new(2023, 11, 30, 11, 41, 0, "UTC"))
+        expect(described_class.validate_date(Time.new(2023, 11, 30, 11, 41))).to eq(Time.new(2023, 11, 30, 11, 41))
+      end
+
+      it "invalid date" do
+        expect { described_class.validate_date("") }.to raise_error described_class::ValidationFailed, "Validation failed for following fields: date"
+        expect { described_class.validate_date(nil) }.to raise_error described_class::ValidationFailed, "Validation failed for following fields: date"
+        expect { described_class.validate_date("invalid-date", "restore_date") }.to raise_error described_class::ValidationFailed, "Validation failed for following fields: restore_date"
+      end
+    end
   end
 end
