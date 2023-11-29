@@ -125,6 +125,7 @@ class CloverWeb < Roda
     login_view { view "auth/login", "Login" }
     login_redirect { "/after-login" }
     login_return_to_requested_location? true
+    login_label "Email Address"
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
     after_login { remember_login if request.params["remember-me"] == "on" }
@@ -142,6 +143,7 @@ class CloverWeb < Roda
     create_account_view { view "auth/create_account", "Create Account" }
     create_account_redirect { login_route }
     create_account_set_password? true
+    password_confirm_label "Password Confirmation"
     before_create_account do
       account[:id] = Account.generate_uuid
       account[:name] = param("name")

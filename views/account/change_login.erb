@@ -13,36 +13,15 @@
           <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
             <h2 class="text-lg font-medium leading-6 text-gray-900">Change Email Address</h2>
             <form action="/<%= rodauth.change_login_route %>" role="form" method="POST">
+              <%== rodauth.change_login_additional_form_tags %>
               <%== rodauth.csrf_tag("/" + rodauth.change_login_route) %>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-2">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "login",
-                      type: "email",
-                      label: "New Email Address",
-                      attributes: {
-                        required: true,
-                        autocomplete: "email"
-                      }
-                    }
-                  ) %>
+                  <%== render("components/rodauth/login_field", locals: {label: "New Email Address"}) %>
                 </div>
                 <% if rodauth.change_login_requires_password? %>
                   <div class="col-span-6 sm:col-span-2">
-                    <%== render(
-                      "components/form/text",
-                      locals: {
-                        name: "password",
-                        type: "password",
-                        label: "Password",
-                        attributes: {
-                          required: true,
-                          autocomplete: "password"
-                        }
-                      }
-                    ) %>
+                    <%== render("components/rodauth/password_field") %>
                   </div>
                 <% end %>
                 <div class="col-span-6">
