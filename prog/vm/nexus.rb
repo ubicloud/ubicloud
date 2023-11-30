@@ -353,7 +353,7 @@ SQL
   label def wait_sshable
     addr = vm.ephemeral_net4 || vm.ephemeral_net6.nth(2)
     begin
-      Socket.tcp(addr.to_s, 22, connect_timeout: 5) {}
+      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
     rescue SystemCallError
       nap 1
     end
