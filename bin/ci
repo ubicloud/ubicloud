@@ -5,46 +5,48 @@ require_relative "../loader"
 require "time"
 
 def main
-  st = Prog::Test::HetznerServer.assemble
+  Prog::Test::HetznerServer.assemble
 
   strand_states = update_status({})
   retries = 0
 
   loop do
-    begin
-      ret = st.run
-    # rubocop:disable Lint/RescueException
-    rescue Exception => e
-      log "Exception: #{e}"
+    Strand.all.each { |st|
+      begin
+        ret = st.run
+      # rubocop:disable Lint/RescueException
+      rescue Exception => e
+        log "Exception: #{e}"
 
-      if e.is_a?(Sshable::SshError)
-        puts "Stdout: #{e.stdout}"
-        puts "Stderr: #{e.stderr}"
+        if e.is_a?(Sshable::SshError)
+          puts "Stdout: #{e.stdout}"
+          puts "Stderr: #{e.stderr}"
+        end
+
+        # retry 5 times, for total of 7:45 minutes before announcing failure
+        # sometimes there's some transient network failures which will be resolved if retried.
+        if retries < 5
+          sleep_duration = 15 * 2**retries
+          log "Retrying in #{sleep_duration} seconds ..."
+          sleep sleep_duration
+          retries += 1
+          next
+        else
+          raise
+        end
       end
+      # rubocop:enable Lint/RescueException
 
-      # retry 5 times, for total of 7:45 minutes before announcing failure
-      # sometimes there's some transient network failures which will be resolved if retried.
-      if retries < 5
-        sleep_duration = 15 * 2**retries
-        log "Retrying in #{sleep_duration} seconds ..."
-        sleep sleep_duration
-        retries += 1
-        next
-      else
-        raise
+      strand_states = update_status(strand_states)
+      retries = 0
+
+      if ret.is_a?(Prog::Base::Nap)
+        sleep ret.seconds
+      elsif ret.is_a?(Prog::Base::Exit)
+        log "Exited with: #{ret}"
+        exit 0 if Strand.count == 0
       end
-    end
-    # rubocop:enable Lint/RescueException
-
-    strand_states = update_status(strand_states)
-    retries = 0
-
-    if ret.is_a?(Prog::Base::Nap)
-      sleep ret.seconds
-    elsif ret.is_a?(Prog::Base::Exit)
-      log "Exited with: #{ret}"
-      exit 0
-    end
+    }
   end
 end
 
