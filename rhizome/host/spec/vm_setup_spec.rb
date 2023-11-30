@@ -215,7 +215,7 @@ RSpec.describe VmSetup do
       clover_ephemeral = NetAddr.parse_net("fddf:53d2:4c89:2305:8000::/65")
       ip4 = "192.168.1.100"
 
-      expect(vs).to receive(:interfaces).with([])
+      expect(vs).to receive(:interfaces).with([], true)
       expect(vs).to receive(:setup_veths_6) {
         expect(_1.to_s).to eq(guest_ephemeral.to_s)
         expect(_2.to_s).to eq(clover_ephemeral.to_s)
@@ -230,19 +230,19 @@ RSpec.describe VmSetup do
       expect(vps).to receive(:write_guest_ephemeral).with(guest_ephemeral.to_s)
       expect(vps).to receive(:write_clover_ephemeral).with(clover_ephemeral.to_s)
 
-      vs.setup_networking(false, gua, ip4, "local_ip4", [], false)
+      vs.setup_networking(false, gua, ip4, "local_ip4", [], false, multiqueue: true)
     end
 
     it "can setup networking for empty ip4" do
       gua = "fddf:53d2:4c89:2305:46a0::"
-      expect(vs).to receive(:interfaces).with([])
+      expect(vs).to receive(:interfaces).with([], false)
       expect(vs).to receive(:setup_veths_6)
       expect(vs).to receive(:setup_taps_6).with(gua, [])
       expect(vs).to receive(:routes4).with(nil, "local_ip4", [])
       expect(vs).to receive(:forwarding)
       expect(vs).to receive(:write_nftables_conf)
 
-      vs.setup_networking(true, gua, "", "local_ip4", [], false)
+      vs.setup_networking(true, gua, "", "local_ip4", [], false, multiqueue: false)
     end
 
     it "can generate nftables config" do
