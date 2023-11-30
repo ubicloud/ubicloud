@@ -108,6 +108,22 @@ PGHOST=/var/run/postgresql
     end
   end
 
+  it "refreshes the earliest backup time" do
+    stub_const("Backup", Struct.new(:last_modified))
+    most_oldest_backup_time = Time.now - 300
+    expect(postgres_timeline).to receive(:backups).and_return(
+      [
+        instance_double(Backup, key: "basebackups_005/0001_backup_stop_sentinel.json", last_modified: most_oldest_backup_time),
+        instance_double(Backup, key: "basebackups_005/0002_backup_stop_sentinel.json", last_modified: most_oldest_backup_time + 100),
+        instance_double(Backup, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_oldest_backup_time + 200)
+      ]
+    )
+
+    expect(postgres_timeline).to receive(:update).with(earliest_backup_completed_at: most_oldest_backup_time).and_call_original
+    expect(postgres_timeline.refresh_earliest_backup_completion_time).to eq(most_oldest_backup_time)
+    expect(postgres_timeline.earliest_restore_time).to eq(most_oldest_backup_time + 5 * 60)
+  end
+
   it "returns list of backups" do
     expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
 

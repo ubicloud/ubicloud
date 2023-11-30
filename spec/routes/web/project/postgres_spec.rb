@@ -71,6 +71,9 @@ RSpec.describe Clover, "postgres" do
       login(user.email)
       project.set_enable_postgres(true)
       project_wo_permissions.set_enable_postgres(true)
+
+      client = instance_double(MinioClient, list_objects: [])
+      allow(MinioClient).to receive(:new).and_return(client)
     end
 
     describe "list" do

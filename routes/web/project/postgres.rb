@@ -10,7 +10,7 @@ class CloverWeb
     @serializer = Serializers::Web::Postgres
 
     r.get true do
-      @postgres_databases = serialize(@project.postgres_resources_dataset.authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand).all)
+      @postgres_databases = serialize(@project.postgres_resources_dataset.authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand, :server, :timeline).all)
 
       view "postgres/index"
     end

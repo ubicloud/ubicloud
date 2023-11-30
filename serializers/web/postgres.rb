@@ -9,7 +9,6 @@ class Serializers::Web::Postgres < Serializers::Base
       name: pg.server_name,
       state: pg.display_state,
       location: pg.location,
-      connection_string: pg.connection_string,
       vm_size: pg.target_vm_size,
       storage_size_gib: pg.target_storage_size_gib
     }
@@ -17,5 +16,14 @@ class Serializers::Web::Postgres < Serializers::Base
 
   structure(:default) do |pg|
     base(pg)
+  end
+
+  structure(:detailed) do |pg|
+    base(pg).merge({
+      connection_string: pg.connection_string
+    }).merge(pg.server.primary? ? {
+      earliest_restore_time: pg.timeline.earliest_restore_time&.iso8601,
+      latest_restore_time: pg.timeline.latest_restore_time&.iso8601
+    } : {})
   end
 end

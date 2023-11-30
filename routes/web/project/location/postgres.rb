@@ -16,7 +16,7 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @pg = serialize(pg)
+      @pg = serialize(pg, :detailed)
 
       r.get true do
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
