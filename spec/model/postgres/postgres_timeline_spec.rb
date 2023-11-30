@@ -85,18 +85,27 @@ PGHOST=/var/run/postgresql
     end
   end
 
-  it "returns most recent backup before given target" do
-    stub_const("Backup", Struct.new(:last_modified))
-    most_recent_backup_time = Time.now
-    expect(postgres_timeline).to receive(:backups).and_return(
-      [
-        instance_double(Backup, key: "basebackups_005/0001_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 200),
-        instance_double(Backup, key: "basebackups_005/0002_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 100),
-        instance_double(Backup, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_recent_backup_time)
-      ]
-    )
+  describe "#last_backup_label_before_target" do
+    it "returns most recent backup before given target" do
+      stub_const("Backup", Struct.new(:last_modified))
+      most_recent_backup_time = Time.now
+      expect(postgres_timeline).to receive(:backups).and_return(
+        [
+          instance_double(Backup, key: "basebackups_005/0001_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 200),
+          instance_double(Backup, key: "basebackups_005/0002_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 100),
+          instance_double(Backup, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_recent_backup_time)
+        ]
+      )
 
-    expect(postgres_timeline.last_backup_label_before_target(target: most_recent_backup_time - 50)).to eq("0002")
+      expect(postgres_timeline.last_backup_label_before_target(target: most_recent_backup_time - 50)).to eq("0002")
+    end
+
+    it "returns nil if no backups before given target" do
+      stub_const("Backup", Struct.new(:last_modified))
+      expect(postgres_timeline).to receive(:backups).and_return([])
+
+      expect(postgres_timeline.last_backup_label_before_target(target: Time.now)).to be_nil
+    end
   end
 
   it "returns list of backups" do

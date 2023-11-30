@@ -53,7 +53,7 @@ PGHOST=/var/run/postgresql
 
   def last_backup_label_before_target(target:)
     backup = backups.sort_by(&:last_modified).reverse.find { _1.last_modified < target }
-    backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
+    backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json") if backup
   end
 
   def blob_storage
