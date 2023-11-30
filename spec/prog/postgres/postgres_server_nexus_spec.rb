@@ -243,6 +243,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("Unknown")
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
+
+    it "fails if the timeline has no backup" do
+      expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now)
+      expect(postgres_server.timeline).to receive(:last_backup_label_before_target).and_return(nil)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
+      expect { nx.initialize_database_from_backup }.to raise_error RuntimeError, "BUG: no backup found"
+    end
   end
 
   describe "#refresh_certificates" do
