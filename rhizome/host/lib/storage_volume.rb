@@ -52,6 +52,7 @@ class StorageVolume
     if @use_bdev_ubi
       create_ubi_writespace(encryption_key)
     elsif @encrypted
+      create_empty_disk_file
       encrypted_image_copy(encryption_key, @image_path)
     else
       unencrypted_image_copy
@@ -199,8 +200,6 @@ class StorageVolume
     # so it doesn't error out in concurrent VM creations.
     rpc_socket = "/var/tmp/spdk_dd.sock.#{@vm_name}"
 
-    create_empty_disk_file
-
     count_param = count.nil? ? "" : "--count #{count}"
 
     r("#{SpdkPath.bin(@spdk_version, "spdk_dd")} --config /dev/stdin " \
@@ -212,17 +211,16 @@ class StorageVolume
   end
 
   def create_ubi_writespace(encryption_key)
+    create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024 + 16)
     if @encrypted
       # just clear the metadata section, i.e. first 8MB
       encrypted_image_copy(encryption_key, "/dev/zero", block_size: 2097152, count: 4)
-    else
-      create_empty_disk_file
     end
   end
 
-  def create_empty_disk_file
+  def create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024)
     FileUtils.touch(@disk_file)
-    r "truncate -s #{@disk_size_gib}G #{@disk_file.shellescape}"
+    File.truncate(@disk_file, disk_size_mib * 1024 * 1024)
 
     set_disk_file_permissions
   end
