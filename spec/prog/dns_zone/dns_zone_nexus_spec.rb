@@ -23,9 +23,9 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
       expect { nx.wait }.to hop("refresh_dns_servers")
     end
 
-    it "hops to purge_tombstoned_records if if last purge happened more than 1 hour ago" do
+    it "hops to purge_dns_records if if last purge happened more than 1 hour ago" do
       expect(dns_zone).to receive(:last_purged_at).and_return(Time.now - 60 * 60 * 2)
-      expect { nx.wait }.to hop("purge_tombstoned_records")
+      expect { nx.wait }.to hop("purge_dns_records")
     end
 
     it "naps if there is nothing to do" do
@@ -80,7 +80,24 @@ COMMANDS
     end
   end
 
-  describe "#purge_tombstoned_records" do
+  describe "#purge_dns_records" do
+    it "deletes obsoleted records, seen or unseen" do
+      r1 = DnsRecord.create_with_id(created_at: Time.now - 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r2 = DnsRecord.create_with_id(created_at: Time.now, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+      r3 = DnsRecord.create_with_id(created_at: Time.now + 1, name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
+
+      dns_zone.add_record(r1)
+      dns_zone.add_record(r2)
+      dns_zone.add_record(r3)
+
+      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r1.id}', '#{dns_server.id}')"].insert
+      DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r3.id}', '#{dns_server.id}')"].insert
+
+      expect { nx.purge_dns_records }.to hop("wait")
+      expect(dns_zone.reload.records.count).to eq(1)
+      expect(DB[:seen_dns_records_by_dns_servers].all.count).to eq(1)
+    end
+
     it "deletes seen tombstoned records" do
       r1 = DnsRecord.create_with_id(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
       r2 = DnsRecord.create_with_id(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8", tombstoned: true)
@@ -93,7 +110,7 @@ COMMANDS
       DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r1.id}', '#{dns_server.id}')"].insert
       DB["INSERT INTO seen_dns_records_by_dns_servers(dns_record_id, dns_server_id) VALUES('#{r2.id}', '#{dns_server.id}')"].insert
 
-      expect { nx.purge_tombstoned_records }.to hop("wait")
+      expect { nx.purge_dns_records }.to hop("wait")
       expect(dns_zone.reload.records.count).to eq(2)
       expect(DB[:seen_dns_records_by_dns_servers].all.count).to eq(1)
     end

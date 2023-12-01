@@ -25,23 +25,6 @@ RSpec.describe DnsZone do
 
       expect(dns_zone.records.count).to eq(1)
     end
-
-    it "ignores error if there is a duplicate record" do
-      dns_zone.insert_record(record_name: "test", type: "A", ttl: 10, data: "1.2.3.4")
-      dns_zone.insert_record(record_name: "test", type: "A", ttl: 10, data: "1.2.3.4")
-
-      expect(dns_zone.records.count).to eq(1)
-    end
-
-    it "raises errors other than duplicate record" do
-      expect(DnsRecord).to receive(:create_with_id).and_raise(Sequel::UniqueConstraintViolation.new("other error"))
-
-      expect {
-        dns_zone.insert_record(record_name: "test", type: "A", ttl: 10, data: "1.2.3.4")
-      }.to raise_error Sequel::UniqueConstraintViolation
-
-      expect(dns_zone.records.count).to eq(0)
-    end
   end
 
   context "when deleting a record" do
