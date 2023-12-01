@@ -128,6 +128,13 @@ class Prog::Vm::Nexus < Prog::Base
     @params_path ||= File.join(vm_home, "prep.json")
   end
 
+  def vm_storage_size_gib
+    if (storage_volumes = frame["storage_volumes"])
+      return storage_volumes.map { _1["size_gib"] }.sum
+    end
+    vm.storage_size_gib
+  end
+
   def storage_volumes
     @storage_volumes ||= vm.vm_storage_volumes.map { |s|
       {
@@ -155,7 +162,7 @@ class Prog::Vm::Nexus < Prog::Base
   def allocation_dataset
     requires_bdev_ubi = frame["storage_volumes"].any? { |v| v["use_bdev_ubi"] }
     spdk_where_clause = requires_bdev_ubi ? "AND id in (select vm_host_id from spdk_installation where version like '%ubi%' and allocation_weight > 0)" : ""
-    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.storage_size_gib, vm.location, vm.arch]
+    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm_storage_size_gib, vm.location, vm.arch]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
 FROM vm_host
 WHERE vm_host.used_cores + ? < least(vm_host.total_cores, vm_host.total_mem_gib / ?)
@@ -178,7 +185,7 @@ SQL
       .update(
         used_cores: Sequel[:used_cores] + vm.cores,
         used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib,
-        available_storage_gib: Sequel[:available_storage_gib] - vm.storage_size_gib
+        available_storage_gib: Sequel[:available_storage_gib] - vm_storage_size_gib
       ).zero?
 
     vm_host_id
@@ -440,7 +447,7 @@ SQL
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores,
         used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib,
-        available_storage_gib: Sequel[:available_storage_gib] + vm.storage_size_gib
+        available_storage_gib: Sequel[:available_storage_gib] + vm_storage_size_gib
       )
       vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy

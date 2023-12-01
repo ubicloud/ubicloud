@@ -439,6 +439,18 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx.allocation_dataset.map { _1[:used_cores] }).to eq([0, 70])
       expect(nx.allocate).to eq idle.id
     end
+
+    it "updates allocated resource columns" do
+      vmh = new_host(location: "hetzner-hel1").save_changes
+      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 10}, {size_gib: 15}])
+      nx = described_class.new(st)
+
+      initial_vmh = vmh.dup
+      expect(nx.allocate).to eq vmh.reload.id
+      expect(vmh.used_cores).to eq(initial_vmh.used_cores + 1)
+      expect(vmh.used_hugepages_1g).to eq(initial_vmh.used_hugepages_1g + 8)
+      expect(vmh.available_storage_gib).to eq(initial_vmh.available_storage_gib - 25)
+    end
   end
 
   describe "#create_storage_volume_records" do
