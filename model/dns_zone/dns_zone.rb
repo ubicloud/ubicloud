@@ -24,8 +24,6 @@ class DnsZone < Sequel::Model
     DnsRecord.create_with_id(dns_zone_id: id, name: record_name, type: type, ttl: ttl, data: data)
 
     incr_refresh_dns_servers
-  rescue Sequel::UniqueConstraintViolation => ex
-    raise unless ex.message.include?("duplicate key value violates unique constraint")
   end
 
   def delete_record(record_name:, type: nil, data: nil)
@@ -35,9 +33,20 @@ class DnsZone < Sequel::Model
     records = records_dataset.where(name: record_name)
     records = records.where(type: type) if type
     records = records.where(data: data) if data
-    records.update(tombstoned: true)
 
-    DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records.map(&:id)).delete(force: true)
+    DB[:dns_record].multi_insert(
+      records.map {
+        {
+          id: DnsRecord.generate_uuid,
+          dns_zone_id: id,
+          name: _1.name,
+          type: _1.type,
+          ttl: _1.ttl,
+          data: _1.data,
+          tombstoned: true
+        }
+      }
+    )
 
     incr_refresh_dns_servers
   end
