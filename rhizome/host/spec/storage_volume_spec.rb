@@ -64,6 +64,7 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2/")
       expect(encrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
       expect(encrypted_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
+      expect(encrypted_sv).to receive(:create_empty_disk_file)
       expect(encrypted_sv).to receive(:encrypted_image_copy).with(encryption_key, image_path)
       encrypted_sv.prep(key_wrapping_secrets)
     end
@@ -169,16 +170,22 @@ RSpec.describe StorageVolume do
   describe "#encrypted_image_copy" do
     it "can copy an image to an encrypted volume" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:create_empty_disk_file).with(no_args)
       expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+\s*$/, stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path)
+    end
+  end
+
+  describe "#create_ubi_writespace" do
+    it "can create an unencrypted ubi writespace" do
+      expect(unencrypted_sv).to receive(:create_empty_disk_file).with(disk_size_mib: 12 * 1024 + 16)
+      unencrypted_sv.create_ubi_writespace(nil)
     end
   end
 
   describe "#create_empty_disk_file" do
     it "can create an empty disk file" do
       expect(FileUtils).to receive(:touch).with(disk_file)
-      expect(encrypted_sv).to receive(:r).with("truncate -s 12G #{disk_file}")
+      expect(File).to receive(:truncate).with(disk_file, 12288 * 1024 * 1024)
       expect(encrypted_sv).to receive(:set_disk_file_permissions)
 
       encrypted_sv.create_empty_disk_file
