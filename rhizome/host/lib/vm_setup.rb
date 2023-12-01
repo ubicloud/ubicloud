@@ -483,7 +483,7 @@ EOS
           install_azcopy
           r "AZCOPY_CONCURRENCY_VALUE=5 azcopy copy #{download.shellescape} #{temp_path.shellescape}"
         else
-          r "curl -L10 -o #{temp_path.shellescape} #{download.shellescape}"
+          r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}"
         end
       end
 
