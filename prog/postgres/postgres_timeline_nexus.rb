@@ -44,7 +44,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       hop_take_backup
     end
 
-    nap 30
+    nap 20 * 60
   end
 
   label def take_backup

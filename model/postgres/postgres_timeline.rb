@@ -34,14 +34,11 @@ PGHOST=/var/run/postgresql
 
   def need_backup?
     return false if blob_storage_endpoint.nil?
-    return false if last_ineffective_check_at && last_ineffective_check_at > Time.now - 60 * 20
 
     status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
     return true if ["Failed", "NotStarted"].include?(status)
     return true if status == "Succeeded" && (last_backup_started_at.nil? || last_backup_started_at < Time.now - 60 * 60 * 24)
 
-    self.last_ineffective_check_at = Time.now
-    save_changes
     false
   end
 
