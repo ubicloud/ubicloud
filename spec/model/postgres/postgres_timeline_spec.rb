@@ -45,6 +45,12 @@ PGHOST=/var/run/postgresql
       expect(postgres_timeline.need_backup?).to be(false)
     end
 
+    it "returns false as backup needed if there is no leader" do
+      expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
+      expect(postgres_timeline).to receive(:leader).and_return(nil)
+      expect(postgres_timeline.need_backup?).to be(false)
+    end
+
     it "returns true as backup needed if there is no backup process or the last backup failed" do
       expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint").twice
       expect(sshable).to receive(:cmd).and_return("NotStarted", "Failed")

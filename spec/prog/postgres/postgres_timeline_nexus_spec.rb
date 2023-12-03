@@ -55,13 +55,18 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#wait_leader" do
+    it "hops to destroy if leader is missing" do
+      expect(postgres_timeline).to receive(:leader).and_return(nil)
+      expect { nx.wait_leader }.to hop("destroy")
+    end
+
     it "naps if leader not ready" do
-      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "start")))
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "start"))).twice
       expect { nx.wait_leader }.to nap(5)
     end
 
     it "hops if leader is ready" do
-      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait")))
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).twice
       expect { nx.wait_leader }.to hop("wait")
     end
   end

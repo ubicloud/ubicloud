@@ -34,6 +34,7 @@ PGHOST=/var/run/postgresql
 
   def need_backup?
     return false if blob_storage_endpoint.nil?
+    return false if leader.nil?
 
     status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
     return true if ["Failed", "NotStarted"].include?(status)
