@@ -245,6 +245,8 @@ SQL
   end
 
   def refresh_walg_credentials
+    return if postgres_server.timeline.blob_storage.nil?
+
     walg_config = postgres_server.timeline.generate_walg_config
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
   end

@@ -47,7 +47,7 @@ class PostgresServer < Sequel::Model
       lc_time: "'C.UTF-8'"
     }
 
-    if timeline.blob_storage_endpoint
+    if timeline.blob_storage
       if primary?
         configs[:archive_mode] = "on"
         configs[:archive_timeout] = "60"
