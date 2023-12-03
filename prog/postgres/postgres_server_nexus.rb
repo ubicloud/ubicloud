@@ -129,7 +129,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      unless (backup_label = postgres_server.timeline.last_backup_label_before_target(target: postgres_server.resource.restore_target))
+      unless (backup_label = postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target))
         fail "BUG: no backup found"
       end
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{backup_label}' initialize_database_from_backup")
