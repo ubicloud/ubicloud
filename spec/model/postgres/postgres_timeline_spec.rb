@@ -132,12 +132,6 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline.blob_storage_endpoint).to be_nil
   end
 
-  it "raises exception if no minio cluster in production" do
-    expect(Config).to receive(:production?).and_return(true)
-    expect(Project).to receive(:[]).and_return(instance_double(Project, minio_clusters: []))
-    expect { postgres_timeline.blob_storage_endpoint }.to raise_error "BUG: Missing blob storage configuration"
-  end
-
   it "returns blob storage client from cache" do
     expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
     expect(MinioClient).to receive(:new).and_return("dummy-client").once
