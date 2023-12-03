@@ -8,6 +8,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   let(:postgres_timeline) {
     instance_double(
       PostgresTimeline,
+      id: "b253669e-1cf5-8ada-9337-5fc319690838",
       ubid: "ptp99pd7gwyp4jcvnzgrsd443g",
       blob_storage_endpoint: "https://blob-endpoint",
       blob_storage_client: instance_double(MinioClient)
@@ -71,8 +72,33 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect { nx.wait }.to hop("take_backup")
     end
 
+    it "creates a missing backup page if last completed backup is older than 2 days" do
+      expect(postgres_timeline).to receive(:need_backup?).and_return(false)
+      stub_const("Backup", Struct.new(:last_modified))
+      expect(postgres_timeline).to receive(:backups).and_return([instance_double(Backup, last_modified: Time.now - 3 * 24 * 60 * 60)])
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer))
+      expect { nx.wait }.to nap(20 * 60)
+      expect(Page.active.count).to eq(1)
+    end
+
+    it "resolves the missing page if last completed backup is more recent than 2 days" do
+      expect(postgres_timeline).to receive(:need_backup?).and_return(false)
+      stub_const("Backup", Struct.new(:last_modified))
+      expect(postgres_timeline).to receive(:backups).and_return([instance_double(Backup, last_modified: Time.now - 1 * 24 * 60 * 60)])
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer))
+      page = instance_double(Page)
+      expect(page).to receive(:incr_resolve)
+      expect(Page).to receive(:from_tag_parts).and_return(page)
+
+      expect { nx.wait }.to nap(20 * 60)
+    end
+
     it "naps if there is nothing to do" do
       expect(postgres_timeline).to receive(:need_backup?).and_return(false)
+      stub_const("Backup", Struct.new(:last_modified))
+      expect(postgres_timeline).to receive(:backups).and_return([instance_double(Backup, last_modified: Time.now - 1 * 24 * 60 * 60)])
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer))
+
       expect { nx.wait }.to nap(20 * 60)
     end
   end

@@ -82,10 +82,6 @@ PGHOST=/var/run/postgresql
 
   def blob_storage_endpoint
     @blob_storage_endpoint ||= blob_storage&.connection_strings&.first
-    if @blob_storage_endpoint.nil? && Config.production?
-      fail "BUG: Missing blob storage configuration"
-    end
-    @blob_storage_endpoint
   end
 
   def blob_storage_client
