@@ -62,15 +62,14 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def take_backup
-    # It is possible that we started backup but crashed before saving the state
-    # to database. Since backup taking is an expensive operation, we check if
-    # backup is truly needed.
+    # It is possible that we already started backup but crashed before saving
+    # the state to database. Since backup taking is an expensive operation,
+    # we check if backup is truly needed.
     if postgres_timeline.need_backup?
       postgres_timeline.leader.vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/take-backup' take_postgres_backup")
+      postgres_timeline.latest_backup_started_at = Time.now
+      postgres_timeline.save_changes
     end
-
-    postgres_timeline.last_backup_started_at = Time.now
-    postgres_timeline.save_changes
 
     hop_wait
   end

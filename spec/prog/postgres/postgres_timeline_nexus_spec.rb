@@ -114,10 +114,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#take_backup" do
-    it "updates last_backup_started_at even if backup is not needed" do
+    it "hops to wait if backup is not needed" do
       expect(postgres_timeline).to receive(:need_backup?).and_return(false)
-      expect(postgres_timeline).to receive(:last_backup_started_at=)
-      expect(postgres_timeline).to receive(:save_changes)
       expect { nx.take_backup }.to hop("wait")
     end
 
@@ -126,7 +124,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       sshable = instance_double(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/take-backup' take_postgres_backup")
       expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, sshable: sshable)))
-      expect(postgres_timeline).to receive(:last_backup_started_at=)
+      expect(postgres_timeline).to receive(:latest_backup_started_at=)
       expect(postgres_timeline).to receive(:save_changes)
       expect { nx.take_backup }.to hop("wait")
     end

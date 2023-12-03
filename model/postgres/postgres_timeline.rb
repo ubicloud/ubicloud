@@ -38,7 +38,7 @@ PGHOST=/var/run/postgresql
 
     status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
     return true if ["Failed", "NotStarted"].include?(status)
-    return true if status == "Succeeded" && (last_backup_started_at.nil? || last_backup_started_at < Time.now - 60 * 60 * 24)
+    return true if status == "Succeeded" && (latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * 24)
 
     false
   end
@@ -51,7 +51,7 @@ PGHOST=/var/run/postgresql
       .select { _1.key.end_with?("backup_stop_sentinel.json") }
   end
 
-  def last_backup_label_before_target(target:)
+  def latest_backup_label_before_target(target:)
     backup = backups.sort_by(&:last_modified).reverse.find { _1.last_modified < target }
     backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json") if backup
   end

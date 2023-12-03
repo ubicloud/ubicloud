@@ -223,7 +223,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#initialize_database_from_backup" do
     it "triggers initialize_database_from_backup if initialize_database_from_backup command is not sent yet or failed" do
       expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now).twice
-      expect(postgres_server.timeline).to receive(:last_backup_label_before_target).and_return("backup-label").twice
+      expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label").twice
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup backup-label' initialize_database_from_backup").twice
 
       # NotStarted
@@ -247,7 +247,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "fails if the timeline has no backup" do
       expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now)
-      expect(postgres_server.timeline).to receive(:last_backup_label_before_target).and_return(nil)
+      expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).and_return(nil)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
       expect { nx.initialize_database_from_backup }.to raise_error RuntimeError, "BUG: no backup found"
     end

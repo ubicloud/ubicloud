@@ -60,14 +60,14 @@ PGHOST=/var/run/postgresql
 
     it "returns true as backup needed if previous backup started more than a day ago and is succeeded" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
-      expect(postgres_timeline).to receive(:last_backup_started_at).and_return(Time.now - 60 * 60 * 25).twice
+      expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 25).twice
       expect(sshable).to receive(:cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(true)
     end
 
     it "returns false as backup needed if previous backup started less than a day ago" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
-      expect(postgres_timeline).to receive(:last_backup_started_at).and_return(Time.now - 60 * 60 * 23).twice
+      expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 23).twice
       expect(sshable).to receive(:cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(false)
     end
@@ -79,7 +79,7 @@ PGHOST=/var/run/postgresql
     end
   end
 
-  describe "#last_backup_label_before_target" do
+  describe "#latest_backup_label_before_target" do
     it "returns most recent backup before given target" do
       stub_const("Backup", Struct.new(:last_modified))
       most_recent_backup_time = Time.now
@@ -91,14 +91,14 @@ PGHOST=/var/run/postgresql
         ]
       )
 
-      expect(postgres_timeline.last_backup_label_before_target(target: most_recent_backup_time - 50)).to eq("0002")
+      expect(postgres_timeline.latest_backup_label_before_target(target: most_recent_backup_time - 50)).to eq("0002")
     end
 
     it "returns nil if no backups before given target" do
       stub_const("Backup", Struct.new(:last_modified))
       expect(postgres_timeline).to receive(:backups).and_return([])
 
-      expect(postgres_timeline.last_backup_label_before_target(target: Time.now)).to be_nil
+      expect(postgres_timeline.latest_backup_label_before_target(target: Time.now)).to be_nil
     end
   end
 
