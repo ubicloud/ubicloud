@@ -73,7 +73,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "naps if there is nothing to do" do
       expect(postgres_timeline).to receive(:need_backup?).and_return(false)
-      expect { nx.wait }.to nap(30)
+      expect { nx.wait }.to nap(20 * 60)
     end
   end
 

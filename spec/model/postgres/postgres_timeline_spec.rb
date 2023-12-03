@@ -45,25 +45,15 @@ PGHOST=/var/run/postgresql
       expect(postgres_timeline.need_backup?).to be(false)
     end
 
-    it "returns false as backup needed if there is recent backup status check" do
-      expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
-      expect(postgres_timeline).to receive(:last_ineffective_check_at).and_return(Time.now).twice
-      expect(postgres_timeline.need_backup?).to be(false)
-    end
-
     it "returns true as backup needed if there is no backup process or the last backup failed" do
       expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint").twice
-      expect(postgres_timeline).to receive(:last_ineffective_check_at).and_return(Time.now - 60 * 60).exactly(4).times
-      expect(sshable).to receive(:cmd).and_return("NotStarted")
+      expect(sshable).to receive(:cmd).and_return("NotStarted", "Failed")
       expect(postgres_timeline.need_backup?).to be(true)
-
-      expect(sshable).to receive(:cmd).and_return("Failed")
       expect(postgres_timeline.need_backup?).to be(true)
     end
 
     it "returns true as backup needed if previous backup started more than a day ago and is succeeded" do
       expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
-      expect(postgres_timeline).to receive(:last_ineffective_check_at).and_return(Time.now - 60 * 60).twice
       expect(postgres_timeline).to receive(:last_backup_started_at).and_return(Time.now - 60 * 60 * 25).twice
       expect(sshable).to receive(:cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(true)
@@ -71,7 +61,6 @@ PGHOST=/var/run/postgresql
 
     it "returns false as backup needed if previous backup started less than a day ago" do
       expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
-      expect(postgres_timeline).to receive(:last_ineffective_check_at).and_return(Time.now - 60 * 60).twice
       expect(postgres_timeline).to receive(:last_backup_started_at).and_return(Time.now - 60 * 60 * 23).twice
       expect(sshable).to receive(:cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(false)
@@ -79,7 +68,6 @@ PGHOST=/var/run/postgresql
 
     it "returns false as backup needed if previous backup started is in progress" do
       expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
-      expect(postgres_timeline).to receive(:last_ineffective_check_at).and_return(Time.now - 60 * 60).twice
       expect(sshable).to receive(:cmd).and_return("InProgress")
       expect(postgres_timeline.need_backup?).to be(false)
     end
