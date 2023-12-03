@@ -10,7 +10,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       PostgresTimeline,
       id: "b253669e-1cf5-8ada-9337-5fc319690838",
       ubid: "ptp99pd7gwyp4jcvnzgrsd443g",
-      blob_storage_endpoint: "https://blob-endpoint",
+      blob_storage: "dummy-blob-storage",
       blob_storage_client: instance_double(MinioClient)
     )
   }
@@ -48,7 +48,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "hops without creating bucket if blob storage is not configures" do
-      expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return(nil)
+      expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
       expect(postgres_timeline.blob_storage_client).not_to receive(:create_bucket)
       expect { nx.start }.to hop("wait_leader")
     end
@@ -72,6 +72,11 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#wait" do
+    it "naps if blob storage is not configures" do
+      expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
+      expect { nx.wait }.to nap(20 * 60)
+    end
+
     it "hops to take_backup if backup is needed" do
       expect(postgres_timeline).to receive(:need_backup?).and_return(true)
       expect { nx.wait }.to hop("take_backup")

@@ -17,7 +17,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       timeline: instance_double(
         PostgresTimeline,
         id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
-        generate_walg_config: "walg config"
+        generate_walg_config: "walg config",
+        blob_storage: "dummy-blob-storage"
       ),
       vm: instance_double(
         Vm,
@@ -392,6 +393,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server).to receive(:destroy)
 
       expect { nx.destroy }.to exit({"msg" => "postgres server is deleted"})
+    end
+  end
+
+  describe "#refresh_walg_credentials" do
+    it "returns nil if blob storage is not configures" do
+      expect(postgres_server.timeline).to receive(:blob_storage).and_return(nil)
+      expect(nx.refresh_walg_credentials).to be_nil
     end
   end
 end

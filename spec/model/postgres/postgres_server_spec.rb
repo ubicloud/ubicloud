@@ -26,7 +26,7 @@ RSpec.describe PostgresServer do
   end
 
   it "generates configure_hash" do
-    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage_endpoint: "https://blob-endpoint"))
+    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"))
     postgres_server.timeline_access = "push"
     configure_hash = {
       configs: {
@@ -76,7 +76,7 @@ RSpec.describe PostgresServer do
   end
 
   it "generates configure_hash with additonal fields for restoring servers" do
-    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage_endpoint: "https://blob-endpoint"))
+    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"))
     postgres_server.timeline_access = "fetch"
     expect(postgres_server).to receive(:resource).and_return(instance_double(PostgresResource, restore_target: "2023-10-25 00:00"))
     expect(postgres_server.configure_hash[:configs]).to include(
@@ -86,7 +86,7 @@ RSpec.describe PostgresServer do
   end
 
   it "does not set archival related configs if blob storage is not configured" do
-    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage_endpoint: nil))
+    expect(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: nil))
     postgres_server.timeline_access = "push"
     expect(postgres_server.configure_hash[:configs]).not_to include(
       archive_mode: "on"

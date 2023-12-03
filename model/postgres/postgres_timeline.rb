@@ -33,7 +33,7 @@ PGHOST=/var/run/postgresql
   end
 
   def need_backup?
-    return false if blob_storage_endpoint.nil?
+    return false if blob_storage.nil?
     return false if leader.nil?
 
     status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
@@ -44,6 +44,8 @@ PGHOST=/var/run/postgresql
   end
 
   def backups
+    return [] if blob_storage.nil?
+
     blob_storage_client
       .list_objects(bucket_name: ubid, folder_path: "basebackups_005/")
       .select { _1.key.end_with?("backup_stop_sentinel.json") }
@@ -82,7 +84,7 @@ PGHOST=/var/run/postgresql
   end
 
   def blob_storage_endpoint
-    @blob_storage_endpoint ||= blob_storage&.connection_strings&.first
+    @blob_storage_endpoint ||= blob_storage.connection_strings.first
   end
 
   def blob_storage_client
