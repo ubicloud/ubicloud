@@ -90,8 +90,12 @@ PGHOST=/var/run/postgresql
   def blob_storage_client
     @blob_storage_client ||= Minio::Client.new(
       endpoint: blob_storage_endpoint,
-      access_key: Config.postgres_service_blob_storage_access_key,
-      secret_key: Config.postgres_service_blob_storage_secret_key
+      access_key: access_key,
+      secret_key: secret_key
     )
+  end
+
+  def blob_storage_policy
+    {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::#{ubid}*"]}]}
   end
 end
