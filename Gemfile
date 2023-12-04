@@ -32,6 +32,7 @@ gem "pagerduty", ">= 4.0"
 gem "stripe"
 gem "countries"
 gem "octokit"
+gem "argon2-kdf"
 
 group :development do
   gem "brakeman"
