@@ -41,6 +41,12 @@ class Minio::Client
     response.status
   end
 
+  def admin_remove_user(access_key)
+    query = URI.encode_www_form({"accessKey" => access_key})
+    response = send_request("DELETE", admin_uri("remove-user?#{query}"))
+    response.status
+  end
+
   def admin_policy_list
     send_request("GET", admin_uri("list-canned-policies"))
   end
@@ -53,6 +59,22 @@ class Minio::Client
 
   def admin_policy_info(policy_name)
     send_request("GET", admin_uri("info-canned-policy?name=#{policy_name}"))
+  end
+
+  def admin_policy_set(policy_name, user_name)
+    query = URI.encode_www_form({
+      "userOrGroup" => user_name,
+      "isGroup" => "false",
+      "policyName" => policy_name
+    })
+    response = send_request("PUT", admin_uri("set-user-or-group-policy?#{query}"))
+    response.data
+  end
+
+  def admin_policy_remove(policy_name)
+    query = URI.encode_www_form({"name" => policy_name})
+    response = send_request("DELETE", admin_uri("remove-canned-policy?#{query}"))
+    response.status
   end
 
   def create_bucket(bucket_name)

@@ -46,6 +46,14 @@ RSpec.describe Minio::Client do
     end
   end
 
+  describe "admin_remove_user" do
+    it "sends a DELETE request to /minio/admin/v3/remove-user" do
+      stub_request(:delete, "#{endpoint}/minio/admin/v3/remove-user?accessKey=test").to_return(status: 200)
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_remove_user("test")).to eq(200)
+    end
+  end
+
   describe "admin_policy_list" do
     it "sends a GET request to /minio/admin/v3/list-canned-policies" do
       stub_request(:get, "#{endpoint}/minio/admin/v3/list-canned-policies").to_return(status: 200, body: "test")
@@ -67,6 +75,22 @@ RSpec.describe Minio::Client do
       stub_request(:get, "#{endpoint}/minio/admin/v3/info-canned-policy?name=test").to_return(status: 200, body: "test")
 
       expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_policy_info("test").data[:body]).to eq("test")
+    end
+  end
+
+  describe "admin_policy_set" do
+    it "sends a PUT request to /minio/admin/v3/set-user-or-group-policy" do
+      stub_request(:put, "#{endpoint}/minio/admin/v3/set-user-or-group-policy?userOrGroup=test&isGroup=false&policyName=test").to_return(status: 200)
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_policy_set("test", "test")).to eq({body: "", headers: {}, reason_phrase: "", remote_ip: "127.0.0.1", status: 200})
+    end
+  end
+
+  describe "admin_policy_remove" do
+    it "sends a DELETE request to /minio/admin/v3/remove-canned-policy" do
+      stub_request(:delete, "#{endpoint}/minio/admin/v3/remove-canned-policy?name=test").to_return(status: 200)
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_policy_remove("test")).to eq(200)
     end
   end
 
