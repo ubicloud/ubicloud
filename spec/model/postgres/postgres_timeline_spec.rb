@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
-require "aws-sdk-s3"
 
 RSpec.describe PostgresTimeline do
   subject(:postgres_timeline) { described_class.create_with_id(access_key: "dummy-access-key", secret_key: "dummy-secret-key") }
