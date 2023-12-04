@@ -144,4 +144,10 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline.blob_storage_client).to eq("dummy-client")
     expect(postgres_timeline.blob_storage_client).to eq("dummy-client")
   end
+
+  it "returns blob storage policy" do
+    policy = {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::dummy-ubid*"]}]}
+    expect(postgres_timeline).to receive(:ubid).and_return("dummy-ubid")
+    expect(postgres_timeline.blob_storage_policy).to eq(policy)
+  end
 end

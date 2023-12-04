@@ -14,8 +14,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     DB.transaction do
       postgres_timeline = PostgresTimeline.create_with_id(
         parent_id: parent_id,
-        access_key: Config.postgres_service_blob_storage_access_key,
-        secret_key: Config.postgres_service_blob_storage_secret_key
+        access_key: SecureRandom.hex(16),
+        secret_key: SecureRandom.hex(32)
       )
       Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { _1.id = postgres_timeline.id }
     end
@@ -30,7 +30,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   label def start
-    blob_storage_client.create_bucket(postgres_timeline.ubid) if postgres_timeline.blob_storage
+    setup_blob_storage if postgres_timeline.blob_storage
     hop_wait_leader
   end
 
@@ -76,7 +76,37 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   label def destroy
     decr_destroy
+    destroy_blob_storage if postgres_timeline.blob_storage_endpoint
     postgres_timeline.destroy
     pop "postgres timeline is deleted"
+  end
+
+  def destroy_blob_storage
+    admin_client = Minio::Client.new(
+      endpoint: postgres_timeline.blob_storage_endpoint,
+      access_key: Config.postgres_service_blob_storage_access_key,
+      secret_key: Config.postgres_service_blob_storage_secret_key
+    )
+
+    admin_client.admin_remove_user(postgres_timeline.access_key)
+    admin_client.admin_policy_remove(postgres_timeline.ubid)
+  end
+
+  def setup_blob_storage
+    DB.transaction do
+      admin_client = Minio::Client.new(
+        endpoint: postgres_timeline.blob_storage_endpoint,
+        access_key: Config.postgres_service_blob_storage_access_key,
+        secret_key: Config.postgres_service_blob_storage_secret_key
+      )
+
+      # Setup user keys and policy for the timeline
+      admin_client.admin_add_user(postgres_timeline.access_key, postgres_timeline.secret_key)
+      admin_client.admin_policy_add(postgres_timeline.ubid, postgres_timeline.blob_storage_policy)
+      admin_client.admin_policy_set(postgres_timeline.ubid, postgres_timeline.access_key)
+
+      # Create bucket for the timeline
+      blob_storage_client.create_bucket(postgres_timeline.ubid)
+    end
   end
 end

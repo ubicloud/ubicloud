@@ -10,8 +10,12 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       PostgresTimeline,
       id: "b253669e-1cf5-8ada-9337-5fc319690838",
       ubid: "ptp99pd7gwyp4jcvnzgrsd443g",
-      blob_storage: "dummy-blob-storage",
-      blob_storage_client: instance_double(Minio::Client)
+      blob_storage: "blob-storage",
+      blob_storage_endpoint: "https://blob-endpoint",
+      blob_storage_client: instance_double(Minio::Client),
+      access_key: "dummy-access-key",
+      secret_key: "dummy-secret-key",
+      blob_storage_policy: {"Version" => "2012-10-17", "Statement" => [{"Action" => ["s3:GetBucketLocation"], "Effect" => "Allow", "Principal" => {"AWS" => ["*"]}, "Resource" => ["arn:aws:s3:::test"], "Sid" => ""}]}
     )
   }
 
@@ -42,8 +46,17 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#start" do
+    let(:admin_blob_storage_client) { instance_double(Minio::Client) }
+    let(:blob_storage_client) { instance_double(Minio::Client) }
+
     it "creates bucket and hops" do
-      expect(postgres_timeline.blob_storage_client).to receive(:create_bucket).with(postgres_timeline.ubid)
+      expect(postgres_timeline).to receive(:blob_storage).and_return("blob_storage")
+      expect(Minio::Client).to receive(:new).with(endpoint: "https://blob-endpoint", access_key: nil, secret_key: nil).and_return(admin_blob_storage_client)
+      expect(postgres_timeline).to receive(:blob_storage_client).and_return(blob_storage_client)
+      expect(admin_blob_storage_client).to receive(:admin_add_user).with(postgres_timeline.access_key, postgres_timeline.secret_key).and_return(200)
+      expect(admin_blob_storage_client).to receive(:admin_policy_add).with(postgres_timeline.ubid, postgres_timeline.blob_storage_policy).and_return(200)
+      expect(admin_blob_storage_client).to receive(:admin_policy_set).with(postgres_timeline.ubid, postgres_timeline.access_key).and_return(200)
+      expect(blob_storage_client).to receive(:create_bucket).with(postgres_timeline.ubid).and_return(200)
       expect { nx.start }.to hop("wait_leader")
     end
 
@@ -131,8 +144,21 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe "#destroy" do
-    it "completes destroy even if dns zone is not configured" do
+    let(:admin_blob_storage_client) { instance_double(Minio::Client) }
+
+    it "completes destroy even if dns zone and blob_storage are not configured" do
+      expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return(nil)
       expect(postgres_timeline).to receive(:destroy)
+      expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+    end
+
+    it "destroys blob storage and postgres timeline" do
+      expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
+      expect(postgres_timeline).to receive(:destroy)
+
+      expect(Minio::Client).to receive(:new).with(endpoint: postgres_timeline.blob_storage_endpoint, access_key: nil, secret_key: nil).and_return(admin_blob_storage_client)
+      expect(admin_blob_storage_client).to receive(:admin_remove_user).with(postgres_timeline.access_key).and_return(200)
+      expect(admin_blob_storage_client).to receive(:admin_policy_remove).with(postgres_timeline.ubid).and_return(200)
       expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
     end
   end
