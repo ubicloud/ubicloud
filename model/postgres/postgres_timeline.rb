@@ -47,7 +47,7 @@ PGHOST=/var/run/postgresql
     return [] if blob_storage.nil?
 
     blob_storage_client
-      .list_objects(bucket_name: ubid, folder_path: "basebackups_005/")
+      .list_objects(ubid, "basebackups_005/")
       .select { _1.key.end_with?("backup_stop_sentinel.json") }
   end
 
@@ -88,7 +88,7 @@ PGHOST=/var/run/postgresql
   end
 
   def blob_storage_client
-    @blob_storage_client ||= MinioClient.new(
+    @blob_storage_client ||= Minio::Client.new(
       endpoint: blob_storage_endpoint,
       access_key: Config.postgres_service_blob_storage_access_key,
       secret_key: Config.postgres_service_blob_storage_secret_key

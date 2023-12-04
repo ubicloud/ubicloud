@@ -124,11 +124,12 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns list of backups" do
+    stub_const("Backup", Struct.new(:key))
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, connection_strings: ["https://blob-endpoint"])).twice
 
-    s3_client = Aws::S3::Client.new(stub_responses: true)
-    s3_client.stub_responses(:list_objects_v2, {is_truncated: false, contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file"}]})
-    expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+    minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key")
+    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Backup, key: "backup_stop_sentinel.json"), instance_double(Backup, key: "unrelated_file.txt")])
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
 
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
   end
@@ -140,7 +141,7 @@ PGHOST=/var/run/postgresql
 
   it "returns blob storage client from cache" do
     expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
-    expect(MinioClient).to receive(:new).and_return("dummy-client").once
+    expect(Minio::Client).to receive(:new).and_return("dummy-client").once
     expect(postgres_timeline.blob_storage_client).to eq("dummy-client")
     expect(postgres_timeline.blob_storage_client).to eq("dummy-client")
   end
