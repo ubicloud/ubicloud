@@ -39,17 +39,6 @@ RSpec.describe Prog::Vm::Nexus do
   }
   let(:prj) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
-  before do
-    allow(nx).to receive(:frame).and_return({
-      "storage_volumes" => [{
-        "use_bdev_ubi" => false,
-        "skip_sync" => true,
-        "storage_size_gib" => 11,
-        "boot" => true
-      }]
-    })
-  end
-
   describe ".assemble" do
     let(:ps) {
       PrivateSubnet.create(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
@@ -333,6 +322,14 @@ RSpec.describe Prog::Vm::Nexus do
     before do
       @host_index = 0
       vm.location = "somewhere-normal"
+      allow(nx).to receive(:frame).and_return({
+        "storage_volumes" => [{
+          "use_bdev_ubi" => false,
+          "skip_sync" => true,
+          "size_gib" => 11,
+          "boot" => true
+        }]
+      })
     end
 
     def new_host(**args)
