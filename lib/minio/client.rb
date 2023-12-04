@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "excon"
+require "json"
 require "nokogiri"
 require "cgi"
 
@@ -15,8 +16,30 @@ class Minio::Client
     @signer = Minio::HeaderSigner.new
   end
 
+  private def admin_uri(path)
+    URI.parse("#{@endpoint}#{ADMIN_URI_PATH}/#{path}")
+  end
+
   private def s3_uri(path)
     URI.parse("#{@endpoint}/#{path}")
+  end
+
+  def admin_info
+    send_request("GET", admin_uri("info"))
+  end
+
+  def admin_policy_list
+    send_request("GET", admin_uri("list-canned-policies"))
+  end
+
+  def admin_policy_add(policy_name, policy)
+    body = JSON.generate(policy).encode("UTF-8")
+    response = send_request("PUT", admin_uri("add-canned-policy?name=#{policy_name}"), body)
+    response.status
+  end
+
+  def admin_policy_info(policy_name)
+    send_request("GET", admin_uri("info-canned-policy?name=#{policy_name}"))
   end
 
   def create_bucket(bucket_name)

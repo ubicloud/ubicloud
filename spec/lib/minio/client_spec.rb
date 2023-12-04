@@ -5,6 +5,38 @@ RSpec.describe Minio::Client do
   let(:access_key) { "minioadmin" }
   let(:secret_key) { "minioadmin" }
 
+  describe "admin_info" do
+    it "sends a GET request to /minio/admin/v3/info" do
+      stub_request(:get, "#{endpoint}/minio/admin/v3/info").to_return(status: 200, body: "test")
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_info.data[:body]).to eq("test")
+    end
+  end
+
+
+  describe "admin_policy_list" do
+    it "sends a GET request to /minio/admin/v3/list-canned-policies" do
+      stub_request(:get, "#{endpoint}/minio/admin/v3/list-canned-policies").to_return(status: 200, body: "test")
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_policy_list.data[:body]).to eq("test")
+    end
+  end
+
+  describe "admin_policy_add" do
+    it "sends a PUT request to /minio/admin/v3/add-canned-policy" do
+      stub_request(:put, "#{endpoint}/minio/admin/v3/add-canned-policy?name=test").to_return(status: 200)
+      policy = {"Version" => "2012-10-17", "Statement" => [{"Action" => ["s3:GetBucketLocation"], "Effect" => "Allow", "Principal" => {"AWS" => ["*"]}, "Resource" => ["arn:aws:s3:::test"], "Sid" => ""}]}
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_policy_add("test", policy)).to eq(200)
+    end
+  end
+
+  describe "admin_policy_info" do
+    it "sends a GET request to /minio/admin/v3/info-canned-policy" do
+      stub_request(:get, "#{endpoint}/minio/admin/v3/info-canned-policy?name=test").to_return(status: 200, body: "test")
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_policy_info("test").data[:body]).to eq("test")
+    end
+  end
 
   describe "put_bucket" do
     it "sends a PUT request to /bucket_name" do
