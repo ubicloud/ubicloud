@@ -14,6 +14,7 @@ class Minio::Client
     @endpoint = endpoint
     @client = Excon.new(endpoint)
     @signer = Minio::HeaderSigner.new
+    @crypto = Minio::Crypto.new
   end
 
   private def admin_uri(path)
@@ -26,6 +27,18 @@ class Minio::Client
 
   def admin_info
     send_request("GET", admin_uri("info"))
+  end
+
+  def admin_list_users
+    response = send_request("GET", admin_uri("list-users"))
+    JSON.parse @crypto.decrypt(response.data[:body], @creds[:secret_key])
+  end
+
+  def admin_add_user(access_key, secret_key)
+    body_str = JSON.generate({"status" => "enabled", "secretKey" => secret_key}).encode("UTF-8")
+    body = @crypto.encrypt(body_str, @creds[:secret_key])
+    response = send_request("PUT", admin_uri("add-user?accessKey=#{access_key}"), body)
+    response.status
   end
 
   def admin_policy_list

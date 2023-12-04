@@ -13,6 +13,38 @@ RSpec.describe Minio::Client do
     end
   end
 
+  describe "admin_list_users" do
+    it "sends a GET request to /minio/admin/v3/list-users" do
+      crypto = instance_double(Minio::Crypto)
+      stub_request(:get, "#{endpoint}/minio/admin/v3/list-users").to_return(status: 200, body: "test_encrypted")
+      expect(Minio::Crypto).to receive(:new).and_return(crypto)
+      expect(crypto).to receive(:decrypt).with("test_encrypted", secret_key).and_return("{\"test\": \"test\"}")
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_list_users).to eq({"test" => "test"})
+    end
+  end
+
+  describe "admin_add_user" do
+    it "sends a PUT request to /minio/admin/v3/add-user" do
+      crypto = instance_double(Minio::Crypto)
+      stub_request(:put, "#{endpoint}/minio/admin/v3/add-user?accessKey=test").to_return(status: 200)
+      expect(Minio::Crypto).to receive(:new).and_return(crypto)
+      expect(crypto).to receive(:encrypt).with("{\"status\":\"enabled\",\"secretKey\":\"test\"}", secret_key).and_return("test_encrypted")
+
+      expect(described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_add_user("test", "test")).to eq(200)
+    end
+
+    it "sends a PUT request but fails if user exists" do
+      crypto = instance_double(Minio::Crypto)
+      stub_request(:put, "#{endpoint}/minio/admin/v3/add-user?accessKey=test").to_return(status: 409)
+      expect(Minio::Crypto).to receive(:new).and_return(crypto)
+      expect(crypto).to receive(:encrypt).with("{\"status\":\"enabled\",\"secretKey\":\"test\"}", secret_key).and_return("test_encrypted")
+
+      expect {
+        described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key).admin_add_user("test", "test")
+      }.to raise_error RuntimeError
+    end
+  end
 
   describe "admin_policy_list" do
     it "sends a GET request to /minio/admin/v3/list-canned-policies" do
