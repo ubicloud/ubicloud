@@ -63,7 +63,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def start
     nap 5 unless server.vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
+    bud self.class, frame, :trigger_pg_current_xact_id_on_parent if postgres_resource.parent
     hop_create_dns_record
+  end
+
+  label def trigger_pg_current_xact_id_on_parent
+    postgres_resource.parent.server.vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_current_xact_id()'")
+    pop "triggered pg_current_xact_id"
   end
 
   label def create_dns_record
@@ -82,7 +88,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
     postgres_resource.save_changes
 
-    hop_wait_server
+    reap
+    hop_wait_server if leaf?
+    nap 5
   end
 
   label def refresh_certificates
@@ -148,6 +156,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     decr_destroy
 
+    strand.children.each { _1.destroy }
     unless server.nil?
       server.incr_destroy
       nap 5

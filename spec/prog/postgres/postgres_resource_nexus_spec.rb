@@ -16,6 +16,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       root_cert_key_2: nil,
       server_cert: "server cert",
       server_cert_key: nil,
+      parent: nil,
       server: instance_double(
         PostgresServer,
         vm: instance_double(
@@ -111,6 +112,32 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx).to receive(:register_deadline)
       expect { nx.start }.to hop("create_dns_record")
     end
+
+    it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
+      expect(postgres_resource.server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(nx).to receive(:register_deadline)
+      expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource))
+      expect(nx).to receive(:bud).with(described_class, {}, :trigger_pg_current_xact_id_on_parent)
+      expect { nx.start }.to hop("create_dns_record")
+    end
+  end
+
+  describe "#trigger_pg_current_xact_id_on_parent" do
+    it "triggers pg_current_xact_id and pops" do
+      sshable = instance_double(Sshable)
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_current_xact_id()'")
+      expect(postgres_resource).to receive(:parent).and_return(
+        instance_double(
+          PostgresResource,
+          server: instance_double(
+            PostgresServer,
+            vm: instance_double(Vm, sshable: sshable)
+          )
+        )
+      )
+
+      expect { nx.trigger_pg_current_xact_id_on_parent }.to exit({"msg" => "triggered pg_current_xact_id"})
+    end
   end
 
   describe "#create_dns_record" do
@@ -148,6 +175,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx).to receive(:create_server_certificate).and_call_original
 
       expect { nx.initialize_certificates }.to hop("wait_server")
+    end
+
+    it "naps if there are children" do
+      expect(nx).to receive(:create_root_certificate).twice
+      expect(nx).to receive(:create_server_certificate)
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.initialize_certificates }.to nap(5)
     end
   end
 
