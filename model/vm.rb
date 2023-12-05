@@ -155,4 +155,14 @@ class Vm < Sequel::Model
   def storage_encrypted?
     vm_storage_volumes.all? { !_1.key_encryption_key_1_id.nil? }
   end
+
+  def add_allow_ssh_fw_rules(ps)
+    ["0.0.0.0/0", "::/0"].each do |ip|
+      FirewallRule.create_with_id(
+        ip: ip,
+        private_subnet_id: ps.id,
+        port_range: Sequel.pg_range(22..22)
+      )
+    end
+  end
 end
