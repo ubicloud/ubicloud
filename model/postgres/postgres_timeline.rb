@@ -46,9 +46,14 @@ PGHOST=/var/run/postgresql
   def backups
     return [] if blob_storage.nil?
 
-    blob_storage_client
-      .list_objects(ubid, "basebackups_005/")
-      .select { _1.key.end_with?("backup_stop_sentinel.json") }
+    begin
+      blob_storage_client
+        .list_objects(ubid, "basebackups_005/")
+        .select { _1.key.end_with?("backup_stop_sentinel.json") }
+    rescue RuntimeError => ex
+      return [] if ex.message.include?("The Access Key Id you provided does not exist in our records.")
+      raise
+    end
   end
 
   def latest_backup_label_before_target(target:)
