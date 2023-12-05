@@ -31,6 +31,16 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         enable_ip4: true
       )
 
+      vm_st.subject.private_subnets.each { _1.firewall_rules.each(&:destroy) }
+      vm_st.subject.add_allow_ssh_fw_rules(vm_st.subject.private_subnets.first)
+      ["0.0.0.0/0", "::/0"].each do |ip|
+        FirewallRule.create_with_id(
+          ip: ip,
+          private_subnet_id: vm_st.subject.private_subnets.first.id,
+          port_range: Sequel.pg_range(5432..5432)
+        )
+      end
+
       postgres_server = PostgresServer.create(
         resource_id: resource_id,
         timeline_id: timeline_id,
