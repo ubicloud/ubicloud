@@ -190,7 +190,15 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#prep" do
-    it "generates and passes a params json" do
+    it "hops to run if prep command is succeeded" do
+      sshable = instance_spy(Sshable)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
+      vmh = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vmh)
+      expect { nx.prep }.to hop("run")
+    end
+
+    it "generates and passes a params json if prep command is not started yet" do
       vm = nx.vm
       vm.ephemeral_net6 = "fe80::/64"
       vm.unix_user = "test_user"
@@ -202,6 +210,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
 
       sshable = instance_spy(Sshable)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
       vmh = instance_double(VmHost, sshable: sshable,
         total_cpus: 80, total_cores: 80, total_sockets: 1, ndp_needed: false)
       expect(vm).to receive(:vm_host).and_return(vmh)
@@ -222,7 +231,15 @@ RSpec.describe Prog::Vm::Nexus do
       end
       expect(sshable).to receive(:cmd).with(/sudo host\/bin\/prepvm/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
 
-      expect { nx.prep }.to hop("run")
+      expect { nx.prep }.to nap(5)
+    end
+
+    it "naps if prep command is in progress" do
+      sshable = instance_spy(Sshable)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("InProgress")
+      vmh = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vmh)
+      expect { nx.prep }.to nap(5)
     end
 
     it "generates local_ipv4 if not set" do
@@ -526,6 +543,7 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_double(Sshable)
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm/)
+      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
       expect { nx.run }.to hop("wait_sshable")
     end
   end
