@@ -154,5 +154,11 @@ RSpec.describe Minio::Client do
       mc = described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key)
       expect(mc.list_objects("test", "folder_path", max_keys: 1).map(&:key)).to eq(["name1", "name2"])
     end
+
+    it "returns empty list for non existent bucket" do
+      stub_request(:get, "#{endpoint}/test?delimiter=&encoding-type=url&list-type=2&prefix=folder_path&max-keys=1").to_return(status: 404)
+      mc = described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key)
+      expect(mc.list_objects("test", "folder_path", max_keys: 1)).to eq([])
+    end
   end
 end
