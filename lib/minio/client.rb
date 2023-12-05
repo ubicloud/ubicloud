@@ -81,6 +81,10 @@ class Minio::Client
       "max-keys" => max_keys
     })
     response = send_request("GET", s3_uri("#{bucket_name}?#{query}"))
+    if response.status == 404
+      return objects
+    end
+
     parsed_objects = parse_list_objects(response.data[:body])
     objects.concat(parsed_objects[0])
 
