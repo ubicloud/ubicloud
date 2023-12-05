@@ -11,6 +11,11 @@ unless (vm_name = ARGV.shift)
   exit 1
 end
 
+unless (storage_space = ARGV.shift)
+  puts "expect storage space as argument"
+  exit 1
+end
+
 unless (disk_index = ARGV.shift)
   puts "expected disk_index as argument"
   exit 1
@@ -21,7 +26,7 @@ unless (action = ARGV.shift)
   exit 1
 end
 
-storage_key_tool = StorageKeyTool.new(vm_name, disk_index)
+storage_key_tool = StorageKeyTool.new(vm_name, storage_space, disk_index)
 
 case action
 when "reencrypt"

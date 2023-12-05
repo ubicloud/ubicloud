@@ -33,6 +33,7 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:skip_sync] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
+      volume[:storage_space] ||= "DEFAULT"
     end
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
@@ -146,7 +147,8 @@ class Prog::Vm::Nexus < Prog::Base
         "encrypted" => !s.key_encryption_key_1.nil?,
         "spdk_version" => s.spdk_version,
         "use_bdev_ubi" => s.use_bdev_ubi,
-        "skip_sync" => s.skip_sync
+        "skip_sync" => s.skip_sync,
+        "storage_space" => s.storage_space
       }
     }
   end
@@ -219,6 +221,7 @@ SQL
         size_gib: volume["size_gib"],
         use_bdev_ubi: volume["use_bdev_ubi"],
         skip_sync: volume["skip_sync"],
+        storage_space: volume["storage_space"],
         disk_index: disk_index,
         key_encryption_key_1_id: key_encryption_key&.id,
         spdk_installation_id: spdk_installation_id

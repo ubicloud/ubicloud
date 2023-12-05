@@ -17,10 +17,10 @@ RSpec.describe Prog::Vm::Nexus do
       init_vector: "iv", auth_data: "somedata"
     ) { _1.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
     si = SpdkInstallation.new(version: "v1") { _1.id = SpdkInstallation.generate_uuid }
-    disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
+    disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, storage_space: "nvme0", use_bdev_ubi: false, skip_sync: false)
     disk_1.spdk_installation = si
     disk_1.key_encryption_key_1 = kek
-    disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1)
+    disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1, storage_space: "DEFAULT", use_bdev_ubi: true, skip_sync: true)
     disk_2.spdk_installation = si
     vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1").tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
@@ -189,6 +189,17 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  describe "#storage_volumes" do
+    it "includes all storage volumes" do
+      expect(nx.storage_volumes).to eq([
+        {"boot" => true, "disk_index" => 0, "image" => nil, "size_gib" => 20, "device_id" => "vm4hjdwr_0", "encrypted" => true,
+         "spdk_version" => "v1", "use_bdev_ubi" => false, "skip_sync" => false, "storage_space" => "nvme0"},
+        {"boot" => false, "disk_index" => 1, "image" => nil, "size_gib" => 15, "device_id" => "vm4hjdwr_1", "encrypted" => false,
+         "spdk_version" => "v1", "use_bdev_ubi" => true, "skip_sync" => true, "storage_space" => "DEFAULT"}
+      ])
+    end
+  end
+
   describe "#prep" do
     it "generates and passes a params json" do
       vm = nx.vm
@@ -327,7 +338,8 @@ RSpec.describe Prog::Vm::Nexus do
           "use_bdev_ubi" => false,
           "skip_sync" => true,
           "size_gib" => 11,
-          "boot" => true
+          "boot" => true,
+          "storage_space" => "nvme0"
         }]
       })
     end

@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
-require_relative "vm_path"
+require_relative "storage_path"
 require_relative "../lib/storage_key_encryption"
 
 class StorageKeyTool
-  def initialize(vm_name, disk_index)
-    vp = VmPath.new(vm_name)
-    @key_file = vp.data_encryption_key(disk_index)
+  def initialize(vm_name, storage_space, disk_index)
+    sp = StoragePath.new(vm_name, storage_space, disk_index)
+    @key_file = sp.data_encryption_key
     @new_key_file = "#{@key_file}.new"
   end
 

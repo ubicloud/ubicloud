@@ -39,7 +39,8 @@ class Prog::RotateStorageKek < Prog::Base
 
     q_vm = vm.inhost_name.shellescape
     disk_index = vm_storage_volume.disk_index
-    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{disk_index} reencrypt", stdin: data_json)
+    q_space = vm_storage_volume.storage_space.shellescape
+    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{q_space} #{disk_index} reencrypt", stdin: data_json)
 
     hop_test_keys_on_server
   end
@@ -52,7 +53,8 @@ class Prog::RotateStorageKek < Prog::Base
 
     q_vm = vm.inhost_name.shellescape
     disk_index = vm_storage_volume.disk_index
-    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{disk_index} test-keys", stdin: data_json)
+    q_space = vm_storage_volume.storage_space.shellescape
+    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{q_space} #{disk_index} test-keys", stdin: data_json)
 
     hop_retire_old_key_on_server
   end
@@ -60,7 +62,8 @@ class Prog::RotateStorageKek < Prog::Base
   label def retire_old_key_on_server
     q_vm = vm.inhost_name.shellescape
     disk_index = vm_storage_volume.disk_index
-    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{disk_index} retire-old-key", stdin: "{}")
+    q_space = vm_storage_volume.storage_space.shellescape
+    sshable.cmd("sudo host/bin/storage-key-tool #{q_vm} #{q_space} #{disk_index} retire-old-key", stdin: "{}")
 
     hop_retire_old_key_in_database
   end

@@ -5,7 +5,7 @@ require "openssl"
 require "base64"
 
 RSpec.describe StorageKeyTool do
-  subject(:skt) { described_class.new("vm12345", 3) }
+  subject(:skt) { described_class.new("vm12345", DEFAULT_STORAGE_SPACE, 3) }
 
   def generate_kek
     key_wrapping_algorithm = "aes-256-gcm"

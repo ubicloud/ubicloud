@@ -36,7 +36,7 @@ RSpec.describe Prog::RotateStorageKek do
   }
 
   let(:volume) {
-    disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
+    disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, storage_space: "nvme0")
     disk.key_encryption_key_1 = current_kek
     disk.key_encryption_key_2 = new_kek
     disk.vm = vm
@@ -64,7 +64,7 @@ RSpec.describe Prog::RotateStorageKek do
 
   describe "#install" do
     it "installs the key & hops" do
-      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/storage-key-tool .* reencrypt/,
+      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/storage-key-tool .* nvme0 0 reencrypt/,
         stdin: "{\"old_key\":{\"key\":\"key_1\",\"init_vector\":\"iv_1\",\"algorithm\":\"aes-256-gcm\",\"auth_data\":\"somedata\"},\"new_key\":{\"key\":\"key_2\",\"init_vector\":\"iv_2\",\"algorithm\":\"aes-256-gcm\",\"auth_data\":\"somedata\"}}")
       expect { rsk.install }.to hop("test_keys_on_server")
     end
@@ -72,14 +72,14 @@ RSpec.describe Prog::RotateStorageKek do
 
   describe "#test_keys_on_server" do
     it "can test keys on server" do
-      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/storage-key-tool .* test-keys/, stdin: /.*/)
+      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/storage-key-tool .* nvme0 0 test-keys/, stdin: /.*/)
       expect { rsk.test_keys_on_server }.to hop("retire_old_key_on_server")
     end
   end
 
   describe "#retire_old_key_on_server" do
     it "can retire old keys on server" do
-      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/storage-key-tool .* retire-old-key/, stdin: "{}")
+      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/storage-key-tool .* nvme0 0 retire-old-key/, stdin: "{}")
       expect { rsk.retire_old_key_on_server }.to hop("retire_old_key_in_database")
     end
   end
