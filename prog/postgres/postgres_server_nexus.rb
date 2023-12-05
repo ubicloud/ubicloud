@@ -27,7 +27,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
           {encrypted: true, size_gib: 30},
           {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
         ],
-        boot_image: "ubuntu-jammy",
+        boot_image: "postgres-ubuntu-2204",
         enable_ip4: true
       )
 
@@ -89,7 +89,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat ext4 defaults 0 0")
       vm.sshable.cmd("sudo mount #{device_path} /dat")
 
-      hop_install_postgres
+      hop_configure_walg_credentials
     when "Failed", "NotStarted"
       device_path = vm.vm_storage_volumes.find { _1.boot == false }.device_path.shellescape
       vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{device_path}' format_disk")
@@ -98,29 +98,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     nap 5
   end
 
-  label def install_postgres
-    case vm.sshable.cmd("common/bin/daemonizer --check install_postgres")
-    when "Succeeded"
-      hop_install_walg
-    when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install_postgres' install_postgres")
-    end
-
-    nap 5
-  end
-
-  label def install_walg
-    case vm.sshable.cmd("common/bin/daemonizer --check install_wal-g")
-    when "Succeeded"
-      refresh_walg_credentials
-
-      hop_initialize_empty_database if postgres_server.primary?
-      hop_initialize_database_from_backup
-    when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/install-wal-g c56a2315d3a63560f0227cb0bf902da8445963c7' install_wal-g")
-    end
-
-    nap 5
+  label def configure_walg_credentials
+    refresh_walg_credentials
+    hop_initialize_empty_database if postgres_server.primary?
+    hop_initialize_database_from_backup
   end
 
   label def initialize_empty_database
