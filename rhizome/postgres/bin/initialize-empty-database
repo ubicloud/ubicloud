@@ -3,4 +3,5 @@
 
 require_relative "../../common/lib/util"
 
+r "chown postgres /dat"
 r "pg_createcluster 16 main"

@@ -15,6 +15,7 @@ r "sudo -u postgres wal-g backup-fetch /dat/16/data #{backup_label} --config /et
 # pg_createcluster does additonal things like configuring systemd. However, it
 # also expect to see .conf files in the data directory, so that it can move them
 # to /etc/postgresql/$VERSION/main. Thus we create a bunch of .conf files.
+r "chown postgres /dat"
 r "sudo -u postgres touch /dat/16/data/pg_ident.conf"
 r "sudo -u postgres touch /dat/16/data/pg_hba.conf"
 r "sudo -u postgres touch /dat/16/data/postgresql.conf"

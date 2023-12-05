@@ -124,13 +124,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.mount_data_disk }.to nap(5)
     end
 
-    it "mounts data disk if format disk is succeeded and hops to install_postgres" do
+    it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check format_disk").and_return("Succeeded")
       expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, boot: true, device_path: "/dev/vda"), instance_double(VmStorageVolume, boot: false, device_path: "/dev/vdb")])
       expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
       expect(sshable).to receive(:cmd).with("sudo mount /dev/vdb /dat")
-      expect { nx.mount_data_disk }.to hop("install_postgres")
+      expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
     end
 
     it "naps if script return unknown status" do
@@ -139,60 +139,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
-  describe "#install_postgres" do
-    it "triggers install_postgres if install_postgres command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/install_postgres' install_postgres").twice
-
-      # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("NotStarted")
-      expect { nx.install_postgres }.to nap(5)
-
-      # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Failed")
-      expect { nx.install_postgres }.to nap(5)
-    end
-
-    it "hops to install_walg if install_postgres command is succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Succeeded")
-      expect { nx.install_postgres }.to hop("install_walg")
-    end
-
-    it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_postgres").and_return("Unknown")
-      expect { nx.install_postgres }.to nap(5)
-    end
-  end
-
-  describe "#install_walg" do
-    it "triggers install_wal-g if install_wal-g command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/install-wal-g c56a2315d3a63560f0227cb0bf902da8445963c7' install_wal-g").twice
-
-      # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("NotStarted")
-      expect { nx.install_walg }.to nap(5)
-
-      # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Failed")
-      expect { nx.install_walg }.to nap(5)
-    end
-
-    it "hops to initialize_empty_database if install_wal-g command is succeeded and if the server is primary" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Succeeded")
+  describe "#configure_walg_credentials" do
+    it "hops to initialize_empty_database if the server is primary" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
       expect(postgres_server).to receive(:primary?).and_return(true)
-      expect { nx.install_walg }.to hop("initialize_empty_database")
+
+      expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
 
-    it "hops to initialize_database_from_backup if install_wal-g command is succeeded and if the server is not primary" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Succeeded")
+    it "hops to initialize_database_from_backup if the server is not primary" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
       expect(postgres_server).to receive(:primary?).and_return(false)
-      expect { nx.install_walg }.to hop("initialize_database_from_backup")
-    end
-
-    it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check install_wal-g").and_return("Unknown")
-      expect { nx.install_walg }.to nap(5)
+      expect { nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
     end
   end
 
