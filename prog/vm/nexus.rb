@@ -320,41 +320,48 @@ SQL
   end
 
   label def prep
-    topo = vm.cloud_hypervisor_cpu_topology
+    case host.sshable.cmd("common/bin/daemonizer --check prep_#{q_vm}")
+    when "Succeeded"
+      hop_run
+    when "NotStarted", "Failed"
+      topo = vm.cloud_hypervisor_cpu_topology
 
-    # we don't write secrets to params_json, because it
-    # shouldn't be stored in the host for security reasons.
-    params_json = JSON.pretty_generate({
-      "vm_name" => vm_name,
-      "public_ipv6" => vm.ephemeral_net6.to_s,
-      "public_ipv4" => vm.ip4.to_s || "",
-      "local_ipv4" => local_ipv4,
-      "unix_user" => vm.unix_user,
-      "ssh_public_key" => vm.public_key,
-      "nics" => vm.nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
-      "boot_image" => vm.boot_image,
-      "max_vcpus" => topo.max_vcpus,
-      "cpu_topology" => topo.to_s,
-      "mem_gib" => vm.mem_gib,
-      "ndp_needed" => host.ndp_needed,
-      "storage_volumes" => storage_volumes
-    })
+      # we don't write secrets to params_json, because it
+      # shouldn't be stored in the host for security reasons.
+      params_json = JSON.pretty_generate({
+        "vm_name" => vm_name,
+        "public_ipv6" => vm.ephemeral_net6.to_s,
+        "public_ipv4" => vm.ip4.to_s || "",
+        "local_ipv4" => local_ipv4,
+        "unix_user" => vm.unix_user,
+        "ssh_public_key" => vm.public_key,
+        "nics" => vm.nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
+        "boot_image" => vm.boot_image,
+        "max_vcpus" => topo.max_vcpus,
+        "cpu_topology" => topo.to_s,
+        "mem_gib" => vm.mem_gib,
+        "ndp_needed" => host.ndp_needed,
+        "storage_volumes" => storage_volumes
+      })
 
-    secrets_json = JSON.generate({
-      storage: storage_secrets
-    })
+      secrets_json = JSON.generate({
+        storage: storage_secrets
+      })
 
-    # Enable KVM access for VM user.
-    host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
+      # Enable KVM access for VM user.
+      host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
 
-    # put prep.json
-    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: params_json)
+      # put prep.json
+      host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: params_json)
 
-    host.sshable.cmd("sudo host/bin/prepvm.rb #{params_path.shellescape}", stdin: secrets_json)
-    hop_run
+      host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/prepvm.rb #{params_path.shellescape}' prep_#{q_vm}", stdin: secrets_json)
+    end
+
+    nap 5
   end
 
   label def run
+    host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
     vm.nics.each { _1.incr_setup_nic }
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     hop_wait_sshable
