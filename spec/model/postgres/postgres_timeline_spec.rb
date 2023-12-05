@@ -117,9 +117,25 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline.earliest_restore_time).to eq(most_oldest_backup_time + 5 * 60)
   end
 
-  it "returns empty array if blob storage is not configures" do
+  it "returns empty array if blob storage is not configured" do
     expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
     expect(postgres_timeline.backups).to eq([])
+  end
+
+  it "returns empty array if user is not created yet" do
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, connection_strings: ["https://blob-endpoint"])).twice
+    minio_client = instance_double(Minio::Client)
+    expect(minio_client).to receive(:list_objects).and_raise(RuntimeError.new("The Access Key Id you provided does not exist in our records."))
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
+    expect(postgres_timeline.backups).to eq([])
+  end
+
+  it "re-raises exceptions other than missin access key" do
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, connection_strings: ["https://blob-endpoint"])).twice
+    minio_client = instance_double(Minio::Client)
+    expect(minio_client).to receive(:list_objects).and_raise(RuntimeError.new("some error"))
+    expect(Minio::Client).to receive(:new).and_return(minio_client)
+    expect { postgres_timeline.backups }.to raise_error(RuntimeError)
   end
 
   it "returns list of backups" do
