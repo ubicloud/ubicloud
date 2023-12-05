@@ -267,14 +267,6 @@ class VmSetup
     nics.map { "ether saddr #{_1.mac} ip saddr != #{_1.net4} drop" }.join("\n")
   end
 
-  def generate_private_ip4_list(nics)
-    nics.map { NetAddr::IPv4Net.parse(_1.net4).network.to_s + "/26" }.join(",")
-  end
-
-  def generate_private_ip6_list(nics)
-    nics.map { NetAddr::IPv6Net.parse(_1.net6).network.to_s + "/64" }.join(",")
-  end
-
   def generate_dhcp_filter_rule
     "oifname vethi#{q_vm} udp sport { 67, 68 } udp dport { 67, 68 } drop"
   end
@@ -316,44 +308,6 @@ class VmSetup
       }
       # NAT4 rules
       #{generate_nat4_rules(ip4, nics.first.net4)}
-      table inet fw_table {
-        set allowed_ipv4_ips {
-          type ipv4_addr;
-          flags interval;
-        }
-      
-        set allowed_ipv6_ips {
-          type ipv6_addr;
-          flags interval;
-        }
-
-        set private_ipv4_ips {
-          type ipv4_addr;
-          flags interval;
-          elements = {
-            #{generate_private_ip4_list(nics)}
-          }
-        }
-
-        set private_ipv6_ips {
-          type ipv6_addr
-          flags interval
-          elements = { #{generate_private_ip6_list(nics)} }
-        }
-
-        chain forward_ingress {
-          type filter hook forward priority filter; policy drop;
-          tcp dport 22 ct state new,established,related accept
-          ip saddr @private_ipv4_ips ct state established,related,new counter accept
-          ip daddr @private_ipv4_ips ct state established,related counter accept
-          ip6 saddr @private_ipv6_ips ct state established,related,new counter accept
-          ip6 daddr @private_ipv6_ips ct state established,related counter accept
-          ip6 saddr #{guest_ephemeral} ct state established,related,new counter accept
-          ip6 daddr #{guest_ephemeral} ct state established,related counter accept
-          ip saddr @allowed_ipv4_ips ip daddr @private_ipv4_ips counter accept
-          ip6 saddr @allowed_ipv6_ips ip6 daddr #{guest_ephemeral} counter accept
-        }
-      }
     NFTABLES_CONF
   end
 
