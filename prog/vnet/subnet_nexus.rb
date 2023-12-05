@@ -22,11 +22,13 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       ps.associate_with_project(project)
       FirewallRule.create_with_id(
         ip: "0.0.0.0/0",
-        private_subnet_id: ps.id
+        private_subnet_id: ps.id,
+        port_range: nil
       )
       FirewallRule.create_with_id(
         ip: "::/0",
-        private_subnet_id: ps.id
+        private_subnet_id: ps.id,
+        port_range: nil
       )
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
     end

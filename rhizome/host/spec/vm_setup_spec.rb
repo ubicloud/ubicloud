@@ -291,44 +291,6 @@ table ip nat {
   }
 }
 
-table inet fw_table {
-  set allowed_ipv4_ips {
-    type ipv4_addr;
-    flags interval;
-  }
-
-  set allowed_ipv6_ips {
-    type ipv6_addr;
-    flags interval;
-  }
-
-  set private_ipv4_ips {
-    type ipv4_addr;
-    flags interval;
-    elements = {
-      192.168.5.50/26
-    }
-  }
-
-  set private_ipv6_ips {
-    type ipv6_addr
-    flags interval
-    elements = { fd48:666c:a296:ce4b:2cc6::/64 }
-  }
-
-  chain forward_ingress {
-    type filter hook forward priority filter; policy drop;
-    tcp dport 22 ct state new,established,related accept
-    ip saddr @private_ipv4_ips ct state established,related,new counter accept
-    ip daddr @private_ipv4_ips ct state established,related counter accept
-    ip6 saddr @private_ipv6_ips ct state established,related,new counter accept
-    ip6 daddr @private_ipv6_ips ct state established,related counter accept
-    ip6 saddr fddf:53d2:4c89:2305:46a0::/80 ct state established,related,new counter accept
-    ip6 daddr fddf:53d2:4c89:2305:46a0::/80 ct state established,related counter accept
-    ip saddr @allowed_ipv4_ips ip daddr @private_ipv4_ips counter accept
-    ip6 saddr @allowed_ipv6_ips ip6 daddr fddf:53d2:4c89:2305:46a0::/80 counter accept
-  }
-}
 NFTABLES_CONF
       expect(vs).to receive(:apply_nftables)
       vs.write_nftables_conf(ip4, gua, nics)
