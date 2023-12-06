@@ -47,6 +47,7 @@ RSpec.describe Prog::Test::VmGroup do
     let(:vm) {
       Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x", vm_host_id: host.id)
     }
+
     before do
       allow(vg_test).to receive(:host).and_return(host)
       allow(host).to receive(:sshable).and_return(sshable)
