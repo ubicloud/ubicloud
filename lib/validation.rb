@@ -90,4 +90,17 @@ module Validation
     msg = "\"#{date}\" is not a valid date for \"#{param}\"."
     fail ValidationFailed.new({param => msg})
   end
+
+  def self.validate_postgres_superuser_password(original_password, repeat_password)
+    messages = []
+    messages.push("Password must have 12 characters minimum.") if original_password.size < 12
+    messages.push("Password must have at least one lowercase letter.") unless original_password.match?(/[a-z]/)
+    messages.push("Password must have at least one uppercase letter.") unless original_password.match?(/[A-Z]/)
+    messages.push("Password must have at least one digit.") unless original_password.match?(/[0-9]/)
+    messages.push("Passwords must match.") if original_password != repeat_password
+
+    unless messages.empty?
+      fail ValidationFailed.new({"original_password" => messages.map { _1 }})
+    end
+  end
 end
