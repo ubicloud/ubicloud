@@ -20,7 +20,7 @@ Sequel.migration do
     # records for default storage devices on existing hosts.
     run <<~SQL
       INSERT INTO storage_device
-        SELECT id, 'DEFAULT', total_storage_gib, available_storage_gib, id
+        SELECT id, 'DEFAULT', total_storage_gib, available_storage_gib, true, id
         FROM vm_host;
 
       UPDATE vm_storage_volume

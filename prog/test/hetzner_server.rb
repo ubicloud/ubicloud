@@ -136,8 +136,18 @@ class Prog::Test::HetznerServer < Prog::Base
 
   label def wait_install_bdev_ubid
     reap
-    hop_test_host_encrypted if children_idle
+    hop_create_storage_devices if children_idle
     donate
+  end
+
+  label def create_storage_devices
+    sshable.cmd("sudo mkdir -p /var/storage/devices/disk02")
+    StorageDevice.create(
+      vm_host_id: vm_host.id, name: "disk02", available_storage_gib: 100,
+      total_storage_gib: 100
+    ) { _1.id = StorageDevice.generate_uuid }
+
+    hop_test_host_encrypted
   end
 
   label def test_host_encrypted
