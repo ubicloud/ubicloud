@@ -233,6 +233,38 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - restored-server")
       end
+
+      it "can reset superuser password of PostgreSQL database" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Reset superuser password"
+
+        fill_in "New password", with: "DummyPassword123"
+        fill_in "New password (repeat)", with: "DummyPassword123"
+        click_button "Reset"
+
+        expect(page.status_code).to eq(200)
+      end
+
+      it "does not show reset superuser password for restoring database" do
+        pg.server.update(timeline_access: "fetch")
+
+        visit "#{project.path}#{pg.path}"
+        expect(page).not_to have_content "Reset superuser password"
+        expect(page.status_code).to eq(200)
+      end
+
+      it "cannot reset superuser password of restoring database" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Reset superuser password"
+
+        pg.server.update(timeline_access: "fetch")
+        fill_in "New password", with: "DummyPassword123"
+        fill_in "New password (repeat)", with: "DummyPassword123"
+        click_button "Reset"
+
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "Superuser password cannot be updated during restore!"
+      end
     end
 
     describe "delete" do

@@ -171,5 +171,20 @@ RSpec.describe Validation do
         expect { described_class.validate_date("invalid-date", "restore_date") }.to raise_error described_class::ValidationFailed, "Validation failed for following fields: restore_date"
       end
     end
+
+    describe "#validate_postgres_superuser_password" do
+      it "valid password" do
+        expect { described_class.validate_postgres_superuser_password("Dummy-pass-123", "Dummy-pass-123") }.not_to raise_error
+      end
+
+      it "invalid password" do
+        expect { described_class.validate_postgres_superuser_password("", "") }.to raise_error(described_class::ValidationFailed)
+        expect { described_class.validate_postgres_superuser_password("Short1", "Short1") }.to raise_error(described_class::ValidationFailed)
+        expect { described_class.validate_postgres_superuser_password("NOLOWERCASE123", "NOLOWERCASE123") }.to raise_error(described_class::ValidationFailed)
+        expect { described_class.validate_postgres_superuser_password("nouppercase123", "nouppercase123") }.to raise_error(described_class::ValidationFailed)
+        expect { described_class.validate_postgres_superuser_password("nodigitNODIGIT", "nodigitNODIGIT") }.to raise_error(described_class::ValidationFailed)
+        expect { described_class.validate_postgres_superuser_password("Different12345", "dIFFERENT12345") }.to raise_error(described_class::ValidationFailed)
+      end
+    end
   end
 end

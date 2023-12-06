@@ -75,6 +75,52 @@
       </div>
     </div>
   <% end %>
+  <!-- Reset password -->
+  <% if @pg[:primary?] %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password") %>
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Reset superuser password</h2>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "New password",
+                    name: "original_password",
+                    type: "password",
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-5">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    label: "New password (repeat)",
+                    name: "repeat_password",
+                    type: "password",
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== render("components/form/submit_button", locals: { text: "Reset" }) %>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  <% end %>
   <!-- Delete Card -->
   <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
