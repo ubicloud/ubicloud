@@ -11,6 +11,7 @@ require_relative "spdk_path"
 require_relative "spdk_rpc"
 require_relative "spdk_setup"
 require_relative "storage_key_encryption"
+require_relative "storage_path"
 
 class StorageVolume
   def initialize(vm_name, params)
@@ -22,7 +23,7 @@ class StorageVolume
     @use_bdev_ubi = (params["use_bdev_ubi"] || false)
     @skip_sync = (params["skip_sync"] || false)
     @image_path = vp.image_path(params["image"]) if params["image"]
-    @disk_file = vp.disk(@disk_index)
+    @device = (params["storage_device"] || DEFAULT_STORAGE_DEVICE)
 
     # Old VMs didn't have the spdk_version field. Fill that in with legacy
     # SPDK version for backward compatibility.
@@ -38,7 +39,11 @@ class StorageVolume
   end
 
   def prep(key_wrapping_secrets)
-    FileUtils.mkdir_p vp.storage(@disk_index, "")
+    # Device path is intended to be created by system admin, so fail loudly if
+    # it doesn't exist
+    fail "Storage device directory doesn't exist: #{sp.device_path}" if !File.exist?(sp.device_path)
+
+    FileUtils.mkdir_p storage_dir
     encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
 
     if @image_path.nil?
@@ -109,7 +114,7 @@ class StorageVolume
       key2: data_encryption_key[64..]
     }
 
-    key_file = vp.data_encryption_key(@disk_index)
+    key_file = data_encryption_key_path
 
     # save encrypted key
     sek = StorageKeyEncryption.new(key_wrapping_secrets)
@@ -124,14 +129,13 @@ class StorageVolume
   end
 
   def read_data_encryption_key(key_wrapping_secrets)
-    key_file = vp.data_encryption_key(@disk_index)
     sek = StorageKeyEncryption.new(key_wrapping_secrets)
-    sek.read_encrypted_dek(key_file)
+    sek.read_encrypted_dek(data_encryption_key_path)
   end
 
   def unencrypted_image_copy
     q_image_path = @image_path.shellescape
-    q_disk_file = @disk_file.shellescape
+    q_disk_file = disk_file.shellescape
 
     r "cp --reflink=auto #{q_image_path} #{q_disk_file}"
     r "truncate -s #{@disk_size_gib}G #{q_disk_file}"
@@ -157,7 +161,7 @@ class StorageVolume
       params: {
         name: "aio0",
         block_size: 512,
-        filename: @disk_file,
+        filename: disk_file,
         readonly: false
       }
     },
@@ -219,20 +223,20 @@ class StorageVolume
   end
 
   def create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024)
-    FileUtils.touch(@disk_file)
-    File.truncate(@disk_file, disk_size_mib * 1024 * 1024)
+    FileUtils.touch(disk_file)
+    File.truncate(disk_file, disk_size_mib * 1024 * 1024)
 
     set_disk_file_permissions
   end
 
   def set_disk_file_permissions
-    FileUtils.chown @vm_name, @vm_name, @disk_file
+    FileUtils.chown @vm_name, @vm_name, disk_file
 
     # don't allow others to read user's disk
-    FileUtils.chmod "u=rw,g=r,o=", @disk_file
+    FileUtils.chmod "u=rw,g=r,o=", disk_file
 
     # allow spdk to access the image
-    r "setfacl -m u:spdk:rw #{@disk_file.shellescape}"
+    r "setfacl -m u:spdk:rw #{disk_file.shellescape}"
   end
 
   def setup_spdk_bdev(encryption_key)
@@ -247,10 +251,10 @@ class StorageVolume
         encryption_key[:key],
         encryption_key[:key2]
       )
-      rpc_client.bdev_aio_create(aio_bdev, @disk_file, 512)
+      rpc_client.bdev_aio_create(aio_bdev, disk_file, 512)
       rpc_client.bdev_crypto_create(non_ubi_bdev, aio_bdev, key_name)
     else
-      rpc_client.bdev_aio_create(non_ubi_bdev, @disk_file, 512)
+      rpc_client.bdev_aio_create(non_ubi_bdev, disk_file, 512)
     end
 
     if @use_bdev_ubi
@@ -271,22 +275,42 @@ class StorageVolume
     r "setfacl -m u:#{@vm_name}:rw #{spdk_vhost_sock.shellescape}"
 
     # create a symlink to the socket in the per vm storage dir
-    rm_if_exists(vp.vhost_sock(@disk_index))
-    FileUtils.ln_s spdk_vhost_sock, vp.vhost_sock(@disk_index)
+    rm_if_exists(vhost_sock)
+    FileUtils.ln_s spdk_vhost_sock, vhost_sock
 
     # Change ownership of the symlink. FileUtils.chown uses File.lchown for
     # symlinks and doesn't follow links. We don't use File.lchown directly
     # because it expects numeric uid & gid, which is less convenient.
-    FileUtils.chown @vm_name, @vm_name, vp.vhost_sock(@disk_index)
+    FileUtils.chown @vm_name, @vm_name, vhost_sock
 
-    vp.vhost_sock(@disk_index)
-  end
-
-  def vhost_sock
-    @vhost_sock ||= vp.vhost_sock(@disk_index)
+    vhost_sock
   end
 
   def spdk_service
     @spdk_service ||= SpdkSetup.new(@spdk_version).spdk_service
+  end
+
+  def sp
+    @sp ||= StoragePath.new(@vm_name, @device, @disk_index)
+  end
+
+  def storage_root
+    @storage_root ||= sp.storage_root
+  end
+
+  def storage_dir
+    @storage_dir ||= sp.storage_dir
+  end
+
+  def disk_file
+    @disk_file ||= sp.disk_file
+  end
+
+  def data_encryption_key_path
+    @dek_path ||= sp.data_encryption_key
+  end
+
+  def vhost_sock
+    @vhost_sock ||= sp.vhost_sock
   end
 end
