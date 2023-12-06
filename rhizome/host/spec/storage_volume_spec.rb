@@ -44,7 +44,8 @@ RSpec.describe StorageVolume do
   describe "#prep" do
     it "can prep a non-imaged unencrypted disk" do
       vol = described_class.new("test", {"disk_index" => 1, "encrypted" => false})
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1/")
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1")
       expect(vol).to receive(:create_empty_disk_file).with(no_args)
       vol.prep(nil)
     end
@@ -52,16 +53,25 @@ RSpec.describe StorageVolume do
     it "can prep a non-imaged encrypted disk" do
       key_wrapping_secrets = "key_wrapping_secrets"
       vol = described_class.new("test", {"disk_index" => 1, "encrypted" => true})
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1/")
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1")
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(vol).to receive(:setup_data_encryption_key).with(key_wrapping_secrets)
       expect(vol).to receive(:create_empty_disk_file).with(no_args)
       vol.prep(key_wrapping_secrets)
     end
 
+    it "fails if storage root doesn't exist" do
+      dev_path = "/var/storage/devices/dev01"
+      vol = described_class.new("test", {"disk_index" => 1, "encrypted" => false, "storage_device" => "dev01"})
+      expect(File).to receive(:exist?).with(dev_path).and_return(false)
+      expect { vol.prep(nil) }.to raise_error RuntimeError, "Storage device directory doesn't exist: #{dev_path}"
+    end
+
     it "can prep an encrypted imaged disk" do
       encryption_key = "test_key"
       key_wrapping_secrets = "key_wrapping_secrets"
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2/")
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(encrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
       expect(encrypted_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
       expect(encrypted_sv).to receive(:create_empty_disk_file)
@@ -70,7 +80,8 @@ RSpec.describe StorageVolume do
     end
 
     it "can prep an unencrypted imaged disk" do
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2/")
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(unencrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
       expect(unencrypted_sv).to receive(:unencrypted_image_copy).with(no_args)
       unencrypted_sv.prep(nil)
@@ -245,6 +256,26 @@ RSpec.describe StorageVolume do
     it "fails if disk size is less than image file size" do
       expect(File).to receive(:size).and_return(15 * 2**30)
       expect { encrypted_sv.verify_imaged_disk_size }.to raise_error RuntimeError, "Image size greater than requested disk size"
+    end
+  end
+
+  describe "#paths" do
+    it "uses correct namespaced paths" do
+      sv = described_class.new("vm12345", {"storage_device" => "nvme0", "disk_index" => 3})
+      expect(sv.storage_root).to eq("/var/storage/devices/nvme0/vm12345")
+      expect(sv.storage_dir).to eq("/var/storage/devices/nvme0/vm12345/3")
+      expect(sv.disk_file).to eq("/var/storage/devices/nvme0/vm12345/3/disk.raw")
+      expect(sv.data_encryption_key_path).to eq("/var/storage/devices/nvme0/vm12345/3/data_encryption_key.json")
+      expect(sv.vhost_sock).to eq("/var/storage/devices/nvme0/vm12345/3/vhost.sock")
+    end
+
+    it "uses correct not-namespaced paths" do
+      sv = described_class.new("vm12345", {"storage_device" => "DEFAULT", "disk_index" => 3})
+      expect(sv.storage_root).to eq("/var/storage/vm12345")
+      expect(sv.storage_dir).to eq("/var/storage/vm12345/3")
+      expect(sv.disk_file).to eq("/var/storage/vm12345/3/disk.raw")
+      expect(sv.data_encryption_key_path).to eq("/var/storage/vm12345/3/data_encryption_key.json")
+      expect(sv.vhost_sock).to eq("/var/storage/vm12345/3/vhost.sock")
     end
   end
 end

@@ -39,14 +39,6 @@ class VmPath
     File.join("", "vm", @vm_name, n)
   end
 
-  def storage_root
-    File.join("", "var", "storage", @vm_name)
-  end
-
-  def storage(disk_index, n)
-    File.join(storage_root, disk_index.to_s, n)
-  end
-
   # Define path, q_path, read, write methods for files in
   # `/vm/#{vm_name}`
   %w[
@@ -94,18 +86,6 @@ class VmPath
     define_method write_method_name do |s|
       write(home(file_name), s)
     end
-  end
-
-  def vhost_sock(disk_index)
-    storage(disk_index, "vhost.sock")
-  end
-
-  def disk(disk_index)
-    storage(disk_index, "disk.raw")
-  end
-
-  def data_encryption_key(disk_index)
-    storage(disk_index, "data_encryption_key.json")
   end
 
   def image_root
