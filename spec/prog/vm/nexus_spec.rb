@@ -380,7 +380,8 @@ RSpec.describe Prog::Vm::Nexus do
               arch: "x64"}.merge(args)
       sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
       @host_index += 1
-      host = VmHost.create(**args) { _1.id = sa.id }
+      vm_host_args = args.except(:total_storage_gib, :available_storage_gib)
+      host = VmHost.create(**vm_host_args) { _1.id = sa.id }
       StorageDevice.create(
         name: "nvme0",
         available_storage_gib: args[:available_storage_gib],
