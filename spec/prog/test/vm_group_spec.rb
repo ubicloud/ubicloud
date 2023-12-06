@@ -35,8 +35,59 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to wait_subtests" do
       vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
       Sshable.create { _1.id = vm.id }
+      expect(vg_test).to receive(:verify_storage_volumes)
       allow(vg_test).to receive(:frame).and_return({"vms" => [vm.id]})
       expect { vg_test.children_ready }.to hop("wait_subtests", "Test::VmGroup")
+    end
+  end
+
+  describe "#verify_storage_volumes" do
+    let(:sshable) { Sshable.create_with_id }
+    let(:host) { VmHost.create(location: "x") { _1.id = sshable.id } }
+    let(:vm) {
+      Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x", vm_host_id: host.id)
+    }
+
+    before do
+      allow(vg_test).to receive(:host).and_return(host)
+      allow(host).to receive(:sshable).and_return(sshable)
+
+      si = SpdkInstallation.create(
+        version: "v1",
+        allocation_weight: 100,
+        vm_host_id: host.id
+      ) { _1.id = host.id }
+      dev_1 = StorageDevice.create(name: "nvme0",
+        available_storage_gib: 100,
+        total_storage_gib: 100,
+        vm_host_id: host.id) { _1.id = StorageDevice.generate_uuid }
+      dev_2 = StorageDevice.create(name: "DEFAULT",
+        available_storage_gib: 100,
+        total_storage_gib: 100,
+        vm_host_id: host.id) { _1.id = host.id }
+      [
+        VmStorageVolume.create_with_id(
+          vm_id: vm.id, size_gib: 5, disk_index: 0, boot: true,
+          spdk_installation_id: si.id,
+          storage_device_id: dev_1.id
+        ),
+        VmStorageVolume.create_with_id(
+          vm_id: vm.id, size_gib: 15, disk_index: 1, boot: false,
+          spdk_installation_id: si.id,
+          storage_device_id: dev_2.id
+        )
+      ]
+    end
+
+    it "verifies sizes of all storage volumes" do
+      allow(sshable).to receive(:cmd).with("sudo wc --bytes /var/storage/devices/nvme0/#{vm.inhost_name}/0/disk.raw").and_return("5368709120 /path\n")
+      allow(sshable).to receive(:cmd).with("sudo wc --bytes /var/storage/#{vm.inhost_name}/1/disk.raw").and_return("16106127360 /path\n")
+      expect { vg_test.verify_storage_volumes(vm) }.not_to raise_error
+    end
+
+    it "fails if file size is too small" do
+      allow(sshable).to receive(:cmd).with("sudo wc --bytes /var/storage/devices/nvme0/#{vm.inhost_name}/0/disk.raw").and_return("5368709110 /path\n")
+      expect { vg_test.verify_storage_volumes(vm) }.to raise_error RuntimeError
     end
   end
 
@@ -151,11 +202,9 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#host" do
-    it "returns first VM's host" do
+    it "returns the host" do
       sshable = Sshable.create_with_id
       host = VmHost.create(location: "A") { _1.id = sshable.id }
-      vm = Vm.create_with_id(unix_user: "root", public_key: "", name: "xyz", location: "a", boot_image: "b", family: "z", cores: 1, vm_host_id: host.id)
-      expect(vg_test).to receive(:frame).and_return({"vms" => [vm.id]})
       expect(vg_test.host).to eq(host)
     end
   end

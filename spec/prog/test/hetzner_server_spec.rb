@@ -148,12 +148,25 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#wait_install_bdev_ubid" do
     it "hops to test_host_encrypted if children idle" do
       expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_install_bdev_ubid }.to hop("test_host_encrypted", "Test::HetznerServer")
+      expect { hs_test.wait_install_bdev_ubid }.to hop("create_storage_devices", "Test::HetznerServer")
     end
 
     it "donates if children not idle" do
       expect(hs_test).to receive(:children_idle).and_return(false)
       expect { hs_test.wait_install_bdev_ubid }.to nap(0)
+    end
+  end
+
+  describe "#create_storage_devices" do
+    it "creates the storage device and hops" do
+      sshable = Sshable.create_with_id
+      host = VmHost.create(location: "xyz") { _1.id = sshable.id }
+      expect(hs_test).to receive(:vm_host).and_return(host)
+      expect(hs_test).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).with("sudo mkdir -p /var/storage/devices/disk02")
+      expect(StorageDevice).to receive(:create).and_call_original
+
+      expect { hs_test.create_storage_devices }.to hop("test_host_encrypted", "Test::HetznerServer")
     end
   end
 
