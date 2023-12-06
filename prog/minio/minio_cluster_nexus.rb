@@ -69,7 +69,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   label def configure_dns_records
     minio_cluster.servers.each do |server|
-      dns_zone.insert_record(record_name: minio_cluster.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
+      dns_zone&.insert_record(record_name: minio_cluster.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
     end
 
     hop_wait
@@ -83,7 +83,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     DB.transaction do
       decr_destroy
-      dns_zone.delete_record(record_name: minio_cluster.hostname)
+      dns_zone&.delete_record(record_name: minio_cluster.hostname)
       minio_cluster.dissociate_with_project(minio_cluster.projects.first)
       minio_cluster.pools.each(&:incr_destroy)
     end

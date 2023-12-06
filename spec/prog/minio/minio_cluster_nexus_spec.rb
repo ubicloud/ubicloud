@@ -83,15 +83,22 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
   end
 
   describe "#configure_dns_records" do
-    it "inserts dns records and hops to wait" do
+    let(:ms) { instance_double(MinioServer, vm: instance_double(Vm, ephemeral_net4: "1.1.1.1")) }
+
+    it "inserts dns records and hops to wait if dns_zone is available" do
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:insert_record).with(record_name: "minio.minio.ubicloud.com", type: "A", ttl: 10, data: "1.1.1.1")
-      ms = instance_double(MinioServer, vm: instance_double(Vm, ephemeral_net4: "1.1.1.1"))
       expect(nx.minio_cluster).to receive(:servers).and_return([ms])
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect {
         nx.configure_dns_records
       }.to hop("wait")
+    end
+
+    it "hops to wait if no dns_zone is configures" do
+      expect(nx).to receive(:dns_zone).and_return(nil)
+      expect(nx.minio_cluster).to receive(:servers).and_return([ms])
+      expect { nx.configure_dns_records }.to hop("wait")
     end
   end
 
@@ -106,6 +113,16 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "minio.minio.ubicloud.com")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
+      expect(nx).to receive(:decr_destroy)
+      expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
+      mp = instance_double(MinioPool, incr_destroy: nil)
+      expect(mp).to receive(:incr_destroy)
+      expect(nx.minio_cluster).to receive(:pools).and_return([mp])
+      expect { nx.destroy }.to hop("wait_pools_destroyed")
+    end
+
+    it "destroys without dns_zone too" do
+      expect(nx).to receive(:dns_zone).and_return(nil)
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
       mp = instance_double(MinioPool, incr_destroy: nil)
