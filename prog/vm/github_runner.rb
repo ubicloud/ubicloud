@@ -75,6 +75,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
     # increment the semaphore, already.
     ps.firewall_rules.map(&:destroy)
+    vm_st.subject.add_allow_ssh_fw_rules(ps)
+
     Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
     vm_st.subject
   end
