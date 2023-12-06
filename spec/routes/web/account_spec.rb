@@ -21,5 +21,11 @@ RSpec.describe Clover, "account" do
       expect(page.title).to eq("Ubicloud - Change Password")
       expect(page).to have_content "Change Password"
     end
+
+    it "show 2FA manage page" do
+      visit "/account/multifactor-manage"
+
+      expect(page.title).to eq("Ubicloud - Multifactor Authentication")
+    end
   end
 end

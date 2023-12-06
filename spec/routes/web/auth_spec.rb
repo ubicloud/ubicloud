@@ -109,6 +109,52 @@ RSpec.describe Clover, "auth" do
     expect(page).to have_content("Your account has been suspended")
   end
 
+  it "redirects to otp page if the otp is only 2FA method" do
+    create_account(enable_otp: true)
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - 2FA - One-Time Password")
+  end
+
+  it "redirects to webauthn page if the webauthn is only 2FA method" do
+    create_account(enable_webauthn: true)
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - 2FA - Security Keys")
+  end
+
+  it "shows 2FA method list if there are multiple 2FA methods" do
+    create_account(enable_otp: true, enable_webauthn: true)
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - Two-factor Authentication")
+  end
+
+  it "shows enter recovery codes page" do
+    create_account(enable_otp: true)
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    click_link "Enter a recovery code"
+
+    expect(page.title).to eq("Ubicloud - 2FA - Recovery Codes")
+  end
+
   describe "authenticated" do
     before do
       create_account

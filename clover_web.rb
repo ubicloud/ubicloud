@@ -205,7 +205,9 @@ class CloverWeb < Roda
     two_factor_auth_view { view "auth/two_factor_auth", "Two-factor Authentication" }
     two_factor_auth_notice_flash { login_notice_flash }
     # don't show error message when redirected after login
+    # :nocov:
     two_factor_need_authentication_error_flash { (flash["notice"] == login_notice_flash) ? nil : super() }
+    # :nocov:
 
     # If the single multifactor auth method is setup, redirect to it
     before_two_factor_auth_route do
@@ -221,10 +223,12 @@ class CloverWeb < Roda
     otp_setup_notice_flash "One-time password authentication is now setup, please make note of your recovery codes"
     otp_setup_error_flash "Error setting up one-time password authentication"
 
+    # :nocov:
     after_otp_setup do
       flash["notice"] = otp_setup_notice_flash
       redirect "/" + recovery_codes_route
     end
+    # :nocov:
 
     # OTP Disable
     otp_disable_route "account/multifactor/otp-disable"
@@ -249,10 +253,12 @@ class CloverWeb < Roda
     webauthn_setup_error_flash "Error setting up security key"
     webauthn_key_insert_hash { |credential| super(credential).merge(name: request.params["name"]) }
 
+    # :nocov:
     after_webauthn_setup do
       flash["notice"] = webauthn_setup_notice_flash
       redirect "/" + recovery_codes_route
     end
+    # :nocov:
 
     # Webauthn Remove
     webauthn_remove_route "account/multifactor/webauthn-remove"

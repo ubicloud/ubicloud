@@ -41,6 +41,9 @@ DatabaseCleaner.url_allowlist = [
 
 Warning.ignore([:not_reached, :unused_var], /.*lib\/mail\/parser.*/)
 Warning.ignore([:mismatched_indentations], /.*lib\/stripe\/api_operations.*/)
+# It's resolved already but the webauthn-ruby hasn't release a new version since Feb 2023.
+# https://github.com/cedarcode/webauthn-ruby/issues/388
+Warning.ignore(/circular require considered harmful/, /.*lib\/webauthn\/relying_party.*/)
 
 RSpec.configure do |config|
   config.define_derived_metadata(file_path: %r{/spec/}) do |metadata|
