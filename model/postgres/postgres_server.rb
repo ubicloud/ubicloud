@@ -11,7 +11,7 @@ class PostgresServer < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
 
-  semaphore :initial_provisioning, :refresh_certificates, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :destroy
 
   def configure_hash
     configs = {

@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :initial_provisioning, :refresh_certificates, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:)
     DB.transaction do
@@ -181,6 +181,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def update_superuser_password
+    decr_update_superuser_password
+
     encrypted_password = DB.synchronize do |conn|
       # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
       # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
@@ -239,6 +241,10 @@ SQL
   label def wait
     when_refresh_certificates_set? do
       hop_refresh_certificates
+    end
+
+    when_update_superuser_password_set? do
+      hop_update_superuser_password
     end
 
     nap 30

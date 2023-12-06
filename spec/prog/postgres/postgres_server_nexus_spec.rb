@@ -384,6 +384,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_refresh_certificates_set?).and_yield
       expect { nx.wait }.to hop("refresh_certificates")
     end
+
+    it "hops to update_superuser_password if update_superuser_password is set" do
+      expect(nx).to receive(:when_update_superuser_password_set?).and_yield
+      expect { nx.wait }.to hop("update_superuser_password")
+    end
   end
 
   describe "#destroy" do
