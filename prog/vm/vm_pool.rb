@@ -46,7 +46,7 @@ class Prog::Vm::VmPool < Prog::Base
     # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
     # increment the semaphore, already.
     ps.firewall_rules.map(&:destroy)
-
+    st.subject.add_allow_ssh_fw_rules(ps)
     hop_wait
   end
 
