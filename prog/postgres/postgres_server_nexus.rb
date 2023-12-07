@@ -237,6 +237,7 @@ SQL
   label def destroy
     decr_destroy
 
+    strand.children.each { _1.destroy }
     vm.private_subnets.each { _1.incr_destroy }
     vm.incr_destroy
     postgres_server.destroy
