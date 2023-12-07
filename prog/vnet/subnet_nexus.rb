@@ -160,6 +160,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
 
     decr_destroy
+    strand.children.each { _1.destroy }
 
     if private_subnet.nics.empty?
       DB.transaction do

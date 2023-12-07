@@ -151,6 +151,7 @@ class Prog::Vnet::NicNexus < Prog::Base
     end
 
     decr_destroy
+    strand.children.each { _1.destroy }
 
     DB.transaction do
       nic.src_ipsec_tunnels_dataset.destroy
