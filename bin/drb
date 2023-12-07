@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+require "drb/drb"
+
+unless (uri = ARGV.shift)
+  puts "need uri as argument"
+  exit 1
+end
+
+front = ResourceAccessor
+DRb.start_service(uri, front)
+DRb.thread.join

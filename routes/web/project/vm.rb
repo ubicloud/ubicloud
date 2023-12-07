@@ -2,10 +2,8 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "vm") do |r|
-    @serializer = Serializers::Web::Vm
-
     r.get true do
-      @vms = serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all)
+      @vms = ResourceManager.get_all(@project, @current_user, "vm")
 
       view "vm/index"
     end
@@ -17,17 +15,9 @@ class CloverWeb
       ps_id = r.params["private-subnet-id"].empty? ? nil : UBID.parse(r.params["private-subnet-id"]).to_uuid
       Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
 
-      st = Prog::Vm::Nexus.assemble(
-        r.params["public-key"],
-        @project.id,
-        name: r.params["name"],
-        unix_user: r.params["user"],
-        size: r.params["size"],
-        location: r.params["location"],
-        boot_image: r.params["boot-image"],
-        private_subnet_id: ps_id,
-        enable_ip4: r.params.key?("enable-ip4")
-      )
+      params = r.params
+      params["ps_id"] = ps_id
+      st = ResourceManager.post(r.params["location"], @project, params, "vm")
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
 
@@ -37,7 +27,7 @@ class CloverWeb
     r.on "create" do
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
-        @subnets = Serializers::Web::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
+        @subnets = ResourceManager.get_all(@project, @current_user, "private_subnet")
         @prices = fetch_location_based_prices("VmCores", "IPAddress")
         @has_valid_payment_method = @project.has_valid_payment_method?
 

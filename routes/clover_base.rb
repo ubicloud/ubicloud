@@ -45,6 +45,7 @@ module CloverBase
 
   # Assign some HTTP response codes to common exceptions.
   def parse_error(e)
+    puts e
     case e
     when Sequel::ValidationFailed
       code = 400

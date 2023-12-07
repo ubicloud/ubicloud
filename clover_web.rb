@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "tilt/sass"
+require "drb/drb"
 
 class CloverWeb < Roda
   include CloverBase
@@ -323,6 +324,14 @@ class CloverWeb < Roda
       r.redirect rodauth.login_route
     end
     rodauth.require_authentication
+
+    # TODOBV: Proper initialization
+    drb1 = DRbObject.new_with_uri("druby://localhost:12345")
+    drb2 = DRbObject.new_with_uri("druby://localhost:12346")
+
+    # TODOBV: Via config
+    ResourceManager.add_remote("hetzner-hel1", drb1)
+    ResourceManager.add_remote("hetzner-fsn1", drb2)
 
     r.hash_branches("")
   end

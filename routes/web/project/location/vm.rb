@@ -5,6 +5,7 @@ class CloverWeb
     @serializer = Serializers::Web::Vm
 
     r.is String do |vm_name|
+      # TODOBV: Must be directed to right location
       vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first
 
       unless vm
@@ -23,6 +24,7 @@ class CloverWeb
       r.delete true do
         Authorization.authorize(@current_user.id, "Vm:delete", vm.id)
 
+        # TODOBV: Have semaphore funcs on accessor
         vm.incr_destroy
 
         return {message: "Deleting #{vm.name}"}.to_json

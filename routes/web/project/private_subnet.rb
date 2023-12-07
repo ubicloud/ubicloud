@@ -2,10 +2,8 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "private-subnet") do |r|
-    @serializer = Serializers::Web::PrivateSubnet
-
     r.get true do
-      @pss = serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
+      @pss = ResourceManager.get_all(@project, @current_user, "private_subnet")
 
       view "private_subnet/index"
     end
@@ -13,15 +11,11 @@ class CloverWeb
     r.post true do
       Authorization.authorize(@current_user.id, "PrivateSubnet:create", @project.id)
 
-      st = Prog::Vnet::SubnetNexus.assemble(
-        @project.id,
-        name: r.params["name"],
-        location: r.params["location"]
-      )
+      st = ResourceManager.post(r.params["location"], @project, r.params, "private_subnet")
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few seconds"
 
-      r.redirect "#{@project.path}#{PrivateSubnet[st.id].path}"
+      r.redirect "#{@project.path}#{st.subject.path}"
     end
 
     r.on "create" do
