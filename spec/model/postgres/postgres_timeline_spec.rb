@@ -150,7 +150,7 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns blob storage endpoint" do
-    expect(Project).to receive(:[]).and_return(instance_double(Project, minio_clusters: [instance_double(MinioCluster, connection_strings: ["https://blob-endpoint"])]))
+    expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, connection_strings: ["https://blob-endpoint"]))
     expect(postgres_timeline.blob_storage_endpoint).to eq("https://blob-endpoint")
   end
 

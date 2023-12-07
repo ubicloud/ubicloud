@@ -15,7 +15,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       postgres_timeline = PostgresTimeline.create_with_id(
         parent_id: parent_id,
         access_key: SecureRandom.hex(16),
-        secret_key: SecureRandom.hex(32)
+        secret_key: SecureRandom.hex(32),
+        blob_storage_id: Config.postgres_service_blob_storage_id
       )
       Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { _1.id = postgres_timeline.id }
     end

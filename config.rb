@@ -111,6 +111,7 @@ module Config
   optional :postgres_service_hostname, string
   optional :postgres_service_blob_storage_access_key, string
   optional :postgres_service_blob_storage_secret_key, string
+  optional :postgres_service_blob_storage_id, string
 
   # Logging
   optional :database_logger_level, string
