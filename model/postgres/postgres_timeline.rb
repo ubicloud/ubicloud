@@ -85,7 +85,7 @@ PGHOST=/var/run/postgresql
   end
 
   def blob_storage
-    @blob_storage ||= Project[Config.postgres_service_project_id].minio_clusters.first
+    @blob_storage ||= MinioCluster[blob_storage_id]
   end
 
   def blob_storage_endpoint
