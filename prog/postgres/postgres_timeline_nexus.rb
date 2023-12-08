@@ -11,6 +11,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   semaphore :destroy
 
   def self.assemble(parent_id: nil)
+    if parent_id && (PostgresResource[parent_id]).nil?
+      fail "No existing parent"
+    end
+
     DB.transaction do
       postgres_timeline = PostgresTimeline.create_with_id(
         parent_id: parent_id,

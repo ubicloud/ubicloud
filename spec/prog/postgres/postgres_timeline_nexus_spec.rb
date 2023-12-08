@@ -24,6 +24,12 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   end
 
   describe ".assemble" do
+    it "throws an exception if parent is not found" do
+      expect {
+        described_class.assemble(parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
+      }.to raise_error RuntimeError, "No existing parent"
+    end
+
     it "creates postgres timeline" do
       st = described_class.assemble
 
