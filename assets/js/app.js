@@ -77,6 +77,11 @@ $(".delete-btn").on("click", function (event) {
             window.location.href = redirect;
         },
         error: function (xhr, ajaxOptions, thrownError) {
+          if(xhr.status == 404){
+            window.location.href = redirect;
+            return;
+          }
+
           let message = thrownError;
           try {
             err = JSON.parse(xhr.responseText);
