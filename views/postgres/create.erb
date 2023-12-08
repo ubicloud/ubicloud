@@ -44,7 +44,7 @@
               </div>
               <div class="col-span-full">
                 <% locations = Option
-                    .locations_for_provider(@project_data.dig(:provider, :name))
+                    .postgres_locations_for_provider(@project_data.dig(:provider, :name))
                     .map { |l| [l.name, l.display_name, @prices[l.name].to_json] }
                 %>
                 <%== render(

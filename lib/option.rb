@@ -19,6 +19,10 @@ module Option
     Option::Locations.select { (!only_visible || _1.visible) && (provider.nil? || _1.provider.name == provider) }
   end
 
+  def self.postgres_locations_for_provider(provider)
+    Option::Locations.select { _1.name == "hetzner-fsn1" }
+  end
+
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
