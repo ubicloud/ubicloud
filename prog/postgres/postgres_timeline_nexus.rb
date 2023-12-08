@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   semaphore :destroy
 
   def self.assemble(parent_id: nil)
-    if parent_id && (PostgresResource[parent_id]).nil?
+    if parent_id && (PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
     end
 
