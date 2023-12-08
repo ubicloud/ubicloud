@@ -40,14 +40,20 @@ SQL
           fail "BUG: strand with @deleted set still exists in the database"
         end
       else
-        num_updated = DB[<<SQL, id, lease_time].update
+        DB.transaction do
+          lease_clear_debug_snapshot = this.for_update.all
+          num_updated = DB[<<SQL, id, lease_time].update
 UPDATE strand
 SET lease = NULL
 WHERE id = ? AND lease = ?
 SQL
-        Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} }
-        unless num_updated == 1
-          fail "BUG: lease violated"
+          Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} }
+          unless num_updated == 1
+            Clog.emit("lease violated data") do
+              {lease_clear_debug_snapshot: lease_clear_debug_snapshot}
+            end
+            fail "BUG: lease violated"
+          end
         end
       end
     end

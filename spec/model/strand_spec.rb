@@ -55,6 +55,8 @@ SQL
         end
       end.at_least(:once)
 
+      expect(Clog).to receive(:emit).with("lease violated data").and_call_original
+      expect(Clog).to receive(:emit).at_least(:once).and_call_original
       expect { st.run }.to raise_error RuntimeError, "BUG: lease violated"
     end
   end
