@@ -343,6 +343,7 @@ dhcp-authoritative
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
 dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
+dhcp-option=option:dns-server,149.112.112.112,9.9.9.9
 dhcp-option=26,1400
 DNSMASQ_CONF
 
