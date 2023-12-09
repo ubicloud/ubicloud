@@ -75,10 +75,14 @@ class CloverWeb
       return success("GithubRunner[#{runner.ubid}] created")
     end
 
+    unless (runner_id = job.fetch("runner_id"))
+      return error("A workflow_job without runner_id")
+    end
+
     runner = GithubRunner.first(
       installation_id: installation.id,
       repository_name: data["repository"]["full_name"],
-      runner_id: job.fetch("runner_id")
+      runner_id: runner_id
     )
 
     return error("Unregistered runner") unless runner

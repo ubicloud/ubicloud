@@ -77,6 +77,13 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] created"}.to_json)
     end
 
+    it "fails if not queued and runner_id is empty" do
+      send_webhook("workflow_job", workflow_job_payload(action: "waiting", runner_id: nil))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "A workflow_job without runner_id"}}.to_json)
+    end
+
     it "fails if runner not exists" do
       send_webhook("workflow_job", workflow_job_payload(action: "in_progress", runner_id: 789))
 
