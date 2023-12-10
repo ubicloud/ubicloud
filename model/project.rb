@@ -72,5 +72,5 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :enable_postgres, :github_storage_policy
+  feature_flag :github_storage_policy
 end
