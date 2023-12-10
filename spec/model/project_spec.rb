@@ -36,8 +36,8 @@ RSpec.describe Project do
   it "sets and gets feature flags" do
     project = described_class.create_with_id(name: "dummy-name")
 
-    expect(project.get_enable_postgres).to be_nil
-    project.set_enable_postgres("new-value")
-    expect(project.get_enable_postgres).to eq "new-value"
+    expect(project.get_github_storage_policy).to be_nil
+    project.set_github_storage_policy("new-value")
+    expect(project.get_github_storage_policy).to eq "new-value"
   end
 end

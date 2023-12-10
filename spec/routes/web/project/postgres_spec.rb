@@ -41,36 +41,11 @@ RSpec.describe Clover, "postgres" do
     end
   end
 
-  describe "authenticated but without feature flag" do
-    before do
-      postgres_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
-      allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
-      login(user.email)
-    end
-
-    it "cannot list postgres databases" do
-      visit "#{project.path}/postgres"
-      expect(page.title).to eq("Ubicloud - Resource not found")
-    end
-
-    it "cannot create postgres databases" do
-      visit "#{project.path}/postgres/create"
-      expect(page.title).to eq("Ubicloud - Resource not found")
-    end
-
-    it "cannot show postgres databases" do
-      visit "#{project.path}#{pg.path}"
-      expect(page.title).to eq("Ubicloud - Resource not found")
-    end
-  end
-
   describe "authenticated" do
     before do
       postgres_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
       login(user.email)
-      project.set_enable_postgres(true)
-      project_wo_permissions.set_enable_postgres(true)
 
       client = instance_double(Minio::Client, list_objects: [])
       allow(Minio::Client).to receive(:new).and_return(client)

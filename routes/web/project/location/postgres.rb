@@ -2,11 +2,6 @@
 
 class CloverWeb
   hash_branch(:project_location_prefix, "postgres") do |r|
-    unless @project.get_enable_postgres
-      response.status = 404
-      r.halt
-    end
-
     @serializer = Serializers::Web::Postgres
 
     r.on String do |pg_name|
