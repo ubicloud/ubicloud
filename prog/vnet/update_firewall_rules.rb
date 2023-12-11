@@ -55,8 +55,15 @@ table inet fw_table {
     elements = { #{generate_private_ip6_list} }
   }
 
+  flowtable ubi_flowtable {
+    hook ingress priority filter
+    devices = { #{vm.nics.map(&:ubid_to_tap_name).join(",")}, vethi#{vm.inhost_name} }
+  }
+
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
+    ip protocol tcp counter flow offload @ubi_flowtable
+    ip protocol udp counter flow offload @ubi_flowtable
     ip saddr @private_ipv4_ips ct state established,related,new counter accept
     ip daddr @private_ipv4_ips ct state established,related counter accept
     ip6 saddr @private_ipv6_ips ct state established,related,new counter accept
