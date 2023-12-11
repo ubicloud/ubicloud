@@ -11,7 +11,7 @@ RSpec.describe Prog::Vnet::UpdateFirewallRules do
   }
   let(:vm) {
     vmh = instance_double(VmHost, sshable: instance_double(Sshable, cmd: nil))
-    nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::1/128"))
+    nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::1/128"), ubid_to_tap_name: "tap0")
     ephemeral_net6 = NetAddr::IPv6Net.parse("fd00::1/79")
     instance_double(Vm, private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6)
   }
@@ -70,8 +70,15 @@ elements = {fd00::1/128 . 8080-65535}
     elements = { fd00::/64 }
   }
 
+  flowtable ubi_flowtable {
+    hook ingress priority filter
+    devices = { tap0, vethix }
+  }
+
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
+    ip protocol tcp counter flow offload @ubi_flowtable
+    ip protocol udp counter flow offload @ubi_flowtable
     ip saddr @private_ipv4_ips ct state established,related,new counter accept
     ip daddr @private_ipv4_ips ct state established,related counter accept
     ip6 saddr @private_ipv6_ips ct state established,related,new counter accept
@@ -139,8 +146,15 @@ table inet fw_table {
     elements = { fd00::/64 }
   }
 
+  flowtable ubi_flowtable {
+    hook ingress priority filter
+    devices = { tap0, vethix }
+  }
+
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
+    ip protocol tcp counter flow offload @ubi_flowtable
+    ip protocol udp counter flow offload @ubi_flowtable
     ip saddr @private_ipv4_ips ct state established,related,new counter accept
     ip daddr @private_ipv4_ips ct state established,related counter accept
     ip6 saddr @private_ipv6_ips ct state established,related,new counter accept
