@@ -269,9 +269,9 @@ SQL
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible hosts")
 
-      queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, Sequel[:strand][:label] => "start").all
-      Prog::PageNexus.assemble("No capacity left at #{vm.location}", queued_vms.first(25).map(&:ubid), "NoCapacity", vm.location)
-      Clog.emit("No capacity left") { {lack_of_capacity: {location: vm.location, queue_size: queued_vms.count}} }
+      queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start").all
+      Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.arch}", queued_vms.first(25).map(&:ubid), "NoCapacity", vm.location, vm.arch)
+      Clog.emit("No capacity left") { {lack_of_capacity: {location: vm.location, arch: vm.arch, queue_size: queued_vms.count}} }
 
       nap 30
     end

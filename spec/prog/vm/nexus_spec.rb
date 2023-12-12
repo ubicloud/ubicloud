@@ -320,7 +320,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts")).twice
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
-      expect(Page.from_tag_parts("NoCapacity", vm.location)).not_to be_nil
+      expect(Page.from_tag_parts("NoCapacity", vm.location, vm.arch)).not_to be_nil
 
       # Second run does not generate another page
       expect { nx.start }.to nap(30)
