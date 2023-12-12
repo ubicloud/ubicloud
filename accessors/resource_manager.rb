@@ -8,39 +8,43 @@ class ResourceManager
   end
 
   def self.get_all(project, current_user, resource_type)
-    # TODOBV: Either dynamically generate or have a map. So bad rn
-    # just tried some dynamic calls to play with it
-    func_to_call = if resource_type == "vm"
-      :project_vm_get
-    else
-      :project_private_subnet_get
-    end
-
-    local_resources = ResourceAccessor.send(func_to_call, project, current_user)
+    local_resources = ResourceAccessor.get_all(project, current_user, resource_type)
 
     remote_resources = []
     @@remote_resource_accessor.each do |_, remote_accessor|
-      remote_resources += remote_accessor.send(func_to_call, project, current_user)
+      remote_resources += remote_accessor.get_all(project, current_user, resource_type)
     end
 
     local_resources + remote_resources
   end
 
-  def self.post(location, project, params, resource_type)
-    func_to_call = if resource_type == "vm"
-      :project_vm_post
+  # TODOBV: What if get returns DRb object reference?
+  def self.get(location, project, name, resource_type)
+    if location == "local"
+      ResourceAccessor.get(project, name, resource_type)
     else
-      :project_private_subnet_post
-    end
-
-    if location == "local" # TODOBV: From the config, no-op but info
-      ResourceAccessor.send(func_to_call, project, params)
-    else
-      @@remote_resource_accessor[location].send(func_to_call, project, params)
+      @@remote_resource_accessor[location].get(project, name, resource_type)
     end
   end
 
-  # TODOBV: Add get for location based single resources
+  def self.post(location, project, params, resource_type)
+    if location == "local"
+      ResourceAccessor.post(project, params, resource_type)
+    else
+      @@remote_resource_accessor[location].post(project, params, resource_type)
+    end
+  end
+
+  def self.delete(location, resource, resource_type)
+    if location == "local"
+      ResourceAccessor.delete(resource, resource_type)
+    else
+      @@remote_resource_accessor[location].delete(resource, resource_type)
+    end
+  end
+
+  # def run --> give block? security ? 
+
   # TODOBV: Add func for semaphores (should I ?)
 
   # postgres

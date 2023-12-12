@@ -5,7 +5,7 @@ class CloverWeb
     @serializer = Serializers::Web::PrivateSubnet
 
     r.on String do |ps_name|
-      ps = @project.private_subnets_dataset.where(location: @location).where { {Sequel[:private_subnet][:name] => ps_name} }.first
+      ps = ResourceManager.get(@location, @project, ps_name, "private_subnet")
 
       unless ps
         response.status = 404
