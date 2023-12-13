@@ -59,7 +59,7 @@
       </div>
       <div class="px-4 py-5 sm:p-6">
         <div class="flex items-center justify-end gap-x-6">
-          <a href="/private-subnet" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <a href="<%= @project_data[:path] %>/private-subnet" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
           <%== render("components/form/submit_button", locals: { text: "Create" }) %>
         </div>
       </div>
