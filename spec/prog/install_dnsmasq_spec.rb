@@ -55,7 +55,7 @@ RSpec.describe Prog::InstallDnsmasq do
     it "fetches a version and pops" do
       sshable = instance_double(Sshable)
       expect(sshable).to receive(:cmd).with <<CMD.rstrip
-git init dnsmasq && (cd dnsmasq &&   git fetch https://github.com/fdr/dnsmasq.git aaba66efbd3b4e7283993ca3718df47706a8549b --depth=1 &&  git checkout aaba66efbd3b4e7283993ca3718df47706a8549b &&  git fsck --full)
+git init dnsmasq && (cd dnsmasq &&   git fetch https://github.com/fdr/dnsmasq.git 5dc14b6e05f39a5ab0dc02e376b1d7da2fda5bc1 --depth=1 &&  git checkout 5dc14b6e05f39a5ab0dc02e376b1d7da2fda5bc1 &&  git fsck --full)
 CMD
       expect(idm).to receive(:sshable).and_return(sshable)
 
