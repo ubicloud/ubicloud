@@ -25,7 +25,7 @@ GEM
       minitest (>= 5.1)
       mutex_m
       tzinfo (~> 2.0)
-    addressable (2.8.5)
+    addressable (2.8.6)
       public_suffix (>= 2.0.2, < 6.0)
     android_key_attestation (0.3.0)
     argon2 (2.3.0)
@@ -43,7 +43,7 @@ GEM
       erubi (~> 1.4)
       parser (>= 2.4)
       smart_properties
-    bigdecimal (3.1.4)
+    bigdecimal (3.1.5)
     bindata (2.4.15)
     brakeman (6.1.0)
     builder (3.2.4)
@@ -65,7 +65,7 @@ GEM
     cose (1.3.0)
       cbor (~> 0.5.9)
       openssl-signature_algorithm (~> 1.0)
-    countries (5.7.0)
+    countries (5.7.1)
       unaccent (~> 0.3)
     crack (0.4.5)
       rexml
@@ -81,7 +81,7 @@ GEM
       ruby2_keywords
     ed25519 (1.3.0)
     erubi (1.12.0)
-    excon (0.105.0)
+    excon (0.106.0)
     faraday (2.7.12)
       base64
       faraday-net_http (>= 2.0, < 3.1)
@@ -112,7 +112,7 @@ GEM
     mini_mime (1.1.5)
     minitest (5.20.0)
     mutex_m (0.2.0)
-    net-imap (0.4.7)
+    net-imap (0.4.8)
       date
       net-protocol
     net-pop (0.1.2)
