@@ -21,6 +21,16 @@ module Authorization
     matched_policies(subject_id, actions).map { _1[:tagged_id] }
   end
 
+  def self.expand_actions(actions)
+    extended_actions = Set["*"]
+    Array(actions).each do |action|
+      extended_actions << action
+      parts = action.split(":")
+      parts[0..-2].each_with_index.each { |_, i| extended_actions << "#{parts[0..i].join(":")}:*" }
+    end
+    extended_actions.to_a
+  end
+
   def self.matched_policies(subject_id, actions = nil, object_id = nil)
     object_filter = if object_id
       Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
@@ -29,7 +39,7 @@ module Authorization
     end
 
     actions_filter = if actions
-      Sequel.lit("AND actions ?| array[:actions]", {actions: Sequel.pg_array(Array(actions))})
+      Sequel.lit("AND actions ?| array[:actions]", {actions: Sequel.pg_array(expand_actions(actions))})
     else
       Sequel.lit("")
     end

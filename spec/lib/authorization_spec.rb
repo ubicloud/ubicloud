@@ -31,7 +31,13 @@ RSpec.describe Authorization do
         [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], 6],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms.map { _1.hyper_tag_name(access_policy.project) }}], users[0].id, "Vm:view", 2],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 0]
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 0],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:Firewall:create", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:delete", 0],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:Firewall:create", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:create", 1],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:Firewall:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:create", 1],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:create", 1],
+        [[{subjects: users[0].hyper_tag_name, actions: "*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1]
       ].each do |policies, subject_id, actions, matched_count|
         access_policy.update(body: {acls: policies})
         expect(described_class.matched_policies(subject_id, actions).count).to eq(matched_count)
@@ -88,6 +94,20 @@ RSpec.describe Authorization do
     it "returns no resource ids when has no matched policies" do
       access_policy.update(body: [])
       expect(described_class.authorized_resources(users[0].id, "Vm:view")).to eq([])
+    end
+  end
+
+  describe "#expand_actions" do
+    it "returns expanded actions" do
+      [
+        ["*", ["*"]],
+        ["Vm:*", ["Vm:*", "*"]],
+        ["Vm:view", ["Vm:view", "Vm:*", "*"]],
+        [["Vm:view", "PrivateSubnet:view"], ["Vm:view", "PrivateSubnet:view", "Vm:*", "PrivateSubnet:*", "*"]],
+        [["Vm:Firewall:view"], ["Vm:Firewall:view", "Vm:Firewall:*", "Vm:*", "*"]]
+      ].each do |actions, expected|
+        expect(described_class.expand_actions(actions)).to match_array(expected)
+      end
     end
   end
 
