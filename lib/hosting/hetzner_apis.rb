@@ -19,18 +19,12 @@ class Hosting::HetznerApis
       user: @host.user,
       password: @host.password,
       headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    response = connection.post(path: "/boot/#{server_id}/linux",
-      body: URI.encode_www_form(dist: "Ubuntu 22.04.2 LTS base", lang: "en", authorized_key: formatted_fingerprint))
+    connection.post(path: "/boot/#{server_id}/linux",
+      body: URI.encode_www_form(dist: "Ubuntu 22.04.2 LTS base", lang: "en", authorized_key: formatted_fingerprint),
+      expects: 200)
 
-    if response.status != 200
-      raise "unexpected status #{response.status} for boot"
-    end
-
-    response = connection.post(path: "/reset/#{server_id}", body: "type=hw")
-
-    if response.status != 200
-      raise "unexpected status #{response.status} for reset"
-    end
+    connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
+    nil
   end
 
   def add_key(name, key)
@@ -38,12 +32,10 @@ class Hosting::HetznerApis
       user: @host.user,
       password: @host.password,
       headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    response = connection.post(path: "/key",
-      body: URI.encode_www_form(name: name, data: key))
-
-    if response.status != 201
-      raise "unexpected status #{response.status} for add_key"
-    end
+    connection.post(path: "/key",
+      body: URI.encode_www_form(name: name, data: key),
+      expects: 201)
+    nil
   end
 
   def delete_key(key)
@@ -55,11 +47,9 @@ class Hosting::HetznerApis
       user: @host.user,
       password: @host.password,
       headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    response = connection.delete(path: "/key/#{fingerprint}")
+    connection.delete(path: "/key/#{fingerprint}", expects: 200)
 
-    if response.status != 200
-      raise "unexpected status #{response.status} for delete_key"
-    end
+    nil
   end
 
   def get_main_ip4
@@ -67,11 +57,8 @@ class Hosting::HetznerApis
       user: @host.user,
       password: @host.password,
       headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    response = connection.get(path: "/server/#{@host.server_identifier}")
-
-    if response.status != 200
-      raise "unexpected status #{response.status} for get_main_ip4"
-    end
+    response = connection.get(path: "/server/#{@host.server_identifier}",
+      expects: 200)
 
     response_hash = JSON.parse(response.body)
     response_hash.dig("server", "server_ip")
@@ -86,22 +73,13 @@ class Hosting::HetznerApis
   # check the failover IP separately.
   def pull_ips
     connection = Excon.new(@host.connection_string, user: @host.user, password: @host.password)
-    response = connection.get(path: "/subnet")
-    if response.status != 200
-      raise "unexpected status #{response.status}"
-    end
+    response = connection.get(path: "/subnet", expects: 200)
     json_arr_subnets = JSON.parse(response.body)
 
-    response = connection.get(path: "/ip")
-    if response.status != 200
-      raise "unexpected status #{response.status}"
-    end
+    response = connection.get(path: "/ip", expects: 200)
     json_arr_ips = JSON.parse(response.body)
 
-    response = connection.get(path: "/failover")
-    if response.status != 200 && response.status != 404
-      raise "unexpected status #{response.status}"
-    end
+    response = connection.get(path: "/failover", expects: [200, 404])
     json_arr_failover = (response.status == 404) ? [] : JSON.parse(response.body)
 
     addresses_with_assignment = process_ips_subnets_failovers(json_arr_ips, json_arr_subnets, json_arr_failover)
@@ -168,10 +146,7 @@ class Hosting::HetznerApis
 
   def pull_dc(server_id)
     connection = Excon.new(@host.connection_string, user: @host.user, password: @host.password)
-    response = connection.get(path: "/server/#{server_id}")
-    if response.status != 200
-      raise "unexpected status #{response.status}"
-    end
+    response = connection.get(path: "/server/#{server_id}", expects: 200)
     json_server = JSON.parse(response.body)
     json_server.dig("server", "dc")
   end
