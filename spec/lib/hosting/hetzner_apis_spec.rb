@@ -64,6 +64,12 @@ RSpec.describe Hosting::HetznerApis do
       Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 500, body: ""})
       expect { hetzner_apis.delete_key(key_data) }.to raise_error Excon::Error::InternalServerError
     end
+
+    it "regards a missing key as deleted" do
+      key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
+      Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 404, body: ""})
+      expect(hetzner_apis.delete_key(key_data)).to be_nil
+    end
   end
 
   describe "get_main_ip4" do

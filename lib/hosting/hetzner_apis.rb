@@ -47,7 +47,7 @@ class Hosting::HetznerApis
       user: @host.user,
       password: @host.password,
       headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    connection.delete(path: "/key/#{fingerprint}", expects: 200)
+    connection.delete(path: "/key/#{fingerprint}", expects: [200, 404])
 
     nil
   end
