@@ -23,7 +23,7 @@ RSpec.describe Hosting::HetznerApis do
       expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
       Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 400, body: ""})
-      expect { hetzner_apis.reset(123) }.to raise_error RuntimeError, "unexpected status 400 for reset"
+      expect { hetzner_apis.reset(123) }.to raise_error Excon::Error::BadRequest
     end
 
     it "raises an error if the ssh key is not set" do
@@ -34,7 +34,7 @@ RSpec.describe Hosting::HetznerApis do
     it "raises an error if the boot fails" do
       expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 400, body: ""})
-      expect { hetzner_apis.reset(123) }.to raise_error RuntimeError, "unexpected status 400 for boot"
+      expect { hetzner_apis.reset(123) }.to raise_error Excon::Error::BadRequest
     end
   end
 
@@ -48,7 +48,7 @@ RSpec.describe Hosting::HetznerApis do
     it "raises an error if adding a key fails" do
       key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
       Excon.stub({path: "/key", method: :post}, {status: 500, body: ""})
-      expect { hetzner_apis.add_key("test_key_1", key_data) }.to raise_error RuntimeError, "unexpected status 500 for add_key"
+      expect { hetzner_apis.add_key("test_key_1", key_data) }.to raise_error Excon::Error::InternalServerError
     end
   end
 
@@ -62,7 +62,7 @@ RSpec.describe Hosting::HetznerApis do
     it "raises an error if deleting a key fails" do
       key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"
       Excon.stub({path: "/key/8003339382ac5baa3637f813becce5e4", method: :delete}, {status: 500, body: ""})
-      expect { hetzner_apis.delete_key(key_data) }.to raise_error RuntimeError, "unexpected status 500 for delete_key"
+      expect { hetzner_apis.delete_key(key_data) }.to raise_error Excon::Error::InternalServerError
     end
   end
 
@@ -74,7 +74,7 @@ RSpec.describe Hosting::HetznerApis do
 
     it "raises an error if getting the main ip4 fails" do
       Excon.stub({path: "/server/123", method: :get}, {status: 404, body: ""})
-      expect { hetzner_apis.get_main_ip4 }.to raise_error RuntimeError, "unexpected status 404 for get_main_ip4"
+      expect { hetzner_apis.get_main_ip4 }.to raise_error Excon::Error::NotFound
     end
   end
 
@@ -86,7 +86,7 @@ RSpec.describe Hosting::HetznerApis do
 
     it "raises an error if getting the dc info fails" do
       Excon.stub({path: "/server/123", method: :get}, {status: 400, body: ""})
-      expect { hetzner_apis.pull_dc(123) }.to raise_error RuntimeError, "unexpected status 400"
+      expect { hetzner_apis.pull_dc(123) }.to raise_error Excon::Error::BadRequest
     end
   end
 
@@ -103,13 +103,13 @@ RSpec.describe Hosting::HetznerApis do
       stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 400, body: JSON.dump([]))
       stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([]))
 
-      expect { hetzner_apis.pull_ips }.to raise_error RuntimeError, "unexpected status 400"
+      expect { hetzner_apis.pull_ips }.to raise_error Excon::Error::BadRequest
     end
 
     it "raises an error if the subnet API returns an unexpected status" do
       stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 400, body: JSON.dump([]))
 
-      expect { hetzner_apis.pull_ips }.to raise_error RuntimeError, "unexpected status 400"
+      expect { hetzner_apis.pull_ips }.to raise_error Excon::Error::BadRequest
     end
 
     it "raises an error if the failover API returns an unexpected status" do
@@ -117,7 +117,7 @@ RSpec.describe Hosting::HetznerApis do
       stub_request(:get, "https://robot-ws.your-server.de/ip").to_return(status: 200, body: JSON.dump([]))
       stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([]))
 
-      expect { hetzner_apis.pull_ips }.to raise_error RuntimeError, "unexpected status 400"
+      expect { hetzner_apis.pull_ips }.to raise_error Excon::Error::BadRequest
     end
 
     it "can pull data from the API" do
