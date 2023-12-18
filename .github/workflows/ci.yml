@@ -69,7 +69,7 @@ jobs:
 
     - name: Archive code coverage results
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: code-coverage-report
         path: coverage/
