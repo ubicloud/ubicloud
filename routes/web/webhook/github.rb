@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class CloverWeb
+  CloverBase.run_on_all_locations :delete_github_runners do |github_installation|
+    github_installation.runners.each(&:incr_destroy)
+  end
+
   hash_branch(:webhook_prefix, "github") do |r|
     r.post true do
       body = r.body.read
@@ -45,7 +49,7 @@ class CloverWeb
       unless installation
         return error("Unregistered installation")
       end
-      installation.runners.each(&:incr_destroy)
+      delete_github_runners(installation)
       installation.destroy
       return success("GithubInstallation[#{installation.ubid}] deleted")
     end
@@ -65,16 +69,19 @@ class CloverWeb
     end
 
     if data["action"] == "queued"
+      # Now all runners are created on the location github-runners,
+      # once storage will be common we should pass/select the location
+      # somehow. Then we can make the call to the right location
       st = Prog::Vm::GithubRunner.assemble(
         installation,
         repository_name: data["repository"]["full_name"],
         label: label
       )
-      runner = GithubRunner[st.id]
 
-      return success("GithubRunner[#{runner.ubid}] created")
+      return success("GithubRunner[#{st.subject.ubid}] created")
     end
 
+    # That should be providing location as well
     runner = GithubRunner.first(
       installation_id: installation.id,
       repository_name: data["repository"]["full_name"],
@@ -83,12 +90,14 @@ class CloverWeb
 
     return error("Unregistered runner") unless runner
 
+    # That should be another call to a location
     runner.update(workflow_job: job.except("steps"))
 
     case data["action"]
     when "in_progress"
       success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
     when "completed"
+      # That should be another call to a location
       runner.incr_destroy
 
       success("GithubRunner[#{runner.ubid}] deleted")

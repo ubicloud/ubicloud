@@ -15,7 +15,10 @@ class CloverWeb
     r.get true do
       if (billing_info = @project.billing_info)
         @billing_info_data = Serializers::Web::BillingInfo.serialize(billing_info)
+        # Payment methods and billing info should be global
         @payment_methods = Serializers::Web::PaymentMethod.serialize(billing_info.payment_methods)
+        # Invoices should be regional, so in order to get total invoice we must combine all
+        # invoiced collected from all locations.
         @invoices = Serializers::Web::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
       end
 

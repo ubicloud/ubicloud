@@ -127,6 +127,24 @@ module CloverBase
     "#{request.scheme}://#{request.host}#{port}"
   end
 
+  # TODO: Move
+  def self.run_on_all_locations(func_label, &block)
+    ResourceAccessor.define_dynamic_function("run_on_all_locations_#{func_label}", &block)
+
+    define_method func_label.to_s do |*args|
+      ResourceManager.run_on_all_locations("run_on_all_locations_#{func_label}", *args[0..])
+    end
+  end
+
+  def self.run_on_location(func_label, &block)
+    ResourceAccessor.define_dynamic_function("run_on_location_#{func_label}", &block)
+
+    # First parameter passed to the dynamically created function must be location
+    define_method func_label.to_s do |*args|
+      ResourceManager.run_on_location("run_on_location_#{func_label}", args[0], *args[1..])
+    end
+  end
+
   module ClassMethods
     def autoload_routes(route)
       route_path = "routes/#{route}"

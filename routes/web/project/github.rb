@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class CloverWeb
+  CloverBase.run_on_all_locations :get_github_runners do |project|
+    # Ordering is problematic
+    project.github_installations_dataset.eager(runners: [:vm, :strand]).flat_map(&:runners).sort_by(&:created_at).reverse
+  end
   hash_branch(:project_prefix, "github") do |r|
     unless Config.github_app_name
       response.status = 501
@@ -11,7 +15,7 @@ class CloverWeb
 
     r.get true do
       @installations = Serializers::Web::GithubInstallation.serialize(@project.github_installations)
-      @runners = Serializers::Web::GithubRunner.serialize(@project.github_installations_dataset.eager(runners: [:vm, :strand]).flat_map(&:runners).sort_by(&:created_at).reverse)
+      @runners = Serializers::Web::GithubRunner.serialize(get_github_runners(@project))
       @has_valid_payment_method = @project.has_valid_payment_method?
 
       view "project/github"

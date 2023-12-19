@@ -39,3 +39,5 @@ class CloverWeb
     end
   end
 end
+
+# Since global installation will be global, no need to update any call
