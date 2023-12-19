@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+
+COHORT_SIZE = 200
+MONITOR_ID = "monitor-1"
+LEASE_EXPIRATION = 30
+
+query = <<SQL
+WITH resources AS (
+  (SELECT 1 AS priority, id FROM monitorable WHERE lessee = '#{MONITOR_ID}')
+  UNION
+  (SELECT 2 AS priority, id FROM monitorable WHERE lease IS NULL OR lease < now())
+  ORDER BY priority
+  LIMIT #{COHORT_SIZE}
+)
+UPDATE monitorable
+SET lessee = '#{MONITOR_ID}', lease = now() + '#{LEASE_EXPIRATION} seconds'
+FROM resources
+WHERE monitorable.id = resources.id
+RETURNING monitorable.id
+SQL
+
+sessions = {}
+threads = []
+loop do
+  resources = DB[query].map { UBID.decode(UBID.from_uuidish(_1[:id])) }
+  resources.each do |r|
+    sessions[r.id] ||= r.init_health_monitor_session
+    threads << Thread.new do
+      r.check_health_status(session: sessions[r.id])
+    end
+  end
+
+  sessions.select! { |k, v| resources.map(&:id).include?(k) }
+
+  sleep 5
+end
