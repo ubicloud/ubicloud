@@ -32,6 +32,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       )
       minio_cluster.associate_with_project(project)
 
+      Monitorable.create { _1.id = minio_cluster.id }
       Strand.create(prog: "Minio::MinioClusterNexus", label: "start") { _1.id = minio_cluster.id }
     end
   end
@@ -94,6 +95,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     nap 10 unless minio_cluster.pools.empty?
     DB.transaction do
       minio_cluster.private_subnet&.incr_destroy
+      minio_cluster.monitorable.destroy
       minio_cluster.destroy
     end
 

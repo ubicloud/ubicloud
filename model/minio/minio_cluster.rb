@@ -11,6 +11,7 @@ class MinioCluster < Sequel::Model
   end
   one_to_one :strand, key: :id
   many_to_one :private_subnet, key: :private_subnet_id
+  one_to_one :monitorable, key: :id
 
   include ResourceMethods
   include SemaphoreMethods
@@ -51,5 +52,32 @@ class MinioCluster < Sequel::Model
 
   def hostname
     "#{name}.#{Config.minio_host_name}"
+  end
+
+  def init_health_monitor_session
+    Minio::Client.new(
+      endpoint: connection_strings.first,
+      access_key: admin_user,
+      secret_key: admin_password
+    )
+  end
+
+  def check_health_status(session:)
+    reading = begin
+      JSON.parse(session.admin_info.body)["servers"].map { _1["state"] }.all?("online") ? "up" : "down"
+    rescue
+      "down"
+    end
+
+    status = {
+      reading: reading,
+      reading_rpt: (monitorable.status["reading"] == reading) ? monitorable.status["reading_rpt"] + 1 : 1,
+      reading_chg: (monitorable.status["reading"] == reading) ? monitorable.status["reading_chg"] : Time.now
+    }
+    monitorable.update(status: status)
+
+    if status["reading"] == "down" && status["reading_rpt"] > 5 && Time.now - Time.parse(status["reading_chg"]) > 30
+      Prog::PageNexus.assemble("#{ubid} is unavailable!", [ubid], "MinIOClusterUnavailable", id)
+    end
   end
 end
