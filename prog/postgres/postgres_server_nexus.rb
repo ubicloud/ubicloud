@@ -48,6 +48,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
 
+      Monitorable.create { _1.id = postgres_server.id }
       Strand.create(prog: "Postgres::PostgresServerNexus", label: "start") { _1.id = postgres_server.id }
     end
   end
@@ -237,6 +238,7 @@ SQL
     strand.children.each { _1.destroy }
     vm.private_subnets.each { _1.incr_destroy }
     vm.incr_destroy
+    postgres_server.monitorable.destroy
     postgres_server.destroy
 
     pop "postgres server is deleted"

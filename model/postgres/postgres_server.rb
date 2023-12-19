@@ -7,6 +7,7 @@ class PostgresServer < Sequel::Model
   many_to_one :resource, class: PostgresResource, key: :resource_id
   many_to_one :timeline, class: PostgresTimeline, key: :timeline_id
   one_to_one :vm, key: :id, primary_key: :vm_id
+  one_to_one :monitorable, key: :id
 
   include ResourceMethods
   include SemaphoreMethods
@@ -71,5 +72,28 @@ class PostgresServer < Sequel::Model
 
   def primary?
     timeline_access == "push"
+  end
+
+  def init_health_monitor_session
+    vm.sshable.connect
+  end
+
+  def check_health_status(session:)
+    reading = begin
+      (session.exec!("sudo -u postgres psql -At -c 'SELECT 1'").chomp == "1") ? "up" : "down"
+    rescue
+      "down"
+    end
+
+    status = {
+      reading: reading,
+      reading_rpt: (monitorable.status["reading"] == reading) ? monitorable.status["reading_rpt"] + 1 : 1,
+      reading_chg: (monitorable.status["reading"] == reading) ? monitorable.status["reading_chg"] : Time.now
+    }
+    monitorable.update(status: status)
+
+    if status["reading"] == "down" && status["reading_rpt"] > 5 && Time.now - Time.parse(status["reading_chg"]) > 30
+      Prog::PageNexus.assemble("#{ubid} is unavailable!", [ubid], "PostgresServerUnavailable", id)
+    end
   end
 end
