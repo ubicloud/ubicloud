@@ -19,6 +19,7 @@ class Clog
 
     return if Config.test?
     out[:message] = message
+    out[:time] = Time.now
 
     if (thread_name = Thread.current.name)
       out[:thread] = thread_name
