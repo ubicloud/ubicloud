@@ -11,6 +11,7 @@ class Vm < Sequel::Model
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
   one_to_many :vm_storage_volumes, key: :vm_id
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
+  one_to_one :monitorable, key: :id
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy
 
@@ -163,6 +164,38 @@ class Vm < Sequel::Model
         private_subnet_id: ps.id,
         port_range: Sequel.pg_range(22..22)
       )
+    end
+  end
+
+  def init_health_monitor_session
+    if sshable
+      sshable.connect
+    else
+      vm_host.sshable.connect
+    end
+  end
+
+  def check_health_status(session:)
+    reading = begin
+      if sshable
+        session.exec!("uptime")
+        "up"
+      else
+        (session.exec!("systemctl is-active #{inhost_name}").chomp == "active") ? "up" : "down"
+      end
+    rescue
+      "down"
+    end
+
+    status = {
+      reading: reading,
+      reading_rpt: (monitorable.status["reading"] == reading) ? monitorable.status["reading_rpt"] + 1 : 1,
+      reading_chg: (monitorable.status["reading"] == reading) ? monitorable.status["reading_chg"] : Time.now
+    }
+    monitorable.update(status: status)
+
+    if status["reading"] == "down" && status["reading_rpt"] > 5 && Time.now - Time.parse(status["reading_chg"]) > 30
+      Prog::PageNexus.assemble("#{ubid} is unavailable!", [ubid], "VmUnavailable", id)
     end
   end
 end

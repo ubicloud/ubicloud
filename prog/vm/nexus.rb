@@ -86,6 +86,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm.associate_with_project(project)
 
+      Monitorable.create { _1.id = vm.id }
       Strand.create(
         prog: "Vm::Nexus",
         label: "start",
@@ -457,6 +458,7 @@ SQL
         available_storage_gib: Sequel[:available_storage_gib] + vm_storage_size_gib
       )
       vm.projects.map { vm.dissociate_with_project(_1) }
+      vm.monitorable.destroy
       vm.destroy
     end
 
