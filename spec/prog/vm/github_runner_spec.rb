@@ -275,6 +275,12 @@ RSpec.describe Prog::Vm::GithubRunner do
         sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
         sudo chown -R runner:runner actions-runner
         ./actions-runner/env.sh
+        cat <<EOT > ./actions-runner/run-withenv.sh
+        #!/bin/bash
+        mapfile -t env </etc/environment
+        exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
+        EOT
+        chmod +x ./actions-runner/run-withenv.sh
         echo "PATH=$PATH" >> ./actions-runner/.env
       COMMAND
 
@@ -285,7 +291,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#register_runner" do
     it "registers runner hops" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
-      expect(sshable).to receive(:cmd).with("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./actions-runner/run.sh --jitconfig {}",
+      expect(sshable).to receive(:cmd).with("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./actions-runner/run-withenv.sh {}",
         stdin: "AABBCC")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
 

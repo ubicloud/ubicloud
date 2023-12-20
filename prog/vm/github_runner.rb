@@ -184,6 +184,16 @@ class Prog::Vm::GithubRunner < Prog::Base
       # ./env.sh sets some variables for runner to run properly
       ./actions-runner/env.sh
 
+      # Include /etc/environment in the runner environment, it's
+      # otherwise ignored, and this omission has caused problems.
+      # See https://github.com/actions/runner/issues/1703
+      cat <<EOT > ./actions-runner/run-withenv.sh
+      #!/bin/bash
+      mapfile -t env </etc/environment
+      exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
+      EOT
+      chmod +x ./actions-runner/run-withenv.sh
+
       # runner script doesn't use global $PATH variable by default. It gets path from
       # secure_path at /etc/sudoers. Also script load .env file, so we are able to
       # overwrite default path value of runner script with $PATH.
@@ -192,7 +202,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     COMMAND
 
     # Remove comments and empty lines before sending them to the machine
-    vm.sshable.cmd(command.gsub(/^(#.*)?\n/, ""))
+    vm.sshable.cmd(command.gsub(/^(# .*)?\n/, ""))
 
     hop_register_runner
   end
@@ -209,7 +219,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # having to store the encoded_jit_config.
     vm.sshable.cmd("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner " \
                    "--working-directory '/home/runner' --unit #{SERVICE_NAME} --remain-after-exit -- " \
-                   "./actions-runner/run.sh --jitconfig {}",
+                   "./actions-runner/run-withenv.sh {}",
       stdin: response[:encoded_jit_config])
 
     hop_wait
