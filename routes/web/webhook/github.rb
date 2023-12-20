@@ -16,7 +16,31 @@ class CloverWeb
       when "installation"
         return handle_installation(data)
       when "workflow_job"
-        return handle_workflow_job(data)
+        response = handle_workflow_job(data)
+        Clog.emit("workflow_job webhook event") {
+          job = data.fetch("workflow_job")
+          {
+            webhook: {
+              action: data["action"],
+              response: response,
+              payload: {
+                installation_id: data["installation"]["id"],
+                repository_name: data["repository"]["full_name"],
+                workflow_job: {
+                  id: job["id"],
+                  run_id: job["run_id"],
+                  status: job["status"],
+                  conclusion: job["conclusion"],
+                  labels: job["labels"],
+                  created_at: job["created_at"],
+                  started_at: job["started_at"],
+                  completed_at: job["completed_at"]
+                }
+              }
+            }
+          }
+        }
+        return response
       end
 
       return error("Unhandled event")
