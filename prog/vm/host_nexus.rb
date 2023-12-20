@@ -79,12 +79,12 @@ class Prog::Vm::HostNexus < Prog::Base
 
         vm_host.update(**kwargs)
       when "LearnStorage"
-        StorageDevice.create(
-          name: "DEFAULT",
+        kwargs = {
           total_storage_gib: st.exitval.fetch("total_storage_gib"),
-          available_storage_gib: st.exitval.fetch("available_storage_gib"),
-          vm_host_id: vm_host.id
-        ) { _1.id = vm_host.id }
+          available_storage_gib: st.exitval.fetch("available_storage_gib")
+        }
+
+        vm_host.update(**kwargs)
       end
     end
 

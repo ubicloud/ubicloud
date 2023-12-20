@@ -127,12 +127,13 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#wait_prep" do
     it "updates the vm_host record from the finished programs" do
       expect(nx).to receive(:leaf?).and_return(true)
-      sshable = Sshable.create_with_id
-      host = VmHost.create(location: "xyz") { _1.id = sshable.id }
-      allow(vm_host).to receive(:id).and_return(host.id)
+      # sshable = Sshable.create_with_id
+      # host = VmHost.create(location: "xyz") { _1.id = sshable.id }
+      # expect(vm_host).to receive(:id).and_return("2af77671-6c37-8371-bf98-941f7678a6ae")
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
       expect(vm_host).to receive(:update).with(arch: "arm64")
       expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
+      expect(vm_host).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
         instance_double(Strand, prog: "LearnArch", exitval: {"arch" => "arm64"}),
@@ -140,13 +141,6 @@ RSpec.describe Prog::Vm::HostNexus do
         instance_double(Strand, prog: "LearnStorage", exitval: {"total_storage_gib" => 300, "available_storage_gib" => 500}),
         instance_double(Strand, prog: "ArbitraryOtherProg")
       ])
-
-      expect(StorageDevice).to receive(:create).with(
-        name: "DEFAULT",
-        total_storage_gib: 300,
-        available_storage_gib: 500,
-        vm_host_id: host.id
-      ).and_call_original
 
       expect { nx.wait_prep }.to hop("setup_hugepages")
     end

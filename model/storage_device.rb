@@ -3,6 +3,8 @@
 require_relative "../model"
 
 class StorageDevice < Sequel::Model
+  include ResourceMethods
+
   many_to_one :vm_host
 
   def self.generate_uuid
