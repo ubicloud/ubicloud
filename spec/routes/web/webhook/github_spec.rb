@@ -99,6 +99,15 @@ RSpec.describe Clover, "github" do
       expect(runner.reload.workflow_job["id"]).to eq(232323)
     end
 
+    it "provisions a new runner if there is possible missing runner" do
+      expect(Prog::Vm::GithubRunner).to receive(:assemble)
+      expect(Clog).to receive(:emit).with("possible missing runner")
+      send_webhook("workflow_job", workflow_job_payload(action: "in_progress", runner_id: runner.runner_id, created_at: Time.now - 3 * 60))
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] picked job 232323"}.to_json)
+      expect(runner.reload.workflow_job["id"]).to eq(232323)
+    end
+
     it "destroys runner when receive completed action" do
       Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = runner.id }
 
@@ -118,7 +127,7 @@ RSpec.describe Clover, "github" do
     end
   end
 
-  def workflow_job_payload(action:, installation_id: installation.installation_id, repository_name: "my-repo", runner_id: 123, label: "ubicloud")
+  def workflow_job_payload(action:, installation_id: installation.installation_id, repository_name: "my-repo", runner_id: 123, label: "ubicloud", created_at: Time.now)
     {
       action: action,
       installation: {id: installation_id},
@@ -127,7 +136,7 @@ RSpec.describe Clover, "github" do
         id: 232323,
         runner_id: runner_id,
         labels: [label],
-
+        created_at: created_at.iso8601,
         name: "test workflow job name",
         job_name: "test job name",
         run_id: 7777777,

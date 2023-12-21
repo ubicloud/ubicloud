@@ -91,6 +91,17 @@ class CloverWeb
 
     case data["action"]
     when "in_progress"
+      # Sometimes, GitHub fails to send webhook events, leading to fewer runners
+      # being provisioned than necessary. If an older job takes a runner from a
+      # newer job, we should provision a new runner to mitigate the issue.
+      if (job_wait_duration = runner.created_at - Time.parse(job["created_at"])) && job_wait_duration > 2 * 60
+        Clog.emit("possible missing runner") { {missing_runner: {repository_name: runner.repository_name, label: runner.label, job_wait_duration: job_wait_duration}} }
+        Prog::Vm::GithubRunner.assemble(
+          installation,
+          repository_name: runner.repository_name,
+          label: runner.label
+        )
+      end
       success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
     when "completed"
       runner.incr_destroy
