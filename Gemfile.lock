@@ -82,7 +82,7 @@ GEM
     ed25519 (1.3.0)
     erubi (1.12.0)
     excon (0.108.0)
-    faraday (2.8.0)
+    faraday (2.8.1)
       base64
       faraday-net_http (>= 2.0, < 3.1)
       ruby2_keywords (>= 0.0.4)
@@ -174,7 +174,7 @@ GEM
     rexml (3.2.6)
     roda (3.75.0)
       rack
-    rodauth (2.32.0)
+    rodauth (2.33.0)
       roda (>= 2.6.0)
       sequel (>= 4)
     rotp (6.3.0)
