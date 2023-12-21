@@ -14,22 +14,36 @@ class Prog::Minio::SetupMinio < Prog::Base
   end
 
   label def configure_minio
-    def_minio = <<ECHO
+    case minio_server.vm.sshable.cmd("common/bin/daemonizer --check configure_minio")
+    when "Succeeded"
+      minio_server.vm.sshable.cmd("common/bin/daemonizer --clean configure_minio")
+      pop "minio is configured"
+    when "Failed", "NotStarted"
+      minio_config = <<ECHO
 MINIO_VOLUMES="#{minio_server.minio_volumes}"
 MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="#{minio_server.cluster.admin_user}"
 MINIO_ROOT_PASSWORD="#{minio_server.cluster.admin_password}"
 ECHO
 
-    hosts = <<ECHO
+      hosts = <<ECHO
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
 #{minio_server.cluster.generate_etc_hosts_entry}
 ECHO
+      config_json = JSON.generate({
+        minio_config: minio_config,
+        hosts: hosts
+      })
 
-    minio_server.vm.sshable.cmd("sudo tee -a /etc/default/minio", stdin: def_minio)
-    minio_server.vm.sshable.cmd("sudo tee -a /etc/hosts", stdin: hosts)
-    minio_server.vm.sshable.cmd("sudo chown -R minio-user:minio-user /etc/default/minio")
+      minio_server.vm.sshable.cmd("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config_json)
+    end
 
-    pop "minio is configured"
+    nap 5
   end
 
   label def mount_data_disks

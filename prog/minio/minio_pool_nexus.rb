@@ -5,9 +5,9 @@ require_relative "../../lib/util"
 class Prog::Minio::MinioPoolNexus < Prog::Base
   subject_is :minio_pool
 
-  semaphore :destroy
+  semaphore :destroy, :add_additional_pool
 
-  def self.assemble(cluster_id, start_index)
+  def self.assemble(cluster_id, start_index, server_count, drive_count, storage_size)
     unless MinioCluster[cluster_id]
       fail "No existing cluster"
     end
@@ -17,10 +17,21 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
 
       minio_pool = MinioPool.create(
         cluster_id: cluster_id,
-        start_index: start_index
+        start_index: start_index,
+        server_count: server_count,
+        drive_count: drive_count,
+        storage_size_gib: storage_size
       ) { _1.id = ubid.to_uuid }
 
       Strand.create(prog: "Minio::MinioPoolNexus", label: "start") { _1.id = minio_pool.id }
+    end
+  end
+
+  def self.assemble_additional_pool(cluster_id, server_count, drive_count, storage_size)
+    DB.transaction do
+      st = assemble(cluster_id, MinioCluster[cluster_id]&.target_total_server_count, server_count, drive_count, storage_size)
+      st.subject.incr_add_additional_pool
+      st
     end
   end
 
@@ -38,7 +49,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
 
   label def start
     register_deadline(:wait, 10 * 60)
-    cluster.per_pool_server_count.times do |i|
+    minio_pool.server_count.times do |i|
       Prog::Minio::MinioServerNexus.assemble(minio_pool.id, minio_pool.start_index + i)
     end
     hop_wait_servers
@@ -46,8 +57,14 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
 
   label def wait_servers
     if minio_pool.servers.all? { _1.strand.label == "wait" }
+      when_add_additional_pool_set? do
+        decr_add_additional_pool
+        cluster.incr_reconfigure
+      end
+
       hop_wait
     end
+
     nap 5
   end
 

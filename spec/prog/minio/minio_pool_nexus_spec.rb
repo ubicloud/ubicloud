@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Minio::MinioPoolNexus do
-  subject(:nx) { described_class.new(described_class.assemble(minio_cluster.id, 0)) }
+  subject(:nx) { described_class.new(described_class.assemble(minio_cluster.id, 0, 1, 1, 100)) }
 
   let(:minio_cluster) {
     MinioCluster.create_with_id(
@@ -34,7 +34,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
   describe ".assemble" do
     it "creates a minio pool" do
-      st = described_class.assemble(minio_cluster.id, 0)
+      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
       expect(MinioPool.count).to eq 1
       expect(st.label).to eq "start"
       expect(MinioPool.first.cluster).to eq minio_cluster
@@ -42,14 +42,30 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
     it "fails if cluster is not valid" do
       expect {
-        described_class.assemble(SecureRandom.uuid, 0)
+        described_class.assemble(SecureRandom.uuid, 0, 1, 1, 100)
+      }.to raise_error RuntimeError, "No existing cluster"
+    end
+  end
+
+  describe ".assemble_additional_pool" do
+    it "creates a minio pool for an existing cluster" do
+      described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
+      st = described_class.assemble_additional_pool(minio_cluster.id, 1, 1, 100)
+      expect(MinioPool.count).to eq 2
+      expect(st.label).to eq "start"
+      expect(st.subject.start_index).to eq 1
+    end
+
+    it "fails if cluster is not valid" do
+      expect {
+        described_class.assemble_additional_pool(SecureRandom.uuid, 0, 1, 100)
       }.to raise_error RuntimeError, "No existing cluster"
     end
   end
 
   describe "#start" do
     it "creates new minio servers and hops to wait_servers" do
-      described_class.assemble(minio_cluster.id, 0)
+      described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
 
       expect { nx.start }.to hop("wait_servers")
       expect(MinioServer.count).to eq 1
@@ -69,6 +85,16 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       st = instance_double(Strand, label: "wait")
       ms = instance_double(MinioServer, strand: st)
       expect(nx.minio_pool).to receive(:servers).and_return([ms])
+      expect { nx.wait_servers }.to hop("wait")
+    end
+
+    it "triggers reconfigure if addition_pool_set" do
+      st = instance_double(Strand, label: "wait")
+      ms = instance_double(MinioServer, strand: st)
+      expect(nx.minio_pool).to receive(:servers).and_return([ms])
+      expect(nx).to receive(:when_add_additional_pool_set?).and_yield
+      expect(nx.minio_pool.cluster).to receive(:incr_reconfigure)
+      expect(nx).to receive(:decr_add_additional_pool)
       expect { nx.wait_servers }.to hop("wait")
     end
   end
@@ -105,14 +131,14 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
   describe "#before_run" do
     it "hops to destroy if strand is not destroy" do
-      st = described_class.assemble(minio_cluster.id, 0)
+      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
       st.update(label: "start")
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if strand is destroy" do
-      st = described_class.assemble(minio_cluster.id, 0)
+      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
       st.update(label: "destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
