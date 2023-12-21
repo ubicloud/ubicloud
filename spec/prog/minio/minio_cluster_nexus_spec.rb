@@ -47,7 +47,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(MinioCluster.first.target_total_storage_size_gib).to eq 100
       expect(MinioCluster.first.target_total_pool_count).to eq 1
       expect(MinioCluster.first.target_total_server_count).to eq 1
-      expect(MinioCluster.first.target_total_driver_count).to eq 1
+      expect(MinioCluster.first.target_total_drive_count).to eq 1
       expect(MinioCluster.first.target_vm_size).to eq "standard-2"
       expect(MinioCluster.first.projects).to eq [minio_project]
       expect(MinioCluster.first.strand.label).to eq "start"

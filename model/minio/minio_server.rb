@@ -30,8 +30,8 @@ class MinioServer < Sequel::Model
   end
 
   def minio_volumes
-    return "/minio/dat1" if cluster.target_total_server_count == 1 && cluster.target_total_driver_count == 1
-    return "/minio/dat{1...#{cluster.target_total_driver_count}}" if cluster.target_total_server_count == 1
+    return "/minio/dat1" if cluster.target_total_server_count == 1 && cluster.target_total_drive_count == 1
+    return "/minio/dat{1...#{cluster.target_total_drive_count}}" if cluster.target_total_server_count == 1
     cluster.pools.map do |pool|
       pool.volumes_url
     end.join(" ")

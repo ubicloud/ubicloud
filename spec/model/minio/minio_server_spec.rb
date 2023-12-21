@@ -12,7 +12,7 @@ RSpec.describe MinioServer do
       target_total_storage_size_gib: 100,
       target_total_pool_count: 1,
       target_total_server_count: 1,
-      target_total_driver_count: 1,
+      target_total_drive_count: 1,
       target_vm_size: "standard-2"
     )
     mp = MinioPool.create_with_id(
@@ -52,12 +52,12 @@ RSpec.describe MinioServer do
     end
 
     it "returns minio volumes properly for a multi drive single server cluster" do
-      ms.cluster.update(target_total_driver_count: 4)
+      ms.cluster.update(target_total_drive_count: 4)
       expect(ms.minio_volumes).to eq("/minio/dat{1...4}")
     end
 
     it "returns minio volumes properly for a multi drive multi server cluster" do
-      ms.cluster.update(target_total_driver_count: 4, target_total_server_count: 2)
+      ms.cluster.update(target_total_drive_count: 4, target_total_server_count: 2)
       expect(ms.minio_volumes).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
   end

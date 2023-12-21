@@ -41,8 +41,8 @@ class MinioCluster < Sequel::Model
     (target_total_server_count / target_total_pool_count).to_i
   end
 
-  def per_pool_driver_count
-    (target_total_driver_count / target_total_pool_count).to_i
+  def per_pool_drive_count
+    (target_total_drive_count / target_total_pool_count).to_i
   end
 
   def connection_strings

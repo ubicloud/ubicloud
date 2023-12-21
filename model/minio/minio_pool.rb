@@ -16,7 +16,7 @@ class MinioPool < Sequel::Model
 
   def volumes_url
     servers_arg = "#{cluster.name}{#{start_index}...#{cluster.per_pool_server_count + start_index - 1}}"
-    drivers_arg = "/minio/dat{1...#{per_server_driver_count}}"
+    drivers_arg = "/minio/dat{1...#{per_server_drive_count}}"
     "http://#{servers_arg}.#{Config.minio_host_name}:9000#{drivers_arg}"
   end
 
@@ -24,8 +24,8 @@ class MinioPool < Sequel::Model
     "#{cluster.name}-#{start_index}"
   end
 
-  def per_server_driver_count
-    (cluster.per_pool_driver_count / cluster.per_pool_server_count).to_i
+  def per_server_drive_count
+    (cluster.per_pool_drive_count / cluster.per_pool_server_count).to_i
   end
 
   def per_server_storage_size
