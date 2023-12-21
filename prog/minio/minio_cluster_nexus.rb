@@ -9,6 +9,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   def self.assemble(project_id, cluster_name, location, admin_user,
     storage_size_gib, pool_count, server_count, driver_count, vm_size)
+    storage_size_gib, pool_count, server_count, drive_count, vm_size)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -27,7 +28,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         target_total_storage_size_gib: storage_size_gib,
         target_total_pool_count: pool_count,
         target_total_server_count: server_count,
-        target_total_driver_count: driver_count,
+        target_total_drive_count: drive_count,
         target_vm_size: vm_size
       )
       minio_cluster.associate_with_project(project)

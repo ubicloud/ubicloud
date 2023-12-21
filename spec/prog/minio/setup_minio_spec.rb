@@ -20,7 +20,7 @@ RSpec.describe Prog::Minio::SetupMinio do
       target_total_storage_size_gib: 100,
       target_total_pool_count: 1,
       target_total_server_count: 1,
-      target_total_driver_count: 1,
+      target_total_drive_count: 1,
       target_vm_size: "standard-2",
       private_subnet_id: ps.id
     )

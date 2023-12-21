@@ -12,7 +12,7 @@ RSpec.describe MinioCluster do
       target_total_storage_size_gib: 100,
       target_total_pool_count: 1,
       target_total_server_count: 1,
-      target_total_driver_count: 1,
+      target_total_drive_count: 1,
       target_vm_size: "standard-2"
     )
     mp = MinioPool.create_with_id(
@@ -51,7 +51,7 @@ RSpec.describe MinioCluster do
   end
 
   it "returns per pool driver count properly" do
-    expect(mc.per_pool_driver_count).to eq(1)
+    expect(mc.per_pool_drive_count).to eq(1)
   end
 
   it "returns connection strings properly" do
