@@ -17,7 +17,10 @@ RSpec.describe MinioPool do
     )
     mp = described_class.create_with_id(
       cluster_id: mc.id,
-      start_index: 0
+      start_index: 0,
+      server_count: 1,
+      drive_count: 1,
+      storage_size_gib: 100
     )
     vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
 
@@ -35,12 +38,12 @@ RSpec.describe MinioPool do
     end
 
     it "returns volumes url properly for a multi drive single server pool" do
-      mp.cluster.update(target_total_drive_count: 4)
+      mp.update(drive_count: 4)
       expect(mp.volumes_url).to eq("http://minio-cluster-name{0...0}.minio.ubicloud.com:9000/minio/dat{1...4}")
     end
 
     it "returns volumes url properly for a multi drive multi server pool" do
-      mp.cluster.update(target_total_drive_count: 4, target_total_server_count: 2)
+      mp.update(drive_count: 4, server_count: 2)
       expect(mp.volumes_url).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
   end
@@ -50,19 +53,19 @@ RSpec.describe MinioPool do
   end
 
   it "returns per server driver count properly" do
-    expect(mp.cluster).to receive(:per_pool_drive_count).and_return(4)
-    expect(mp.cluster).to receive(:per_pool_server_count).and_return(2)
+    expect(mp).to receive(:drive_count).and_return(4)
+    expect(mp).to receive(:server_count).and_return(2)
     expect(mp.per_server_drive_count).to eq(2)
   end
 
   it "returns per server storage size properly" do
-    expect(mp.cluster).to receive(:per_pool_storage_size).and_return(500)
-    expect(mp.cluster).to receive(:per_pool_server_count).and_return(2)
+    expect(mp).to receive(:storage_size_gib).and_return(500)
+    expect(mp).to receive(:server_count).and_return(2)
     expect(mp.per_server_storage_size).to eq(250)
   end
 
   it "returns servers in ordered way" do
-    mp.cluster.update(target_total_drive_count: 4, target_total_server_count: 2)
+    mp.update(drive_count: 4, server_count: 2)
     vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
 
     MinioServer.create_with_id(

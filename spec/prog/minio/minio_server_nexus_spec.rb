@@ -21,7 +21,10 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
     MinioPool.create_with_id(
       start_index: 0,
-      cluster_id: mc.id
+      cluster_id: mc.id,
+      server_count: 1,
+      drive_count: 1,
+      storage_size_gib: 100
     )
   }
   let(:ps) {
@@ -108,39 +111,66 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait_setup }.to nap(0)
     end
 
-    it "hops to minio_start if setup is done" do
+    it "hops to wait if setup is done" do
       expect(nx).to receive(:leaf?).and_return(true)
-      expect { nx.wait_setup }.to hop("minio_start")
+      expect { nx.wait_setup }.to hop("wait")
     end
   end
 
-  describe "#minio_start" do
+  describe "#minio_restart" do
     it "hops to wait if succeeded" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check start_minio").and_return("Succeeded")
-      expect { nx.minio_start }.to hop("wait")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean restart_minio")
+      expect { nx.minio_restart }.to hop("wait")
     end
 
     it "naps if minio is not started" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check start_minio").and_return("NotStarted")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl start minio' start_minio")
-      expect { nx.minio_start }.to nap(5)
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("NotStarted")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
+      expect { nx.minio_restart }.to nap(1)
     end
 
     it "naps if minio is failed" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check start_minio").and_return("Failed")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl start minio' start_minio")
-      expect { nx.minio_start }.to nap(5)
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Failed")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
+      expect { nx.minio_restart }.to nap(1)
     end
 
     it "naps if the status is unknown" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check start_minio").and_return("Unknown")
-      expect { nx.minio_start }.to nap(5)
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Unknown")
+      expect { nx.minio_restart }.to nap(1)
     end
   end
 
   describe "#wait" do
     it "naps" do
       expect { nx.wait }.to nap(10)
+    end
+
+    it "hops to wait_reconfigure if reconfigure is set" do
+      expect(nx).to receive(:when_reconfigure_set?).and_yield
+      expect(nx).to receive(:bud).with(Prog::Minio::SetupMinio, {}, :configure_minio)
+      expect { nx.wait }.to hop("wait_reconfigure")
+    end
+
+    it "hops to minio_restart if restart is set" do
+      expect(nx).to receive(:when_restart_set?).and_yield
+      expect { nx.wait }.to hop("minio_restart")
+    end
+  end
+
+  describe "#wait_reconfigure" do
+    before { expect(nx).to receive(:reap) }
+
+    it "donates if reconfigure continues" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect(nx).to receive(:donate).and_call_original
+      expect { nx.wait_reconfigure }.to nap(0)
+    end
+
+    it "hops to wait if reconfigure is done" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_reconfigure }.to hop("wait")
     end
   end
 

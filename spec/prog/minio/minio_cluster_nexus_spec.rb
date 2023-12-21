@@ -106,6 +106,22 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     it "naps" do
       expect { nx.wait }.to nap(30)
     end
+
+    it "hops to reconfigure if reconfigure is set" do
+      expect(nx).to receive(:when_reconfigure_set?).and_yield
+      expect { nx.wait }.to hop("reconfigure")
+    end
+  end
+
+  describe "#reconfigure" do
+    it "increments reconfigure semaphore of all minio servers and hops to configure_dns_records" do
+      expect(nx).to receive(:decr_reconfigure)
+      ms = instance_double(MinioServer)
+      expect(ms).to receive(:incr_reconfigure)
+      expect(nx.minio_cluster).to receive(:servers).and_return([ms]).at_least(:once)
+      expect(ms).to receive(:incr_restart)
+      expect { nx.reconfigure }.to hop("configure_dns_records")
+    end
   end
 
   describe "#destroy" do

@@ -1,0 +1,21 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+config_json = JSON.parse($stdin.read)
+
+unless (minio_config = config_json["minio_config"])
+  puts "need minio_config as argument"
+  exit 1
+end
+
+unless (hosts = config_json["hosts"])
+  puts "need hosts as argument"
+  exit 1
+end
+
+require_relative "../../common/lib/util"
+
+safe_write_to_file("/etc/default/minio", minio_config)
+safe_write_to_file("/etc/hosts", hosts)
+r "sudo chown -R minio-user:minio-user /etc/default/minio"

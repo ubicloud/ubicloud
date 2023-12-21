@@ -68,19 +68,53 @@ RSpec.describe Prog::Minio::SetupMinio do
   end
 
   describe ".configure_minio" do
-    it "configures minio" do
-      expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo tee -a /etc/default/minio", stdin: <<SH)
+    let(:config) {
+      minio_config = <<ECHO
 MINIO_VOLUMES="/minio/dat1"
 MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="minio-admin"
 MINIO_ROOT_PASSWORD="dummy-password"
-SH
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", stdin: <<SH)
+ECHO
+      minio_hosts = <<ECHO
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
 192.168.0.0 minio-cluster-name0.minio.ubicloud.com
-SH
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo chown -R minio-user:minio-user /etc/default/minio")
+ECHO
+      JSON.generate({
+        minio_config: minio_config,
+        hosts: minio_hosts
+      }).chomp
+    }
+
+    it "configures minio if not started" do
+      expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("NotStarted")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config)
+
+      expect { nx.configure_minio }.to nap(5)
+    end
+
+    it "pops if minio is configured" do
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("Succeeded")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_minio")
       expect { nx.configure_minio }.to exit({"msg" => "minio is configured"})
+    end
+
+    it "configures minio if failed" do
+      expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("Failed")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config)
+
+      expect { nx.configure_minio }.to nap(5)
+    end
+
+    it "naps if check returns unknown" do
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("Unknown")
+      expect { nx.configure_minio }.to nap(5)
     end
   end
 

@@ -15,7 +15,7 @@ class MinioServer < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
 
-  semaphore :destroy
+  semaphore :destroy, :restart, :reconfigure
 
   def hostname
     "#{cluster.name}#{index}.#{Config.minio_host_name}"

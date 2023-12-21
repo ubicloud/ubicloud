@@ -10,7 +10,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   extend Forwardable
   def_delegators :minio_server, :vm
 
-  semaphore :destroy
+  semaphore :destroy, :restart, :reconfigure
 
   def self.assemble(minio_pool_id, index)
     unless (minio_pool = MinioPool[minio_pool_id])
@@ -73,23 +73,41 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   label def wait_setup
     reap
     if leaf?
-      hop_minio_start
+      hop_wait
     end
     donate
   end
 
-  label def minio_start
-    case minio_server.vm.sshable.cmd("common/bin/daemonizer --check start_minio")
-    when "Succeeded"
-      hop_wait
-    when "Failed", "NotStarted"
-      minio_server.vm.sshable.cmd("common/bin/daemonizer 'systemctl start minio' start_minio")
+  label def wait
+    when_reconfigure_set? do
+      bud Prog::Minio::SetupMinio, {}, :configure_minio
+      hop_wait_reconfigure
     end
-    nap 5
+    when_restart_set? do
+      hop_minio_restart
+    end
+    nap 10
   end
 
-  label def wait
-    nap 10
+  label def wait_reconfigure
+    decr_reconfigure
+    reap
+    if leaf?
+      hop_wait
+    end
+    donate
+  end
+
+  label def minio_restart
+    decr_restart
+    case minio_server.vm.sshable.cmd("common/bin/daemonizer --check restart_minio")
+    when "Succeeded"
+      minio_server.vm.sshable.cmd("common/bin/daemonizer --clean restart_minio")
+      hop_wait
+    when "Failed", "NotStarted"
+      minio_server.vm.sshable.cmd("common/bin/daemonizer 'systemctl restart minio' restart_minio")
+    end
+    nap 1
   end
 
   label def destroy

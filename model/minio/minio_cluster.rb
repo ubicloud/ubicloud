@@ -17,7 +17,7 @@ class MinioCluster < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy
+  semaphore :destroy, :reconfigure
 
   plugin :column_encryption do |enc|
     enc.column :admin_password

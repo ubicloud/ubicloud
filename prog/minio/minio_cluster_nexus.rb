@@ -5,10 +5,9 @@ require_relative "../../lib/util"
 class Prog::Minio::MinioClusterNexus < Prog::Base
   subject_is :minio_cluster
 
-  semaphore :destroy
+  semaphore :destroy, :reconfigure
 
   def self.assemble(project_id, cluster_name, location, admin_user,
-    storage_size_gib, pool_count, server_count, driver_count, vm_size)
     storage_size_gib, pool_count, server_count, drive_count, vm_size)
     unless (project = Project[project_id])
       fail "No existing project"
@@ -55,7 +54,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     minio_cluster.update(private_subnet_id: subnet_st.id)
 
     minio_cluster.target_total_pool_count.times do |i|
-      Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, i * minio_cluster.per_pool_server_count)
+      Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, i * minio_cluster.per_pool_server_count, minio_cluster.per_pool_server_count, minio_cluster.per_pool_drive_count, minio_cluster.per_pool_storage_size)
     end
 
     hop_wait_pools
@@ -63,6 +62,8 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   label def wait_pools
     if minio_cluster.pools.all? { _1.strand.label == "wait" }
+      # Start all the servers now
+      minio_cluster.servers.each(&:incr_restart)
       hop_configure_dns_records
     end
     nap 5
@@ -77,7 +78,18 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   end
 
   label def wait
+    when_reconfigure_set? do
+      hop_reconfigure
+    end
+
     nap 30
+  end
+
+  label def reconfigure
+    decr_reconfigure
+    minio_cluster.servers.map(&:incr_reconfigure)
+    minio_cluster.servers.map(&:incr_restart)
+    hop_configure_dns_records
   end
 
   label def destroy
