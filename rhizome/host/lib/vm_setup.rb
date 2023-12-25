@@ -131,6 +131,18 @@ class VmSetup
   end
 
   def interfaces(nics, multiqueue)
+    # We first delete the network namespace for idempotency. Instead
+    # we could catch various exceptions for each command run, and if
+    # the error message matches certain text, we could resume. But
+    # the "ip link add" step generates the MAC addresses randomly,
+    # which makes it unsuitable for error message matching. Deleting
+    # and recreating the network namespace seems easier and safer.
+    begin
+      r "ip netns del #{q_vm}"
+    rescue CommandFail => ex
+      raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
+    end
+
     r "ip netns add #{q_vm}"
 
     # Generate MAC addresses rather than letting Linux do it to avoid
@@ -144,12 +156,6 @@ class VmSetup
     nics.each do |nic|
       r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm} #{multiqueue_fragment}"
     end
-  rescue CommandFail => ex
-    errors = [
-      /ioctl(TUNSETIFF): Device or resource busy/,
-      /File exists/
-    ]
-    raise unless errors.any? { |e| e.match?(ex.stderr) }
   end
 
   def subdivide_network(net)
