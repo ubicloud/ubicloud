@@ -45,7 +45,8 @@ GEM
       smart_properties
     bigdecimal (3.1.5)
     bindata (2.4.15)
-    brakeman (6.1.0)
+    brakeman (6.1.1)
+      racc
     builder (3.2.4)
     byebug (11.1.3)
     capybara (3.39.2)
@@ -112,7 +113,7 @@ GEM
     mini_mime (1.1.5)
     minitest (5.20.0)
     mutex_m (0.2.0)
-    net-imap (0.4.8)
+    net-imap (0.4.9)
       date
       net-protocol
     net-pop (0.1.2)
