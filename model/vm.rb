@@ -51,11 +51,12 @@ class Vm < Sequel::Model
   end
 
   def mem_gib_ratio
+    return 3.2 if arch == "arm64"
     8
   end
 
   def mem_gib
-    cores * mem_gib_ratio
+    (cores * mem_gib_ratio).to_i
   end
 
   # cloud-hypervisor takes topology information in this format:

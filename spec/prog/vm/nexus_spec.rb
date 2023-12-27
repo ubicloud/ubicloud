@@ -157,6 +157,13 @@ RSpec.describe Prog::Vm::Nexus do
         described_class.assemble("some_ssh_key", prj.id, private_subnet_id: ps.id)
       }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
+
+    it "creates arm64 vm with double core count and 3.2GB memory per core" do
+      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-4", arch: "arm64")
+      expect(st.subject.cores).to eq(4)
+      expect(st.subject.mem_gib_ratio).to eq(3.2)
+      expect(st.subject.mem_gib).to eq(12)
+    end
   end
 
   describe ".assemble_with_sshable" do
