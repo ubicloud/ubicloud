@@ -17,17 +17,15 @@ RSpec.describe Prog::Minio::SetupMinio do
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",
-      target_total_storage_size_gib: 100,
-      target_total_pool_count: 1,
-      target_total_server_count: 1,
-      target_total_drive_count: 1,
-      target_vm_size: "standard-2",
       private_subnet_id: ps.id
     )
 
     mp = MinioPool.create_with_id(
       start_index: 0,
-      cluster_id: mc.id
+      cluster_id: mc.id,
+      vm_size: "standard-2",
+      server_count: 1,
+      drive_count: 1
     )
     vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
     MinioServer.create_with_id(

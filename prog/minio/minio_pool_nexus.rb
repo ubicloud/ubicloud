@@ -7,7 +7,7 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
 
   semaphore :destroy, :add_additional_pool
 
-  def self.assemble(cluster_id, start_index, server_count, drive_count, storage_size)
+  def self.assemble(cluster_id, start_index, server_count, drive_count, storage_size_gib, vm_size)
     unless MinioCluster[cluster_id]
       fail "No existing cluster"
     end
@@ -20,16 +20,20 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
         start_index: start_index,
         server_count: server_count,
         drive_count: drive_count,
-        storage_size_gib: storage_size
+        storage_size_gib: storage_size_gib,
+        vm_size: vm_size
       ) { _1.id = ubid.to_uuid }
 
-      Strand.create(prog: "Minio::MinioPoolNexus", label: "start") { _1.id = minio_pool.id }
+      minio_pool.server_count.times do |i|
+        Prog::Minio::MinioServerNexus.assemble(minio_pool.id, minio_pool.start_index + i)
+      end
+      Strand.create(prog: "Minio::MinioPoolNexus", label: "wait_servers") { _1.id = minio_pool.id }
     end
   end
 
-  def self.assemble_additional_pool(cluster_id, server_count, drive_count, storage_size)
+  def self.assemble_additional_pool(cluster_id, server_count, drive_count, storage_size_gib, vm_size)
     DB.transaction do
-      st = assemble(cluster_id, MinioCluster[cluster_id]&.target_total_server_count, server_count, drive_count, storage_size)
+      st = assemble(cluster_id, MinioCluster[cluster_id]&.server_count, server_count, drive_count, storage_size_gib, vm_size)
       st.subject.incr_add_additional_pool
       st
     end
@@ -45,14 +49,6 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
 
   def cluster
     @cluster ||= minio_pool.cluster
-  end
-
-  label def start
-    register_deadline(:wait, 10 * 60)
-    minio_pool.server_count.times do |i|
-      Prog::Minio::MinioServerNexus.assemble(minio_pool.id, minio_pool.start_index + i)
-    end
-    hop_wait_servers
   end
 
   label def wait_servers

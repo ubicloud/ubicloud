@@ -4,6 +4,7 @@ require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Minio::MinioClusterNexus do
   subject(:nx) {
+    expect(Config).to receive(:minio_service_project_id).and_return(minio_project.id).at_least(:once)
     described_class.new(
       described_class.assemble(
         minio_project.id, "minio", "hetzner-hel1", "minio-admin", 100, 1, 1, 1, "standard-2"
@@ -44,25 +45,13 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(MinioCluster.first.location).to eq "hetzner-hel1"
       expect(MinioCluster.first.admin_user).to eq "minio-admin"
       expect(MinioCluster.first.admin_password).to match(/^[A-Za-z0-9_-]{20}$/)
-      expect(MinioCluster.first.target_total_storage_size_gib).to eq 100
-      expect(MinioCluster.first.target_total_pool_count).to eq 1
-      expect(MinioCluster.first.target_total_server_count).to eq 1
-      expect(MinioCluster.first.target_total_drive_count).to eq 1
-      expect(MinioCluster.first.target_vm_size).to eq "standard-2"
+      expect(MinioCluster.first.storage_size_gib).to eq 100
+      expect(MinioCluster.first.pools.count).to eq 1
+      expect(MinioCluster.first.server_count).to eq 1
+      expect(MinioCluster.first.drive_count).to eq 1
+      expect(MinioCluster.first.pools.first.vm_size).to eq "standard-2"
       expect(MinioCluster.first.projects).to eq [minio_project]
-      expect(MinioCluster.first.strand.label).to eq "start"
-    end
-  end
-
-  describe "#start" do
-    before do
-      allow(Config).to receive(:minio_service_project_id).and_return(minio_project.id)
-    end
-
-    it "creates a subnet and minio pools" do
-      expect { nx.start }.to hop("wait_pools")
-      expect(nx.minio_cluster.pools.count).to eq 1
-      expect(nx.minio_cluster.private_subnet_id).not_to be_nil
+      expect(MinioCluster.first.strand.label).to eq "wait_pools"
     end
   end
 
@@ -155,11 +144,14 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     end
 
     it "increments destroy semaphore of subnet and minio cluster and pops" do
+      expect(nx.minio_cluster).to receive(:pools).and_return([])
+      expect(nx.minio_cluster).to receive(:private_subnet).and_return(nil)
       expect(nx.minio_cluster).to receive(:destroy)
       expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
     end
 
     it "increments private subnet destroy if exists" do
+      expect(nx.minio_cluster).to receive(:pools).and_return([])
       ps = instance_double(PrivateSubnet)
       expect(ps).to receive(:incr_destroy)
       expect(nx.minio_cluster).to receive(:private_subnet).and_return(ps)

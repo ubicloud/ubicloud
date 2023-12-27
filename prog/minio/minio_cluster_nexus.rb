@@ -19,20 +19,29 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     Validation.validate_minio_username(admin_user)
 
     DB.transaction do
+      subnet_st = Prog::Vnet::SubnetNexus.assemble(
+        Config.minio_service_project_id,
+        name: "#{cluster_name}-subnet",
+        location: location
+      )
       minio_cluster = MinioCluster.create_with_id(
         name: cluster_name,
         location: location,
         admin_user: admin_user,
         admin_password: SecureRandom.urlsafe_base64(15),
-        target_total_storage_size_gib: storage_size_gib,
-        target_total_pool_count: pool_count,
-        target_total_server_count: server_count,
-        target_total_drive_count: drive_count,
-        target_vm_size: vm_size
+        private_subnet_id: subnet_st.id
       )
       minio_cluster.associate_with_project(project)
 
-      Strand.create(prog: "Minio::MinioClusterNexus", label: "start") { _1.id = minio_cluster.id }
+      per_pool_server_count = server_count / pool_count
+      per_pool_drive_count = drive_count / pool_count
+      per_pool_storage_size = storage_size_gib / pool_count
+      pool_count.times do |i|
+        start_index = i * per_pool_server_count
+        Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, start_index, per_pool_server_count, per_pool_drive_count, per_pool_storage_size, vm_size)
+      end
+
+      Strand.create(prog: "Minio::MinioClusterNexus", label: "wait_pools") { _1.id = minio_cluster.id }
     end
   end
 
@@ -44,23 +53,8 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     end
   end
 
-  label def start
-    register_deadline(:wait, 10 * 60)
-    subnet_st = Prog::Vnet::SubnetNexus.assemble(
-      Config.minio_service_project_id,
-      name: "#{minio_cluster.name}-subnet",
-      location: minio_cluster.location
-    )
-    minio_cluster.update(private_subnet_id: subnet_st.id)
-
-    minio_cluster.target_total_pool_count.times do |i|
-      Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, i * minio_cluster.per_pool_server_count, minio_cluster.per_pool_server_count, minio_cluster.per_pool_drive_count, minio_cluster.per_pool_storage_size)
-    end
-
-    hop_wait_pools
-  end
-
   label def wait_pools
+    register_deadline(:wait, 10 * 60)
     if minio_cluster.pools.all? { _1.strand.label == "wait" }
       # Start all the servers now
       minio_cluster.servers.each(&:incr_restart)

@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Minio::MinioPoolNexus do
-  subject(:nx) { described_class.new(described_class.assemble(minio_cluster.id, 0, 1, 1, 100)) }
+  subject(:nx) { described_class.new(described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")) }
 
   let(:minio_cluster) {
     MinioCluster.create_with_id(
@@ -11,18 +11,11 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",
-      target_total_storage_size_gib: 100,
-      target_total_pool_count: 1,
-      target_total_server_count: 1,
-      target_total_drive_count: 1,
-      target_vm_size: "standard-2",
       private_subnet_id: ps.id
     )
   }
   let(:ps) {
-    Prog::Vnet::SubnetNexus.assemble(
-      minio_project.id, name: "minio-cluster-name"
-    )
+    Prog::Vnet::SubnetNexus.assemble(minio_project.id, name: "minio-cluster-name")
   }
 
   let(:minio_project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
@@ -34,48 +27,38 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
   describe ".assemble" do
     it "creates a minio pool" do
-      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
+      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")
       expect(MinioPool.count).to eq 1
-      expect(st.label).to eq "start"
+      expect(st.label).to eq "wait_servers"
       expect(MinioPool.first.cluster).to eq minio_cluster
     end
 
     it "fails if cluster is not valid" do
       expect {
-        described_class.assemble(SecureRandom.uuid, 0, 1, 1, 100)
+        described_class.assemble(SecureRandom.uuid, 0, 1, 1, 100, "standard-2")
       }.to raise_error RuntimeError, "No existing cluster"
     end
   end
 
   describe ".assemble_additional_pool" do
     it "creates a minio pool for an existing cluster" do
-      described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
-      st = described_class.assemble_additional_pool(minio_cluster.id, 1, 1, 100)
+      described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")
+      st = described_class.assemble_additional_pool(minio_cluster.id, 1, 1, 100, "standard-2")
       expect(MinioPool.count).to eq 2
-      expect(st.label).to eq "start"
+      expect(st.label).to eq "wait_servers"
       expect(st.subject.start_index).to eq 1
     end
 
     it "fails if cluster is not valid" do
       expect {
-        described_class.assemble_additional_pool(SecureRandom.uuid, 0, 1, 100)
+        described_class.assemble_additional_pool(SecureRandom.uuid, 0, 1, 100, "standard-2")
       }.to raise_error RuntimeError, "No existing cluster"
-    end
-  end
-
-  describe "#start" do
-    it "creates new minio servers and hops to wait_servers" do
-      described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
-
-      expect { nx.start }.to hop("wait_servers")
-      expect(MinioServer.count).to eq 1
-      expect(MinioServer.first.pool.name).to eq "minio-cluster-name-0"
     end
   end
 
   describe "#wait_servers" do
     it "waits if nothing to do" do
-      st = instance_double(Strand, label: "start")
+      st = instance_double(Strand, label: "wait_servers")
       ms = instance_double(MinioServer, strand: st)
       expect(nx.minio_pool).to receive(:servers).and_return([ms])
       expect { nx.wait_servers }.to nap(5)
@@ -131,14 +114,14 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
   describe "#before_run" do
     it "hops to destroy if strand is not destroy" do
-      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
+      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")
       st.update(label: "start")
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if strand is destroy" do
-      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100)
+      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")
       st.update(label: "destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end

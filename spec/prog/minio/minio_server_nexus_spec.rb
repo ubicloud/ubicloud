@@ -11,11 +11,6 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",
-      target_total_storage_size_gib: 100,
-      target_total_pool_count: 1,
-      target_total_server_count: 1,
-      target_total_drive_count: 1,
-      target_vm_size: "standard-2",
       private_subnet_id: ps.id
     )
 
@@ -24,7 +19,8 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       cluster_id: mc.id,
       server_count: 1,
       drive_count: 1,
-      storage_size_gib: 100
+      storage_size_gib: 100,
+      vm_size: "standard-2"
     )
   }
   let(:ps) {
