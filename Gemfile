@@ -57,4 +57,4 @@ group :test do
   gem "webmock"
 end
 
-gem "webauthn", "~> 3.0"
+gem "webauthn", "~> 3.1"
