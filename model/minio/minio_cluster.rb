@@ -49,6 +49,14 @@ class MinioCluster < Sequel::Model
     servers.map { "http://#{_1.vm.ephemeral_net4}:9000" }
   end
 
+  def single_instance_single_drive?
+    server_count == 1 && drive_count == 1
+  end
+
+  def single_instance_multi_drive?
+    server_count == 1 && drive_count > 1
+  end
+
   def hostname
     "#{name}.#{Config.minio_host_name}"
   end
