@@ -19,7 +19,7 @@ class Sshable < Sequel::Model
       @exit_signal = exit_signal
       @stdout = stdout
       @stderr = stderr
-      super "command exited with an error: " + cmd
+      super("command exited with an error: " + cmd)
     end
   end
 

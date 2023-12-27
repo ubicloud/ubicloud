@@ -8,7 +8,7 @@ class CommandFail < RuntimeError
   attr_reader :stdout, :stderr
 
   def initialize(message, stdout, stderr)
-    super message
+    super(message)
     @stdout = stdout
     @stderr = stderr
   end
