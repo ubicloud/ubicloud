@@ -19,8 +19,8 @@ class StorageVolume
     @device_id = params["device_id"]
     @encrypted = params["encrypted"]
     @disk_size_gib = params["size_gib"]
-    @use_bdev_ubi = (params["use_bdev_ubi"] || false)
-    @skip_sync = (params["skip_sync"] || false)
+    @use_bdev_ubi = params["use_bdev_ubi"] || false
+    @skip_sync = params["skip_sync"] || false
     @image_path = vp.image_path(params["image"]) if params["image"]
     @disk_file = vp.disk(@disk_index)
 

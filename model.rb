@@ -28,11 +28,11 @@ module SemaphoreMethods
     def semaphore(*names)
       names.map!(&:intern)
       names.each do |name|
-        define_method "incr_#{name}" do
+        define_method :"incr_#{name}" do
           Semaphore.incr(id, name)
         end
 
-        define_method "#{name}_set?" do
+        define_method :"#{name}_set?" do
           semaphores.any? { |s| s.name == name.to_s }
         end
       end

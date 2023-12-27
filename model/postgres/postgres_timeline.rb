@@ -75,7 +75,7 @@ PGHOST=/var/run/postgresql
   # implemented, we can invoke the "refresh_earliest_backup_completion_time"
   # method at the appropriate points.
   def earliest_restore_time
-    if (earliest_backup = (earliest_backup_completed_at || refresh_earliest_backup_completion_time))
+    if (earliest_backup = earliest_backup_completed_at || refresh_earliest_backup_completion_time)
       earliest_backup + 5 * 60
     end
   end

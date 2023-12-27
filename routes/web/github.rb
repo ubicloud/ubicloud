@@ -29,7 +29,7 @@ class CloverWeb
 
       GithubInstallation.create_with_id(
         installation_id: installation_id,
-        name: (installation_response[:account][:login] || installation_response[:account][:name]),
+        name: installation_response[:account][:login] || installation_response[:account][:name],
         type: installation_response[:account][:type],
         project_id: project.id
       )

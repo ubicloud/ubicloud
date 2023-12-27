@@ -143,7 +143,7 @@ module CloverBase
           if namespaces.empty?
             autoload_hash_branch(File.basename(filename, ".rb").tr("_", "-"), full_path)
           else
-            autoload_hash_branch("#{namespaces.join("_")}_prefix".intern, File.basename(filename, ".rb").tr("_", "-"), full_path)
+            autoload_hash_branch(:"#{namespaces.join("_")}_prefix", File.basename(filename, ".rb").tr("_", "-"), full_path)
           end
         end
         Unreloader.autoload(route_path, delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}

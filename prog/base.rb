@@ -22,11 +22,11 @@ end
   def self.semaphore(*names)
     names.map!(&:intern)
     names.each do |name|
-      define_method "incr_#{name}" do
+      define_method :"incr_#{name}" do
         @snap.incr(name)
       end
 
-      define_method "decr_#{name}" do
+      define_method :"decr_#{name}" do
         @snap.decr(name)
       end
 
@@ -47,7 +47,7 @@ end
   def self.label(label)
     (@labels ||= []) << label
 
-    define_method "hop_#{label}" do
+    define_method :"hop_#{label}" do
       dynamic_hop label
     end
   end
