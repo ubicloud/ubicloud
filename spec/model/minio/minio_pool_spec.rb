@@ -8,19 +8,15 @@ RSpec.describe MinioPool do
       location: "hetzner-hel1",
       name: "minio-cluster-name",
       admin_user: "minio-admin",
-      admin_password: "dummy-password",
-      target_total_storage_size_gib: 100,
-      target_total_pool_count: 1,
-      target_total_server_count: 1,
-      target_total_drive_count: 1,
-      target_vm_size: "standard-2"
+      admin_password: "dummy-password"
     )
     mp = described_class.create_with_id(
       cluster_id: mc.id,
       start_index: 0,
       server_count: 1,
       drive_count: 1,
-      storage_size_gib: 100
+      storage_size_gib: 100,
+      vm_size: "standard-2"
     )
     vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
 

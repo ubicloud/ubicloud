@@ -8,19 +8,15 @@ RSpec.describe MinioServer do
       location: "hetzner-hel1",
       name: "minio-cluster-name",
       admin_user: "minio-admin",
-      admin_password: "dummy-password",
-      target_total_storage_size_gib: 100,
-      target_total_pool_count: 1,
-      target_total_server_count: 1,
-      target_total_drive_count: 1,
-      target_vm_size: "standard-2"
+      admin_password: "dummy-password"
     )
     mp = MinioPool.create_with_id(
       cluster_id: mc.id,
       start_index: 0,
       server_count: 1,
       drive_count: 1,
-      storage_size_gib: 100
+      storage_size_gib: 100,
+      vm_size: "standard-2"
     )
     vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
 
@@ -55,13 +51,12 @@ RSpec.describe MinioServer do
     end
 
     it "returns minio volumes properly for a multi drive single server cluster" do
-      ms.cluster.update(target_total_drive_count: 4)
+      ms.pool.update(drive_count: 4)
       expect(ms.minio_volumes).to eq("/minio/dat{1...4}")
     end
 
     it "returns minio volumes properly for a multi drive multi server cluster" do
-      ms.cluster.update(target_total_drive_count: 4, target_total_server_count: 2)
-      ms.pool.update(server_count: 2, drive_count: 4)
+      ms.pool.update(drive_count: 4, server_count: 2)
       expect(ms.minio_volumes).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
   end

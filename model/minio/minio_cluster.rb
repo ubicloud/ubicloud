@@ -33,16 +33,16 @@ class MinioCluster < Sequel::Model
     end.join("\n")
   end
 
-  def per_pool_storage_size
-    (target_total_storage_size_gib / target_total_pool_count).to_i
+  def storage_size_gib
+    pools.sum(&:storage_size_gib)
   end
 
-  def per_pool_server_count
-    (target_total_server_count / target_total_pool_count).to_i
+  def server_count
+    pools.sum(&:server_count)
   end
 
-  def per_pool_drive_count
-    (target_total_drive_count / target_total_pool_count).to_i
+  def drive_count
+    pools.sum(&:drive_count)
   end
 
   def connection_strings

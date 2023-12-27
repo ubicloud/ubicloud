@@ -22,7 +22,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         "minio-user",
         Config.minio_service_project_id,
         location: minio_pool.cluster.location,
-        size: minio_pool.cluster.target_vm_size,
+        size: minio_pool.vm_size,
         storage_volumes: [
           {encrypted: true, size_gib: 30}
         ] + Array.new(minio_pool.per_server_drive_count) { {encrypted: false, size_gib: (minio_pool.per_server_storage_size / minio_pool.per_server_drive_count).floor} },
