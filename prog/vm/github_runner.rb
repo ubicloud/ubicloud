@@ -201,7 +201,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # We use generate-jitconfig instead of registration-token because it's
     # recommended by GitHub for security reasons.
     # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
-    data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1}
+    data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
 
