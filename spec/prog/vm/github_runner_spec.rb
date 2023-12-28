@@ -265,8 +265,20 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
+  describe ".setup_info" do
+    it "returns setup info with vm pool ubid" do
+      expect(vm).to receive(:pool_id).and_return("ccd51c1e-2c78-8f76-b182-467e6cdc51f0").at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+
+      expect(nx.setup_info[:detail]).to eq("Name: #{github_runner.ubid}\nLabel: ubicloud-standard-4\nArch: \nImage: \nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\nVM Pool: vpskahr7hcf26p614czkcvh8z1\nLocation: hetzner-hel1\nDatacenter: FSN1-DC8\nProject: pjwnadpt27b21p81d7334f11rx\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github")
+    end
+  end
+
   describe "#setup_environment" do
     it "hops to register_runner" do
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         sudo usermod -a -G docker,adm,systemd-journal runner
         sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
@@ -281,6 +293,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         EOT
         chmod +x ./actions-runner/run-withenv.sh
         echo "PATH=$PATH" >> ./actions-runner/.env
+        cat /imagegeneration/imagedata.json | jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github"}]' > /home/runner/actions-runner/.setup_info
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")

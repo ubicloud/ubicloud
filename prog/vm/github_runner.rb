@@ -136,6 +136,24 @@ class Prog::Vm::GithubRunner < Prog::Base
     hop_setup_environment
   end
 
+  def setup_info
+    {
+      group: "Ubicloud Managed Runner",
+      detail: {
+        "Name" => github_runner.ubid,
+        "Label" => github_runner.label,
+        "Arch" => vm.arch,
+        "Image" => vm.boot_image,
+        "VM Host" => vm.vm_host.ubid,
+        "VM Pool" => vm.pool_id ? UBID.from_uuidish(vm.pool_id).to_s : nil,
+        "Location" => vm.vm_host.location,
+        "Datacenter" => vm.vm_host.data_center,
+        "Project" => github_runner.installation.project.ubid,
+        "Console URL" => "https://console.ubicloud.com#{github_runner.installation.project.path}/github"
+      }.map { "#{_1}: #{_2}" }.join("\n")
+    }
+  end
+
   label def setup_environment
     command = <<~COMMAND
       # runner unix user needed access to manipulate the Docker daemon.
@@ -180,6 +198,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       # overwrite default path value of runner script with $PATH.
       # https://github.com/microsoft/azure-pipelines-agent/issues/3461
       echo "PATH=$PATH" >> ./actions-runner/.env
+
+      # The `imagedata.json` file contains information about the generated image.
+      # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
+      # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
+      cat /imagegeneration/imagedata.json | jq '. += [#{setup_info.to_json}]' > /home/runner/actions-runner/.setup_info
     COMMAND
 
     # Remove comments and empty lines before sending them to the machine
