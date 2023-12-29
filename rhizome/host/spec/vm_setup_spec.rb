@@ -63,6 +63,20 @@ RSpec.describe VmSetup do
       vs.download_boot_image("github-ubuntu-2204", custom_url: "https://images.blob.core.windows.net/images/ubuntu2204.vhd?sp=r&st=2023-09-05T22:44:05Z&se=2023-10-07T06:44:05")
     end
 
+    it "does not convert image if it's in raw format already" do
+      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/var/storage/images/github-ubuntu-2204.raw.tmp")
+      end.and_yield
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
+      expect(vs).to receive(:r).with("which azcopy")
+      expect(vs).to receive(:r).with("AZCOPY_CONCURRENCY_VALUE=5 azcopy copy https://images.blob.core.windows.net/images/ubuntu2204.raw\\?sp\\=r\\&st\\=2023-09-05T22:44:05Z\\&se\\=2023-10-07T06:44:05 /var/storage/images/github-ubuntu-2204.raw.tmp")
+      expect(File).to receive(:rename).with("/var/storage/images/github-ubuntu-2204.raw.tmp", "/var/storage/images/github-ubuntu-2204.raw")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.raw.tmp")
+
+      vs.download_boot_image("github-ubuntu-2204", custom_url: "https://images.blob.core.windows.net/images/ubuntu2204.raw?sp=r&st=2023-09-05T22:44:05Z&se=2023-10-07T06:44:05")
+    end
+
     it "can use an image that's already downloaded" do
       expect(File).to receive(:exist?).with("/var/storage/images/almalinux-9.1.raw").and_return(true)
       vs.download_boot_image("almalinux-9.1")

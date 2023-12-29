@@ -441,6 +441,8 @@ EOS
         "qcow2"
       when ".vhd"
         "vpc"
+      when ".raw"
+        "raw"
       else
         fail "Unsupported boot_image format: #{image_ext}"
       end
@@ -458,9 +460,13 @@ EOS
         end
       end
 
-      # Images are presumed to be atomically renamed into the path,
-      # i.e. no partial images will be passed to qemu-image.
-      r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+      if initial_format == "raw"
+        File.rename(temp_path, image_path)
+      else
+        # Images are presumed to be atomically renamed into the path,
+        # i.e. no partial images will be passed to qemu-image.
+        r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+      end
 
       rm_if_exists(temp_path)
     end
