@@ -17,7 +17,16 @@ env:
   IMAGE_NAME: ubicloud/ubicloud
 jobs:
   docker:
-    runs-on: ubicloud-standard-8
+    name: Docker ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubicloud-standard-8
+            platform: linux/amd64
+          - runner: ubicloud-standard-8-arm
+            platform: linux/arm64
 
     steps:
       - name: Check out code
@@ -51,10 +60,10 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=ubicloud-${{ matrix.runner }}
+          cache-to: type=gha,mode=max,scope=ubicloud-${{ matrix.runner }}
           outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
