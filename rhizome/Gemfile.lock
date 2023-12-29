@@ -18,6 +18,7 @@ GEM
     rspec-support (3.12.1)
 
 PLATFORMS
+  aarch64-linux
   x86_64-linux
 
 DEPENDENCIES

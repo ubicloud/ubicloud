@@ -8,7 +8,12 @@ on:
 
 jobs:
   ruby-ci:
-    runs-on: ubicloud
+    strategy:
+      matrix:
+        runs-on: [ubicloud, ubicloud-arm]
+    continue-on-error: true
+    name: Ruby CI - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
 
     env:
       DB_USER: clover
@@ -34,6 +39,25 @@ jobs:
 
     - name: Check out code
       uses: actions/checkout@v4
+
+    - name: Cache ruby for ARM runners
+      id: cache-ruby
+      if: matrix.runs-on == 'ubicloud-arm'
+      uses: actions/cache@v3
+      with:
+        path: /opt/hostedtoolcache/Ruby
+        key: ${{ matrix.runs-on }}-ruby-${{ hashFiles('.tool-versions') }}
+
+    - name: Install ruby for ARM runners if not cached
+      if: matrix.runs-on == 'ubicloud-arm' && steps.cache-ruby.outputs.cache-hit != 'true'
+      run: |
+        git clone https://github.com/rbenv/ruby-build.git
+        sudo ./ruby-build/install.sh
+        RUBY_VERSION="$(grep -E '^ruby ' .tool-versions | cut -d' ' -f2)"
+        sudo ruby-build "$RUBY_VERSION" /opt/hostedtoolcache/Ruby/$RUBY_VERSION/arm64
+        sudo chown -R runner:runner /opt/hostedtoolcache/Ruby
+        touch /opt/hostedtoolcache/Ruby/$RUBY_VERSION/arm64.complete
+        rm -rf ruby-build
 
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
