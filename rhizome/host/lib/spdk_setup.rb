@@ -56,11 +56,11 @@ class SpdkSetup
       fail "BUG: unexpected architecture"
     end
 
-    # YYY: Support v23.09-ubi-0.1 on arm64
+    # YYY: Support v23.09-ubi-0.2 on arm64
     {
       ["v23.09", :arm64] => "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-arm64.tar.gz",
       ["v23.09", :x64] => "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-23.09-x64.tar.gz",
-      ["v23.09-ubi-0.1", :x64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.1/ubicloud-spdk-ubuntu-22.04-x64.tar.gz"
+      ["v23.09-ubi-0.2", :x64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2/ubicloud-spdk-ubuntu-22.04-x64.tar.gz"
     }.fetch([@spdk_version, arch])
   end
 
