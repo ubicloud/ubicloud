@@ -40,13 +40,19 @@ class SpdkRpc
     raise e unless if_exists
   end
 
-  def bdev_ubi_create(name, base_bdev_name, image_path, skip_sync = false, stripe_size_mb = 1)
+  def bdev_ubi_create(name, base_bdev_name, image_path,
+    skip_sync = false,
+    stripe_size_kb = 1024,
+    copy_on_read = false,
+    directio = true)
     params = {
       name: name,
       base_bdev: base_bdev_name,
       image_path: image_path,
-      stripe_size_mb: stripe_size_mb,
-      no_sync: skip_sync
+      stripe_size_kb: stripe_size_kb,
+      no_sync: skip_sync,
+      copy_on_read: copy_on_read,
+      directio: directio
     }
     call("bdev_ubi_create", params)
   end

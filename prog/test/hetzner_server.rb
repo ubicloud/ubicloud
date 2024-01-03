@@ -125,7 +125,7 @@ class Prog::Test::HetznerServer < Prog::Base
     SpdkInstallation.dataset.update(allocation_weight: 0)
     strand.add_child(
       Prog::Storage::SetupSpdk.assemble(
-        vm_host.id, "v23.09-ubi-0.1",
+        vm_host.id, "v23.09-ubi-0.2",
         start_service: true,
         allocation_weight: 100
       )
