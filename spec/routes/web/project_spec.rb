@@ -51,7 +51,7 @@ RSpec.describe Clover, "project" do
 
         expect(page.title).to eq("Ubicloud - Projects")
         expect(page).to have_content project.name
-        expect(page).not_to have_content new_project.name
+        expect(page).to have_no_content new_project.name
       end
     end
 
@@ -98,7 +98,7 @@ RSpec.describe Clover, "project" do
       it "not show on sidebar when does not have permissions" do
         visit "#{project_wo_permissions.path}/dashboard"
 
-        within find_by_id("desktop-menu") do
+        within "#desktop-menu" do
           expect { click_link "Users" }.to raise_error Capybara::ElementNotFound
           expect { click_link "Access Policy" }.to raise_error Capybara::ElementNotFound
           expect { click_link "Billing" }.to raise_error Capybara::ElementNotFound
@@ -148,7 +148,7 @@ RSpec.describe Clover, "project" do
       it "can show project users" do
         visit project.path
 
-        within find_by_id("desktop-menu") do
+        within "#desktop-menu" do
           click_link "Users"
         end
 
@@ -169,7 +169,7 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
 
         expect(page).to have_content user.email
-        expect(page).not_to have_content user2.email
+        expect(page).to have_no_content user2.email
 
         fill_in "Email", with: user2.email
         click_button "Invite"
@@ -209,7 +209,7 @@ RSpec.describe Clover, "project" do
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
-        expect(page).not_to have_content user2.email
+        expect(page).to have_no_content user2.email
       end
 
       it "raises bad request when it's the last user" do
@@ -240,7 +240,7 @@ RSpec.describe Clover, "project" do
       it "can show project policy" do
         visit project.path
 
-        within find_by_id("desktop-menu") do
+        within "#desktop-menu" do
           click_link "Access Policy"
         end
 

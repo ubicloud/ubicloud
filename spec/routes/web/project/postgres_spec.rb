@@ -69,7 +69,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
         expect(page).to have_content pg.server_name
-        expect(page).not_to have_content pg_wo_permission.server_name
+        expect(page).to have_no_content pg_wo_permission.server_name
       end
     end
 
@@ -224,7 +224,7 @@ RSpec.describe Clover, "postgres" do
         pg.server.update(timeline_access: "fetch")
 
         visit "#{project.path}#{pg.path}"
-        expect(page).not_to have_content "Reset superuser password"
+        expect(page).to have_no_content "Reset superuser password"
         expect(page.status_code).to eq(200)
       end
 
