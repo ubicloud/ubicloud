@@ -96,7 +96,7 @@ ExecStart=#{vhost_binary} -S #{SpdkPath.vhost_dir.shellescape} \
 --huge-dir #{hugepages_dir.shellescape} \
 --iova-mode va \
 --rpc-socket #{rpc_sock.shellescape} \
---cpumask [0] \
+--cpumask [0,1] \
 --disable-cpumask-locks
 ExecReload=/bin/kill -HUP $MAINPID
 LimitMEMLOCK=8400113664

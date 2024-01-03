@@ -70,11 +70,16 @@ class Prog::Vm::HostNexus < Prog::Base
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
       when "LearnCores"
+        total_cores = st.exitval.fetch("total_cores")
+        total_cpus = st.exitval.fetch("total_cpus")
+        # Currently all SPDK installations share vcpus 0 and 1.
+        spdk_cores = (2 * total_cores) / total_cpus
         kwargs = {
           total_sockets: st.exitval.fetch("total_sockets"),
           total_dies: st.exitval.fetch("total_dies"),
-          total_cores: st.exitval.fetch("total_cores"),
-          total_cpus: st.exitval.fetch("total_cpus")
+          total_cores: total_cores,
+          total_cpus: total_cpus,
+          used_cores: spdk_cores
         }
 
         vm_host.update(**kwargs)

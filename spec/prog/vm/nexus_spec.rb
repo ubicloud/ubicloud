@@ -464,6 +464,26 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx.allocate).to eq idle.id
     end
 
+    it "can use all cores" do
+      vmh = new_host(used_cores: 79)
+      expect(nx.allocate).to eq vmh.id
+    end
+
+    it "fails if all cores have been used" do
+      new_host(used_cores: 80)
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+    end
+
+    it "can use all hugepages" do
+      vmh = new_host(used_hugepages_1g: 632 - vm.mem_gib)
+      expect(nx.allocate).to eq vmh.id
+    end
+
+    it "fails if all hugepages have been used" do
+      new_host(used_hugepages_1g: 632 - vm.mem_gib + 1)
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+    end
+
     it "updates allocated resource columns" do
       vmh = new_host(location: "hetzner-hel1")
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 10}, {size_gib: 15}])
