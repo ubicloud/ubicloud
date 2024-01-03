@@ -16,7 +16,7 @@ RSpec.describe Clover, "github" do
     allow(Config).to receive(:github_app_name).and_return(nil)
 
     visit project.path
-    within find_by_id("desktop-menu") do
+    within "#desktop-menu" do
       expect { click_link "GitHub Runners" }.to raise_error Capybara::ElementNotFound
     end
     expect(page.title).to eq("Ubicloud - #{project.name}")

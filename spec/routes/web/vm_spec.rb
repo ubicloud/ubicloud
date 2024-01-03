@@ -54,7 +54,7 @@ RSpec.describe Clover, "vm" do
 
         expect(page.title).to eq("Ubicloud - Virtual Machines")
         expect(page).to have_content vm.name
-        expect(page).not_to have_content vm_wo_permission.name
+        expect(page).to have_no_content vm_wo_permission.name
       end
     end
 

@@ -77,3 +77,6 @@ RSpec/SpecFilePathFormat:
 
 Sequel/ColumnDefault:
   Enabled: false
+
+Capybara/ClickLinkOrButtonStyle:
+  EnforcedStyle: strict
