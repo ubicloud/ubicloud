@@ -34,4 +34,8 @@ class MinioServer < Sequel::Model
       pool.volumes_url
     end.join(" ")
   end
+
+  def connection_string
+    "http://#{vm.ephemeral_net4}:9000"
+  end
 end

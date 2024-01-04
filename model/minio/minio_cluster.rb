@@ -46,7 +46,7 @@ class MinioCluster < Sequel::Model
   end
 
   def connection_strings
-    servers.map { "http://#{_1.vm.ephemeral_net4}:9000" }
+    servers.map(&:connection_string)
   end
 
   def single_instance_single_drive?
