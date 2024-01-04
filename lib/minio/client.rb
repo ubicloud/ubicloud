@@ -9,10 +9,10 @@ REGION = "us-east-1"
 ADMIN_URI_PATH = "/minio/admin/v3"
 
 class Minio::Client
-  def initialize(endpoint:, access_key:, secret_key:)
+  def initialize(endpoint:, access_key:, secret_key:, socket: nil)
     @creds = {access_key: access_key, secret_key: secret_key}
     @endpoint = endpoint
-    @client = Excon.new(endpoint)
+    @client = socket.nil? ? Excon.new(endpoint) : Excon.new("unix:///", socket: socket)
     @signer = Minio::HeaderSigner.new
     @crypto = Minio::Crypto.new
   end
