@@ -27,6 +27,7 @@ class Prog::DownloadBootImage < Prog::Base
   label def download
     case sshable.cmd("common/bin/daemonizer --check download_#{image_name.shellescape}")
     when "Succeeded"
+      sshable.cmd("common/bin/daemonizer --clean download_#{image_name.shellescape}")
       hop_learn_storage
     when "NotStarted"
       sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{image_name.shellescape} #{custom_url.shellescape}' download_#{image_name.shellescape}")

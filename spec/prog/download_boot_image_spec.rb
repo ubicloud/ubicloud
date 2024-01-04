@@ -54,6 +54,7 @@ RSpec.describe Prog::DownloadBootImage do
 
     it "hops if it's succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean download_my-image")
       expect { dbi.download }.to hop("learn_storage")
     end
   end
