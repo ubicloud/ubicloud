@@ -3,7 +3,7 @@
 
 require_relative "../loader"
 
-MONITORABLE_RESOURCE_TYPES = [PostgresServer]
+MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer]
 
 sessions = {}
 ssh_threads = {}

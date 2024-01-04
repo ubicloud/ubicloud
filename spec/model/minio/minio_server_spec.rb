@@ -18,7 +18,7 @@ RSpec.describe MinioServer do
       storage_size_gib: 100,
       vm_size: "standard-2"
     )
-    vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
+    vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2, ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
 
     described_class.create_with_id(
       minio_pool_id: mp.id,
@@ -59,5 +59,49 @@ RSpec.describe MinioServer do
       ms.pool.update(drive_count: 4, server_count: 2)
       expect(ms.minio_volumes).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
+  end
+
+  it "initiates a new health monitor session" do
+    forward = instance_double(Net::SSH::Service::Forward)
+    expect(forward).to receive(:local)
+    session = instance_double(Net::SSH::Connection::Session)
+    expect(session).to receive(:forward).and_return(forward)
+    sshable = instance_double(Sshable)
+    expect(sshable).to receive(:start_fresh_session).and_return(session)
+    expect(ms.vm).to receive(:sshable).and_return(sshable)
+    expect(UNIXServer).to receive(:new)
+    expect(Minio::Client).to receive(:new)
+    expect(ms).to receive(:private_ipv4_address).and_return("192.168.1.1")
+    ms.init_health_monitor_session
+  end
+
+  it "checks pulse" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      minio_client: Minio::Client.new(endpoint: "http://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret")
+    }
+
+    expect(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").at_least(:once)
+    expect(ms).not_to receive(:incr_checkup)
+
+    stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
+    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+
+    stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}]}))
+    ms.check_pulse(session: session, previous_pulse: {})
+
+    stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
+    ms.check_pulse(session: session, previous_pulse: {})
+  end
+
+  it "increments checkup semaphore if pulse is down for a while" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      minio_client: instance_double(Minio::Client)
+    }
+
+    expect(session[:minio_client]).to receive(:admin_info).and_raise(RuntimeError)
+    expect(ms).to receive(:incr_checkup)
+    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
   end
 end

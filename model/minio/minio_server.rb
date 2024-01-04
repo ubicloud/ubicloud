@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "net/ssh"
 require_relative "../../model"
 
 class MinioServer < Sequel::Model
@@ -14,8 +15,9 @@ class MinioServer < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include HealthMonitorMethods
 
-  semaphore :destroy, :restart, :reconfigure
+  semaphore :checkup, :destroy, :restart, :reconfigure
 
   def hostname
     "#{cluster.name}#{index}.#{Config.minio_host_name}"
@@ -37,5 +39,39 @@ class MinioServer < Sequel::Model
 
   def connection_string
     "http://#{vm.ephemeral_net4}:9000"
+  end
+
+  def init_health_monitor_session
+    socket_path = File.join(Dir.pwd, "health_monitor_sockets", "ms_#{vm.ephemeral_net6.nth(2)}")
+    FileUtils.rm_rf(socket_path)
+    FileUtils.mkdir_p(socket_path)
+
+    ssh_session = vm.sshable.start_fresh_session
+    ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 9000)
+    {
+      ssh_session: ssh_session,
+      minio_client: Minio::Client.new(
+        endpoint: connection_string,
+        access_key: cluster.admin_user,
+        secret_key: cluster.admin_password,
+        socket: File.join(socket_path, "health_monitor_socket")
+      )
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      server_data = JSON.parse(session[:minio_client].admin_info.body)["servers"].find { _1["endpoint"] == "#{vm.ephemeral_net4}:9000" }
+      (server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }) ? "up" : "down"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
+      incr_checkup
+    end
+
+    pulse
   end
 end
