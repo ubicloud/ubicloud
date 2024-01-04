@@ -21,7 +21,8 @@ class CloverApi
         unix_user: r.params["unix_user"],
         size: r.params["size"],
         location: @location,
-        boot_image: r.params["boot_image"]
+        boot_image: r.params["boot_image"],
+        enable_ip4: !!r.params["enable_ip4"]
       )
 
       serialize(st.subject)

@@ -66,6 +66,22 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
+        expect(Vm.first.ip4_enabled).to be false
+      end
+
+      it "success with ipv4" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm", {
+          public_key: "ssh key",
+          name: "test-vm",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+          enable_ip4: true
+        }
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
+        expect(Vm.first.ip4_enabled).to be true
       end
 
       it "invalid name" do
