@@ -52,4 +52,8 @@ module Util
 
     [cert, key]
   end
+
+  def self.exception_to_hash(ex)
+    {exception: {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace, cause: ex.cause.inspect}}
+  end
 end
