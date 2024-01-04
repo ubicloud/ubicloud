@@ -10,7 +10,9 @@ RSpec.describe PostgresServer do
   let(:vm) {
     instance_double(
       Vm,
+      sshable: instance_double(Sshable),
       mem_gib: 8,
+      ephemeral_net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64"),
       private_subnets: [
         instance_double(
           PrivateSubnet,
@@ -22,7 +24,7 @@ RSpec.describe PostgresServer do
   }
 
   before do
-    expect(postgres_server).to receive(:vm).and_return(vm).at_least(:once)
+    allow(postgres_server).to receive(:vm).and_return(vm)
   end
 
   it "generates configure_hash" do
@@ -92,5 +94,47 @@ RSpec.describe PostgresServer do
     expect(postgres_server.configure_hash[:configs]).not_to include(
       archive_mode: "on"
     )
+  end
+
+  it "initiates a new health monitor session" do
+    forward = instance_double(Net::SSH::Service::Forward)
+    expect(forward).to receive(:local_socket)
+    session = instance_double(Net::SSH::Connection::Session)
+    expect(session).to receive(:forward).and_return(forward)
+    expect(postgres_server.vm.sshable).to receive(:start_fresh_session).and_return(session)
+    postgres_server.init_health_monitor_session
+  end
+
+  it "checks pulse" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      db_connection: DB
+    }
+    t = Time.now - 30
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: t
+    }
+
+    expect(postgres_server).not_to receive(:incr_checkup)
+    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+  end
+
+  it "increments checkup semaphore if pulse is down for a while" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      db_connection: instance_double(Sequel::Postgres::Database)
+    }
+    t = Time.now - 30
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: t
+    }
+
+    expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
+    expect(postgres_server).to receive(:incr_checkup)
+    postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
 end

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "net/ssh"
 require_relative "../../model"
 
 class PostgresServer < Sequel::Model
@@ -10,8 +11,9 @@ class PostgresServer < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include HealthMonitorMethods
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :destroy
 
   def configure_hash
     configs = {
@@ -72,5 +74,38 @@ class PostgresServer < Sequel::Model
 
   def primary?
     timeline_access == "push"
+  end
+
+  def init_health_monitor_session
+    FileUtils.rm_rf(health_monitor_socket_path)
+    FileUtils.mkdir_p(health_monitor_socket_path)
+
+    ssh_session = vm.sshable.start_fresh_session
+    ssh_session.forward.local_socket(File.join(health_monitor_socket_path, ".s.PGSQL.5432"), "/var/run/postgresql/.s.PGSQL.5432")
+    {
+      ssh_session: ssh_session,
+      db_connection: nil
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres")
+
+    reading = begin
+      session[:db_connection]["SELECT 1"].all && "up"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
+      incr_checkup
+    end
+
+    pulse
+  end
+
+  def health_monitor_socket_path
+    @health_monitor_socket_path ||= File.join(Dir.pwd, "health_monitor_sockets", "pg_#{vm.ephemeral_net6.nth(2)}")
   end
 end

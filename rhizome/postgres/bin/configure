@@ -27,7 +27,7 @@ pg_hba_entries = <<-PG_HBA
 
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 # Database administrative login by Unix domain socket
-local   all             postgres                                peer
+local   all             postgres                                peer map=system2postgres
 
 # "local" is for Unix domain socket connections only
 local   all             all                                     peer
@@ -49,6 +49,18 @@ host    replication     all             ::1/128                 scram-sha-256
 host    all             all             all                     scram-sha-256
 PG_HBA
 safe_write_to_file("/etc/postgresql/16/main/pg_hba.conf", pg_hba_entries)
+
+pg_ident_entries = <<-PG_IDENT
+# PostgreSQL User Name Maps
+# =========================
+#
+# Refer to the PostgreSQL documentation, chapter "Client
+# Authentication" for a complete description.
+# MAPNAME          SYSTEM-USERNAME         PG-USERNAME
+system2postgres    postgres                postgres
+system2postgres    ubi                     postgres
+PG_IDENT
+safe_write_to_file("/etc/postgresql/16/main/pg_ident.conf", pg_ident_entries)
 
 # Reload the postmaster to apply changes
 r "pg_ctlcluster 16 main reload || pg_ctlcluster 16 main restart"
