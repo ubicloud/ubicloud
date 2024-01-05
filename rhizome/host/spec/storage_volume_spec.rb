@@ -93,7 +93,7 @@ RSpec.describe StorageVolume do
       unencrypted_sv.start(nil)
     end
 
-    it "will retry after purging if spdk artifacts exist" do
+    it "retries after purging if spdk artifacts exist" do
       expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil).and_return(nil, nil)
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
         -> { raise SpdkExists.new("Device Exists", -17) },
@@ -103,7 +103,7 @@ RSpec.describe StorageVolume do
       unencrypted_sv.start(nil)
     end
 
-    it "won't retry more than once" do
+    it "doesn't retry more than once" do
       expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil).and_return(nil, nil)
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
         -> { raise SpdkExists.new("Device Exists", -17) },
