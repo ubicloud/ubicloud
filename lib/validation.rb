@@ -31,12 +31,12 @@ module Validation
 
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
-    fail ValidationFailed.new({name: msg}) unless name.match(ALLOWED_NAME_PATTERN)
+    fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
   end
 
   def self.validate_minio_username(username)
     msg = "Minio user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32, min length of 3."
-    fail ValidationFailed.new({username: msg}) unless username.match(ALLOWED_MINIO_USERNAME_PATTERN)
+    fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
   def self.validate_provider(provider)
@@ -59,7 +59,7 @@ module Validation
 
   def self.validate_os_user_name(os_user_name)
     msg = "OS user name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32."
-    fail ValidationFailed.new({user: msg}) unless os_user_name.match(ALLOWED_OS_USER_NAME_PATTERN)
+    fail ValidationFailed.new({user: msg}) unless os_user_name&.match(ALLOWED_OS_USER_NAME_PATTERN)
   end
 
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)

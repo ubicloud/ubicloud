@@ -18,6 +18,7 @@ RSpec.describe Validation do
 
     it "invalid names" do
       [
+        nil,
         "-abc",
         "abc-",
         "-abc-",
@@ -89,6 +90,7 @@ RSpec.describe Validation do
 
       it "invalid os user names" do
         [
+          nil,
           "-abc",
           "ABC",
           "123abc",
@@ -135,8 +137,9 @@ RSpec.describe Validation do
         end
       end
 
-      it "invalid os user names" do
+      it "invalid minio user names" do
         [
+          nil,
           "ab",
           "-abc",
           "ABC",
