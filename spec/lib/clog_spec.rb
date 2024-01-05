@@ -8,7 +8,7 @@ RSpec.describe Clog do
     allow(Time).to receive(:now).and_return(now)
   end
 
-  it "will add the thread name to the structure data, if defined" do
+  it "adds the thread name to the structured data" do
     Thread.new do
       Thread.current.name = "test thread name"
       expect($stdout).to receive(:write).with('{"message":"hello","time":"' + now.to_s + '","thread":"test thread name"}' + "\n")
