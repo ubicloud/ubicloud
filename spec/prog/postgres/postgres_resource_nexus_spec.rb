@@ -193,7 +193,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx).to receive(:create_root_certificate).with(hash_including(duration: 60 * 60 * 24 * 365 * 10))
       expect(postgres_resource.server).to receive(:incr_refresh_certificates)
 
-      expect { nx.refresh_certificates }.to hop("wait_server")
+      expect { nx.refresh_certificates }.to hop("wait")
     end
 
     it "rotates server certificate if it is close to expiration" do
@@ -203,7 +203,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx).to receive(:create_server_certificate)
       expect(postgres_resource.server).to receive(:incr_refresh_certificates)
 
-      expect { nx.refresh_certificates }.to hop("wait_server")
+      expect { nx.refresh_certificates }.to hop("wait")
     end
 
     it "rotates server certificate using root_cert_2 if root_cert_1 is close to expiration" do
@@ -215,7 +215,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Util).to receive(:create_certificate).with(hash_including(issuer_cert: root_cert_2)).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "server cert")])
       expect(postgres_resource.server).to receive(:incr_refresh_certificates)
 
-      expect { nx.refresh_certificates }.to hop("wait_server")
+      expect { nx.refresh_certificates }.to hop("wait")
     end
   end
 

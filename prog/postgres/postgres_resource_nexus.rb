@@ -115,7 +115,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.certificate_last_checked_at = Time.now
     postgres_resource.save_changes
 
-    hop_wait_server
+    hop_wait
   end
 
   label def wait_server
