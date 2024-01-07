@@ -106,16 +106,21 @@ class VmSetup
   end
 
   def purge_storage
-    # Storage hasn't been created yet, so nothing to purge.
-    return if !File.exist?(vp.storage_root)
+    # prep.json doesn't exist, nothing more to do
+    return if !File.exist?(vp.prep_json)
+
+    storage_roots = []
 
     params = JSON.parse(File.read(vp.prep_json))
     params["storage_volumes"].each { |params|
       volume = StorageVolume.new(@vm_name, params)
       volume.purge_spdk_artifacts
+      storage_roots.append(volume.storage_root)
     }
 
-    rm_if_exists(vp.storage_root)
+    storage_roots.each { |path|
+      rm_if_exists(path)
+    }
   end
 
   def unmount_hugepages

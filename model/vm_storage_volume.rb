@@ -5,6 +5,7 @@ require_relative "../model"
 class VmStorageVolume < Sequel::Model
   many_to_one :vm
   many_to_one :spdk_installation
+  many_to_one :storage_device
   many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
 

@@ -81,44 +81,52 @@ RSpec.describe VmSetup do
   end
 
   describe "#purge_storage" do
-    it "can purge storage" do
-      vol_1_params = {
+    let(:vol_1_params) {
+      {
         "size_gib" => 20,
         "device_id" => "test_0",
         "disk_index" => 0,
         "encrypted" => false,
         "spdk_version" => "some-version"
       }
-      vol_2_params = {
+    }
+    let(:vol_2_params) {
+      {
         "size_gib" => 20,
         "device_id" => "test_1",
         "disk_index" => 1,
         "encrypted" => true,
         "spdk_version" => "some-version"
       }
-      params = JSON.generate({storage_volumes: [vol_1_params, vol_2_params]})
+    }
+    let(:params) {
+      JSON.generate({storage_volumes: [vol_1_params, vol_2_params]})
+    }
 
-      expect(File).to receive(:exist?).with("/var/storage/test").and_return(true)
+    it "can purge storage" do
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(true)
       expect(File).to receive(:read).with("/vm/test/prep.json").and_return(params)
 
       # delete the unencrypted volume
       sv_1 = instance_double(StorageVolume)
       expect(StorageVolume).to receive(:new).with("test", vol_1_params).and_return(sv_1)
       expect(sv_1).to receive(:purge_spdk_artifacts)
+      expect(sv_1).to receive(:storage_root).and_return("/var/storage/test")
 
       # delete the encrypted volume
       sv_2 = instance_double(StorageVolume)
       expect(StorageVolume).to receive(:new).with("test", vol_2_params).and_return(sv_2)
       expect(sv_2).to receive(:purge_spdk_artifacts)
+      expect(sv_2).to receive(:storage_root).and_return("/var/storage/test")
 
-      expect(FileUtils).to receive(:rm_r).with("/var/storage/test")
+      allow(FileUtils).to receive(:rm_r).with("/var/storage/test")
 
       vs.purge_storage
     end
 
-    it "exits silently if storage hasn't been created yet" do
-      expect(File).to receive(:exist?).with("/var/storage/test").and_return(false)
-      vs.purge_storage
+    it "exits silently if vm hasn't been created yet" do
+      expect(File).to receive(:exist?).with("/vm/test/prep.json").and_return(false)
+      expect { vs.purge_storage }.not_to raise_error
     end
   end
 
