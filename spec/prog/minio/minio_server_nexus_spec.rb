@@ -117,7 +117,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     it "hops to wait if succeeded" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean restart_minio")
-      expect { nx.minio_restart }.to hop("wait")
+      expect { nx.minio_restart }.to exit({"msg" => "minio server is restarted"})
     end
 
     it "naps if minio is not started" do
@@ -143,14 +143,27 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait }.to nap(10)
     end
 
+    it "hops to unavailable if checkup is set and the server is not available" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+    end
+
+    it "naps if checkup is set but the server is available" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(true)
+      expect { nx.wait }.to nap(10)
+    end
+
     it "hops to wait_reconfigure if reconfigure is set" do
       expect(nx).to receive(:when_reconfigure_set?).and_yield
       expect(nx).to receive(:bud).with(Prog::Minio::SetupMinio, {}, :configure_minio)
       expect { nx.wait }.to hop("wait_reconfigure")
     end
 
-    it "hops to minio_restart if restart is set" do
+    it "pushes minio_restart if restart is set" do
       expect(nx).to receive(:when_restart_set?).and_yield
+      expect(nx).to receive(:push).with(described_class, {}, "minio_restart").and_call_original
       expect { nx.wait }.to hop("minio_restart")
     end
   end
@@ -167,6 +180,26 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     it "hops to wait if reconfigure is done" do
       expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_reconfigure }.to hop("wait")
+    end
+  end
+
+  describe "#unavailable" do
+    it "hops to wait if the server is available" do
+      expect(nx).to receive(:available?).and_return(true)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "buds minio_restart if the server is not available" do
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:bud).with(described_class, {}, :minio_restart)
+      expect { nx.unavailable }.to nap(5)
+    end
+
+    it "does not bud minio_restart if there is already one restart going on" do
+      expect(nx).to receive(:available?).and_return(false).twice
+      expect { nx.unavailable }.to nap(5)
+      expect(nx).not_to receive(:bud).with(described_class, {}, :minio_restart)
+      expect { nx.unavailable }.to nap(5)
     end
   end
 
@@ -202,6 +235,25 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
+    end
+  end
+
+  describe "#available?" do
+    it "returns true if health check is successful" do
+      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
+      stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
+      expect(nx.available?).to be(true)
+    end
+
+    it "returns false if health check is unsuccessful" do
+      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
+      stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
+      expect(nx.available?).to be(false)
+    end
+
+    it "returns false if health check raises an exception" do
+      expect(Minio::Client).to receive(:new).and_raise(RuntimeError)
+      expect(nx.available?).to be(false)
     end
   end
 end
