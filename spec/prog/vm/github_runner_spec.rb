@@ -12,7 +12,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:github_runner) {
-    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud", ready_at: Time.now).tap {
+    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", ready_at: Time.now).tap {
       _1.id = GithubRunner.generate_uuid
     }
   }
@@ -89,7 +89,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     before do
       runner_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
-      expect(github_runner).to receive(:label).and_return("ubicloud-standard-4").at_least(:once)
     end
 
     it "provisions a VM if the pool is not existing" do
@@ -107,8 +106,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
-      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150)
-      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150).and_return([git_runner_pool])
+      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64")
+      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64").and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
@@ -122,10 +121,11 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses the existing vm if pool can pick one" do
-      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150)
-      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150).and_return([git_runner_pool])
+      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64")
+      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64").and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
       expect(Clog).to receive(:emit).with("Pool is used").and_call_original
+      expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")

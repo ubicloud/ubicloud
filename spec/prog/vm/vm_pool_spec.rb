@@ -9,7 +9,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe ".assemble" do
     it "creates the entity and strand properly" do
-      st = described_class.assemble(size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86)
+      st = described_class.assemble(size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86, arch: "x64")
       pool = VmPool[st.id]
       expect(pool).not_to be_nil
       expect(pool.size).to eq(3)
@@ -27,7 +27,7 @@ RSpec.describe Prog::Vm::VmPool do
 
     it "creates a new vm and hops to wait" do
       expect(Config).to receive(:vm_pool_project_id).and_return(prj.id)
-      st = described_class.assemble(size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86)
+      st = described_class.assemble(size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86, arch: "arm64")
       st.update(label: "create_new_vm")
       expect(SshKey).to receive(:generate).and_call_original
       expect(nx).to receive(:vm_pool).and_return(VmPool[st.id]).at_least(:once)
@@ -40,7 +40,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#wait" do
     let(:pool) {
-      VmPool.create_with_id(size: 0, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86)
+      VmPool.create_with_id(size: 0, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86, arch: "x64")
     }
 
     it "waits if nothing to do" do
