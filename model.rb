@@ -108,6 +108,10 @@ module ResourceMethods
       generate_ubid.to_uuid
     end
 
+    def new_with_id(*, **)
+      new(*, **) { _1.id = generate_uuid }
+    end
+
     def create_with_id(*, **)
       create(*, **) { _1.id = generate_uuid }
     end
