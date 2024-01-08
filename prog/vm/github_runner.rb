@@ -47,12 +47,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
       location: label_data["location"],
-      storage_size_gib: label_data["storage_size_gib"]
+      storage_size_gib: label_data["storage_size_gib"],
+      arch: label_data["arch"]
     ).first
 
-    # Do not use the pool for arm64 runners until we decide to on their positioning.
-    # Our current use of labels with the `-arm` suffix is a temporary solution.
-    if label_data["arch"] == "x64" && (picked_vm = pool&.pick_vm)
+    if (picked_vm = pool&.pick_vm)
       Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
