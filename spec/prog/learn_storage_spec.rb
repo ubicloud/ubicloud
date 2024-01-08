@@ -3,25 +3,86 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnStorage do
-  subject(:ls) { described_class.new(Strand.new) }
-
   describe "#start" do
-    it "exits, popping total storage and available storage" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("if [ -d /var/storage ]; then df -B1 --output=size,avail /var/storage; else df -B1 --output=size,avail /var; fi").and_return(<<EOS)
-1B-blocks     Avail
-494384795648 299711037440
+    it "exits, saving StorageDevice model instances" do
+      vmh = Prog::Vm::HostNexus.assemble("::1").subject
+      ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
+/var/storage/devices/stor1   205520896     99571712
+/var/storage/devices/stor2  3331416064   3331276800
 EOS
-      expect(ls).to receive(:sshable).and_return(sshable).at_least(:once)
-      expect { ls.start }.to exit({total_storage_gib: 460, available_storage_gib: 274})
+
+      expect { ls.start }.to exit({"total_storage_gib" => 3, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
+        StorageDevice.map(&:name).sort
+      }.from([]).to(%w[stor1 stor2])
     end
   end
 
-  describe Prog::LearnStorage::ParseDf do
-    it "returns nil when parsing bad input" do
+  describe Prog::LearnStorage, "#make_model_instances" do
+    subject(:ls) { described_class.new(Strand.new) }
+
+    let(:sshable) { instance_double(Sshable) }
+    let(:vmh) { instance_double(VmHost, id: "746976d6-315b-8f71-95e6-367c4ac068d7") }
+
+    before do
+      expect(ls).to receive(:sshable).and_return(sshable).at_least(:once)
+      expect(ls).to receive(:vm_host).and_return(vmh).at_least(:once)
+    end
+
+    it "can parse multiple file systems in /var/storage/NAME" do
+      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
+/run                        3331420160   3328692224
+/                         452564664320 381456842752
+/dev/shm                   16657084416  16605118464
+/run/lock                      5242880      5234688
+/sys/firmware/efi/efivars       448412        74256
+/boot                       2024529920   1641877504
+/var/storage/devices/stor1   205520896     99571712
+/var/storage/devices/stor2  3331416064   3331276800
+EOS
+
+      expect(ls.make_model_instances.map(&:name)).to eq(%w[stor1 stor2])
+    end
+
+    it "can use any file system that is present at '/var/storage'" do
+      # First, the sshable is scanned for any file systems in
+      # /var/storage/devices. Iff there are none, a second command is
+      # sent to fill in the "DEFAULT" storage device.
+      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
+/run                        3331420160   3328692224
+/                         452564664320 381456842752
+/dev/shm                   16657084416  16605118464
+/run/lock                      5242880      5234688
+/sys/firmware/efi/efivars       448412        74256
+/boot                       2024529920   1641877504
+EOS
+
+      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
+/                         452564664320 381456842752
+EOS
+
+      expect(ls.make_model_instances.map(&:name)).to eq(%w[DEFAULT])
+    end
+  end
+
+  describe Prog::LearnStorage::DfRecord do
+    it "can raise a header parse error" do
       expect {
-        described_class.parse("")
-      }.to raise_error RuntimeError, "BUG: unexpected output from df"
+        described_class.parse_all("")
+      }.to raise_error RuntimeError, "BUG: df header parse failed"
+    end
+
+    it "can raise a data parse error" do
+      expect {
+        described_class.parse_all(<<DF)
+Mounted on                   1B-blocks        Avail
+nope
+DF
+      }.to raise_error RuntimeError, "BUG: df data parse failed"
     end
   end
 end

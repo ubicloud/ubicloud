@@ -1,32 +1,60 @@
 # frozen_string_literal: true
 
 class Prog::LearnStorage < Prog::Base
-  subject_is :sshable
+  subject_is :sshable, :vm_host
 
-  ParseDf = Struct.new(:size_gib, :avail_gib) do
-    def self.parse(s)
-      m = /\A\s*1B-blocks\s+Avail\n(\d+)\s+(\d+)\s*\n\z/.match(s)
-      fail "BUG: unexpected output from df" unless m
-      new(*m.captures.map { Integer(_1) / 1073741824 })
+  DfRecord = Struct.new(:optional_name, :size_gib, :avail_gib) do
+    def self.parse_all(str)
+      s = StringScanner.new(str)
+      fail "BUG: df header parse failed" unless s.scan(/\AMounted on\s+1B-blocks\s+Avail\n/)
+      out = []
+
+      until s.eos?
+        fail "BUG: df data parse failed" unless s.scan(/(.*?)\s+(\d+)\s+(\d+)\s*\n/)
+        optional_name = if s.captures.first =~ %r{/var/storage/devices/(.*)?}
+          $1
+        end
+        size_gib, avail_gib = s.captures[1..].map { Integer(_1) / 1073741824 }
+        out << DfRecord.new(optional_name, size_gib, avail_gib)
+      end
+
+      out.freeze
     end
   end
 
-  def df_command(path) = "df -B1 --output=size,avail #{path}"
+  def df_command(path = "") = "df -B1 --output=target,size,avail #{path}"
+
+  def make_model_instances
+    devices = DfRecord.parse_all(sshable.cmd(df_command))
+    if devices.none? { _1.optional_name }
+      rec = DfRecord.parse_all(sshable.cmd(df_command("/var/storage"))).first
+      [
+        StorageDevice.new_with_id(
+          vm_host_id: vm_host.id, name: "DEFAULT",
+          # reserve 5G the host.
+          available_storage_gib: [rec.avail_gib - 5, 0].max,
+          total_storage_gib: rec.size_gib
+        )
+      ]
+    else
+      devices.filter_map do |rec|
+        next unless (name = rec.optional_name)
+        StorageDevice.new_with_id(
+          vm_host_id: vm_host.id, name: name,
+          available_storage_gib: rec.avail_gib,
+          total_storage_gib: rec.size_gib
+        )
+      end
+    end
+  end
 
   label def start
-    q_var_root = "/var".shellescape.freeze
-    q_storage_root = "/var/storage".shellescape.freeze
-
-    # For GitHub runner hosts, we mount /var/storage from a separate btrfs disk
-    # partition. As a result, /var does not include the size of /var/storage,
-    # which has more storage. We can't check the size of /var/storage directly,
-    # because it might not there for other hosts at this step. Until we unify
-    # our hosts with ext4 disks, we check /var/storage only if exists.
-    output = sshable.cmd("if [ -d #{q_storage_root} ]; then #{df_command(q_storage_root)}; else #{df_command(q_var_root)}; fi")
-    parsed = ParseDf.parse(output)
-
-    # reserve 5G for future host related stuff
-    available_storage_gib = [0, parsed.avail_gib - 5].max
-    pop total_storage_gib: parsed.size_gib, available_storage_gib: available_storage_gib
+    total, avail = make_model_instances.each_with_object([0, 0]) { |sd, accum|
+      sd.save_changes
+      accum[0] += sd.total_storage_gib
+      accum[1] += sd.available_storage_gib
+    }
+    pop({"total_storage_gib" => total, "available_storage_gib" => avail,
+         "msg" => "created StorageDevice records"})
   end
 end
