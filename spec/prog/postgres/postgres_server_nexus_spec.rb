@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresServerNexus do
-  subject(:nx) { described_class.new(Strand.new(id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8")) }
+  subject(:nx) { described_class.new(Strand.create(id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8", prog: "Postgres::PostgresServerNexus", label: "start")) }
 
   let(:postgres_server) {
     instance_double(
@@ -274,9 +274,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#update_superuser_password" do
-    it "updates password and hops to restart during the initial provisioning" do
+    it "updates password and pushes restart during the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
       expect { nx.update_superuser_password }.to hop("restart")
     end
 
@@ -284,20 +285,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_initial_provisioning_set?)
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("wait")
-    end
-  end
-
-  describe "#restart" do
-    it "restarts and hops to wait" do
-      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
-      expect { nx.restart }.to hop("wait")
-    end
-
-    it "during the initial provisioning decrements initial_provisioning semaphore" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(nx).to receive(:decr_initial_provisioning)
-      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
-      expect { nx.restart }.to hop("wait")
     end
   end
 
@@ -347,6 +334,38 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_update_superuser_password_set?).and_yield
       expect { nx.wait }.to hop("update_superuser_password")
     end
+
+    it "hops to unavailable if checkup is set and the server is not available" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+    end
+
+    it "naps if checkup is set but the server is available" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(true)
+      expect { nx.wait }.to nap(30)
+    end
+  end
+
+  describe "#unavailable" do
+    it "hops to wait if the server is available" do
+      expect(nx).to receive(:available?).and_return(true)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "buds restart if the server is not available" do
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+    end
+
+    it "does not bud restart if there is already one restart going on" do
+      expect(nx).to receive(:available?).and_return(false).twice
+      expect { nx.unavailable }.to nap(5)
+      expect(nx).not_to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+    end
   end
 
   describe "#destroy" do
@@ -359,10 +378,40 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
+  describe "#restart" do
+    it "restarts and exits" do
+      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
+      expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
+    end
+  end
+
   describe "#refresh_walg_credentials" do
     it "returns nil if blob storage is not configures" do
       expect(postgres_server.timeline).to receive(:blob_storage).and_return(nil)
       expect(nx.refresh_walg_credentials).to be_nil
+    end
+  end
+
+  describe "#available?" do
+    before do
+      expect(sshable).to receive(:invalidate_cache_entry)
+    end
+
+    it "returns true if health check is successful" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT 1'").and_return("1")
+      expect(nx.available?).to be(true)
+    end
+
+    it "returns true if the database is in crash recovery" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT 1'").and_raise(Sshable::SshError)
+      expect(sshable).to receive(:cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("redo in progress")
+      expect(nx.available?).to be(true)
+    end
+
+    it "returns false otherwise" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT 1'").and_raise(Sshable::SshError)
+      expect(sshable).to receive(:cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("not doing redo")
+      expect(nx.available?).to be(false)
     end
   end
 end

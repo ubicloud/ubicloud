@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:)
     DB.transaction do
@@ -179,17 +179,10 @@ SQL
     vm.sshable.cmd("sudo -u postgres psql", stdin: commands)
 
     when_initial_provisioning_set? do
-      hop_restart
-    end
-    hop_wait
-  end
-
-  label def restart
-    vm.sshable.cmd("sudo postgres/bin/restart")
-
-    when_initial_provisioning_set? do
       decr_initial_provisioning
+      push self.class, frame, "restart"
     end
+
     hop_wait
   end
 
@@ -228,7 +221,26 @@ SQL
       hop_update_superuser_password
     end
 
+    when_checkup_set? do
+      decr_checkup
+      hop_unavailable if !available?
+    end
+
     nap 30
+  end
+
+  label def unavailable
+    register_deadline(:wait, 10 * 60)
+
+    if available?
+      decr_checkup
+      strand.children.select { _1.prog == "Postgres::PostgresServerNexus" && _1.label == "restart" }.each(&:destroy)
+      hop_wait
+    end
+
+    reap
+    bud self.class, frame, :restart if leaf?
+    nap 5
   end
 
   label def destroy
@@ -242,10 +254,33 @@ SQL
     pop "postgres server is deleted"
   end
 
+  label def restart
+    vm.sshable.cmd("sudo postgres/bin/restart")
+    pop "postgres server is restarted"
+  end
+
   def refresh_walg_credentials
     return if postgres_server.timeline.blob_storage.nil?
 
     walg_config = postgres_server.timeline.generate_walg_config
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
+  end
+
+  def available?
+    vm.sshable.invalidate_cache_entry
+
+    begin
+      vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT 1'")
+      return true
+    rescue
+    end
+
+    # Do not declare unavailability if Postgres is in crash recovery
+    begin
+      return true if vm.sshable.cmd("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").include?("redo in progress")
+    rescue
+    end
+
+    false
   end
 end

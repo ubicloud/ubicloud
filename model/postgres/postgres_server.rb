@@ -40,7 +40,7 @@ class PostgresServer < Sequel::Model
       ssl_key_file: "'/dat/16/data/server.key'",
       log_timezone: "'UTC'",
       log_directory: "'pg_log'",
-      log_filename: "'postgresql-%A.log'",
+      log_filename: "'postgresql.log'",
       log_truncate_on_rotation: "true",
       logging_collector: "on",
       timezone: "'UTC'",
