@@ -10,7 +10,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   extend Forwardable
   def_delegators :minio_server, :vm
 
-  semaphore :destroy, :restart, :reconfigure
+  semaphore :checkup, :destroy, :restart, :reconfigure
 
   def self.assemble(minio_pool_id, index)
     unless (minio_pool = MinioPool[minio_pool_id])
@@ -79,12 +79,19 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def wait
+    when_checkup_set? do
+      decr_checkup
+      hop_unavailable if !available?
+    end
+
     when_reconfigure_set? do
       bud Prog::Minio::SetupMinio, {}, :configure_minio
       hop_wait_reconfigure
     end
+
     when_restart_set? do
-      hop_minio_restart
+      decr_restart
+      push self.class, frame, "minio_restart"
     end
     nap 10
   end
@@ -99,15 +106,28 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def minio_restart
-    decr_restart
     case minio_server.vm.sshable.cmd("common/bin/daemonizer --check restart_minio")
     when "Succeeded"
       minio_server.vm.sshable.cmd("common/bin/daemonizer --clean restart_minio")
-      hop_wait
+      pop "minio server is restarted"
     when "Failed", "NotStarted"
       minio_server.vm.sshable.cmd("common/bin/daemonizer 'systemctl restart minio' restart_minio")
     end
     nap 1
+  end
+
+  label def unavailable
+    register_deadline(:wait, 10 * 60)
+
+    if available?
+      decr_checkup
+      strand.children.select { _1.prog == "Minio::MinioServerNexus" && _1.label == "minio_restart" }.each(&:destroy)
+      hop_wait
+    end
+
+    reap
+    bud self.class, frame, :minio_restart if leaf?
+    nap 5
   end
 
   label def destroy
@@ -121,5 +141,18 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     end
 
     pop "minio server destroyed"
+  end
+
+  def available?
+    client = Minio::Client.new(
+      endpoint: minio_server.connection_string,
+      access_key: minio_server.cluster.admin_user,
+      secret_key: minio_server.cluster.admin_password
+    )
+
+    server_data = JSON.parse(client.admin_info.body)["servers"].find { _1["endpoint"] == "#{minio_server.vm.ephemeral_net4}:9000" }
+    server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }
+  rescue
+    false
   end
 end
