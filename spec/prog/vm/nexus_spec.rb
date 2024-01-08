@@ -369,7 +369,13 @@ RSpec.describe Prog::Vm::Nexus do
               arch: "x64"}.merge(args)
       sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
       @host_index += 1
-      VmHost.create(**args) { _1.id = sa.id }
+      host = VmHost.create(**args) { _1.id = sa.id }
+      SpdkInstallation.create(
+        version: "v29.01",
+        allocation_weight: 100,
+        vm_host_id: host.id
+      ) { _1.id = SpdkInstallation.generate_uuid }
+      host
     end
 
     it "fails if there was a concurrent modification to allocation_state" do

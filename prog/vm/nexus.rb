@@ -167,7 +167,14 @@ class Prog::Vm::Nexus < Prog::Base
 
   def allocation_dataset
     requires_bdev_ubi = frame["storage_volumes"].any? { |v| v["use_bdev_ubi"] }
-    spdk_where_clause = requires_bdev_ubi ? "AND id in (select vm_host_id from spdk_installation where version like '%ubi%' and allocation_weight > 0)" : ""
+    # Currently, github runners require btrfs if not using bdev_ubi. We will use
+    # ext4 for hosts with bdev_ubi installation. So, we make sure we don't
+    # schedule disks on a bdev_ubi enabled host if bdev_ubi is not used.
+    #
+    # YYY: revisit this check after migrating away from btrfs, or having some
+    # direct way to check for filesystem type.
+    version_qualifier = requires_bdev_ubi ? "like '%ubi%'" : "not like '%ubi%'"
+    spdk_where_clause = "AND id in (select vm_host_id from spdk_installation where version #{version_qualifier} and allocation_weight > 0)"
     DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm_storage_size_gib, vm.location, vm.arch]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
 FROM vm_host
