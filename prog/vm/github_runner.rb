@@ -86,7 +86,11 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     project = github_runner.installation.project
     label_data = Github.runner_labels[github_runner.label]
-    rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", label_data["vm_size"], "global")["id"]
+    rate_id = if label_data["arch"] == "arm64"
+      BillingRate.from_resource_properties("GitHubRunnerMinutes", "#{label_data["vm_size"]}-arm", "global")["id"]
+    else
+      BillingRate.from_resource_properties("GitHubRunnerMinutes", label_data["vm_size"], "global")["id"]
+    end
 
     retries = 0
     begin

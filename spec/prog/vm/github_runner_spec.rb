@@ -167,6 +167,20 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(br.duration(time, time)).to eq(1)
     end
 
+    it "uses separate billing rate for arm64 runners" do
+      time = Time.now
+      expect(Time).to receive(:now).and_return(time).at_least(:once)
+      expect(github_runner).to receive(:label).and_return("ubicloud-arm").at_least(:once)
+      expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
+      expect(BillingRecord).to receive(:create_with_id).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(time, time)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-2-arm")
+    end
+
     it "updates the amount of existing billing record" do
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
