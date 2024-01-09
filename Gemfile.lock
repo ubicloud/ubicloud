@@ -83,11 +83,10 @@ GEM
     ed25519 (1.3.0)
     erubi (1.12.0)
     excon (0.109.0)
-    faraday (2.8.1)
-      base64
-      faraday-net_http (>= 2.0, < 3.1)
-      ruby2_keywords (>= 0.0.4)
-    faraday-net_http (3.0.2)
+    faraday (2.9.0)
+      faraday-net_http (>= 2.0, < 3.2)
+    faraday-net_http (3.1.0)
+      net-http
     ffi (1.16.3)
     ffi-compiler (1.0.1)
       ffi (>= 1.0.0)
@@ -113,6 +112,8 @@ GEM
     mini_mime (1.1.5)
     minitest (5.20.0)
     mutex_m (0.2.0)
+    net-http (0.4.1)
+      uri
     net-imap (0.4.9.1)
       date
       net-protocol
@@ -141,7 +142,7 @@ GEM
       openssl (> 2.0)
     pagerduty (4.0.0)
     parallel (1.24.0)
-    parser (3.3.0.0)
+    parser (3.3.0.2)
       ast (~> 2.4.1)
       racc
     pg (1.5.4)
@@ -173,7 +174,7 @@ GEM
     rainbow (3.1.1)
     rake (13.1.0)
     refrigerator (1.7.0)
-    regexp_parser (2.8.3)
+    regexp_parser (2.9.0)
     rexml (3.2.6)
     roda (3.75.0)
       rack
@@ -216,9 +217,9 @@ GEM
     rubocop-erb (0.3.0)
       better_html
       rubocop (~> 1.45)
-    rubocop-factory_bot (2.25.0)
-      rubocop (~> 1.33)
-    rubocop-performance (1.20.1)
+    rubocop-factory_bot (2.25.1)
+      rubocop (~> 1.41)
+    rubocop-performance (1.20.2)
       rubocop (>= 1.48.1, < 2.0)
       rubocop-ast (>= 1.30.0, < 2.0)
     rubocop-rake (0.6.0)
@@ -277,6 +278,7 @@ GEM
       concurrent-ruby (~> 1.0)
     unaccent (0.4.0)
     unicode-display_width (2.5.0)
+    uri (0.13.0)
     warning (1.3.0)
     webauthn (3.1.0)
       android_key_attestation (~> 0.3.0)
