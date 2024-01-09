@@ -276,7 +276,7 @@ table ip6 raw {
     type filter hook prerouting priority raw; policy accept;
     # avoid ip6 spoofing
     ether saddr 3e:bd:a5:96:f7:b9 ip6 saddr != {fddf:53d2:4c89:2305:46a0::/80,fd48:666c:a296:ce4b:2cc6::/79,fe80::3cbd:a5ff:fe96:f7b9} drop
-    
+
   }
 }
 # NAT4 rules
