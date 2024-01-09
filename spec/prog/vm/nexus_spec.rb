@@ -309,6 +309,25 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Page.active.count).to eq(1)
     end
 
+    it "resolves the page if no VM left in the queue" do
+      # First run creates the page
+      expect(nx).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts"))
+      expect { nx.start }.to nap(30)
+      expect(Page.active.count).to eq(1)
+
+      # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
+      expect(nx).to receive(:allocate).and_return(vmh_id).twice
+      allow(Vm).to receive_message_chain(:join, :where).and_return([vm, vm], [vm]) # rubocop:disable RSpec/MessageChain
+      expect { nx.start }.to hop("create_unix_user")
+      expect(Page.active.count).to eq(1)
+      expect(Page.active.first.resolve_set?).to be false
+
+      # Third run is able to allocate and there are no vms left in the queue, so we resolve the page
+      expect { nx.start }.to hop("create_unix_user")
+      expect(Page.active.count).to eq(1)
+      expect(Page.active.first.resolve_set?).to be true
+    end
+
     it "re-raises exceptions other than lack of capacity" do
       expect(nx).to receive(:allocate).and_raise(RuntimeError.new("will not allocate because allocating is too mainstream and I'm too cool for that"))
       expect {
