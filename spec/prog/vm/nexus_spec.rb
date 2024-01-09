@@ -369,11 +369,11 @@ RSpec.describe Prog::Vm::Nexus do
               arch: "x64"}.merge(args)
       sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
       @host_index += 1
-      VmHost.new(**args) { _1.id = sa.id }
+      VmHost.create(**args) { _1.id = sa.id }
     end
 
     it "fails if there was a concurrent modification to allocation_state" do
-      vmh = new_host.tap { _1.allocation_state = "draining" }.save_changes
+      vmh = new_host(allocation_state: "draining")
       ds = instance_double(Sequel::Dataset)
 
       expect(ds).to receive(:limit).with(1).and_return(ds)
@@ -391,7 +391,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "only matches when location matches" do
       vm.location = "somewhere-normal"
-      vmh = new_host(location: "somewhere-weird").save_changes
+      vmh = new_host(location: "somewhere-weird")
       expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
 
       vm.location = "somewhere-weird"
@@ -400,7 +400,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "does not match if bdev_ubi is requested & no bdev_ubi enabled hosts are available" do
-      new_host.save_changes
+      new_host
       expect(nx).to receive(:frame).and_return({
         "storage_volumes" => [{
           "use_bdev_ubi" => true
@@ -410,7 +410,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "matches if bdev_ubi is requested & a bdev_ubi enabled host is available" do
-      vmh = new_host.save_changes
+      vmh = new_host
       SpdkInstallation.create(
         version: "v29.01-ubi-0.1",
         allocation_weight: 100,
@@ -425,7 +425,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "does not match if bdev_ubi is requested & a bdev_ubi enabled host is available, but with weight 0" do
-      vmh = new_host.save_changes
+      vmh = new_host
       SpdkInstallation.create(
         version: "v29.01-ubi-0.1",
         allocation_weight: 0,
@@ -440,32 +440,32 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "does not match if there is not enough ram capacity" do
-      new_host(total_mem_gib: 1).save_changes
+      new_host(total_mem_gib: 1)
       expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
 
     it "does not match if there is not enough storage capacity" do
-      new_host(available_storage_gib: 10).save_changes
+      new_host(available_storage_gib: 10)
       expect(vm.storage_size_gib).to eq(35)
       expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
 
     it "prefers the host with a more snugly fitting RAM ratio, even if busy" do
-      snug = new_host(used_cores: 78).save_changes
-      new_host(total_mem_gib: snug.total_mem_gib * 2).save_changes
+      snug = new_host(used_cores: 78)
+      new_host(total_mem_gib: snug.total_mem_gib * 2)
       expect(nx.allocation_dataset.map { _1[:mem_ratio] }).to eq([8, 16])
       expect(nx.allocate).to eq snug.id
     end
 
     it "prefers hosts with fewer used cores" do
-      idle = new_host.save_changes
-      new_host(used_cores: 70).save_changes
+      idle = new_host
+      new_host(used_cores: 70)
       expect(nx.allocation_dataset.map { _1[:used_cores] }).to eq([0, 70])
       expect(nx.allocate).to eq idle.id
     end
 
     it "updates allocated resource columns" do
-      vmh = new_host(location: "hetzner-hel1").save_changes
+      vmh = new_host(location: "hetzner-hel1")
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 10}, {size_gib: 15}])
       nx = described_class.new(st)
 
