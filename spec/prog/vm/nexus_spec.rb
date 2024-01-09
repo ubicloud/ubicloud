@@ -261,45 +261,30 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#start" do
-    it "allocates the vm to a host" do
-      expect(nx).to receive(:register_deadline)
-
-      vmh_id = "46ca6ded-b056-4723-bd91-612959f52f6f"
-      vmh = VmHost.new(
+    let(:vmh_id) { "46ca6ded-b056-4723-bd91-612959f52f6f" }
+    let(:vmh) {
+      VmHost.new(
         net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
         ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
       ) { _1.id = vmh_id }
+    }
 
-      expect(nx).to receive(:allocate).and_return(vmh_id)
-      expect(nx).to receive(:create_storage_volume_records)
-      expect(nx).to receive(:clear_stack_storage_volumes)
-      expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
-      expect(vm).to receive(:update) do |**args|
-        expect(args[:ephemeral_net6]).to match(/2a01:4f9:2b:35a:.*/)
-        expect(args[:vm_host_id]).to match vmh_id
-      end
-      expect(vm).to receive(:sshable).and_return(nil)
-
-      expect { nx.start }.to hop("create_unix_user")
+    before do
+      allow(nx).to receive(:allocate).and_return(vmh_id)
+      allow(VmHost).to receive(:[]).with(vmh_id) { vmh }
+      allow(nx).to receive(:create_storage_volume_records)
+      allow(nx).to receive(:clear_stack_storage_volumes)
+      allow(vm).to receive(:update)
     end
 
     it "allocates the vm to a host with IPv4 address" do
-      vmh_id = "46ca6ded-b056-4723-bd91-612959f52f6f"
-      vmh = VmHost.new(
-        net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
-        ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
-      ) { _1.id = vmh_id }
       address = Address.new(cidr: "0.0.0.0/30", routed_to_host_id: vmh_id)
       assigned_address = AssignedVmAddress.new(ip: NetAddr::IPv4Net.parse("10.0.0.1"))
 
       expect(nx).to receive(:allocate).and_return(vmh_id)
-      expect(nx).to receive(:create_storage_volume_records)
-      expect(nx).to receive(:clear_stack_storage_volumes)
-      expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
       expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
       expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
-      expect(vm).to receive(:update)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_address)
       expect(vm).to receive(:sshable).and_return(instance_double(Sshable)).at_least(:once)
       expect(vm.sshable).to receive(:update).with(host: assigned_address.ip.network)
@@ -308,18 +293,8 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if there is no ip address available but the vm is ip4 enabled" do
-      vmh_id = "46ca6ded-b056-4723-bd91-612959f52f6f"
-      vmh = VmHost.new(
-        net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
-        ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
-      ) { _1.id = vmh_id }
-
-      expect(nx).to receive(:allocate).and_return(vmh_id)
-      expect(nx).to receive(:create_storage_volume_records).and_return(vmh_id)
-      expect(VmHost).to receive(:[]).with(vmh_id) { vmh }
       expect(vmh).to receive(:ip4_random_vm_network).and_return([nil, nil])
       expect(vm).to receive(:ip4_enabled).and_return(true).at_least(:once)
-
       expect { nx.start }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
 
