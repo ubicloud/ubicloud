@@ -270,17 +270,20 @@ SQL
   end
 
   label def start
+    queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start")
     vm_host_id = begin
       allocate
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible hosts")
 
-      queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start").all
+      queued_vms = queued_vms.all
       Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.arch}", queued_vms.first(25).map(&:ubid), "NoCapacity", vm.location, vm.arch)
       Clog.emit("No capacity left") { {lack_of_capacity: {location: vm.location, arch: vm.arch, queue_size: queued_vms.count}} }
 
       nap 30
     end
+
+    Page.from_tag_parts("NoCapacity", vm.location, vm.arch)&.incr_resolve if queued_vms.count <= 1
 
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
