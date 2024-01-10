@@ -255,31 +255,31 @@ RSpec.describe VmSetup do
       nics = [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "ncaka58xyg", "3e:bd:a5:96:f7:b9")]
 
       expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)
-table ip raw {
-  chain prerouting {
-    type filter hook prerouting priority raw; policy accept;
-    # allow dhcp
-    udp sport 68 udp dport 67 accept
-    udp sport 67 udp dport 68 accept
+      table ip raw {
+        chain prerouting {
+          type filter hook prerouting priority raw; policy accept;
+          # allow dhcp
+          udp sport 68 udp dport 67 accept
+          udp sport 67 udp dport 68 accept
 
-    # avoid ip4 spoofing
-    ether saddr 3e:bd:a5:96:f7:b9 ip saddr != 192.168.5.50/32 drop
-  }
-  chain postrouting {
-    type filter hook postrouting priority raw; policy accept;
-    # avoid dhcp ports to be used for spoofing
-    oifname vethitest udp sport { 67, 68 } udp dport { 67, 68 } drop
-  }
-}
-table ip6 raw {
-  chain prerouting {
-    type filter hook prerouting priority raw; policy accept;
-    # avoid ip6 spoofing
-    ether saddr 3e:bd:a5:96:f7:b9 ip6 saddr != {fddf:53d2:4c89:2305:46a0::/80,fd48:666c:a296:ce4b:2cc6::/79,fe80::3cbd:a5ff:fe96:f7b9} drop
-    
-  }
-}
-# NAT4 rules
+          # avoid ip4 spoofing
+ether saddr 3e:bd:a5:96:f7:b9 ip saddr != 192.168.5.50/32 drop
+        }
+        chain postrouting {
+          type filter hook postrouting priority raw; policy accept;
+          # avoid dhcp ports to be used for spoofing
+oifname vethitest udp sport { 67, 68 } udp dport { 67, 68 } drop
+        }
+      }
+      table ip6 raw {
+        chain prerouting {
+          type filter hook prerouting priority raw; policy accept;
+          # avoid ip6 spoofing
+ether saddr 3e:bd:a5:96:f7:b9 ip6 saddr != {fddf:53d2:4c89:2305:46a0::/80,fd48:666c:a296:ce4b:2cc6::/79,fe80::3cbd:a5ff:fe96:f7b9} drop
+
+        }
+      }
+      # NAT4 rules
 table ip nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
