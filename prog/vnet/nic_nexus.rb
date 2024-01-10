@@ -157,7 +157,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       nic.src_ipsec_tunnels_dataset.destroy
       nic.dst_ipsec_tunnels_dataset.destroy
       nic.private_subnet.incr_refresh_keys
-      strand.children.map { _1.destroy }
+
       nic.destroy
     end
 
