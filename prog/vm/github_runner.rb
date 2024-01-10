@@ -24,9 +24,10 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
-  def storage_params(size_gib)
+  def storage_params(arch, size_gib)
     project = github_runner.installation.project
-    storage_policy = GithubStoragePolicy.new(project.get_github_storage_policy)
+    storage_policy =
+      GithubStoragePolicy.new(arch, project.get_github_storage_policy || {})
 
     # We use unencrypted storage for now, because provisioning 86G encrypted
     # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
@@ -63,7 +64,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [storage_params(label_data["storage_size_gib"])],
+      storage_volumes: [storage_params(label_data["arch"], label_data["storage_size_gib"])],
       enable_ip4: true,
       arch: label_data["arch"]
     )

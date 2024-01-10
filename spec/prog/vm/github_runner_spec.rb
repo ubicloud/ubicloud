@@ -65,16 +65,18 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe ".storage_params" do
     it "returns the values returned by the storage_policy" do
       storage_policy_params = {
-        "use_bdev_ubi_rate" => 0.1,
-        "skip_sync_rate" => 0.2
+        "arch64" => {
+          "use_bdev_ubi_rate" => 0.1,
+          "skip_sync_rate" => 0.2
+        }
       }
       project = Project.create_with_id(name: "sample project")
       project.set_github_storage_policy(storage_policy_params)
       expect(github_runner.installation).to receive(:project).and_return(project)
       storage_policy = instance_double(GithubStoragePolicy)
-      expect(GithubStoragePolicy).to receive(:new).with(storage_policy_params).and_return(storage_policy)
+      expect(GithubStoragePolicy).to receive(:new).with("x64", storage_policy_params).and_return(storage_policy)
       expect(storage_policy).to receive_messages(use_bdev_ubi?: false, skip_sync?: true)
-      expect(nx.storage_params(5)).to eq({
+      expect(nx.storage_params("x64", 5)).to eq({
         size_gib: 5,
         encrypted: false,
         use_bdev_ubi: false,

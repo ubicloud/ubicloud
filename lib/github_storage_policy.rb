@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 class GithubStoragePolicy
-  def initialize(rules)
-    @rules = rules || {}
+  def initialize(arch, rules)
+    @rules = rules[arch] || {}
   end
 
   def use_bdev_ubi?
