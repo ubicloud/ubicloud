@@ -264,13 +264,16 @@ class VmSetup
       chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
+        ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
       }
     }
     NAT4_RULES
   end
 
-  def generate_ip4_filter_rules(nics)
-    nics.map { "ether saddr #{_1.mac} ip saddr != #{_1.net4} drop" }.join("\n")
+  def generate_ip4_filter_rules(nics, ip4)
+    ips = nics.map(&:net4).push(ip4).join(", ")
+    macs = nics.map(&:mac).join(", ")
+    "ether saddr {#{macs}} ip saddr != {#{ips}} drop"
   end
 
   def generate_dhcp_filter_rule
@@ -296,7 +299,7 @@ class VmSetup
           udp sport 67 udp dport 68 accept
 
           # avoid ip4 spoofing
-          #{generate_ip4_filter_rules(nics)}
+          #{generate_ip4_filter_rules(nics, ip4)}
         }
         chain postrouting {
           type filter hook postrouting priority raw; policy accept;

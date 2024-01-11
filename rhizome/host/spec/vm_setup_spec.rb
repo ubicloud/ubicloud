@@ -252,7 +252,10 @@ RSpec.describe VmSetup do
 
       gua = "fddf:53d2:4c89:2305:46a0::/79"
       ip4 = "123.123.123.123"
-      nics = [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "ncaka58xyg", "3e:bd:a5:96:f7:b9")]
+      nics = [
+        %w[fd48:666c:a296:ce4b:2cc6::/79 192.168.5.50/32 ncaka58xyg 3e:bd:a5:96:f7:b9],
+        %w[fddf:53d2:4c89:2305:46a0::/79 10.10.10.10/32 ncbbbbbbbb fb:55:dd:ba:21:0a]
+      ].map { VmSetup::Nic.new(*_1) }
 
       expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)
 table ip raw {
@@ -263,7 +266,7 @@ table ip raw {
     udp sport 67 udp dport 68 accept
 
     # avoid ip4 spoofing
-    ether saddr 3e:bd:a5:96:f7:b9 ip saddr != 192.168.5.50/32 drop
+    ether saddr {3e:bd:a5:96:f7:b9, fb:55:dd:ba:21:0a} ip saddr != {192.168.5.50/32, 10.10.10.10/32, 123.123.123.123} drop
   }
   chain postrouting {
     type filter hook postrouting priority raw; policy accept;
@@ -276,7 +279,7 @@ table ip6 raw {
     type filter hook prerouting priority raw; policy accept;
     # avoid ip6 spoofing
     ether saddr 3e:bd:a5:96:f7:b9 ip6 saddr != {fddf:53d2:4c89:2305:46a0::/80,fd48:666c:a296:ce4b:2cc6::/79,fe80::3cbd:a5ff:fe96:f7b9} drop
-    
+    ether saddr fb:55:dd:ba:21:0a ip6 saddr != fddf:53d2:4c89:2305:46a0::/79 drop
   }
 }
 # NAT4 rules
@@ -289,6 +292,7 @@ table ip nat {
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
     ip saddr 192.168.5.50 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 123.123.123.123
+    ip saddr 192.168.5.50 ip daddr 192.168.5.50 snat to 123.123.123.123
   }
 }
 
