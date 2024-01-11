@@ -364,6 +364,12 @@ RSpec.describe Prog::Vm::Nexus do
       sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
       @host_index += 1
       host = VmHost.create(**args) { _1.id = sa.id }
+      StorageDevice.create_with_id(
+        name: "DEFAULT",
+        available_storage_gib: args[:available_storage_gib],
+        total_storage_gib: args[:total_storage_gib],
+        vm_host_id: host.id
+      )
       SpdkInstallation.create(
         version: "v29.01",
         allocation_weight: 100,
@@ -494,6 +500,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vmh.used_cores).to eq(initial_vmh.used_cores + 1)
       expect(vmh.used_hugepages_1g).to eq(initial_vmh.used_hugepages_1g + 8)
       expect(vmh.available_storage_gib).to eq(initial_vmh.available_storage_gib - 25)
+      expect(vmh.storage_devices_dataset[name: "DEFAULT"].available_storage_gib).to eq(initial_vmh.available_storage_gib - 25)
     end
   end
 

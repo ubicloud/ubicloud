@@ -201,6 +201,10 @@ SQL
         available_storage_gib: Sequel[:available_storage_gib] - vm_storage_size_gib
       ).zero?
 
+    StorageDevice.where(vm_host_id: vm_host_id, name: "DEFAULT").update(
+      available_storage_gib: Sequel[:available_storage_gib] - vm_storage_size_gib
+    )
+
     vm_host_id
   end
 
