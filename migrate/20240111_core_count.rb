@@ -7,8 +7,8 @@ Sequel.migration do
     end
 
     alter_table(:spdk_installation) do
-        add_column :core_count, Integer, null: false, default: 1
-        add_column :core_offset, Integer, null: false, default: 0
+      add_column :core_count, Integer, null: false, default: 1
+      add_column :core_offset, Integer, null: false, default: 0
     end
 
     create_view(:vm_host_with_stats, <<~SQL

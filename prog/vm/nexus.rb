@@ -176,16 +176,18 @@ class Prog::Vm::Nexus < Prog::Base
     version_qualifier = requires_bdev_ubi ? "like '%ubi%'" : "not like '%ubi%'"
     spdk_where_clause = "AND id in (select vm_host_id from spdk_installation where version #{version_qualifier} and allocation_weight > 0)"
     DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm_storage_size_gib, vm.location, vm.arch]
-SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
-FROM vm_host
-WHERE vm_host.used_cores + ? < least(vm_host.total_cores, vm_host.total_mem_gib / ?)
-AND vm_host.used_hugepages_1g + ? < vm_host.total_hugepages_1g
-AND vm_host.available_storage_gib > ?
-AND vm_host.allocation_state = 'accepting'
-AND vm_host.location = ?
-AND vm_host.arch = ?
-#{spdk_where_clause}
-ORDER BY mem_ratio, used_cores
+SELECT *
+FROM vm_host_with_stats
+WHERE
+  vm_cores + spdk_cores + ? < least(total_cores, total_mem_gib / ?)
+  AND used_hugepages_1g + ? < total_hugepages_1g
+  AND available_storage_gib > ?
+  AND allocation_state = 'accepting'
+  AND location = ?
+  AND arch = ?
+  #{spdk_where_clause}
+ORDER BY
+  mem_ratio, vm_cores + spdk_cores
 SQL
   end
 
@@ -196,7 +198,6 @@ SQL
     fail "concurrent allocation_state modification requires re-allocation" if VmHost.dataset
       .where(id: vm_host_id, allocation_state: "accepting")
       .update(
-        used_cores: Sequel[:used_cores] + vm.cores,
         used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib,
         available_storage_gib: Sequel[:available_storage_gib] - vm_storage_size_gib
       ).zero?
@@ -468,7 +469,6 @@ SQL
       end
 
       VmHost.dataset.where(id: vm.vm_host_id).update(
-        used_cores: Sequel[:used_cores] - vm.cores,
         used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib,
         available_storage_gib: Sequel[:available_storage_gib] + vm_storage_size_gib
       )
