@@ -50,6 +50,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       boot_image: label_data["boot_image"],
       location: label_data["location"],
       storage_size_gib: label_data["storage_size_gib"],
+      storage_encrypted: vm_storage_params[:encrypted],
+      storage_skip_sync: vm_storage_params[:skip_sync],
       arch: label_data["arch"]
     ).first
 
