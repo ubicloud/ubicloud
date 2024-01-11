@@ -367,7 +367,9 @@ RSpec.describe Prog::Vm::Nexus do
       SpdkInstallation.create(
         version: "v29.01",
         allocation_weight: 100,
-        vm_host_id: host.id
+        vm_host_id: host.id,
+        core_count: 2,
+        core_offset: 0
       ) { _1.id = SpdkInstallation.generate_uuid }
       host
     end
@@ -396,7 +398,6 @@ RSpec.describe Prog::Vm::Nexus do
 
       vm.location = "somewhere-weird"
       expect(nx.allocate).to eq vmh.id
-      expect(vmh.reload.used_cores).to eq(1)
     end
 
     it "does not match if bdev_ubi is requested & no bdev_ubi enabled hosts are available" do
@@ -429,7 +430,8 @@ RSpec.describe Prog::Vm::Nexus do
       SpdkInstallation.create(
         version: "v29.01-ubi-0.1",
         allocation_weight: 0,
-        vm_host_id: vmh.id
+        vm_host_id: vmh.id,
+        core_count: 1
       ) { _1.id = SpdkInstallation.generate_uuid }
       expect(nx).to receive(:frame).and_return({
         "storage_volumes" => [{
@@ -451,7 +453,11 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "prefers the host with a more snugly fitting RAM ratio, even if busy" do
-      snug = new_host(used_cores: 78)
+      snug = new_host
+      Vm.create_with_id(
+        vm_host_id: snug.id, cores: 76, unix_user: "a", public_key: "k",
+        name: "v", location: "l", boot_image: "i", family: "f"
+      )
       new_host(total_mem_gib: snug.total_mem_gib * 2)
       expect(nx.allocation_dataset.map { _1[:mem_ratio] }).to eq([8, 16])
       expect(nx.allocate).to eq snug.id
@@ -459,9 +465,26 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "prefers hosts with fewer used cores" do
       idle = new_host
-      new_host(used_cores: 70)
-      expect(nx.allocation_dataset.map { _1[:used_cores] }).to eq([0, 70])
+      busy = new_host
+      Vm.create_with_id(
+        vm_host_id: busy.id, cores: 70, unix_user: "a", public_key: "k",
+        name: "v", location: "l", boot_image: "i", family: "f"
+      )
+      expect(nx.allocation_dataset.map { _1[:vm_cores] }).to eq([0, 70])
       expect(nx.allocate).to eq idle.id
+    end
+
+    it "fails to allocate if not enough cores are available" do
+      h = new_host
+      Vm.create_with_id(
+        vm_host_id: h.id, cores: 40, unix_user: "a", public_key: "k",
+        name: "v", location: "l", boot_image: "i", family: "f"
+      )
+      Vm.create_with_id(
+        vm_host_id: h.id, cores: 38, unix_user: "a", public_key: "k",
+        name: "v", location: "l", boot_image: "i", family: "f"
+      )
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
 
     it "updates allocated resource columns" do
@@ -471,7 +494,6 @@ RSpec.describe Prog::Vm::Nexus do
 
       initial_vmh = vmh.dup
       expect(nx.allocate).to eq vmh.reload.id
-      expect(vmh.used_cores).to eq(initial_vmh.used_cores + 1)
       expect(vmh.used_hugepages_1g).to eq(initial_vmh.used_hugepages_1g + 8)
       expect(vmh.available_storage_gib).to eq(initial_vmh.available_storage_gib - 25)
     end
