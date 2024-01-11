@@ -75,9 +75,9 @@ GitHub Actions), or you'd like to run compute/memory heavy tests. Our managed
 cloud is ~3x cheaper than AWS, so you save on costs.
 
 * You want a portable and simple app deployment service like 
-[MRSK](https://github.com/mrsked/mrsk). We're moving Ubicloud's control plane
-from Heroku to MRSK; and we want to provide open and portable services for
-MRSK's dependencies in the process.
+[Kamal](https://github.com/basecamp/kamal). We're moving Ubicloud's control plane
+from Heroku to Kamal; and we want to provide open and portable services for
+Kamal's dependencies in the process.
 
 * You have bare metal machines sitting somewhere. You'd like to build your own
 cloud for portability, security, or compliance reasons.
