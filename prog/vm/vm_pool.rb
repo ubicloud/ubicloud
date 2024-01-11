@@ -7,7 +7,8 @@ class Prog::Vm::VmPool < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(size:, vm_size:, boot_image:, location:, storage_size_gib:, arch:)
+  def self.assemble(size:, vm_size:, boot_image:, location:, storage_size_gib:,
+    storage_encrypted:, storage_use_bdev_ubi:, storage_skip_sync:, arch:)
     DB.transaction do
       vm_pool = VmPool.create_with_id(
         size: size,
@@ -15,6 +16,9 @@ class Prog::Vm::VmPool < Prog::Base
         boot_image: boot_image,
         location: location,
         storage_size_gib: storage_size_gib,
+        storage_encrypted: storage_encrypted,
+        storage_use_bdev_ubi: storage_use_bdev_ubi,
+        storage_skip_sync: storage_skip_sync,
         arch: arch
       )
       Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { _1.id = vm_pool.id }
@@ -30,13 +34,19 @@ class Prog::Vm::VmPool < Prog::Base
   end
 
   label def create_new_vm
+    storage_params = {
+      size_gib: vm_pool.storage_size_gib,
+      encrypted: vm_pool.storage_encrypted,
+      use_bdev_ubi: vm_pool.storage_use_bdev_ubi,
+      skip_sync: vm_pool.storage_skip_sync
+    }
     st = Prog::Vm::Nexus.assemble_with_sshable(
       "runner",
       Config.vm_pool_project_id,
       size: vm_pool.vm_size,
       location: vm_pool.location,
       boot_image: vm_pool.boot_image,
-      storage_volumes: [{size_gib: vm_pool.storage_size_gib, encrypted: false}],
+      storage_volumes: [storage_params],
       enable_ip4: true,
       pool_id: vm_pool.id,
       arch: vm_pool.arch

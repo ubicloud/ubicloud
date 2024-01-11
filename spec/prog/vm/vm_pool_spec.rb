@@ -9,13 +9,21 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe ".assemble" do
     it "creates the entity and strand properly" do
-      st = described_class.assemble(size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86, arch: "x64")
+      st = described_class.assemble(
+        size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1",
+        storage_size_gib: 86, storage_encrypted: true, storage_use_bdev_ubi: true,
+        storage_skip_sync: false, arch: "x64"
+      )
       pool = VmPool[st.id]
       expect(pool).not_to be_nil
       expect(pool.size).to eq(3)
       expect(pool.vm_size).to eq("standard-2")
       expect(pool.boot_image).to eq("img")
       expect(pool.location).to eq("hetzner-fsn1")
+      expect(pool.storage_size_gib).to eq(86)
+      expect(pool.storage_encrypted).to be(true)
+      expect(pool.storage_use_bdev_ubi).to be(true)
+      expect(pool.storage_skip_sync).to be(false)
       expect(st.label).to eq("create_new_vm")
     end
   end
@@ -27,7 +35,11 @@ RSpec.describe Prog::Vm::VmPool do
 
     it "creates a new vm and hops to wait" do
       expect(Config).to receive(:vm_pool_project_id).and_return(prj.id)
-      st = described_class.assemble(size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86, arch: "arm64")
+      st = described_class.assemble(
+        size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1",
+        storage_size_gib: 86, storage_encrypted: true, storage_use_bdev_ubi: true,
+        storage_skip_sync: false, arch: "arm64"
+      )
       st.update(label: "create_new_vm")
       expect(SshKey).to receive(:generate).and_call_original
       expect(nx).to receive(:vm_pool).and_return(VmPool[st.id]).at_least(:once)
@@ -40,7 +52,11 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#wait" do
     let(:pool) {
-      VmPool.create_with_id(size: 0, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1", storage_size_gib: 86, arch: "x64")
+      VmPool.create_with_id(
+        size: 0, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1",
+        storage_size_gib: 86, storage_encrypted: true, storage_use_bdev_ubi: true,
+        storage_skip_sync: false, arch: "x64"
+      )
     }
 
     it "waits if nothing to do" do
