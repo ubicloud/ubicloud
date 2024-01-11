@@ -44,6 +44,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   def pick_vm
     label = github_runner.label
     label_data = Github.runner_labels[label]
+    vm_storage_params = storage_params(label_data["arch"], label_data["storage_size_gib"])
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
@@ -52,7 +53,9 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"]
     ).first
 
-    if (picked_vm = pool&.pick_vm)
+    # YYY: Checking for use_bdev_ubi should be removed after transitioning
+    # completely to bdev_ubi.
+    if !vm_storage_params[:use_bdev_ubi] && (picked_vm = pool&.pick_vm)
       Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
@@ -64,7 +67,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [storage_params(label_data["arch"], label_data["storage_size_gib"])],
+      storage_volumes: [vm_storage_params],
       enable_ip4: true,
       arch: label_data["arch"]
     )

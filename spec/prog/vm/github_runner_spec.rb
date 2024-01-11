@@ -98,7 +98,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
-      expect(nx).to receive(:storage_params).and_return({encrypted: true, use_bdev_ubi: true, skip_sync: true})
+      expect(nx).to receive(:storage_params).and_return({encrypted: true, use_bdev_ubi: false, skip_sync: true})
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
@@ -126,11 +126,27 @@ RSpec.describe Prog::Vm::GithubRunner do
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64")
       expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64").and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
+      expect(nx).to receive(:storage_params).and_return({encrypted: false, use_bdev_ubi: false})
       expect(Clog).to receive(:emit).with("Pool is used").and_call_original
       expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")
+    end
+
+    it "doesn't use the pool if use_bdev_ubi is true" do
+      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64")
+      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64").and_return([git_runner_pool])
+      expect(git_runner_pool).not_to receive(:pick_vm)
+      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
+      expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
+      expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
+      expect(nx).to receive(:storage_params).and_return({encrypted: false, use_bdev_ubi: true})
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+      expect(vm.sshable.unix_user).to eq("runner")
+      expect(vm.family).to eq("standard")
+      expect(vm.cores).to eq(2)
     end
   end
 
