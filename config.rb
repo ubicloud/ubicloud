@@ -115,4 +115,10 @@ module Config
 
   # Logging
   optional :database_logger_level, string
+
+  # Ubicloud Images
+  override :ubicloud_images_bucket_name, "ubicloud-images", string
+  optional :ubicloud_images_blob_storage_endpoint, string
+  optional :ubicloud_images_blob_storage_access_key, string, clear: true
+  optional :ubicloud_images_blob_storage_secret_key, string, clear: true
 end
