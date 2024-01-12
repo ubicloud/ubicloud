@@ -107,6 +107,16 @@ RSpec.describe Minio::Client do
     end
   end
 
+  describe "get_presigned_url" do
+    it "creates a presigned URL for given object" do
+      client = described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key)
+      uri = client.get_presigned_url("GET", "test", "object", 3600)
+      expect(uri.to_s).to start_with(endpoint)
+      expect(uri.path).to eq("/test/object")
+      expect(uri.query).to match(/X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=#{access_key}%2F\d{8}%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=\d{8}T\d{6}Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=\w+/)
+    end
+  end
+
   describe "delete_bucket" do
     it "sends a DELETE request to /bucket_name" do
       stub_request(:delete, "#{endpoint}/test").to_return(status: 200)

@@ -77,6 +77,10 @@ class Minio::Client
     response.status
   end
 
+  def get_presigned_url(method, bucket_name, object_name, expires)
+    @signer.presign_v4(method, s3_uri("#{bucket_name}/#{object_name}"), REGION, @creds, Time.now.utc, expires)
+  end
+
   def create_bucket(bucket_name)
     response = send_request("PUT", s3_uri(bucket_name))
     response.status

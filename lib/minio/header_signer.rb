@@ -39,6 +39,17 @@ class Minio::HeaderSigner
     @headers
   end
 
+  def presign_v4(method, uri, region, credentials, date, expires)
+    scope = get_scope(date, region)
+    canonical_request_hash, uri = get_presign_canonical_request_hash(method, uri, credentials[:access_key], scope, date, expires)
+    string_to_sign = get_string_to_sign(date, scope, canonical_request_hash)
+    signing_key = get_signing_key(credentials[:secret_key], date, region)
+    signature = hmac_hash(signing_key, string_to_sign.encode("UTF-8"), true)
+
+    uri.query = uri.query + "&#{URI.encode_www_form({"X-Amz-Signature" => signature})}"
+    uri
+  end
+
   private
 
   def get_authorization(access_key, scope, signed_headers, signature)
@@ -71,6 +82,31 @@ class Minio::HeaderSigner
     ].join("\n")
 
     [sha256_hash(canonical_request), signed_headers]
+  end
+
+  def get_presign_canonical_request_hash(method, uri, access_key, scope, date, expires)
+    canonical_headers, signed_headers = "host:" + "#{uri.host}:#{uri.port}", "host"
+
+    uri.query = URI.encode_www_form({
+      "X-Amz-Algorithm" => "AWS4-HMAC-SHA256",
+      "X-Amz-Credential" => access_key + "/" + scope,
+      "X-Amz-Date" => time_to_amz_date(date),
+      "X-Amz-Expires" => expires,
+      "X-Amz-SignedHeaders" => signed_headers
+    })
+    canonical_query_string = get_canonical_query_string(uri.query)
+
+    canonical_request = [
+      method,
+      uri.path,
+      canonical_query_string,
+      canonical_headers,
+      "",
+      signed_headers,
+      "UNSIGNED-PAYLOAD"
+    ].join("\n")
+
+    [sha256_hash(canonical_request), uri]
   end
 
   def get_canonical_query_string(query)
