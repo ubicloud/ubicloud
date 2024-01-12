@@ -16,22 +16,22 @@ require "openssl"
 class Minio::HeaderSigner
   SERVICE_NAME = "s3"
   def build_headers(method, uri, body, creds, region)
+    date = Time.now.utc
     @headers = {}
-    @date = Time.now.utc
     @headers["Host"] = uri.host + ":" + uri.port.to_s
     @headers["User-Agent"] = "MinIO Ubicloud"
     @headers["Content-Type"] = "application/octet-stream"
     @headers["x-amz-content-sha256"] = sha256_hash(body)
-    @headers["x-amz-date"] = @date.strftime("%Y%m%dT%H%M%SZ")
+    @headers["x-amz-date"] = time_to_amz_date(date)
     @headers["Content-Length"] = body.length.to_s if body
-    sign_v4_s3(method, uri, region, creds)
+    sign_v4_s3(method, uri, region, creds, date)
   end
 
-  def sign_v4_s3(method, uri, region, credentials)
-    scope = get_scope(@date, region)
+  def sign_v4_s3(method, uri, region, credentials, date)
+    scope = get_scope(date, region)
     canonical_request_hash, signed_headers = get_canonical_request_hash(method, uri, @headers)
-    string_to_sign = get_string_to_sign(@date, scope, canonical_request_hash)
-    signing_key = get_signing_key(credentials[:secret_key], @date, region)
+    string_to_sign = get_string_to_sign(date, scope, canonical_request_hash)
+    signing_key = get_signing_key(credentials[:secret_key], date, region)
     signature = hmac_hash(signing_key, string_to_sign.encode("UTF-8"), true)
     authorization = get_authorization(credentials[:access_key], scope, signed_headers, signature)
     @headers["Authorization"] = authorization
@@ -46,14 +46,14 @@ class Minio::HeaderSigner
   end
 
   def get_signing_key(secret_key, date, region)
-    date_key = hmac_hash("AWS4#{secret_key}", date.strftime("%Y%m%d"))
+    date_key = hmac_hash("AWS4#{secret_key}", time_to_signer_date(date))
     date_region_key = hmac_hash(date_key, region)
     date_region_service_key = hmac_hash(date_region_key, SERVICE_NAME)
     hmac_hash(date_region_service_key, "aws4_request")
   end
 
   def get_string_to_sign(date, scope, canonical_request_hash)
-    "AWS4-HMAC-SHA256\n#{date.strftime("%Y%m%dT%H%M%SZ")}\n#{scope}\n#{canonical_request_hash}"
+    "AWS4-HMAC-SHA256\n#{time_to_amz_date(date)}\n#{scope}\n#{canonical_request_hash}"
   end
 
   def get_canonical_request_hash(method, uri, headers)
@@ -94,7 +94,7 @@ class Minio::HeaderSigner
   end
 
   def get_scope(date, region)
-    "#{date.strftime("%Y%m%d")}/#{region}/#{SERVICE_NAME}/aws4_request"
+    "#{time_to_signer_date(date)}/#{region}/#{SERVICE_NAME}/aws4_request"
   end
 
   def sha256_hash(data)
@@ -108,5 +108,13 @@ class Minio::HeaderSigner
     digest = OpenSSL::Digest.new("sha256")
     hmac = OpenSSL::HMAC.digest(digest, key, data)
     hexdigest ? hmac.unpack1("H*") : hmac
+  end
+
+  def time_to_amz_date(date)
+    date.strftime("%Y%m%dT%H%M%SZ")
+  end
+
+  def time_to_signer_date(date)
+    date.strftime("%Y%m%d")
   end
 end
