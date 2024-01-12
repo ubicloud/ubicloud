@@ -62,7 +62,7 @@ RSpec.describe DnsZone do
   end
 
   it "returns record_name with dot" do
-    expect(dns_zone.add_dot_if_missing("pg-server-name.postgres.ubicloud.com")).to eq("pg-server-name.postgres.ubicloud.com.")
-    expect(dns_zone.add_dot_if_missing("pg-server-name.postgres.ubicloud.com.")).to eq("pg-server-name.postgres.ubicloud.com.")
+    expect(dns_zone.add_dot_if_missing("pg-name.postgres.ubicloud.com")).to eq("pg-name.postgres.ubicloud.com.")
+    expect(dns_zone.add_dot_if_missing("pg-name.postgres.ubicloud.com.")).to eq("pg-name.postgres.ubicloud.com.")
   end
 end

@@ -6,7 +6,7 @@ class Serializers::Web::Postgres < Serializers::Base
       id: pg.id,
       ubid: pg.ubid,
       path: pg.path,
-      name: pg.server_name,
+      name: pg.name,
       state: pg.display_state,
       location: pg.location,
       vm_size: pg.target_vm_size,

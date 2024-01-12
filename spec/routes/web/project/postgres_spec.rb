@@ -11,7 +11,7 @@ RSpec.describe Clover, "postgres" do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id,
       location: "hetzner-fsn1",
-      server_name: "pg-with-permission",
+      name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 100
     ).subject
@@ -21,7 +21,7 @@ RSpec.describe Clover, "postgres" do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project_wo_permissions.id,
       location: "hetzner-fsn1",
-      server_name: "pg-without-permission",
+      name: "pg-without-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 100
     ).subject
@@ -68,8 +68,8 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
-        expect(page).to have_content pg.server_name
-        expect(page).to have_no_content pg_wo_permission.server_name
+        expect(page).to have_content pg.name
+        expect(page).to have_no_content pg_wo_permission.name
       end
     end
 
@@ -112,7 +112,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
 
-        fill_in "Name", with: pg.server_name
+        fill_in "Name", with: pg.name
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
 
@@ -165,12 +165,12 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
-        expect(page).to have_content pg.server_name
+        expect(page).to have_content pg.name
 
         click_link "Show", href: "#{project.path}#{pg.path}"
 
-        expect(page.title).to eq("Ubicloud - #{pg.server_name}")
-        expect(page).to have_content pg.server_name
+        expect(page.title).to eq("Ubicloud - #{pg.name}")
+        expect(page).to have_content pg.name
       end
 
       it "raises forbidden when does not have permissions" do
@@ -251,7 +251,7 @@ RSpec.describe Clover, "postgres" do
         btn = find ".delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Deleting #{pg.server_name}"}.to_json)
+        expect(page.body).to eq({message: "Deleting #{pg.name}"}.to_json)
         expect(SemSnap.new(pg.id).set?("destroy")).to be true
       end
 

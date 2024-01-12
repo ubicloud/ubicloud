@@ -5,7 +5,7 @@ class CloverWeb
     @serializer = Serializers::Web::Postgres
 
     r.on String do |pg_name|
-      pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:server_name] => pg_name} }.first
+      pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
 
       unless pg
         response.status = 404
@@ -21,7 +21,7 @@ class CloverWeb
       r.delete true do
         Authorization.authorize(@current_user.id, "Postgres:delete", pg.id)
         pg.incr_destroy
-        return {message: "Deleting #{pg.server_name}"}.to_json
+        return {message: "Deleting #{pg.name}"}.to_json
       end
 
       r.post "restore" do
@@ -31,7 +31,7 @@ class CloverWeb
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
           location: pg.location,
-          server_name: r.params["name"],
+          name: r.params["name"],
           target_vm_size: pg.target_vm_size,
           target_storage_size_gib: pg.target_storage_size_gib,
           parent_id: pg.id,

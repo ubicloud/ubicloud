@@ -40,7 +40,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       postgres_resource = PostgresResource.create_with_id(
         project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
         location: "hetzner-hel1",
-        server_name: "pg-server-name",
+        name: "pg-name",
         target_vm_size: "standard-2",
         target_storage_size_gib: 100,
         superuser_password: "dummy-password"
