@@ -452,12 +452,7 @@ EOS
       # same time.
       temp_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-        if download.match?(/^https:\/\/.+\.blob\.core\.windows\.net/)
-          install_azcopy
-          r "AZCOPY_CONCURRENCY_VALUE=5 azcopy copy #{download.shellescape} #{temp_path.shellescape}"
-        else
-          r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}"
-        end
+        r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}"
       end
 
       if initial_format == "raw"
@@ -470,16 +465,6 @@ EOS
 
       rm_if_exists(temp_path)
     end
-  end
-
-  def install_azcopy
-    r "which azcopy"
-  rescue CommandFail
-    r "curl -L10 -o azcopy_v10.tar.gz 'https://aka.ms/downloadazcopy-v10-linux#{Arch.render(x64: "", arm64: "-arm64")}'"
-    r "tar --strip-components=1 --exclude=*.txt -xzvf azcopy_v10.tar.gz"
-    r "rm azcopy_v10.tar.gz"
-    r "mv azcopy /usr/bin/azcopy"
-    r "chmod +x /usr/bin/azcopy"
   end
 
   # Unnecessary if host has this set before creating the netns, but
