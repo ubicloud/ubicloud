@@ -53,4 +53,6 @@ OptionParser.new do |opts|
   opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? VmHost.from_ubid(v).id : v }
 end.parse!
 
+clover_freeze
+
 main(options)
