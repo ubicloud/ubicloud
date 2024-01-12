@@ -49,18 +49,17 @@ RSpec.describe VmSetup do
       vs.download_boot_image("ubuntu-jammy")
     end
 
-    it "can download image with custom URL that has query params using azcopy" do
+    it "can download vhd image with custom URL that has query params using curl" do
       expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/var/storage/images/github-ubuntu-2204.vhd.tmp")
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(vs).to receive(:r).with("which azcopy")
-      expect(vs).to receive(:r).with("AZCOPY_CONCURRENCY_VALUE=5 azcopy copy https://images.blob.core.windows.net/images/ubuntu2204.vhd\\?sp\\=r\\&st\\=2023-09-05T22:44:05Z\\&se\\=2023-10-07T06:44:05 /var/storage/images/github-ubuntu-2204.vhd.tmp")
+      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.vhd.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
       expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /var/storage/images/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.vhd.tmp")
 
-      vs.download_boot_image("github-ubuntu-2204", custom_url: "https://images.blob.core.windows.net/images/ubuntu2204.vhd?sp=r&st=2023-09-05T22:44:05Z&se=2023-10-07T06:44:05")
+      vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
     end
 
     it "does not convert image if it's in raw format already" do
@@ -69,12 +68,11 @@ RSpec.describe VmSetup do
         expect(path).to eq("/var/storage/images/github-ubuntu-2204.raw.tmp")
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(vs).to receive(:r).with("which azcopy")
-      expect(vs).to receive(:r).with("AZCOPY_CONCURRENCY_VALUE=5 azcopy copy https://images.blob.core.windows.net/images/ubuntu2204.raw\\?sp\\=r\\&st\\=2023-09-05T22:44:05Z\\&se\\=2023-10-07T06:44:05 /var/storage/images/github-ubuntu-2204.raw.tmp")
+      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.raw.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
       expect(File).to receive(:rename).with("/var/storage/images/github-ubuntu-2204.raw.tmp", "/var/storage/images/github-ubuntu-2204.raw")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.raw.tmp")
 
-      vs.download_boot_image("github-ubuntu-2204", custom_url: "https://images.blob.core.windows.net/images/ubuntu2204.raw?sp=r&st=2023-09-05T22:44:05Z&se=2023-10-07T06:44:05")
+      vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
     end
 
     it "can use an image that's already downloaded" do
