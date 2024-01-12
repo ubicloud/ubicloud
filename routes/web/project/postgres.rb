@@ -18,7 +18,7 @@ class CloverWeb
       st = Prog::Postgres::PostgresResourceNexus.assemble(
         project_id: @project.id,
         location: r.params["location"],
-        server_name: r.params["name"],
+        name: r.params["name"],
         target_vm_size: parsed_size.vm_size,
         target_storage_size_gib: parsed_size.storage_size_gib
       )

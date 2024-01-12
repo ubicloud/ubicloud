@@ -5,14 +5,14 @@ require_relative "../spec_helper"
 RSpec.describe PostgresResource do
   subject(:postgres_resource) {
     described_class.new(
-      server_name: "pg-server-name",
+      name: "pg-name",
       superuser_password: "dummy-password"
     )
   }
 
   it "returns connection string" do
     expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-server-name.postgres.ubicloud.com")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com")
   end
 
   it "returns connection string with ip address if config is not set" do

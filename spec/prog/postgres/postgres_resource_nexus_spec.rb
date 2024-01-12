@@ -39,49 +39,49 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
       expect {
-        described_class.assemble(project_id: "26820e05-562a-4e25-a51b-de5f78bd00af", location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
+        described_class.assemble(project_id: "26820e05-562a-4e25-a51b-de5f78bd00af", location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-xxx", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-xxx", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg/server/name", target_vm_size: "standard-2", target_storage_size_gib: 100)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg/server/name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-128", target_storage_size_gib: 100)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-128", target_storage_size_gib: 100)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: size"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 100)
       }.not_to raise_error
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
       }.to raise_error RuntimeError, "No existing parent"
 
       expect {
-        parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 100).subject
+        parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 100).subject
         parent.timeline.update(earliest_backup_completed_at: Time.now)
         expect(parent.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(Time.now)
         expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: Time.now)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
     end
 
     it "passes timeline of parent resource if parent is passed" do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
-      parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name", target_vm_size: "standard-2", target_storage_size_gib: 100).subject
+      parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 100).subject
       restore_target = Time.now
       parent.timeline.update(earliest_backup_completed_at: restore_target - 10 * 60)
       expect(parent.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(restore_target - 10 * 60)
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch"))
 
-      described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", server_name: "pg-server-name-2", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target)
+      described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target)
     end
   end
 
@@ -143,9 +143,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#create_dns_record" do
     it "creates dns records and hops" do
       expect(postgres_resource.server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(postgres_resource).to receive(:hostname).and_return("pg-server-name.postgres.ubicloud.com.")
+      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
       dns_zone = instance_double(DnsZone)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-server-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
+      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.create_dns_record }.to hop("initialize_certificates")
     end
@@ -161,7 +161,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       postgres_resource = PostgresResource.create_with_id(
         project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
         location: "hetzner-hel1",
-        server_name: "pg-server-name",
+        name: "pg-name",
         target_vm_size: "standard-2",
         target_storage_size_gib: 100,
         superuser_password: "dummy-password"
@@ -236,7 +236,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(BillingRecord).to receive(:create_with_id).with(
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
-        resource_name: postgres_resource.server_name,
+        resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
         amount: postgres_resource.server.vm.cores
       )
@@ -244,7 +244,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(BillingRecord).to receive(:create_with_id).with(
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
-        resource_name: postgres_resource.server_name,
+        resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
         amount: postgres_resource.target_storage_size_gib
       )

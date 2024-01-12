@@ -32,11 +32,11 @@ class PostgresResource < Sequel::Model
   end
 
   def path
-    "/location/#{location}/postgres/#{server_name}"
+    "/location/#{location}/postgres/#{name}"
   end
 
   def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/postgres/#{server_name}"
+    "project/#{project.ubid}/location/#{location}/postgres/#{name}"
   end
 
   def display_state
@@ -47,7 +47,7 @@ class PostgresResource < Sequel::Model
 
   def hostname
     if Config.postgres_service_hostname
-      "#{server_name}.#{Config.postgres_service_hostname}"
+      "#{name}.#{Config.postgres_service_hostname}"
     else
       server&.vm&.ephemeral_net4&.to_s
     end

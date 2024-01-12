@@ -12,13 +12,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(project_id:, location:, server_name:, target_vm_size:, target_storage_size_gib:, parent_id: nil, restore_target: nil)
+  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, parent_id: nil, restore_target: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
 
     Validation.validate_vm_size(target_vm_size)
-    Validation.validate_name(server_name)
+    Validation.validate_name(name)
     Validation.validate_location(location, project.provider)
 
     DB.transaction do
@@ -38,7 +38,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
 
       postgres_resource = PostgresResource.create_with_id(
-        project_id: project_id, location: location, server_name: server_name,
+        project_id: project_id, location: location, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
         superuser_password: superuser_password, parent_id: parent_id,
         restore_target: restore_target
@@ -127,7 +127,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     BillingRecord.create_with_id(
       project_id: postgres_resource.project_id,
       resource_id: postgres_resource.id,
-      resource_name: postgres_resource.server_name,
+      resource_name: postgres_resource.name,
       billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
       amount: server.vm.cores
     )
@@ -135,7 +135,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     BillingRecord.create_with_id(
       project_id: postgres_resource.project_id,
       resource_id: postgres_resource.id,
-      resource_name: postgres_resource.server_name,
+      resource_name: postgres_resource.name,
       billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
       amount: postgres_resource.target_storage_size_gib
     )
