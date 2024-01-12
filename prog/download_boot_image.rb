@@ -8,7 +8,15 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def custom_url
-    @custom_url ||= frame.fetch("custom_url")
+    @custom_url ||= frame["custom_url"]
+  end
+
+  def blob_storage_client
+    @blob_storage_client ||= Minio::Client.new(
+      endpoint: Config.ubicloud_images_blob_storage_endpoint,
+      access_key: Config.ubicloud_images_blob_storage_access_key,
+      secret_key: Config.ubicloud_images_blob_storage_secret_key
+    )
   end
 
   label def start
@@ -30,9 +38,10 @@ class Prog::DownloadBootImage < Prog::Base
       sshable.cmd("common/bin/daemonizer --clean download_#{image_name.shellescape}")
       hop_learn_storage
     when "NotStarted"
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{image_name.shellescape} #{custom_url.shellescape}' download_#{image_name.shellescape}")
+      url = custom_url || blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}.raw", 60 * 60).to_s
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{image_name.shellescape} #{url.shellescape}' #{("download_" + image_name).shellescape}")
     when "Failed"
-      puts "#{vm_host} Failed to download '#{image_name}' image"
+      fail "Failed to download '#{image_name}' image on #{vm_host}"
     end
 
     nap 15
