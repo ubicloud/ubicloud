@@ -8,6 +8,9 @@ MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer]
 sessions = {}
 ssh_threads = {}
 pulse_threads = {}
+
+clover_freeze
+
 loop do
   resources = MONITORABLE_RESOURCE_TYPES.flat_map { _1.all }
 

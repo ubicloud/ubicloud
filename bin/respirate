@@ -16,6 +16,8 @@ if Config.github_app_id
   Strand.dataset.insert_conflict.insert(id: "c39ae087-6ec4-033a-d440-b7a821061caf", schedule: Time.now, prog: "RedeliverGithubFailures", label: "wait", stack: [{last_check_at: Time.now}].to_json)
 end
 
+clover_freeze
+
 loop do
   d.start_cohort
   next if d.wait_cohort > 0
