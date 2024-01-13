@@ -44,7 +44,8 @@ class Prog::Test::VmGroup < Prog::Base
         {encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: true},
         {encrypted: storage_encrypted, size_gib: 5}
       ],
-      enable_ip4: true
+      enable_ip4: true,
+      distinct_storage_devices: true
     )
 
     vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
@@ -89,12 +90,26 @@ class Prog::Test::VmGroup < Prog::Base
   label def children_ready
     frame["vms"].each { |vm_id|
       Sshable[vm_id].update(host: Vm[vm_id].ephemeral_net4.to_s)
+      verify_storage_volumes(Vm[vm_id])
     }
 
     # add sub-tests
     strand.add_child(Prog::Test::Vm.assemble(frame["vms"].first))
 
     hop_wait_subtests
+  end
+
+  def verify_storage_volumes(vm)
+    sshable = host.sshable
+    vm.vm_storage_volumes.each { |v|
+      root =
+        (v.storage_device.name == "DEFAULT") ?
+          "/var/storage" :
+          "/var/storage/devices/#{v.storage_device.name}"
+      datafile = "#{root}/#{vm.inhost_name}/#{v.disk_index}/disk.raw"
+      bytes = sshable.cmd("sudo wc --bytes #{datafile.shellescape}").split.first.to_i
+      raise if bytes < v.size_gib * 1024 * 1024 * 1024
+    }
   end
 
   label def wait_subtests
@@ -176,7 +191,6 @@ class Prog::Test::VmGroup < Prog::Base
   end
 
   def host
-    vm_id = frame["vms"].first
-    Vm[vm_id].vm_host
+    VmHost.first
   end
 end
