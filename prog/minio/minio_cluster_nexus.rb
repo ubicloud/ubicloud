@@ -58,17 +58,9 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     if minio_cluster.pools.all? { _1.strand.label == "wait" }
       # Start all the servers now
       minio_cluster.servers.each(&:incr_restart)
-      hop_configure_dns_records
+      hop_wait
     end
     nap 5
-  end
-
-  label def configure_dns_records
-    minio_cluster.servers.each do |server|
-      dns_zone&.insert_record(record_name: minio_cluster.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
-    end
-
-    hop_wait
   end
 
   label def wait
@@ -83,14 +75,13 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     decr_reconfigure
     minio_cluster.servers.map(&:incr_reconfigure)
     minio_cluster.servers.map(&:incr_restart)
-    hop_configure_dns_records
+    hop_wait
   end
 
   label def destroy
     register_deadline(nil, 10 * 60)
     DB.transaction do
       decr_destroy
-      dns_zone&.delete_record(record_name: minio_cluster.hostname)
       minio_cluster.dissociate_with_project(minio_cluster.projects.first)
       minio_cluster.pools.each(&:incr_destroy)
     end
@@ -105,9 +96,5 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     end
 
     pop "destroyed"
-  end
-
-  def dns_zone
-    @@dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
   end
 end

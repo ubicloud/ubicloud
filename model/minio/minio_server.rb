@@ -74,4 +74,9 @@ class MinioServer < Sequel::Model
 
     pulse
   end
+
+  def dns_zone
+    @dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
+  end
+
 end
