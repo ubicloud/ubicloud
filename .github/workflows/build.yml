@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload digest
         if: ${{ inputs.push_image }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: digests
           path: /tmp/digests/*
@@ -88,7 +88,7 @@ jobs:
       - docker
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: digests
           path: /tmp/digests
