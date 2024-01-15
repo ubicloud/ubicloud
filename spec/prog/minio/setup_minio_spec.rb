@@ -72,6 +72,7 @@ MINIO_VOLUMES="/minio/dat1"
 MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="minio-admin"
 MINIO_ROOT_PASSWORD="dummy-password"
+MINIO_SERVER_URL="http://minio-cluster-name.minio.ubicloud.com:9000"
 ECHO
       minio_hosts = <<ECHO
 ::1 ip6-localhost ip6-loopback
@@ -87,6 +88,10 @@ ECHO
         hosts: minio_hosts
       }).chomp
     }
+
+    before do
+      allow(DnsZone).to receive(:where).and_return([instance_double(DnsZone, name: "minio.ubicloud.com")])
+    end
 
     it "configures minio if not started" do
       expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")

@@ -79,4 +79,7 @@ class MinioServer < Sequel::Model
     @dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
   end
 
+  def url
+    dns_zone ? "http://#{cluster.hostname}:9000" : connection_string
+  end
 end
