@@ -61,33 +61,13 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       instance_double(MinioPool, strand: st).tap { |mp| allow(nx.minio_cluster).to receive(:pools).and_return([mp]) }
     end
 
-    it "hops to configure_dns_records if all pools are waiting" do
-      expect { nx.wait_pools }.to hop("configure_dns_records")
+    it "hops to wait if all pools are waiting" do
+      expect { nx.wait_pools }.to hop("wait")
     end
 
     it "naps if not all pools are waiting" do
       allow(nx.minio_cluster.pools.first.strand).to receive(:label).and_return("start")
       expect { nx.wait_pools }.to nap(5)
-    end
-  end
-
-  describe "#configure_dns_records" do
-    let(:ms) { instance_double(MinioServer, vm: instance_double(Vm, ephemeral_net4: "1.1.1.1")) }
-
-    it "inserts dns records and hops to wait if dns_zone is available" do
-      dns_zone = instance_double(DnsZone)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "minio.minio.ubicloud.com", type: "A", ttl: 10, data: "1.1.1.1")
-      expect(nx.minio_cluster).to receive(:servers).and_return([ms])
-      expect(nx).to receive(:dns_zone).and_return(dns_zone)
-      expect {
-        nx.configure_dns_records
-      }.to hop("wait")
-    end
-
-    it "hops to wait if no dns_zone is configures" do
-      expect(nx).to receive(:dns_zone).and_return(nil)
-      expect(nx.minio_cluster).to receive(:servers).and_return([ms])
-      expect { nx.configure_dns_records }.to hop("wait")
     end
   end
 
@@ -103,31 +83,18 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
   end
 
   describe "#reconfigure" do
-    it "increments reconfigure semaphore of all minio servers and hops to configure_dns_records" do
+    it "increments reconfigure semaphore of all minio servers and hops to wait" do
       expect(nx).to receive(:decr_reconfigure)
       ms = instance_double(MinioServer)
       expect(ms).to receive(:incr_reconfigure)
       expect(nx.minio_cluster).to receive(:servers).and_return([ms]).at_least(:once)
       expect(ms).to receive(:incr_restart)
-      expect { nx.reconfigure }.to hop("configure_dns_records")
+      expect { nx.reconfigure }.to hop("wait")
     end
   end
 
   describe "#destroy" do
     it "increments destroy semaphore of minio pools and hops to wait_pools_destroy" do
-      dns_zone = instance_double(DnsZone)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "minio.minio.ubicloud.com")
-      expect(nx).to receive(:dns_zone).and_return(dns_zone)
-      expect(nx).to receive(:decr_destroy)
-      expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
-      mp = instance_double(MinioPool, incr_destroy: nil)
-      expect(mp).to receive(:incr_destroy)
-      expect(nx.minio_cluster).to receive(:pools).and_return([mp])
-      expect { nx.destroy }.to hop("wait_pools_destroyed")
-    end
-
-    it "destroys without dns_zone too" do
-      expect(nx).to receive(:dns_zone).and_return(nil)
       expect(nx).to receive(:decr_destroy)
       expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
       mp = instance_double(MinioPool, incr_destroy: nil)
@@ -175,15 +142,6 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
-  describe "#dns_zone" do
-    it "fetches dns zone from database only once" do
-      expect(DnsZone).to receive(:where).exactly(:once).and_return([true])
-
-      nx.dns_zone
-      nx.dns_zone
     end
   end
 end
