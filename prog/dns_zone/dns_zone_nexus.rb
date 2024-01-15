@@ -76,8 +76,8 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
       .having { count.function.* =~ dns_server_ids.count }.all
 
     records_to_purge = obsoleted_records + seen_tombstoned_records
-    DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id)).delete(force: true)
-    records_to_purge.map(&:destroy)
+    DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id).uniq).delete(force: true)
+    records_to_purge.uniq(&:id).map(&:destroy)
 
     dns_zone.last_purged_at = Time.now
     dns_zone.save_changes
