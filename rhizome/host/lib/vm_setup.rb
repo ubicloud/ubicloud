@@ -260,7 +260,7 @@ class VmSetup
         type nat hook prerouting priority dstnat; policy accept;
         ip daddr #{public_ipv4} dnat to #{private_ipv4}
       }
-    
+
       chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
@@ -294,7 +294,7 @@ class VmSetup
           # allow dhcp
           udp sport 68 udp dport 67 accept
           udp sport 67 udp dport 68 accept
-  
+
           # avoid ip4 spoofing
           #{generate_ip4_filter_rules(nics)}
         }
