@@ -76,7 +76,7 @@ jobs:
         if: ${{ inputs.push_image }}
         uses: actions/upload-artifact@v4
         with:
-          name: digests
+          name: digests-${{ matrix.runner }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -90,7 +90,8 @@ jobs:
       - name: Download digests
         uses: actions/download-artifact@v4
         with:
-          name: digests
+          pattern: digests-*
+          merge-multiple: true
           path: /tmp/digests
 
       - name: Set up Docker Buildx
