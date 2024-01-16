@@ -543,6 +543,8 @@ ExecStop=#{CloudHypervisor::VERSION.ch_remote_bin} --api-socket #{vp.ch_api_sock
 Restart=no
 User=#{@vm_name}
 Group=#{@vm_name}
+
+LimitNOFILE=500000
 SERVICE
     r "systemctl daemon-reload"
   end
