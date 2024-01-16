@@ -85,8 +85,3 @@ AUTOLOAD_CONSTANTS.freeze
 if Config.production?
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
 end
-
-if Config.production?
-  require "refrigerator"
-  Refrigerator.freeze_core
-end
