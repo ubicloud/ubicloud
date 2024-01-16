@@ -153,7 +153,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       secret_key: minio_server.cluster.admin_password
     )
 
-    server_data = JSON.parse(client.admin_info.body)["servers"].find { _1["endpoint"] == "#{minio_server.vm.ephemeral_net4}:9000" }
+    server_data = JSON.parse(client.admin_info.body)["servers"].find { _1["endpoint"] == minio_server.endpoint }
     server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }
   rescue
     false

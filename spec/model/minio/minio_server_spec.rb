@@ -105,6 +105,14 @@ RSpec.describe MinioServer do
     ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
   end
 
+  it "returns endpoint properly" do
+    expect(ms.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+    expect(ms.endpoint).to eq("1.1.1.1:9000")
+
+    expect(ms).to receive(:dns_zone).and_return("something")
+    expect(ms.endpoint).to eq("minio-cluster-name0.minio.ubicloud.com:9000")
+  end
+
   describe "#dns_zone" do
     before do
       minio_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
