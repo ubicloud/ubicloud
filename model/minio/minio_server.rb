@@ -38,7 +38,7 @@ class MinioServer < Sequel::Model
   end
 
   def connection_string
-    dns_zone ? "http://#{hostname}:9000" : "http://#{vm.ephemeral_net4}:9000"
+    "http://#{vm.ephemeral_net4}:9000"
   end
 
   def init_health_monitor_session
@@ -61,7 +61,7 @@ class MinioServer < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      server_data = JSON.parse(session[:minio_client].admin_info.body)["servers"].find { "http://#{_1["endpoint"]}" == connection_string }
+      server_data = JSON.parse(session[:minio_client].admin_info.body)["servers"].find { _1["endpoint"] == "#{vm.ephemeral_net4}:9000" }
       (server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }) ? "up" : "down"
     rescue
       "down"
