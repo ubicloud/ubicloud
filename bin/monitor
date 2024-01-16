@@ -32,6 +32,7 @@ loop do
       pulse = {}
       loop do
         pulse = r.check_pulse(session: sessions[r.id], previous_pulse: pulse) if sessions[r.id]
+        Clog.emit("Got new pulse") { {got_pulse: {ubid: r.ubid, pulse: pulse}} }
         sleep r.monitoring_interval
       end
     end
