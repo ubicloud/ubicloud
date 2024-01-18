@@ -55,6 +55,7 @@ module Authorization
       acls: [
         {subjects: [subject], actions: ["Project:view", "Project:delete", "Project:user", "Project:policy", "Project:billing", "Project:github"], objects: [object]},
         {subjects: [subject], actions: ["Vm:view", "Vm:create", "Vm:delete"], objects: [object]},
+        {subjects: [subject], actions: ["Vm:Firewall:view", "Vm:Firewall:edit"], objects: [object]},
         {subjects: [subject], actions: ["PrivateSubnet:view", "PrivateSubnet:create", "PrivateSubnet:delete", "PrivateSubnet:nic"], objects: [object]},
         {subjects: [subject], actions: ["Postgres:view", "Postgres:create", "Postgres:delete"], objects: [object]}
       ]

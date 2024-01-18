@@ -234,13 +234,115 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "firewall_rules" do
+      before do
+        vm.update(display_state: "running")
+      end
+
+      it "does not list firewall rules if the VM is getting created" do
+        vm.update(display_state: "creating")
+        visit "#{project.path}#{vm.path}"
+
+        expect(page.title).to eq("Ubicloud - #{vm.name}")
+        expect(page).to have_no_content "Firewall Rules"
+      end
+
+      it "can show firewall rules" do
+        vm
+        # can visualize port_range nil as 0..65535
+        vm.firewalls.map(&:firewall_rules).flatten.first.update(port_range: nil)
+
+        visit "#{project.path}#{vm.path}"
+
+        expect(page.title).to eq("Ubicloud - #{vm.name}")
+        expect(page).to have_content "Firewall Rules"
+        expect(page).to have_content "0.0.0.0/0"
+        expect(page).to have_content "0..65535"
+      end
+
+      it "can delete firewall rule" do
+        visit "#{project.path}#{vm.path}"
+
+        # We send delete request manually instead of just clicking to button
+        # because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript engine.
+        btn = find "#fwr-delete-#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(page.body).to eq({message: "Firewall rule deleted"}.to_json)
+        expect(SemSnap.new(vm.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can not delete firewall rule if not exist" do
+        visit "#{project.path}#{vm.path}"
+
+        # We send delete request manually instead of just clicking to button
+        # because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript engine.
+        btn = find "#fwr-delete-#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid} .delete-btn"
+        expect(FirewallRule).to receive(:[]).and_return(nil)
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq(404)
+      end
+
+      it "can not delete firewall rule when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["Vm:view", "Vm:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}"
+
+        expect { find "#fwr-delete-#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "does not show create firewall rule when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["Vm:view", "Vm:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+        visit "#{project_wo_permissions.path}#{vm.path}"
+        expect { find_by_id "fwr-create" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can create firewall rule" do
+        visit "#{project.path}#{vm.path}"
+
+        fill_in "cidr", with: "1.1.1.2"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_content "1.1.1.2/32"
+        expect(page).to have_content "0..65535"
+
+        fill_in "cidr", with: "10.10.10.10"
+        fill_in "port_range", with: "80..8080"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_content "10.10.10.10/32"
+        expect(page).to have_content "80..8080"
+
+        fill_in "cidr", with: "12.12.12.0/26"
+        fill_in "port_range", with: "443"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_content "12.12.12.0/26"
+        expect(page).to have_content "443"
+
+        expect(SemSnap.new(vm.id).set?("update_firewall_rules")).to be true
+      end
+    end
+
     describe "delete" do
       it "can delete virtual machine" do
         visit "#{project.path}#{vm.path}"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
+        # UI tests run without a JavaScript engine.
+        btn = find "#vm-delete-#{vm.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.body).to eq({message: "Deleting #{vm.name}"}.to_json)

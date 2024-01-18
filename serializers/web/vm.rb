@@ -25,7 +25,8 @@ class Serializers::Web::Vm < Serializers::Base
   structure(:detailed) do |vm|
     base(vm).merge(
       {
-        nics: vm.nics.map { |nic| Serializers::Web::Nic.serialize(nic) }
+        nics: vm.nics.map { |nic| Serializers::Web::Nic.serialize(nic) },
+        firewalls: vm.firewalls.map { |fw| Serializers::Web::Firewall.serialize(fw) }
       }
     )
   end
