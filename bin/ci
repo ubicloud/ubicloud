@@ -3,9 +3,10 @@
 
 require_relative "../loader"
 require "time"
+require "optparse"
 
-def main
-  hetzner_server_st = Prog::Test::HetznerServer.assemble
+def main(options)
+  hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id])
   wait_until(hetzner_server_st, "wait")
 
   encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
@@ -42,4 +43,9 @@ def log(st, msg)
   $stdout.write "#{Time.now.utc.iso8601} | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
 end
 
-main
+options = {}
+OptionParser.new do |opts|
+  opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? VmHost.from_ubid(v).id : v }
+end.parse!
+
+main(options)
