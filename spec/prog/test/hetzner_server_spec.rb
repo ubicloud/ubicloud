@@ -3,28 +3,16 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::HetznerServer do
-  subject(:hs_test) {
-    expect(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("1.1.1.1")
-    described_class.new(described_class.assemble)
-  }
+  subject(:hs_test) { described_class.new(described_class.assemble) }
 
-  let(:hetzner_api) {
-    instance_double(Hosting::HetznerApis)
-  }
-
-  let(:sshable) {
-    Sshable.create_with_id
-  }
-
-  let(:vm_host) {
-    VmHost.create(location: "l") { _1.id = sshable.id }
-  }
+  let(:hetzner_api) { instance_double(Hosting::HetznerApis) }
+  let(:vm_host) { Prog::Vm::HostNexus.assemble("1.1.1.1").subject }
 
   before {
-    Strand.create(prog: "Prog", label: "label") { _1.id = sshable.id }
+    allow(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("1.1.1.1")
     allow(hs_test).to receive_messages(frame: {"vm_host_id" => vm_host.id,
                                                "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
-                                               "server_id" => "1234"}, hetzner_api: hetzner_api)
+                                               "server_id" => "1234"}, hetzner_api: hetzner_api, vm_host: vm_host)
   }
 
   describe "#assemble" do
@@ -35,39 +23,39 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#start" do
-    it "hops to setup_vms" do
-      expect { hs_test.start }.to hop("fetch_hostname", "Test::HetznerServer")
+    it "hops to fetch_hostname" do
+      expect { hs_test.start }.to hop("fetch_hostname")
     end
   end
 
   describe "#fetch_hostname" do
     it "can fetch hostname" do
       expect(hetzner_api).to receive(:get_main_ip4)
-      expect { hs_test.fetch_hostname }.to hop("add_ssh_key", "Test::HetznerServer")
+      expect { hs_test.fetch_hostname }.to hop("add_ssh_key")
     end
   end
 
   describe "#add_ssh_key" do
     it "can add ssh key" do
       expect(hetzner_api).to receive(:add_key)
-      expect { hs_test.add_ssh_key }.to hop("reset", "Test::HetznerServer")
+      expect { hs_test.add_ssh_key }.to hop("reset")
     end
   end
 
   describe "#reset" do
     it "can reset" do
       expect(hetzner_api).to receive(:reset).with("1234", hetzner_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
-      expect { hs_test.reset }.to hop("wait_reset", "Test::HetznerServer")
+      expect { hs_test.reset }.to hop("wait_reset")
     end
   end
 
   describe "#wait_reset" do
-    it "hops to setup_host if children idle" do
+    it "hops to setup_host if the server is up" do
       expect(Util).to receive(:rootish_ssh)
-      expect { hs_test.wait_reset }.to hop("setup_host", "Test::HetznerServer")
+      expect { hs_test.wait_reset }.to hop("setup_host")
     end
 
-    it "donates if children not idle" do
+    it "naps if the server is not up yet" do
       expect(Util).to receive(:rootish_ssh).and_raise RuntimeError, "ssh failed"
       expect { hs_test.wait_reset }.to nap(15)
     end
@@ -75,160 +63,105 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#setup_host" do
     it "hops to wait_setup_host" do
-      allow(Prog::Vm::HostNexus).to receive(:assemble).and_return(Strand[sshable.id])
-      expect { hs_test.setup_host }.to hop("wait_setup_host", "Test::HetznerServer")
+      expect(Prog::Vm::HostNexus).to receive(:assemble).and_return(vm_host.strand)
+      expect { hs_test.setup_host }.to hop("wait_setup_host")
     end
   end
 
   describe "#wait_setup_host" do
-    it "hops to wait_install_specs if children idle" do
-      expect(hs_test).to receive(:children_idle).and_return(true)
-      expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
-      expect { hs_test.wait_setup_host }.to hop("wait_install_specs", "Test::HetznerServer")
+    it "naps if the vm host is not ready yet" do
+      expect(vm_host.strand).to receive(:label).and_return("wait_prep")
+      expect { hs_test.wait_setup_host }.to nap(15)
     end
 
-    it "donates if children not idle" do
-      expect(hs_test).to receive(:children_idle).and_return(false)
-      expect { hs_test.wait_setup_host }.to nap(0)
+    it "hops to run_integration_specs if rhizome installed" do
+      expect(vm_host.strand).to receive(:label).and_return("wait")
+      expect(hs_test).to receive(:retval).and_return({"msg" => "installed rhizome"})
+      expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
+      expect { hs_test.wait_setup_host }.to hop("run_integration_specs")
+    end
+
+    it "installs rhizome if not installed yet with specs" do
+      expect(vm_host.strand).to receive(:label).and_return("wait")
+      expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
+      expect { hs_test.wait_setup_host }.to hop("start", "InstallRhizome")
     end
   end
 
   describe "#verify_specs_installation" do
     it "succeeds when installed=false & not exists" do
-      allow(hs_test).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).and_return("0\n")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("0\n")
       expect { hs_test.verify_specs_installation(installed: false) }.not_to raise_error
     end
 
     it "succeeds when installed=true & exists" do
-      allow(hs_test).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).and_return("5\n")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("5\n")
       expect { hs_test.verify_specs_installation(installed: true) }.not_to raise_error
     end
 
     it "succeeds when installed=false & exists" do
-      allow(hs_test).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).and_return("5\n")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("5\n")
       expect { hs_test.verify_specs_installation(installed: false) }.to raise_error RuntimeError
     end
   end
 
-  describe "#wait_install_specs" do
-    it "hops to run_integration_specs if children idle" do
-      expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_install_specs }.to hop("run_integration_specs", "Test::HetznerServer")
-    end
-
-    it "donates if children not idle" do
-      expect(hs_test).to receive(:children_idle).and_return(false)
-      expect { hs_test.wait_install_specs }.to nap(0)
-    end
-  end
-
   describe "#run_integration_specs" do
-    it "hops to test_host_encrypted" do
+    it "hops to install_bdev_ubid" do
       tmp_dir = "/var/storage/tests"
-      allow(hs_test).to receive(:sshable).and_return(sshable)
-      expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
-      expect(sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
-      expect(sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
-      expect(sshable).to receive(:cmd).with(
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with(
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
-      expect { hs_test.run_integration_specs }.to hop("install_bdev_ubid", "Test::HetznerServer")
+      expect { hs_test.run_integration_specs }.to hop("install_bdev_ubid")
     end
   end
 
   describe "#install_bdev_ubid" do
-    it "hops to wait_install_bdev_ubid" do
-      expect { hs_test.install_bdev_ubid }.to hop("wait_install_bdev_ubid", "Test::HetznerServer")
+    it "hops to wait if it's installed" do
+      expect(hs_test).to receive(:retval).and_return({"msg" => "SPDK was setup"})
+      expect { hs_test.install_bdev_ubid }.to hop("wait")
+    end
+
+    it "setups spdk with bdev_ubi" do
+      expect { hs_test.install_bdev_ubid }.to hop("start", "Storage::SetupSpdk")
     end
   end
 
-  describe "#wait_install_bdev_ubid" do
-    it "hops to test_host_encrypted if children idle" do
-      expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_install_bdev_ubid }.to hop("test_host_encrypted", "Test::HetznerServer")
+  describe "#wait" do
+    it "hops to destroy when needed" do
+      expect(hs_test).to receive(:when_destroy_set?).and_yield
+      expect { hs_test.wait }.to hop("destroy")
     end
 
-    it "donates if children not idle" do
-      expect(hs_test).to receive(:children_idle).and_return(false)
-      expect { hs_test.wait_install_bdev_ubid }.to nap(0)
-    end
-  end
-
-  describe "#test_host_encrypted" do
-    it "hops to wait_test_host_encrypted" do
-      expect { hs_test.test_host_encrypted }.to hop("wait_test_host_encrypted", "Test::HetznerServer")
+    it "naps" do
+      expect { hs_test.wait }.to nap(15)
     end
   end
 
-  describe "#wait_test_host_encrypted" do
-    it "hops to test_host_unencrypted if children idle" do
-      expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_test_host_encrypted }.to hop("test_host_unencrypted", "Test::HetznerServer")
-    end
-
-    it "donates if children not idle" do
-      expect(hs_test).to receive(:children_idle).and_return(false)
-      expect { hs_test.wait_test_host_encrypted }.to nap(0)
-    end
-  end
-
-  describe "#test_host_unencrypted" do
-    it "hops to wait_test_host_unencrypted" do
-      expect { hs_test.test_host_unencrypted }.to hop("wait_test_host_unencrypted", "Test::HetznerServer")
-    end
-  end
-
-  describe "#wait_test_host_unencrypted" do
-    it "hops to delete_key if children idle" do
-      expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_test_host_unencrypted }.to hop("delete_key", "Test::HetznerServer")
-    end
-
-    it "donates if children not idle" do
-      expect(hs_test).to receive(:children_idle).and_return(false)
-      expect { hs_test.wait_test_host_unencrypted }.to nap(0)
-    end
-  end
-
-  describe "#delete_key" do
-    it "deletes key" do
+  describe "#destroy" do
+    it "deletes key and vm host" do
       expect(hetzner_api).to receive(:delete_key).with("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
-      expect { hs_test.delete_key }.to hop("delete_host", "Test::HetznerServer")
+      expect(vm_host).to receive(:incr_destroy)
+      expect { hs_test.destroy }.to hop("wait_vm_host_destroyed")
     end
   end
 
-  describe "#delete_host" do
-    it "deletes host" do
-      expect { hs_test.delete_host }.to hop("wait_host_destroyed", "Test::HetznerServer")
-    end
-  end
-
-  describe "#wait_host_destroyed" do
-    it "hops to delete_key if children idle" do
-      expect(hs_test).to receive(:children_idle).and_return(true)
-      expect { hs_test.wait_host_destroyed }.to hop("finish", "Test::HetznerServer")
+  describe "#wait_vm_host_destroyed" do
+    it "naps if the vm host isn't deleted yet" do
+      expect(hs_test).to receive(:vm_host).and_return(vm_host)
+      expect { hs_test.wait_vm_host_destroyed }.to nap(10)
     end
 
-    it "donates if children not idle" do
-      expect(hs_test).to receive(:children_idle).and_return(false)
-      expect { hs_test.wait_host_destroyed }.to nap(0)
+    it "hops to finish if the vm host destroyed" do
+      expect(hs_test).to receive(:vm_host).and_return(nil)
+      expect { hs_test.wait_vm_host_destroyed }.to hop("finish")
     end
   end
 
   describe "#finish" do
     it "exits" do
       expect { hs_test.finish }.to exit({"msg" => "HetznerServer tests finished!"})
-    end
-  end
-
-  describe "#children_idle" do
-    it "returns true if no children" do
-      st = Strand.create_with_id(prog: "Prog", label: "label")
-      allow(hs_test).to receive(:strand).and_return(st)
-      expect(hs_test.children_idle).to be(true)
     end
   end
 
@@ -239,10 +172,12 @@ RSpec.describe Prog::Test::HetznerServer do
     end
   end
 
-  describe "#sshable" do
-    it "returns the sshable" do
-      allow(vm_host).to receive(:sshable).and_return(sshable)
-      expect(hs_test.sshable).to eq(sshable)
+  describe "#vm_host" do
+    it "returns the vm_host" do
+      prg = described_class.new(Strand.new(stack: [{"vm_host_id" => "123"}]))
+      vmh = instance_double(VmHost)
+      expect(VmHost).to receive(:[]).with("123").and_return(vmh)
+      expect(prg.vm_host).to eq(vmh)
     end
   end
 end

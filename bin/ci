@@ -5,12 +5,41 @@ require_relative "../loader"
 require "time"
 
 def main
-  st = Prog::Test::HetznerServer.assemble
+  hetzner_server_st = Prog::Test::HetznerServer.assemble
+  wait_until(hetzner_server_st, "wait")
 
-  while Strand[st.id]
-    puts "Strand #{st.id} is still running, sleeping for 15 seconds ..."
-    sleep 15
+  encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
+  log(encrypted_vms_st, "storage_encrypted: true")
+  wait_until(encrypted_vms_st)
+
+  unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
+  log(unencrypted_vms_st, "storage_encrypted: false")
+  wait_until(unencrypted_vms_st)
+
+  Semaphore.incr(hetzner_server_st.id, "destroy")
+  wait_until(hetzner_server_st)
+end
+
+def wait_until(st, label = nil)
+  while (loaded_st = Strand[st.id]) && loaded_st.label != label
+    log(st.reload, "waiting #{label ? "for #{label}" : "exit"}")
+    sleep 10
   end
+  log(st, "reached")
+end
+
+def log(st, msg)
+  resources = case st.prog
+  when "Test::HetznerServer"
+    "VmHost.#{Strand[st.stack.first["vm_host_id"]]&.label}"
+  when "Test::VmGroup"
+    st.stack.first["vms"].map { "Vm.#{Strand[_1]&.label}" }.join(", ")
+  when "Test::Vm"
+    "Vm.#{Strand[st.stack.first["subject_id"]]&.label}"
+  else
+    "#{st.prog}.#{st.label}"
+  end
+  $stdout.write "#{Time.now.utc.iso8601} | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
 end
 
 main
