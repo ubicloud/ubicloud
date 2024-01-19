@@ -156,7 +156,7 @@ end
   def push(prog, new_frame = {}, label = "start")
     old_prog = strand.prog
     old_label = strand.label
-    new_frame = new_frame.merge("subject_id" => @subject_id, "link" => [strand.prog, old_label])
+    new_frame = {"subject_id" => @subject_id, "link" => [strand.prog, old_label]}.merge(new_frame)
 
     fail Hop.new(old_prog, old_label,
       {prog: Strand.prog_verify(prog), label: label,
