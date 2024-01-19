@@ -5,7 +5,7 @@ require "netaddr"
 
 RSpec.describe Prog::Test::Vm do
   subject(:vm_test) {
-    described_class.new(described_class.assemble("vm1"))
+    described_class.new(Strand.new(prog: "Test::Vm"))
   }
 
   let(:sshable) {
@@ -47,18 +47,15 @@ RSpec.describe Prog::Test::Vm do
       ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a3::/64"),
       nics: [nic3])
 
-    vms_dataset = instance_double(Sequel::Dataset, all: [vm1, vm2, vm3])
-
     project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
-    allow(project).to receive(:vms_dataset).and_return(vms_dataset)
-
+    allow(project).to receive(:vms).and_return([vm1, vm2, vm3])
     allow(vm1).to receive(:projects).and_return [project]
     allow(vm_test).to receive_messages(sshable: sshable, vm: vm1)
   }
 
   describe "#start" do
     it "hops to verify_dd" do
-      expect { vm_test.start }.to hop("verify_dd", "Test::Vm")
+      expect { vm_test.start }.to hop("verify_dd")
     end
   end
 
@@ -67,7 +64,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:cmd).with("dd if=/dev/random of=~/1.txt bs=512 count=1000000")
       expect(sshable).to receive(:cmd).with("sync ~/1.txt")
       expect(sshable).to receive(:cmd).with("ls -s ~/1.txt").and_return "500004 /home/xyz/1.txt"
-      expect { vm_test.verify_dd }.to hop("install_packages", "Test::Vm")
+      expect { vm_test.verify_dd }.to hop("install_packages")
     end
 
     it "fails to verify if size is not in expected range" do
@@ -82,7 +79,7 @@ RSpec.describe Prog::Test::Vm do
     it "installs packages and hops to next step" do
       expect(sshable).to receive(:cmd).with("sudo apt update")
       expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential")
-      expect { vm_test.install_packages }.to hop("verify_extra_disks", "Test::Vm")
+      expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
   end
 
@@ -96,14 +93,14 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:cmd).with("sudo chown ubi #{mount_path}")
       expect(sshable).to receive(:cmd).with("dd if=/dev/random of=#{mount_path}/1.txt bs=512 count=10000")
       expect(sshable).to receive(:cmd).with("sync #{mount_path}/1.txt")
-      expect { vm_test.verify_extra_disks }.to hop("ping_google", "Test::Vm")
+      expect { vm_test.verify_extra_disks }.to hop("ping_google")
     end
   end
 
   describe "#ping_google" do
     it "pings google and hops to next step" do
       expect(sshable).to receive(:cmd).with("ping -c 2 google.com")
-      expect { vm_test.ping_google }.to hop("ping_vms_in_subnet", "Test::Vm")
+      expect { vm_test.ping_google }.to hop("ping_vms_in_subnet")
     end
   end
 
@@ -113,7 +110,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:cmd).with("ping -c 2 192.168.0.2")
       expect(sshable).to receive(:cmd).with("ping -c 2 2001:db8:85a2::2")
       expect(sshable).to receive(:cmd).with("ping -c 2 fd01:db8:85a2::2")
-      expect { vm_test.ping_vms_in_subnet }.to hop("ping_vms_not_in_subnet", "Test::Vm")
+      expect { vm_test.ping_vms_in_subnet }.to hop("ping_vms_not_in_subnet")
     end
   end
 
@@ -123,7 +120,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect(sshable).to receive(:cmd).with("ping -c 2 2001:db8:85a3::2")
       expect(sshable).to receive(:cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
-      expect { vm_test.ping_vms_not_in_subnet }.to hop("finish", "Test::Vm")
+      expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
     end
 
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do

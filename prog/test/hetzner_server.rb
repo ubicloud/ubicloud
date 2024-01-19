@@ -3,6 +3,8 @@
 require_relative "../../lib/util"
 
 class Prog::Test::HetznerServer < Prog::Base
+  semaphore :destroy
+
   def self.assemble
     server_id = Config.ci_hetzner_sacrificial_server_id
     if server_id.nil? || server_id.empty?
@@ -20,32 +22,21 @@ class Prog::Test::HetznerServer < Prog::Base
   end
 
   label def fetch_hostname
-    current_frame = strand.stack.first
-    current_frame["hostname"] = hetzner_api.get_main_ip4
-    strand.modified!(:stack)
-    strand.save_changes
+    update_stack({"hostname" => hetzner_api.get_main_ip4})
 
     hop_add_ssh_key
   end
 
   label def add_ssh_key
     keypair = SshKey.generate
-
     hetzner_api.add_key("ubicloud_ci_key_#{strand.ubid}", keypair.public_key)
-
-    current_frame = strand.stack.first
-    current_frame["hetzner_ssh_keypair"] = Base64.encode64(keypair.keypair)
-    strand.modified!(:stack)
-    strand.save_changes
+    update_stack({"hetzner_ssh_keypair" => Base64.encode64(keypair.keypair)})
 
     hop_reset
   end
 
   label def reset
-    hetzner_api.reset(
-      frame["server_id"],
-      hetzner_ssh_key: hetzner_ssh_keypair.public_key
-    )
+    hetzner_api.reset(frame["server_id"], hetzner_ssh_key: hetzner_ssh_keypair.public_key)
 
     hop_wait_reset
   end
@@ -61,149 +52,92 @@ class Prog::Test::HetznerServer < Prog::Base
   end
 
   label def setup_host
-    st = Prog::Vm::HostNexus.assemble(
+    vm_host = Prog::Vm::HostNexus.assemble(
       frame["hostname"],
       provider: "hetzner",
       hetzner_server_identifier: frame["server_id"]
-    )
-
-    current_frame = strand.stack.first
-    current_frame["vm_host_id"] = st.id
-    strand.modified!(:stack)
-    strand.save_changes
+    ).subject
+    update_stack({"vm_host_id" => vm_host.id})
 
     # BootstrapRhizome::start will override raw_private_key_1, so save the key in
     # raw_private_key_2. This will allow BootstrapRhizome::setup to do a root
     # ssh into the server.
-    Sshable[st.id].update(raw_private_key_2: hetzner_ssh_keypair.keypair)
-
-    strand.add_child(st)
+    vm_host.sshable.update(raw_private_key_2: hetzner_ssh_keypair.keypair)
 
     hop_wait_setup_host
   end
 
   label def wait_setup_host
-    reap
+    nap 15 unless vm_host && vm_host.strand.label == "wait"
 
-    if children_idle
-      # We shouldn't install specs by default
-      verify_specs_installation(installed: false)
+    if retval&.dig("msg") == "installed rhizome"
+      verify_specs_installation(installed: true)
 
-      # install specs
-      strand.add_child(vm_host.install_rhizome(install_specs: true))
-      hop_wait_install_specs
+      hop_run_integration_specs
     end
 
-    donate
+    # We shouldn't install specs by default
+    verify_specs_installation(installed: false)
+
+    # install specs
+    push Prog::InstallRhizome, {subject_id: vm_host.id, target_folder: "host", install_specs: true}
   end
 
   def verify_specs_installation(installed: true)
-    specs_count = sshable.cmd("find /home/rhizome -type f -name '*_spec.rb' -not -path \"/home/rhizome/vendor/*\" | wc -l")
+    specs_count = vm_host.sshable.cmd("find /home/rhizome -type f -name '*_spec.rb' -not -path \"/home/rhizome/vendor/*\" | wc -l")
     specs_installed = (specs_count.strip != "0")
     fail "verify_specs_installation(installed: #{installed}) failed" unless specs_installed == installed
   end
 
-  label def wait_install_specs
-    reap
-    hop_run_integration_specs if children_idle
-    donate
-  end
-
   label def run_integration_specs
-    verify_specs_installation(installed: true)
-
     tmp_dir = "/var/storage/tests"
-    sshable.cmd("sudo mkdir -p #{tmp_dir}")
-    sshable.cmd("sudo chmod a+rw #{tmp_dir}")
-    sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
+    vm_host.sshable.cmd("sudo mkdir -p #{tmp_dir}")
+    vm_host.sshable.cmd("sudo chmod a+rw #{tmp_dir}")
+    vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
 
     hop_install_bdev_ubid
   end
 
   label def install_bdev_ubid
+    hop_wait if retval&.dig("msg") == "SPDK was setup"
+
     # disable the default installation and install a bdev_ubi enabled spdk
-    SpdkInstallation.dataset.update(allocation_weight: 0)
-    strand.add_child(
-      Prog::Storage::SetupSpdk.assemble(
-        vm_host.id, "v23.09-ubi-0.2",
-        start_service: true,
-        allocation_weight: 100
-      )
-    )
-
-    hop_wait_install_bdev_ubid
+    vm_host.spdk_installations_dataset.update(allocation_weight: 0)
+    push Prog::Storage::SetupSpdk, {subject_id: vm_host.id, version: "v23.09-ubi-0.2", start_service: true, allocation_weight: 100}
   end
 
-  label def wait_install_bdev_ubid
-    reap
-    hop_test_host_encrypted if children_idle
-    donate
+  label def wait
+    when_destroy_set? do
+      hop_destroy
+    end
+
+    nap 15
   end
 
-  label def test_host_encrypted
-    strand.add_child(
-      Prog::Test::VmGroup.assemble(
-        storage_encrypted: true,
-        test_reboot: true
-      )
-    )
-
-    hop_wait_test_host_encrypted
-  end
-
-  label def wait_test_host_encrypted
-    reap
-
-    hop_test_host_unencrypted if children_idle
-
-    donate
-  end
-
-  label def test_host_unencrypted
-    strand.add_child(
-      Prog::Test::VmGroup.assemble(
-        storage_encrypted: false,
-        test_reboot: false
-      )
-    )
-
-    hop_wait_test_host_unencrypted
-  end
-
-  label def wait_test_host_unencrypted
-    reap
-
-    hop_delete_key if children_idle
-
-    donate
-  end
-
-  def children_idle
-    active_children = strand.children_dataset.where(Sequel.~(label: "wait"))
-    active_semaphores = strand.children_dataset.join(:semaphore, strand_id: :id)
-
-    active_children.count == 0 and active_semaphores.count == 0
-  end
-
-  label def delete_key
+  label def destroy
     hetzner_api.delete_key(hetzner_ssh_keypair.public_key)
-
-    hop_delete_host
-  end
-
-  label def delete_host
     vm_host.incr_destroy
-    hop_wait_host_destroyed
+
+    hop_wait_vm_host_destroyed
   end
 
-  label def wait_host_destroyed
-    reap
-    hop_finish if children_idle
-    donate
+  label def wait_vm_host_destroyed
+    if vm_host
+      Clog.emit("Waiting vm host to be destroyed")
+      nap 10
+    end
+
+    hop_finish
   end
 
   label def finish
     pop "HetznerServer tests finished!"
+  end
+
+  def update_stack(new_frame)
+    strand.stack.first.merge!(new_frame)
+    strand.modified!(:stack)
+    strand.save_changes
   end
 
   def hetzner_api
@@ -218,9 +152,5 @@ class Prog::Test::HetznerServer < Prog::Base
 
   def vm_host
     @vm_host ||= VmHost[frame["vm_host_id"]]
-  end
-
-  def sshable
-    @sshable ||= vm_host.sshable
   end
 end
