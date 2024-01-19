@@ -20,11 +20,25 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("")
       expect { described_class.assemble }.to raise_error RuntimeError, "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
     end
+
+    it "uses exiting vm host if given" do
+      HetznerHost.create(server_identifier: "1234") { _1.id = vm_host.id }
+      st = described_class.assemble(vm_host_id: vm_host.id)
+      expect(st.stack.first["vm_host_id"]).to eq(vm_host.id)
+      expect(st.stack.first["hostname"]).to eq("1.1.1.1")
+      expect(st.stack.first["destroy"]).to be(false)
+    end
   end
 
   describe "#start" do
-    it "hops to fetch_hostname" do
+    it "hops to fetch_hostname if vm_host_id is not given" do
+      expect(hs_test).to receive(:frame).and_return({})
       expect { hs_test.start }.to hop("fetch_hostname")
+    end
+
+    it "hops to wait_setup_host if vm_host_id is given" do
+      expect(hs_test).to receive(:frame).and_return({"vm_host_id" => "123"})
+      expect { hs_test.start }.to hop("wait_setup_host")
     end
   end
 
@@ -140,7 +154,13 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#destroy" do
+    it "does not delete key and vm host if existing vm host used" do
+      expect(hs_test).to receive(:frame).and_return({"destroy" => false})
+      expect { hs_test.destroy }.to hop("finish")
+    end
+
     it "deletes key and vm host" do
+      expect(hs_test).to receive(:frame).and_return({"destroy" => true})
       expect(hetzner_api).to receive(:delete_key).with("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
       expect(vm_host).to receive(:incr_destroy)
       expect { hs_test.destroy }.to hop("wait_vm_host_destroyed")

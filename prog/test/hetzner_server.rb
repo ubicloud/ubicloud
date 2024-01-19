@@ -5,19 +5,32 @@ require_relative "../../lib/util"
 class Prog::Test::HetznerServer < Prog::Base
   semaphore :destroy
 
-  def self.assemble
-    server_id = Config.ci_hetzner_sacrificial_server_id
-    if server_id.nil? || server_id.empty?
+  def self.assemble(vm_host_id: nil)
+    frame = if vm_host_id
+      vm_host = VmHost[vm_host_id]
+      {
+        vm_host_id: vm_host.id, server_id: vm_host.hetzner_host.server_identifier,
+        hostname: vm_host.sshable.host, destroy: false
+      }
+    else
+      {
+        server_id: Config.ci_hetzner_sacrificial_server_id, destroy: true
+      }
+    end
+
+    if frame[:server_id].nil? || frame[:server_id].empty?
       fail "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
     end
+
     Strand.create_with_id(
       prog: "Test::HetznerServer",
       label: "start",
-      stack: [{server_id: server_id}]
+      stack: [frame]
     )
   end
 
   label def start
+    hop_wait_setup_host if frame["vm_host_id"]
     hop_fetch_hostname
   end
 
@@ -99,11 +112,12 @@ class Prog::Test::HetznerServer < Prog::Base
   end
 
   label def install_bdev_ubid
-    hop_wait if retval&.dig("msg") == "SPDK was setup"
+    version = "v23.09-ubi-0.2"
+    hop_wait if vm_host.spdk_installations.find { _1.version == version } || retval&.dig("msg") == "SPDK was setup"
 
     # disable the default installation and install a bdev_ubi enabled spdk
     vm_host.spdk_installations_dataset.update(allocation_weight: 0)
-    push Prog::Storage::SetupSpdk, {subject_id: vm_host.id, version: "v23.09-ubi-0.2", start_service: true, allocation_weight: 100}
+    push Prog::Storage::SetupSpdk, {subject_id: vm_host.id, version: version, start_service: true, allocation_weight: 100}
   end
 
   label def wait
@@ -115,6 +129,8 @@ class Prog::Test::HetznerServer < Prog::Base
   end
 
   label def destroy
+    hop_finish unless frame["destroy"]
+
     hetzner_api.delete_key(hetzner_ssh_keypair.public_key)
     vm_host.incr_destroy
 
