@@ -86,6 +86,12 @@ RSpec.describe Prog::Base do
     expect(post - ante).to be > 121
   end
 
+  it "can push new subject_id" do
+    st = Strand.create_with_id(prog: "Test", label: "push_subject_id")
+    st.run
+    expect(st.stack.first["subject_id"]).not_to eq(st.id)
+  end
+
   it "requires a symbol for hop" do
     expect {
       Strand.new(prog: "Test", label: "invalid_hop").unsynchronized_run
