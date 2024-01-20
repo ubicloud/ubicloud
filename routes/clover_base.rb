@@ -63,6 +63,10 @@ module CloverBase
       code = 403
       title = "Forbidden"
       message = "Sorry, you don't have permission to continue with this request."
+    when ErrorCodes::DependencyError
+      code = 409
+      title = "Dependency Error"
+      message = e.to_s
     else
       $stderr.print "#{e.class}: #{e.message}\n"
       warn e.backtrace

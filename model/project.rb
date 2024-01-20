@@ -41,6 +41,22 @@ class Project < Sequel::Model
     "/project/#{ubid}"
   end
 
+  def has_resources
+    access_tags_dataset.exclude(hyper_tag_table: [Account.table_name.to_s, Project.table_name.to_s, AccessTag.table_name.to_s]).count > 0
+  end
+
+  def soft_delete
+    DB.transaction do
+      access_tags_dataset.destroy
+      access_policies_dataset.destroy
+
+      # We still keep the project object for billing purposes.
+      # These need to be cleaned up manually once in a while.
+      # Don't forget to clean up billing info and payment methods.
+      update(visible: false)
+    end
+  end
+
   def current_invoice
     begin_time = invoices.first&.end_time || Time.new(Time.now.year, Time.now.month, 1)
     end_time = Time.now

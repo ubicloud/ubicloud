@@ -21,6 +21,13 @@ RSpec.describe Clover, "vm" do
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
+
+    it "not delete" do
+      delete "api/project/#{project.ubid}"
+
+      expect(last_response.status).to eq(401)
+      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+    end
   end
 
   describe "authenticated" do
@@ -47,6 +54,37 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-project")
+      end
+    end
+
+    describe "delete" do
+      it "success" do
+        delete "api/project/#{project.ubid}"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["message"]).to eq("'#{project.name}' project is deleted.")
+
+        expect(Project[project.id].visible).to be_falsey
+        expect(AccessTag.where(project_id: project.id).count).to eq(0)
+        expect(AccessPolicy.where(project_id: project.id).count).to eq(0)
+      end
+
+      it "can not delete project when it has resources" do
+        Prog::Vm::Nexus.assemble("key", project.id, name: "vm1")
+
+        delete "api/project/#{project.ubid}"
+
+        expect(last_response.status).to eq(409)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("'#{project.name}' project has some resources. Delete all related resources first.")
+      end
+
+      it "not authorized" do
+        u = create_account("test@test.com")
+        p = u.create_project_with_default_policy("project-1")
+        delete "api/project/#{p.ubid}"
+
+        expect(last_response.status).to eq(403)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, you don't have permission to continue with this request.")
       end
     end
 

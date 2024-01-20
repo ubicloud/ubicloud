@@ -48,21 +48,12 @@ class CloverWeb
         Authorization.authorize(@current_user.id, "Project:delete", @project.id)
 
         # If it has some resources, do not allow to delete it.
-        if @project.access_tags_dataset.exclude(hyper_tag_table: [Account.table_name.to_s, Project.table_name.to_s, AccessTag.table_name.to_s]).count > 0
+        if @project.has_resources
           flash["error"] = "'#{@project.name}' project has some resources. Delete all related resources first."
           return {message: "'#{@project.name}' project has some resources. Delete all related resources first."}.to_json
         end
 
-        DB.transaction do
-          @project.access_tags.each { |access_tag| access_tag.applied_tags_dataset.destroy }
-          @project.access_tags_dataset.destroy
-          @project.access_policies_dataset.destroy
-
-          # We still keep the project object for billing purposes.
-          # These need to be cleaned up manually once in a while.
-          # Don't forget to clean up billing info and payment methods.
-          @project.update(visible: false)
-        end
+        @project.soft_delete
 
         flash["notice"] = "'#{@project.name}' project is deleted."
         return {message: "'#{@project.name}' project is deleted."}.to_json

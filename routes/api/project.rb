@@ -35,6 +35,19 @@ class CloverApi
         serialize(@project)
       end
 
+      r.delete true do
+        Authorization.authorize(@current_user.id, "Project:delete", @project.id)
+
+        # If it has some resources, do not allow to delete it.
+        if @project.has_resources
+          fail ErrorCodes::DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
+        end
+
+        @project.soft_delete
+
+        return {message: "'#{@project.name}' project is deleted."}.to_json
+      end
+
       r.hash_branches(:project_prefix)
     end
   end
