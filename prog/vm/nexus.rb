@@ -8,12 +8,12 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil, arch: "x64")
+    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -88,6 +88,10 @@ class Prog::Vm::Nexus < Prog::Base
         name: name, family: vm_size.family, cores: cores, location: location,
         boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
+
+      port_range = allow_only_ssh ? 22..22 : 0..65535
+      fw = Firewall.create_with_id(vm_id: vm.id, name: "#{name}-default")
+      ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
 
       vm.associate_with_project(project)
 
@@ -322,7 +326,10 @@ SQL
   label def prep
     case host.sshable.cmd("common/bin/daemonizer --check prep_#{q_vm}")
     when "Succeeded"
-      hop_run
+      host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
+      vm.nics.each { _1.incr_setup_nic }
+      bud Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules
+      hop_wait_firewall_rules_before_run
     when "NotStarted", "Failed"
       topo = vm.cloud_hypervisor_cpu_topology
 
@@ -360,9 +367,13 @@ SQL
     nap 5
   end
 
+  label def wait_firewall_rules_before_run
+    reap
+    hop_run if leaf?
+    donate
+  end
+
   label def run
-    host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
-    vm.nics.each { _1.incr_setup_nic }
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     hop_wait_sshable
   end
@@ -411,7 +422,24 @@ SQL
       hop_start_after_host_reboot
     end
 
+    when_update_firewall_rules_set? do
+      register_deadline(:wait, 5 * 60)
+      hop_update_firewall_rules
+    end
+
     nap 30
+  end
+
+  label def update_firewall_rules
+    decr_update_firewall_rules
+    bud Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules
+    hop_wait_firewall_rules
+  end
+
+  label def wait_firewall_rules
+    reap
+    hop_wait if leaf?
+    donate
   end
 
   label def prevent_destroy

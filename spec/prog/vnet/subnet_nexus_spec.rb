@@ -35,7 +35,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv4).and_return("10.0.0.0/26")
       expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
-      expect(FirewallRule).to receive(:create_with_id).at_least(:once)
       described_class.assemble(
         prj.id,
         name: "default-ps",
@@ -56,7 +55,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
       expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
-      expect(FirewallRule).to receive(:create_with_id).at_least(:once)
       described_class.assemble(
         prj.id,
         name: "default-ps",
@@ -130,12 +128,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect { nx.wait }.to hop("add_new_nic")
     end
 
-    it "hops to update_furewall_rules if when_update_firewall_rules_set?" do
-      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
-      expect(ps).to receive(:update).with(state: "updating_firewall_rules").and_return(true)
-      expect { nx.wait }.to hop("update_firewall_rules")
-    end
-
     it "increments refresh_keys if it passed more than a day" do
       expect(ps).to receive(:last_rekey_at).and_return(Time.now - 60 * 60 * 24 - 1)
       expect(ps).to receive(:incr_refresh_keys).and_return(true)
@@ -144,33 +136,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
     it "naps if nothing to do" do
       expect { nx.wait }.to nap(30)
-    end
-  end
-
-  describe "#update_firewall_rules" do
-    let(:vm) {
-      instance_double(Vm, id: "vm-id")
-    }
-
-    it "buds UpdateFirewallRules and hops to wait_fw_rules" do
-      expect(ps).to receive(:vms).and_return([vm]).at_least(:once)
-      expect(nx).to receive(:bud).with(Prog::Vnet::UpdateFirewallRules, {subject_id: "vm-id"}, :update_firewall_rules)
-      expect { nx.update_firewall_rules }.to hop("wait_fw_rules")
-    end
-  end
-
-  describe "#wait_fw_rules" do
-    it "donates if there are active buds" do
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect { nx.wait_fw_rules }.to nap(0)
-    end
-
-    it "hops to wait if there are no active buds" do
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(ps).to receive(:update).with(state: "waiting").and_return(true)
-      expect { nx.wait_fw_rules }.to hop("wait")
     end
   end
 

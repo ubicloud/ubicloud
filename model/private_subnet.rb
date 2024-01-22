@@ -37,7 +37,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   include SemaphoreMethods
-  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
+  semaphore :destroy, :refresh_keys, :add_new_nic
 
   def self.random_subnet
     PRIVATE_SUBNET_RANGES.sample
