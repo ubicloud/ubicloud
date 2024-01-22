@@ -361,7 +361,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "does not bud restart if there is already one restart going on" do
-      expect(nx).to receive(:available?).and_return(false).twice
+      expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(5)
       expect(nx).not_to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)

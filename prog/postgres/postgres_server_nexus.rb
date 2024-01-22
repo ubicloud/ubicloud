@@ -232,14 +232,15 @@ SQL
   label def unavailable
     register_deadline(:wait, 10 * 60)
 
+    reap
+    nap 5 unless strand.children.select { _1.prog == "Postgres::PostgresServerNexus" && _1.label == "restart" }.empty?
+
     if available?
       decr_checkup
-      strand.children.select { _1.prog == "Postgres::PostgresServerNexus" && _1.label == "restart" }.each(&:destroy)
       hop_wait
     end
 
-    reap
-    bud self.class, frame, :restart if leaf?
+    bud self.class, frame, :restart
     nap 5
   end
 
