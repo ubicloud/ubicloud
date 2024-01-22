@@ -21,7 +21,8 @@ class Serializers::Web::Postgres < Serializers::Base
   structure(:detailed) do |pg|
     base(pg).merge({
       connection_string: pg.connection_string,
-      primary?: pg.server&.primary?
+      primary?: pg.server&.primary?,
+      firewall_rules: pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }.map { |fw| Serializers::Web::PostgresFirewallRule.serialize(fw) }
     }).merge((pg.timeline && pg.server && pg.server.primary?) ? {
       earliest_restore_time: pg.timeline.earliest_restore_time&.utc&.iso8601,
       latest_restore_time: pg.timeline.latest_restore_time&.utc&.iso8601

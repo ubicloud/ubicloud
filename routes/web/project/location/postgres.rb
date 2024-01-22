@@ -24,6 +24,42 @@ class CloverWeb
         return {message: "Deleting #{pg.name}"}.to_json
       end
 
+      r.on "firewall-rule" do
+        r.post true do
+          Authorization.authorize(@current_user.id, "Postgres:Firewall:edit", pg.id)
+
+          DB.transaction do
+            PostgresFirewallRule.create_with_id(
+              postgres_resource_id: pg.id,
+              cidr: r.params["cidr"]
+            )
+            pg.incr_update_firewall_rules
+          end
+
+          flash["notice"] = "Firewall rule is created"
+
+          r.redirect "#{@project.path}#{pg.path}"
+        end
+
+        r.is String do |firewall_rule_ubid|
+          r.delete true do
+            Authorization.authorize(@current_user.id, "Postgres:Firewall:edit", pg.id)
+            fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid)
+            unless fwr
+              response.status = 404
+              r.halt
+            end
+
+            DB.transaction do
+              fwr.destroy
+              pg.incr_update_firewall_rules
+            end
+
+            return {message: "Firewall rule deleted"}.to_json
+          end
+        end
+      end
+
       r.post "restore" do
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
