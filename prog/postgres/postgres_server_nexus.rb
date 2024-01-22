@@ -123,6 +123,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def refresh_certificates
+    decr_refresh_certificates
+
     vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
     vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
     vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
@@ -177,7 +179,7 @@ SQL
     vm.sshable.cmd("sudo -u postgres psql", stdin: commands)
 
     when_initial_provisioning_set? do
-      decr_initial_provisioning
+      hop_wait if retval&.dig("msg") == "postgres server is restarted"
       push self.class, frame, "restart"
     end
 
@@ -203,7 +205,6 @@ SQL
 
       refresh_walg_credentials
 
-      decr_initial_provisioning
       hop_configure
     end
 
@@ -211,6 +212,8 @@ SQL
   end
 
   label def wait
+    decr_initial_provisioning
+
     when_refresh_certificates_set? do
       hop_refresh_certificates
     end
@@ -220,7 +223,6 @@ SQL
     end
 
     when_checkup_set? do
-      decr_checkup
       hop_unavailable if !available?
     end
 
