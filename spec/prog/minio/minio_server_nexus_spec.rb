@@ -206,7 +206,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "does not bud minio_restart if there is already one restart going on" do
-      expect(nx).to receive(:available?).and_return(false).twice
+      expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(5)
       expect(nx).not_to receive(:bud).with(described_class, {}, :minio_restart)
       expect { nx.unavailable }.to nap(5)
