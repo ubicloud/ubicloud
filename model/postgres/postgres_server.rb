@@ -13,7 +13,7 @@ class PostgresServer < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :destroy, :update_firewall_rules
 
   def configure_hash
     configs = {
@@ -107,5 +107,12 @@ class PostgresServer < Sequel::Model
 
   def health_monitor_socket_path
     @health_monitor_socket_path ||= File.join(Dir.pwd, "health_monitor_sockets", "pg_#{vm.ephemeral_net6.nth(2)}")
+  end
+
+  def create_resource_firewall_rules
+    fw = Firewall.create_with_id(vm_id: vm.id, name: ubid.to_s, description: "Postgres default firewall")
+    resource.firewall_rules.each do |pg_fwr|
+      fw.insert_firewall_rule(pg_fwr.cidr.to_s, Sequel.pg_range(5432..5432))
+    end
   end
 end

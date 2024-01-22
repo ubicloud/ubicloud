@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :destroy, :update_firewall_rules
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:)
     DB.transaction do
@@ -28,18 +28,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
           {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
         ],
         boot_image: "postgres-ubuntu-2204",
-        enable_ip4: true
+        enable_ip4: true,
+        allow_only_ssh: true
       )
-
-      vm_st.subject.private_subnets.each { _1.firewall_rules.each(&:destroy) }
-      vm_st.subject.add_allow_ssh_fw_rules(vm_st.subject.private_subnets.first)
-      ["0.0.0.0/0", "::/0"].each do |ip|
-        FirewallRule.create_with_id(
-          ip: ip,
-          private_subnet_id: vm_st.subject.private_subnets.first.id,
-          port_range: Sequel.pg_range(5432..5432)
-        )
-      end
 
       postgres_server = PostgresServer.create(
         resource_id: resource_id,
@@ -47,6 +38,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         timeline_access: timeline_access,
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
+
+      postgres_server.create_resource_firewall_rules
 
       Strand.create(prog: "Postgres::PostgresServerNexus", label: "start") { _1.id = postgres_server.id }
     end
@@ -226,7 +219,25 @@ SQL
       hop_unavailable if !available?
     end
 
+    when_update_firewall_rules_set? do
+      decr_update_firewall_rules
+      hop_update_firewall_rules
+    end
+
     nap 30
+  end
+
+  label def update_firewall_rules
+    register_deadline(:wait, 1 * 60)
+
+    # destroy the previous set of firewall rules
+    vm.firewalls.select { _1.name == postgres_server.ubid.to_s }.each(&:destroy)
+
+    # create a new set of firewall rules
+    postgres_server.create_resource_firewall_rules
+    vm.incr_update_firewall_rules
+
+    hop_wait
   end
 
   label def unavailable

@@ -263,6 +263,14 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
       expect { nx.wait }.to hop("refresh_certificates")
     end
+
+    it "increments update_firewall_rules semaphore of postgres server if when_update_firewall_rules_set? is called" do
+      expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now)
+
+      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      expect(postgres_resource.server).to receive(:incr_update_firewall_rules)
+      expect { nx.wait }.to nap(30)
+    end
   end
 
   describe "#destroy" do
