@@ -43,7 +43,7 @@ jobs:
     - name: Cache ruby for ARM runners
       id: cache-ruby
       if: matrix.runs-on == 'ubicloud-arm'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: /opt/hostedtoolcache/Ruby
         key: ${{ matrix.runs-on }}-ruby-${{ hashFiles('.tool-versions') }}
