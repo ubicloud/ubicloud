@@ -121,14 +121,15 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   label def unavailable
     register_deadline(:wait, 10 * 60)
 
+    reap
+    nap 5 unless strand.children.select { _1.prog == "Minio::MinioServerNexus" && _1.label == "minio_restart" }.empty?
+
     if available?
       decr_checkup
-      strand.children.select { _1.prog == "Minio::MinioServerNexus" && _1.label == "minio_restart" }.each(&:destroy)
       hop_wait
     end
 
-    reap
-    bud self.class, frame, :minio_restart if leaf?
+    bud self.class, frame, :minio_restart
     nap 5
   end
 
