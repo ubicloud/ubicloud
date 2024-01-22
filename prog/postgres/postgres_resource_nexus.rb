@@ -74,7 +74,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def create_dns_record
-    dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
+    PostgresResource.dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
     hop_initialize_certificates
   end
 
@@ -168,15 +168,11 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       nap 5
     end
 
-    dns_zone&.delete_record(record_name: postgres_resource.hostname)
+    PostgresResource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
     postgres_resource.dissociate_with_project(postgres_resource.project)
     postgres_resource.destroy
 
     pop "postgres resource is deleted"
-  end
-
-  def dns_zone
-    @@dns_zone ||= DnsZone.where(project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname).first
   end
 
   def create_server_certificate
