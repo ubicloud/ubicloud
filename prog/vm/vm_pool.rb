@@ -38,7 +38,7 @@ class Prog::Vm::VmPool < Prog::Base
       encrypted: vm_pool.storage_encrypted,
       skip_sync: vm_pool.storage_skip_sync
     }
-    st = Prog::Vm::Nexus.assemble_with_sshable(
+    Prog::Vm::Nexus.assemble_with_sshable(
       "runner",
       Config.vm_pool_project_id,
       size: vm_pool.vm_size,
@@ -47,16 +47,10 @@ class Prog::Vm::VmPool < Prog::Base
       storage_volumes: [storage_params],
       enable_ip4: true,
       pool_id: vm_pool.id,
-      arch: vm_pool.arch
+      arch: vm_pool.arch,
+      allow_only_ssh: true
     )
 
-    ps = st.subject.private_subnets.first
-    # We don't need to incr_update_firewall_rules semaphore here because the VM
-    # is just created and the firewall rules are not applied in the SubnetNexus,
-    # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
-    # increment the semaphore, already.
-    ps.firewall_rules.map(&:destroy)
-    st.subject.add_allow_ssh_fw_rules(ps)
     hop_wait
   end
 

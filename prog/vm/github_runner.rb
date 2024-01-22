@@ -50,16 +50,9 @@ class Prog::Vm::GithubRunner < Prog::Base
       boot_image: label_data["boot_image"],
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
       enable_ip4: true,
-      arch: label_data["arch"]
+      arch: label_data["arch"],
+      allow_only_ssh: true
     )
-
-    ps = vm_st.subject.private_subnets.first
-    # We don't need to incr_update_firewall_rules semaphore here because the VM
-    # is just created and the firewall rules are not applied in the SubnetNexus,
-    # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
-    # increment the semaphore, already.
-    ps.firewall_rules.map(&:destroy)
-    vm_st.subject.add_allow_ssh_fw_rules(ps)
 
     Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
     vm_st.subject
