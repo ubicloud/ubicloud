@@ -200,9 +200,14 @@ RSpec.describe Prog::Vm::Nexus do
     it "hops to run if prep command is succeeded" do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
+      nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
+      expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:incr_setup_nic)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
-      expect { nx.prep }.to hop("run")
+      expect(nx).to receive(:bud).with(Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules)
+      expect { nx.prep }.to hop("wait_firewall_rules_before_run")
     end
 
     it "generates and passes a params json if prep command is not started yet" do
@@ -565,12 +570,27 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  describe "#wait_firewall_rules_before_run" do
+    before do
+      expect(nx).to receive(:reap).and_return([])
+    end
+
+    it "donates if firewall rules are not updated" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_firewall_rules_before_run }.to nap(0)
+    end
+
+    it "hops to run if firewall rules are updated" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_firewall_rules_before_run }.to hop("run")
+    end
+  end
+
   describe "#run" do
     it "runs the vm" do
       sshable = instance_double(Sshable)
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm/)
-      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
       expect { nx.run }.to hop("wait_sshable")
     end
   end
@@ -676,6 +696,34 @@ RSpec.describe Prog::Vm::Nexus do
     it "hops to start_after_host_reboot when needed" do
       expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
       expect { nx.wait }.to hop("start_after_host_reboot")
+    end
+
+    it "hops to update_firewall_rules when needed" do
+      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      expect { nx.wait }.to hop("update_firewall_rules")
+    end
+  end
+
+  describe "#update_firewall_rules" do
+    it "hops to wait_firewall_rules" do
+      expect(nx).to receive(:bud).with(Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules)
+      expect { nx.update_firewall_rules }.to hop("wait_firewall_rules")
+    end
+  end
+
+  describe "#wait_firewall_rules" do
+    before do
+      expect(nx).to receive(:reap).and_return([])
+    end
+
+    it "naps when nothing to do" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_firewall_rules }.to nap(0)
+    end
+
+    it "hops to run if firewall rules are updated" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_firewall_rules }.to hop("wait")
     end
   end
 
