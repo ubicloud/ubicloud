@@ -242,13 +242,94 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "firewall" do
+      it "can show default firewall rules" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        expect(page).to have_content "Firewall Rules"
+        expect(page).to have_content "0.0.0.0/0"
+        expect(page).to have_content "5432"
+      end
+
+      it "can delete firewall rules" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(page.body).to eq({message: "Firewall rule deleted"}.to_json)
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can not delete firewall rules when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+
+        expect { find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can not delete firewall rules if not exist" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
+        expect(PostgresFirewallRule).to receive(:from_ubid).and_return(nil)
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq(404)
+      end
+
+      it "does not show create firewall rule when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+
+        expect { find_by_id "fwr-create" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can create firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        fill_in "cidr", with: "1.1.1.2"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_content "1.1.1.2/32"
+        expect(page).to have_content "5432"
+
+        fill_in "cidr", with: "12.12.12.0/26"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+
+        fill_in "cidr", with: "fd00::/64"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "fd00::/64"
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+    end
+
     describe "delete" do
       it "can delete PostgreSQL database" do
         visit "#{project.path}#{pg.path}"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
+        btn = find "#postgres-delete-#{pg.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.body).to eq({message: "Deleting #{pg.name}"}.to_json)
