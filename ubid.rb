@@ -67,6 +67,7 @@ class UBID
   TYPE_DNS_SERVER = "ds"
   TYPE_FIREWALL_RULE = "fr"
   TYPE_FIREWALL = "fw"
+  TYPE_POSTGRES_FIREWALL_RULE = "pf"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"

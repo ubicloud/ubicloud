@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_resource, :server
 
-  semaphore :destroy
+  semaphore :destroy, :update_firewall_rules
 
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, parent_id: nil, restore_target: nil)
     unless (project = Project[project_id])
@@ -45,6 +45,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       )
       postgres_resource.associate_with_project(project)
 
+      PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access)
 
       Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
@@ -146,6 +147,11 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def wait
     if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
       hop_refresh_certificates
+    end
+
+    when_update_firewall_rules_set? do
+      postgres_resource.server.incr_update_firewall_rules
+      decr_update_firewall_rules
     end
 
     nap 30

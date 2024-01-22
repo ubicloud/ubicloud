@@ -346,6 +346,24 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(30)
     end
+
+    it "hops to update_firewall_rules if update_firewall_rules is set" do
+      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      expect { nx.wait }.to hop("update_firewall_rules")
+    end
+  end
+
+  describe "#update_firewall_rules" do
+    it "updates firewall rules and hops to wait" do
+      expect(postgres_server).to receive(:ubid).and_return("dummy-ubid")
+      fw = instance_double(Firewall, name: "dummy-ubid")
+      expect(postgres_server.vm).to receive(:firewalls).and_return([fw])
+      expect(fw).to receive(:destroy)
+      expect(postgres_server).to receive(:create_resource_firewall_rules)
+      expect(postgres_server.vm).to receive(:incr_update_firewall_rules)
+
+      expect { nx.update_firewall_rules }.to hop("wait")
+    end
   end
 
   describe "#unavailable" do

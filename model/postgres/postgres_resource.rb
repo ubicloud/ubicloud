@@ -9,7 +9,9 @@ class PostgresResource < Sequel::Model
   many_to_one :parent, key: :parent_id, class: self
   one_to_one :server, class: PostgresServer, key: :resource_id
   one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
+  one_to_many :firewall_rules, class: PostgresFirewallRule, key: :postgres_resource_id
 
+  plugin :association_dependencies, firewall_rules: :destroy
   dataset_module Authorization::Dataset
 
   include ResourceMethods
@@ -22,7 +24,7 @@ class PostgresResource < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy
+  semaphore :destroy, :update_firewall_rules
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
