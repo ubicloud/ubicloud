@@ -18,10 +18,13 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     end
 
     DB.transaction do
+      ubid = MinioServer.generate_ubid
+
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         "minio-user",
         Config.minio_service_project_id,
         location: minio_pool.cluster.location,
+        name: ubid.to_s,
         size: minio_pool.vm_size,
         storage_volumes: [
           {encrypted: true, size_gib: 30}
@@ -31,7 +34,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         private_subnet_id: minio_pool.cluster.private_subnet.id
       )
 
-      minio_server = MinioServer.create_with_id(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index)
+      minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { _1.id = ubid.to_uuid }
 
       Strand.create(prog: "Minio::MinioServerNexus", label: "start") { _1.id = minio_server.id }
     end
