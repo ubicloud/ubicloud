@@ -2,7 +2,7 @@
 
 require "net/ssh"
 
-class Prog::Test::VmGroup < Prog::Base
+class Prog::Test::VmGroup < Prog::Test::Base
   def self.assemble(storage_encrypted: true, test_reboot: true)
     Strand.create_with_id(
       prog: "Test::VmGroup",
@@ -118,10 +118,8 @@ class Prog::Test::VmGroup < Prog::Base
     pop "VmGroup tests finished!"
   end
 
-  def update_stack(new_frame)
-    strand.stack.first.merge!(new_frame)
-    strand.modified!(:stack)
-    strand.save_changes
+  label def failed
+    nap 15
   end
 
   def vm_host

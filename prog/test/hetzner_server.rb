@@ -2,7 +2,7 @@
 
 require_relative "../../lib/util"
 
-class Prog::Test::HetznerServer < Prog::Base
+class Prog::Test::HetznerServer < Prog::Test::Base
   semaphore :destroy
 
   def self.assemble(vm_host_id: nil)
@@ -99,7 +99,7 @@ class Prog::Test::HetznerServer < Prog::Base
   def verify_specs_installation(installed: true)
     specs_count = vm_host.sshable.cmd("find /home/rhizome -type f -name '*_spec.rb' -not -path \"/home/rhizome/vendor/*\" | wc -l")
     specs_installed = (specs_count.strip != "0")
-    fail "verify_specs_installation(installed: #{installed}) failed" unless specs_installed == installed
+    fail_test "verify_specs_installation(installed: #{installed}) failed" unless specs_installed == installed
   end
 
   label def run_integration_specs
@@ -150,10 +150,8 @@ class Prog::Test::HetznerServer < Prog::Base
     pop "HetznerServer tests finished!"
   end
 
-  def update_stack(new_frame)
-    strand.stack.first.merge!(new_frame)
-    strand.modified!(:stack)
-    strand.save_changes
+  label def failed
+    nap 15
   end
 
   def hetzner_api

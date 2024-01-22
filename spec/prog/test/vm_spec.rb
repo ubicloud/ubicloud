@@ -71,7 +71,8 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:cmd).with("dd if=/dev/random of=~/1.txt bs=512 count=1000000")
       expect(sshable).to receive(:cmd).with("sync ~/1.txt")
       expect(sshable).to receive(:cmd).with("ls -s ~/1.txt").and_return "300 /home/xyz/1.txt"
-      expect { vm_test.verify_dd }.to raise_error RuntimeError, "unexpected size after dd"
+      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "unexpected size after dd"})
+      expect { vm_test.verify_dd }.to hop("failed")
     end
   end
 
@@ -142,6 +143,12 @@ RSpec.describe Prog::Test::Vm do
   describe "#finish" do
     it "exits" do
       expect { vm_test.finish }.to exit({"msg" => "Verified VM!"})
+    end
+  end
+
+  describe "#failed" do
+    it "naps" do
+      expect { vm_test.failed }.to nap(15)
     end
   end
 end
