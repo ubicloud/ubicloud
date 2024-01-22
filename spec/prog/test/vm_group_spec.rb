@@ -112,6 +112,12 @@ RSpec.describe Prog::Test::VmGroup do
     end
   end
 
+  describe "#failed" do
+    it "naps" do
+      expect { vg_test.failed }.to nap(15)
+    end
+  end
+
   describe "#vm_host" do
     it "returns first VM's host" do
       sshable = Sshable.create_with_id

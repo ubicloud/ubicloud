@@ -115,7 +115,8 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "succeeds when installed=false & exists" do
       expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("5\n")
-      expect { hs_test.verify_specs_installation(installed: false) }.to raise_error RuntimeError
+      expect(hs_test).to receive(:fail_test).with("verify_specs_installation(installed: false) failed")
+      hs_test.verify_specs_installation(installed: false)
     end
   end
 
@@ -182,6 +183,12 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#finish" do
     it "exits" do
       expect { hs_test.finish }.to exit({"msg" => "HetznerServer tests finished!"})
+    end
+  end
+
+  describe "#failed" do
+    it "naps" do
+      expect { hs_test.failed }.to nap(15)
     end
   end
 

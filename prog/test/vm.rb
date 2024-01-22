@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Prog::Test::Vm < Prog::Base
+class Prog::Test::Vm < Prog::Test::Base
   subject_is :vm, :sshable
 
   label def start
@@ -15,7 +15,7 @@ class Prog::Test::Vm < Prog::Base
     size_info = sshable.cmd("ls -s ~/1.txt").split
 
     unless size_info[0].to_i.between?(500000, 500100)
-      fail "unexpected size after dd"
+      fail_test "unexpected size after dd"
     end
 
     hop_install_packages
@@ -95,6 +95,10 @@ class Prog::Test::Vm < Prog::Base
 
   label def finish
     pop "Verified VM!"
+  end
+
+  label def failed
+    nap 15
   end
 
   def vms_in_same_project

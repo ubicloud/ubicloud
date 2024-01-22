@@ -23,6 +23,11 @@ end
 
 def wait_until(st, label = nil)
   while (loaded_st = Strand[st.id]) && loaded_st.label != label
+    if loaded_st.label == "failed"
+      log(st.reload, "FAILED: #{loaded_st.exitval.fetch("msg")}")
+      st.destroy
+      exit 1
+    end
     log(st.reload, "waiting #{label ? "for #{label}" : "exit"}")
     sleep 10
   end
