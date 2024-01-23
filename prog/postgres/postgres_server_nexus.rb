@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :destroy, :update_firewall_rules
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :configure, :update_firewall_rules, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:)
     DB.transaction do
@@ -143,6 +143,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def configure
+    decr_configure
+
     case vm.sshable.cmd("common/bin/daemonizer --check configure_postgres")
     when "Succeeded"
       vm.sshable.cmd("common/bin/daemonizer --clean configure_postgres")
@@ -229,6 +231,10 @@ SQL
     when_update_firewall_rules_set? do
       decr_update_firewall_rules
       hop_update_firewall_rules
+    end
+
+    when_configure_set? do
+      hop_configure
     end
 
     nap 30

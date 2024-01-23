@@ -364,6 +364,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
       expect { nx.wait }.to hop("update_firewall_rules")
     end
+
+    it "hops to configure if configure is set" do
+      expect(nx).to receive(:when_configure_set?).and_yield
+      expect { nx.wait }.to hop("configure")
+    end
   end
 
   describe "#update_firewall_rules" do
