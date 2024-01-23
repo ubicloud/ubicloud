@@ -4,4 +4,9 @@
 require_relative "../../common/lib/util"
 
 r "chown postgres /dat"
+
+# Below commands are required for idempotency
+r "rm -rf /dat/16"
+r "rm -rf /etc/postgresql/16"
+
 r "pg_createcluster 16 main"
