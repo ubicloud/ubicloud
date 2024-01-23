@@ -53,7 +53,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       postgres_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
 
-      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
 
       postgres_server = PostgresServer[st.id]
       expect(postgres_server).not_to be_nil

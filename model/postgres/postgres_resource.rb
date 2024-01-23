@@ -7,7 +7,8 @@ class PostgresResource < Sequel::Model
   many_to_one :project
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
   many_to_one :parent, key: :parent_id, class: self
-  one_to_one :server, class: PostgresServer, key: :resource_id
+  one_to_many :servers, class: PostgresServer, key: :resource_id
+  one_to_one :representative_server, class: PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
   one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
   one_to_many :firewall_rules, class: PostgresFirewallRule, key: :postgres_resource_id
 
@@ -46,7 +47,7 @@ class PostgresResource < Sequel::Model
     if Prog::Postgres::PostgresResourceNexus.dns_zone
       "#{name}.#{Config.postgres_service_hostname}"
     else
-      server&.vm&.ephemeral_net4&.to_s
+      representative_server&.vm&.ephemeral_net4&.to_s
     end
   end
 

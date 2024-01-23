@@ -74,7 +74,7 @@ class PostgresServer < Sequel::Model
         }
       },
       identity: resource.identity,
-      hosts: "#{vm.ephemeral_net4} #{resource.identity}"
+      hosts: "#{resource.representative_server.vm.ephemeral_net4} #{resource.identity}"
     }
   end
 

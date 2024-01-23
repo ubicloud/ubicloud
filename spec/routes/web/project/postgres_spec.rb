@@ -221,7 +221,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "does not show reset superuser password for restoring database" do
-        pg.server.update(timeline_access: "fetch")
+        pg.representative_server.update(timeline_access: "fetch")
 
         visit "#{project.path}#{pg.path}"
         expect(page).to have_no_content "Reset superuser password"
@@ -232,7 +232,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}"
         expect(page).to have_content "Reset superuser password"
 
-        pg.server.update(timeline_access: "fetch")
+        pg.representative_server.update(timeline_access: "fetch")
         fill_in "New password", with: "DummyPassword123"
         fill_in "New password (repeat)", with: "DummyPassword123"
         click_button "Reset"
