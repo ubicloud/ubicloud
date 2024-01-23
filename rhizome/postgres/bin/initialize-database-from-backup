@@ -10,6 +10,11 @@ end
 backup_label = ARGV[0]
 
 r "chown postgres /dat"
+
+# Below commands are required for idempotency
+r "rm -rf /dat/16"
+r "rm -rf /etc/postgresql/16"
+
 r "sudo -u postgres wal-g backup-fetch /dat/16/data #{backup_label} --config /etc/postgresql/wal-g.env"
 
 # We want to use pg_createcluster, even with an existing database folder because
