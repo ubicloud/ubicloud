@@ -15,11 +15,6 @@ class PostgresResource < Sequel::Model
   dataset_module Authorization::Dataset
 
   include ResourceMethods
-
-  def self.redacted_columns
-    super + [:root_cert_1, :root_cert_2, :server_cert]
-  end
-
   include SemaphoreMethods
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
@@ -57,5 +52,9 @@ class PostgresResource < Sequel::Model
 
   def connection_string
     URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s if hostname
+  end
+
+  def self.redacted_columns
+    super + [:root_cert_1, :root_cert_2, :server_cert]
   end
 end

@@ -18,11 +18,6 @@ class Vm < Sequel::Model
   dataset_module Authorization::Dataset
 
   include ResourceMethods
-
-  def self.redacted_columns
-    super + [:public_key]
-  end
-
   include SemaphoreMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
 
@@ -156,5 +151,9 @@ class Vm < Sequel::Model
 
   def storage_encrypted?
     vm_storage_volumes.all? { !_1.key_encryption_key_1_id.nil? }
+  end
+
+  def self.redacted_columns
+    super + [:public_key]
   end
 end

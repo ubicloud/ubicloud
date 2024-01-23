@@ -13,11 +13,6 @@ class MinioCluster < Sequel::Model
   many_to_one :private_subnet, key: :private_subnet_id
 
   include ResourceMethods
-
-  def self.redacted_columns
-    super + [:root_cert_1, :root_cert_2]
-  end
-
   include SemaphoreMethods
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
@@ -78,5 +73,9 @@ class MinioCluster < Sequel::Model
 
   def root_certs
     root_cert_1.to_s + root_cert_2.to_s
+  end
+
+  def self.redacted_columns
+    super + [:root_cert_1, :root_cert_2]
   end
 end

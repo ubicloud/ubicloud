@@ -14,11 +14,6 @@ class MinioServer < Sequel::Model
   dataset_module Authorization::Dataset
 
   include ResourceMethods
-
-  def self.redacted_columns
-    super + [:cert]
-  end
-
   include SemaphoreMethods
   include HealthMonitorMethods
 
@@ -91,5 +86,9 @@ class MinioServer < Sequel::Model
       socket: socket,
       ssl_ca_file_data: cluster.root_certs
     )
+  end
+
+  def self.redacted_columns
+    super + [:cert]
   end
 end
