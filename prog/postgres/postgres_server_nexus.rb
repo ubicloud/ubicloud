@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :configure, :update_firewall_rules, :destroy
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:)
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -36,6 +36,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         resource_id: resource_id,
         timeline_id: timeline_id,
         timeline_access: timeline_access,
+        representative_at: representative_at,
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
 

@@ -7,7 +7,13 @@ RSpec.describe PostgresServer do
     described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
   }
 
-  let(:resource) { instance_double(PostgresResource, identity: "pgubid.postgres.ubicloud.com") }
+  let(:resource) {
+    instance_double(
+      PostgresResource,
+      representative_server: postgres_server,
+      identity: "pgubid.postgres.ubicloud.com"
+    )
+  }
 
   let(:vm) {
     instance_double(

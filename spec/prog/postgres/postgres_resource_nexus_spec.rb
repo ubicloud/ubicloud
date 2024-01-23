@@ -17,7 +17,14 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       server_cert: "server cert",
       server_cert_key: nil,
       parent: nil,
-      server: instance_double(
+      servers: [instance_double(
+        PostgresServer,
+        vm: instance_double(
+          Vm,
+          cores: 1
+        )
+      )],
+      representative_server: instance_double(
         PostgresServer,
         vm: instance_double(
           Vm,
@@ -103,18 +110,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#start" do
     it "naps if vm not ready" do
-      expect(postgres_resource.server.vm).to receive(:strand).and_return(instance_double(Strand, label: "prep"))
+      expect(postgres_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "prep"))
       expect { nx.start }.to nap(5)
     end
 
     it "registers deadline and hops" do
-      expect(postgres_resource.server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(postgres_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(nx).to receive(:register_deadline)
       expect { nx.start }.to hop("create_dns_record")
     end
 
     it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
-      expect(postgres_resource.server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(postgres_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(nx).to receive(:register_deadline)
       expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource))
       expect(nx).to receive(:bud).with(described_class, {}, :trigger_pg_current_xact_id_on_parent)
@@ -129,7 +136,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:parent).and_return(
         instance_double(
           PostgresResource,
-          server: instance_double(
+          representative_server: instance_double(
             PostgresServer,
             vm: instance_double(Vm, sshable: sshable)
           )
@@ -142,7 +149,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#create_dns_record" do
     it "creates dns records and hops" do
-      expect(postgres_resource.server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(postgres_resource.representative_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
       expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
@@ -157,7 +164,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#initialize_certificates" do
-    it "hops to wait_server after creating certificates" do
+    it "hops to wait_servers after creating certificates" do
       postgres_resource = PostgresResource.create_with_id(
         project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
         location: "hetzner-hel1",
@@ -174,7 +181,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
       expect(nx).to receive(:create_certificate).and_call_original
 
-      expect { nx.initialize_certificates }.to hop("wait_server")
+      expect { nx.initialize_certificates }.to hop("wait_servers")
     end
 
     it "naps if there are children" do
@@ -191,7 +198,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 30 * 4))
 
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{postgres_resource.ubid} Root Certificate Authority")
-      expect(postgres_resource.server).to receive(:incr_refresh_certificates)
+      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
 
       expect { nx.refresh_certificates }.to hop("wait")
     end
@@ -201,7 +208,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
 
       expect(nx).to receive(:create_certificate)
-      expect(postgres_resource.server).to receive(:incr_refresh_certificates)
+      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
 
       expect { nx.refresh_certificates }.to hop("wait")
     end
@@ -213,21 +220,22 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
 
       expect(Util).to receive(:create_certificate).with(hash_including(issuer_cert: root_cert_2)).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "server cert")])
-      expect(postgres_resource.server).to receive(:incr_refresh_certificates)
+      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
 
       expect { nx.refresh_certificates }.to hop("wait")
     end
   end
 
-  describe "#wait_server" do
+  describe "#wait_servers" do
     it "naps if server not ready" do
-      expect(postgres_resource.server).to receive(:strand).and_return(instance_double(Strand, label: "start"))
-      expect { nx.wait_server }.to nap(5)
+      expect(postgres_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "start")))
+
+      expect { nx.wait_servers }.to nap(5)
     end
 
     it "hops if server is ready" do
-      expect(postgres_resource.server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect { nx.wait_server }.to hop("create_billing_record")
+      expect(postgres_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "wait")))
+      expect { nx.wait_servers }.to hop("create_billing_record")
     end
   end
 
@@ -238,7 +246,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
-        amount: postgres_resource.server.vm.cores
+        amount: postgres_resource.representative_server.vm.cores
       )
 
       expect(BillingRecord).to receive(:create_with_id).with(
@@ -268,7 +276,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now)
 
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
-      expect(postgres_resource.server).to receive(:incr_update_firewall_rules)
+      expect(postgres_resource.representative_server).to receive(:incr_update_firewall_rules)
       expect { nx.wait }.to nap(30)
     end
   end
@@ -278,10 +286,10 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = instance_double(DnsZone)
       expect(described_class).to receive(:dns_zone).and_return(dns_zone)
 
-      expect(postgres_resource.server).to receive(:incr_destroy)
+      expect(postgres_resource.servers).to all(receive(:incr_destroy))
       expect { nx.destroy }.to nap(5)
 
-      expect(postgres_resource).to receive(:server).and_return(nil)
+      expect(postgres_resource).to receive(:servers).and_return([])
       expect(postgres_resource).to receive(:hostname)
       expect(dns_zone).to receive(:delete_record)
       expect(postgres_resource).to receive(:dissociate_with_project)
@@ -292,7 +300,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "completes destroy even if dns zone is not configured" do
       expect(described_class).to receive(:dns_zone).and_return(nil)
-      expect(postgres_resource).to receive(:server).and_return(nil)
+      expect(postgres_resource).to receive(:servers).and_return([])
 
       expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
     end

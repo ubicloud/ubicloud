@@ -8,7 +8,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   extend Forwardable
-  def_delegators :postgres_resource, :server
+  def_delegators :postgres_resource, :servers, :representative_server
 
   semaphore :destroy, :update_firewall_rules
 
@@ -46,7 +46,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource.associate_with_project(project)
 
       PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
 
       Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
     end
@@ -62,19 +62,19 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def start
-    nap 5 unless server.vm.strand.label == "wait"
+    nap 5 unless representative_server.vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
     bud self.class, frame, :trigger_pg_current_xact_id_on_parent if postgres_resource.parent
     hop_create_dns_record
   end
 
   label def trigger_pg_current_xact_id_on_parent
-    postgres_resource.parent.server.vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_current_xact_id()'")
+    postgres_resource.parent.representative_server.vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_current_xact_id()'")
     pop "triggered pg_current_xact_id"
   end
 
   label def create_dns_record
-    Prog::Postgres::PostgresResourceNexus.dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
+    Prog::Postgres::PostgresResourceNexus.dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: representative_server.vm.ephemeral_net4.to_s)
     hop_initialize_certificates
   end
 
@@ -90,7 +90,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.save_changes
 
     reap
-    hop_wait_server if leaf?
+    hop_wait_servers if leaf?
     nap 5
   end
 
@@ -105,12 +105,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     if OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
       postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-      server.incr_refresh_certificates
+      servers.each(&:incr_refresh_certificates)
     end
 
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
       postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
-      server.incr_refresh_certificates
+      servers.each(&:incr_refresh_certificates)
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
@@ -119,8 +119,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     hop_wait
   end
 
-  label def wait_server
-    nap 5 if server.strand.label != "wait"
+  label def wait_servers
+    nap 5 if servers.any? { _1.strand.label != "wait" }
     hop_create_billing_record
   end
 
@@ -130,7 +130,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       resource_id: postgres_resource.id,
       resource_name: postgres_resource.name,
       billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
-      amount: server.vm.cores
+      amount: representative_server.vm.cores
     )
 
     BillingRecord.create_with_id(
@@ -150,7 +150,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     when_update_firewall_rules_set? do
-      postgres_resource.server.incr_update_firewall_rules
+      postgres_resource.representative_server.incr_update_firewall_rules
       decr_update_firewall_rules
     end
 
@@ -163,8 +163,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     decr_destroy
 
     strand.children.each { _1.destroy }
-    unless server.nil?
-      server.incr_destroy
+    unless servers.empty?
+      servers.each(&:incr_destroy)
       nap 5
     end
 

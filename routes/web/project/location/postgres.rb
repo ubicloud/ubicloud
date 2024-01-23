@@ -83,7 +83,7 @@ class CloverWeb
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
 
-        unless pg.server.primary?
+        unless pg.representative_server.primary?
           flash["error"] = "Superuser password cannot be updated during restore!"
           return redirect_back_with_inputs
         end
@@ -91,7 +91,7 @@ class CloverWeb
         Validation.validate_postgres_superuser_password(r.params["original_password"], r.params["repeat_password"])
 
         pg.update(superuser_password: r.params["original_password"])
-        pg.server.incr_update_superuser_password
+        pg.representative_server.incr_update_superuser_password
 
         flash["notice"] = "The superuser password will be updated in a few seconds"
 
