@@ -8,11 +8,6 @@ class GithubRunner < Sequel::Model
   one_to_one :vm, key: :id, primary_key: :vm_id
 
   include ResourceMethods
-
-  def self.redacted_columns
-    super + [:workflow_job]
-  end
-
   include SemaphoreMethods
   semaphore :destroy
 
@@ -26,5 +21,9 @@ class GithubRunner < Sequel::Model
 
   def runner_url
     "http://github.com/#{repository_name}/settings/actions/runners/#{runner_id}" if runner_id
+  end
+
+  def self.redacted_columns
+    super + [:workflow_job]
   end
 end
