@@ -184,8 +184,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     Util.create_certificate(
-      subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Server Certificate",
-      extensions: ["subjectAltName=DNS:#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth,clientAuth"],
+      subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.identity}",
+      extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth,clientAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
       issuer_key: root_cert_key

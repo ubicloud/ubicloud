@@ -69,7 +69,8 @@ class PostgresServer < Sequel::Model
           net4: _1.net4.to_s,
           net6: _1.net6.to_s
         }
-      }
+      },
+      identity: resource.identity
     }
   end
 

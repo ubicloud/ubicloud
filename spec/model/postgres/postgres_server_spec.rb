@@ -7,6 +7,8 @@ RSpec.describe PostgresServer do
     described_class.new
   }
 
+  let(:resource) { instance_double(PostgresResource, identity: "pgubid.postgres.ubicloud.com") }
+
   let(:vm) {
     instance_double(
       Vm,
@@ -24,7 +26,7 @@ RSpec.describe PostgresServer do
   }
 
   before do
-    allow(postgres_server).to receive(:vm).and_return(vm)
+    allow(postgres_server).to receive_messages(resource: resource, vm: vm)
   end
 
   it "generates configure_hash" do
@@ -73,7 +75,8 @@ RSpec.describe PostgresServer do
           net4: "172.0.0.0/26",
           net6: "fdfa:b5aa:14a3:4a3d::/64"
         }
-      ]
+      ],
+      identity: "pgubid.postgres.ubicloud.com"
     }
 
     expect(postgres_server.configure_hash).to eq(configure_hash)

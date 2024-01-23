@@ -50,6 +50,10 @@ class PostgresResource < Sequel::Model
     end
   end
 
+  def identity
+    "#{ubid}.#{Config.postgres_service_hostname}"
+  end
+
   def connection_string
     URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s if hostname
   end
