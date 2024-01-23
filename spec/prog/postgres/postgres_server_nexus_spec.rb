@@ -10,6 +10,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       PostgresServer,
       resource: instance_double(
         PostgresResource,
+        root_cert_1: "root_cert_1",
+        root_cert_2: "root_cert_2",
         server_cert: "server_cert",
         server_cert_key: "server_cert_key",
         superuser_password: "dummy-password"
@@ -215,6 +217,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#refresh_certificates" do
     it "pushes certificates to vm and hops to configure during initial provisioning" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")
@@ -225,6 +228,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait at times other than the initial provisioning" do
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")

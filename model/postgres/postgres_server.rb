@@ -36,6 +36,7 @@ class PostgresServer < Sequel::Model
       tcp_keepalives_interval: "2",
       ssl: "on",
       ssl_min_protocol_version: "TLSv1.3",
+      ssl_ca_file: "'/dat/16/data/ca.crt'",
       ssl_cert_file: "'/dat/16/data/server.crt'",
       ssl_key_file: "'/dat/16/data/server.key'",
       log_timezone: "'UTC'",
