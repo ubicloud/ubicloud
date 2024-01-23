@@ -86,7 +86,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # ago.
     postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
     postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-    postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
+    postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
     postgres_resource.save_changes
 
     reap
@@ -109,7 +109,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
-      postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
+      postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
       server.incr_refresh_certificates
     end
 
@@ -175,7 +175,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     pop "postgres resource is deleted"
   end
 
-  def create_server_certificate
+  def create_certificate
     root_cert = OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1)
     root_cert_key = OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
     if root_cert.not_after < Time.now + 60 * 60 * 24 * 365 * 1
@@ -185,7 +185,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Server Certificate",
-      extensions: ["subjectAltName=DNS:#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
+      extensions: ["subjectAltName=DNS:#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth,clientAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
       issuer_key: root_cert_key

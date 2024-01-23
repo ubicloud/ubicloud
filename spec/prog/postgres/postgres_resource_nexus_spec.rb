@@ -172,14 +172,14 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 5, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
-      expect(nx).to receive(:create_server_certificate).and_call_original
+      expect(nx).to receive(:create_certificate).and_call_original
 
       expect { nx.initialize_certificates }.to hop("wait_server")
     end
 
     it "naps if there are children" do
       expect(Util).to receive(:create_root_certificate).twice
-      expect(nx).to receive(:create_server_certificate)
+      expect(nx).to receive(:create_certificate)
       expect(nx).to receive(:leaf?).and_return(false)
       expect { nx.initialize_certificates }.to nap(5)
     end
@@ -200,7 +200,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
       expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
 
-      expect(nx).to receive(:create_server_certificate)
+      expect(nx).to receive(:create_certificate)
       expect(postgres_resource.server).to receive(:incr_refresh_certificates)
 
       expect { nx.refresh_certificates }.to hop("wait")
