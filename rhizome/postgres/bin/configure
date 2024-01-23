@@ -45,20 +45,26 @@ host    replication     all             ::1/128                 scram-sha-256
 # Allow connections from private subnet with SCRAM authentication
 #{private_subnets}
 
+# Allow replication connection using special replication user for
+# HA standbys
+hostssl replication     ubi_replication all                     cert map=standby2replication
+
 # Allow connections from public internet with SCRAM authentication
 host    all             all             all                     scram-sha-256
 PG_HBA
 safe_write_to_file("/etc/postgresql/16/main/pg_hba.conf", pg_hba_entries)
 
+identity = configure_hash["identity"]
 pg_ident_entries = <<-PG_IDENT
 # PostgreSQL User Name Maps
 # =========================
 #
 # Refer to the PostgreSQL documentation, chapter "Client
 # Authentication" for a complete description.
-# MAPNAME          SYSTEM-USERNAME         PG-USERNAME
-system2postgres    postgres                postgres
-system2postgres    ubi                     postgres
+# MAPNAME             SYSTEM-USERNAME         PG-USERNAME
+system2postgres       postgres                postgres
+system2postgres       ubi                     postgres
+standby2replication   #{identity}             ubi_replication
 PG_IDENT
 safe_write_to_file("/etc/postgresql/16/main/pg_ident.conf", pg_ident_entries)
 
