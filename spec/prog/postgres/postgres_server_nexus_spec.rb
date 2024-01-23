@@ -8,14 +8,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   let(:postgres_server) {
     instance_double(
       PostgresServer,
-      resource: instance_double(
-        PostgresResource,
-        root_cert_1: "root_cert_1",
-        root_cert_2: "root_cert_2",
-        server_cert: "server_cert",
-        server_cert_key: "server_cert_key",
-        superuser_password: "dummy-password"
-      ),
+      ubid: "pgubid",
       timeline: instance_double(
         PostgresTimeline,
         id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
@@ -31,10 +24,23 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     )
   }
 
+  let(:resource) {
+    instance_double(
+      PostgresResource,
+      root_cert_1: "root_cert_1",
+      root_cert_2: "root_cert_2",
+      server_cert: "server_cert",
+      server_cert_key: "server_cert_key",
+      superuser_password: "dummy-password",
+      representative_server: postgres_server
+    )
+  }
+
   let(:sshable) { instance_double(Sshable) }
 
   before do
     allow(nx).to receive(:postgres_server).and_return(postgres_server)
+    allow(postgres_server).to receive(:resource).and_return(resource)
   end
 
   describe ".assemble" do
@@ -51,14 +57,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       postgres_timeline = PostgresTimeline.create_with_id
 
       postgres_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
-
       postgres_server = PostgresServer[st.id]
       expect(postgres_server).not_to be_nil
       expect(postgres_server.vm).not_to be_nil
       expect(postgres_server.vm.sshable).not_to be_nil
+
+      st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
+      expect(PostgresServer[st.id].synchronization_status).to eq("catching_up")
     end
   end
 
@@ -186,6 +194,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "triggers initialize_database_from_backup if initialize_database_from_backup command is not sent yet or failed" do
       expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now).twice
       expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label").twice
+      expect(postgres_server).to receive(:standby?).and_return(false).twice
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup backup-label' initialize_database_from_backup").twice
 
       # NotStarted
@@ -207,11 +216,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
-    it "fails if the timeline has no backup" do
-      expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now)
-      expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).and_return(nil)
+    it "triggers initialize_database_from_backup with LATEST as backup_label for standbys" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
-      expect { nx.initialize_database_from_backup }.to raise_error RuntimeError, "BUG: no backup found"
+      expect(postgres_server).to receive(:standby?).and_return(true)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup LATEST' initialize_database_from_backup")
+      expect { nx.initialize_database_from_backup }.to nap(5)
     end
   end
 
@@ -265,19 +274,39 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure }.to hop("update_superuser_password")
     end
 
-    it "hops to wait_recovery_completion if configure command is succeeded during the initial provisioning and if the server is not primary" do
+    it "hops to wait_catch_up if configure command is succeeded during the initial provisioning and if the server is standby" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
       expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server).to receive(:standby?).and_return(true)
+      expect { nx.configure }.to hop("wait_catch_up")
+    end
+
+    it "hops to wait_recovery_completion if configure command is succeeded during the initial provisioning and if the server is doing pitr" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server).to receive(:standby?).and_return(false)
       expect { nx.configure }.to hop("wait_recovery_completion")
     end
 
-    it "hops to wait if configure command is succeeded at times other than the initial provisioning" do
+    it "hops to wait for primaries if configure command is succeeded at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(postgres_server).to receive(:standby?).and_return(false)
       expect { nx.configure }.to hop("wait")
+    end
+
+    it "hops to wait_catchup for standbys if configure command is succeeded at times other than the initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("Succeeded")
+      expect(postgres_server).to receive(:standby?).and_return(true)
+      expect(postgres_server).to receive(:synchronization_status).and_return("catching_up")
+      expect { nx.configure }.to hop("wait_catch_up")
     end
 
     it "naps if script return unknown status" do
@@ -305,6 +334,44 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_initial_provisioning_set?)
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("wait")
+    end
+  end
+
+  describe "#wait_catch_up" do
+    it "naps if the lag cannot be read or too high" do
+      expect(sshable).to receive(:cmd).and_return("", "90000000")
+      expect { nx.wait_catch_up }.to nap(30)
+      expect { nx.wait_catch_up }.to nap(30)
+    end
+
+    it "sets the synchronization_status and hops to wait_synchronization for sync replication" do
+      expect(sshable).to receive(:cmd).and_return("80000000")
+      expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
+      expect(postgres_server).to receive(:incr_configure)
+      expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect { nx.wait_catch_up }.to hop("wait_synchronization")
+    end
+
+    it "sets the synchronization_status and hops to wait for async replication" do
+      expect(sshable).to receive(:cmd).and_return("80000000")
+      expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
+      expect(postgres_server).to receive(:incr_configure)
+      expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
+      expect { nx.wait_catch_up }.to hop("wait")
+    end
+  end
+
+  describe "#wait_synchronization" do
+    it "hops to wait if sync replication is established" do
+      expect(sshable).to receive(:cmd).and_return("quorum", "sync")
+      expect { nx.wait_synchronization }.to hop("wait")
+      expect { nx.wait_synchronization }.to hop("wait")
+    end
+
+    it "naps if sync replication is not established" do
+      expect(sshable).to receive(:cmd).and_return("", "async")
+      expect { nx.wait_synchronization }.to nap(30)
+      expect { nx.wait_synchronization }.to nap(30)
     end
   end
 
