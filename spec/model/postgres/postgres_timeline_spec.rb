@@ -93,11 +93,11 @@ PGHOST=/var/run/postgresql
       expect(postgres_timeline.latest_backup_label_before_target(target: most_recent_backup_time - 50)).to eq("0002")
     end
 
-    it "returns nil if no backups before given target" do
+    it "raises error if no backups before given target" do
       stub_const("Backup", Struct.new(:last_modified))
       expect(postgres_timeline).to receive(:backups).and_return([])
 
-      expect(postgres_timeline.latest_backup_label_before_target(target: Time.now)).to be_nil
+      expect { postgres_timeline.latest_backup_label_before_target(target: Time.now) }.to raise_error RuntimeError, "BUG: no backup found"
     end
   end
 

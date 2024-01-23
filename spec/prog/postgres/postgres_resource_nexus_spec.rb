@@ -90,6 +90,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target)
     end
+
+    it "creates additional servers for HA" do
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_access: "push"))
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_access: "fetch")).twice
+      described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 100, ha_type: "sync")
+    end
   end
 
   describe "#before_run" do

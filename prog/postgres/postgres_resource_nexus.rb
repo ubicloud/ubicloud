@@ -12,14 +12,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   semaphore :destroy, :update_firewall_rules
 
-  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, parent_id: nil, restore_target: nil)
+  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
 
-    Validation.validate_vm_size(target_vm_size)
-    Validation.validate_name(name)
     Validation.validate_location(location, project.provider)
+    Validation.validate_name(name)
+    Validation.validate_vm_size(target_vm_size)
+    Validation.validate_postgres_ha_type(ha_type)
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access = if parent_id.nil?
@@ -40,13 +41,17 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create_with_id(
         project_id: project_id, location: location, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: superuser_password, parent_id: parent_id,
+        superuser_password: superuser_password, ha_type: ha_type, parent_id: parent_id,
         restore_target: restore_target
       )
       postgres_resource.associate_with_project(project)
 
       PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
+
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
+      postgres_resource.required_standby_count.times do
+        Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: "fetch")
+      end
 
       Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
     end

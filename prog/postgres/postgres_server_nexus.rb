@@ -32,11 +32,13 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         allow_only_ssh: true
       )
 
+      synchronization_status = representative_at ? "ready" : "catching_up"
       postgres_server = PostgresServer.create(
         resource_id: resource_id,
         timeline_id: timeline_id,
         timeline_access: timeline_access,
         representative_at: representative_at,
+        synchronization_status: synchronization_status,
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
 
@@ -114,8 +116,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      unless (backup_label = postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target))
-        fail "BUG: no backup found"
+      backup_label = if postgres_server.standby?
+        "LATEST"
+      else
+        postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
       end
       vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{backup_label}' initialize_database_from_backup")
     end
@@ -156,9 +160,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       when_initial_provisioning_set? do
         hop_update_superuser_password if postgres_server.primary?
+        hop_wait_catch_up if postgres_server.standby?
         hop_wait_recovery_completion
       end
 
+      hop_wait_catch_up if postgres_server.standby? && postgres_server.synchronization_status != "ready"
       hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
@@ -191,6 +197,26 @@ SQL
     end
 
     hop_wait
+  end
+
+  label def wait_catch_up
+    query = "SELECT pg_current_wal_lsn() - replay_lsn FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
+    lag = postgres_server.resource.representative_server.vm.sshable.cmd("sudo -u postgres psql -At -c \"#{query}\"").chomp
+
+    nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
+
+    postgres_server.update(synchronization_status: "ready")
+    postgres_server.resource.representative_server.incr_configure
+    hop_wait_synchronization if postgres_server.resource.ha_type == PostgresResource::HaType::SYNC
+    hop_wait
+  end
+
+  label def wait_synchronization
+    query = "SELECT sync_state FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
+    sync_state = postgres_server.resource.representative_server.vm.sshable.cmd("sudo -u postgres psql -At -c \"#{query}\"").chomp
+    hop_wait if ["quorum", "sync"].include?(sync_state)
+
+    nap 30
   end
 
   label def wait_recovery_completion

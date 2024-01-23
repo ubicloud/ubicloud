@@ -59,6 +59,29 @@ class PostgresResource < Sequel::Model
     URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s if hostname
   end
 
+  def replication_connection_string(application_name:)
+    query_parameters = {
+      sslrootcert: "/dat/16/data/ca.crt",
+      sslcert: "/dat/16/data/server.crt",
+      sslkey: "/dat/16/data/server.key",
+      sslmode: "verify-full",
+      application_name: application_name
+    }.map { |k, v| "#{k}=#{v}" }.join("\\&")
+
+    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
+  end
+
+  def required_standby_count
+    required_standby_count_map = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}
+    required_standby_count_map[ha_type]
+  end
+
+  module HaType
+    NONE = "none"
+    ASYNC = "async"
+    SYNC = "sync"
+  end
+
   def self.redacted_columns
     super + [:root_cert_1, :root_cert_2, :server_cert]
   end

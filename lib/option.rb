@@ -42,4 +42,9 @@ module Option
   PostgresSizes = [2, 4, 8, 16].map {
     PostgresSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 128)
   }.freeze
+
+  PostgresHaOption = Struct.new(:name)
+  PostgresHaOptions = [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC].map {
+    PostgresHaOption.new(_1)
+  }.freeze
 end

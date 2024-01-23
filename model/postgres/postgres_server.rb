@@ -59,8 +59,21 @@ class PostgresServer < Sequel::Model
         configs[:archive_mode] = "on"
         configs[:archive_timeout] = "60"
         configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
-      else
+        if resource.ha_type == PostgresResource::HaType::SYNC
+          caught_up_standbys = resource.servers.select { _1.standby? && _1.synchronization_status == "ready" }
+          configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
+        end
+      end
+
+      if standby?
+        configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
+      end
+
+      if doing_pitr?
         configs[:recovery_target_time] = "'#{resource.restore_target}'"
+      end
+
+      if standby? || doing_pitr?
         configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
       end
     end
@@ -80,6 +93,14 @@ class PostgresServer < Sequel::Model
 
   def primary?
     timeline_access == "push"
+  end
+
+  def standby?
+    timeline_access == "fetch" && !doing_pitr?
+  end
+
+  def doing_pitr?
+    !resource.representative_server.primary?
   end
 
   def init_health_monitor_session

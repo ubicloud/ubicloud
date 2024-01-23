@@ -58,7 +58,8 @@ PGHOST=/var/run/postgresql
 
   def latest_backup_label_before_target(target:)
     backup = backups.sort_by(&:last_modified).reverse.find { _1.last_modified < target }
-    backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json") if backup
+    fail "BUG: no backup found" unless backup
+    backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
   end
 
   def refresh_earliest_backup_completion_time
