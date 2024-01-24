@@ -79,6 +79,8 @@ table inet fw_table {
     ip6 saddr . tcp dport @allowed_ipv6_port_tuple ip6 daddr #{guest_ephemeral} counter accept
     ip saddr . udp dport @allowed_ipv4_port_tuple ip daddr @private_ipv4_cidrs counter accept
     ip6 saddr . udp dport @allowed_ipv6_port_tuple ip6 daddr #{guest_ephemeral} counter accept
+    ip saddr 0.0.0.0/0 icmp type echo-request counter accept
+    ip6 saddr ::/0 icmpv6 type echo-request counter accept
   }
 }
 TEMPLATE
