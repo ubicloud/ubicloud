@@ -14,7 +14,7 @@
       "components/page_header",
       locals: {
         title: "Private Subnets",
-        right_items: @project_permissions.include?("PrivateSubnet:create") ? [
+        right_items: has_project_permission("PrivateSubnet:create") ? [
           render("components/button", locals: { text: "Create Private Subnet", link: "private-subnet/create" })
         ] : []
       }
@@ -58,7 +58,7 @@
       icon: "hero-globe-alt",
       title: "No private subnets",
       description: "You don't have permission to create private subnet."
-    }.merge(@project_permissions.include?("PrivateSubnet:create") ? {
+    }.merge(has_project_permission("PrivateSubnet:create") ? {
       description: "Get started by creating a new private subnet.",
       button_link: "#{@project_data[:path]}/private-subnet/create",
       button_title: "New Private Subnet"

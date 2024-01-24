@@ -74,7 +74,7 @@
           <% end %>
         </ul>
       </li>
-      <% if @project_data && (@project_permissions & ["Project:user", "Project:policy", "Project:billing", "Project:view"]).any? %>
+      <% if @project_data && has_project_permission(["Project:user", "Project:policy", "Project:billing", "Project:view"]) %>
         <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Project Details</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
@@ -85,7 +85,7 @@
                 url: "#{@project_data[:path]}/user",
                 is_active: request.path.start_with?("#{@project_data[:path]}/user"),
                 icon: "hero-users",
-                has_permission: @project_permissions.include?("Project:user")
+                has_permission: has_project_permission("Project:user")
               }
             ) %>
             <%== render(
@@ -95,7 +95,7 @@
                 url: "#{@project_data[:path]}/policy",
                 is_active: request.path.start_with?("#{@project_data[:path]}/policy"),
                 icon: "hero-key",
-                has_permission: @project_permissions.include?("Project:policy")
+                has_permission: has_project_permission("Project:policy")
               }
             ) %>
             <% if Config.stripe_secret_key %>
@@ -106,7 +106,7 @@
                   url: "#{@project_data[:path]}/billing",
                   is_active: request.path.start_with?("#{@project_data[:path]}/billing"),
                   icon: "hero-banknotes",
-                  has_permission: @project_permissions.include?("Project:billing")
+                  has_permission: has_project_permission("Project:billing")
                 }
               ) %>
             <% end %>
@@ -117,13 +117,13 @@
                 url: @project_data[:path],
                 is_active: request.path == @project_data[:path],
                 icon: "hero-cog-6-tooth",
-                has_permission: @project_permissions.include?("Project:view")
+                has_permission: has_project_permission("Project:view")
               }
             ) %>
           </ul>
         </li>
       <% end %>
-      <% if @project_data && (@project_permissions & ["Project:github"]).any? %>
+      <% if @project_data && has_project_permission("Project:github") %>
               <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
@@ -135,7 +135,7 @@
                   url: "#{@project_data[:path]}/github",
                   is_active: request.path.start_with?("#{@project_data[:path]}/github"),
                   icon: "github",
-                  has_permission: @project_permissions.include?("Project:github")
+                  has_permission: has_project_permission("Project:github")
                 }
               ) %>
             <% end %>

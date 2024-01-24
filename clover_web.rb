@@ -294,6 +294,10 @@ class CloverWeb < Roda
     request.redirect env["HTTP_REFERER"]
   end
 
+  def has_project_permission(actions)
+    @project_permissions.intersection(Authorization.expand_actions(actions)).any?
+  end
+
   hash_branch("dashboard") do |r|
     view "/dashboard"
   end
