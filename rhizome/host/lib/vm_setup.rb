@@ -448,7 +448,7 @@ EOS
       # Use of File::EXCL provokes a crash rather than a race
       # condition if two VMs are lazily getting their images at the
       # same time.
-      temp_path = "/tmp/" + boot_image + image_ext + ".tmp"
+      temp_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
         if download.match?(/^https:\/\/.+\.blob\.core\.windows\.net/)
           install_azcopy
