@@ -71,6 +71,4 @@ class Project < Sequel::Model
       end
     end
   end
-
-  feature_flag :github_storage_policy
 end

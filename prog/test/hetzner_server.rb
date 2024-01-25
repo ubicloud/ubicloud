@@ -144,8 +144,7 @@ class Prog::Test::HetznerServer < Prog::Base
     strand.add_child(
       Prog::Test::VmGroup.assemble(
         storage_encrypted: true,
-        test_reboot: true,
-        use_bdev_ubi: true
+        test_reboot: true
       )
     )
 
@@ -164,8 +163,7 @@ class Prog::Test::HetznerServer < Prog::Base
     strand.add_child(
       Prog::Test::VmGroup.assemble(
         storage_encrypted: false,
-        test_reboot: false,
-        use_bdev_ubi: true
+        test_reboot: false
       )
     )
 

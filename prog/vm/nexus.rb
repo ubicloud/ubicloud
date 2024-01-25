@@ -29,7 +29,6 @@ class Prog::Vm::Nexus < Prog::Base
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_gib
-      volume[:use_bdev_ubi] ||= false
       volume[:skip_sync] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
@@ -166,15 +165,6 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def allocation_dataset
-    requires_bdev_ubi = frame["storage_volumes"].any? { |v| v["use_bdev_ubi"] }
-    # Currently, github runners require btrfs if not using bdev_ubi. We will use
-    # ext4 for hosts with bdev_ubi installation. So, we make sure we don't
-    # schedule disks on a bdev_ubi enabled host if bdev_ubi is not used.
-    #
-    # YYY: revisit this check after migrating away from btrfs, or having some
-    # direct way to check for filesystem type.
-    version_qualifier = requires_bdev_ubi ? "like '%ubi%'" : "not like '%ubi%'"
-    spdk_where_clause = "AND id in (select vm_host_id from spdk_installation where version #{version_qualifier} and allocation_weight > 0)"
     DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm_storage_size_gib, vm.location, vm.arch]
 SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
 FROM vm_host
@@ -184,7 +174,6 @@ AND vm_host.available_storage_gib > ?
 AND vm_host.allocation_state = 'accepting'
 AND vm_host.location = ?
 AND vm_host.arch = ?
-#{spdk_where_clause}
 ORDER BY mem_ratio, used_cores
 SQL
   end
@@ -224,17 +213,13 @@ SQL
         )
       end
 
-      spdk_installation_id =
-        allocate_spdk_installation(
-          vm_host.spdk_installations,
-          use_bdev_ubi: volume["use_bdev_ubi"]
-        )
+      spdk_installation_id = allocate_spdk_installation(vm_host.spdk_installations)
 
       VmStorageVolume.create_with_id(
         vm_id: vm.id,
         boot: volume["boot"],
         size_gib: volume["size_gib"],
-        use_bdev_ubi: volume["use_bdev_ubi"],
+        use_bdev_ubi: SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"],
         skip_sync: volume["skip_sync"],
         disk_index: disk_index,
         key_encryption_key_1_id: key_encryption_key&.id,
@@ -243,18 +228,13 @@ SQL
     end
   end
 
-  def allocate_spdk_installation(spdk_installations, use_bdev_ubi: false)
-    eligible_spdk_installations =
-      use_bdev_ubi ?
-        spdk_installations.select { |si| si.supports_bdev_ubi? } :
-        spdk_installations
-
-    total_weight = eligible_spdk_installations.sum(&:allocation_weight)
+  def allocate_spdk_installation(spdk_installations)
+    total_weight = spdk_installations.sum(&:allocation_weight)
     fail "Total weight of all eligible spdk_installations shouldn't be zero." if total_weight == 0
 
     rand_point = rand(0..total_weight - 1)
     weight_sum = 0
-    rand_choice = eligible_spdk_installations.each { |si|
+    rand_choice = spdk_installations.each { |si|
       weight_sum += si.allocation_weight
       break si if weight_sum > rand_point
     }

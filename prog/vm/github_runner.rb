@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "net/ssh"
-require_relative "../../lib/github_storage_policy"
 
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
@@ -24,40 +23,20 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
-  def storage_params(arch, size_gib)
-    project = github_runner.installation.project
-    storage_policy =
-      GithubStoragePolicy.new(arch, project.get_github_storage_policy || {})
-
-    # We use unencrypted storage for now, because provisioning 86G encrypted
-    # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
-    # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
-    # ~10 seconds.
-    {
-      size_gib: size_gib,
-      encrypted: false,
-      use_bdev_ubi: storage_policy.use_bdev_ubi?,
-      skip_sync: storage_policy.skip_sync?
-    }
-  end
-
   def pick_vm
     label = github_runner.label
     label_data = Github.runner_labels[label]
-    vm_storage_params = storage_params(label_data["arch"], label_data["storage_size_gib"])
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
       location: label_data["location"],
       storage_size_gib: label_data["storage_size_gib"],
-      storage_encrypted: vm_storage_params[:encrypted],
-      storage_skip_sync: vm_storage_params[:skip_sync],
+      storage_encrypted: false,
+      storage_skip_sync: false,
       arch: label_data["arch"]
     ).first
 
-    # YYY: Checking for use_bdev_ubi should be removed after transitioning
-    # completely to bdev_ubi.
-    if !vm_storage_params[:use_bdev_ubi] && (picked_vm = pool&.pick_vm)
+    if (picked_vm = pool&.pick_vm)
       Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
@@ -69,7 +48,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [vm_storage_params],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
       enable_ip4: true,
       arch: label_data["arch"]
     )
