@@ -14,6 +14,7 @@ class PrivateSubnet < Sequel::Model
     "192.168.0.0/16"
   ].freeze
 
+  dataset_module Pagination::Dataset
   dataset_module Authorization::Dataset
   include Authorization::HyperTagMethods
   def hyper_tag_name(project)
