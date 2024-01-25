@@ -31,13 +31,14 @@ RSpec.describe Project do
       expect(project).to receive(:billing_info).and_return(bi)
       expect(project.has_valid_payment_method?).to be true
     end
-  end
 
-  it "sets and gets feature flags" do
-    project = described_class.create_with_id(name: "dummy-name")
+    it "sets and gets feature flags" do
+      described_class.feature_flag(:dummy_flag)
+      project = described_class.create_with_id(name: "dummy-name")
 
-    expect(project.get_github_storage_policy).to be_nil
-    project.set_github_storage_policy("new-value")
-    expect(project.get_github_storage_policy).to eq "new-value"
+      expect(project.get_dummy_flag).to be_nil
+      project.set_dummy_flag("new-value")
+      expect(project.get_dummy_flag).to eq "new-value"
+    end
   end
 end

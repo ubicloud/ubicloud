@@ -405,51 +405,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vmh.reload.used_cores).to eq(1)
     end
 
-    it "does not match if bdev_ubi is requested & no bdev_ubi enabled hosts are available" do
-      new_host
-      expect(nx).to receive(:frame).and_return({
-        "storage_volumes" => [{
-          "use_bdev_ubi" => true
-        }]
-      })
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "matches if bdev_ubi is requested & a bdev_ubi enabled host is available" do
-      vmh = new_host
-      SpdkInstallation.create(
-        version: "v29.01-ubi-0.1",
-        allocation_weight: 100,
-        vm_host_id: vmh.id
-      ) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx).to receive(:frame).and_return({
-        "storage_volumes" => [{
-          "use_bdev_ubi" => true
-        }]
-      })
-      expect(nx.allocate).to eq vmh.id
-    end
-
-    it "does not match if bdev_ubi is requested & a bdev_ubi enabled host is available, but with weight 0" do
-      vmh = new_host
-      SpdkInstallation.create(
-        version: "v29.01-ubi-0.1",
-        allocation_weight: 0,
-        vm_host_id: vmh.id
-      ) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx).to receive(:frame).and_return({
-        "storage_volumes" => [{
-          "use_bdev_ubi" => true
-        }]
-      })
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "does not match if there is not enough ram capacity" do
-      new_host(total_mem_gib: 1)
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
     it "does not match if there is not enough storage capacity" do
       new_host(available_storage_gib: 10)
       expect(vm.storage_size_gib).to eq(35)
@@ -537,25 +492,18 @@ RSpec.describe Prog::Vm::Nexus do
       si_1 = SpdkInstallation.new(allocation_weight: 0)
       si_2 = SpdkInstallation.new(allocation_weight: 0)
 
-      expect { nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: false) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
-    end
-
-    it "fails if requested use_bdev_ubi, but no installations with bdev_ubi supports are available" do
-      si_1 = SpdkInstallation.new(allocation_weight: 100, version: "v23.09")
-      si_2 = SpdkInstallation.new(allocation_weight: 100, version: "v25.00")
-
-      expect { nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: true) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
+      expect { nx.allocate_spdk_installation([si_1, si_2]) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
     end
 
     it "chooses the only one if one provided" do
       si_1 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1], use_bdev_ubi: false)).to eq(si_1.id)
+      expect(nx.allocate_spdk_installation([si_1])).to eq(si_1.id)
     end
 
     it "doesn't return the one with zero weight" do
       si_1 = SpdkInstallation.new(allocation_weight: 0) { _1.id = SpdkInstallation.generate_uuid }
       si_2 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: false)).to eq(si_2.id)
+      expect(nx.allocate_spdk_installation([si_1, si_2])).to eq(si_2.id)
     end
   end
 

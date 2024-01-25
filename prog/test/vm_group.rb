@@ -3,14 +3,13 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Base
-  def self.assemble(storage_encrypted: true, test_reboot: true, use_bdev_ubi: true)
+  def self.assemble(storage_encrypted: true, test_reboot: true)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
         "storage_encrypted" => storage_encrypted,
-        "test_reboot" => test_reboot,
-        "use_bdev_ubi" => use_bdev_ubi
+        "test_reboot" => test_reboot
       }]
     )
   end
@@ -35,13 +34,12 @@ class Prog::Test::VmGroup < Prog::Base
     strand.add_child(subnet2_s)
 
     storage_encrypted = frame.fetch("storage_encrypted", true)
-    use_bdev_ubi = frame.fetch("use_bdev_ubi", true)
 
     vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
       storage_volumes: [
-        {encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: true},
+        {encrypted: storage_encrypted, skip_sync: true},
         {encrypted: storage_encrypted, size_gib: 5}
       ],
       enable_ip4: true
@@ -50,14 +48,14 @@ class Prog::Test::VmGroup < Prog::Base
     vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: false}],
+      storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
       enable_ip4: true
     )
 
     vm3_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet2_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: false}],
+      storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
       enable_ip4: true
     )
 
