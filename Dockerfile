@@ -24,9 +24,10 @@ FROM ruby:3.2.2-alpine3.17
 # - tzdata: The public-domain time zone database
 # - curl: Required for healthcheck and some basic operations
 # - postgresql-client: Required for postgresql gem at runtime
+# - gcompat: Required for nokogiri gem at runtime. https://nokogiri.org/tutorials/installing_nokogiri.html#linux-musl-error-loading-shared-library
 # - foreman: Helps to start different parts of app based on Procfile
 RUN apk update --no-cache && \
-    apk add tzdata curl postgresql-client --no-cache && \
+    apk add tzdata curl postgresql-client gcompat --no-cache && \
     gem install foreman
 
 RUN adduser -D ubicloud && \
