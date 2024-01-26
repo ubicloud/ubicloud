@@ -18,7 +18,7 @@ class Scheduling::Dispatcher
     end
 
     Strand.dataset.where(
-      Sequel.lit("(lease IS NULL OR lease < now()) AND schedule < now()")
+      Sequel.lit("(lease IS NULL OR lease < now()) AND schedule < now() AND exitval IS NULL")
     ).order_by(:schedule).limit(idle_connections)
   end
 
