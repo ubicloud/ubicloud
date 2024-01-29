@@ -48,7 +48,7 @@ else
   FileUtils.mkdir_p("var/proc")
 
   File.open("var/proc/#{name}.lock", File::RDWR | File::CREAT) do |f|
-    break unless f.flock(File::LOCK_EX || File::LOCK_NB)
+    break unless f.flock(File::LOCK_EX | File::LOCK_NB)
 
     state = get_state(name)
     case state
