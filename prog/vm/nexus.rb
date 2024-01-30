@@ -278,7 +278,9 @@ SQL
       nap 30
     end
 
-    Page.from_tag_parts("NoCapacity", vm.location, vm.arch)&.incr_resolve if queued_vms.count <= 1
+    if (page = Page.from_tag_parts("NoCapacity", vm.location, vm.arch)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
+      page.incr_resolve
+    end
 
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
