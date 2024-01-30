@@ -40,8 +40,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
-          labels: |
-            org.opencontainers.image.licenses=Elastic-2.0
           tags: |
             type=sha,prefix=
             type=ref,event=branch
@@ -102,8 +100,6 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
-          labels: |
-            org.opencontainers.image.licenses=Elastic-2.0
           tags: |
             type=sha,prefix=
             type=ref,event=branch
