@@ -152,9 +152,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def destroy
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
-      Clog.emit "Cannot destroy subnet with active nics, first clean up the attached resources" do
-        {private_subnet: private_subnet.values}
-      end
+      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources") { private_subnet }
 
       nap 5
     end
