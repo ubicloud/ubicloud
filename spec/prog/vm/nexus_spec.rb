@@ -314,7 +314,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Page.active.count).to eq(1)
     end
 
-    it "resolves the page if no VM left in the queue" do
+    it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
       expect(nx).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts"))
       expect { nx.start }.to nap(30)
@@ -327,7 +327,13 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
-      # Third run is able to allocate and there are no vms left in the queue, so we resolve the page
+      # Third run is able to allocate and there are no vms left in the queue, but it's not 15 minutes yet, so we don't resolve the page
+      expect { nx.start }.to hop("create_unix_user")
+      expect(Page.active.count).to eq(1)
+      expect(Page.active.first.resolve_set?).to be false
+
+      # Fourth run is able to allocate and there are no vms left in the queue after 15 minutes, so we resolve the page
+      Page.active.first.update(created_at: Time.now - 16 * 60)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be true
