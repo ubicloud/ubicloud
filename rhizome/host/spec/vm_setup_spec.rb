@@ -62,8 +62,9 @@ RSpec.describe VmSetup do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
       expect(Arch).to receive(:render).and_return("amd64").at_least(:once)
       expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-amd64.img")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw.tmp")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/images/ubuntu-jammy.img.tmp")
+      expect(File).to receive(:rename).with("/var/storage/images/ubuntu-jammy.raw.tmp", "/var/storage/images/ubuntu-jammy.raw")
 
       vs.download_boot_image("ubuntu-jammy")
     end
@@ -75,8 +76,9 @@ RSpec.describe VmSetup do
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
       expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.vhd.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /var/storage/images/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /var/storage/images/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw.tmp")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.vhd.tmp")
+      expect(File).to receive(:rename).with("/var/storage/images/github-ubuntu-2204.raw.tmp", "/var/storage/images/github-ubuntu-2204.raw")
 
       vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
     end
@@ -89,7 +91,6 @@ RSpec.describe VmSetup do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
       expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.raw.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
       expect(File).to receive(:rename).with("/var/storage/images/github-ubuntu-2204.raw.tmp", "/var/storage/images/github-ubuntu-2204.raw")
-      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.raw.tmp")
 
       vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
     end

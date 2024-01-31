@@ -492,21 +492,20 @@ EOS
     # Use of File::EXCL provokes a crash rather than a race
     # condition if two VMs are lazily getting their images at the
     # same time.
-    temp_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
+    download_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
     ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
-    File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-      r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}#{ca_arg}"
+    File.open(download_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
+      r "curl -f -L10 -o #{download_path.shellescape} #{download.shellescape}#{ca_arg}"
     end
 
-    if initial_format == "raw"
-      File.rename(temp_path, image_path)
-    else
+    temp_path = File.join(vp.image_root, boot_image + ".raw.tmp")
+    if initial_format != "raw"
       # Images are presumed to be atomically renamed into the path,
       # i.e. no partial images will be passed to qemu-image.
-      r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+      r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{download_path.shellescape} #{temp_path.shellescape}"
+      rm_if_exists(download_path)
     end
-
-    rm_if_exists(temp_path)
+    File.rename(temp_path, image_path)
   end
 
   # Unnecessary if host has this set before creating the netns, but
