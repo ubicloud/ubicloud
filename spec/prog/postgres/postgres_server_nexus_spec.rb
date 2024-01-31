@@ -213,6 +213,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#refresh_certificates" do
     it "pushes certificates to vm and hops to configure during initial provisioning" do
+      expect(nx).to receive(:decr_refresh_certificates)
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")
@@ -222,6 +223,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait at times other than the initial provisioning" do
+      expect(nx).to receive(:decr_refresh_certificates)
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")
