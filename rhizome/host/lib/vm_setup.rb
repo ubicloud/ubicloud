@@ -489,23 +489,24 @@ EOS
       fail "Unsupported boot_image format: #{image_ext}"
     end
 
-    # Use of File::EXCL provokes a crash rather than a race
-    # condition if two VMs are lazily getting their images at the
-    # same time.
-    download_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
-    ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
-    File.open(download_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-      r "curl -f -L10 -o #{download_path.shellescape} #{download.shellescape}#{ca_arg}"
-    end
+    File.open(File.join(vp.image_root, boot_image + ".lock"), File::RDWR | File::CREAT) do |lock|
+      fail "Another vm is downloading #{boot_image}" unless lock.flock(File::LOCK_EX | File::LOCK_NB)
 
-    temp_path = File.join(vp.image_root, boot_image + ".raw.tmp")
-    if initial_format != "raw"
-      # Images are presumed to be atomically renamed into the path,
-      # i.e. no partial images will be passed to qemu-image.
-      r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{download_path.shellescape} #{temp_path.shellescape}"
-      rm_if_exists(download_path)
+      download_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
+      ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
+      File.open(download_path, File::RDWR | File::CREAT, 0o644) do
+        r "curl -f -L10 -o #{download_path.shellescape} #{download.shellescape}#{ca_arg}"
+      end
+
+      temp_path = File.join(vp.image_root, boot_image + ".raw.tmp")
+      if initial_format != "raw"
+        # Images are presumed to be atomically renamed into the path,
+        # i.e. no partial images will be passed to qemu-image.
+        r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{download_path.shellescape} #{temp_path.shellescape}"
+        rm_if_exists(download_path)
+      end
+      File.rename(temp_path, image_path)
     end
-    File.rename(temp_path, image_path)
   end
 
   # Unnecessary if host has this set before creating the netns, but

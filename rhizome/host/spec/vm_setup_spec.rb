@@ -56,6 +56,7 @@ RSpec.describe VmSetup do
   describe "#download_boot_image" do
     it "can download an image" do
       expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
+      expect(File).to receive(:open).with("/var/storage/images/ubuntu-jammy.lock", File::RDWR | File::CREAT).and_yield(instance_double(File, flock: true))
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/var/storage/images/ubuntu-jammy.img.tmp")
       end.and_yield
@@ -71,6 +72,7 @@ RSpec.describe VmSetup do
 
     it "can download vhd image with custom URL that has query params using curl" do
       expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
+      expect(File).to receive(:open).with("/var/storage/images/github-ubuntu-2204.lock", File::RDWR | File::CREAT).and_yield(instance_double(File, flock: true))
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/var/storage/images/github-ubuntu-2204.vhd.tmp")
       end.and_yield
@@ -85,6 +87,7 @@ RSpec.describe VmSetup do
 
     it "does not convert image if it's in raw format already" do
       expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
+      expect(File).to receive(:open).with("/var/storage/images/github-ubuntu-2204.lock", File::RDWR | File::CREAT).and_yield(instance_double(File, flock: true))
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/var/storage/images/github-ubuntu-2204.raw.tmp")
       end.and_yield
@@ -97,6 +100,7 @@ RSpec.describe VmSetup do
 
     it "can download the image with force even if it exists" do
       expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(true)
+      expect(File).to receive(:open).with("/var/storage/images/ubuntu-jammy.lock", File::RDWR | File::CREAT).and_yield(instance_double(File, flock: true))
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/var/storage/images/ubuntu-jammy.img.tmp")
       end.and_yield
@@ -124,6 +128,15 @@ RSpec.describe VmSetup do
       expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
       expect { vs.download_boot_image("github-ubuntu-2204", custom_url: "https://example.com/ubuntu.iso") }.to raise_error RuntimeError, "Unsupported boot_image format: .iso"
+    end
+
+    it "fails if another vm is already downloading the image" do
+      expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
+      expect(Arch).to receive(:render).and_return("amd64").at_least(:once)
+      expect(File).to receive(:open).with("/var/storage/images/ubuntu-jammy.lock", File::RDWR | File::CREAT).and_yield(instance_double(File, flock: false))
+
+      expect { vs.download_boot_image("ubuntu-jammy") }.to raise_error RuntimeError, "Another vm is downloading ubuntu-jammy"
     end
   end
 
