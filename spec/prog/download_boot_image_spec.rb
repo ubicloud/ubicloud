@@ -28,7 +28,6 @@ RSpec.describe Prog::DownloadBootImage do
 
     it "hops if it's drained" do
       expect(vm_host).to receive(:vms).and_return([])
-      expect(sshable).to receive(:cmd).with("sudo rm -f /var/storage/images/my-image.raw")
       expect { dbi.wait_draining }.to hop("download")
     end
   end
@@ -99,6 +98,7 @@ RSpec.describe Prog::DownloadBootImage do
 
   describe "#activate_host" do
     it "activates vm host again" do
+      expect(sshable).to receive(:cmd).with("ls /var/storage/images/my-image.raw")
       expect {
         expect { dbi.activate_host }.to exit({"msg" => "my-image downloaded"})
       }.to change { vm_host.reload.allocation_state }.from("unprepared").to("accepting")
