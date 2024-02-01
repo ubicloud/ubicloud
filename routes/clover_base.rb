@@ -67,6 +67,10 @@ module CloverBase
       code = 409
       title = "Dependency Error"
       message = e.to_s
+    when ErrorCodes::PostgresPrimaryError
+      code = 409
+      title = "Invalid Postgres Server"
+      message = e.to_s
     else
       $stderr.print "#{e.class}: #{e.message}\n"
       warn e.backtrace

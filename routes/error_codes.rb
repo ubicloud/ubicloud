@@ -12,4 +12,6 @@ module ErrorCodes
   end
 
   class DependencyError < BaseError; end
+
+  class PostgresPrimaryError < BaseError; end
 end

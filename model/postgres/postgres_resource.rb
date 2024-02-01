@@ -10,6 +10,7 @@ class PostgresResource < Sequel::Model
   one_to_one :server, class: PostgresServer, key: :resource_id
   one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
 
+  dataset_module Pagination::Dataset
   dataset_module Authorization::Dataset
 
   include ResourceMethods
