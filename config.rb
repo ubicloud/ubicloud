@@ -82,7 +82,7 @@ module Config
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
   override :hetzner_ssh_key, string
-  override :minimum_invoice_charge_threshold, 1.0, float
+  override :minimum_invoice_charge_threshold, 0.5, float
 
   # GitHub Runner App
   optional :github_app_name, string
