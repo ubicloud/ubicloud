@@ -379,7 +379,17 @@ SQL
   end
 
   label def wait_sshable
-    addr = vm.ephemeral_net4 || vm.ephemeral_net6.nth(2)
+    addr = vm.ephemeral_net4
+
+    # Alas, our hosting environment, for now, doesn't support IPv6, so
+    # only check SSH availability when IPv4 is available: a
+    # unistacked IPv6 server will not be checked.
+    #
+    # I considered removing wait_sshable altogether, but (very)
+    # occasionally helps us glean interesting information about boot
+    # problems.
+    hop_create_billing_record unless addr
+
     begin
       Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
     rescue SystemCallError

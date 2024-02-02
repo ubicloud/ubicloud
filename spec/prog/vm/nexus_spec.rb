@@ -568,12 +568,9 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
 
-    it "uses ipv6 if ipv4 is not enabled" do
-      expect(vm).to receive(:created_at).and_return(Time.now)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhhqmsyfvzpy2q9gqb5h0mpde2"))
-      expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:3bfa::/79"))
-      expect(Socket).to receive(:tcp).with("2a01:4f8:10a:128b:3bfa::2", 22, connect_timeout: 1)
-      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+    it "skips a check if ipv4 is not enabled" do
+      expect(vm.ephemeral_net4).to be_nil
+      expect(vm).not_to receive(:ephemeral_net6)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
