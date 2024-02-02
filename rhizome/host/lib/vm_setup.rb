@@ -459,7 +459,7 @@ EOS
     }
   end
 
-  def download_boot_image(boot_image, custom_url: nil, ca_path: nil)
+  def download_boot_image(boot_image, force: false, custom_url: nil, ca_path: nil)
     urls = {
       "ubuntu-jammy" => "https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
       "almalinux-9.1" => Arch.render(x64: "x86_64", arm64: "aarch64").yield_self { "https://repo.almalinux.org/almalinux/9/cloud/#{_1}/images/AlmaLinux-9-GenericCloud-latest.#{_1}.qcow2" },
@@ -470,7 +470,7 @@ EOS
 
     download = urls.fetch(boot_image) || custom_url
     image_path = vp.image_path(boot_image)
-    return if File.exist?(image_path)
+    return if File.exist?(image_path) && !force
 
     fail "Must provide custom_url for #{boot_image} image" if download.nil?
     FileUtils.mkdir_p vp.image_root

@@ -95,6 +95,21 @@ RSpec.describe VmSetup do
       vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
     end
 
+    it "can download the image with force even if it exists" do
+      expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(true)
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/var/storage/images/ubuntu-jammy.img.tmp")
+      end.and_yield
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
+      expect(Arch).to receive(:render).and_return("amd64").at_least(:once)
+      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-amd64.img")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw.tmp")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/ubuntu-jammy.img.tmp")
+      expect(File).to receive(:rename).with("/var/storage/images/ubuntu-jammy.raw.tmp", "/var/storage/images/ubuntu-jammy.raw")
+
+      vs.download_boot_image("ubuntu-jammy", force: true)
+    end
+
     it "can use an image that's already downloaded" do
       expect(File).to receive(:exist?).with("/var/storage/images/almalinux-9.1.raw").and_return(true)
       vs.download_boot_image("almalinux-9.1")
