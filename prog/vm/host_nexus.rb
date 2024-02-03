@@ -38,15 +38,9 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def start
     register_deadline(:wait, 15 * 60)
+    hop_prep if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
 
-    bud Prog::BootstrapRhizome, {"target_folder" => "host"}
-    hop_wait_bootstrap_rhizome
-  end
-
-  label def wait_bootstrap_rhizome
-    reap
-    hop_prep if leaf?
-    donate
+    push Prog::BootstrapRhizome, {"target_folder" => "host"}
   end
 
   label def prep
@@ -91,35 +85,24 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_hugepages
-    bud Prog::SetupHugepages
-    hop_wait_setup_hugepages
-  end
+    hop_setup_spdk if retval&.dig("msg") == "hugepages installed"
 
-  label def wait_setup_hugepages
-    reap
-    hop_setup_spdk if leaf?
-    donate
+    push Prog::SetupHugepages
   end
 
   label def setup_spdk
-    bud(Prog::Storage::SetupSpdk,
-      {
-        "version" => frame["spdk_version"],
-        "start_service" => false,
-        "allocation_weight" => 100
-      })
-    hop_wait_setup_spdk
-  end
-
-  label def wait_setup_spdk
-    reap
-    if leaf?
+    if retval&.dig("msg") == "SPDK was setup"
       spdk_installation = vm_host.spdk_installations.first
       spdk_cores = (spdk_installation.cpu_count * vm_host.total_cores) / vm_host.total_cpus
       vm_host.update(used_cores: spdk_cores)
       hop_prep_reboot
     end
-    donate
+
+    push Prog::Storage::SetupSpdk, {
+      "version" => frame["spdk_version"],
+      "start_service" => false,
+      "allocation_weight" => 100
+    }
   end
 
   label def prep_reboot

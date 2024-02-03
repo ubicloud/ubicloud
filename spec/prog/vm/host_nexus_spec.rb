@@ -67,26 +67,14 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#start" do
-    it "buds a bootstrap rhizome process" do
-      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "host"})
-      expect { nx.start }.to hop("wait_bootstrap_rhizome")
-    end
-  end
-
-  describe "#wait_bootstrap_rhizome" do
-    before { expect(nx).to receive(:reap) }
-
-    it "hops to prep if there are no sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return true
-
-      expect { nx.wait_bootstrap_rhizome }.to hop("prep")
+    it "pushes a bootstrap rhizome process" do
+      expect(nx).to receive(:push).with(Prog::BootstrapRhizome, {"target_folder" => "host"}).and_call_original
+      expect { nx.start }.to hop("start", "BootstrapRhizome")
     end
 
-    it "donates if there are sub-programs running" do
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+    it "hops once BootstrapRhizome has returned" do
+      nx.strand.retval = {"msg" => "rhizome user bootstrapped and source installed"}
+      expect { nx.start }.to hop("prep")
     end
   end
 
@@ -161,47 +149,29 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#setup_hugepages" do
-    it "buds the hugepage program" do
-      expect(nx).to receive(:bud).with(Prog::SetupHugepages)
-      expect { nx.setup_hugepages }.to hop("wait_setup_hugepages")
-    end
-  end
-
-  describe "#wait_setup_hugepages" do
-    it "enters the setup_spdk state" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return true
-      vmh = instance_double(VmHost)
-      nx.instance_variable_set(:@vm_host, vmh)
-
-      expect { nx.wait_setup_hugepages }.to hop("setup_spdk")
+    it "pushes the hugepage program" do
+      expect { nx.setup_hugepages }.to hop("start", "SetupHugepages")
     end
 
-    it "donates its time if child strands are still running" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
-      expect { nx.wait_setup_hugepages }.to nap(1)
+    it "hops once SetupHugepages has returned" do
+      nx.strand.retval = {"msg" => "hugepages installed"}
+      expect { nx.setup_hugepages }.to hop("setup_spdk")
     end
   end
 
   describe "#setup_spdk" do
-    it "buds the spdk program" do
-      expect(nx).to receive(:bud).with(Prog::Storage::SetupSpdk,
+    it "pushes the spdk program" do
+      expect(nx).to receive(:push).with(Prog::Storage::SetupSpdk,
         {
           "version" => Config.spdk_version,
           "start_service" => false,
           "allocation_weight" => 100
-        })
-      expect { nx.setup_spdk }.to hop("wait_setup_spdk")
+        }).and_call_original
+      expect { nx.setup_spdk }.to hop("start", "Storage::SetupSpdk")
     end
-  end
 
-  describe "#wait_setup_spdk" do
-    it "hops to prep_reboot if all tasks are done" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return true
+    it "hops once SetupSpdk has returned" do
+      nx.strand.retval = {"msg" => "SPDK was setup"}
       vmh = instance_double(VmHost)
       spdk_installation = SpdkInstallation.new(cpu_count: 4)
       allow(vmh).to receive_messages(
@@ -211,16 +181,7 @@ RSpec.describe Prog::Vm::HostNexus do
       )
       allow(nx).to receive(:vm_host).and_return(vmh)
       expect(vmh).to receive(:update).with({used_cores: 2})
-
-      expect { nx.wait_setup_spdk }.to hop("prep_reboot")
-    end
-
-    it "donates its time if child strands are still running" do
-      expect(nx).to receive(:reap).and_return([])
-      expect(nx).to receive(:leaf?).and_return false
-      expect(nx).to receive(:donate).and_call_original
-
-      expect { nx.wait_setup_spdk }.to nap(1)
+      expect { nx.setup_spdk }.to hop("prep_reboot")
     end
   end
 
