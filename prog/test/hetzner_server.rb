@@ -5,16 +5,21 @@ require_relative "../../lib/util"
 class Prog::Test::HetznerServer < Prog::Test::Base
   semaphore :destroy
 
+  required_input :server_id
+  required_input :hostname
+  required_input :should_destroy
+  optional_input :vm_host_id
+
   def self.assemble(vm_host_id: nil)
     frame = if vm_host_id
       vm_host = VmHost[vm_host_id]
       {
         vm_host_id: vm_host.id, server_id: vm_host.hetzner_host.server_identifier,
-        hostname: vm_host.sshable.host, destroy: false
+        hostname: vm_host.sshable.host, should_destroy: false
       }
     else
       {
-        server_id: Config.ci_hetzner_sacrificial_server_id, destroy: true
+        server_id: Config.ci_hetzner_sacrificial_server_id, should_destroy: true
       }
     end
 
@@ -30,7 +35,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def start
-    hop_wait_setup_host if frame["vm_host_id"]
+    hop_wait_setup_host if vm_host_id
     hop_fetch_hostname
   end
 
@@ -49,14 +54,14 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def reset
-    hetzner_api.reset(frame["server_id"], hetzner_ssh_key: hetzner_ssh_keypair.public_key)
+    hetzner_api.reset(server_id, hetzner_ssh_key: hetzner_ssh_keypair.public_key)
 
     hop_wait_reset
   end
 
   label def wait_reset
     begin
-      Util.rootish_ssh(frame["hostname"], "root", [hetzner_ssh_keypair.private_key], "echo 1")
+      Util.rootish_ssh(hostname, "root", [hetzner_ssh_keypair.private_key], "echo 1")
     rescue
       nap 15
     end
@@ -66,10 +71,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def setup_host
     vm_host = Prog::Vm::HostNexus.assemble(
-      frame["hostname"],
+      hostname,
       provider: "hetzner",
-      hetzner_server_identifier: frame["server_id"],
-      default_boot_images: Option::BootImages.map { _1.name }
+      hetzner_server_identifier: server_id,
+      default_boot_images: [Config.default_boot_image_name]
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
 
@@ -121,7 +126,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def destroy
-    hop_finish unless frame["destroy"]
+    hop_finish unless should_destroy
 
     hetzner_api.delete_key(hetzner_ssh_keypair.public_key)
     vm_host.incr_destroy
@@ -148,7 +153,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   def hetzner_api
     @hetzner_api ||= Hosting::HetznerApis.new(
-      HetznerHost.new(server_identifier: frame["server_id"])
+      HetznerHost.new(server_identifier: server_id)
     )
   end
 
@@ -157,6 +162,6 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   def vm_host
-    @vm_host ||= VmHost[frame["vm_host_id"]]
+    @vm_host ||= VmHost[vm_host_id]
   end
 end

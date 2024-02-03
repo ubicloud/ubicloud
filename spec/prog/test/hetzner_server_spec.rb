@@ -12,7 +12,7 @@ RSpec.describe Prog::Test::HetznerServer do
     allow(Config).to receive(:ci_hetzner_sacrificial_server_id).and_return("1.1.1.1")
     allow(hs_test).to receive_messages(frame: {"vm_host_id" => vm_host.id,
                                                "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
-                                               "server_id" => "1234"}, hetzner_api: hetzner_api, vm_host: vm_host)
+                                               "server_id" => "1234", "hostname" => ""}, hetzner_api: hetzner_api, vm_host: vm_host)
   }
 
   describe "#assemble" do
@@ -26,7 +26,7 @@ RSpec.describe Prog::Test::HetznerServer do
       st = described_class.assemble(vm_host_id: vm_host.id)
       expect(st.stack.first["vm_host_id"]).to eq(vm_host.id)
       expect(st.stack.first["hostname"]).to eq("1.1.1.1")
-      expect(st.stack.first["destroy"]).to be(false)
+      expect(st.stack.first["should_destroy"]).to be(false)
     end
   end
 
@@ -64,6 +64,7 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#wait_reset" do
+    before { expect(hs_test).to receive(:frame).and_return({"hostname" => ""}) }
     it "hops to setup_host if the server is up" do
       expect(Util).to receive(:rootish_ssh)
       expect { hs_test.wait_reset }.to hop("setup_host")
@@ -145,12 +146,12 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#destroy" do
     it "does not delete key and vm host if existing vm host used" do
-      expect(hs_test).to receive(:frame).and_return({"destroy" => false})
+      expect(hs_test).to receive(:frame).and_return({"should_destroy" => false})
       expect { hs_test.destroy }.to hop("finish")
     end
 
     it "deletes key and vm host" do
-      expect(hs_test).to receive(:frame).and_return({"destroy" => true})
+      expect(hs_test).to receive(:frame).and_return({"should_destroy" => true})
       expect(hetzner_api).to receive(:delete_key).with("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
       expect(vm_host).to receive(:incr_destroy)
       expect { hs_test.destroy }.to hop("wait_vm_host_destroyed")

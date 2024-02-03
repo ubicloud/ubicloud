@@ -3,6 +3,10 @@
 class Prog::Storage::SetupSpdk < Prog::Base
   subject_is :sshable, :vm_host
 
+  required_input :version
+  optional_input :should_start_service, false
+  optional_input :allocation_weight, 0
+
   SUPPORTED_SPDK_VERSIONS = [
     ["v23.09-ubi-0.2", "x64"],
     ["v23.09-ubi-0.2", "arm64"]
@@ -15,24 +19,23 @@ class Prog::Storage::SetupSpdk < Prog::Base
       stack: [{
         "subject_id" => vm_host_id,
         "version" => version,
-        "start_service" => start_service,
+        "should_start_service" => start_service,
         "allocation_weight" => allocation_weight
       }]
     )
   end
 
   label def start
-    version = frame["version"]
     arch = vm_host.arch
 
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_SPDK_VERSIONS.include? [version, arch]
 
     fail "Can't install more than 2 SPDKs on a host" if vm_host.spdk_installations.length > 1
 
-    fail "No available hugepages" if frame["start_service"] && vm_host.used_hugepages_1g > vm_host.total_hugepages_1g - 2
+    fail "No available hugepages" if should_start_service && vm_host.used_hugepages_1g > vm_host.total_hugepages_1g - 2
 
     SpdkInstallation.create(
-      version: frame["version"],
+      version: version,
       allocation_weight: 0,
       vm_host_id: vm_host.id,
       cpu_count: spdk_cpu_count(total_host_cpus: vm_host.total_cpus),
@@ -43,9 +46,8 @@ class Prog::Storage::SetupSpdk < Prog::Base
   end
 
   label def install_spdk
-    q_version = frame["version"].shellescape
     cpu_count = spdk_cpu_count(total_host_cpus: vm_host.total_cpus)
-    sshable.cmd("sudo host/bin/setup-spdk install #{q_version} #{cpu_count}")
+    sshable.cmd("sudo host/bin/setup-spdk install #{version.shellescape} #{cpu_count}")
 
     hop_start_service
   end
@@ -59,8 +61,8 @@ class Prog::Storage::SetupSpdk < Prog::Base
   end
 
   label def start_service
-    if frame["start_service"]
-      q_version = frame["version"].shellescape
+    if should_start_service
+      q_version = version.shellescape
       sshable.cmd("sudo host/bin/setup-spdk start #{q_version}")
       sshable.cmd("sudo host/bin/setup-spdk verify #{q_version}")
     end
@@ -70,13 +72,13 @@ class Prog::Storage::SetupSpdk < Prog::Base
 
   label def update_database
     spdk_installation = SpdkInstallation.where(
-      version: frame["version"],
+      version: version,
       vm_host_id: vm_host.id
     ).first
 
-    spdk_installation.update(allocation_weight: frame["allocation_weight"])
+    spdk_installation.update(allocation_weight: allocation_weight)
 
-    if frame["start_service"]
+    if should_start_service
       VmHost.where(id: vm_host.id).update(
         used_hugepages_1g: Sequel[:used_hugepages_1g] + spdk_installation.hugepages
       )

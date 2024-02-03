@@ -40,13 +40,13 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "hops to destroy_resources if tests are done and not test_reboot" do
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM!"})
-      expect(vg_test).to receive(:frame).and_return({"test_reboot" => false})
+      expect(vg_test).to receive(:frame).and_return({"should_reboot" => false})
       expect { vg_test.verify_vms }.to hop("destroy_resources")
     end
 
     it "hops to test_reboot if tests are done and test_reboot" do
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM!"})
-      expect(vg_test).to receive(:frame).and_return({"test_reboot" => true})
+      expect(vg_test).to receive(:frame).and_return({"should_reboot" => true})
       expect { vg_test.verify_vms }.to hop("test_reboot")
     end
   end

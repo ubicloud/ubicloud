@@ -3,14 +3,19 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
+  required_input :storage_encrypted
+  required_input :should_reboot
+  required_input :project_id
+  optional_input :vms, []
+  optional_input :subnets, []
+
   def self.assemble(storage_encrypted: true, test_reboot: true)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
         "storage_encrypted" => storage_encrypted,
-        "test_reboot" => test_reboot,
-        "vms" => []
+        "should_reboot" => test_reboot
       }]
     )
   end
@@ -30,8 +35,6 @@ class Prog::Test::VmGroup < Prog::Test::Base
     subnet2_s = Prog::Vnet::SubnetNexus.assemble(
       project.id, name: "the-second-subnet", location: "hetzner-hel1"
     )
-
-    storage_encrypted = frame.fetch("storage_encrypted", true)
 
     vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
@@ -70,20 +73,20 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def wait_vms
-    nap 10 if frame["vms"].any? { Vm[_1].display_state != "running" }
+    nap 10 if vms.any? { Vm[_1].display_state != "running" }
     hop_verify_vms
   end
 
   label def verify_vms
     if retval&.dig("msg") == "Verified VM!"
-      if frame["test_reboot"]
+      if should_reboot
         hop_test_reboot
       else
         hop_destroy_resources
       end
     end
 
-    push Prog::Test::Vm, {subject_id: frame["vms"].first}
+    push Prog::Test::Vm, {subject_id: vms.first}
   end
 
   label def test_reboot
@@ -94,7 +97,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   label def wait_reboot
     if vm_host.strand.label == "wait" && vm_host.strand.semaphores.empty?
       # Run VM tests again, but avoid rebooting again
-      update_stack({"test_reboot" => false})
+      update_stack({"should_reboot" => false})
       hop_verify_vms
     end
 
@@ -102,14 +105,14 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def destroy_resources
-    frame["vms"].each { Vm[_1].incr_destroy }
-    frame["subnets"].each { PrivateSubnet[_1].incr_destroy }
+    vms.each { Vm[_1].incr_destroy }
+    subnets.each { PrivateSubnet[_1].incr_destroy }
 
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    unless frame["vms"].all? { Vm[_1].nil? } && frame["subnets"].all? { PrivateSubnet[_1].nil? }
+    unless vms.all? { Vm[_1].nil? } && subnets.all? { PrivateSubnet[_1].nil? }
       nap 5
     end
 
@@ -117,7 +120,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def finish
-    Project[frame["project_id"]].destroy
+    Project[project_id].destroy
     pop "VmGroup tests finished!"
   end
 
@@ -126,6 +129,6 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   def vm_host
-    @vm_host ||= Vm[frame["vms"].first].vm_host
+    @vm_host ||= Vm[vms.first].vm_host
   end
 end

@@ -5,6 +5,9 @@ require "json"
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host
 
+  required_input :image_name
+  optional_input :custom_url
+
   def image_name
     @image_name ||= frame.fetch("image_name")
   end

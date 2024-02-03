@@ -52,6 +52,18 @@ end
     end
   end
 
+  def self.required_input(name)
+    define_method :"#{name}" do
+      instance_variable_get(:"@#{name}") || instance_variable_set(:"@#{name}", frame.fetch(name.to_s))
+    end
+  end
+
+  def self.optional_input(name, default = nil)
+    define_method :"#{name}" do
+      instance_variable_get(:"@#{name}") || instance_variable_set(:"@#{name}", frame.fetch(name.to_s, default))
+    end
+  end
+
   def nap(seconds = 30)
     fail Nap.new(seconds)
   end

@@ -4,6 +4,8 @@ class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
   semaphore :checkup, :reboot, :destroy
 
+  required_input :spdk_version
+
   def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
     DB.transaction do
       ubid = VmHost.generate_ubid
@@ -100,7 +102,7 @@ class Prog::Vm::HostNexus < Prog::Base
     end
 
     push Prog::Storage::SetupSpdk, {
-      "version" => frame["spdk_version"],
+      "version" => spdk_version,
       "start_service" => false,
       "allocation_weight" => 100
     }

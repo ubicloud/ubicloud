@@ -5,9 +5,8 @@ require_relative "../lib/util"
 class Prog::BootstrapRhizome < Prog::Base
   subject_is :sshable
 
-  def user
-    @user ||= frame.fetch("user", "root")
-  end
+  required_input :target_folder
+  optional_input :user, "root"
 
   label def start
     sshable.update(raw_private_key_1: SshKey.generate.keypair) if sshable.raw_private_key_1.nil?
@@ -29,6 +28,6 @@ sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authoriz
 echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 SH
 
-    push Prog::InstallRhizome, {"target_folder" => frame["target_folder"]}
+    push Prog::InstallRhizome, {"target_folder" => target_folder}
   end
 end
