@@ -75,35 +75,22 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def start_rekey
     decr_start_rekey
-
-    if retval&.dig("msg") == "inbound_setup is complete"
-      hop_wait_rekey_outbound_trigger
-    end
-
-    push Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
+    push Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound, next_label: "wait_rekey_outbound_trigger"
   end
 
   label def wait_rekey_outbound_trigger
-    if retval&.dig("msg") == "outbound_setup is complete"
-      hop_wait_rekey_old_state_drop_trigger
-    end
-
     when_trigger_outbound_update_set? do
       decr_trigger_outbound_update
-      push Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
+      push Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound, next_label: "wait_rekey_old_state_drop_trigger"
     end
 
     nap 5
   end
 
   label def wait_rekey_old_state_drop_trigger
-    if retval&.dig("msg")&.include?("drop_old_state is complete")
-      hop_wait
-    end
-
     when_old_state_drop_trigger_set? do
       decr_old_state_drop_trigger
-      push Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
+      push Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state, next_label: "wait"
     end
 
     nap 5

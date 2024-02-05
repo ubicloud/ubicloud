@@ -325,18 +325,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#update_superuser_password" do
-    it "updates password and pushes restart during the initial provisioning" do
+    it "updates password and pushes restart during the initial provisioning and returns to wait label" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
-      expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
-      expect { nx.update_superuser_password }.to hop("restart")
-    end
 
-    it "updates password and hops to wait during initial provisioning if restart is already executed" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
-      expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
-      expect { nx.update_superuser_password }.to hop("wait")
+      expect { nx.update_superuser_password }.to hop("restart").with_hop { |hopped|
+        expect(nx).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { nx.pop("exit") }.to hop("wait")
     end
 
     it "updates password and hops to wait at times other than the initial provisioning" do

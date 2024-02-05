@@ -75,15 +75,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_vms
-    if retval&.dig("msg") == "Verified VM!"
-      if frame["test_reboot"]
-        hop_test_reboot
-      else
-        hop_destroy_resources
-      end
-    end
-
-    push Prog::Test::Vm, {subject_id: frame["vms"].first}
+    push Prog::Test::Vm, {subject_id: frame["vms"].first}, next_label: frame["test_reboot"] ? "test_reboot" : "destroy_resources"
   end
 
   label def test_reboot
