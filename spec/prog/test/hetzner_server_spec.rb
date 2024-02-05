@@ -133,13 +133,16 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#install_bdev_ubid" do
-    it "hops to wait if it's installed" do
-      expect(hs_test).to receive(:retval).and_return({"msg" => "SPDK was setup"})
-      expect { hs_test.install_bdev_ubid }.to hop("wait")
+    it "setups spdk with bdev_ubi and returns to wait label" do
+      expect { hs_test.install_bdev_ubid }.to hop("start", "Storage::SetupSpdk").with_hop { |hopped|
+        expect(hs_test).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { hs_test.pop("exit") }.to hop("wait")
     end
 
-    it "setups spdk with bdev_ubi" do
-      expect { hs_test.install_bdev_ubid }.to hop("start", "Storage::SetupSpdk")
+    it "skips bdev_ubi installation if it's installed already" do
+      expect(vm_host).to receive(:spdk_installations).and_return([instance_double(SpdkInstallation, version: "v23.09-ubi-0.2")])
+      expect { hs_test.install_bdev_ubid }.to hop("wait")
     end
   end
 
