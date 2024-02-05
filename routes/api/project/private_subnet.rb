@@ -18,19 +18,5 @@ class CloverApi
         count: result[:count]
       }
     end
-
-    r.post true do
-      Authorization.authorize(@current_user.id, "PrivateSubnet:create", @project.id)
-
-      request_body_params = JSON.parse(request.body.read)
-
-      st = Prog::Vnet::SubnetNexus.assemble(
-        @project.id,
-        name: request_body_params["name"],
-        location: request_body_params["location"]
-      )
-
-      serialize(st.subject)
-    end
   end
 end
