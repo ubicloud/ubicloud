@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 RSpec.describe Minio::Client do
-  let(:endpoint) { "http://localhost:9000" }
+  let(:endpoint) { "https://localhost:9000" }
   let(:access_key) { "minioadmin" }
   let(:secret_key) { "minioadmin" }
 
   it "can use sockets" do
-    expect(Excon).to receive(:new).with("unix:///", socket: "/tmp/socket")
+    expect(Excon).to receive(:new).with("unix:///", socket: "/tmp/socket", ssl_ca_file: File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt"))
     described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key, socket: "/tmp/socket")
   end
 

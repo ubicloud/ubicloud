@@ -123,7 +123,7 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns empty array if user is not created yet" do
-    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint")).at_least(:once)
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
     minio_client = instance_double(Minio::Client)
     expect(minio_client).to receive(:list_objects).and_raise(RuntimeError.new("The Access Key Id you provided does not exist in our records."))
     expect(Minio::Client).to receive(:new).and_return(minio_client)
@@ -131,7 +131,7 @@ PGHOST=/var/run/postgresql
   end
 
   it "re-raises exceptions other than missin access key" do
-    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint")).at_least(:once)
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
     minio_client = instance_double(Minio::Client)
     expect(minio_client).to receive(:list_objects).and_raise(RuntimeError.new("some error"))
     expect(Minio::Client).to receive(:new).and_return(minio_client)
@@ -140,7 +140,7 @@ PGHOST=/var/run/postgresql
 
   it "returns list of backups" do
     stub_const("Backup", Struct.new(:key))
-    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint")).at_least(:once)
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
 
     minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key")
     expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Backup, key: "backup_stop_sentinel.json"), instance_double(Backup, key: "unrelated_file.txt")])
@@ -156,6 +156,7 @@ PGHOST=/var/run/postgresql
 
   it "returns blob storage client from cache" do
     expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "certs")).once
     expect(Minio::Client).to receive(:new).and_return("dummy-client").once
     expect(postgres_timeline.blob_storage_client).to eq("dummy-client")
     expect(postgres_timeline.blob_storage_client).to eq("dummy-client")

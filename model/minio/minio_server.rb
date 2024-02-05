@@ -63,7 +63,8 @@ class MinioServer < Sequel::Model
         endpoint: ip4_url,
         access_key: cluster.admin_user,
         secret_key: cluster.admin_password,
-        socket: File.join(socket_path, "health_monitor_socket")
+        socket: File.join(socket_path, "health_monitor_socket"),
+        ssl_ca_file_data: cluster.root_certs
       )
     }
   end
