@@ -6,23 +6,29 @@
 <% description = (defined?(description) && description) ? description : nil %>
 <% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
 <% extra_class = defined?(extra_class) ? extra_class : nil %>
+<% button_title = defined?(button_title) ? button_title : nil %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
     <label for="<%= name %>" class="block text-sm font-medium leading-6"><%= label %></label>
   <% end %>
-  <input
-    id="<%= name %>"
-    type="<%= type %>"
-    name="<%= name %>"
-    <% if value %>
-    value="<%= value %>"
+  <div class="flex gap-x-2">
+    <input
+      id="<%= name %>"
+      type="<%= type %>"
+      name="<%= name %>"
+      <% if value %>
+      value="<%= value %>"
+      <% end %>
+      class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%> <%= extra_class %>"
+      <% attributes.each do |atr_key, atr_value| %>
+      <%= atr_key %>="<%= atr_value %>"
+      <% end%>
+    >
+    <% if button_title %>
+      <%== render("components/form/submit_button", locals: { text: button_title }) %>
     <% end %>
-    class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%> <%= extra_class %>"
-    <% attributes.each do |atr_key, atr_value| %>
-    <%= atr_key %>="<%= atr_value %>"
-    <% end%>
-  >
+  </div>
   <% if error %>
     <% if error.is_a?(Array) %>
       <p class="text-sm text-red-600 leading-6" id="<%= name %>-error">
