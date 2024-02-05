@@ -45,8 +45,8 @@ class MinioCluster < Sequel::Model
     pools.sum(&:drive_count)
   end
 
-  def connection_strings
-    servers.map(&:connection_string)
+  def ip4_urls
+    servers.map(&:ip4_url)
   end
 
   def single_instance_single_drive?
@@ -59,5 +59,13 @@ class MinioCluster < Sequel::Model
 
   def hostname
     "#{name}.#{Config.minio_host_name}"
+  end
+
+  def url
+    dns_zone ? "http://#{hostname}:9000" : nil
+  end
+
+  def dns_zone
+    @dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
   end
 end

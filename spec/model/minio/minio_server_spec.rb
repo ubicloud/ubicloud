@@ -37,10 +37,6 @@ RSpec.describe MinioServer do
     expect(ms.private_ipv4_address).to eq("192.168.0.0")
   end
 
-  it "returns name properly" do
-    expect(ms.name).to eq("minio-cluster-name-0-0")
-  end
-
   it "returns minio cluster properly" do
     expect(ms.cluster.name).to eq("minio-cluster-name")
   end
@@ -109,20 +105,8 @@ RSpec.describe MinioServer do
     expect(ms.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
     expect(ms.endpoint).to eq("1.1.1.1:9000")
 
-    expect(ms).to receive(:dns_zone).and_return("something")
+    expect(ms.cluster).to receive(:dns_zone).and_return("something")
     expect(ms.endpoint).to eq("minio-cluster-name0.minio.ubicloud.com:9000")
-  end
-
-  describe "#dns_zone" do
-    before do
-      minio_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
-      allow(Config).to receive(:minio_service_project_id).and_return(minio_project.id)
-    end
-
-    it "returns dns zone properly" do
-      DnsZone.create_with_id(project_id: Config.minio_service_project_id, name: Config.minio_host_name)
-      expect(ms.dns_zone.name).to eq("minio.ubicloud.com")
-    end
   end
 
   describe "#url" do
@@ -133,12 +117,12 @@ RSpec.describe MinioServer do
 
     it "returns url properly" do
       DnsZone.create_with_id(project_id: Config.minio_service_project_id, name: Config.minio_host_name)
-      expect(ms.url).to eq("http://minio-cluster-name.minio.ubicloud.com:9000")
+      expect(ms.server_url).to eq("http://minio-cluster-name.minio.ubicloud.com:9000")
     end
 
     it "returns ip address when dns zone is not found" do
       expect(ms.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
-      expect(ms.url).to eq("http://10.10.10.10:9000")
+      expect(ms.server_url).to eq("http://10.10.10.10:9000")
     end
   end
 end
