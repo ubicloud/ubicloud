@@ -237,6 +237,52 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx).to receive(:push).with(described_class, {}, "minio_restart").and_call_original
       expect { nx.wait }.to hop("minio_restart")
     end
+
+    it "hops to refresh_certificates if certificate is checked more than a month ago" do
+      expect(nx.minio_server).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 31 - 1)
+      expect { nx.wait }.to hop("refresh_certificates")
+    end
+  end
+
+  describe "#refresh_certificates" do
+    it "creates new certificates and hops to wait after incr_reconfigure" do
+      cert = nx.minio_server.cert
+      cert_key = nx.minio_server.cert_key
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root_cert_1").and_return(cert_1)
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
+      expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
+      expect(nx.minio_server).to receive(:update).and_call_original
+      expect(nx).to receive(:incr_reconfigure)
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(nx.minio_server.cert).not_to eq cert
+      expect(nx.minio_server.cert_key).not_to eq cert_key
+    end
+
+    it "creates new certificates from root_cert_2 if root_cert_1 is about to expire" do
+      expect(Time).to receive(:now).and_return(Time.now + 60 * 60 * 24 * 365 * 4 + 1).at_least(:once)
+      cert = nx.minio_server.cert
+      cert_key = nx.minio_server.cert_key
+      cert_2 = instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 5)
+      key_2 = instance_double(OpenSSL::PKey::EC)
+      expect(cert_1).to receive(:not_after).and_return(Time.now + 60 * 60 * 24 * 365 * 1 - 1)
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root_cert_1").and_return(cert_1)
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root_cert_2").and_return(cert_2)
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_2").and_return(key_2)
+      create_certificate_payload[:issuer_cert] = cert_2
+      create_certificate_payload[:issuer_key] = key_2
+      expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
+      expect(nx.minio_server).to receive(:update).and_call_original
+      expect(nx).to receive(:incr_reconfigure)
+
+      expect(nx.minio_server.cluster).to receive(:root_cert_2).and_call_original
+      expect(nx.minio_server.cluster).to receive(:root_cert_key_2).and_call_original
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(nx.minio_server.cert).not_to eq cert
+      expect(nx.minio_server.cert_key).not_to eq cert_key
+    end
   end
 
   describe "#wait_reconfigure" do
