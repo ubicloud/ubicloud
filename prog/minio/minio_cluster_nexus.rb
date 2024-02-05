@@ -19,18 +19,26 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     Validation.validate_minio_username(admin_user)
 
     DB.transaction do
+      ubid = MinioCluster.generate_ubid
+      root_cert_1, root_cert_key_1 = Util.create_root_certificate(common_name: "#{ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+      root_cert_2, root_cert_key_2 = Util.create_root_certificate(common_name: "#{ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+
       subnet_st = Prog::Vnet::SubnetNexus.assemble(
         Config.minio_service_project_id,
         name: "#{cluster_name}-subnet",
         location: location
       )
-      minio_cluster = MinioCluster.create_with_id(
+      minio_cluster = MinioCluster.create(
         name: cluster_name,
         location: location,
         admin_user: admin_user,
         admin_password: SecureRandom.urlsafe_base64(15),
-        private_subnet_id: subnet_st.id
-      )
+        private_subnet_id: subnet_st.id,
+        root_cert_1: root_cert_1,
+        root_cert_key_1: root_cert_key_1,
+        root_cert_2: root_cert_2,
+        root_cert_key_2: root_cert_key_2
+      ) { _1.id = ubid.to_uuid }
       minio_cluster.associate_with_project(project)
 
       per_pool_server_count = server_count / pool_count

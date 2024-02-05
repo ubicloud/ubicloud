@@ -6,12 +6,19 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   subject(:nx) { described_class.new(described_class.assemble(minio_pool.id, 0)) }
 
   let(:minio_pool) {
+    ps = Prog::Vnet::SubnetNexus.assemble(
+      minio_project.id, name: "minio-cluster-name"
+    )
     mc = MinioCluster.create_with_id(
       location: "hetzner-hel1",
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",
-      private_subnet_id: ps.id
+      private_subnet_id: ps.id,
+      root_cert_1: "root_cert_1",
+      root_cert_key_1: "root_cert_key_1",
+      root_cert_2: "root_cert_2",
+      root_cert_key_2: "root_cert_key_2"
     )
 
     MinioPool.create_with_id(
@@ -23,10 +30,19 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       vm_size: "standard-2"
     )
   }
-  let(:ps) {
-    Prog::Vnet::SubnetNexus.assemble(
-      minio_project.id, name: "minio-cluster-name"
-    )
+
+  let(:cert_1) {
+    instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 5)
+  }
+  let(:key_1) { instance_double(OpenSSL::PKey::EC) }
+  let(:create_certificate_payload) {
+    {
+      subject: "/C=US/O=Ubicloud/CN=#{nx.minio_server.cluster.ubid} Server Certificate",
+      extensions: ["subjectAltName=DNS:minio-cluster-name.minio.ubicloud.com,DNS:minio-cluster-name0.minio.ubicloud.com", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
+      duration: 60 * 60 * 24 * 30 * 6,
+      issuer_cert: cert_1,
+      issuer_key: key_1
+    }
   }
 
   let(:minio_project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
@@ -50,7 +66,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(Vm.count).to eq 1
       expect(Vm.first.unix_user).to eq "minio-user"
       expect(Vm.first.sshable.host).to eq "temp_#{Vm.first.id}"
-      expect(Vm.first.private_subnets.first.id).to eq ps.id
+      expect(Vm.first.private_subnets.first.id).to eq minio_pool.cluster.private_subnet_id
     end
 
     it "fails if pool is not valid" do
@@ -65,23 +81,67 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.start }.to nap(5)
     end
 
-    it "updates sshable and hops to bootstrap_rhizome if dnszone doesn't exist" do
+    it "creates server certificate and hops to bootstrap_rhizome if dnszone doesn't exist" do
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
+      expect(nx).to receive(:vm).and_return(vm)
       expect(nx).to receive(:register_deadline)
-      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"})
-      expect { nx.start }.to hop("wait_bootstrap_rhizome")
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root_cert_1").and_return(cert_1)
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
+      expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
+      expect(nx.minio_server).to receive(:update).and_call_original
+
+      expect { nx.start }.to hop("bootstrap_rhizome")
+
+      expect(nx.minio_server.cert).to eq "cert"
+      expect(nx.minio_server.cert_key).to eq "cert_key"
     end
 
-    it "updates sshable, inserts dns record and hops to bootstrap_rhizome if dnszone exists" do
+    it "creates server certificate with ip_san and hops to bootstrap_rhizome if dnszone doesn't exist" do
+      vm = nx.minio_server.vm
+      vm.strand.update(label: "wait")
+      expect(nx).to receive(:vm).and_return(vm)
+      expect(nx).to receive(:register_deadline)
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root_cert_1").and_return(cert_1)
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
+
+      expect(Config).to receive(:development?).and_return(true)
+      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      create_certificate_payload[:extensions] = ["subjectAltName=DNS:minio-cluster-name.minio.ubicloud.com,DNS:minio-cluster-name0.minio.ubicloud.com,IP:1.1.1.1", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"]
+      expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
+
+      expect(nx.minio_server).to receive(:update).and_call_original
+
+      expect { nx.start }.to hop("bootstrap_rhizome")
+
+      expect(nx.minio_server.cert).to eq "cert"
+      expect(nx.minio_server.cert_key).to eq "cert_key"
+    end
+
+    it "inserts dns record and hops to bootstrap_rhizome if dnszone exists" do
       dz = DnsZone.create_with_id(project_id: minio_project.id, name: Config.minio_host_name)
       expect(nx.minio_server.cluster).to receive(:dns_zone).and_return(dz).at_least(:once)
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
+      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(nx.minio_server.cluster.dns_zone).to receive(:insert_record).with(record_name: nx.cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
       expect(nx).to receive(:register_deadline)
+      expect(OpenSSL::X509::Certificate).to receive(:new).with("root_cert_1").and_return(cert_1)
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
+      expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
+      expect(nx.minio_server).to receive(:update).and_call_original
+
+      expect { nx.start }.to hop("bootstrap_rhizome")
+      expect(nx.minio_server.cert).to eq "cert"
+      expect(nx.minio_server.cert_key).to eq "cert_key"
+    end
+  end
+
+  describe "#bootstrap_rhizome" do
+    it "buds bootstrap rhizome and hops to wait_bootstrap_rhizome" do
+      vm = nx.minio_server.vm
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"})
-      expect { nx.start }.to hop("wait_bootstrap_rhizome")
+      expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end
 
@@ -264,13 +324,13 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   describe "#available?" do
     it "returns true if health check is successful" do
       expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
-      stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
+      stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
       expect(nx.available?).to be(true)
     end
 
     it "returns false if health check is unsuccessful" do
       expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
-      stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
+      stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
       expect(nx.available?).to be(false)
     end
 

@@ -14,10 +14,19 @@ class MinioServer < Sequel::Model
   dataset_module Authorization::Dataset
 
   include ResourceMethods
+
+  def self.redacted_columns
+    super + [:cert]
+  end
+
   include SemaphoreMethods
   include HealthMonitorMethods
 
-  semaphore :checkup, :destroy, :restart, :reconfigure
+  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates
+
+  plugin :column_encryption do |enc|
+    enc.column :cert_key
+  end
 
   def hostname
     "#{cluster.name}#{index}.#{Config.minio_host_name}"
@@ -34,7 +43,7 @@ class MinioServer < Sequel::Model
   end
 
   def ip4_url
-    "http://#{vm.ephemeral_net4}:9000"
+    "https://#{vm.ephemeral_net4}:9000"
   end
 
   def endpoint

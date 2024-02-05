@@ -8,7 +8,9 @@ RSpec.describe MinioServer do
       location: "hetzner-hel1",
       name: "minio-cluster-name",
       admin_user: "minio-admin",
-      admin_password: "dummy-password"
+      admin_password: "dummy-password",
+      root_cert_1: "dummy-root-cert-1",
+      root_cert_2: "dummy-root-cert-2"
     )
     mp = MinioPool.create_with_id(
       cluster_id: mc.id,
@@ -53,7 +55,7 @@ RSpec.describe MinioServer do
 
     it "returns minio volumes properly for a multi drive multi server cluster" do
       ms.pool.update(drive_count: 4, server_count: 2)
-      expect(ms.minio_volumes).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
+      expect(ms.minio_volumes).to eq("https://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
   end
 
@@ -117,12 +119,12 @@ RSpec.describe MinioServer do
 
     it "returns url properly" do
       DnsZone.create_with_id(project_id: Config.minio_service_project_id, name: Config.minio_host_name)
-      expect(ms.server_url).to eq("http://minio-cluster-name.minio.ubicloud.com:9000")
+      expect(ms.server_url).to eq("https://minio-cluster-name.minio.ubicloud.com:9000")
     end
 
     it "returns ip address when dns zone is not found" do
       expect(ms.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
-      expect(ms.server_url).to eq("http://10.10.10.10:9000")
+      expect(ms.server_url).to eq("https://10.10.10.10:9000")
     end
   end
 end

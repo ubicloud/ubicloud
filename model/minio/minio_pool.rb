@@ -19,7 +19,7 @@ class MinioPool < Sequel::Model
     return "/minio/dat{1...#{drive_count}}" if cluster.single_instance_multi_drive?
     servers_arg = "#{cluster.name}{#{start_index}...#{server_count + start_index - 1}}"
     drivers_arg = "/minio/dat{1...#{per_server_drive_count}}"
-    "http://#{servers_arg}.#{Config.minio_host_name}:9000#{drivers_arg}"
+    "https://#{servers_arg}.#{Config.minio_host_name}:9000#{drivers_arg}"
   end
 
   def name

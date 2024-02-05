@@ -8,7 +8,9 @@ RSpec.describe MinioPool do
       location: "hetzner-hel1",
       name: "minio-cluster-name",
       admin_user: "minio-admin",
-      admin_password: "dummy-password"
+      admin_password: "dummy-password",
+      root_cert_1: "dummy-root-cert-1",
+      root_cert_2: "dummy-root-cert-2"
     )
     mp = described_class.create_with_id(
       cluster_id: mc.id,
@@ -40,7 +42,7 @@ RSpec.describe MinioPool do
 
     it "returns volumes url properly for a multi drive multi server pool" do
       mp.update(drive_count: 4, server_count: 2)
-      expect(mp.volumes_url).to eq("http://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
+      expect(mp.volumes_url).to eq("https://minio-cluster-name{0...1}.minio.ubicloud.com:9000/minio/dat{1...2}")
     end
   end
 
