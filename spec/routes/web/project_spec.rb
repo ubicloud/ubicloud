@@ -142,6 +142,23 @@ RSpec.describe Clover, "project" do
         expect(page.status_code).to eq(404)
         expect(page).to have_content "Resource not found"
       end
+
+      it "can update the project name" do
+        new_name = "New Project Name"
+        visit project.path
+
+        fill_in "name", with: new_name
+        click_button "Save"
+
+        expect(page).to have_content new_name
+        expect(project.reload.name).to eq(new_name)
+      end
+
+      it "can not update the project name when does not have permissions" do
+        visit project_wo_permissions.path
+
+        expect { click_button "Save" }.to raise_error Capybara::ElementNotFound
+      end
     end
 
     describe "users" do
