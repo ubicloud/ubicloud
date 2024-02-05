@@ -30,7 +30,7 @@ class CloverWeb
           return redirect_back_with_inputs
         end
 
-        policy.update(body: body)
+        policy.tap { _1.body = body }.transform_to_tags.save_changes
 
         flash["notice"] = "'#{policy.name}' policy updated for '#{@project.name}'"
 

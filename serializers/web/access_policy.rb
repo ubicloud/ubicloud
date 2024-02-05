@@ -2,6 +2,7 @@
 
 class Serializers::Web::AccessPolicy < Serializers::Base
   def self.base(ap)
+    ap.transform_to_names
     {
       id: ap.id,
       ubid: ap.ubid,

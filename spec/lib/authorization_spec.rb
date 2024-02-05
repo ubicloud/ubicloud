@@ -104,10 +104,14 @@ RSpec.describe Authorization do
 
   describe "#HyperTagMethods" do
     it "hyper_tag_name" do
-      expect(users[0].hyper_tag_name).to eq("user/auth1@example.com")
+      expect(users[0].hyper_tag_name).to eq(users[0].ubid)
       p = vms[0].projects.first
       expect(vms[0].hyper_tag_name(p)).to eq("project/#{p.ubid}/location/hetzner-hel1/vm/vm0")
       expect(projects[0].hyper_tag_name).to eq("project/#{projects[0].ubid}")
+    end
+
+    it "policy_tag_name" do
+      expect(users[0].policy_tag_name).to eq("user/auth1@example.com")
     end
 
     it "hyper_tag_name error" do

@@ -7,6 +7,10 @@ class Account < Sequel::Model(:accounts)
   include Authorization::HyperTagMethods
 
   def hyper_tag_name(project = nil)
+    ubid
+  end
+
+  def policy_tag_name
     "user/#{email}"
   end
 
