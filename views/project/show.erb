@@ -13,16 +13,40 @@
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <%== render(
-    "components/kv_data_card",
-    locals: {
-      data: [
-        ["ID", @project_data[:ubid]],
-        ["Name", @project_data[:name]],
-        ["Provider", @project_data.dig(:provider, :display_name)]
-      ]
-    }
-  ) %>
+  <form action="<%= (@project_data[:path]) %>" method="POST">
+    <%== csrf_tag((@project_data[:path])) %>
+
+    <%== render(
+      "components/kv_data_card",
+      locals: {
+        data: [
+          ["ID", @project_data[:ubid]],
+          (
+            if Authorization.has_permission?(@current_user.id, "Project:edit", @project_data[:id])
+              [
+                "Name",
+                render(
+                  "components/form/text",
+                  locals: {
+                    name: "name",
+                    value: @project_data[:name],
+                    button_title: "Save",
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ),
+                { escape: false }
+              ]
+            else
+              ["Name", @project_data[:name]]
+            end
+          ),
+          ["Provider", @project_data.dig(:provider, :display_name)]
+        ]
+      }
+    ) %>
+  </form>
   <!-- Delete Card -->
   <% if Authorization.has_permission?(@current_user.id, "Project:delete", @project_data[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">

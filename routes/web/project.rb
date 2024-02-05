@@ -44,6 +44,15 @@ class CloverWeb
         view "project/show"
       end
 
+      r.post true do
+        Authorization.authorize(@current_user.id, "Project:edit", @project.id)
+        @project.update(name: r.params["name"])
+
+        flash["notice"] = "The project name is updated to '#{@project.name}'."
+
+        r.redirect @project.path
+      end
+
       r.delete true do
         Authorization.authorize(@current_user.id, "Project:delete", @project.id)
 
