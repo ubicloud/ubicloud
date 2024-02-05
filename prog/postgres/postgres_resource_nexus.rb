@@ -84,8 +84,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # without excessive branching, we create the very first root certificate
     # with only 5 year validity. So it would look like it is created 5 years
     # ago.
-    postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 5)
-    postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
+    postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+    postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
     postgres_resource.server_cert, postgres_resource.server_cert_key = create_server_certificate
     postgres_resource.save_changes
 
@@ -104,7 +104,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # than 5 months.
     if OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
-      postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = create_root_certificate(duration: 60 * 60 * 24 * 365 * 10)
+      postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
       server.incr_refresh_certificates
     end
 
@@ -177,14 +177,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def dns_zone
     @@dns_zone ||= DnsZone.where(project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname).first
-  end
-
-  def create_root_certificate(duration:)
-    Util.create_certificate(
-      subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.ubid} Root Certificate Authority",
-      extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
-      duration: duration
-    ).map(&:to_pem)
   end
 
   def create_server_certificate
