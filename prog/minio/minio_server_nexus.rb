@@ -56,7 +56,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     nap 5 unless vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
 
-    minio_server.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
+    minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
     bud Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"}
 
     hop_wait_bootstrap_rhizome
@@ -140,7 +140,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     DB.transaction do
       decr_destroy
-      minio_server.dns_zone&.delete_record(record_name: cluster.hostname)
+      minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname)
       minio_server.vm.sshable.destroy
       minio_server.vm.nics.each { _1.incr_destroy }
       minio_server.vm.incr_destroy
@@ -152,7 +152,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def available?
     client = Minio::Client.new(
-      endpoint: minio_server.connection_string,
+      endpoint: minio_server.ip4_url,
       access_key: minio_server.cluster.admin_user,
       secret_key: minio_server.cluster.admin_password
     )

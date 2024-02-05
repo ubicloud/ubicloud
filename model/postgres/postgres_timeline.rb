@@ -89,7 +89,7 @@ PGHOST=/var/run/postgresql
   end
 
   def blob_storage_endpoint
-    @blob_storage_endpoint ||= blob_storage.connection_strings.first
+    @blob_storage_endpoint ||= blob_storage.url || blob_storage.ip4_urls.sample
   end
 
   def blob_storage_client

@@ -24,7 +24,7 @@ MINIO_VOLUMES="#{minio_server.minio_volumes}"
 MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="#{minio_server.cluster.admin_user}"
 MINIO_ROOT_PASSWORD="#{minio_server.cluster.admin_password}"
-MINIO_SERVER_URL="#{minio_server.url}"
+MINIO_SERVER_URL="#{minio_server.server_url}"
 ECHO
 
       hosts = <<ECHO

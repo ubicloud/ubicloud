@@ -74,10 +74,11 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "updates sshable, inserts dns record and hops to bootstrap_rhizome if dnszone exists" do
-      DnsZone.create_with_id(project_id: minio_project.id, name: Config.minio_host_name)
+      dz = DnsZone.create_with_id(project_id: minio_project.id, name: Config.minio_host_name)
+      expect(nx.minio_server.cluster).to receive(:dns_zone).and_return(dz).at_least(:once)
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
-      expect(nx.minio_server.dns_zone).to receive(:insert_record).with(record_name: nx.cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
+      expect(nx.minio_server.cluster.dns_zone).to receive(:insert_record).with(record_name: nx.cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"})
       expect { nx.start }.to hop("wait_bootstrap_rhizome")
@@ -232,7 +233,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:incr_destroy)
       expect(nx.minio_server).to receive(:destroy)
-      expect(nx.minio_server.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname)
+      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname)
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
     end
   end

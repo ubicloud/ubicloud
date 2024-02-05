@@ -27,22 +27,18 @@ class MinioServer < Sequel::Model
     vm.nics.first.private_ipv4.network.to_s
   end
 
-  def name
-    "#{cluster.name}-#{pool.start_index}-#{index}"
-  end
-
   def minio_volumes
     cluster.pools.map do |pool|
       pool.volumes_url
     end.join(" ")
   end
 
-  def connection_string
+  def ip4_url
     "http://#{vm.ephemeral_net4}:9000"
   end
 
   def endpoint
-    dns_zone ? "#{hostname}:9000" : "#{vm.ephemeral_net4}:9000"
+    cluster.dns_zone ? "#{hostname}:9000" : "#{vm.ephemeral_net4}:9000"
   end
 
   def init_health_monitor_session
@@ -55,7 +51,7 @@ class MinioServer < Sequel::Model
     {
       ssh_session: ssh_session,
       minio_client: Minio::Client.new(
-        endpoint: connection_string,
+        endpoint: ip4_url,
         access_key: cluster.admin_user,
         secret_key: cluster.admin_password,
         socket: File.join(socket_path, "health_monitor_socket")
@@ -79,11 +75,7 @@ class MinioServer < Sequel::Model
     pulse
   end
 
-  def dns_zone
-    @dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
-  end
-
-  def url
-    dns_zone ? "http://#{cluster.hostname}:9000" : connection_string
+  def server_url
+    cluster.url || ip4_url
   end
 end
