@@ -57,6 +57,13 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     register_deadline(:wait, 10 * 60)
 
     minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
+    cert, cert_key = create_certificate
+    minio_server.update(cert: cert, cert_key: cert_key)
+
+    hop_bootstrap_rhizome
+  end
+
+  label def bootstrap_rhizome
     bud Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"}
 
     hop_wait_bootstrap_rhizome
@@ -161,5 +168,24 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }
   rescue
     false
+  end
+
+  def create_certificate
+    root_cert = OpenSSL::X509::Certificate.new(minio_server.cluster.root_cert_1)
+    root_cert_key = OpenSSL::PKey::EC.new(minio_server.cluster.root_cert_key_1)
+    if root_cert.not_after < Time.now + 60 * 60 * 24 * 365 * 1
+      root_cert = OpenSSL::X509::Certificate.new(minio_server.cluster.root_cert_2)
+      root_cert_key = OpenSSL::PKey::EC.new(minio_server.cluster.root_cert_key_2)
+    end
+
+    ip_san = Config.development? ? ",IP:#{minio_server.vm.ephemeral_net4}" : nil
+
+    Util.create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{minio_server.cluster.ubid} Server Certificate",
+      extensions: ["subjectAltName=DNS:#{minio_server.cluster.hostname},DNS:#{minio_server.hostname}#{ip_san}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
+      duration: 60 * 60 * 24 * 30 * 6, # ~6 months
+      issuer_cert: root_cert,
+      issuer_key: root_cert_key
+    ).map(&:to_pem)
   end
 end

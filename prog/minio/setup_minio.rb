@@ -38,7 +38,10 @@ ff02::3 ip6-allhosts
 ECHO
       config_json = JSON.generate({
         minio_config: minio_config,
-        hosts: hosts
+        hosts: hosts,
+        cert: minio_server.cert,
+        cert_key: minio_server.cert_key,
+        ca_bundle: minio_server.cluster.root_certs
       })
 
       minio_server.vm.sshable.cmd("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config_json)
