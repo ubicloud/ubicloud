@@ -10,7 +10,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   extend Forwardable
   def_delegators :minio_server, :vm
 
-  semaphore :checkup, :destroy, :restart, :reconfigure
+  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates
 
   def self.assemble(minio_pool_id, index)
     unless (minio_pool = MinioPool[minio_pool_id])
@@ -105,7 +105,20 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       decr_restart
       push self.class, frame, "minio_restart"
     end
+
+    if minio_server.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+      hop_refresh_certificates
+    end
+
     nap 10
+  end
+
+  label def refresh_certificates
+    cert, cert_key = create_certificate
+    minio_server.update(cert: cert, cert_key: cert_key, certificate_last_checked_at: Time.now)
+
+    incr_reconfigure
+    hop_wait
   end
 
   label def wait_reconfigure

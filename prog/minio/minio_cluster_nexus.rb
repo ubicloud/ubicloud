@@ -72,11 +72,28 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   end
 
   label def wait
+    if minio_cluster.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+      hop_refresh_certificates
+    end
+
     when_reconfigure_set? do
       hop_reconfigure
     end
 
     nap 30
+  end
+
+  label def refresh_certificates
+    if OpenSSL::X509::Certificate.new(minio_cluster.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+      minio_cluster.root_cert_1, minio_cluster.root_cert_key_1 = minio_cluster.root_cert_2, minio_cluster.root_cert_key_2
+      minio_cluster.root_cert_2, minio_cluster.root_cert_key_2 = Util.create_root_certificate(common_name: "#{minio_cluster.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      minio_cluster.servers.map(&:incr_reconfigure)
+    end
+
+    minio_cluster.certificate_last_checked_at = Time.now
+    minio_cluster.save_changes
+
+    hop_wait
   end
 
   label def reconfigure

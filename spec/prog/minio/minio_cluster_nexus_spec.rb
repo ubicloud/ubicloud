@@ -80,6 +80,55 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(nx).to receive(:when_reconfigure_set?).and_yield
       expect { nx.wait }.to hop("reconfigure")
     end
+
+    it "hops to refresh_certificates if certificate_last_checked_at is before 1 month" do
+      expect(nx.minio_cluster).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
+      expect { nx.wait }.to hop("refresh_certificates")
+    end
+  end
+
+  describe "#refresh_certificates" do
+    let(:ms) do
+      instance_double(MinioServer, cert: "server_cert")
+    end
+
+    before do
+      allow(nx.minio_cluster).to receive(:servers).and_return([ms])
+    end
+
+    it "moves root_cert_2 to root_cert_1 and creates new root_cert_2 if root_cert_1 is about to expire, also updates server_cert" do
+      rc2 = nx.minio_cluster.root_cert_2
+      rck2 = nx.minio_cluster.root_cert_key_2
+      certificate_last_checked_at = nx.minio_cluster.certificate_last_checked_at
+      expect(OpenSSL::X509::Certificate).to receive(:new).with(nx.minio_cluster.root_cert_1).and_call_original
+      expect(Time).to receive(:now).and_return(Time.now + 60 * 60 * 24 * 335 * 5 + 1).at_least(:once)
+      expect(Util).to receive(:create_root_certificate).with(common_name: "#{nx.minio_cluster.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10).and_return(["cert", "key"])
+      expect(ms).to receive(:incr_reconfigure).once
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(nx.minio_cluster.root_cert_1).to eq rc2
+      expect(nx.minio_cluster.root_cert_key_1).to eq rck2
+      expect(nx.minio_cluster.root_cert_2).to eq "cert"
+      expect(nx.minio_cluster.root_cert_key_2).to eq "key"
+      expect(nx.minio_cluster.certificate_last_checked_at).to be > certificate_last_checked_at
+    end
+
+    it "doesn't update root_certs if they are not close to expire" do
+      rc1 = nx.minio_cluster.root_cert_1
+      rck1 = nx.minio_cluster.root_cert_key_1
+      rc2 = nx.minio_cluster.root_cert_2
+      rck2 = nx.minio_cluster.root_cert_key_2
+      certificate_last_checked_at = nx.minio_cluster.certificate_last_checked_at
+
+      expect(OpenSSL::X509::Certificate).to receive(:new).with(nx.minio_cluster.root_cert_1).and_call_original
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(nx.minio_cluster.root_cert_1).to eq rc1
+      expect(nx.minio_cluster.root_cert_key_1).to eq rck1
+      expect(nx.minio_cluster.root_cert_2).to eq rc2
+      expect(nx.minio_cluster.root_cert_key_2).to eq rck2
+      expect(nx.minio_cluster.certificate_last_checked_at).to be > certificate_last_checked_at
+    end
   end
 
   describe "#reconfigure" do
