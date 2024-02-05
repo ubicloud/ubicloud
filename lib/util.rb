@@ -20,6 +20,14 @@ module Util
     end
   end
 
+  def self.create_root_certificate(common_name:, duration:)
+    create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{common_name}",
+      extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
+      duration: duration
+    ).map(&:to_pem)
+  end
+
   def self.create_certificate(subject:, duration:, extensions: [], issuer_cert: nil, issuer_key: nil)
     cert = OpenSSL::X509::Certificate.new
     key = OpenSSL::PKey::EC.generate("prime256v1")
