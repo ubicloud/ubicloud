@@ -76,19 +76,19 @@ RSpec.describe MinioServer do
   it "checks pulse" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session),
-      minio_client: Minio::Client.new(endpoint: "http://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret")
+      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret")
     }
 
     expect(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").at_least(:once)
     expect(ms).not_to receive(:incr_checkup)
 
-    stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
     ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
 
-    stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}]}))
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}]}))
     ms.check_pulse(session: session, previous_pulse: {})
 
-    stub_request(:get, "http://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
     ms.check_pulse(session: session, previous_pulse: {})
   end
 

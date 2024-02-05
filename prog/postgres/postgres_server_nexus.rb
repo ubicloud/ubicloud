@@ -127,6 +127,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
     vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
 
+    # MinIO cluster certificate rotation timelines are similar to postgres
+    # servers' timelines. So we refresh the wal-g credentials which uses MinIO
+    # certificates when we refresh the certificates of the postgres server.
+    refresh_walg_credentials
+
     when_initial_provisioning_set? do
       hop_configure
     end
@@ -276,6 +281,7 @@ SQL
 
     walg_config = postgres_server.timeline.generate_walg_config
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
+    vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: postgres_server.timeline.blob_storage.root_certs)
   end
 
   def available?

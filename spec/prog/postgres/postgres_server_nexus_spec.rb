@@ -18,7 +18,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         PostgresTimeline,
         id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
         generate_walg_config: "walg config",
-        blob_storage: "dummy-blob-storage"
+        blob_storage: instance_double(MinioCluster, root_certs: "certs")
       ),
       vm: instance_double(
         Vm,
@@ -142,6 +142,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure_walg_credentials" do
     it "hops to initialize_empty_database if the server is primary" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
       expect(postgres_server).to receive(:primary?).and_return(true)
 
       expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
@@ -149,6 +150,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to initialize_database_from_backup if the server is not primary" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
       expect(postgres_server).to receive(:primary?).and_return(false)
       expect { nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
     end
@@ -216,6 +218,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")
+      expect(nx).to receive(:refresh_walg_credentials)
 
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_certificates }.to hop("configure")
@@ -226,6 +229,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
+      expect(nx).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
     end
   end
@@ -299,6 +303,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("t")
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_get_wal_replay_pause_state()'").and_return("paused")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
 
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql -c 'SELECT pg_wal_replay_resume()'")
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "375b1399-ec21-8eda-8859-2faee6ff6613"))
@@ -311,6 +316,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "switches to new timeline if the recovery is completed" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("f")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
+      expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
 
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "375b1399-ec21-8eda-8859-2faee6ff6613"))
       expect(postgres_server).to receive(:timeline_id=).with("375b1399-ec21-8eda-8859-2faee6ff6613")

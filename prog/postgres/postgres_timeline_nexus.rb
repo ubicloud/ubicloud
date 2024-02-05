@@ -90,7 +90,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     admin_client = Minio::Client.new(
       endpoint: postgres_timeline.blob_storage_endpoint,
       access_key: Config.postgres_service_blob_storage_access_key,
-      secret_key: Config.postgres_service_blob_storage_secret_key
+      secret_key: Config.postgres_service_blob_storage_secret_key,
+      ssl_ca_file_data: postgres_timeline.blob_storage.root_certs
     )
 
     admin_client.admin_remove_user(postgres_timeline.access_key)
@@ -102,7 +103,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       admin_client = Minio::Client.new(
         endpoint: postgres_timeline.blob_storage_endpoint,
         access_key: Config.postgres_service_blob_storage_access_key,
-        secret_key: Config.postgres_service_blob_storage_secret_key
+        secret_key: Config.postgres_service_blob_storage_secret_key,
+        ssl_ca_file_data: postgres_timeline.blob_storage.root_certs
       )
 
       # Setup user keys and policy for the timeline

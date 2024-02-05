@@ -174,7 +174,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     client = Minio::Client.new(
       endpoint: minio_server.ip4_url,
       access_key: minio_server.cluster.admin_user,
-      secret_key: minio_server.cluster.admin_password
+      secret_key: minio_server.cluster.admin_password,
+      ssl_ca_file_data: minio_server.cluster.root_certs
     )
 
     server_data = JSON.parse(client.admin_info.body)["servers"].find { _1["endpoint"] == minio_server.endpoint }
