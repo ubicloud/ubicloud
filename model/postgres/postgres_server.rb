@@ -8,6 +8,9 @@ class PostgresServer < Sequel::Model
   many_to_one :resource, class: PostgresResource, key: :resource_id
   many_to_one :timeline, class: PostgresTimeline, key: :timeline_id
   one_to_one :vm, key: :id, primary_key: :vm_id
+  one_to_one :lsn_monitor, class: PostgresLsnMonitor, key: :postgres_server_id
+
+  plugin :association_dependencies, lsn_monitor: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -95,14 +98,26 @@ class PostgresServer < Sequel::Model
     session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres")
 
     reading = begin
-      session[:db_connection]["SELECT 1"].all && "up"
+      lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"
+      last_known_lsn = session[:db_connection]["SELECT #{lsn_function} AS lsn"].first[:lsn]
+      "up"
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {last_known_lsn: last_known_lsn})
 
-    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
-      incr_checkup
+    DB.transaction do
+      if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
+        PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { _1.postgres_server_id = id }
+          .insert_conflict(
+            target: :postgres_server_id,
+            update: {last_known_lsn: last_known_lsn}
+          ).save_changes
+      end
+
+      if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
+        incr_checkup
+      end
     end
 
     pulse
