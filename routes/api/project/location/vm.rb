@@ -7,8 +7,8 @@ class CloverApi
     r.get true do
       result = @project.vms_dataset.where(location: @location).authorized(@current_user.id, "Vm:view").eager(:semaphores).paginated_result(
         r.params["cursor"],
-        r.params["page-size"],
-        r.params["order-column"]
+        r.params["page_size"],
+        r.params["order_column"]
       )
 
       {
@@ -38,7 +38,7 @@ class CloverApi
         fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
         required_parameters = ["public_key"]
-        allowed_optional_parameters = ["size", "unix_user", "location", "boot_image"]
+        allowed_optional_parameters = ["size", "unix_user", "location", "boot_image", "enable_ip4"]
 
         request_body = r.body.read
         Validation.validate_request_body(request_body, required_parameters, allowed_optional_parameters)

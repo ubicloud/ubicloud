@@ -7,8 +7,8 @@ class CloverApi
     r.get true do
       result = @project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores).paginated_result(
         r.params["cursor"],
-        r.params["page-size"],
-        r.params["order-column"]
+        r.params["page_size"],
+        r.params["order_column"]
       )
 
       {
