@@ -123,7 +123,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     it "registers deadline and hops" do
       expect(postgres_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("create_dns_record")
+      expect { nx.start }.to hop("refresh_dns_record")
     end
 
     it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
@@ -131,7 +131,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(nx).to receive(:register_deadline)
       expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource))
       expect(nx).to receive(:bud).with(described_class, {}, :trigger_pg_current_xact_id_on_parent)
-      expect { nx.start }.to hop("create_dns_record")
+      expect { nx.start }.to hop("refresh_dns_record")
     end
   end
 
@@ -153,19 +153,20 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
   end
 
-  describe "#create_dns_record" do
+  describe "#refresh_dns_record" do
     it "creates dns records and hops" do
       expect(postgres_resource.representative_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
-      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
+      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.").twice
       dns_zone = instance_double(DnsZone)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone)
-      expect { nx.create_dns_record }.to hop("initialize_certificates")
+      expect(described_class).to receive(:dns_zone).and_return(dns_zone).twice
+      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
     end
 
     it "hops even if dns zone is not configured" do
-      expect(described_class).to receive(:dns_zone).and_return(nil)
-      expect { nx.create_dns_record }.to hop("initialize_certificates")
+      expect(described_class).to receive(:dns_zone).and_return(nil).twice
+      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
     end
   end
 
@@ -273,14 +274,17 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.wait }.to nap(30)
     end
 
+    it "hops to refresh_dns_record when refresh_dns_record is set" do
+      expect(nx).to receive(:when_refresh_dns_record_set?).and_yield
+      expect { nx.wait }.to hop("refresh_dns_record")
+    end
+
     it "hops to refresh_certificates if the certificate is checked more than 1 months ago" do
       expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
-    it "increments update_firewall_rules semaphore of postgres server if when_update_firewall_rules_set? is called" do
-      expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now)
-
+    it "increments update_firewall_rules semaphore of postgres server when update_firewall_rules is set" do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
       expect(postgres_resource.representative_server).to receive(:incr_update_firewall_rules)
       expect { nx.wait }.to nap(30)

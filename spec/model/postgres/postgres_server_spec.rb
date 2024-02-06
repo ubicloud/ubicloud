@@ -90,6 +90,44 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#failover_target" do
+    before do
+      postgres_server.timeline_access = "push"
+      sshable = instance_double(Sshable)
+      vm = instance_double(Vm, sshable: sshable)
+      expect(sshable).to receive(:cmd).and_return("1/5", "1/10")
+      expect(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, vm: vm, strand: instance_double(Strand, label: "wait_catch_up")),
+        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, vm: vm, strand: instance_double(Strand, label: "wait")),
+        instance_double(described_class, ubid: "pgubidstandby3", standby?: true, vm: vm, strand: instance_double(Strand, label: "wait"))
+      ])
+    end
+
+    it "returns the standby with highest lsn in sync replication" do
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
+    end
+
+    it "returns nil if last_known_lsn in unknown for async replication" do
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
+      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: nil))
+      expect(postgres_server.failover_target).to be_nil
+    end
+
+    it "returns nil if lsn difference is too hign for async replication" do
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
+      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "2/0")).twice
+      expect(postgres_server.failover_target).to be_nil
+    end
+
+    it "returns the standby with highest lsn if lsn difference is not high in async replication" do
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
+      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "1/11")).twice
+      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
+    end
+  end
+
   it "initiates a new health monitor session" do
     forward = instance_double(Net::SSH::Service::Forward)
     expect(forward).to receive(:local_socket)

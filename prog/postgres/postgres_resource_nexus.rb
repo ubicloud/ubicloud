@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_resource, :servers, :representative_server
 
-  semaphore :destroy, :update_firewall_rules
+  semaphore :update_firewall_rules, :refresh_dns_record, :destroy
 
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
     unless (project = Project[project_id])
@@ -70,7 +70,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     nap 5 unless representative_server.vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
     bud self.class, frame, :trigger_pg_current_xact_id_on_parent if postgres_resource.parent
-    hop_create_dns_record
+    hop_refresh_dns_record
   end
 
   label def trigger_pg_current_xact_id_on_parent
@@ -78,8 +78,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     pop "triggered pg_current_xact_id"
   end
 
-  label def create_dns_record
+  label def refresh_dns_record
+    decr_refresh_dns_record
+
+    Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
     Prog::Postgres::PostgresResourceNexus.dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: representative_server.vm.ephemeral_net4.to_s)
+
     hop_initialize_certificates
   end
 
@@ -150,6 +154,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait
+    when_refresh_dns_record_set? do
+      hop_refresh_dns_record
+    end
+
     if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
       hop_refresh_certificates
     end

@@ -414,6 +414,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to nap(30)
     end
 
+    it "hops to wait_primary_destroy if take_over is set" do
+      expect(nx).to receive(:when_take_over_set?).and_yield
+      expect { nx.wait }.to hop("wait_primary_destroy")
+    end
+
     it "hops to refresh_certificates if refresh_certificates is set" do
       expect(nx).to receive(:when_refresh_certificates_set?).and_yield
       expect { nx.wait }.to hop("refresh_certificates")
@@ -462,21 +467,82 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#unavailable" do
     it "hops to wait if the server is available" do
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:failover_target).and_return(nil)
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
     end
 
     it "buds restart if the server is not available" do
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:failover_target).and_return(nil)
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
     end
 
     it "does not bud restart if there is already one restart going on" do
+      expect(postgres_server).to receive(:primary?).and_return(true).twice
+      expect(postgres_server).to receive(:failover_target).and_return(nil).twice
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(5)
       expect(nx).not_to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
+    end
+
+    it "increments take_over if there is a failover target and increments destroy" do
+      standby = instance_double(PostgresServer)
+      expect(standby).to receive(:incr_take_over)
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:failover_target).and_return(standby)
+      expect(postgres_server).to receive(:incr_destroy)
+      expect { nx.unavailable }.to nap(0)
+    end
+  end
+
+  describe "#wait_primary_destroy" do
+    it "naps if primary still exists" do
+      expect(nx).to receive(:decr_take_over)
+      expect(postgres_server.resource).to receive(:representative_server).and_return("something")
+      expect { nx.wait_primary_destroy }.to nap(5)
+    end
+
+    it "hops to take_over if primary still exists" do
+      expect(nx).to receive(:decr_take_over)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(nil)
+      expect { nx.wait_primary_destroy }.to hop("take_over")
+    end
+  end
+
+  describe "#take_over" do
+    it "triggers promote if promote command is not sent yet or failed" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo pg_ctlcluster 16 main promote' promote_postgres").twice
+
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("NotStarted", "Failed")
+      expect { nx.take_over }.to nap(0)
+      expect { nx.take_over }.to nap(0)
+    end
+
+    it "updates the metadata and hops to configure if promote command is succeeded" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Succeeded")
+
+      expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything)
+      expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:incr_configure)
+
+      standby = instance_double(PostgresServer, primary?: false)
+      expect(standby).to receive(:update).with(synchronization_status: "catching_up")
+      expect(standby).to receive(:incr_configure)
+
+      expect(postgres_server.resource).to receive(:servers).and_return([postgres_server, standby]).twice
+
+      expect { nx.take_over }.to hop("configure")
+    end
+
+    it "naps if script return unknown status" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Unknown")
+      expect { nx.take_over }.to nap(5)
     end
   end
 
