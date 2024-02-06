@@ -404,17 +404,26 @@ DHCP
     end.join("\n")
 
     raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
-
+    interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
+    dnsmasq_address_ip6 = NetAddr::IPv6Net.parse(nics.first.net6).nth(3)
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
 enable-ra
 dhcp-authoritative
+domain-needed
+bogus-priv
+no-resolv
 #{raparams}
+#{interfaces}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
-dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
-dhcp-option=option:dns-server,149.112.112.112,9.9.9.9
+server=149.112.112.112
+server=9.9.9.9
+server=2620:fe::fe
+server=2620:fe::9
+dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+listen-address=#{dnsmasq_address_ip6}
 dhcp-option=26,1400
 DNSMASQ_CONF
 
