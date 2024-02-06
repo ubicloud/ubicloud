@@ -291,7 +291,7 @@ GEM
       openssl (>= 2.2)
       safety_net_attestation (~> 0.4.0)
       tpm-key_attestation (~> 0.12.0)
-    webmock (3.19.1)
+    webmock (3.20.0)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
