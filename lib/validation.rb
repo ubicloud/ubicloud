@@ -107,4 +107,22 @@ module Validation
       fail ValidationFailed.new({"original_password" => messages.map { _1 }})
     end
   end
+
+  def self.validate_request_body(request_body, required_keys, allowed_optional_keys = nil)
+    begin
+      request_body_params = JSON.parse(request_body)
+    rescue JSON::ParserError
+      fail ValidationFailed.new({body: "Body isn't a valid JSON object."})
+    end
+
+    missing_required_keys = required_keys - request_body_params.keys
+    unless missing_required_keys.empty?
+      fail ValidationFailed.new({parameters: "Request body must include required parameters: #{missing_required_keys.join(", ")}"})
+    end
+
+    unallowed_keys = request_body_params.keys - (required_keys + (allowed_optional_keys || []))
+    if unallowed_keys.any?
+      fail ValidationFailed.new({parameters: "Only following parameters are allowed: #{(required_keys + allowed_optional_keys).join(", ")}"})
+    end
+  end
 end
