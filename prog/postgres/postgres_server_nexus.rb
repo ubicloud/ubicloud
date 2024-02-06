@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :configure, :update_firewall_rules, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :configure, :update_firewall_rules, :take_over, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil)
     DB.transaction do
@@ -247,6 +247,10 @@ SQL
   label def wait
     decr_initial_provisioning
 
+    when_take_over_set? do
+      hop_wait_primary_destroy
+    end
+
     when_refresh_certificates_set? do
       hop_refresh_certificates
     end
@@ -287,6 +291,12 @@ SQL
   label def unavailable
     register_deadline(:wait, 10 * 60)
 
+    if postgres_server.primary? && (standby = postgres_server.failover_target)
+      standby.incr_take_over
+      postgres_server.incr_destroy
+      nap 0
+    end
+
     reap
     nap 5 unless strand.children.select { _1.prog == "Postgres::PostgresServerNexus" && _1.label == "restart" }.empty?
 
@@ -296,6 +306,28 @@ SQL
     end
 
     bud self.class, frame, :restart
+    nap 5
+  end
+
+  label def wait_primary_destroy
+    decr_take_over
+    hop_take_over if postgres_server.resource.representative_server.nil?
+    nap 5
+  end
+
+  label def take_over
+    case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
+    when "Succeeded"
+      postgres_server.update(timeline_access: "push", representative_at: Time.now)
+      postgres_server.resource.incr_refresh_dns_record
+      postgres_server.resource.servers.each(&:incr_configure)
+      postgres_server.resource.servers.reject(&:primary?).each { _1.update(synchronization_status: "catching_up") }
+      hop_configure
+    when "Failed", "NotStarted"
+      vm.sshable.cmd("common/bin/daemonizer 'sudo pg_ctlcluster 16 main promote' promote_postgres")
+      nap 0
+    end
+
     nap 5
   end
 

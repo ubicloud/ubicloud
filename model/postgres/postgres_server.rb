@@ -16,7 +16,7 @@ class PostgresServer < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :configure, :update_firewall_rules, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :configure, :update_firewall_rules, :take_over, :destroy
 
   def configure_hash
     configs = {
@@ -103,6 +103,20 @@ class PostgresServer < Sequel::Model
     !resource.representative_server.primary?
   end
 
+  def failover_target
+    target = resource.servers
+      .select { _1.standby? && _1.strand.label == "wait" }
+      .map { {server: _1, lsn: _1.vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_last_wal_receive_lsn()'").chomp} }
+      .max_by { lsn2int(_1[:lsn]) }
+
+    if resource.ha_type == PostgresResource::HaType::ASYNC
+      return nil if lsn_monitor.last_known_lsn.nil?
+      return nil if lsn_diff(lsn_monitor.last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
+    end
+
+    target[:server]
+  end
+
   def init_health_monitor_session
     FileUtils.rm_rf(health_monitor_socket_path)
     FileUtils.mkdir_p(health_monitor_socket_path)
@@ -152,5 +166,13 @@ class PostgresServer < Sequel::Model
     resource.firewall_rules.each do |pg_fwr|
       fw.insert_firewall_rule(pg_fwr.cidr.to_s, Sequel.pg_range(5432..5432))
     end
+  end
+
+  def lsn2int(lsn)
+    lsn.split("/").map { _1.rjust(8, "0") }.join.hex
+  end
+
+  def lsn_diff(lsn1, lsn2)
+    lsn2int(lsn1) - lsn2int(lsn2)
   end
 end
