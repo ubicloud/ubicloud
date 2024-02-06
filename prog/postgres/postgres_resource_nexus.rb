@@ -154,6 +154,11 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait
+    # Create missing standbys
+    (postgres_resource.required_standby_count + 1 - postgres_resource.servers.count).times do
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch")
+    end
+
     when_refresh_dns_record_set? do
       hop_refresh_dns_record
     end

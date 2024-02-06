@@ -269,8 +269,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#wait" do
-    it "naps" do
-      expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now)
+    before do
+      allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, required_standby_count: 0)
+    end
+
+    it "creates missing standbys" do
+      expect(postgres_resource).to receive(:required_standby_count).and_return(1)
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble)
       expect { nx.wait }.to nap(30)
     end
 
