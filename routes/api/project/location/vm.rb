@@ -18,25 +18,25 @@ class CloverApi
       }
     end
 
-    r.post true do
-      Authorization.authorize(@current_user.id, "Vm:create", @project.id)
-      fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
-
-      st = Prog::Vm::Nexus.assemble(
-        r.params["public_key"],
-        @project.id,
-        name: r.params["name"],
-        unix_user: r.params["unix_user"],
-        size: r.params["size"],
-        location: @location,
-        boot_image: r.params["boot_image"],
-        enable_ip4: !!r.params["enable_ip4"]
-      )
-
-      serialize(st.subject)
-    end
-
     r.is String do |vm_name|
+      r.post true do
+        Authorization.authorize(@current_user.id, "Vm:create", @project.id)
+        fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
+
+        st = Prog::Vm::Nexus.assemble(
+          r.params["public_key"],
+          @project.id,
+          name: vm_name,
+          unix_user: r.params["unix_user"],
+          size: r.params["size"],
+          location: @location,
+          boot_image: r.params["boot_image"],
+          enable_ip4: !!r.params["enable_ip4"]
+        )
+
+        serialize(st.subject)
+      end
+
       vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first
 
       unless vm
