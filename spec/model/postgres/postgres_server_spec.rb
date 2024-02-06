@@ -4,7 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe PostgresServer do
   subject(:postgres_server) {
-    described_class.new
+    described_class.new { _1.id = "c068cac7-ed45-82db-bf38-a003582b36ee" }
   }
 
   let(:resource) { instance_double(PostgresResource, identity: "pgubid.postgres.ubicloud.com") }
@@ -116,11 +116,10 @@ RSpec.describe PostgresServer do
       ssh_session: instance_double(Net::SSH::Connection::Session),
       db_connection: DB
     }
-    t = Time.now - 30
     pulse = {
       reading: "down",
       reading_rpt: 5,
-      reading_chg: t
+      reading_chg: Time.now - 30
     }
 
     expect(postgres_server).not_to receive(:incr_checkup)
@@ -132,14 +131,31 @@ RSpec.describe PostgresServer do
       ssh_session: instance_double(Net::SSH::Connection::Session),
       db_connection: instance_double(Sequel::Postgres::Database)
     }
-    t = Time.now - 30
     pulse = {
       reading: "down",
       reading_rpt: 5,
-      reading_chg: t
+      reading_chg: Time.now - 30
     }
 
     expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
+    expect(postgres_server).to receive(:incr_checkup)
+    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+  end
+
+  it "uses pg_current_wal_lsn to track lsn for primaries" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session),
+      db_connection: instance_double(Sequel::Postgres::Database)
+    }
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    expect(session[:db_connection]).to receive(:[]).with("SELECT pg_current_wal_lsn() AS lsn").and_raise(Sequel::DatabaseConnectionError)
+    expect(postgres_server).to receive(:primary?).and_return(true)
+
     expect(postgres_server).to receive(:incr_checkup)
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
