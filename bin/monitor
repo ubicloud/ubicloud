@@ -37,6 +37,12 @@ loop do
         pulse = r.check_pulse(session: sessions[r.id], previous_pulse: pulse) if sessions[r.id]
         Clog.emit("Got new pulse") { {got_pulse: {ubid: r.ubid, pulse: pulse}} }
         sleep r.monitoring_interval
+      rescue RuntimeError, IOError => ex
+        Clog.emit("Pulse checking is failed") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
+        sleep r.monitoring_interval
+      rescue => ex
+        Clog.emit("Pulse checking is failed permanently!") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
+        raise
       end
     end
   end
