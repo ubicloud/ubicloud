@@ -6,6 +6,19 @@ require_relative "../../common/lib/util"
 
 configure_hash = JSON.parse($stdin.read)
 
+# Update /etc/hosts
+hosts = <<-HOSTS
+127.0.0.1 localhost
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+#{configure_hash["hosts"]}
+HOSTS
+safe_write_to_file("/etc/hosts", hosts)
+
 # Update postgresql.conf
 configs = configure_hash["configs"].map { |k, v| "#{k} = #{v}" }.join("\n")
 safe_write_to_file("/etc/postgresql/16/main/conf.d/001-service.conf", configs)

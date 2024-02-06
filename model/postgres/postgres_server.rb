@@ -70,7 +70,8 @@ class PostgresServer < Sequel::Model
           net6: _1.net6.to_s
         }
       },
-      identity: resource.identity
+      identity: resource.identity,
+      hosts: "#{vm.ephemeral_net4} #{resource.identity}"
     }
   end
 
