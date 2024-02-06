@@ -5,9 +5,17 @@ class CloverApi
     @serializer = Serializers::Api::Vm
 
     r.get true do
-      vms = @project.vms_dataset.where(location: @location).authorized(@current_user.id, "Vm:view").eager(:semaphores).all
+      result = @project.vms_dataset.where(location: @location).authorized(@current_user.id, "Vm:view").eager(:semaphores).paginated_result(
+        r.params["cursor"],
+        r.params["page-size"],
+        r.params["order-column"]
+      )
 
-      serialize(vms)
+      {
+        values: serialize(result[:records]),
+        next_cursor: result[:next_cursor],
+        count: result[:count]
+      }
     end
 
     r.post true do
