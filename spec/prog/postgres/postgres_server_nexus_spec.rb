@@ -216,6 +216,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#refresh_certificates" do
+    it "waits for certificate creation by the parent resource" do
+      expect(postgres_server.resource).to receive(:server_cert).and_return(nil)
+      expect { nx.refresh_certificates }.to nap(5)
+    end
+
     it "pushes certificates to vm and hops to configure during initial provisioning" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")

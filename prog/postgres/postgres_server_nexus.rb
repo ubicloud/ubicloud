@@ -125,6 +125,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def refresh_certificates
     decr_refresh_certificates
 
+    nap 5 if postgres_server.resource.server_cert.nil?
+
     ca_bundle = [postgres_server.resource.root_cert_1, postgres_server.resource.root_cert_2].join("\n")
     vm.sshable.cmd("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: ca_bundle)
     vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
