@@ -564,13 +564,9 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait if sshable" do
-      expect(vm).to receive(:created_at).and_return(Time.now)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhhqmsyfvzpy2q9gqb5h0mpde2"))
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
-      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
-      expect(Clog).to receive(:emit).with("vm provisioned").and_call_original
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
 
@@ -582,6 +578,11 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#create_billing_record" do
+    before do
+      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+      expect(Clog).to receive(:emit).with("vm provisioned")
+    end
+
     it "creates billing records when ip4 is enabled" do
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)

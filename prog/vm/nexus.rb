@@ -398,12 +398,12 @@ SQL
       nap 1
     end
 
-    vm.update(display_state: "running")
-    Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
     hop_create_billing_record
   end
 
   label def create_billing_record
+    vm.update(display_state: "running")
+    Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
     project = vm.projects.first
     hop_wait unless project.billable
 
