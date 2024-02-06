@@ -18,6 +18,20 @@ class CloverApi
       }
     end
 
+    r.on "ubid" do
+      r.is String do |vm_ubid|
+        vm = Vm.from_ubid(vm_ubid)
+
+        r.get true do
+          get_vm_handler(@current_user, vm)
+        end
+
+        r.delete true do
+          delete_vm_handler(@current_user, vm)
+        end
+      end
+    end
+
     r.is String do |vm_name|
       r.post true do
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
@@ -43,24 +57,34 @@ class CloverApi
 
       vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first
 
-      unless vm
-        response.status = 404
-        r.halt
-      end
-
       r.get true do
-        Authorization.authorize(@current_user.id, "Vm:view", vm.id)
-
-        serialize(vm)
+        get_vm_handler(@current_user, vm)
       end
 
       r.delete true do
-        Authorization.authorize(@current_user.id, "Vm:delete", vm.id)
-
-        vm.incr_destroy
-
-        serialize(vm)
+        delete_vm_handler(@current_user, vm)
       end
     end
+  end
+
+  def get_vm_handler(user, vm)
+    unless vm
+      response.status = 404
+      request.halt
+    end
+
+    Authorization.authorize(user.id, "Vm:view", vm.id)
+
+    serialize(vm)
+  end
+
+  def delete_vm_handler(user, vm)
+    if vm
+      Authorization.authorize(user.id, "Vm:delete", vm.id)
+      vm.incr_destroy
+    end
+
+    response.status = 204
+    request.halt
   end
 end
