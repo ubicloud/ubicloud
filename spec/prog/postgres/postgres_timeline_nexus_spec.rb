@@ -58,11 +58,12 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "creates bucket and hops" do
       expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs"))
       expect(Minio::Client).to receive(:new).with(endpoint: "https://blob-endpoint", access_key: nil, secret_key: nil, ssl_ca_file_data: "certs").and_return(admin_blob_storage_client)
-      expect(postgres_timeline).to receive(:blob_storage_client).and_return(blob_storage_client)
+      expect(postgres_timeline).to receive(:blob_storage_client).and_return(blob_storage_client).twice
       expect(admin_blob_storage_client).to receive(:admin_add_user).with(postgres_timeline.access_key, postgres_timeline.secret_key).and_return(200)
       expect(admin_blob_storage_client).to receive(:admin_policy_add).with(postgres_timeline.ubid, postgres_timeline.blob_storage_policy).and_return(200)
       expect(admin_blob_storage_client).to receive(:admin_policy_set).with(postgres_timeline.ubid, postgres_timeline.access_key).and_return(200)
       expect(blob_storage_client).to receive(:create_bucket).with(postgres_timeline.ubid).and_return(200)
+      expect(blob_storage_client).to receive(:set_lifecycle_policy).with(postgres_timeline.ubid, postgres_timeline.ubid, 8).and_return(200)
       expect { nx.start }.to hop("wait_leader")
     end
 

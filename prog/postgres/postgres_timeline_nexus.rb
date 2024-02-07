@@ -114,6 +114,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
       # Create bucket for the timeline
       blob_storage_client.create_bucket(postgres_timeline.ubid)
+      blob_storage_client.set_lifecycle_policy(postgres_timeline.ubid, postgres_timeline.ubid, 8)
     end
   end
 end
