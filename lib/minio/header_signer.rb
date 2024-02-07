@@ -15,7 +15,7 @@ require "openssl"
 # https://github.com/minio/minio/blob/7926df0b80f557d0160153c5156b9b6d6b12b42e/cmd/globals.go#L93
 class Minio::HeaderSigner
   SERVICE_NAME = "s3"
-  def build_headers(method, uri, body, creds, region)
+  def build_headers(method, uri, body, creds, region, needs_md5 = false)
     date = Time.now.utc
     @headers = {}
     @headers["Host"] = uri.host + ":" + uri.port.to_s
@@ -24,6 +24,7 @@ class Minio::HeaderSigner
     @headers["x-amz-content-sha256"] = sha256_hash(body)
     @headers["x-amz-date"] = time_to_amz_date(date)
     @headers["Content-Length"] = body.length.to_s if body
+    @headers["Content-Md5"] = md5sum_hash(body) if body && needs_md5
     sign_v4_s3(method, uri, region, creds, date)
   end
 
@@ -152,5 +153,9 @@ class Minio::HeaderSigner
 
   def time_to_signer_date(date)
     date.strftime("%Y%m%d")
+  end
+
+  def md5sum_hash(data)
+    Base64.strict_encode64(Digest::MD5.digest(data))
   end
 end

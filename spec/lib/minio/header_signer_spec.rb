@@ -14,12 +14,13 @@ RSpec.describe Minio::HeaderSigner do
   }
 
   describe "build_headers" do
-    it "can build headers and sign" do
+    it "can build headers and sign with and without Content-Md5" do
       method = "PUT"
       uri = URI.parse("http://localhost:9000/test")
       body = "test"
-      allow(Time).to receive(:now).and_return(Time.new("2023-11-30 15:43:58.612009 +0100"))
+      expect(Time).to receive(:now).and_return(Time.new("2023-11-30 15:43:58.612009 +0100")).at_least(:once)
       expect(described_class.new.build_headers(method, uri, body, {access_key: "access_key", secret_key: "secret_key"}, "us-east-1")).to eq(headers)
+      expect(described_class.new.build_headers(method, uri, body, {access_key: "access_key", secret_key: "secret_key"}, "us-east-1", true)).to include("Content-Md5" => "CY9rzUYh03PK3k6DJie09g==")
     end
   end
 end

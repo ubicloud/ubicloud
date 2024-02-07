@@ -150,8 +150,27 @@ class Minio::Client
     objects
   end
 
-  def send_request(method, uri, body = nil)
-    headers = @signer.build_headers(method, uri, body, @creds, REGION)
+  def set_lifecycle_policy(bucket_name, policy_id, expiration_days)
+    raise "Error: policy_id must be all alphanumeric with the length between 5 and 32" unless /\A[a-z0-9]{5,32}\z/.match?(policy_id)
+    raise "Error: expiration_days must be an integer between 0 and 999" unless expiration_days.is_a?(Integer) && expiration_days >= 0 && expiration_days <= 999
+    policy = <<~LIFECYCLE_CONFIGURATION
+<LifecycleConfiguration>
+  <Rule>
+    <ID>#{policy_id}</ID>
+    <Status>Enabled</Status>
+    <Filter></Filter>
+    <Expiration>
+      <Days>#{expiration_days}</Days>
+    </Expiration>
+  </Rule>
+</LifecycleConfiguration>
+    LIFECYCLE_CONFIGURATION
+    response = send_request("PUT", s3_uri("#{bucket_name}?lifecycle"), policy, needs_md5: true)
+    response.status
+  end
+
+  def send_request(method, uri, body = nil, needs_md5: false)
+    headers = @signer.build_headers(method, uri, body, @creds, REGION, needs_md5)
 
     full_path = uri.path + (uri.query ? "?" + uri.query : "")
     response = @client.request(method: method, path: full_path, headers: headers, body: body)
