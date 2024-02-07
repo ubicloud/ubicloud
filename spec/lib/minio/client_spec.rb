@@ -206,4 +206,20 @@ RSpec.describe Minio::Client do
       expect(minio_client.list_objects("test", "folder_path", max_keys: 1)).to eq([])
     end
   end
+
+  describe "set_lifecycle_policy" do
+    it "raises exception on faulty input" do
+      expect { minio_client.set_lifecycle_policy("test", "shrt", 8) }.to raise_error RuntimeError
+      expect { minio_client.set_lifecycle_policy("test", "loooooooooooooooooooooooooooooooooooooooooooong", 8) }.to raise_error RuntimeError
+      expect { minio_client.set_lifecycle_policy("test", "non-alphanumeric-character", 8) }.to raise_error RuntimeError
+      expect { minio_client.set_lifecycle_policy("test", "testid", "non integer") }.to raise_error RuntimeError
+      expect { minio_client.set_lifecycle_policy("test", "testid", -1) }.to raise_error RuntimeError
+      expect { minio_client.set_lifecycle_policy("test", "testid", 1000) }.to raise_error RuntimeError
+    end
+
+    it "sends a PUT request to /bucket_name?lifecycle" do
+      stub_request(:put, "#{endpoint}/test?lifecycle").to_return(status: 200)
+      expect(minio_client.set_lifecycle_policy("test", "testid", 8)).to eq(200)
+    end
+  end
 end
