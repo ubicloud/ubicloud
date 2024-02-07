@@ -10,7 +10,8 @@ class Serializers::Web::Postgres < Serializers::Base
       state: pg.display_state,
       location: pg.location,
       vm_size: pg.target_vm_size,
-      storage_size_gib: pg.target_storage_size_gib
+      storage_size_gib: pg.target_storage_size_gib,
+      ha_type: pg.ha_type
     }
   end
 

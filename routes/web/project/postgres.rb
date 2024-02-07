@@ -20,7 +20,8 @@ class CloverWeb
         location: r.params["location"],
         name: r.params["name"],
         target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: parsed_size.storage_size_gib
+        target_storage_size_gib: parsed_size.storage_size_gib,
+        ha_type: r.params["ha_type"]
       )
 
       flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"

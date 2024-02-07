@@ -178,7 +178,12 @@ function jsonHighlight(str) {
 
 $("input[name=location]").on("change", function (event) {
   setupLocationBasedPrices();
+  setupLocationBasedPostgresHaPrices();
   setupLocationBasedOptions();
+});
+
+$("input[name=size]").on("change", function (event) {
+  setupLocationBasedPostgresHaPrices();
 });
 
 function setupLocationBasedPrices() {
@@ -207,9 +212,20 @@ function setupLocationBasedPrices() {
       }
     }
 
+    $(this).data("monthly-price", monthly.toFixed(2));
     $(`.${name}-${value}`).show();
     $(`.${name}-${value}-monthly-price`).text(`$${monthly.toFixed(2)}`);
     count[name] = (count[name] || 0) + 1;
+  });
+}
+
+function setupLocationBasedPostgresHaPrices() {
+  $("input.location-based-postgres-ha-price").each(function(i, obj) {
+    let value = $(this).val();
+    let monthlyPrice = $("input[name=size]:checked").data("monthly-price");
+    let standbyCount = $(this).data("standby-count");
+    $(`.ha-status-${value}`).show();
+    $(`.ha-status-${value}-monthly-price`).text(`+$${(standbyCount * monthlyPrice).toFixed(2)}`);
   });
 }
 

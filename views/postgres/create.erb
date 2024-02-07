@@ -110,6 +110,48 @@
                 </div>
               </div>
 
+              <div class="col-span-full">
+                <div class="space-y-2">
+                  <label for="size" class="text-sm font-medium leading-6 text-gray-900">High Availability</label>
+                  <fieldset class="radio-small-cards" id="size-radios">
+                    <legend class="sr-only">Server size</legend>
+                    <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                      <% Option::PostgresHaOptions.each do |ha_type| %>
+                        <label>
+                          <input
+                            type="radio"
+                            name="ha_type"
+                            value="<%= ha_type.name %>"
+                            class="peer sr-only location-based-postgres-ha-price"
+                            data-standby-count="<%= ha_type.standby_count %>"
+                            required
+                            <%= (flash.dig("old", "ha_type") == ha_type.name) ? "checked" : "" %>
+                          >
+                          <span
+                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
+                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
+                          >
+                            <span class="flex flex-col">
+                              <span class="text-md font-semibold"><%= ha_type.title %></span>
+                              <span class="text-sm opacity-80">
+                                <span class="block sm:inline">
+                                  <%= ha_type.explanation %>
+                                </span>
+                              </span>
+                            </span>
+                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
+                              <span class="font-medium ha-status-<%= ha_type.name %>-monthly-price">-</span>
+                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                            </span>
+                          </span>
+                        </label>
+                      <% end %>
+                    </div>
+                  </fieldset>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
