@@ -172,7 +172,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def available?
     client = Minio::Client.new(
-      endpoint: minio_server.ip4_url,
+      endpoint: minio_server.server_url,
       access_key: minio_server.cluster.admin_user,
       secret_key: minio_server.cluster.admin_password,
       ssl_ca_file_data: minio_server.cluster.root_certs
