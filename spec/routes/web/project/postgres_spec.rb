@@ -82,6 +82,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -99,6 +100,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: "invalid name"
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -115,6 +117,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: pg.name
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -134,6 +137,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: "new-pg-db"
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 

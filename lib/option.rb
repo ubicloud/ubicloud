@@ -43,8 +43,10 @@ module Option
     PostgresSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 128)
   }.freeze
 
-  PostgresHaOption = Struct.new(:name)
-  PostgresHaOptions = [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC].map {
-    PostgresHaOption.new(_1)
+  PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)
+  PostgresHaOptions = [[PostgresResource::HaType::NONE, 0, "No Standbys", "No replication"],
+    [PostgresResource::HaType::ASYNC, 1, "1 Standby", "Asyncronous replication"],
+    [PostgresResource::HaType::SYNC, 2, "2 Standbys", "Syncronous replication with quorum"]].map {
+    PostgresHaOption.new(*_1)
   }.freeze
 end
