@@ -39,7 +39,7 @@ class Prog::DownloadBootImage < Prog::Base
       hop_learn_storage
     when "NotStarted"
       url = custom_url || blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}.raw", 60 * 60).to_s
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{image_name.shellescape} #{url.shellescape}' #{("download_" + image_name).shellescape}")
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{image_name.shellescape} #{url.shellescape}' #{("download_" + image_name).shellescape}", stdin: Config.ubicloud_images_blob_storage_certs)
     when "Failed"
       fail "Failed to download '#{image_name}' image on #{vm_host}"
     end

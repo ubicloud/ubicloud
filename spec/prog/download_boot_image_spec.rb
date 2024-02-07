@@ -36,15 +36,16 @@ RSpec.describe Prog::DownloadBootImage do
   describe "#download" do
     it "starts to download image if it's not started yet" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image my-image https://example.com/my-image.raw' download_my-image")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image my-image https://example.com/my-image.raw' download_my-image", stdin: nil)
       expect { dbi.download }.to nap(15)
     end
 
     it "generates presigned URL if a custom_url not provided" do
       expect(dbi).to receive(:frame).and_return({"image_name" => "my-image"}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
+      expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image my-image https://minio.example.com/my-image.raw' download_my-image")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image my-image https://minio.example.com/my-image.raw' download_my-image", stdin: "certs")
       expect { dbi.download }.to nap(15)
     end
 
