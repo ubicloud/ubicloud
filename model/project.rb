@@ -9,6 +9,7 @@ class Project < Sequel::Model
   one_to_many :usage_alerts
   one_to_many :github_installations
 
+  many_to_many :accounts, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :vms, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :minio_clusters, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :private_subnets, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
@@ -30,10 +31,6 @@ class Project < Sequel::Model
   end
 
   include Authorization::TaggableMethods
-
-  def user_ids
-    access_tags_dataset.where(hyper_tag_table: Account.table_name.to_s).select_map(:hyper_tag_id)
-  end
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key

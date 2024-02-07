@@ -31,7 +31,7 @@ class CloverWeb
         r.halt
       end
 
-      unless @project.user_ids.include?(@current_user.id)
+      unless @project.accounts.any? { _1.id == @current_user.id }
         fail Authorization::Unauthorized
       end
 
