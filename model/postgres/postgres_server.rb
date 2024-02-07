@@ -106,7 +106,7 @@ class PostgresServer < Sequel::Model
   def failover_target
     target = resource.servers
       .select { _1.standby? && _1.strand.label == "wait" }
-      .map { {server: _1, lsn: _1.vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_last_wal_receive_lsn()'").chomp} }
+      .map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_receive_lsn()").chomp} }
       .max_by { lsn2int(_1[:lsn]) }
 
     if resource.ha_type == PostgresResource::HaType::ASYNC
@@ -174,5 +174,9 @@ class PostgresServer < Sequel::Model
 
   def lsn_diff(lsn1, lsn2)
     lsn2int(lsn1) - lsn2int(lsn2)
+  end
+
+  def run_query(query)
+    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv", stdin: query).chomp
   end
 end

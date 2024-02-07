@@ -318,34 +318,34 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#update_superuser_password" do
     it "updates password and pushes restart during the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
       expect { nx.update_superuser_password }.to hop("restart")
     end
 
     it "updates password and hops to wait during initial provisioning if restart is already executed" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
       expect { nx.update_superuser_password }.to hop("wait")
     end
 
     it "updates password and hops to wait at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql", stdin: /log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("wait")
     end
   end
 
   describe "#wait_catch_up" do
     it "naps if the lag cannot be read or too high" do
-      expect(sshable).to receive(:cmd).and_return("", "90000000")
+      expect(postgres_server).to receive(:run_query).and_return("", "90000000")
       expect { nx.wait_catch_up }.to nap(30)
       expect { nx.wait_catch_up }.to nap(30)
     end
 
     it "sets the synchronization_status and hops to wait_synchronization for sync replication" do
-      expect(sshable).to receive(:cmd).and_return("80000000")
+      expect(postgres_server).to receive(:run_query).and_return("80000000")
       expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
       expect(postgres_server).to receive(:incr_configure)
       expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
@@ -353,7 +353,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "sets the synchronization_status and hops to wait for async replication" do
-      expect(sshable).to receive(:cmd).and_return("80000000")
+      expect(postgres_server).to receive(:run_query).and_return("80000000")
       expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
       expect(postgres_server).to receive(:incr_configure)
       expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
@@ -363,13 +363,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#wait_synchronization" do
     it "hops to wait if sync replication is established" do
-      expect(sshable).to receive(:cmd).and_return("quorum", "sync")
+      expect(postgres_server).to receive(:run_query).and_return("quorum", "sync")
       expect { nx.wait_synchronization }.to hop("wait")
       expect { nx.wait_synchronization }.to hop("wait")
     end
 
     it "naps if sync replication is not established" do
-      expect(sshable).to receive(:cmd).and_return("", "async")
+      expect(postgres_server).to receive(:run_query).and_return("", "async")
       expect { nx.wait_synchronization }.to nap(30)
       expect { nx.wait_synchronization }.to nap(30)
     end
@@ -377,18 +377,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#wait_recovery_completion" do
     it "naps if it is still in recovery and wal replay is not paused" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("t")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_get_wal_replay_pause_state()'").and_return("not paused")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("t")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("not paused")
       expect { nx.wait_recovery_completion }.to nap(5)
     end
 
     it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("t")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_get_wal_replay_pause_state()'").and_return("paused")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("t")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("paused")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
       expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
 
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -c 'SELECT pg_wal_replay_resume()'")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_wal_replay_resume()")
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(Strand, id: "375b1399-ec21-8eda-8859-2faee6ff6613"))
       expect(postgres_server).to receive(:timeline_id=).with("375b1399-ec21-8eda-8859-2faee6ff6613")
       expect(postgres_server).to receive(:timeline_access=).with("push")
@@ -397,7 +397,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "switches to new timeline if the recovery is completed" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").and_return("f")
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("f")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg config")
       expect(sshable).to receive(:cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "certs")
 
@@ -576,18 +576,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "returns true if health check is successful" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT 1'").and_return("1")
+      expect(postgres_server).to receive(:run_query).with("SELECT 1").and_return("1")
       expect(nx.available?).to be(true)
     end
 
     it "returns true if the database is in crash recovery" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT 1'").and_raise(Sshable::SshError)
+      expect(postgres_server).to receive(:run_query).with("SELECT 1").and_raise(Sshable::SshError)
       expect(sshable).to receive(:cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("redo in progress")
       expect(nx.available?).to be(true)
     end
 
     it "returns false otherwise" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT 1'").and_raise(Sshable::SshError)
+      expect(postgres_server).to receive(:run_query).with("SELECT 1").and_raise(Sshable::SshError)
       expect(sshable).to receive(:cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("not doing redo")
       expect(nx.available?).to be(false)
     end
