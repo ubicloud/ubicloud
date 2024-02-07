@@ -137,17 +137,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#trigger_pg_current_xact_id_on_parent" do
     it "triggers pg_current_xact_id and pops" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("sudo -u postgres psql -At -c 'SELECT pg_current_xact_id()'")
-      expect(postgres_resource).to receive(:parent).and_return(
-        instance_double(
-          PostgresResource,
-          representative_server: instance_double(
-            PostgresServer,
-            vm: instance_double(Vm, sshable: sshable)
-          )
-        )
-      )
+      representative_server = instance_double(PostgresServer)
+      expect(representative_server).to receive(:run_query).with("SELECT pg_current_xact_id()")
+      expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource, representative_server: representative_server))
 
       expect { nx.trigger_pg_current_xact_id_on_parent }.to exit({"msg" => "triggered pg_current_xact_id"})
     end

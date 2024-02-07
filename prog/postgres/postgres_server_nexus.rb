@@ -189,7 +189,7 @@ SET LOCAL log_statement = 'none';
 ALTER ROLE postgres WITH PASSWORD #{DB.literal(encrypted_password)};
 COMMIT;
 SQL
-    vm.sshable.cmd("sudo -u postgres psql", stdin: commands)
+    postgres_server.run_query(commands)
 
     when_initial_provisioning_set? do
       hop_wait if retval&.dig("msg") == "postgres server is restarted"
@@ -201,7 +201,7 @@ SQL
 
   label def wait_catch_up
     query = "SELECT pg_current_wal_lsn() - replay_lsn FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
-    lag = postgres_server.resource.representative_server.vm.sshable.cmd("sudo -u postgres psql -At -c \"#{query}\"").chomp
+    lag = postgres_server.resource.representative_server.run_query(query).chomp
 
     nap 30 if lag.empty? || lag.to_i > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
 
@@ -213,19 +213,19 @@ SQL
 
   label def wait_synchronization
     query = "SELECT sync_state FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
-    sync_state = postgres_server.resource.representative_server.vm.sshable.cmd("sudo -u postgres psql -At -c \"#{query}\"").chomp
+    sync_state = postgres_server.resource.representative_server.run_query(query).chomp
     hop_wait if ["quorum", "sync"].include?(sync_state)
 
     nap 30
   end
 
   label def wait_recovery_completion
-    is_in_recovery = vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_is_in_recovery()'").chomp == "t"
+    is_in_recovery = postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
 
     if is_in_recovery
-      is_wal_replay_paused = vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_get_wal_replay_pause_state()'").chomp == "paused"
+      is_wal_replay_paused = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state()").chomp == "paused"
       if is_wal_replay_paused
-        vm.sshable.cmd("sudo -u postgres psql -c 'SELECT pg_wal_replay_resume()'")
+        postgres_server.run_query("SELECT pg_wal_replay_resume()")
         is_in_recovery = false
       end
     end
@@ -359,7 +359,7 @@ SQL
     vm.sshable.invalidate_cache_entry
 
     begin
-      vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT 1'")
+      postgres_server.run_query("SELECT 1")
       return true
     rescue
     end

@@ -74,7 +74,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def trigger_pg_current_xact_id_on_parent
-    postgres_resource.parent.representative_server.vm.sshable.cmd("sudo -u postgres psql -At -c 'SELECT pg_current_xact_id()'")
+    postgres_resource.parent.representative_server.run_query("SELECT pg_current_xact_id()")
     pop "triggered pg_current_xact_id"
   end
 

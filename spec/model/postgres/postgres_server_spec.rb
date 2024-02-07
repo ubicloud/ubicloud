@@ -93,14 +93,11 @@ RSpec.describe PostgresServer do
   describe "#failover_target" do
     before do
       postgres_server.timeline_access = "push"
-      sshable = instance_double(Sshable)
-      vm = instance_double(Vm, sshable: sshable)
-      expect(sshable).to receive(:cmd).and_return("1/5", "1/10")
       expect(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, vm: vm, strand: instance_double(Strand, label: "wait_catch_up")),
-        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, vm: vm, strand: instance_double(Strand, label: "wait")),
-        instance_double(described_class, ubid: "pgubidstandby3", standby?: true, vm: vm, strand: instance_double(Strand, label: "wait"))
+        instance_double(described_class, ubid: "pgubidstandby1", standby?: true, strand: instance_double(Strand, label: "wait_catch_up")),
+        instance_double(described_class, ubid: "pgubidstandby2", standby?: true, run_query: "1/5", strand: instance_double(Strand, label: "wait")),
+        instance_double(described_class, ubid: "pgubidstandby3", standby?: true, run_query: "1/10", strand: instance_double(Strand, label: "wait"))
       ])
     end
 
@@ -184,5 +181,10 @@ RSpec.describe PostgresServer do
 
     expect(postgres_server).to receive(:incr_checkup)
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
+  end
+
+  it "runs query on vm" do
+    expect(postgres_server.vm.sshable).to receive(:cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv", stdin: "SELECT 1").and_return("1\n")
+    expect(postgres_server.run_query("SELECT 1")).to eq("1")
   end
 end
