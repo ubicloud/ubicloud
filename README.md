@@ -122,7 +122,7 @@ Forum](https://github.com/ubicloud/ubicloud/discussions).
 that stores its data in Postgres. We use the [Roda](https://roda.jeremyevans.net/)
 framework to serve HTTP requests and [Sequel](http://sequel.jeremyevans.net/) to
 access the database. We manage web authentication with
-[RodAuth](http://rodauth.jeremyevans.net/). We communicate with data plane servers
+[Rodauth](http://rodauth.jeremyevans.net/). We communicate with data plane servers
 using SSH, via the library [net-ssh](https://github.com/net-ssh/net-ssh). For our
 tests, we use [RSpec](https://rspec.info/).
 
