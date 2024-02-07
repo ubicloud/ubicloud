@@ -6,8 +6,7 @@ class CloverWeb
     @serializer = Serializers::Web::Account
 
     r.get true do
-      users_with_hyper_tag = @project.user_ids
-      @users = serialize(Account.where(id: users_with_hyper_tag).all)
+      @users = serialize(@project.accounts)
 
       view "project/user"
     end
@@ -41,7 +40,7 @@ class CloverWeb
       end
 
       r.delete true do
-        unless @project.user_ids.count > 1
+        unless @project.accounts.count > 1
           response.status = 400
           return {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}.to_json
         end

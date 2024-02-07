@@ -25,7 +25,7 @@ class CloverApi
         r.halt
       end
 
-      unless @project.user_ids.include?(@current_user.id)
+      unless @project.accounts.include?(@current_user)
         fail Authorization::Unauthorized
       end
 
