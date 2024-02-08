@@ -78,6 +78,7 @@ class CloverWeb < Roda
       flash["error"] = @error[:message]
       return redirect_back_with_inputs
     when Validation::ValidationFailed
+      flash["error"] = @error[:message]
       flash["errors"] = (flash["errors"] || {}).merge(@error[:details])
       return redirect_back_with_inputs
     end
