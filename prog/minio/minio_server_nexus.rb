@@ -180,7 +180,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
     server_data = JSON.parse(client.admin_info.body)["servers"].find { _1["endpoint"] == minio_server.endpoint }
     server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }
-  rescue
+  rescue => ex
+    Clog.emit("Minio server is down") { {minio_server_down: {ubid: minio_server.ubid, exception: Util.exception_to_hash(ex)}} }
     false
   end
 
