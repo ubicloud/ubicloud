@@ -17,11 +17,14 @@ unless (env_type = ARGV.shift)
   exit 1
 end
 
+# Set up hostname to better identify servers in transcripts.
 original_hostname = Socket.gethostname
 
 safe_write_to_file("/etc/hosts", File.read("/etc/hosts").gsub(original_hostname, hostname))
 r "sudo hostnamectl set-hostname " + hostname
 
+# Color prompt and MOTD to cue operators as to production-level
+# status.
 color_code = (env_type == "production") ? "\e[31m" : "\e[32m"
 
 reset_color_code = "\e[0m"
@@ -45,8 +48,10 @@ MOTD_SCRIPT
 
 r "chmod +x /etc/update-motd.d/99-clover-motd"
 
+# Set up time zone.
 r "timedatectl set-timezone UTC"
 
+# Download cloud hypervisor binaries.
 ch_dir = CloudHypervisor::VERSION.dir
 FileUtils.mkdir_p(ch_dir)
 FileUtils.cd ch_dir do
@@ -56,7 +61,7 @@ FileUtils.cd ch_dir do
   FileUtils.chmod "a+x", "cloud-hypervisor"
 end
 
-# edk2 firmware
+# Download firmware binaries.
 fw_dir = File.dirname(CloudHypervisor::FIRMWARE.path)
 FileUtils.mkdir_p(fw_dir)
 FileUtils.cd fw_dir do
