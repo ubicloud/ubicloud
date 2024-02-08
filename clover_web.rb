@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "tilt"
+require "tilt/erubi"
+
 class CloverWeb < Roda
   include CloverBase
 
@@ -32,7 +35,7 @@ class CloverWeb < Roda
   plugin :disallow_file_uploads
   plugin :flash
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
-  plugin :render, escape: true, layout: "./layouts/app", template_opts: {freeze: true}
+  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true}
   plugin :public
   plugin :Integer_matcher_max
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
