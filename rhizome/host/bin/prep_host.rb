@@ -45,6 +45,8 @@ MOTD_SCRIPT
 
 r "chmod +x /etc/update-motd.d/99-clover-motd"
 
+r "timedatectl set-timezone UTC"
+
 ch_dir = CloudHypervisor::VERSION.dir
 FileUtils.mkdir_p(ch_dir)
 FileUtils.cd ch_dir do
