@@ -92,3 +92,6 @@ r "sysctl --system"
 r "apt-get -y install qemu-utils mtools"
 
 SpdkSetup.prep
+
+# cron job to store serial.log files
+FileUtils.mkdir_p("/var/log/ubicloud/serials")

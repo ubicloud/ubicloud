@@ -250,7 +250,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     case vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp
     when "exited"
       github_runner.incr_destroy
-      nap 0
+      nap 15
     when "failed"
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       github_runner.update(runner_id: nil, ready_at: nil)
@@ -285,6 +285,27 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     if vm
       vm.private_subnets.each { _1.incr_destroy }
+
+      # If the runner is not assigned any job and we destroy it after a
+      # timeline, the workflow_job is nil, in that case, we want to be able to
+      # see journalctl output to debug if there was any problem with the runner
+      # script.
+      #
+      # We also want to see the journalctl output if the runner script failed.
+      #
+      # Hence, the condition is added to check if the workflow_job is nil or
+      # the conclusion is failure.
+      if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
+        begin
+          serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
+          vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+
+          # Exclude the "Started" line because it contains sensitive information.
+          vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v Started")
+        rescue Sshable::SshError
+          Clog.emit("Failed to move serial.log or running journalctl") { {github_runner: github_runner.values} }
+        end
+      end
       vm.incr_destroy
     end
 
