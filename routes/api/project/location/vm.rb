@@ -38,7 +38,7 @@ class CloverApi
         fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
         required_parameters = ["public_key"]
-        allowed_optional_parameters = ["size", "unix_user", "location", "boot_image", "enable_ip4"]
+        allowed_optional_parameters = ["size", "unix_user", "boot_image", "enable_ip4"]
 
         request_body = r.body.read
         Validation.validate_request_body(request_body, required_parameters, allowed_optional_parameters)
@@ -49,6 +49,7 @@ class CloverApi
           request_body_params["public_key"],
           @project.id,
           name: vm_name,
+          location: @location,
           **request_body_params.except(*required_parameters).transform_keys { |key| key.to_sym }
         )
 
