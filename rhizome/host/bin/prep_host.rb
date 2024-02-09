@@ -19,13 +19,14 @@ end
 
 # Set up hostname to better identify servers in transcripts.
 original_hostname = Socket.gethostname
+is_prod_env = (env_type == "production")
 
 safe_write_to_file("/etc/hosts", File.read("/etc/hosts").gsub(original_hostname, hostname))
 r "sudo hostnamectl set-hostname " + hostname
 
 # Color prompt and MOTD to cue operators as to production-level
 # status.
-color_code = (env_type == "production") ? "\e[31m" : "\e[32m"
+color_code = is_prod_env ? "\e[31m" : "\e[32m"
 
 reset_color_code = "\e[0m"
 
@@ -90,5 +91,9 @@ r "sysctl --system"
 # For qemu-image convert and mcopy for cloud-init with the nocloud
 # driver.
 r "apt-get -y install qemu-utils mtools"
+
+# We need nvme-cli to inspect installed NVMe cards in prod servers when
+# looking into I/O performance issues.
+r "apt-get -y install nvme-cli" if is_prod_env
 
 SpdkSetup.prep
