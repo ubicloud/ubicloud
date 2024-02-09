@@ -340,8 +340,8 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#wait" do
-    it "does not destroy runner if it does not pick a job in two minutes, and busy" do
-      expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
+    it "does not destroy runner if it does not pick a job in five minutes, and busy" do
+      expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
       expect(client).to receive(:get).and_return({busy: true})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
@@ -349,13 +349,13 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.wait }.to nap(15)
     end
 
-    it "destroys runner if it does not pick a job in two minutes and not busy" do
+    it "destroys runner if it does not pick a job in five minutes and not busy" do
       expect(github_runner).to receive(:workflow_job).and_return(nil)
-      expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
+      expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
       expect(client).to receive(:get).and_return({busy: false})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:incr_destroy)
-      expect(Clog).to receive(:emit).with("Destroying GithubRunner because it does not pick a job in two minutes").and_call_original
+      expect(Clog).to receive(:emit).with("The runner does not pick a job").and_call_original
 
       expect { nx.wait }.to nap(0)
     end
