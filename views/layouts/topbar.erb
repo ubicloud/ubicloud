@@ -20,7 +20,7 @@
       <div class="hidden lg:block lg:h-6 lg:w-px lg:bg-gray-900/10" aria-hidden="true"></div>
       <!-- Profile dropdown -->
       <div class="relative group dropdown text-sm leading-6 text-gray-900">
-        <button type="button" class="-m-1.5 flex items-center p-1.5">
+        <button type="button" class="-m-1.5 flex items-center p-1.5" title="<%= @current_user.email %>">
           <%== render("components/icon", locals: { name: "hero-user-circle", classes: "h-8 w-8 rounded-full bg-gray-50" }) %>
           <span class="hidden lg:flex lg:items-center">
             <span class="ml-3 font-semibold" aria-hidden="true"><%= @current_user.name %></span>
@@ -28,16 +28,26 @@
           </span>
         </button>
         <div
-          class="hidden group-[.active]:block absolute right-0 z-10 mt-2.5 w-32 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none"
+          class="hidden group-[.active]:block absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-md bg-white pb-2 shadow-lg ring-1 ring-gray-900/5 focus:outline-none divide-y divide-gray-100"
           role="menu"
           tabindex="-1"
         >
-          <a href="/account" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">My Account</a>
-          <a href="/project" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">Projects</a>
-          <form action="/logout" method="post">
-            <%== csrf_tag("/logout") %>
-            <button type="submit" class="block px-3 py-1 hover:bg-gray-100 w-full text-left" role="menuitem" tabindex="-1">Log out</button>
-          </form>
+          <div class="px-3 py-2">
+            <p class="text-sm">Signed in as</p>
+            <p class="truncate text-sm font-medium text-gray-900">
+              <%= @current_user.email %></p>
+          </div>
+          <div>
+            <a href="/account" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">My Account</a>
+            <a href="/project" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">Projects</a>
+          </div>
+          <div>
+
+            <form action="/logout" method="post">
+              <%== csrf_tag("/logout") %>
+              <button type="submit" class="block px-3 py-1 hover:bg-gray-100 w-full text-left" role="menuitem" tabindex="-1">Log out</button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
