@@ -10,6 +10,20 @@ RSpec.describe Minio::Client do
     described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key, socket: "/tmp/socket")
   end
 
+  it "can use ssl_ca_file_data" do
+    expect(File).to receive(:exist?).with(File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt")).and_return(false)
+    expect(FileUtils).to receive(:mkdir_p).with(File.dirname(File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt")))
+    lock_file = instance_double(File, flock: true)
+    expect(File).to receive(:open).with("#{File.join(Dir.pwd, "var", "ca_bundles", access_key + ".tmp")}.lock", File::RDWR | File::CREAT).and_yield(lock_file)
+    expect(lock_file).to receive(:flock).with(File::LOCK_EX)
+    temp_file = instance_double(File, puts: true)
+    expect(File).to receive(:open).with(File.join(Dir.pwd, "var", "ca_bundles", access_key + ".tmp").to_s, File::RDWR | File::CREAT).and_yield(temp_file)
+    expect(temp_file).to receive(:puts).with("test")
+    expect(File).to receive(:rename).with(File.join(Dir.pwd, "var", "ca_bundles", access_key + ".tmp").to_s, File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt"))
+
+    described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key, ssl_ca_file_data: "test")
+  end
+
   describe "admin_info" do
     it "sends a GET request to /minio/admin/v3/info" do
       stub_request(:get, "#{endpoint}/minio/admin/v3/info").to_return(status: 200, body: "test")
