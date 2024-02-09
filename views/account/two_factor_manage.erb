@@ -16,7 +16,7 @@
                 <div class="text-lg font-medium leading-6 text-gray-900">One-Time Password Generator</div>
                 <p class="mt-1 text-sm text-gray-500">Connect an authenticator app that generates verification codes.</p>
               </div>
-              <div class="col-span-6 sm:col-span-2 text-right">
+              <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                 <% if rodauth.otp_exists? %>
                   <%== render(
                     "components/button",
@@ -38,7 +38,7 @@
                 <div class="text-lg font-medium leading-6 text-gray-900">Security Keys</div>
                 <p class="mt-1 text-sm text-gray-500">Connect a security key to your account.</p>
               </div>
-              <div class="col-span-6 sm:col-span-2 text-right">
+              <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                 <%== render("components/button", locals: { text: rodauth.webauthn_setup_link_text, link: rodauth.webauthn_setup_path }) %>
                 <% if rodauth.webauthn_setup? %>
                   <%== render(
