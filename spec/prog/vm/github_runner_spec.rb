@@ -373,7 +373,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
       expect(github_runner).to receive(:incr_destroy)
 
-      expect { nx.wait }.to nap(0)
+      expect { nx.wait }.to nap(15)
     end
 
     it "registers the runner again if the runner-script is failed" do
@@ -404,6 +404,55 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "failure"}).at_least(:once)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v Started")
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "destroys resources and hops if runner deregistered, also, copies serial log if workflow_job is nil" do
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return(nil)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v Started")
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "destroys resources and hops if runner deregistered, also, emits log if it couldn't move the serial.log" do
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "failure"}).at_least(:once)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
+      expect(Clog).to receive(:emit).with("Failed to move serial.log or running journalctl").and_call_original
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "simply destroys the VM if the workflow_job is there and the conclusion is success" do
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
+      expect(sshable).not_to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+      expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v Started")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
