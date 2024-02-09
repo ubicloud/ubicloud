@@ -95,3 +95,9 @@ SpdkSetup.prep
 
 # cron job to store serial.log files
 FileUtils.mkdir_p("/var/log/ubicloud/serials")
+File.write("/etc/cron.d/ubicloud-clean-serial-logs", <<CRON)
+0 * * * * root /home/rhizome/host/bin/delete-old-serial-logs
+CRON
+
+r "systemctl enable cron"
+r "systemctl start cron"
