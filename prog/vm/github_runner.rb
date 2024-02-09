@@ -257,12 +257,14 @@ class Prog::Vm::GithubRunner < Prog::Base
       hop_register_runner
     end
 
-    # If the runner doesn't pick a job in two minutes, destroy it
-    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 60 * 2
+    # If the runner doesn't pick a job within five minutes, the job may have
+    # been cancelled prior to assignment, so we destroy the runner. But we also
+    # check if the runner is busy or not with GitHub API.
+    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
         github_runner.incr_destroy
-        Clog.emit("Destroying GithubRunner because it does not pick a job in two minutes") { {github_runner: github_runner.values} }
+        Clog.emit("The runner does not pick a job") { {github_runner: github_runner.values} }
         nap 0
       end
     end
