@@ -11,13 +11,15 @@ ADMIN_URI_PATH = "/minio/admin/v3"
 class Minio::Client
   def initialize(endpoint:, access_key:, secret_key:, socket: nil, ssl_ca_file_data: nil)
     ssl_ca_file = File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt")
-    if ssl_ca_file_data
+    if ssl_ca_file_data && !File.exist?(ssl_ca_file)
       FileUtils.mkdir_p(File.dirname(ssl_ca_file))
       temp_filename = File.join(Dir.pwd, "var", "ca_bundles", access_key + ".tmp")
-      File.open(temp_filename, File::RDWR | File::CREAT) do |f|
-        f.flock(File::LOCK_EX)
-        f.puts(ssl_ca_file_data)
-        File.rename(temp_filename, ssl_ca_file)
+      File.open("#{temp_filename}.lock", File::RDWR | File::CREAT) do |lock|
+        lock.flock(File::LOCK_EX)
+        File.open(temp_filename, File::RDWR | File::CREAT) do |f|
+          f.puts(ssl_ca_file_data)
+          File.rename(temp_filename, ssl_ca_file)
+        end
       end
     end
 
