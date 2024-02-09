@@ -20,14 +20,14 @@
               <% end %>
               <%== rodauth.csrf_tag("/" + rodauth.otp_setup_route) %>
               <div class="mt-6 grid grid-cols-6 gap-6">
-                <div class="col-span-6 sm:col-span-3">
+                <div class="col-span-6 md:col-span-3">
                   <%== rodauth.otp_qr_code %>
                   <p class="mt-2 text-sm text-gray-500 text-center">
                     If you can't scan the QR code, please enter the following secret in your authenticator app manually: </br>
-                    <span class="font-bold"><%= rodauth.otp_user_key %></span>
+                    <span class="font-bold break-words"><%= rodauth.otp_user_key %></span>
                   </p>
                 </div>
-                <div class="col-span-6 sm:col-span-3 space-y-4">
+                <div class="col-span-6 md:col-span-3 space-y-4">
                   <%== render("components/rodauth/otp_auth_code_field") %>
                   <% if rodauth.two_factor_modifications_require_password? %>
                     <%== render("components/rodauth/password_field") %>
