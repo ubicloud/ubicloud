@@ -171,14 +171,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   def available?
-    client = Minio::Client.new(
-      endpoint: minio_server.server_url,
-      access_key: minio_server.cluster.admin_user,
-      secret_key: minio_server.cluster.admin_password,
-      ssl_ca_file_data: minio_server.cluster.root_certs
-    )
-
-    server_data = JSON.parse(client.admin_info.body)["servers"].find { _1["endpoint"] == minio_server.endpoint }
+    server_data = JSON.parse(minio_server.client.admin_info.body)["servers"].find { _1["endpoint"] == minio_server.endpoint }
     server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }
   rescue => ex
     Clog.emit("Minio server is down") { {minio_server_down: {ubid: minio_server.ubid, exception: Util.exception_to_hash(ex)}} }
