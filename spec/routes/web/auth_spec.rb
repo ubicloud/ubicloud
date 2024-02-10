@@ -76,6 +76,18 @@ RSpec.describe Clover, "auth" do
 
     visit reset_link
     expect(page.title).to eq("Ubicloud - Reset Password")
+
+    fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+    fill_in "Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+
+    click_button "Reset Password"
+
+    expect(page.title).to eq("Ubicloud - Login")
+
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+
+    click_button "Sign in"
   end
 
   it "can login to an account without projects" do
@@ -189,6 +201,39 @@ RSpec.describe Clover, "auth" do
 
       visit verify_link
       expect(page.title).to eq("Ubicloud - Verify New Email")
+
+      click_button "Click to Verify New Email"
+
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+
+      click_button "Log out"
+
+      expect(page.title).to eq("Ubicloud - Login")
+
+      fill_in "Email Address", with: new_email
+      fill_in "Password", with: TEST_USER_PASSWORD
+
+      click_button "Sign in"
+    end
+
+    it "can change password" do
+      visit "/account/change-password"
+
+      fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
+      fill_in "New Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+
+      click_button "Change Password"
+
+      expect(page.title).to eq("Ubicloud - Change Password")
+
+      click_button "Log out"
+
+      expect(page.title).to eq("Ubicloud - Login")
+
+      fill_in "Email Address", with: TEST_USER_EMAIL
+      fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+
+      click_button "Sign in"
     end
   end
 end
