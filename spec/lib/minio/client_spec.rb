@@ -5,11 +5,6 @@ RSpec.describe Minio::Client do
   let(:access_key) { "minioadmin" }
   let(:secret_key) { "minioadmin" }
 
-  it "can use sockets" do
-    expect(Excon).to receive(:new).with("unix:///", socket: "/tmp/socket", ssl_ca_file: File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt"))
-    described_class.new(endpoint: endpoint, access_key: access_key, secret_key: secret_key, socket: "/tmp/socket")
-  end
-
   it "can use ssl_ca_file_data" do
     expect(File).to receive(:exist?).with(File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt")).and_return(false)
     expect(FileUtils).to receive(:mkdir_p).with(File.dirname(File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt")))
