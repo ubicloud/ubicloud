@@ -83,7 +83,7 @@ autoload_normal.call("model", flat: true)
 AUTOLOAD_CONSTANTS.freeze
 
 if Config.production?
-  AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
+  AUTOLOAD_CONSTANTS.map { Object.const_get(_1) }.each(&:freeze)
 end
 
 def clover_freeze
