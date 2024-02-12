@@ -146,12 +146,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
-      expect(PostgresResource).to receive(:dns_zone).and_return(dns_zone)
+      expect(described_class).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.create_dns_record }.to hop("initialize_certificates")
     end
 
     it "hops even if dns zone is not configured" do
-      expect(PostgresResource).to receive(:dns_zone).and_return(nil)
+      expect(described_class).to receive(:dns_zone).and_return(nil)
       expect { nx.create_dns_record }.to hop("initialize_certificates")
     end
   end
@@ -168,7 +168,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       )
 
       expect(nx).to receive(:postgres_resource).and_return(postgres_resource).at_least(:once)
-      expect(PostgresResource).to receive(:dns_zone).and_return("something").at_least(:once)
+      expect(described_class).to receive(:dns_zone).and_return("something").at_least(:once)
 
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 5, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
       expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
@@ -276,7 +276,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#destroy" do
     it "triggers server deletion and waits until it is deleted" do
       dns_zone = instance_double(DnsZone)
-      expect(PostgresResource).to receive(:dns_zone).and_return(dns_zone)
+      expect(described_class).to receive(:dns_zone).and_return(dns_zone)
 
       expect(postgres_resource.server).to receive(:incr_destroy)
       expect { nx.destroy }.to nap(5)
@@ -291,7 +291,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "completes destroy even if dns zone is not configured" do
-      expect(PostgresResource).to receive(:dns_zone).and_return(nil)
+      expect(described_class).to receive(:dns_zone).and_return(nil)
       expect(postgres_resource).to receive(:server).and_return(nil)
 
       expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
