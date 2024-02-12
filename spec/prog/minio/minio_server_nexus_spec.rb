@@ -64,7 +64,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(st.label).to eq "start"
       expect(MinioServer.first.pool).to eq minio_pool
       expect(Vm.count).to eq 1
-      expect(Vm.first.unix_user).to eq "minio-user"
+      expect(Vm.first.unix_user).to eq "ubi"
       expect(Vm.first.sshable.host).to eq "temp_#{Vm.first.id}"
       expect(Vm.first.private_subnets.first.id).to eq minio_pool.cluster.private_subnet_id
     end
@@ -140,7 +140,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   describe "#bootstrap_rhizome" do
     it "buds bootstrap rhizome and hops to wait_bootstrap_rhizome" do
       vm = nx.minio_server.vm
-      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"})
+      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "ubi"})
       expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end
@@ -156,7 +156,28 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
     it "hops to setup if bootstrap rhizome is done" do
       expect(nx).to receive(:leaf?).and_return(true)
-      expect { nx.wait_bootstrap_rhizome }.to hop("setup")
+      expect { nx.wait_bootstrap_rhizome }.to hop("create_minio_user")
+    end
+  end
+
+  describe "#create_minio_user" do
+    it "creates minio user and hops to setup" do
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user")
+      expect { nx.create_minio_user }.to hop("setup")
+    end
+
+    it "does not raise an exception if the user already exists" do
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "useradd: user 'minio-user' already exists")
+      expect { nx.create_minio_user }.to hop("setup")
+    end
+
+    it "raises an exception if the useradd command fails with a different error" do
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "Error!")
+
+      expect { nx.create_minio_user }.to raise_error(RuntimeError, "Error!")
     end
   end
 

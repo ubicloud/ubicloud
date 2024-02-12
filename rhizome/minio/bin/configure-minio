@@ -26,8 +26,8 @@ r "sudo chown -R minio-user:minio-user /etc/default/minio"
 
 if cert && cert_key && ca_bundle
   r "sudo mkdir -p /home/minio-user/.minio/certs/CAs"
-  safe_write_to_file(".minio/certs/public.crt", cert)
-  safe_write_to_file(".minio/certs/private.key", cert_key)
-  safe_write_to_file(".minio/certs/CAs/public.crt", ca_bundle)
+  safe_write_to_file("/home/minio-user/.minio/certs/public.crt", cert)
+  safe_write_to_file("/home/minio-user/.minio/certs/private.key", cert_key)
+  safe_write_to_file("/home/minio-user/.minio/certs/CAs/public.crt", ca_bundle)
   r "sudo chown -R minio-user:minio-user /home/minio-user/.minio/certs"
 end
