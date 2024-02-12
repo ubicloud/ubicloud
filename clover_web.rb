@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "tilt/sass"
-
 class CloverWeb < Roda
   include CloverBase
 
