@@ -21,7 +21,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       ubid = MinioServer.generate_ubid
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-        "minio-user",
+        "ubi",
         Config.minio_service_project_id,
         location: minio_pool.cluster.location,
         name: ubid.to_s,
@@ -64,15 +64,26 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    bud Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"}
+    bud Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "ubi"}
 
     hop_wait_bootstrap_rhizome
   end
 
   label def wait_bootstrap_rhizome
     reap
-    hop_setup if leaf?
+    hop_create_minio_user if leaf?
     donate
+  end
+
+  label def create_minio_user
+    begin
+      minio_server.vm.sshable.cmd("sudo groupadd -f --system minio-user")
+      minio_server.vm.sshable.cmd("sudo useradd --no-create-home --system -g minio-user minio-user")
+    rescue => ex
+      raise ex unless ex.message.include?("already exists")
+    end
+
+    hop_setup
   end
 
   label def setup
