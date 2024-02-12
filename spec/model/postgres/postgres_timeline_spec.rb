@@ -142,7 +142,7 @@ PGHOST=/var/run/postgresql
     stub_const("Backup", Struct.new(:key))
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
 
-    minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key")
+    minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key", ssl_ca_file_data: "data")
     expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Backup, key: "backup_stop_sentinel.json"), instance_double(Backup, key: "unrelated_file.txt")])
     expect(Minio::Client).to receive(:new).and_return(minio_client)
 

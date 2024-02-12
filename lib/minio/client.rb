@@ -9,11 +9,12 @@ REGION = "us-east-1"
 ADMIN_URI_PATH = "/minio/admin/v3"
 
 class Minio::Client
-  def initialize(endpoint:, access_key:, secret_key:, socket: nil, ssl_ca_file_data: nil)
-    ssl_ca_file = File.join(Dir.pwd, "var", "ca_bundles", access_key + ".crt")
-    if ssl_ca_file_data && !File.exist?(ssl_ca_file)
+  def initialize(endpoint:, access_key:, secret_key:, ssl_ca_file_data:, socket: nil)
+    ssl_ca_file_name = Digest::SHA256.hexdigest(ssl_ca_file_data)
+    ssl_ca_file = File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")
+    if !File.exist?(ssl_ca_file)
       FileUtils.mkdir_p(File.dirname(ssl_ca_file))
-      temp_filename = File.join(Dir.pwd, "var", "ca_bundles", access_key + ".tmp")
+      temp_filename = File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".tmp")
       File.open("#{temp_filename}.lock", File::RDWR | File::CREAT) do |lock|
         lock.flock(File::LOCK_EX)
         File.open(temp_filename, File::RDWR | File::CREAT) do |f|
