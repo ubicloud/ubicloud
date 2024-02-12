@@ -19,7 +19,7 @@ Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) {
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
 Unreloader.autoload("#{__dir__}/ubid.rb") { "UBID" }
 
-AUTOLOAD_CONSTANTS = ["DB", "UBID"]
+AUTOLOAD_CONSTANTS = ["DB", "UBID", "Clover"]
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
