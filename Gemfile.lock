@@ -236,8 +236,6 @@ GEM
     ruby2_keywords (0.0.5)
     safety_net_attestation (0.4.0)
       jwt (~> 2.0)
-    sassc (2.4.0)
-      ffi (~> 1.9)
     sawyer (0.9.2)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
@@ -344,7 +342,6 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
-  sassc (>= 2)
   sequel (>= 5.62)
   sequel-annotate
   sequel_pg (>= 1.8)
