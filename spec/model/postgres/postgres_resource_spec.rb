@@ -11,7 +11,7 @@ RSpec.describe PostgresResource do
   }
 
   it "returns connection string" do
-    expect(described_class).to receive(:dns_zone).and_return("something").at_least(:once)
+    expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com")
   end
 
