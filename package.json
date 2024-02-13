@@ -8,5 +8,9 @@
     "dev": "npx tailwindcss -o assets/css/app.css",
     "prod": "npx tailwindcss -o assets/css/app.css --minify",
     "watch": "npx tailwindcss -o assets/css/app.css --watch"
+  },
+  "engines": {
+    "node": "21.6.1",
+    "npm": "10.2.4"
   }
 }
