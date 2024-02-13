@@ -66,7 +66,6 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   label def bootstrap_rhizome
     bud Prog::BootstrapRhizome, {"target_folder" => "minio", "subject_id" => vm.id, "user" => "minio-user"}
 
-    hop_wait_bootstrap_rhizome
   end
 
   label def wait_bootstrap_rhizome
