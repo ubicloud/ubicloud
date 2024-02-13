@@ -43,9 +43,9 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets)
+  def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets, swap_size_bytes)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
-    cloudinit(unix_user, public_key, nics)
+    cloudinit(unix_user, public_key, nics, swap_size_bytes)
     download_boot_image(boot_image)
     storage_params = storage(storage_volumes, storage_secrets, true)
     hugepages(mem_gib)
@@ -330,7 +330,7 @@ class VmSetup
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_key, nics)
+  def cloudinit(unix_user, public_key, nics, swap_size_bytes)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -377,7 +377,7 @@ ethernets:
 #{ethernets}
 EOS
 
-    write_user_data(unix_user, public_key)
+    write_user_data(unix_user, public_key, swap_size_bytes)
 
     FileUtils.rm_rf(vp.cloudinit_img)
     r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
@@ -387,7 +387,18 @@ EOS
     FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
   end
 
-  def write_user_data(unix_user, public_key)
+  def generate_swap_config(swap_size_bytes)
+    return unless swap_size_bytes
+    fail "BUG: swap_size_bytes must be an integer" unless swap_size_bytes.instance_of?(Integer)
+
+    <<~SWAP_CONFIG
+    swap:
+      filename: /swapfile
+      size: #{yq(swap_size_bytes)}
+    SWAP_CONFIG
+  end
+
+  def write_user_data(unix_user, public_key, swap_size_bytes)
     vp.write_user_data(<<EOS)
 #cloud-config
 users:
@@ -401,6 +412,8 @@ ssh_pwauth: False
 
 runcmd:
   - [ systemctl, daemon-reload]
+
+#{generate_swap_config(swap_size_bytes)}
 EOS
   end
 

@@ -238,7 +238,8 @@ RSpec.describe Prog::Vm::Nexus do
           "cpu_topology" => "1:1:1:1",
           "mem_gib" => 8,
           "local_ipv4" => "169.254.0.0",
-          "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]]
+          "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]],
+          "swap_size_bytes" => nil
         })
       end
       expect(sshable).to receive(:cmd).with(/sudo host\/bin\/prepvm/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
