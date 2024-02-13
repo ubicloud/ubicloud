@@ -6,12 +6,16 @@ class CloverWeb < Roda
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
-  plugin :default_headers,
+  plugin :default_headers, {
     "Content-Type" => "text/html",
-    # 'Strict-Transport-Security'=>'max-age=16070400;', # Uncomment if only allowing https:// access
     "X-Frame-Options" => "deny",
     "X-Content-Type-Options" => "nosniff",
     "X-XSS-Protection" => "1; mode=block"
+  }.merge(
+    # :nocov:
+    Config.production? ? {"Strict-Transport-Security" => "max-age=15;"} : {}
+    # :nocov:
+  )
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
