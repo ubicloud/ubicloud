@@ -99,5 +99,5 @@ def clover_freeze
   # Also for at least puma, but not itemized by the roda-sequel-stack
   # project for some reason.
   require "nio4r"
-  Refrigerator.freeze_core
+  Refrigerator.freeze
 end
