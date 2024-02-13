@@ -99,5 +99,14 @@ def clover_freeze
   # Also for at least puma, but not itemized by the roda-sequel-stack
   # project for some reason.
   require "nio4r"
-  Refrigerator.freeze
+
+  # this Ruby standard library method patches core classes.
+  "".unicode_normalize(:nfc)
+
+  # A standard library method that edits/creates a module variable as
+  # a side effect.  We encountered it when using rubygems for its tar
+  # file writing.
+  Gem.source_date_epoch
+
+  Refrigerator.freeze_core
 end
