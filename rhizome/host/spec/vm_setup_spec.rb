@@ -24,14 +24,33 @@ RSpec.describe VmSetup do
     expect(upper.to_s).to eq("2a01:4f9:2b:35b:7e41::/80")
   end
 
-  it "templates user YAML" do
-    vps = instance_spy(VmPath)
-    expect(vs).to receive(:vp).and_return(vps).at_least(:once)
-    vs.write_user_data("some_user", "some_ssh_key")
-    expect(vps).to have_received(:write_user_data) {
-      expect(_1).to match(/some_user/)
-      expect(_1).to match(/some_ssh_key/)
-    }
+  describe "#write_user_data" do
+    let(:vps) { instance_spy(VmPath) }
+
+    before { expect(vs).to receive(:vp).and_return(vps).at_least(:once) }
+
+    it "templates user YAML with no swap" do
+      vs.write_user_data("some_user", "some_ssh_key", nil)
+      expect(vps).to have_received(:write_user_data) {
+        expect(_1).to match(/some_user/)
+        expect(_1).to match(/some_ssh_key/)
+      }
+    end
+
+    it "templates user YAML with swap" do
+      vs.write_user_data("some_user", "some_ssh_key", 123)
+      expect(vps).to have_received(:write_user_data) {
+        expect(_1).to match(/some_user/)
+        expect(_1).to match(/some_ssh_key/)
+        expect(_1).to match(/size: 123/)
+      }
+    end
+
+    it "fails if the swap is not an integer" do
+      expect {
+        vs.write_user_data("some_user", "some_ssh_key", "123")
+      }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
+    end
   end
 
   describe "#download_boot_image" do

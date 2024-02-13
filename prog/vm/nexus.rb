@@ -13,7 +13,7 @@ class Prog::Vm::Nexus < Prog::Base
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false)
+    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -98,7 +98,7 @@ class Prog::Vm::Nexus < Prog::Base
       Strand.create(
         prog: "Vm::Nexus",
         label: "start",
-        stack: [{"storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) }}]
+        stack: [{"storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) }, "swap_size_bytes" => swap_size_bytes}]
       ) { _1.id = vm.id }
     end
   end
@@ -350,7 +350,8 @@ SQL
         "cpu_topology" => topo.to_s,
         "mem_gib" => vm.mem_gib,
         "ndp_needed" => host.ndp_needed,
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
+        "swap_size_bytes" => frame["swap_size_bytes"]
       })
 
       secrets_json = JSON.generate({
