@@ -240,6 +240,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#create_billing_record" do
     it "creates billing record for cores and storage then hops" do
+      expect(postgres_resource).to receive(:required_standby_count).and_return(1)
+
       expect(BillingRecord).to receive(:create_with_id).with(
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
@@ -252,7 +254,23 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
+        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyCores", "standard", postgres_resource.location)["id"],
+        amount: postgres_resource.representative_server.vm.cores
+      )
+
+      expect(BillingRecord).to receive(:create_with_id).with(
+        project_id: postgres_resource.project_id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
+        amount: postgres_resource.target_storage_size_gib
+      )
+
+      expect(BillingRecord).to receive(:create_with_id).with(
+        project_id: postgres_resource.project_id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyStorage", "standard", postgres_resource.location)["id"],
         amount: postgres_resource.target_storage_size_gib
       )
 
