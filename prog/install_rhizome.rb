@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
+require "rubygems/package"
+require "stringio"
+
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable
 
   label def start
-    require "rubygems/package"
-    require "stringio"
-
     tar = StringIO.new
     Gem::Package::TarWriter.new(tar) do |writer|
       base = Config.root + "/rhizome"
