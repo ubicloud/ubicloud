@@ -27,6 +27,16 @@ loop do
         end
       rescue => ex
         Clog.emit("Establishing the SSH session is failed") { {health_monitor_reestablish_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
+
+        begin
+          r.reload
+        rescue Sequel::NoExistingObject
+          Clog.emit("Resource is deleted") { {health_monitor_resource_deleted: {ubid: r.ubid}} }
+          sessions.delete(r.id)
+          ssh_threads.delete(r.id)
+          break
+        end
+
         sleep 5
       end
     end
