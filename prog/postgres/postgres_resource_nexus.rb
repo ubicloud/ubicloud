@@ -134,21 +134,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def create_billing_record
-    BillingRecord.create_with_id(
-      project_id: postgres_resource.project_id,
-      resource_id: postgres_resource.id,
-      resource_name: postgres_resource.name,
-      billing_rate_id: BillingRate.from_resource_properties("PostgresCores", "standard", postgres_resource.location)["id"],
-      amount: representative_server.vm.cores
-    )
+    billing_record_parts = []
+    (postgres_resource.required_standby_count + 1).times do |index|
+      billing_record_parts.push({resource_type: index.zero? ? "PostgresCores" : "PostgresStandbyCores", amount: representative_server.vm.cores})
+      billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", amount: postgres_resource.target_storage_size_gib})
+    end
 
-    BillingRecord.create_with_id(
-      project_id: postgres_resource.project_id,
-      resource_id: postgres_resource.id,
-      resource_name: postgres_resource.name,
-      billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", postgres_resource.location)["id"],
-      amount: postgres_resource.target_storage_size_gib
-    )
+    billing_record_parts.each do |brp|
+      BillingRecord.create_with_id(
+        project_id: postgres_resource.project_id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], "standard", postgres_resource.location)["id"],
+        amount: brp[:amount]
+      )
+    end
 
     hop_wait
   end
