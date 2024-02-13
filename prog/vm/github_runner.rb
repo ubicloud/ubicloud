@@ -51,7 +51,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
       enable_ip4: true,
       arch: label_data["arch"],
-      allow_only_ssh: true
+      allow_only_ssh: true,
+      swap_size_bytes: 4294963200 # ~4096MB, the same value with GitHub hosted runners
     )
 
     Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
