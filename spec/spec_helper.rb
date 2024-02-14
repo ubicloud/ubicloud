@@ -53,6 +53,9 @@ RSpec.configure do |config|
 
   config.before(:suite) do
     DatabaseCleaner.strategy = :transaction
+    # Since we have 2 active sequel databases, we need to manually
+    # specify which one to clean.
+    DatabaseCleaner[:sequel].db = DB
     DatabaseCleaner.clean_with(:truncation,
       # Skip tables that are filled with migrations.
       except: %w[
