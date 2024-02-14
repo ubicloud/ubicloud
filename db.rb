@@ -15,6 +15,8 @@ DB = Sequel.connect(Config.clover_database_url, max_connections: Config.db_pool 
   db.add_conversion_proc(869, NetAddr.method(:parse_ip))
 end
 
+POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool, pool_timeout: Config.database_timeout) if Config.postgres_monitor_database_url
+
 # Load Sequel Database/Global extensions here
 # DB.extension :date_arithmetic
 DB.extension :pg_json, :pg_auto_parameterize, :pg_timestamptz, :pg_range, :pg_array

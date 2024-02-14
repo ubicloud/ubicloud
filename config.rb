@@ -112,6 +112,7 @@ module Config
   optional :postgres_service_blob_storage_access_key, string
   optional :postgres_service_blob_storage_secret_key, string, clear: true
   optional :postgres_service_blob_storage_id, string
+  override :postgres_monitor_database_url, Config.clover_database_url, string
 
   # Logging
   optional :database_logger_level, string
