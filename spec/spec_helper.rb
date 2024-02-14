@@ -61,7 +61,6 @@ RSpec.configure do |config|
       except: %w[
         schema_migrations_password
         account_statuses
-        billing_rate
       ])
   end
 
