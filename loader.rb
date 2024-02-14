@@ -99,9 +99,5 @@ def clover_freeze
   # Also for at least puma, but not itemized by the roda-sequel-stack
   # project for some reason.
   require "nio4r"
-
-  # this Ruby standard library method patches core classes.
-  "".unicode_normalize(:nfc)
-
-  Refrigerator.freeze_core
+  Refrigerator.freeze
 end
