@@ -409,7 +409,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm_host = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vm_host)
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
-      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v Started")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
@@ -424,7 +424,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm_host = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vm_host)
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
-      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v Started")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
@@ -452,7 +452,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
       expect(sshable).not_to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
-      expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v Started")
+      expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")

@@ -301,7 +301,7 @@ class Prog::Vm::GithubRunner < Prog::Base
           vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
 
           # Exclude the "Started" line because it contains sensitive information.
-          vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v Started")
+          vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
         rescue Sshable::SshError
           Clog.emit("Failed to move serial.log or running journalctl") { {github_runner: github_runner.values} }
         end
