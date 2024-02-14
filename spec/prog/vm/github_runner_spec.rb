@@ -88,7 +88,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(VmPool).to receive(:where).with(
         vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
         storage_size_gib: 150, storage_encrypted: false,
-        storage_skip_sync: false, arch: "x64"
+        storage_skip_sync: true, arch: "x64"
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
@@ -106,7 +106,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(VmPool).to receive(:where).with(
         vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
         storage_size_gib: 150, storage_encrypted: false,
-        storage_skip_sync: false, arch: "arm64"
+        storage_skip_sync: true, arch: "arm64"
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
       expect(Clog).to receive(:emit).with("Pool is used").and_call_original
