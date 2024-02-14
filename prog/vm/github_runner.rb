@@ -26,13 +26,14 @@ class Prog::Vm::GithubRunner < Prog::Base
   def pick_vm
     label = github_runner.label
     label_data = Github.runner_labels[label]
+    skip_sync = true
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
       location: label_data["location"],
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: false,
-      storage_skip_sync: false,
+      storage_skip_sync: skip_sync,
       arch: label_data["arch"]
     ).first
 
@@ -48,7 +49,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false}],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false, skip_sync: skip_sync}],
       enable_ip4: true,
       arch: label_data["arch"],
       allow_only_ssh: true
