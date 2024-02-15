@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
-require_relative "../base"
-
 class Serializers::Api::Project < Serializers::Base
   def self.base(p)
     {
-      id: p.ubid,
-      name: p.name
+      ubid: p.ubid,
+      path: p.path,
+      name: p.name,
+      credit: p.credit.to_f,
+      discount: p.discount,
+      provider: p.provider
     }
   end
 
