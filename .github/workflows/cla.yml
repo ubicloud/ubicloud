@@ -23,10 +23,8 @@ jobs:
           path-to-signatures: 'signatures/cla.json'
           path-to-document: 'https://docs.google.com/document/d/1ymjqOk6fXhi-VxnV2qZEgI5ibX9gtg7Y/edit?usp=sharing&ouid=105153831332304232521&rtpof=true&sd=true' # e.g. a CLA or a DCO document
           branch: 'main'
-          allowlist: byucesoy, enescakir, fdr, ozgune, pykello, umurc, velioglu, bot*
+          allowlist: furkansahin, byucesoy, enescakir, fdr, ozgune, pykello, umurc, velioglu, bot*
           remote-organization-name: ubicloud
           remote-repository-name: cla-signers
           create-file-commit-message: 'Creating file for storing CLA Signatures'
           signed-commit-message: '$contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
-          custom-notsigned-prcomment: 'Hello, please sign the CLA to get your pull request merged. Thanks!'
-

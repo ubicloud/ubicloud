@@ -233,7 +233,6 @@ SQL
   end
 
   def allocate_spdk_installation(spdk_installations)
-    total_weight = spdk_installations.sum(&:allocation_weight)
     fail "Total weight of all eligible spdk_installations shouldn't be zero." if total_weight == 0
 
     rand_point = rand(0..total_weight - 1)
