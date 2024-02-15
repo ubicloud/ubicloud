@@ -28,5 +28,4 @@ jobs:
           remote-repository-name: cla-signers
           create-file-commit-message: 'Creating file for storing CLA Signatures'
           signed-commit-message: '$contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
-          custom-notsigned-prcomment: 'Hello, please sign the CLA to get your pull request merged. Thanks!'
 
