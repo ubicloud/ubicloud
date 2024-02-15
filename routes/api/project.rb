@@ -20,6 +20,22 @@ class CloverApi
       @project = Project.from_ubid(project_ubid)
       @project = nil unless @project&.visible
 
+      r.delete true do
+        if @project
+          Authorization.authorize(@current_user.id, "Project:delete", @project.id)
+
+          # If it has some resources, do not allow to delete it.
+          if @project.has_resources
+            fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
+          end
+
+          @project.soft_delete
+        end
+
+        response.status = 204
+        r.halt
+      end
+
       unless @project
         response.status = 404
         r.halt
