@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
 module Authorization
-  class Unauthorized < StandardError; end
+  class Unauthorized < CloverError
+    def initialize
+      super(403, "Forbidden", "Sorry, you don't have permission to continue with this request.")
+    end
+  end
 
   def self.has_permission?(subject_id, actions, object_id)
     !matched_policies(subject_id, actions, object_id).empty?
