@@ -50,19 +50,15 @@ module CloverBase
       code = 400
       title = "Invalid request"
       message = e.to_s
-    when Validation::ValidationFailed
-      code = 400
-      title = "Invalid request"
-      message = "Failed validations"
-      details = e.errors
     when Roda::RodaPlugins::RouteCsrf::InvalidToken
       code = 419
       title = "Invalid Security Token"
       message = "An invalid security token was submitted with this request, and this request could not be processed."
-    when Authorization::Unauthorized
-      code = 403
-      title = "Forbidden"
-      message = "Sorry, you don't have permission to continue with this request."
+    when CloverError
+      code = e.code
+      title = e.title
+      message = e.message
+      details = e.details
     else
       $stderr.print "#{e.class}: #{e.message}\n"
       warn e.backtrace
