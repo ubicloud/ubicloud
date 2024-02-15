@@ -3,11 +3,9 @@
 require "time"
 
 module Validation
-  class ValidationFailed < StandardError
-    attr_reader :errors
-    def initialize(errors)
-      @errors = errors
-      super("Validation failed for following fields: #{errors.keys.join(", ")}")
+  class ValidationFailed < CloverError
+    def initialize(details)
+      super(400, "Invalid request", "Validation failed for following fields: #{details.keys.join(", ")}", details)
     end
   end
 
