@@ -10,23 +10,12 @@ ADMIN_URI_PATH = "/minio/admin/v3"
 
 class Minio::Client
   def initialize(endpoint:, access_key:, secret_key:, ssl_ca_file_data:, socket: nil)
-    ssl_ca_file_name = Digest::SHA256.hexdigest(ssl_ca_file_data)
-    ssl_ca_file = File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")
-    if !File.exist?(ssl_ca_file)
-      FileUtils.mkdir_p(File.dirname(ssl_ca_file))
-      temp_filename = File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".tmp")
-      File.open("#{temp_filename}.lock", File::RDWR | File::CREAT) do |lock|
-        lock.flock(File::LOCK_EX)
-        File.open(temp_filename, File::RDWR | File::CREAT) do |f|
-          f.puts(ssl_ca_file_data)
-          File.rename(temp_filename, ssl_ca_file)
-        end
-      end
-    end
+    ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", Digest::SHA256.hexdigest(ssl_ca_file_data) + ".crt")
+    Util.safe_write_to_file(ca_bundle_filename, ssl_ca_file_data) unless File.exist?(ca_bundle_filename)
 
     @creds = {access_key: access_key, secret_key: secret_key}
     @endpoint = endpoint
-    @client = Excon.new(endpoint, socket: socket, ssl_ca_file: ssl_ca_file)
+    @client = Excon.new(endpoint, socket: socket, ssl_ca_file: ca_bundle_filename)
     @signer = Minio::HeaderSigner.new
     @crypto = Minio::Crypto.new
   end

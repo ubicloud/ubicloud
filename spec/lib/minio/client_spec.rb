@@ -9,12 +9,10 @@ RSpec.describe Minio::Client do
     expect(File).to receive(:exist?).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")).and_return(false)
     expect(FileUtils).to receive(:mkdir_p).with(File.dirname(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")))
     lock_file = instance_double(File, flock: true)
-    expect(File).to receive(:open).with("#{File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".tmp")}.lock", File::RDWR | File::CREAT).and_yield(lock_file)
+    expect(File).to receive(:open).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt.tmp.lock"), File::RDWR | File::CREAT).and_yield(lock_file)
     expect(lock_file).to receive(:flock).with(File::LOCK_EX)
-    temp_file = instance_double(File, puts: true)
-    expect(File).to receive(:open).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".tmp").to_s, File::RDWR | File::CREAT).and_yield(temp_file)
-    expect(temp_file).to receive(:puts).with("data")
-    expect(File).to receive(:rename).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".tmp").to_s, File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt"))
+    expect(File).to receive(:write)
+    expect(File).to receive(:rename).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt.tmp").to_s, File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt"))
 
     minio_client
   end
