@@ -47,6 +47,7 @@ module Config
   optional :stripe_public_key, string, clear: true
   optional :stripe_secret_key, string, clear: true
   optional :heartbeat_url, string
+  optional :clover_database_root_certs, string
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
@@ -113,6 +114,7 @@ module Config
   optional :postgres_service_blob_storage_secret_key, string, clear: true
   optional :postgres_service_blob_storage_id, string
   override :postgres_monitor_database_url, Config.clover_database_url, string
+  optional :postgres_monitor_database_root_certs, string
 
   # Logging
   optional :database_logger_level, string
