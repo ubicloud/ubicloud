@@ -56,7 +56,13 @@ class PostgresResource < Sequel::Model
   end
 
   def connection_string
-    URI::Generic.build2(scheme: "postgres", userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}", host: hostname).to_s if hostname
+    return nil unless (hn = hostname)
+    URI::Generic.build2(
+      scheme: "postgres",
+      userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",
+      host: hn,
+      query: "channel_binding=require"
+    ).to_s
   end
 
   def replication_connection_string(application_name:)
