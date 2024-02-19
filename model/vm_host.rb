@@ -169,6 +169,8 @@ class VmHost < Sequel::Model
         end
       end
     end
+
+    Strand.create_with_id(schedule: Time.now, prog: "SetupNftables", label: "start", stack: [{subject_id: id}])
   end
 
   # Operational Functions

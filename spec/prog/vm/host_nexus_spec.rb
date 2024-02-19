@@ -107,7 +107,8 @@ RSpec.describe Prog::Vm::HostNexus do
         Prog::LearnCores,
         Prog::LearnStorage,
         Prog::InstallDnsmasq,
-        Prog::SetupSysstat
+        Prog::SetupSysstat,
+        Prog::SetupNftables
       ])
     end
 

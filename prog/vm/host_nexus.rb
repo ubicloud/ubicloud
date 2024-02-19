@@ -58,6 +58,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnStorage
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
+    bud Prog::SetupNftables
     hop_wait_prep
   end
 
