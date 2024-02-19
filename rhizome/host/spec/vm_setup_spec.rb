@@ -170,6 +170,9 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:r).with("deluser --remove-home test")
       expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
 
+      expect(vs.vp).to receive(:read_public_ipv4).and_return("12.12.12.12")
+      expect(vs).to receive(:block_ip4)
+
       vs.purge
     end
   end
@@ -253,6 +256,7 @@ RSpec.describe VmSetup do
       clover_ephemeral = NetAddr.parse_net("fddf:53d2:4c89:2305:8000::/65")
       ip4 = "192.168.1.100"
 
+      expect(vs).to receive(:unblock_ip4).with("192.168.1.100")
       expect(vs).to receive(:interfaces).with([], true)
       expect(vs).to receive(:setup_veths_6) {
         expect(_1.to_s).to eq(guest_ephemeral.to_s)
@@ -345,6 +349,33 @@ NFTABLES_CONF
       expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/hugepages")
       expect(vs).to receive(:r).with("mount -t hugetlbfs -o uid=test,size=2G nodev /vm/test/hugepages")
       vs.hugepages(2)
+    end
+  end
+
+  describe "#unblock_ip4" do
+    it "can unblock ip4" do
+      f = instance_double(File)
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/etc/nftables.d/test.conf.tmp")
+      end.and_yield(f)
+
+      expect(f).to receive(:flock).with(File::LOCK_EX | File::LOCK_NB)
+      expect(f).to receive(:puts).with(<<NFTABLES_CONF)
+#!/usr/sbin/nft -f
+add element inet drop_unused_ip_packets allowed_ipv4_addresses { 1.1.1.1 }
+NFTABLES_CONF
+      expect(File).to receive(:rename).with("/etc/nftables.d/test.conf.tmp", "/etc/nftables.d/test.conf")
+
+
+      vs.unblock_ip4("1.1.1.1/32")
+    end
+  end
+
+  describe "#block_ip4" do
+    it "can block ip4" do
+      expect(FileUtils).to receive(:rm_f).with("/etc/nftables.d/test.conf")
+
+      vs.block_ip4
     end
   end
 end
