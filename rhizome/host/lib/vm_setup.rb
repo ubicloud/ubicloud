@@ -97,10 +97,18 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       File.rename(temp_filename, filename)
     end
 
+    reload_nftables
   end
+
   def block_ip4
     FileUtils.rm_f("/etc/nftables.d/#{q_vm}.conf")
+    reload_nftables
   end
+
+  def reload_nftables
+    r "systemctl reload nftables"
+  end
+
   # Delete all traces of the VM.
   def purge
     block_ip4 if vp.read_public_ipv4

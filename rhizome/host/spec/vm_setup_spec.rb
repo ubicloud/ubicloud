@@ -366,6 +366,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { 1.1.1.1 }
 NFTABLES_CONF
       expect(File).to receive(:rename).with("/etc/nftables.d/test.conf.tmp", "/etc/nftables.d/test.conf")
 
+      expect(vs).to receive(:r).with("systemctl reload nftables")
 
       vs.unblock_ip4("1.1.1.1/32")
     end
@@ -374,6 +375,7 @@ NFTABLES_CONF
   describe "#block_ip4" do
     it "can block ip4" do
       expect(FileUtils).to receive(:rm_f).with("/etc/nftables.d/test.conf")
+      expect(vs).to receive(:r).with("systemctl reload nftables")
 
       vs.block_ip4
     end
