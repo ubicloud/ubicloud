@@ -44,3 +44,6 @@ File.open("/etc/nftables.conf", File::APPEND | File::RDWR) do |f|
   break if f.each_line.any? { |line| line.include?("include \"/etc/nftables.d/*.conf") }
   f.write("include \"/etc/nftables.d/*.conf\"\n")
 end
+
+r "systemctl enable nftables"
+r "systemctl start nftables"
