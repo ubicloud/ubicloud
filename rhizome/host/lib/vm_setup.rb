@@ -72,6 +72,7 @@ class VmSetup
       if ip4
         vm_sub = NetAddr::IPv4Net.parse(ip4)
         vp.write_public_ipv4(vm_sub.to_s)
+        unblock_ip4(ip4)
       end
     end
 
@@ -83,8 +84,27 @@ class VmSetup
     forwarding
   end
 
+  def unblock_ip4(ip4)
+    ip_net = NetAddr::IPv4Net.parse(ip4).network.to_s
+    filename = "/etc/nftables.d/#{q_vm}.conf"
+    temp_filename = "#{filename}.tmp"
+    File.open(temp_filename, File::RDWR | File::CREAT) do |f|
+      f.flock(File::LOCK_EX | File::LOCK_NB)
+      f.puts(<<-NFTABLES)
+#!/usr/sbin/nft -f
+add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
+      NFTABLES
+      File.rename(temp_filename, filename)
+    end
+
+  end
+  def block_ip4
+    FileUtils.rm_f("/etc/nftables.d/#{q_vm}.conf")
+  end
   # Delete all traces of the VM.
   def purge
+    block_ip4 if vp.read_public_ipv4
+
     begin
       r "ip netns del #{q_vm}"
     rescue CommandFail => ex
