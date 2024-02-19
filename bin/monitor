@@ -34,6 +34,7 @@ loop do
           Clog.emit("Resource is deleted") { {health_monitor_resource_deleted: {ubid: r.ubid}} }
           sessions.delete(r.id)
           ssh_threads.delete(r.id)
+          pulse_threads.delete(r.id)&.kill
           break
         end
 
