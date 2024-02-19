@@ -12,12 +12,12 @@ RSpec.describe PostgresResource do
 
   it "returns connection string" do
     expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com?channel_binding=require")
   end
 
   it "returns connection string with ip address if config is not set" do
     expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ephemeral_net4: "1.2.3.4"))).at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4?channel_binding=require")
   end
 
   it "returns connection string as nil if there is no server" do
