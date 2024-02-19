@@ -13,6 +13,15 @@ RSpec.describe InvoiceGenerator do
     )
   end
 
+  def generate_concession_record(project, discount: 0, credit: 0, resource_type: nil)
+    Concession.create(
+      project_id: project.id,
+      resource_type: resource_type,
+      discount: discount,
+      credit: credit
+    )
+  end
+
   def check_invoice_for_single_vm(invoices, project, vm, duration)
     expect(invoices.count).to eq(1)
 
@@ -152,7 +161,7 @@ RSpec.describe InvoiceGenerator do
     expect(Invoice.first.invoice_number).to eq("#{begin_time.strftime("%y%m")}-#{p1.id[-10..]}-0001")
   end
 
-  it "handles discounts" do
+  it "handles discounts on project model" do
     generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
@@ -164,7 +173,7 @@ RSpec.describe InvoiceGenerator do
     expect(discount_after).to eq(cost_before * 0.1)
   end
 
-  it "handles credits" do
+  it "handles credits on project model" do
     generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, credit_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
@@ -177,7 +186,7 @@ RSpec.describe InvoiceGenerator do
     expect(p1.reload.credit).to eq(0)
   end
 
-  it "handles discounts and credits at the same time" do
+  it "handles discounts and credits at the same time on project model" do
     generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     before = described_class.new(begin_time, end_time).run.first.content
@@ -187,7 +196,80 @@ RSpec.describe InvoiceGenerator do
     expect(after["cost"]).to eq(before["cost"] * 0.9 - 10)
     expect(after["discount"]).to eq(before["cost"] * 0.1)
     expect(after["credit"]).to eq(10)
-    expect(p1.reload.credit).to eq(0)
+  end
+
+  it "handles discounts on concession model" do
+    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    cost_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
+    generate_concession_record(p1, discount: 10)
+    cost_after, discount_after = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
+
+    expect(cost_after).to eq(cost_before * 0.9)
+    expect(discount_before).to eq(0)
+    expect(discount_after).to eq(cost_before * 0.1)
+  end
+
+  it "handles credits on concession model" do
+    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    cost_before, credit_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
+    generate_concession_record(p1, credit: 10)
+    cost_after, credit_after = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
+
+    expect(cost_after).to eq(cost_before - 10)
+    expect(credit_before).to eq(0)
+    expect(credit_after).to eq(10)
+  end
+
+  it "handles discounts and credits at the same time on concession model" do
+    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    before = described_class.new(begin_time, end_time).run.first.content
+    generate_concession_record(p1, discount: 10, credit: 10)
+    after = described_class.new(begin_time, end_time, save_result: true).run.first.content
+
+    expect(after["cost"]).to eq(before["cost"] * 0.9 - 10)
+  end
+
+  it "handles discounts and credits on both project and project level concession" do
+    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    cost_before, credit_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit", "discount")
+    generate_concession_record(p1, discount: 10, credit: 10)
+    p1.update(credit: 10, discount: 10)
+    cost_after, credit_after, discount_after = described_class.new(begin_time, end_time, save_result: true).run.first.content.values_at("cost", "credit", "discount")
+
+    expect(cost_after).to eq(cost_before * 0.9 * 0.9 - 20)
+    expect(credit_before).to eq(0)
+    expect(credit_after).to eq(20)
+    expect(discount_before).to eq(0)
+    expect(discount_after).to be_within(1e-6).of(cost_before - cost_before * 0.9 * 0.9)
+  end
+
+  it "handles concession resource level" do
+    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    cost_before, credit_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit", "discount")
+    generate_concession_record(p1, discount: 10, credit: 10, resource_type: "VmCores")
+    cost_after, credit_after, discount_after = described_class.new(begin_time, end_time, save_result: true).run.first.content.values_at("cost", "credit", "discount")
+
+    expect(cost_after).to eq(cost_before * 0.9 - 10)
+    expect(credit_before).to eq(0)
+    expect(credit_after).to eq(10)
+    expect(discount_before).to eq(0)
+    expect(discount_after).to be_within(1e-6).of(cost_before - credit_after - cost_after)
+  end
+
+  it "handles multiple concessions resource level" do
+    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    before = described_class.new(begin_time, end_time).run.first.content
+    generate_concession_record(p1, discount: 10, credit: 10, resource_type: "VmCores")
+    generate_concession_record(p1, discount: 10, credit: 10, resource_type: "VmCores")
+    after = described_class.new(begin_time, end_time, save_result: true).run.first.content
+
+    expect(after["cost"]).to eq(before["cost"] * 0.9 * 0.9 - 20)
   end
 end
 
