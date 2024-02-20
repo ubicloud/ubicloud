@@ -17,7 +17,7 @@ class Project < Sequel::Model
 
   dataset_module Authorization::Dataset
 
-  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy
+  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy
 
   include ResourceMethods
   include Authorization::HyperTagMethods
@@ -49,6 +49,11 @@ class Project < Sequel::Model
     DB.transaction do
       access_tags_dataset.destroy
       access_policies_dataset.destroy
+
+      github_installations.each do
+        Github.app_client.delete_installation(_1.installation_id)
+        _1.destroy
+      end
 
       # We still keep the project object for billing purposes.
       # These need to be cleaned up manually once in a while.
