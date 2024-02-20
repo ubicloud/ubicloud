@@ -10,9 +10,15 @@ RSpec.describe PostgresResource do
     ) { _1.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b" }
   }
 
-  it "returns connection string" do
+  it "returns connection string without ubid qualifier" do
     expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
+    expect(postgres_resource).to receive(:hostname_version).and_return("v1")
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com?channel_binding=require")
+  end
+
+  it "returns connection string with ubid qualifier" do
+    expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com?channel_binding=require")
   end
 
   it "returns connection string with ip address if config is not set" do
