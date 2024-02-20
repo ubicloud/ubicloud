@@ -236,7 +236,7 @@ RSpec.describe Prog::Base do
 
     it "resolves the page once the target is reached" do
       st = Strand.create_with_id(prog: "Test", label: :napper)
-      page_id = Prog::PageNexus.assemble("dummy-summary", [st.ubid], "Deadline", st.id, st.prog, :napper).id
+      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
 
       st.stack.first["deadline_target"] = :napper
       st.stack.first["deadline_at"] = Time.now - 1
@@ -250,7 +250,7 @@ RSpec.describe Prog::Base do
 
     it "resolves the page once a new deadline is registered" do
       st = Strand.create_with_id(prog: "Test", label: :start)
-      page_id = Prog::PageNexus.assemble("dummy-summary", [st.ubid], "Deadline", st.id, st.prog, :napper).id
+      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
 
       st.stack.first["deadline_target"] = :napper
       st.stack.first["deadline_at"] = Time.now - 1

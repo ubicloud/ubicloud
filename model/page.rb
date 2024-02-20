@@ -29,7 +29,7 @@ class Page < Sequel::Model
     end
 
     incident = pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
-    incident.trigger(summary: summary, severity: "error", source: "clover", custom_details: details, links: links)
+    incident.trigger(summary: summary, severity: severity, source: "clover", custom_details: details, links: links)
   end
 
   def resolve
