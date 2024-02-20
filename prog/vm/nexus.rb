@@ -188,7 +188,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
       queued_vms = queued_vms.all
-      Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.family} family of #{vm.arch}", queued_vms.first(25).map(&:ubid), "NoCapacity", vm.location, vm.arch, vm.family)
+      Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.family} family of #{vm.arch}", ["NoCapacity", vm.location, vm.arch, vm.family], queued_vms.first(25).map(&:ubid))
       Clog.emit("No capacity left") { {lack_of_capacity: {location: vm.location, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}} }
 
       nap 30
@@ -365,7 +365,7 @@ class Prog::Vm::Nexus < Prog::Base
         decr_checkup
         hop_wait
       else
-        Prog::PageNexus.assemble("#{vm} is unavailable", vm.ubid, "VmUnavailable", vm.ubid)
+        Prog::PageNexus.assemble("#{vm} is unavailable", ["VmUnavailable", vm.ubid], vm.ubid)
       end
     rescue Sshable::SshError
       # Host is likely to be down, which will be handled by HostNexus. No need
