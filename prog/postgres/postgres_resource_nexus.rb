@@ -210,6 +210,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     ).map(&:to_pem)
   end
 
+  @@dns_zone = nil
+
   def self.dns_zone
     @@dns_zone ||= DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname]
   end

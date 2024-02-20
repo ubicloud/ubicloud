@@ -30,6 +30,8 @@ module Github
     client
   end
 
+  @@runner_labels = nil
+
   def self.runner_labels
     @@runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
   end
