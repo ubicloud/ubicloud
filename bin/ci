@@ -55,4 +55,6 @@ end.parse!
 
 clover_freeze
 
+$stdout.sync = true
+
 main(options)
