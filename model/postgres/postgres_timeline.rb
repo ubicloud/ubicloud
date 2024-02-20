@@ -51,7 +51,8 @@ PGHOST=/var/run/postgresql
         .list_objects(ubid, "basebackups_005/")
         .select { _1.key.end_with?("backup_stop_sentinel.json") }
     rescue RuntimeError => ex
-      return [] if ex.message.include?("The Access Key Id you provided does not exist in our records.")
+      recoverable_errors = ["The Access Key Id you provided does not exist in our records.", "AccessDenied"]
+      return [] if recoverable_errors.any? { ex.message.include?(_1) }
       raise
     end
   end
