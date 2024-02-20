@@ -45,7 +45,8 @@ class PostgresResource < Sequel::Model
 
   def hostname
     if Prog::Postgres::PostgresResourceNexus.dns_zone
-      "#{name}.#{Config.postgres_service_hostname}"
+      return "#{name}.#{Config.postgres_service_hostname}" if hostname_version == "v1"
+      "#{name}.#{ubid}.#{Config.postgres_service_hostname}"
     else
       representative_server&.vm&.ephemeral_net4&.to_s
     end
