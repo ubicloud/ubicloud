@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "octokit"
 
 RSpec.describe Project do
   subject(:project) { described_class.new }
@@ -39,6 +40,21 @@ RSpec.describe Project do
       expect(project.get_dummy_flag).to be_nil
       project.set_dummy_flag("new-value")
       expect(project.get_dummy_flag).to eq "new-value"
+    end
+  end
+
+  describe ".soft_delete" do
+    it "deletes github installations" do
+      expect(project).to receive(:access_tags_dataset).and_return(instance_double(AccessTag, destroy: nil))
+      expect(project).to receive(:access_policies_dataset).and_return(instance_double(AccessPolicy, destroy: nil))
+      installation = instance_double(GithubInstallation, installation_id: 123)
+      expect(installation).to receive(:destroy)
+      expect(project).to receive(:github_installations).and_return([installation])
+      app_client = instance_double(Octokit::Client)
+      expect(Github).to receive(:app_client).and_return(app_client)
+      expect(app_client).to receive(:delete_installation).with(123)
+      expect(project).to receive(:update).with(visible: false)
+      project.soft_delete
     end
   end
 end
