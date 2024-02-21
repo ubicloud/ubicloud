@@ -31,7 +31,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         ] + Array.new(minio_pool.per_server_drive_count) { {encrypted: false, size_gib: (minio_pool.per_server_storage_size / minio_pool.per_server_drive_count).floor} },
         boot_image: "ubuntu-jammy",
         enable_ip4: true,
-        private_subnet_id: minio_pool.cluster.private_subnet.id
+        private_subnet_id: minio_pool.cluster.private_subnet.id,
+        distinct_storage_devices: true
       )
 
       minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { _1.id = ubid.to_uuid }

@@ -13,7 +13,8 @@ class Prog::Vm::Nexus < Prog::Base
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil)
+    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
+    distinct_storage_devices: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -98,7 +99,11 @@ class Prog::Vm::Nexus < Prog::Base
       Strand.create(
         prog: "Vm::Nexus",
         label: "start",
-        stack: [{"storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) }, "swap_size_bytes" => swap_size_bytes}]
+        stack: [{
+          "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
+          "swap_size_bytes" => swap_size_bytes,
+          "distinct_storage_devices" => distinct_storage_devices
+        }]
       ) { _1.id = vm.id }
     end
   end
@@ -137,13 +142,6 @@ class Prog::Vm::Nexus < Prog::Base
     @params_path ||= File.join(vm_home, "prep.json")
   end
 
-  def vm_storage_size_gib
-    if (storage_volumes = frame["storage_volumes"])
-      return storage_volumes.map { _1["size_gib"] }.sum
-    end
-    vm.storage_size_gib
-  end
-
   def storage_volumes
     @storage_volumes ||= vm.vm_storage_volumes.map { |s|
       {
@@ -155,7 +153,8 @@ class Prog::Vm::Nexus < Prog::Base
         "encrypted" => !s.key_encryption_key_1.nil?,
         "spdk_version" => s.spdk_version,
         "use_bdev_ubi" => s.use_bdev_ubi,
-        "skip_sync" => s.skip_sync
+        "skip_sync" => s.skip_sync,
+        "storage_device" => s.storage_device.name
       }
     }
   end
@@ -169,17 +168,74 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def allocation_dataset
-    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm_storage_size_gib, vm.location, vm.arch]
-SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
-FROM vm_host
-WHERE vm_host.used_cores + ? <= least(vm_host.total_cores, vm_host.total_mem_gib / ?)
-AND vm_host.used_hugepages_1g + ? <= vm_host.total_hugepages_1g
-AND vm_host.available_storage_gib > ?
-AND vm_host.allocation_state = 'accepting'
-AND vm_host.location = ?
-AND vm_host.arch = ?
-ORDER BY mem_ratio, used_cores
-SQL
+    requires_bdev_ubi = frame["storage_volumes"].any? { |v| v["use_bdev_ubi"] }
+    spdk_where_clause = requires_bdev_ubi ? "AND id in (select vm_host_id from spdk_installation where version like '%ubi%' and allocation_weight > 0)" : ""
+
+    total_storage_gib = frame["storage_volumes"].sum { |v| v["size_gib"] }
+
+    device_allocation_query = if frame["distinct_storage_devices"]
+      <<-SQL
+WITH AvailableStorageDevices AS (
+    SELECT
+        id,
+        vm_host_id,
+        available_storage_gib,
+        ROW_NUMBER() OVER (PARTITION BY vm_host_id ORDER BY available_storage_gib DESC) AS device_rank
+    FROM
+        storage_device
+    WHERE
+        storage_device.enabled
+),
+VolumeAllocation AS (
+    SELECT
+        size_gib,
+        ROW_NUMBER() OVER (ORDER BY size_gib DESC) AS volume_rank
+    FROM (
+        VALUES #{frame["storage_volumes"].map { |v| "(#{v["size_gib"]})" }.join(", ")}
+    ) AS Volumes (size_gib)
+),
+DeviceVolumeMatch AS (
+    SELECT
+        vm_host_id,
+        COUNT(DISTINCT asd.id) as matched_devices
+    FROM
+        AvailableStorageDevices asd
+        INNER JOIN VolumeAllocation va ON asd.available_storage_gib >= va.size_gib
+    GROUP BY vm_host_id
+    HAVING COUNT(DISTINCT asd.id) >= (SELECT COUNT(*) FROM VolumeAllocation)
+)
+SELECT
+    *,
+    vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
+FROM
+    vm_host
+    INNER JOIN DeviceVolumeMatch ON vm_host.id = DeviceVolumeMatch.vm_host_id
+    WHERE
+      SQL
+    else
+      <<-SQL
+SELECT
+    *,
+    vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
+FROM
+    vm_host
+WHERE
+    (SELECT max(available_storage_gib) FROM storage_device WHERE storage_device.enabled AND storage_device.vm_host_id = vm_host.id) >= #{total_storage_gib}
+    AND
+      SQL
+    end
+
+    device_allocation_query += <<-SQL
+        vm_host.used_cores + ? < least(vm_host.total_cores, vm_host.total_mem_gib / ?)
+        AND vm_host.used_hugepages_1g + ? < vm_host.total_hugepages_1g
+        AND vm_host.allocation_state = 'accepting'
+        AND vm_host.location = ?
+        AND vm_host.arch = ?
+        #{spdk_where_clause}
+      ORDER BY mem_ratio, used_cores
+    SQL
+
+    DB[device_allocation_query, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.location, vm.arch]
   end
 
   def allocate
@@ -190,19 +246,42 @@ SQL
       .where(id: vm_host_id, allocation_state: "accepting")
       .update(
         used_cores: Sequel[:used_cores] + vm.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib,
-        available_storage_gib: Sequel[:available_storage_gib] - vm_storage_size_gib
+        used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib
       ).zero?
-
-    StorageDevice.where(vm_host_id: vm_host_id, name: "DEFAULT").update(
-      available_storage_gib: Sequel[:available_storage_gib] - vm_storage_size_gib
-    )
 
     vm_host_id
   end
 
-  def create_storage_volume_records(vm_host)
-    frame["storage_volumes"].each_with_index do |volume, disk_index|
+  def allocate_storage_devices(vm_host, storage_volumes)
+    DB.transaction do
+      devices = vm_host.storage_devices_dataset.for_update.order_by(&:available_storage_gib).all
+      device_index = 0
+
+      storage_volumes.sort_by{ _1["size_gib"]}.map do |volume|
+        while device_index < devices.length &&
+            (!devices[device_index].enabled ||
+            devices[device_index].available_storage_gib < volume["size_gib"])
+          device_index += 1
+        end
+
+        fail "Storage device allocation failed" unless device_index < devices.length
+
+        # Allocate!
+        allocated_device = devices[device_index]
+        allocated_device.update(available_storage_gib: allocated_device.available_storage_gib - volume["size_gib"])
+        volume.update({"storage_device_id" => allocated_device.id})
+
+        # If we require distinct storage devices, then the next volume can't use
+        # this device. Therefore, skip it.
+        device_index += 1 if frame["distinct_storage_devices"]
+
+        volume
+      end
+    end
+  end
+
+  def create_storage_volume_records(vm_host, storage_volumes)
+    storage_volumes.each_with_index do |volume, disk_index|
       key_encryption_key = if volume["encrypted"]
         key_wrapping_algorithm = "aes-256-gcm"
         cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
@@ -227,7 +306,8 @@ SQL
         skip_sync: volume["skip_sync"],
         disk_index: disk_index,
         key_encryption_key_1_id: key_encryption_key&.id,
-        spdk_installation_id: spdk_installation_id
+        spdk_installation_id: spdk_installation_id,
+        storage_device_id: volume["storage_device_id"],
       )
     end
   end
@@ -285,7 +365,10 @@ SQL
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
 
-    create_storage_volume_records(vm_host)
+    DB.transaction do
+      storage_volumes = allocate_storage_devices(vm_host, frame["storage_volumes"])
+      create_storage_volume_records(vm_host, storage_volumes)
+    end
 
     Clog.emit("vm allocated") do
       {allocation: {vm_host_ubid: vm_host.ubid, ip4: ip4, address: address&.cidr&.to_s,
@@ -492,10 +575,14 @@ SQL
         nic.incr_destroy
       end
 
+      vm.vm_storage_volumes.each do |vol|
+        dev = vol.storage_device
+        dev.update(available_storage_gib: dev.available_storage_gib + vol.size_gib)
+      end
+
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib,
-        available_storage_gib: Sequel[:available_storage_gib] + vm_storage_size_gib
+        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib
       )
       vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy
