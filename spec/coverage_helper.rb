@@ -3,6 +3,10 @@
 if (suite = ENV.delete("COVERAGE"))
   require "simplecov"
 
+  # Needed for coverage of erb.
+  require "fileutils"
+  FileUtils.mkdir_p(File.join(File.dirname(__FILE__), "..", "coverage", "views"))
+
   SimpleCov.start do
     enable_coverage :branch
     minimum_coverage line: 100, branch: 100

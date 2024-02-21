@@ -31,11 +31,12 @@ class CloverWeb < Roda
     csp.frame_ancestors :none
   end
 
+  plugin :render_coverage if Config.test? && defined?(SimpleCov)
   plugin :route_csrf
   plugin :disallow_file_uploads
   plugin :flash
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
-  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true}
+  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: Config.production? || !defined?(SimpleCov), freeze: true, skip_compiled_encoding_detection: true}
   plugin :public
   plugin :Integer_matcher_max
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64

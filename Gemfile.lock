@@ -331,7 +331,7 @@ DEPENDENCIES
   rackup
   rake
   refrigerator (>= 1)
-  roda (>= 3.62)
+  roda (>= 3.66)
   rodauth (>= 2.26.1)
   rotp
   rqrcode
