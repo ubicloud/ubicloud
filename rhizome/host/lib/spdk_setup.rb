@@ -4,6 +4,7 @@ require_relative "../../common/lib/util"
 require_relative "../../common/lib/arch"
 require_relative "spdk_path"
 require "fileutils"
+require "json"
 
 class SpdkSetup
   def initialize(spdk_version)
@@ -26,6 +27,10 @@ class SpdkSetup
 
   def install_path
     @install_path ||= SpdkPath.install_path(@spdk_version)
+  end
+
+  def conf_path
+    @conf_path ||= SpdkPath.conf_path(@spdk_version)
   end
 
   def spdk_service
@@ -95,7 +100,8 @@ ExecStart=#{vhost_binary} -S #{SpdkPath.vhost_dir.shellescape} \
 --iova-mode va \
 --rpc-socket #{rpc_sock.shellescape} \
 --cpumask [0,1] \
---disable-cpumask-locks
+--disable-cpumask-locks \
+--config #{conf_path.shellescape}
 ExecReload=/bin/kill -HUP $MAINPID
 LimitMEMLOCK=8400113664
 PrivateDevices=yes
@@ -125,12 +131,80 @@ Description=SPDK hugepages mount #{@spdk_version}
 What=hugetlbfs
 Where=#{hugepages_dir}
 Type=hugetlbfs
-Options=uid=#{user},size=1G
+Options=uid=#{user},size=2G
 
 [Install]
 WantedBy=#{spdk_service}
 SPDK_HUGEPAGES_MOUNT
     )
+  end
+
+  def create_conf
+    iobuf_conf = [{
+      method: "iobuf_set_options",
+      params: {
+        # Each bdev iobuf channel requires 128 small pool items & 16 large pool
+        # items. These are hard-coded in v23.09 and aren't configurable. Each
+        # accel iobuf channel requires 128 small pool & 16 large pool items.
+        # These values are configurable using accel_set_options.
+        #
+        # An unencrypted volume requires 1 bdev & 1 accel iobuff channels. An
+        # encrypted volume requires 1 bdev & 2 accel iobuff channels.
+        #
+        # So, small_pool_count must be at least #Volumes-per-host*3*128, and
+        # large_pool_count must be at least #Volumes-per-host*3*16. This config,
+        # which modifies the defaults, is enough for 100 encrypted volumes in a
+        # host.
+        small_pool_count: 38400,
+        large_pool_count: 4800,
+        small_bufsize: 8192,
+        large_bufsize: 135168
+      }
+    }]
+
+    # Leave these same as defaults for now.
+    accel_conf = [{
+      method: "accel_set_options",
+      params: {
+        small_cache_size: 128,
+        large_cache_size: 16,
+        task_count: 2048,
+        sequence_count: 2048,
+        buf_count: 2048
+      }
+    }]
+
+    bdev_conf = [{
+      method: "bdev_set_options",
+      params: {
+        # SPDK pre-populates the bdev_io cache per each io_channel. So,
+        # bdev_io_pool_size should be least #io_channels * bdev_io_cache_size.
+        # Therefore, bdev_io_pool_size must be #Volumes-per-host * 256.
+        #
+        # The default config is enough for 512 volumes in a host, so keeping it
+        # as it is.
+        bdev_io_pool_size: 65536,
+        bdev_io_cache_size: 256,
+        bdev_auto_examine: true
+      }
+    }]
+
+    safe_write_to_file(conf_path, JSON.pretty_generate({
+      subsystems: [
+        {
+          subsystem: "iobuf",
+          config: iobuf_conf
+        },
+        {
+          subsystem: "accel",
+          config: accel_conf
+        },
+        {
+          subsystem: "bdev",
+          config: bdev_conf
+        }
+      ]
+    }))
   end
 
   def enable_services
