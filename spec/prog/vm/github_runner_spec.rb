@@ -234,6 +234,12 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
+
+    it "does not hop to destroy if already in the wait_vm_destroy state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_vm_destroy")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
   end
 
   describe "#start" do
@@ -405,9 +411,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
-      expect(github_runner).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "github runner deleted"})
+      expect { nx.destroy }.to hop("wait_vm_destroy")
     end
 
     it "destroys resources and hops if runner deregistered, also, copies serial log if workflow_job is nil" do
@@ -421,9 +426,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
-      expect(github_runner).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "github runner deleted"})
+      expect { nx.destroy }.to hop("wait_vm_destroy")
     end
 
     it "destroys resources and hops if runner deregistered, also, emits log if it couldn't move the serial.log" do
@@ -437,9 +441,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Clog).to receive(:emit).with("Failed to move serial.log or running journalctl").and_call_original
       expect(vm).to receive(:incr_destroy)
-      expect(github_runner).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "github runner deleted"})
+      expect { nx.destroy }.to hop("wait_vm_destroy")
     end
 
     it "simply destroys the VM if the workflow_job is there and the conclusion is success" do
@@ -451,9 +454,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).not_to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
-      expect(github_runner).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "github runner deleted"})
+      expect { nx.destroy }.to hop("wait_vm_destroy")
     end
 
     it "does not destroy vm if it's already destroyed" do
@@ -462,9 +464,21 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(client).not_to receive(:delete)
       expect(github_runner).to receive(:vm).and_return(nil)
       expect(vm).not_to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+  end
+
+  describe "#wait_vm_destroy" do
+    it "naps if vm not destroyed yet" do
+      expect { nx.wait_vm_destroy }.to nap(10)
+    end
+
+    it "pops if vm destroyed" do
+      expect(nx).to receive(:vm).and_return(nil)
       expect(github_runner).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "github runner deleted"})
+      expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
     end
   end
 end
