@@ -58,7 +58,10 @@ class CloverWeb
       return error("Unregistered installation")
     end
 
-    job = data.fetch("workflow_job")
+    unless (job = data["workflow_job"])
+      Clog.emit("No workflow_job in the payload") { {workflow_job_missing: {installation_id: installation.id, action: data["action"]}} }
+      return error("No workflow_job in the payload")
+    end
 
     unless (label = job.fetch("labels").find { Github.runner_labels.key?(_1) })
       return error("Unmatched label")
