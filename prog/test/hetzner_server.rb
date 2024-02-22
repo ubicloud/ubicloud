@@ -113,11 +113,11 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def install_bdev_ubid
     version = "v23.09-ubi-0.2"
-    hop_wait if vm_host.spdk_installations.find { _1.version == version } || retval&.dig("msg") == "SPDK was setup"
+    hop_wait if vm_host.spdk_installations.find { _1.version == version }
 
     # disable the default installation and install a bdev_ubi enabled spdk
     vm_host.spdk_installations_dataset.update(allocation_weight: 0)
-    push Prog::Storage::SetupSpdk, {subject_id: vm_host.id, version: version, start_service: true, allocation_weight: 100}
+    push Prog::Storage::SetupSpdk, {subject_id: vm_host.id, version: version, start_service: true, allocation_weight: 100}, next_label: "wait"
   end
 
   label def wait

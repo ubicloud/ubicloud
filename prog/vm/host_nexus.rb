@@ -38,9 +38,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def start
     register_deadline(:wait, 15 * 60)
-    hop_prep if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
-
-    push Prog::BootstrapRhizome, {"target_folder" => "host"}
+    push Prog::BootstrapRhizome, {"target_folder" => "host"}, next_label: "prep"
   end
 
   label def prep
@@ -95,19 +93,15 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_hugepages
-    hop_setup_spdk if retval&.dig("msg") == "hugepages installed"
-
-    push Prog::SetupHugepages
+    push Prog::SetupHugepages, next_label: "setup_spdk"
   end
 
   label def setup_spdk
-    hop_prep_reboot if retval&.dig("msg") == "SPDK was setup"
-
     push Prog::Storage::SetupSpdk, {
       "version" => frame["spdk_version"],
       "start_service" => false,
       "allocation_weight" => 100
-    }
+    }, next_label: "prep_reboot"
   end
 
   label def prep_reboot

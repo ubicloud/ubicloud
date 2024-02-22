@@ -15,8 +15,6 @@ class Prog::BootstrapRhizome < Prog::Base
   end
 
   label def setup
-    pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
-
     key_data = sshable.keys.map(&:private_key)
     Util.rootish_ssh(sshable.host, user, key_data, <<SH)
 set -ueo pipefail
@@ -29,6 +27,10 @@ sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authoriz
 echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 SH
 
-    push Prog::InstallRhizome, {"target_folder" => frame["target_folder"]}
+    push Prog::InstallRhizome, {"target_folder" => frame["target_folder"]}, next_label: "finish"
+  end
+
+  label def finish
+    pop "rhizome user bootstrapped and source installed"
   end
 end
