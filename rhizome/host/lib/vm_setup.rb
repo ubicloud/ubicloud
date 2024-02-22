@@ -111,7 +111,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   # Delete all traces of the VM.
   def purge
-    block_ip4 if vp.read_public_ipv4
+    block_ip4
 
     begin
       r "ip netns del #{q_vm}"
