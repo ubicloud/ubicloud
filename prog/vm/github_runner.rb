@@ -308,6 +308,7 @@ class Prog::Vm::GithubRunner < Prog::Base
           Clog.emit("Failed to move serial.log or running journalctl") { {github_runner: github_runner.values} }
         end
       end
+      vm.update(display_state: "deleting")
       vm.incr_destroy
     end
 
