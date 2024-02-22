@@ -22,6 +22,7 @@ case verb
 when "install"
   spdk_setup.install_package
   spdk_setup.create_hugepages_mount
+  spdk_setup.create_conf
   spdk_setup.create_service
   spdk_setup.enable_services
 when "start"

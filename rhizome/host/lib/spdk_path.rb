@@ -41,6 +41,10 @@ module SpdkPath
       File.join(home, "spdk-#{spdk_version}.sock")
   end
 
+  def self.conf_path(spdk_version)
+    File.join(home, "spdk-#{spdk_version}.conf")
+  end
+
   def self.install_prefix
     File.join("", "opt")
   end
