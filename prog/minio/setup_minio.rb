@@ -19,12 +19,13 @@ class Prog::Minio::SetupMinio < Prog::Base
       minio_server.vm.sshable.cmd("common/bin/daemonizer --clean configure_minio")
       pop "minio is configured"
     when "Failed", "NotStarted"
+      server_url_config = minio_server.cluster.dns_zone ? "MINIO_SERVER_URL=\"#{minio_server.server_url}\"" : ""
       minio_config = <<ECHO
 MINIO_VOLUMES="#{minio_server.minio_volumes}"
 MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="#{minio_server.cluster.admin_user}"
 MINIO_ROOT_PASSWORD="#{minio_server.cluster.admin_password}"
-MINIO_SERVER_URL="#{minio_server.server_url}"
+#{server_url_config}
 ECHO
 
       hosts = <<ECHO

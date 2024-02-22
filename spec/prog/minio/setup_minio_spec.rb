@@ -110,6 +110,15 @@ ECHO
       expect { nx.configure_minio }.to nap(5)
     end
 
+    it "configures minio without server_url if dns is not configures" do
+      expect(nx.minio_server.cluster).to receive(:dns_zone).and_return(false)
+      expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("NotStarted")
+      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config.gsub("MINIO_SERVER_URL=\\\"https://minio-cluster-name.minio.ubicloud.com:9000\\\"", ""))
+
+      expect { nx.configure_minio }.to nap(5)
+    end
+
     it "pops if minio is configured" do
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_minio").and_return("Succeeded")
       expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean configure_minio")
