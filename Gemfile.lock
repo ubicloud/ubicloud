@@ -97,7 +97,8 @@ GEM
     i18n (1.14.1)
       concurrent-ruby (~> 1.0)
     json (2.7.1)
-    jwt (2.7.1)
+    jwt (2.8.0)
+      base64
     language_server-protocol (3.17.0.3)
     lint_roller (1.1.0)
     loofah (2.22.0)
