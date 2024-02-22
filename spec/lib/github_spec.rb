@@ -10,6 +10,7 @@ RSpec.describe Github do
   it "creates app client" do
     expect(Config).to receive(:github_app_id).and_return("123456")
     private_key = instance_double(OpenSSL::PKey::RSA)
+    expect(private_key).to receive(:is_a?).with(OpenSSL::PKey::RSA).and_return(true)
     expect(private_key).to receive(:sign).and_return("signed")
     expect(OpenSSL::PKey::RSA).to receive(:new).and_return(private_key)
     expect(Octokit::Client).to receive(:new).with(bearer_token: anything)
