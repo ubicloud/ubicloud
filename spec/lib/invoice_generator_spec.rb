@@ -2,14 +2,27 @@
 
 # rubocop:disable RSpec/NoExpectationExample
 RSpec.describe InvoiceGenerator do
-  def generate_vm_billing_record(project, vm, span)
+  def generate_billing_record(project, resource, span)
+    case resource
+    when Vm
+      vm = resource
+      billing_rate_id = BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"]
+      amount = vm.cores
+      name = vm.name
+    when GithubRunner
+      gr = resource
+      billing_rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", Github.runner_labels[gr.label]["vm_size"], "global")["id"]
+      name = "foo"
+      amount = 5000
+    end
+
     BillingRecord.create_with_id(
       project_id: project.id,
-      resource_id: vm.id,
-      resource_name: vm.name,
+      resource_id: resource.id,
+      resource_name: name,
       span: span,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
-      amount: vm.cores
+      billing_rate_id: billing_rate_id,
+      amount: amount
     )
   end
 
@@ -72,49 +85,49 @@ RSpec.describe InvoiceGenerator do
   let(:end_time) { Time.parse("2023-07-01") }
 
   it "does not generate invoice for billing record that started and terminated before this billing window" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 150 * day, begin_time - 90 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 150 * day, begin_time - 90 * day))
     invoices = described_class.new(begin_time, end_time).run
     expect(invoices.count).to eq(0)
   end
 
   it "generates invoice for billing record started before this billing window and not terminated yet" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
     invoices = described_class.new(begin_time, end_time).run
     check_invoice_for_single_vm(invoices, p1, vm1, 30 * day)
   end
 
   it "generates invoice for billing record started before this billing window and terminated in the future" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
     invoices = described_class.new(begin_time, end_time).run
     check_invoice_for_single_vm(invoices, p1, vm1, 30 * day)
   end
 
   it "generates invoice for billing record started before this billing window and terminated before end of it" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, begin_time + 15 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, begin_time + 15 * day))
     invoices = described_class.new(begin_time, end_time).run
     check_invoice_for_single_vm(invoices, p1, vm1, 15 * day)
   end
 
   it "generates invoice for billing record started in this billing window and not terminated yet" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time + 5 * day, nil))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time + 5 * day, nil))
     invoices = described_class.new(begin_time, end_time).run
     check_invoice_for_single_vm(invoices, p1, vm1, 25 * day)
   end
 
   it "generates invoice for billing record started in this billing window and terminated in the future" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time + 5 * day, end_time + 90 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time + 5 * day, end_time + 90 * day))
     invoices = described_class.new(begin_time, end_time).run
     check_invoice_for_single_vm(invoices, p1, vm1, 25 * day)
   end
 
   it "generates invoice for billing record started in this billing window and terminated before end of it" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time + 5 * day, begin_time + 15 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time + 5 * day, begin_time + 15 * day))
     invoices = described_class.new(begin_time, end_time).run
     check_invoice_for_single_vm(invoices, p1, vm1, 10 * day)
   end
 
   it "does not generate invoice for billing record started in a future billing window" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(end_time + 5 * day, end_time + 15 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(end_time + 5 * day, end_time + 15 * day))
     invoices = described_class.new(begin_time, end_time).run
     expect(invoices.count).to eq(0)
   end
@@ -123,7 +136,7 @@ RSpec.describe InvoiceGenerator do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
     expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
 
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
     bi = BillingInfo.create_with_id(stripe_id: "cs_1234567890")
     p1.update(billing_info_id: bi.id)
     invoices = described_class.new(begin_time, end_time).run
@@ -134,15 +147,15 @@ RSpec.describe InvoiceGenerator do
     p2 = Project.create_with_id(name: "cool-project", provider: "hetzner")
     vm2 = Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", family: "standard", cores: 2, location: "hetzner-hel1", boot_image: "x")
 
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, end_time))
-    generate_vm_billing_record(p2, vm2, Sequel::Postgres::PGRange.new(begin_time, end_time))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, end_time))
+    generate_billing_record(p2, vm2, Sequel::Postgres::PGRange.new(begin_time, end_time))
 
     invoices = described_class.new(begin_time, end_time, project_id: p1.id).run
     expect(invoices.count).to eq(1)
   end
 
   it "creates invoice record in the database only if save_result is set" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
     described_class.new(begin_time, end_time, save_result: false).run
     expect(Invoice.count).to eq(0)
 
@@ -153,7 +166,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles discounts" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, discount_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
     p1.update(discount: 10)
@@ -165,7 +178,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles credits" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     cost_before, credit_before = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "credit")
     p1.update(credit: 10)
@@ -178,7 +191,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "handles discounts and credits at the same time" do
-    generate_vm_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
 
     before = described_class.new(begin_time, end_time).run.first.content
     p1.update(credit: 10, discount: 10)
@@ -187,6 +200,33 @@ RSpec.describe InvoiceGenerator do
     expect(after["cost"]).to eq(before["cost"] * 0.9 - 10)
     expect(after["discount"]).to eq(before["cost"] * 0.1)
     expect(after["credit"]).to eq(10)
+    expect(p1.reload.credit).to eq(0)
+  end
+
+  it "handles github runner credit only" do
+    github_runner = GithubRunner.create_with_id(label: "ubicloud", repository_name: "my-repo")
+    generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    invoice = described_class.new(begin_time, end_time).run.first.content
+
+    expect(invoice["cost"]).to eq(invoice["subtotal"] - 1)
+    expect(invoice["credit"]).to eq(1)
+    expect(p1.reload.credit).to eq(0)
+  end
+
+  it "handles project and github runner credits together" do
+    github_runner = GithubRunner.create_with_id(label: "ubicloud", repository_name: "my-repo")
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    before = described_class.new(begin_time, end_time).run.first.content
+    p1.update(credit: 10, discount: 10)
+    after = described_class.new(begin_time, end_time, save_result: true).run.first.content
+
+    expect(before["cost"]).to eq(before["subtotal"] - 1)
+    expect(after["cost"]).to eq(before["subtotal"] * 0.9 - 11)
+    expect(after["discount"]).to eq(before["subtotal"] * 0.1)
+    expect(after["credit"]).to eq(11)
     expect(p1.reload.credit).to eq(0)
   end
 end

@@ -71,6 +71,16 @@ class InvoiceGenerator
           project_content[:cost] -= project_content[:credit]
         end
 
+        # Each project have $1 github runner credit every month
+        # 1$ github credit won't be shown on the portal billing page for now.
+        github_usage = project_content[:resources].flat_map { _1[:line_items] }.select { _1[:resource_type] == "GitHubRunnerMinutes" }.sum { _1[:cost] }
+        github_credit = [1.0, github_usage].min
+        if github_credit > 0
+          project_content[:github_credit] = github_credit
+          project_content[:credit] += project_content[:github_credit]
+          project_content[:cost] -= project_content[:github_credit]
+        end
+
         if @save_result
           invoice_month = @begin_time.strftime("%y%m")
           invoice_customer = project.id[-10..]
@@ -79,6 +89,8 @@ class InvoiceGenerator
 
           invoice = Invoice.create_with_id(project_id: project.id, invoice_number: invoice_number, content: project_content, begin_time: @begin_time, end_time: @end_time)
 
+          # Don't substract the 1$ credit from customer's overall credit as it will be applied each month to each customer
+          project_content[:credit] -= project_content.fetch(:github_credit, 0)
           if project_content[:credit] > 0
             # We don't use project.credit here, because credit might get updated between
             # the time we read and write. Referencing credit column here prevents such
