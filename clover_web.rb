@@ -12,11 +12,10 @@ class CloverWeb < Roda
   plugin :default_headers, {
     "Content-Type" => "text/html",
     "X-Frame-Options" => "deny",
-    "X-Content-Type-Options" => "nosniff",
-    "X-XSS-Protection" => "1; mode=block"
+    "X-Content-Type-Options" => "nosniff"
   }.merge(
     # :nocov:
-    Config.production? ? {"Strict-Transport-Security" => "max-age=15;"} : {}
+    Config.production? ? {"Strict-Transport-Security" => "max-age=15; includeSubDomains"} : {}
     # :nocov:
   )
 
