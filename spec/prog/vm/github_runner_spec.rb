@@ -398,7 +398,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         EOT
         chmod +x ./actions-runner/run-withenv.sh
         echo "PATH=$PATH" >> ./actions-runner/.env
-        cat /imagegeneration/imagedata.json | jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github"}]' > ./actions-runner/.setup_info
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
         sudo mv ./actions-runner /home/runner/
         sudo chown -R runner:runner /home/runner/actions-runner
       COMMAND

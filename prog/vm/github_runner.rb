@@ -257,7 +257,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       # The `imagedata.json` file contains information about the generated image.
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
       # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
-      cat /imagegeneration/imagedata.json | jq '. += [#{setup_info.to_json}]' > ./actions-runner/.setup_info
+      jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
 
       sudo mv ./actions-runner /home/runner/
       sudo chown -R runner:runner /home/runner/actions-runner
