@@ -93,8 +93,6 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "starts setup and pings subnet" do
-      expect(ps).to receive(:incr_update_firewall_rules)
-      expect(nic).to receive(:private_subnet).and_return(ps)
       vm = instance_double(Vm)
       expect(nic).to receive(:vm).and_return(vm)
       expect(nx).to receive(:when_setup_nic_set?).and_yield
@@ -168,10 +166,6 @@ RSpec.describe Prog::Vnet::NicNexus do
 
   describe "#repopulate" do
     it "buds RekeyNicTunnel with add_subnet_addr" do
-      ps = instance_double(PrivateSubnet)
-      nic = instance_double(Nic, private_subnet: ps)
-      expect(nx).to receive(:nic).and_return(nic)
-      expect(ps).to receive(:incr_update_firewall_rules)
       expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr)
       expect { nx.repopulate }.to hop("wait_repopulate")
     end

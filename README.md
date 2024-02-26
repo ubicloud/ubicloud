@@ -53,13 +53,13 @@ docker exec -it ubicloud-app ./demo/cloudify_server
 ```
 
 Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP 
-doesn't support IPv6, please use a VPN or tunnel broker such Mullvad or Hurricane 
+doesn't support IPv6, please use a VPN or tunnel broker such as Mullvad or Hurricane 
 Electric's https://tunnelbroker.net/ to connect. Alternatively, you could lease
 IPv4 addresses from your provider and add them to your control plane.
 
 ## Why use it
 
-Public cloud providers like AWS, Azure, and Google Cloud made life easier for 
+Public cloud providers like AWS, Azure, and Google Cloud have made life easier for 
 start-ups and enterprises. But they are closed source, have you rent computers 
 at a huge premium, and lock you in. Ubicloud offers an open alternative, reduces 
 your costs, and returns control of your infrastructure back to you. All without
@@ -75,9 +75,9 @@ GitHub Actions), or you'd like to run compute/memory heavy tests. Our managed
 cloud is ~3x cheaper than AWS, so you save on costs.
 
 * You want a portable and simple app deployment service like 
-[MRSK](https://github.com/mrsked/mrsk). We're moving Ubicloud's control plane
-from Heroku to MRSK; and we want to provide open and portable services for
-MRSK's dependencies in the process.
+[Kamal](https://github.com/basecamp/kamal). We're moving Ubicloud's control plane
+from Heroku to Kamal; and we want to provide open and portable services for
+Kamal's dependencies in the process.
 
 * You have bare metal machines sitting somewhere. You'd like to build your own
 cloud for portability, security, or compliance reasons.
@@ -122,7 +122,7 @@ Forum](https://github.com/ubicloud/ubicloud/discussions).
 that stores its data in Postgres. We use the [Roda](https://roda.jeremyevans.net/)
 framework to serve HTTP requests and [Sequel](http://sequel.jeremyevans.net/) to
 access the database. We manage web authentication with
-[RodAuth](http://rodauth.jeremyevans.net/). We communicate with data plane servers
+[Rodauth](http://rodauth.jeremyevans.net/). We communicate with data plane servers
 using SSH, via the library [net-ssh](https://github.com/net-ssh/net-ssh). For our
 tests, we use [RSpec](https://rspec.info/).
 
@@ -147,7 +147,7 @@ Microsoft](https://news.ycombinator.com/item?id=18990469).
 
 We see three differences. First, Ubicloud is available as a managed service (vs boxed
 software). This way, you can get started in minutes rather than weeks. Since Ubicloud
-is designed for multi-tenancy, it comes with built-in with features such as encryption 
+is designed for multi-tenancy, it comes with built-in features such as encryption 
 at rest and in transit, virtual networking, secrets rotation, etc.
 
 Second, we're initially targeting developers. This -we hope- will give us fast feedback 

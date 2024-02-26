@@ -13,7 +13,7 @@ indicates, this project uses [Roda](https://roda.jeremyevans.net/)
 database queries).
 
 Web authentication is managed with
-[RodAuth](http://rodauth.jeremyevans.net/).
+[Rodauth](http://rodauth.jeremyevans.net/).
 
 It communicates with servers using SSH, via the library
 [net-ssh](https://github.com/net-ssh/net-ssh).

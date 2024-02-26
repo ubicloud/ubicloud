@@ -17,13 +17,27 @@ EOS
         StorageDevice.map(&:name).sort
       }.from([]).to(%w[stor1 stor2])
     end
+
+    it "exits, updating existing StorageDevice model instances" do
+      vmh = Prog::Vm::HostNexus.assemble("::1").subject
+      ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
+/var/storage/devices/stor1   205520896     99571712
+/var/storage/devices/stor2  3331416064   3331276800
+EOS
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 3, total_storage_gib: 15)
+      expect { ls.start }.to exit({"total_storage_gib" => 3, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
+        StorageDevice.map(&:name).sort
+      }.from(%w[stor1]).to(%w[stor1 stor2])
+    end
   end
 
   describe Prog::LearnStorage, "#make_model_instances" do
     subject(:ls) { described_class.new(Strand.new) }
 
     let(:sshable) { instance_double(Sshable) }
-    let(:vmh) { instance_double(VmHost, id: "746976d6-315b-8f71-95e6-367c4ac068d7") }
+    let(:vmh) { instance_double(VmHost, id: "746976d6-315b-8f71-95e6-367c4ac068d7", storage_devices: []) }
 
     before do
       expect(ls).to receive(:sshable).and_return(sshable).at_least(:once)

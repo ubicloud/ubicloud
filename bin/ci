@@ -3,69 +3,58 @@
 
 require_relative "../loader"
 require "time"
+require "optparse"
 
-def main
-  st = Prog::Test::HetznerServer.assemble
+def main(options)
+  hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id])
+  wait_until(hetzner_server_st, "wait")
 
-  strand_states = update_status({})
-  retries = 0
+  encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
+  log(encrypted_vms_st, "storage_encrypted: true")
+  wait_until(encrypted_vms_st)
 
-  loop do
-    begin
-      ret = st.run
-    # rubocop:disable Lint/RescueException
-    rescue Exception => e
-      log "Exception: #{e}"
+  unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
+  log(unencrypted_vms_st, "storage_encrypted: false")
+  wait_until(unencrypted_vms_st)
 
-      if e.is_a?(Sshable::SshError)
-        puts "Stdout: #{e.stdout}"
-        puts "Stderr: #{e.stderr}"
-      end
+  Semaphore.incr(hetzner_server_st.id, "destroy")
+  wait_until(hetzner_server_st)
+end
 
-      # retry 5 times, for total of 7:45 minutes before announcing failure
-      # sometimes there's some transient network failures which will be resolved if retried.
-      if retries < 5
-        sleep_duration = 15 * 2**retries
-        log "Retrying in #{sleep_duration} seconds ..."
-        sleep sleep_duration
-        retries += 1
-        next
-      else
-        raise
-      end
+def wait_until(st, label = nil)
+  while (loaded_st = Strand[st.id]) && loaded_st.label != label
+    if loaded_st.label == "failed"
+      log(st.reload, "FAILED: #{loaded_st.exitval.fetch("msg")}")
+      st.destroy
+      exit 1
     end
-    # rubocop:enable Lint/RescueException
-
-    strand_states = update_status(strand_states)
-    retries = 0
-
-    if ret.is_a?(Prog::Base::Nap)
-      sleep ret.seconds
-    elsif ret.is_a?(Prog::Base::Exit)
-      log "Exited with: #{ret}"
-      exit 0
-    end
+    log(st.reload, "waiting #{label ? "for #{label}" : "exit"}")
+    sleep 10
   end
+  log(st, "reached")
 end
 
-def update_status(previous)
-  current = Strand.all.map { |x| [x[:id], {prog: x[:prog], label: x[:label]}] }.to_h
-  previous.each_pair { |key, value|
-    if !current.has_key? key
-      log "Strand deleted: id=#{key}, prog=#{value[:prog]}, label=#{value[:label]}"
-    elsif current[key] != value
-      log "Strand updated: id=#{key}, prog=#{value[:prog]}, label=#{value[:label]} => #{current[key][:label]}"
-    end
-  }
-  current.each_pair { |key, value|
-    if !previous.has_key? key
-      log "Strand created: id=#{key}, prog=#{value[:prog]}, label=#{value[:label]}"
-    end
-  }
+def log(st, msg)
+  resources = case st.prog
+  when "Test::HetznerServer"
+    "VmHost.#{Strand[st.stack.first["vm_host_id"]]&.label}"
+  when "Test::VmGroup"
+    st.stack.first["vms"].map { "Vm.#{Strand[_1]&.label}" }.join(", ")
+  when "Test::Vm"
+    "Vm.#{Strand[st.stack.first["subject_id"]]&.label}"
+  else
+    "#{st.prog}.#{st.label}"
+  end
+  $stdout.write "#{Time.now.utc.iso8601} | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
 end
 
-def log(msg)
-  puts "#{Time.now.utc.iso8601} #{msg}"
-end
+options = {}
+OptionParser.new do |opts|
+  opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? VmHost.from_ubid(v).id : v }
+end.parse!
 
-main
+clover_freeze
+
+$stdout.sync = true
+
+main(options)

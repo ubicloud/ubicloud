@@ -1,4 +1,4 @@
-FROM node:21.4-alpine3.17 as frontend-builder
+FROM node:21.6.2-alpine3.19 as frontend-builder
 WORKDIR /app
 COPY tailwind.config.js package.json package-lock.json ./
 COPY views/ ./views/
@@ -7,7 +7,7 @@ RUN npm ci
 RUN npm run prod
 
 
-FROM ruby:3.2.2-alpine3.17 as bundler
+FROM ruby:3.2.3-alpine3.19 as bundler
 # Install build dependencies
 # - build-base, git, curl: To ensure certain gems can be compiled
 # - postgresql-dev: Required for postgresql gem
@@ -19,14 +19,15 @@ RUN bundle config set --local without development:test
 RUN bundle install
 
 
-FROM ruby:3.2.2-alpine3.17
+FROM ruby:3.2.3-alpine3.19
 # Install runtime dependencies
 # - tzdata: The public-domain time zone database
 # - curl: Required for healthcheck and some basic operations
 # - postgresql-client: Required for postgresql gem at runtime
+# - gcompat: Required for nokogiri gem at runtime. https://nokogiri.org/tutorials/installing_nokogiri.html#linux-musl-error-loading-shared-library
 # - foreman: Helps to start different parts of app based on Procfile
 RUN apk update --no-cache && \
-    apk add tzdata curl postgresql-client --no-cache && \
+    apk add tzdata curl postgresql-client gcompat --no-cache && \
     gem install foreman
 
 RUN adduser -D ubicloud && \

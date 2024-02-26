@@ -19,18 +19,26 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     Validation.validate_minio_username(admin_user)
 
     DB.transaction do
+      ubid = MinioCluster.generate_ubid
+      root_cert_1, root_cert_key_1 = Util.create_root_certificate(common_name: "#{ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+      root_cert_2, root_cert_key_2 = Util.create_root_certificate(common_name: "#{ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+
       subnet_st = Prog::Vnet::SubnetNexus.assemble(
         Config.minio_service_project_id,
         name: "#{cluster_name}-subnet",
         location: location
       )
-      minio_cluster = MinioCluster.create_with_id(
+      minio_cluster = MinioCluster.create(
         name: cluster_name,
         location: location,
         admin_user: admin_user,
         admin_password: SecureRandom.urlsafe_base64(15),
-        private_subnet_id: subnet_st.id
-      )
+        private_subnet_id: subnet_st.id,
+        root_cert_1: root_cert_1,
+        root_cert_key_1: root_cert_key_1,
+        root_cert_2: root_cert_2,
+        root_cert_key_2: root_cert_key_2
+      ) { _1.id = ubid.to_uuid }
       minio_cluster.associate_with_project(project)
 
       per_pool_server_count = server_count / pool_count
@@ -58,20 +66,16 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     if minio_cluster.pools.all? { _1.strand.label == "wait" }
       # Start all the servers now
       minio_cluster.servers.each(&:incr_restart)
-      hop_configure_dns_records
+      hop_wait
     end
     nap 5
   end
 
-  label def configure_dns_records
-    minio_cluster.servers.each do |server|
-      dns_zone&.insert_record(record_name: minio_cluster.hostname, type: "A", ttl: 10, data: server.vm.ephemeral_net4.to_s)
+  label def wait
+    if minio_cluster.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+      hop_refresh_certificates
     end
 
-    hop_wait
-  end
-
-  label def wait
     when_reconfigure_set? do
       hop_reconfigure
     end
@@ -79,18 +83,30 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     nap 30
   end
 
+  label def refresh_certificates
+    if OpenSSL::X509::Certificate.new(minio_cluster.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+      minio_cluster.root_cert_1, minio_cluster.root_cert_key_1 = minio_cluster.root_cert_2, minio_cluster.root_cert_key_2
+      minio_cluster.root_cert_2, minio_cluster.root_cert_key_2 = Util.create_root_certificate(common_name: "#{minio_cluster.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      minio_cluster.servers.map(&:incr_reconfigure)
+    end
+
+    minio_cluster.certificate_last_checked_at = Time.now
+    minio_cluster.save_changes
+
+    hop_wait
+  end
+
   label def reconfigure
     decr_reconfigure
     minio_cluster.servers.map(&:incr_reconfigure)
     minio_cluster.servers.map(&:incr_restart)
-    hop_configure_dns_records
+    hop_wait
   end
 
   label def destroy
     register_deadline(nil, 10 * 60)
     DB.transaction do
       decr_destroy
-      dns_zone&.delete_record(record_name: minio_cluster.hostname)
       minio_cluster.dissociate_with_project(minio_cluster.projects.first)
       minio_cluster.pools.each(&:incr_destroy)
     end
@@ -105,9 +121,5 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     end
 
     pop "destroyed"
-  end
-
-  def dns_zone
-    @@dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
   end
 end

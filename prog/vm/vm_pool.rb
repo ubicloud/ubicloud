@@ -7,7 +7,8 @@ class Prog::Vm::VmPool < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(size:, vm_size:, boot_image:, location:, storage_size_gib:, arch:)
+  def self.assemble(size:, vm_size:, boot_image:, location:, storage_size_gib:,
+    storage_encrypted:, storage_skip_sync:, arch:)
     DB.transaction do
       vm_pool = VmPool.create_with_id(
         size: size,
@@ -15,6 +16,8 @@ class Prog::Vm::VmPool < Prog::Base
         boot_image: boot_image,
         location: location,
         storage_size_gib: storage_size_gib,
+        storage_encrypted: storage_encrypted,
+        storage_skip_sync: storage_skip_sync,
         arch: arch
       )
       Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { _1.id = vm_pool.id }
@@ -30,25 +33,25 @@ class Prog::Vm::VmPool < Prog::Base
   end
 
   label def create_new_vm
-    st = Prog::Vm::Nexus.assemble_with_sshable(
+    storage_params = {
+      size_gib: vm_pool.storage_size_gib,
+      encrypted: vm_pool.storage_encrypted,
+      skip_sync: vm_pool.storage_skip_sync
+    }
+    Prog::Vm::Nexus.assemble_with_sshable(
       "runner",
       Config.vm_pool_project_id,
       size: vm_pool.vm_size,
       location: vm_pool.location,
       boot_image: vm_pool.boot_image,
-      storage_volumes: [{size_gib: vm_pool.storage_size_gib, encrypted: false}],
+      storage_volumes: [storage_params],
       enable_ip4: true,
       pool_id: vm_pool.id,
-      arch: vm_pool.arch
+      arch: vm_pool.arch,
+      allow_only_ssh: true,
+      swap_size_bytes: 4294963200
     )
 
-    ps = st.subject.private_subnets.first
-    # We don't need to incr_update_firewall_rules semaphore here because the VM
-    # is just created and the firewall rules are not applied in the SubnetNexus,
-    # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
-    # increment the semaphore, already.
-    ps.firewall_rules.map(&:destroy)
-    st.subject.add_allow_ssh_fw_rules(ps)
     hop_wait
   end
 

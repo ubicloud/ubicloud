@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+
+MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner]
+
+sessions = {}
+ssh_threads = {}
+pulse_threads = {}
+
+clover_freeze
+
+loop do
+  resources = MONITORABLE_RESOURCE_TYPES.flat_map { _1.all }
+
+  resources.each do |r|
+    ssh_threads[r.id] ||= Thread.new do
+      loop do
+        sessions[r.id] = r.init_health_monitor_session
+
+        loop do
+          sessions[r.id][:ssh_session].process
+        rescue => ex
+          Clog.emit("Processing SSH session is failed. Trying to reestablish the connection") { {health_monitor_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
+          break
+        end
+      rescue => ex
+        Clog.emit("Establishing the SSH session is failed") { {health_monitor_reestablish_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
+
+        begin
+          r.reload
+        rescue Sequel::NoExistingObject
+          Clog.emit("Resource is deleted") { {health_monitor_resource_deleted: {ubid: r.ubid}} }
+          sessions.delete(r.id)
+          ssh_threads.delete(r.id)
+          pulse_threads.delete(r.id)&.kill
+          break
+        end
+
+        sleep 5
+      end
+    end
+
+    pulse_threads[r.id] ||= Thread.new do
+      pulse = {}
+      loop do
+        pulse = r.check_pulse(session: sessions[r.id], previous_pulse: pulse) if sessions[r.id]
+        Clog.emit("Got new pulse") { {got_pulse: {ubid: r.ubid, pulse: pulse}} }
+        sleep r.monitoring_interval
+      rescue RuntimeError, IOError => ex
+        Clog.emit("Pulse checking is failed") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
+        sleep r.monitoring_interval
+      rescue => ex
+        Clog.emit("Pulse checking is failed permanently!") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
+        raise
+      end
+    end
+  end
+
+  sleep 5 * 60
+end

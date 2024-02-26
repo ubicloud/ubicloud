@@ -215,9 +215,14 @@ RSpec.describe Prog::Vm::Nexus do
     it "hops to run if prep command is succeeded" do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
+      nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
+      expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
+      expect(nic).to receive(:incr_setup_nic)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
-      expect { nx.prep }.to hop("run")
+      expect(nx).to receive(:bud).with(Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules)
+      expect { nx.prep }.to hop("wait_firewall_rules_before_run")
     end
 
     it "generates and passes a params json if prep command is not started yet" do
@@ -248,7 +253,8 @@ RSpec.describe Prog::Vm::Nexus do
           "cpu_topology" => "1:1:1:1",
           "mem_gib" => 8,
           "local_ipv4" => "169.254.0.0",
-          "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]]
+          "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]],
+          "swap_size_bytes" => nil
         })
       end
       expect(sshable).to receive(:cmd).with(/sudo host\/bin\/prepvm/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
@@ -330,7 +336,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Page.active.count).to eq(1)
     end
 
-    it "resolves the page if no VM left in the queue" do
+    it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
       expect(nx).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts"))
       expect { nx.start }.to nap(30)
@@ -343,7 +349,13 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
-      # Third run is able to allocate and there are no vms left in the queue, so we resolve the page
+      # Third run is able to allocate and there are no vms left in the queue, but it's not 15 minutes yet, so we don't resolve the page
+      expect { nx.start }.to hop("create_unix_user")
+      expect(Page.active.count).to eq(1)
+      expect(Page.active.first.resolve_set?).to be false
+
+      # Fourth run is able to allocate and there are no vms left in the queue after 15 minutes, so we resolve the page
+      Page.active.first.update(created_at: Time.now - 16 * 60)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be true
@@ -503,6 +515,26 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx.allocate).to eq idle.id
     end
 
+    it "can use all cores" do
+      vmh = new_host(used_cores: 79)
+      expect(nx.allocate).to eq vmh.id
+    end
+
+    it "fails if all cores have been used" do
+      new_host(used_cores: 80)
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+    end
+
+    it "can use all hugepages" do
+      vmh = new_host(used_hugepages_1g: 632 - vm.mem_gib)
+      expect(nx.allocate).to eq vmh.id
+    end
+
+    it "fails if all hugepages have been used" do
+      new_host(used_hugepages_1g: 632 - vm.mem_gib + 1)
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+    end
+
     it "updates allocated resource columns" do
       vmh = new_host(location: "hetzner-hel1")
       st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 10}, {size_gib: 15}])
@@ -633,25 +665,18 @@ RSpec.describe Prog::Vm::Nexus do
       si_1 = SpdkInstallation.new(allocation_weight: 0)
       si_2 = SpdkInstallation.new(allocation_weight: 0)
 
-      expect { nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: false) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
-    end
-
-    it "fails if requested use_bdev_ubi, but no installations with bdev_ubi supports are available" do
-      si_1 = SpdkInstallation.new(allocation_weight: 100, version: "v23.09")
-      si_2 = SpdkInstallation.new(allocation_weight: 100, version: "v25.00")
-
-      expect { nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: true) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
+      expect { nx.allocate_spdk_installation([si_1, si_2]) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
     end
 
     it "chooses the only one if one provided" do
       si_1 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1], use_bdev_ubi: false)).to eq(si_1.id)
+      expect(nx.allocate_spdk_installation([si_1])).to eq(si_1.id)
     end
 
     it "doesn't return the one with zero weight" do
       si_1 = SpdkInstallation.new(allocation_weight: 0) { _1.id = SpdkInstallation.generate_uuid }
       si_2 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1, si_2], use_bdev_ubi: false)).to eq(si_2.id)
+      expect(nx.allocate_spdk_installation([si_1, si_2])).to eq(si_2.id)
     end
   end
 
@@ -668,12 +693,27 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  describe "#wait_firewall_rules_before_run" do
+    before do
+      expect(nx).to receive(:reap).and_return([])
+    end
+
+    it "donates if firewall rules are not updated" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_firewall_rules_before_run }.to nap(0)
+    end
+
+    it "hops to run if firewall rules are updated" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_firewall_rules_before_run }.to hop("run")
+    end
+  end
+
   describe "#run" do
     it "runs the vm" do
       sshable = instance_double(Sshable)
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm/)
-      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
       expect { nx.run }.to hop("wait_sshable")
     end
   end
@@ -686,27 +726,25 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "hops to wait if sshable" do
-      expect(vm).to receive(:created_at).and_return(Time.now)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhhqmsyfvzpy2q9gqb5h0mpde2"))
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
-      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
-      expect(Clog).to receive(:emit).with("vm provisioned").and_call_original
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
 
-    it "uses ipv6 if ipv4 is not enabled" do
-      expect(vm).to receive(:created_at).and_return(Time.now)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhhqmsyfvzpy2q9gqb5h0mpde2"))
-      expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:3bfa::/79"))
-      expect(Socket).to receive(:tcp).with("2a01:4f8:10a:128b:3bfa::2", 22, connect_timeout: 1)
-      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+    it "skips a check if ipv4 is not enabled" do
+      expect(vm.ephemeral_net4).to be_nil
+      expect(vm).not_to receive(:ephemeral_net6)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
 
   describe "#create_billing_record" do
+    before do
+      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+      expect(Clog).to receive(:emit).with("vm provisioned")
+    end
+
     it "creates billing records when ip4 is enabled" do
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
@@ -779,6 +817,34 @@ RSpec.describe Prog::Vm::Nexus do
     it "hops to start_after_host_reboot when needed" do
       expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
       expect { nx.wait }.to hop("start_after_host_reboot")
+    end
+
+    it "hops to update_firewall_rules when needed" do
+      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      expect { nx.wait }.to hop("update_firewall_rules")
+    end
+  end
+
+  describe "#update_firewall_rules" do
+    it "hops to wait_firewall_rules" do
+      expect(nx).to receive(:bud).with(Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules)
+      expect { nx.update_firewall_rules }.to hop("wait_firewall_rules")
+    end
+  end
+
+  describe "#wait_firewall_rules" do
+    before do
+      expect(nx).to receive(:reap).and_return([])
+    end
+
+    it "naps when nothing to do" do
+      expect(nx).to receive(:leaf?).and_return(false)
+      expect { nx.wait_firewall_rules }.to nap(0)
+    end
+
+    it "hops to run if firewall rules are updated" do
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_firewall_rules }.to hop("wait")
     end
   end
 

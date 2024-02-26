@@ -11,19 +11,15 @@ class Vm < Sequel::Model
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
   one_to_many :vm_storage_volumes, key: :vm_id
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
+  one_to_many :firewalls, key: :vm_id
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, firewalls: :destroy
 
   dataset_module Authorization::Dataset
 
   include ResourceMethods
-
-  def self.redacted_columns
-    super + [:public_key]
-  end
-
   include SemaphoreMethods
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
 
   include Authorization::HyperTagMethods
 
@@ -157,13 +153,7 @@ class Vm < Sequel::Model
     vm_storage_volumes.all? { !_1.key_encryption_key_1_id.nil? }
   end
 
-  def add_allow_ssh_fw_rules(ps)
-    ["0.0.0.0/0", "::/0"].each do |ip|
-      FirewallRule.create_with_id(
-        ip: ip,
-        private_subnet_id: ps.id,
-        port_range: Sequel.pg_range(22..22)
-      )
-    end
+  def self.redacted_columns
+    super + [:public_key]
   end
 end

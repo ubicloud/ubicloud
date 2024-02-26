@@ -62,29 +62,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
-  describe ".storage_params" do
-    it "returns the values returned by the storage_policy" do
-      storage_policy_params = {
-        "arch64" => {
-          "use_bdev_ubi_rate" => 0.1,
-          "skip_sync_rate" => 0.2
-        }
-      }
-      project = Project.create_with_id(name: "sample project")
-      project.set_github_storage_policy(storage_policy_params)
-      expect(github_runner.installation).to receive(:project).and_return(project)
-      storage_policy = instance_double(GithubStoragePolicy)
-      expect(GithubStoragePolicy).to receive(:new).with("x64", storage_policy_params).and_return(storage_policy)
-      expect(storage_policy).to receive_messages(use_bdev_ubi?: false, skip_sync?: true)
-      expect(nx.storage_params("x64", 5)).to eq({
-        size_gib: 5,
-        encrypted: false,
-        use_bdev_ubi: false,
-        skip_sync: true
-      })
-    end
-  end
-
   describe ".pick_vm" do
     let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
 
@@ -98,7 +75,6 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
-      expect(nx).to receive(:storage_params).and_return({encrypted: true, use_bdev_ubi: false, skip_sync: true})
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
@@ -109,12 +85,15 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "provisions a new vm if pool is valid but there is no vm" do
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64")
-      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64").and_return([git_runner_pool])
+      expect(VmPool).to receive(:where).with(
+        vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
+        storage_size_gib: 150, storage_encrypted: false,
+        storage_skip_sync: true, arch: "x64"
+      ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
-      expect(nx).to receive(:storage_params).and_return({encrypted: false, use_bdev_ubi: false})
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runner")
@@ -124,29 +103,17 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "uses the existing vm if pool can pick one" do
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64")
-      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64").and_return([git_runner_pool])
+      expect(VmPool).to receive(:where).with(
+        vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
+        storage_size_gib: 150, storage_encrypted: false,
+        storage_skip_sync: true, arch: "arm64"
+      ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
-      expect(nx).to receive(:storage_params).and_return({encrypted: false, use_bdev_ubi: false})
       expect(Clog).to receive(:emit).with("Pool is used").and_call_original
       expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")
-    end
-
-    it "doesn't use the pool if use_bdev_ubi is true" do
-      git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64")
-      expect(VmPool).to receive(:where).with(vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64").and_return([git_runner_pool])
-      expect(git_runner_pool).not_to receive(:pick_vm)
-      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
-      expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
-      expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
-      expect(nx).to receive(:storage_params).and_return({encrypted: false, use_bdev_ubi: true})
-      vm = nx.pick_vm
-      expect(vm).not_to be_nil
-      expect(vm.sshable.unix_user).to eq("runner")
-      expect(vm.family).to eq("standard")
-      expect(vm.cores).to eq(2)
     end
   end
 
@@ -298,8 +265,20 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
+  describe ".setup_info" do
+    it "returns setup info with vm pool ubid" do
+      expect(vm).to receive(:pool_id).and_return("ccd51c1e-2c78-8f76-b182-467e6cdc51f0").at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+
+      expect(nx.setup_info[:detail]).to eq("Name: #{github_runner.ubid}\nLabel: ubicloud-standard-4\nArch: \nImage: \nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\nVM Pool: vpskahr7hcf26p614czkcvh8z1\nLocation: hetzner-hel1\nDatacenter: FSN1-DC8\nProject: pjwnadpt27b21p81d7334f11rx\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github")
+    end
+  end
+
   describe "#setup_environment" do
     it "hops to register_runner" do
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         sudo usermod -a -G docker,adm,systemd-journal runner
         sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
@@ -314,6 +293,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         EOT
         chmod +x ./actions-runner/run-withenv.sh
         echo "PATH=$PATH" >> ./actions-runner/.env
+        cat /imagegeneration/imagedata.json | jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github"}]' > /home/runner/actions-runner/.setup_info
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -360,8 +340,8 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#wait" do
-    it "does not destroy runner if it does not pick a job in two minutes, and busy" do
-      expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
+    it "does not destroy runner if it does not pick a job in five minutes, and busy" do
+      expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
       expect(client).to receive(:get).and_return({busy: true})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
@@ -369,13 +349,13 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.wait }.to nap(15)
     end
 
-    it "destroys runner if it does not pick a job in two minutes and not busy" do
+    it "destroys runner if it does not pick a job in five minutes and not busy" do
       expect(github_runner).to receive(:workflow_job).and_return(nil)
-      expect(Time).to receive(:now).and_return(github_runner.ready_at + 3 * 60)
+      expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
       expect(client).to receive(:get).and_return({busy: false})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).to receive(:incr_destroy)
-      expect(Clog).to receive(:emit).with("Destroying GithubRunner because it does not pick a job in two minutes").and_call_original
+      expect(Clog).to receive(:emit).with("The runner does not pick a job").and_call_original
 
       expect { nx.wait }.to nap(0)
     end
@@ -393,7 +373,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("exited")
       expect(github_runner).to receive(:incr_destroy)
 
-      expect { nx.wait }.to nap(0)
+      expect { nx.wait }.to nap(15)
     end
 
     it "registers the runner again if the runner-script is failed" do
@@ -424,6 +404,55 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "failure"}).at_least(:once)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "destroys resources and hops if runner deregistered, also, copies serial log if workflow_job is nil" do
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return(nil)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "destroys resources and hops if runner deregistered, also, emits log if it couldn't move the serial.log" do
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "failure"}).at_least(:once)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
+      expect(Clog).to receive(:emit).with("Failed to move serial.log or running journalctl").and_call_original
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "simply destroys the VM if the workflow_job is there and the conclusion is success" do
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
+      expect(sshable).not_to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+      expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")

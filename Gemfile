@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 source "https://rubygems.org"
-ruby "3.2.2"
+ruby "3.2.3"
 
 gem "argon2"
 gem "nokogiri"
@@ -9,8 +9,7 @@ gem "bcrypt_pbkdf"
 gem "ed25519"
 gem "net-ssh"
 gem "netaddr"
-gem "sassc", ">= 2"
-gem "tilt", ">= 2.0.9"
+gem "tilt", ">= 2.2"
 gem "erubi", ">= 1.5"
 gem "puma", ">= 6.2.2"
 gem "roda", ">= 3.62"

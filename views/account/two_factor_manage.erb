@@ -9,14 +9,14 @@
     <div class="overflow-hidden rounded-lg bg-white shadow">
       <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
         <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-10 pb-10">
+        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
           <div class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
             <div class="mt-6 grid grid-cols-6 gap-6">
               <div class="col-span-6 sm:col-span-4">
                 <div class="text-lg font-medium leading-6 text-gray-900">One-Time Password Generator</div>
                 <p class="mt-1 text-sm text-gray-500">Connect an authenticator app that generates verification codes.</p>
               </div>
-              <div class="col-span-6 sm:col-span-2 text-right">
+              <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                 <% if rodauth.otp_exists? %>
                   <%== render(
                     "components/button",
@@ -38,7 +38,7 @@
                 <div class="text-lg font-medium leading-6 text-gray-900">Security Keys</div>
                 <p class="mt-1 text-sm text-gray-500">Connect a security key to your account.</p>
               </div>
-              <div class="col-span-6 sm:col-span-2 text-right">
+              <div class="col-span-6 sm:col-span-2 text-right space-y-1">
                 <%== render("components/button", locals: { text: rodauth.webauthn_setup_link_text, link: rodauth.webauthn_setup_path }) %>
                 <% if rodauth.webauthn_setup? %>
                   <%== render(

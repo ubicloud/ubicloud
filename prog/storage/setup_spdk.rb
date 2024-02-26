@@ -6,7 +6,8 @@ class Prog::Storage::SetupSpdk < Prog::Base
   SUPPORTED_SPDK_VERSIONS = [
     ["v23.09", "arm64"],
     ["v23.09", "x64"],
-    ["v23.09-ubi-0.2", "x64"]
+    ["v23.09-ubi-0.2", "x64"],
+    ["v23.09-ubi-0.2", "arm64"]
   ]
 
   def self.assemble(vm_host_id, version, start_service: false, allocation_weight: 0)

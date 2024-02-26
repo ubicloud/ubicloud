@@ -1,11 +1,7 @@
 # frozen_string_literal: true
 
-class Prog::Test::Vm < Prog::Base
+class Prog::Test::Vm < Prog::Test::Base
   subject_is :vm, :sshable
-
-  def self.assemble(vm_id)
-    Strand.create_with_id(prog: "Test::Vm", label: "start", stack: [{subject_id: vm_id}])
-  end
 
   label def start
     hop_verify_dd
@@ -19,7 +15,7 @@ class Prog::Test::Vm < Prog::Base
     size_info = sshable.cmd("ls -s ~/1.txt").split
 
     unless size_info[0].to_i.between?(500000, 500100)
-      fail "unexpected size after dd"
+      fail_test "unexpected size after dd"
     end
 
     hop_install_packages
@@ -101,23 +97,19 @@ class Prog::Test::Vm < Prog::Base
     pop "Verified VM!"
   end
 
+  label def failed
+    nap 15
+  end
+
   def vms_in_same_project
-    vm.projects.first.vms_dataset.all.filter { |x|
-      x.id != vm.id
-    }
+    vm.projects.first.vms.filter { _1.id != vm.id }
   end
 
   def vms_with_same_subnet
-    my_subnet = vm.private_subnets.first.id
-    vms_in_same_project.filter { |x|
-      x.private_subnets.first.id == my_subnet
-    }
+    vms_in_same_project.filter { _1.private_subnets.first.id == vm.private_subnets.first.id }
   end
 
   def vms_with_different_subnet
-    my_subnet = vm.private_subnets.first.id
-    vms_in_same_project.filter { |x|
-      x.private_subnets.first.id != my_subnet
-    }
+    vms_in_same_project.filter { _1.private_subnets.first.id != vm.private_subnets.first.id }
   end
 end

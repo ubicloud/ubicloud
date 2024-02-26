@@ -5,24 +5,35 @@ require_relative "../spec_helper"
 RSpec.describe PostgresResource do
   subject(:postgres_resource) {
     described_class.new(
-      server_name: "pg-server-name",
+      name: "pg-name",
       superuser_password: "dummy-password"
-    )
+    ) { _1.id = "6181ddb3-0002-8ad0-9aeb-084832c9273b" }
   }
 
-  it "returns connection string" do
-    expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-server-name.postgres.ubicloud.com")
+  it "returns connection string without ubid qualifier" do
+    expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
+    expect(postgres_resource).to receive(:hostname_version).and_return("v1")
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.postgres.ubicloud.com?channel_binding=require")
+  end
+
+  it "returns connection string with ubid qualifier" do
+    expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return("something").at_least(:once)
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@pg-name.pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com?channel_binding=require")
   end
 
   it "returns connection string with ip address if config is not set" do
-    expect(postgres_resource).to receive(:server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ephemeral_net4: "1.2.3.4"))).at_least(:once)
-    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4")
+    expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, vm: instance_double(Vm, ephemeral_net4: "1.2.3.4"))).at_least(:once)
+    expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4?channel_binding=require")
   end
 
   it "returns connection string as nil if there is no server" do
-    expect(postgres_resource).to receive(:server).and_return(nil).at_least(:once)
+    expect(postgres_resource).to receive(:representative_server).and_return(nil).at_least(:once)
     expect(postgres_resource.connection_string).to be_nil
+  end
+
+  it "returns replication_connection_string" do
+    s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
+    expect(s).to include("ubi_replication@pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/dat/16/data/server.crt")
   end
 
   it "returns running as display state if the database is ready" do

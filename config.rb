@@ -47,6 +47,7 @@ module Config
   optional :stripe_public_key, string, clear: true
   optional :stripe_secret_key, string, clear: true
   optional :heartbeat_url, string
+  optional :clover_database_root_certs, string
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
@@ -82,7 +83,7 @@ module Config
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
   override :hetzner_ssh_key, string
-  override :minimum_invoice_charge_threshold, 1.0, float
+  override :minimum_invoice_charge_threshold, 0.5, float
 
   # GitHub Runner App
   optional :github_app_name, string
@@ -108,11 +109,20 @@ module Config
 
   # Postgres
   optional :postgres_service_project_id, string
-  optional :postgres_service_hostname, string
+  override :postgres_service_hostname, "postgres.ubicloud.com", string
   optional :postgres_service_blob_storage_access_key, string
-  optional :postgres_service_blob_storage_secret_key, string
+  optional :postgres_service_blob_storage_secret_key, string, clear: true
   optional :postgres_service_blob_storage_id, string
+  override :postgres_monitor_database_url, Config.clover_database_url, string
+  optional :postgres_monitor_database_root_certs, string
 
   # Logging
   optional :database_logger_level, string
+
+  # Ubicloud Images
+  override :ubicloud_images_bucket_name, "ubicloud-images", string
+  optional :ubicloud_images_blob_storage_endpoint, string
+  optional :ubicloud_images_blob_storage_access_key, string, clear: true
+  optional :ubicloud_images_blob_storage_secret_key, string, clear: true
+  optional :ubicloud_images_blob_storage_certs, string
 end

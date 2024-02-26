@@ -17,12 +17,16 @@ unless (env_type = ARGV.shift)
   exit 1
 end
 
+# Set up hostname to better identify servers in transcripts.
 original_hostname = Socket.gethostname
+is_prod_env = (env_type == "production")
 
 safe_write_to_file("/etc/hosts", File.read("/etc/hosts").gsub(original_hostname, hostname))
 r "sudo hostnamectl set-hostname " + hostname
 
-color_code = (env_type == "production") ? "\e[31m" : "\e[32m"
+# Color prompt and MOTD to cue operators as to production-level
+# status.
+color_code = is_prod_env ? "\e[31m" : "\e[32m"
 
 reset_color_code = "\e[0m"
 
@@ -45,6 +49,10 @@ MOTD_SCRIPT
 
 r "chmod +x /etc/update-motd.d/99-clover-motd"
 
+# Set up time zone.
+r "timedatectl set-timezone UTC"
+
+# Download cloud hypervisor binaries.
 ch_dir = CloudHypervisor::VERSION.dir
 FileUtils.mkdir_p(ch_dir)
 FileUtils.cd ch_dir do
@@ -54,7 +62,7 @@ FileUtils.cd ch_dir do
   FileUtils.chmod "a+x", "cloud-hypervisor"
 end
 
-# edk2 firmware
+# Download firmware binaries.
 fw_dir = File.dirname(CloudHypervisor::FIRMWARE.path)
 FileUtils.mkdir_p(fw_dir)
 FileUtils.cd fw_dir do
@@ -84,4 +92,17 @@ r "sysctl --system"
 # driver.
 r "apt-get -y install qemu-utils mtools"
 
+# We need nvme-cli to inspect installed NVMe cards in prod servers when
+# looking into I/O performance issues.
+r "apt-get -y install nvme-cli" if is_prod_env
+
 SpdkSetup.prep
+
+# cron job to store serial.log files
+FileUtils.mkdir_p("/var/log/ubicloud/serials")
+File.write("/etc/cron.d/ubicloud-clean-serial-logs", <<CRON)
+0 * * * * root /home/rhizome/host/bin/delete-old-serial-logs
+CRON
+
+r "systemctl enable cron"
+r "systemctl start cron"

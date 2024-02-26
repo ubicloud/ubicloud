@@ -6,6 +6,19 @@ require_relative "../../common/lib/util"
 
 configure_hash = JSON.parse($stdin.read)
 
+# Update /etc/hosts
+hosts = <<-HOSTS
+127.0.0.1 localhost
+::1 ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+ff02::3 ip6-allhosts
+#{configure_hash["hosts"]}
+HOSTS
+safe_write_to_file("/etc/hosts", hosts)
+
 # Update postgresql.conf
 configs = configure_hash["configs"].map { |k, v| "#{k} = #{v}" }.join("\n")
 safe_write_to_file("/etc/postgresql/16/main/conf.d/001-service.conf", configs)
@@ -27,7 +40,7 @@ pg_hba_entries = <<-PG_HBA
 
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
 # Database administrative login by Unix domain socket
-local   all             postgres                                peer
+local   all             postgres                                peer map=system2postgres
 
 # "local" is for Unix domain socket connections only
 local   all             all                                     peer
@@ -45,10 +58,28 @@ host    replication     all             ::1/128                 scram-sha-256
 # Allow connections from private subnet with SCRAM authentication
 #{private_subnets}
 
+# Allow replication connection using special replication user for
+# HA standbys
+hostssl replication     ubi_replication all                     cert map=standby2replication
+
 # Allow connections from public internet with SCRAM authentication
 host    all             all             all                     scram-sha-256
 PG_HBA
 safe_write_to_file("/etc/postgresql/16/main/pg_hba.conf", pg_hba_entries)
+
+identity = configure_hash["identity"]
+pg_ident_entries = <<-PG_IDENT
+# PostgreSQL User Name Maps
+# =========================
+#
+# Refer to the PostgreSQL documentation, chapter "Client
+# Authentication" for a complete description.
+# MAPNAME             SYSTEM-USERNAME         PG-USERNAME
+system2postgres       postgres                postgres
+system2postgres       ubi                     postgres
+standby2replication   #{identity}             ubi_replication
+PG_IDENT
+safe_write_to_file("/etc/postgresql/16/main/pg_ident.conf", pg_ident_entries)
 
 # Reload the postmaster to apply changes
 r "pg_ctlcluster 16 main reload || pg_ctlcluster 16 main restart"

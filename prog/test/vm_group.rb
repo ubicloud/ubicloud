@@ -2,15 +2,15 @@
 
 require "net/ssh"
 
-class Prog::Test::VmGroup < Prog::Base
-  def self.assemble(storage_encrypted: true, test_reboot: true, use_bdev_ubi: true)
+class Prog::Test::VmGroup < Prog::Test::Base
+  def self.assemble(storage_encrypted: true, test_reboot: true)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
         "storage_encrypted" => storage_encrypted,
         "test_reboot" => test_reboot,
-        "use_bdev_ubi" => use_bdev_ubi
+        "vms" => []
       }]
     )
   end
@@ -31,17 +31,13 @@ class Prog::Test::VmGroup < Prog::Base
       project.id, name: "the-second-subnet", location: "hetzner-hel1"
     )
 
-    strand.add_child(subnet1_s)
-    strand.add_child(subnet2_s)
-
     storage_encrypted = frame.fetch("storage_encrypted", true)
-    use_bdev_ubi = frame.fetch("use_bdev_ubi", true)
 
     vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
       storage_volumes: [
-        {encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: true},
+        {encrypted: storage_encrypted, skip_sync: true},
         {encrypted: storage_encrypted, size_gib: 5}
       ],
       enable_ip4: true,
@@ -51,40 +47,29 @@ class Prog::Test::VmGroup < Prog::Base
     vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: false}],
+      storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
       enable_ip4: true
     )
 
     vm3_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet2_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, use_bdev_ubi: use_bdev_ubi, skip_sync: false}],
+      storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
       enable_ip4: true
     )
 
-    strand.add_child(vm1_s)
-    strand.add_child(vm2_s)
-    strand.add_child(vm3_s)
-    strand.add_child(Strand[vm1_s.subject.nics.first.id])
-    strand.add_child(Strand[vm2_s.subject.nics.first.id])
-    strand.add_child(Strand[vm3_s.subject.nics.first.id])
+    update_stack({
+      "vms" => [vm1_s.id, vm2_s.id, vm3_s.id],
+      "subnets" => [subnet1_s.id, subnet2_s.id],
+      "project_id" => project.id
+    })
 
-    current_frame = strand.stack.first
-    current_frame["vms"] = [vm1_s.id, vm2_s.id, vm3_s.id]
-    current_frame["subnets"] = [subnet1_s.id, subnet2_s.id]
-    current_frame["project_id"] = project.id
-    strand.modified!(:stack)
-    strand.save_changes
-
-    hop_wait_children_ready
+    hop_wait_vms
   end
 
-  label def wait_children_ready
-    reap
-
-    hop_children_ready if children_idle
-
-    donate
+  label def wait_vms
+    nap 10 if frame["vms"].any? { Vm[_1].display_state != "running" }
+    hop_verify_vms
   end
 
   label def children_ready
@@ -116,66 +101,50 @@ class Prog::Test::VmGroup < Prog::Base
     reap
 
     if children_idle
+      hop_destroy_resources
+    end
+  end
+
+  label def verify_vms
+    if retval&.dig("msg") == "Verified VM!"
       if frame["test_reboot"]
         hop_test_reboot
       else
-        hop_destroy_vms
+        hop_destroy_resources
       end
     end
 
-    donate
+    push Prog::Test::Vm, {subject_id: frame["vms"].first}
   end
 
   label def test_reboot
-    host.incr_reboot
+    vm_host.incr_reboot
     hop_wait_reboot
   end
 
   label def wait_reboot
-    st = host.strand
-
-    if st.label == "wait" && st.semaphores.empty?
+    if vm_host.strand.label == "wait" && vm_host.strand.semaphores.empty?
       # Run VM tests again, but avoid rebooting again
-      current_frame = strand.stack.first
-      current_frame["test_reboot"] = false
-      strand.modified!(:stack)
-      strand.save_changes
-      hop_wait_children_ready
+      update_stack({"test_reboot" => false})
+      hop_verify_vms
     end
 
-    nap 30
+    nap 20
   end
 
-  label def destroy_vms
-    frame["vms"].each { |vm_id|
-      Vm[vm_id].incr_destroy
-    }
+  label def destroy_resources
+    frame["vms"].each { Vm[_1].incr_destroy }
+    frame["subnets"].each { PrivateSubnet[_1].incr_destroy }
 
-    hop_wait_vms_destroyed
+    hop_wait_resources_destroyed
   end
 
-  label def wait_vms_destroyed
-    reap
+  label def wait_resources_destroyed
+    unless frame["vms"].all? { Vm[_1].nil? } && frame["subnets"].all? { PrivateSubnet[_1].nil? }
+      nap 5
+    end
 
-    hop_destroy_subnets if children_idle
-
-    donate
-  end
-
-  label def destroy_subnets
-    frame["subnets"].each { |subnet_id|
-      PrivateSubnet[subnet_id].incr_destroy
-    }
-
-    hop_wait_subnets_destroyed
-  end
-
-  label def wait_subnets_destroyed
-    reap
-
-    hop_finish if children_idle
-
-    donate
+    hop_finish
   end
 
   label def finish
@@ -183,14 +152,11 @@ class Prog::Test::VmGroup < Prog::Base
     pop "VmGroup tests finished!"
   end
 
-  def children_idle
-    active_children = strand.children_dataset.where(Sequel.~(label: "wait"))
-    active_semaphores = strand.children_dataset.join(:semaphore, strand_id: :id)
-
-    active_children.count == 0 and active_semaphores.count == 0
+  label def failed
+    nap 15
   end
 
-  def host
-    VmHost.first
+  def vm_host
+    @vm_host ||= Vm[frame["vms"].first].vm_host
   end
 end

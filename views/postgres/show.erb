@@ -31,6 +31,15 @@
     ["Storage", "#{@pg[:storage_size_gib]} GB"]
   ]
   
+  case @pg[:ha_type]
+  when PostgresResource::HaType::NONE
+    data.push(["High Availability", "Inactive"])
+  when PostgresResource::HaType::ASYNC
+    data.push(["High Availability", "Active (1 standby with asyncronous replication)"])
+  when PostgresResource::HaType::SYNC
+    data.push(["High Availability", "Active (2 standbys with syncronous replication)"])
+  end
+  
   if @pg[:connection_string] == ""
     data.push(["Connection String", "Waiting for host to be ready..."])
   else
@@ -121,6 +130,79 @@
       </div>
     </div>
   <% end %>
+  <!-- Firewall Rules Card -->
+  <% if Authorization.has_permission?(@current_user.id, "Postgres:Firewall:view", @pg[:id]) %>
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Firewall Rules
+        </h3>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Port Range</th>
+            <% if Authorization.has_permission?(@current_user.id, "Postgres:Firewall:edit", @pg[:id]) %>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @pg[:firewall_rules].each do |fwr| %>
+            <tr>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432</td>
+              <% if Authorization.has_permission?(@current_user.id, "Postgres:Firewall:edit", @pg[:id]) %>
+                <td
+                  id="fwr-delete-<%=fwr[:ubid]%>"
+                  class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+                >
+                  <button
+                    type="button"
+                    data-url="<%= "#{request.path}/firewall-rule/#{fwr[:ubid]}" %>"
+                    data-csrf="<%= csrf_token("#{request.path}/firewall-rule/#{fwr[:ubid]}", "DELETE") %>"
+                    data-redirect="<%= request.path.to_s %>"
+                    class="delete-btn inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+                  >
+                    <%== render("components/icon", locals: { name: "hero-trash", classes: "h-5 w-5" }) %>
+                  </button>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+          <% if Authorization.has_permission?(@current_user.id, "Postgres:Firewall:edit", @pg[:id]) %>
+            <tr>
+              <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST">
+                <%== csrf_tag("#{request.path}/firewall-rule") %>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "cidr",
+                      type: "cidr",
+                      attributes: {
+                        placeholder: "0.0.0.0/0",
+                        required: true
+                      }
+                    }
+                  ) %>
+                </td>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  5432
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                  <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+                </td>
+              </form>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
   <!-- Delete Card -->
   <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -132,7 +214,7 @@
               <p>This action will permanently delete this PostgreSQL database.</p>
             </div>
           </div>
-          <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+          <div id="postgres-delete-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
             <%== render(
               "components/delete_button",
               locals: {

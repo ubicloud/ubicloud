@@ -132,7 +132,7 @@ RSpec.describe Clover, "billing" do
       visit "#{project.path}/billing"
 
       # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-      # UI tests run without a JavaScript enginer.
+      # UI tests run without a JavaScript engine.
       btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 

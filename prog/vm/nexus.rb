@@ -8,12 +8,13 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil, arch: "x64", distinct_storage_devices: false)
+    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
+    distinct_storage_devices: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -29,7 +30,6 @@ class Prog::Vm::Nexus < Prog::Base
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_gib
-      volume[:use_bdev_ubi] ||= false
       volume[:skip_sync] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
@@ -90,6 +90,10 @@ class Prog::Vm::Nexus < Prog::Base
         boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
+      port_range = allow_only_ssh ? 22..22 : 0..65535
+      fw = Firewall.create_with_id(vm_id: vm.id, name: "#{name}-default")
+      ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
+
       vm.associate_with_project(project)
 
       Strand.create(
@@ -97,6 +101,7 @@ class Prog::Vm::Nexus < Prog::Base
         label: "start",
         stack: [{
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
+          "swap_size_bytes" => swap_size_bytes,
           "distinct_storage_devices" => distinct_storage_devices
         }]
       ) { _1.id = vm.id }
@@ -164,48 +169,73 @@ class Prog::Vm::Nexus < Prog::Base
 
   def allocation_dataset
     requires_bdev_ubi = frame["storage_volumes"].any? { |v| v["use_bdev_ubi"] }
-
-    # Currently, github runners require btrfs if not using bdev_ubi. We will use
-    # ext4 for hosts with bdev_ubi installation. So, we make sure we don't
-    # schedule disks on a bdev_ubi enabled host if bdev_ubi is not used.
-    #
-    # YYY: revisit this check after migrating away from btrfs, or having some
-    # direct way to check for filesystem type.
-    version_qualifier = requires_bdev_ubi ? "like '%ubi%'" : "not like '%ubi%'"
-    spdk_where_clause = "AND id in (select vm_host_id from spdk_installation where version #{version_qualifier} and allocation_weight > 0)"
     spdk_where_clause = requires_bdev_ubi ? "AND id in (select vm_host_id from spdk_installation where version like '%ubi%' and allocation_weight > 0)" : ""
 
-    # YYY: Although when the following WHERE clauses return true then disks can
-    # be allocated, but there are edge cases where disks can be allocated, but
-    # the following WHERE clauses return false. Improve them.
-    max_storage_gib = frame["storage_volumes"].map { |v| v["size_gib"] }.max
     total_storage_gib = frame["storage_volumes"].sum { |v| v["size_gib"] }
-    n_volumes = frame["storage_volumes"].length
 
-    disks_can_fit_on_distinct_devices = "(SELECT count(*) FROM storage_device WHERE " \
-          "storage_device.enabled AND storage_device.vm_host_id = vm_host.id AND " \
-          "storage_device.available_storage_gib >= #{max_storage_gib}) >= #{n_volumes}"
+    device_allocation_query = if frame["distinct_storage_devices"]
+      <<-SQL
+WITH AvailableStorageDevices AS (
+    SELECT
+        id,
+        vm_host_id,
+        available_storage_gib,
+        ROW_NUMBER() OVER (PARTITION BY vm_host_id ORDER BY available_storage_gib DESC) AS device_rank
+    FROM
+        storage_device
+    WHERE
+        storage_device.enabled
+),
+VolumeAllocation AS (
+    SELECT
+        size_gib,
+        ROW_NUMBER() OVER (ORDER BY size_gib DESC) AS volume_rank
+    FROM (
+        VALUES #{frame["storage_volumes"].map { |v| "(#{v["size_gib"]})" }.join(", ")}
+    ) AS Volumes (size_gib)
+),
+DeviceVolumeMatch AS (
+    SELECT
+        vm_host_id,
+        COUNT(DISTINCT asd.id) as matched_devices
+    FROM
+        AvailableStorageDevices asd
+        INNER JOIN VolumeAllocation va ON asd.available_storage_gib >= va.size_gib
+    GROUP BY vm_host_id
+    HAVING COUNT(DISTINCT asd.id) >= (SELECT COUNT(*) FROM VolumeAllocation)
+)
+SELECT
+    *,
+    vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
+FROM
+    vm_host
+    INNER JOIN DeviceVolumeMatch ON vm_host.id = DeviceVolumeMatch.vm_host_id
+    WHERE
+      SQL
+    else
+      <<-SQL
+SELECT
+    *,
+    vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
+FROM
+    vm_host
+WHERE
+    (SELECT max(available_storage_gib) FROM storage_device WHERE storage_device.enabled AND storage_device.vm_host_id = vm_host.id) >= #{total_storage_gib}
+    AND
+      SQL
+    end
 
-    all_disks_can_fit_a_single_device = "(SELECT max(available_storage_gib) FROM storage_device WHERE " \
-    "storage_device.enabled AND storage_device.vm_host_id = vm_host.id) >= #{total_storage_gib}"
+    device_allocation_query += <<-SQL
+        vm_host.used_cores + ? < least(vm_host.total_cores, vm_host.total_mem_gib / ?)
+        AND vm_host.used_hugepages_1g + ? < vm_host.total_hugepages_1g
+        AND vm_host.allocation_state = 'accepting'
+        AND vm_host.location = ?
+        AND vm_host.arch = ?
+        #{spdk_where_clause}
+      ORDER BY mem_ratio, used_cores
+    SQL
 
-    device_where_clause = frame["distinct_storage_devices"] ?
-        "AND #{disks_can_fit_on_distinct_devices}" :
-        "AND (#{disks_can_fit_on_distinct_devices} OR #{all_disks_can_fit_a_single_device})"
-
-    DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.location, vm.arch]
-
-SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
-FROM vm_host
-WHERE vm_host.used_cores + ? < least(vm_host.total_cores, vm_host.total_mem_gib / ?)
-AND vm_host.used_hugepages_1g + ? < vm_host.total_hugepages_1g
-AND vm_host.allocation_state = 'accepting'
-AND vm_host.location = ?
-AND vm_host.arch = ?
-#{spdk_where_clause}
-#{device_where_clause}
-ORDER BY mem_ratio, used_cores
-SQL
+    DB[device_allocation_query, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.location, vm.arch]
   end
 
   def allocate
@@ -227,29 +257,30 @@ SQL
   end
 
   def allocate_storage_devices(vm_host, storage_volumes)
-    devices = vm_host.storage_devices
-    device_index = 0
+    DB.transaction do
+      devices = vm_host.storage_devices_dataset.for_update.order_by(&:available_storage_gib).all
+      device_index = 0
 
-    storage_volumes.map do |volume|
-      while device_index < devices.length &&
-          (!devices[device_index].enabled ||
-          devices[device_index].available_storage_gib < volume["size_gib"])
-        device_index += 1
+      storage_volumes.sort_by { _1["size_gib"] }.map do |volume|
+        while device_index < devices.length &&
+            (!devices[device_index].enabled ||
+            devices[device_index].available_storage_gib < volume["size_gib"])
+          device_index += 1
+        end
+
+        fail "Storage device allocation failed" unless device_index < devices.length
+
+        # Allocate!
+        allocated_device = devices[device_index]
+        allocated_device.update(available_storage_gib: allocated_device.available_storage_gib - volume["size_gib"])
+        volume.update({"storage_device_id" => allocated_device.id})
+
+        # If we require distinct storage devices, then the next volume can't use
+        # this device. Therefore, skip it.
+        device_index += 1 if frame["distinct_storage_devices"]
+
+        volume
       end
-
-      fail "Storage device allocation failed" unless device_index < devices.length
-
-      # Allocate!
-      # YYY: handle concurrency
-      allocated_device = devices[device_index]
-      volume.update({"storage_device_id" => allocated_device.id})
-      allocated_device.update(available_storage_gib: allocated_device.available_storage_gib - volume["size_gib"])
-
-      # If we require distinct storage devices, then the next volume can't use
-      # this device. Therfore, skip it.
-      device_index += 1 if frame["distinct_storage_devices"]
-
-      volume
     end
   end
 
@@ -269,38 +300,29 @@ SQL
         )
       end
 
-      spdk_installation_id =
-        allocate_spdk_installation(
-          vm_host.spdk_installations,
-          use_bdev_ubi: volume["use_bdev_ubi"]
-        )
+      spdk_installation_id = allocate_spdk_installation(vm_host.spdk_installations)
 
       VmStorageVolume.create_with_id(
         vm_id: vm.id,
         boot: volume["boot"],
         size_gib: volume["size_gib"],
-        use_bdev_ubi: volume["use_bdev_ubi"],
+        use_bdev_ubi: SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"],
         skip_sync: volume["skip_sync"],
-        storage_device_id: volume["storage_device_id"],
         disk_index: disk_index,
         key_encryption_key_1_id: key_encryption_key&.id,
-        spdk_installation_id: spdk_installation_id
+        spdk_installation_id: spdk_installation_id,
+        storage_device_id: volume["storage_device_id"]
       )
     end
   end
 
-  def allocate_spdk_installation(spdk_installations, use_bdev_ubi: false)
-    eligible_spdk_installations =
-      use_bdev_ubi ?
-        spdk_installations.select { |si| si.supports_bdev_ubi? } :
-        spdk_installations
-
-    total_weight = eligible_spdk_installations.sum(&:allocation_weight)
+  def allocate_spdk_installation(spdk_installations)
+    total_weight = spdk_installations.sum(&:allocation_weight)
     fail "Total weight of all eligible spdk_installations shouldn't be zero." if total_weight == 0
 
     rand_point = rand(0..total_weight - 1)
     weight_sum = 0
-    rand_choice = eligible_spdk_installations.each { |si|
+    rand_choice = spdk_installations.each { |si|
       weight_sum += si.allocation_weight
       break si if weight_sum > rand_point
     }
@@ -340,7 +362,9 @@ SQL
       nap 30
     end
 
-    Page.from_tag_parts("NoCapacity", vm.location, vm.arch)&.incr_resolve if queued_vms.count <= 1
+    if (page = Page.from_tag_parts("NoCapacity", vm.location, vm.arch)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
+      page.incr_resolve
+    end
 
     vm_host = VmHost[vm_host_id]
     ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
@@ -391,7 +415,10 @@ SQL
   label def prep
     case host.sshable.cmd("common/bin/daemonizer --check prep_#{q_vm}")
     when "Succeeded"
-      hop_run
+      host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
+      vm.nics.each { _1.incr_setup_nic }
+      bud Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules
+      hop_wait_firewall_rules_before_run
     when "NotStarted", "Failed"
       topo = vm.cloud_hypervisor_cpu_topology
 
@@ -410,7 +437,8 @@ SQL
         "cpu_topology" => topo.to_s,
         "mem_gib" => vm.mem_gib,
         "ndp_needed" => host.ndp_needed,
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
+        "swap_size_bytes" => frame["swap_size_bytes"]
       })
 
       secrets_json = JSON.generate({
@@ -429,27 +457,41 @@ SQL
     nap 5
   end
 
+  label def wait_firewall_rules_before_run
+    reap
+    hop_run if leaf?
+    donate
+  end
+
   label def run
-    host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
-    vm.nics.each { _1.incr_setup_nic }
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     hop_wait_sshable
   end
 
   label def wait_sshable
-    addr = vm.ephemeral_net4 || vm.ephemeral_net6.nth(2)
+    addr = vm.ephemeral_net4
+
+    # Alas, our hosting environment, for now, doesn't support IPv6, so
+    # only check SSH availability when IPv4 is available: a
+    # unistacked IPv6 server will not be checked.
+    #
+    # I considered removing wait_sshable altogether, but (very)
+    # occasionally helps us glean interesting information about boot
+    # problems.
+    hop_create_billing_record unless addr
+
     begin
       Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
     rescue SystemCallError
       nap 1
     end
 
-    vm.update(display_state: "running")
-    Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
     hop_create_billing_record
   end
 
   label def create_billing_record
+    vm.update(display_state: "running")
+    Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
     project = vm.projects.first
     hop_wait unless project.billable
 
@@ -480,7 +522,24 @@ SQL
       hop_start_after_host_reboot
     end
 
+    when_update_firewall_rules_set? do
+      register_deadline(:wait, 5 * 60)
+      hop_update_firewall_rules
+    end
+
     nap 30
+  end
+
+  label def update_firewall_rules
+    decr_update_firewall_rules
+    bud Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules
+    hop_wait_firewall_rules
+  end
+
+  label def wait_firewall_rules
+    reap
+    hop_wait if leaf?
+    donate
   end
 
   label def prevent_destroy

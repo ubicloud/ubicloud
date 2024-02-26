@@ -48,20 +48,27 @@ jobs:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
       run: bundle exec rake test_up
 
-    - name: Run tests
+    - name: Install foreman
+      run: gem install foreman
+
+    - name: Add e2e script to Procfile
+      run: |
+        echo "e2e: bin/ci" >> Procfile
+
+    - name: Run services
       env:
-        RACK_ENV: test
+        RACK_ENV: development
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
         CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
         CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
         CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
         HETZNER_PASSWORD: ${{ secrets.HETZNER_PASSWORD }}
-      run: bin/ci
+      run: foreman start
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
-      uses: slackapi/slack-github-action@v1.24.0
+      uses: slackapi/slack-github-action@v1.25.0
       with:
         payload: |
           {

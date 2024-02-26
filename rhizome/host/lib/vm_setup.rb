@@ -43,9 +43,9 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets)
+  def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets, swap_size_bytes)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
-    cloudinit(unix_user, public_key, nics)
+    cloudinit(unix_user, public_key, nics, swap_size_bytes)
     download_boot_image(boot_image)
     storage_params = storage(storage_volumes, storage_secrets, true)
     hugepages(mem_gib)
@@ -72,6 +72,7 @@ class VmSetup
       if ip4
         vm_sub = NetAddr::IPv4Net.parse(ip4)
         vp.write_public_ipv4(vm_sub.to_s)
+        unblock_ip4(ip4)
       end
     end
 
@@ -83,8 +84,35 @@ class VmSetup
     forwarding
   end
 
+  def unblock_ip4(ip4)
+    ip_net = NetAddr::IPv4Net.parse(ip4).network.to_s
+    filename = "/etc/nftables.d/#{q_vm}.conf"
+    temp_filename = "#{filename}.tmp"
+    File.open(temp_filename, File::RDWR | File::CREAT) do |f|
+      f.flock(File::LOCK_EX | File::LOCK_NB)
+      f.puts(<<-NFTABLES)
+#!/usr/sbin/nft -f
+add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
+      NFTABLES
+      File.rename(temp_filename, filename)
+    end
+
+    reload_nftables
+  end
+
+  def block_ip4
+    FileUtils.rm_f("/etc/nftables.d/#{q_vm}.conf")
+    reload_nftables
+  end
+
+  def reload_nftables
+    r "systemctl reload nftables"
+  end
+
   # Delete all traces of the VM.
   def purge
+    block_ip4 if vp.read_public_ipv4
+
     begin
       r "ip netns del #{q_vm}"
     rescue CommandFail => ex
@@ -265,17 +293,20 @@ class VmSetup
         type nat hook prerouting priority dstnat; policy accept;
         ip daddr #{public_ipv4} dnat to #{private_ipv4}
       }
-    
+
       chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
+        ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
       }
     }
     NAT4_RULES
   end
 
-  def generate_ip4_filter_rules(nics)
-    nics.map { "ether saddr #{_1.mac} ip saddr != #{_1.net4} drop" }.join("\n")
+  def generate_ip4_filter_rules(nics, ip4)
+    ips = nics.map(&:net4).push(ip4).join(", ")
+    macs = nics.map(&:mac).join(", ")
+    "ether saddr {#{macs}} ip saddr != {#{ips}} drop"
   end
 
   def generate_dhcp_filter_rule
@@ -299,9 +330,9 @@ class VmSetup
           # allow dhcp
           udp sport 68 udp dport 67 accept
           udp sport 67 udp dport 68 accept
-  
+
           # avoid ip4 spoofing
-          #{generate_ip4_filter_rules(nics)}
+          #{generate_ip4_filter_rules(nics, ip4)}
         }
         chain postrouting {
           type filter hook postrouting priority raw; policy accept;
@@ -327,7 +358,7 @@ class VmSetup
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_key, nics)
+  def cloudinit(unix_user, public_key, nics, swap_size_bytes)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -374,7 +405,7 @@ ethernets:
 #{ethernets}
 EOS
 
-    write_user_data(unix_user, public_key)
+    write_user_data(unix_user, public_key, swap_size_bytes)
 
     FileUtils.rm_rf(vp.cloudinit_img)
     r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
@@ -384,7 +415,18 @@ EOS
     FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
   end
 
-  def write_user_data(unix_user, public_key)
+  def generate_swap_config(swap_size_bytes)
+    return unless swap_size_bytes
+    fail "BUG: swap_size_bytes must be an integer" unless swap_size_bytes.instance_of?(Integer)
+
+    <<~SWAP_CONFIG
+    swap:
+      filename: /swapfile
+      size: #{yq(swap_size_bytes)}
+    SWAP_CONFIG
+  end
+
+  def write_user_data(unix_user, public_key, swap_size_bytes)
     vp.write_user_data(<<EOS)
 #cloud-config
 users:
@@ -398,6 +440,8 @@ ssh_pwauth: False
 
 runcmd:
   - [ systemctl, daemon-reload]
+
+#{generate_swap_config(swap_size_bytes)}
 EOS
   end
 
@@ -415,7 +459,7 @@ EOS
     }
   end
 
-  def download_boot_image(boot_image, custom_url: nil)
+  def download_boot_image(boot_image, custom_url: nil, ca_path: nil)
     urls = {
       "ubuntu-jammy" => "https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
       "almalinux-9.1" => Arch.render(x64: "x86_64", arm64: "aarch64").yield_self { "https://repo.almalinux.org/almalinux/9/cloud/#{_1}/images/AlmaLinux-9-GenericCloud-latest.#{_1}.qcow2" },
@@ -438,6 +482,8 @@ EOS
         "qcow2"
       when ".vhd"
         "vpc"
+      when ".raw"
+        "raw"
       else
         fail "Unsupported boot_image format: #{image_ext}"
       end
@@ -445,32 +491,22 @@ EOS
       # Use of File::EXCL provokes a crash rather than a race
       # condition if two VMs are lazily getting their images at the
       # same time.
-      temp_path = "/tmp/" + boot_image + image_ext + ".tmp"
+      temp_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
+      ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
       File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-        if download.match?(/^https:\/\/.+\.blob\.core\.windows\.net/)
-          install_azcopy
-          r "AZCOPY_CONCURRENCY_VALUE=5 azcopy copy #{download.shellescape} #{temp_path.shellescape}"
-        else
-          r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}"
-        end
+        r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}#{ca_arg}"
       end
 
-      # Images are presumed to be atomically renamed into the path,
-      # i.e. no partial images will be passed to qemu-image.
-      r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+      if initial_format == "raw"
+        File.rename(temp_path, image_path)
+      else
+        # Images are presumed to be atomically renamed into the path,
+        # i.e. no partial images will be passed to qemu-image.
+        r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+      end
 
       rm_if_exists(temp_path)
     end
-  end
-
-  def install_azcopy
-    r "which azcopy"
-  rescue CommandFail
-    r "curl -L10 -o azcopy_v10.tar.gz 'https://aka.ms/downloadazcopy-v10-linux#{Arch.render(x64: "", arm64: "-arm64")}'"
-    r "tar --strip-components=1 --exclude=*.txt -xzvf azcopy_v10.tar.gz"
-    r "rm azcopy_v10.tar.gz"
-    r "mv azcopy /usr/bin/azcopy"
-    r "chmod +x /usr/bin/azcopy"
   end
 
   # Unnecessary if host has this set before creating the netns, but
@@ -548,6 +584,8 @@ ExecStop=#{CloudHypervisor::VERSION.ch_remote_bin} --api-socket #{vp.ch_api_sock
 Restart=no
 User=#{@vm_name}
 Group=#{@vm_name}
+
+LimitNOFILE=500000
 SERVICE
     r "systemctl daemon-reload"
   end

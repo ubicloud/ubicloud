@@ -17,6 +17,8 @@ class Prog::Minio::SetupMinio < Prog::Base
     case minio_server.vm.sshable.cmd("common/bin/daemonizer --check configure_minio")
     when "Succeeded"
       minio_server.vm.sshable.cmd("common/bin/daemonizer --clean configure_minio")
+      (minio_server.server_url == minio_server.ip4_url) ? "" : "MINIO_SERVER_URL=#{minio_server.server_url}"
+
       pop "minio is configured"
     when "Failed", "NotStarted"
       minio_config = <<ECHO
@@ -24,6 +26,7 @@ MINIO_VOLUMES="#{minio_server.minio_volumes}"
 MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="#{minio_server.cluster.admin_user}"
 MINIO_ROOT_PASSWORD="#{minio_server.cluster.admin_password}"
+#{server_url}
 ECHO
 
       hosts = <<ECHO
@@ -37,7 +40,10 @@ ff02::3 ip6-allhosts
 ECHO
       config_json = JSON.generate({
         minio_config: minio_config,
-        hosts: hosts
+        hosts: hosts,
+        cert: minio_server.cert,
+        cert_key: minio_server.cert_key,
+        ca_bundle: minio_server.cluster.root_certs
       })
 
       minio_server.vm.sshable.cmd("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config_json)

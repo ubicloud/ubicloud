@@ -10,6 +10,11 @@ end
 backup_label = ARGV[0]
 
 r "chown postgres /dat"
+
+# Below commands are required for idempotency
+r "rm -rf /dat/16"
+r "rm -rf /etc/postgresql/16"
+
 r "sudo -u postgres wal-g backup-fetch /dat/16/data #{backup_label} --config /etc/postgresql/wal-g.env"
 
 # We want to use pg_createcluster, even with an existing database folder because
@@ -20,6 +25,12 @@ r "sudo -u postgres touch /dat/16/data/pg_ident.conf"
 r "sudo -u postgres touch /dat/16/data/pg_hba.conf"
 r "sudo -u postgres touch /dat/16/data/postgresql.conf"
 
-r "sudo -u postgres touch /dat/16/data/recovery.signal"
-
+# Technically LATEST label can be used for PITR as well, but we use the label
+# name from backups in PITR case. So backup_label can be used to decide on
+# which signal file to use.
+if backup_label == "LATEST"
+  r "sudo -u postgres touch /dat/16/data/standby.signal"
+else
+  r "sudo -u postgres touch /dat/16/data/recovery.signal"
+end
 r "pg_createcluster 16 main"

@@ -21,6 +21,8 @@ class MinioCluster < Sequel::Model
 
   plugin :column_encryption do |enc|
     enc.column :admin_password
+    enc.column :root_cert_key_1
+    enc.column :root_cert_key_2
   end
 
   def hyper_tag_name(project)
@@ -45,8 +47,8 @@ class MinioCluster < Sequel::Model
     pools.sum(&:drive_count)
   end
 
-  def connection_strings
-    servers.map { "http://#{_1.vm.ephemeral_net4}:9000" }
+  def ip4_urls
+    servers.map(&:ip4_url)
   end
 
   def single_instance_single_drive?
@@ -59,5 +61,21 @@ class MinioCluster < Sequel::Model
 
   def hostname
     "#{name}.#{Config.minio_host_name}"
+  end
+
+  def url
+    dns_zone ? "https://#{hostname}:9000" : nil
+  end
+
+  def dns_zone
+    @dns_zone ||= DnsZone.where(project_id: Config.minio_service_project_id, name: Config.minio_host_name).first
+  end
+
+  def root_certs
+    root_cert_1.to_s + root_cert_2.to_s
+  end
+
+  def self.redacted_columns
+    super + [:root_cert_1, :root_cert_2]
   end
 end

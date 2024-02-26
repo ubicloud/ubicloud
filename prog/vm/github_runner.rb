@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "net/ssh"
-require_relative "../../lib/github_storage_policy"
 
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
@@ -24,38 +23,21 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
-  def storage_params(arch, size_gib)
-    project = github_runner.installation.project
-    storage_policy =
-      GithubStoragePolicy.new(arch, project.get_github_storage_policy || {})
-
-    # We use unencrypted storage for now, because provisioning 86G encrypted
-    # storage takes ~8 minutes. Unencrypted disk uses `cp` command instead
-    # of `spdk_dd` and takes ~3 minutes. If btrfs disk mounted, it decreases to
-    # ~10 seconds.
-    {
-      size_gib: size_gib,
-      encrypted: false,
-      use_bdev_ubi: storage_policy.use_bdev_ubi?,
-      skip_sync: storage_policy.skip_sync?
-    }
-  end
-
   def pick_vm
     label = github_runner.label
     label_data = Github.runner_labels[label]
-    vm_storage_params = storage_params(label_data["arch"], label_data["storage_size_gib"])
+    skip_sync = true
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
       location: label_data["location"],
       storage_size_gib: label_data["storage_size_gib"],
+      storage_encrypted: false,
+      storage_skip_sync: skip_sync,
       arch: label_data["arch"]
     ).first
 
-    # YYY: Checking for use_bdev_ubi should be removed after transitioning
-    # completely to bdev_ubi.
-    if !vm_storage_params[:use_bdev_ubi] && (picked_vm = pool&.pick_vm)
+    if (picked_vm = pool&.pick_vm)
       Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
@@ -67,18 +49,12 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [vm_storage_params],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false, skip_sync: skip_sync}],
       enable_ip4: true,
-      arch: label_data["arch"]
+      arch: label_data["arch"],
+      allow_only_ssh: true,
+      swap_size_bytes: 4294963200 # ~4096MB, the same value with GitHub hosted runners
     )
-
-    ps = vm_st.subject.private_subnets.first
-    # We don't need to incr_update_firewall_rules semaphore here because the VM
-    # is just created and the firewall rules are not applied in the SubnetNexus,
-    # yet. When NicNexus switches from "wait_vm" to "setup_nic", it will
-    # increment the semaphore, already.
-    ps.firewall_rules.map(&:destroy)
-    vm_st.subject.add_allow_ssh_fw_rules(ps)
 
     Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
     vm_st.subject
@@ -162,6 +138,24 @@ class Prog::Vm::GithubRunner < Prog::Base
     hop_setup_environment
   end
 
+  def setup_info
+    {
+      group: "Ubicloud Managed Runner",
+      detail: {
+        "Name" => github_runner.ubid,
+        "Label" => github_runner.label,
+        "Arch" => vm.arch,
+        "Image" => vm.boot_image,
+        "VM Host" => vm.vm_host.ubid,
+        "VM Pool" => vm.pool_id ? UBID.from_uuidish(vm.pool_id).to_s : nil,
+        "Location" => vm.vm_host.location,
+        "Datacenter" => vm.vm_host.data_center,
+        "Project" => github_runner.installation.project.ubid,
+        "Console URL" => "https://console.ubicloud.com#{github_runner.installation.project.path}/github"
+      }.map { "#{_1}: #{_2}" }.join("\n")
+    }
+  end
+
   label def setup_environment
     command = <<~COMMAND
       # runner unix user needed access to manipulate the Docker daemon.
@@ -206,6 +200,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       # overwrite default path value of runner script with $PATH.
       # https://github.com/microsoft/azure-pipelines-agent/issues/3461
       echo "PATH=$PATH" >> ./actions-runner/.env
+
+      # The `imagedata.json` file contains information about the generated image.
+      # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
+      # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
+      cat /imagegeneration/imagedata.json | jq '. += [#{setup_info.to_json}]' > /home/runner/actions-runner/.setup_info
     COMMAND
 
     # Remove comments and empty lines before sending them to the machine
@@ -253,19 +252,21 @@ class Prog::Vm::GithubRunner < Prog::Base
     case vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp
     when "exited"
       github_runner.incr_destroy
-      nap 0
+      nap 15
     when "failed"
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       github_runner.update(runner_id: nil, ready_at: nil)
       hop_register_runner
     end
 
-    # If the runner doesn't pick a job in two minutes, destroy it
-    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 60 * 2
+    # If the runner doesn't pick a job within five minutes, the job may have
+    # been cancelled prior to assignment, so we destroy the runner. But we also
+    # check if the runner is busy or not with GitHub API.
+    if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
         github_runner.incr_destroy
-        Clog.emit("Destroying GithubRunner because it does not pick a job in two minutes") { {github_runner: github_runner.values} }
+        Clog.emit("The runner does not pick a job") { {github_runner: github_runner.values} }
         nap 0
       end
     end
@@ -286,6 +287,27 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     if vm
       vm.private_subnets.each { _1.incr_destroy }
+
+      # If the runner is not assigned any job and we destroy it after a
+      # timeline, the workflow_job is nil, in that case, we want to be able to
+      # see journalctl output to debug if there was any problem with the runner
+      # script.
+      #
+      # We also want to see the journalctl output if the runner script failed.
+      #
+      # Hence, the condition is added to check if the workflow_job is nil or
+      # the conclusion is failure.
+      if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
+        begin
+          serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
+          vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+
+          # Exclude the "Started" line because it contains sensitive information.
+          vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+        rescue Sshable::SshError
+          Clog.emit("Failed to move serial.log or running journalctl") { {github_runner: github_runner.values} }
+        end
+      end
       vm.incr_destroy
     end
 

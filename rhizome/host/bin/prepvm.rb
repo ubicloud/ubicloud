@@ -82,6 +82,8 @@ unless (storage_volumes = params["storage_volumes"])
   exit 1
 end
 
+swap_size_bytes = params["swap_size_bytes"]
+
 require "fileutils"
 require_relative "../../common/lib/util"
 require_relative "../lib/vm_setup"
@@ -89,4 +91,4 @@ require_relative "../lib/vm_setup"
 nics = nics_arr.map { |args| VmSetup::Nic.new(*args) }.freeze
 VmSetup.new(vm_name).prep(unix_user, ssh_public_key, nics, gua, ip4,
   local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib,
-  ndp_needed, storage_volumes, storage_secrets)
+  ndp_needed, storage_volumes, storage_secrets, swap_size_bytes)

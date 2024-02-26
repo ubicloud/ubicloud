@@ -162,6 +162,16 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_postgres_ha_type" do
+      it "valid postgres ha_type" do
+        [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.not_to raise_error }
+      end
+
+      it "invalid postgres ha_type" do
+        ["quorum", "on", "off"].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.to raise_error described_class::ValidationFailed }
+      end
+    end
+
     describe "#validate_date" do
       it "valid date" do
         expect(described_class.validate_date("2023-11-30 11:41")).to eq(Time.new(2023, 11, 30, 11, 41, 0, "UTC"))

@@ -9,13 +9,13 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    actionview (7.1.2)
-      activesupport (= 7.1.2)
+    actionview (7.1.3)
+      activesupport (= 7.1.3)
       builder (~> 3.1)
       erubi (~> 1.11)
       rails-dom-testing (~> 2.2)
       rails-html-sanitizer (~> 1.6)
-    activesupport (7.1.2)
+    activesupport (7.1.3)
       base64
       bigdecimal
       concurrent-ruby (~> 1.0, >= 1.0.2)
@@ -43,17 +43,17 @@ GEM
       erubi (~> 1.4)
       parser (>= 2.4)
       smart_properties
-    bigdecimal (3.1.5)
-    bindata (2.4.15)
-    brakeman (6.1.1)
+    bigdecimal (3.1.6)
+    bindata (2.5.0)
+    brakeman (6.1.2)
       racc
     builder (3.2.4)
     byebug (11.1.3)
-    capybara (3.39.2)
+    capybara (3.40.0)
       addressable
       matrix
       mini_mime (>= 0.1.3)
-      nokogiri (~> 1.8)
+      nokogiri (~> 1.11)
       rack (>= 1.6.0)
       rack-test (>= 0.6.3)
       regexp_parser (>= 1.5, < 3.0)
@@ -61,14 +61,15 @@ GEM
     cbor (0.5.9.8)
     chunky_png (1.4.0)
     coderay (1.1.3)
-    concurrent-ruby (1.2.2)
+    concurrent-ruby (1.2.3)
     connection_pool (2.4.1)
     cose (1.3.0)
       cbor (~> 0.5.9)
       openssl-signature_algorithm (~> 1.0)
-    countries (5.7.1)
+    countries (6.0.0)
       unaccent (~> 0.3)
-    crack (0.4.5)
+    crack (1.0.0)
+      bigdecimal
       rexml
     crass (1.0.6)
     database_cleaner-core (2.0.1)
@@ -76,7 +77,7 @@ GEM
       database_cleaner-core (~> 2.0.0)
       sequel
     date (3.3.4)
-    diff-lcs (1.5.0)
+    diff-lcs (1.5.1)
     docile (1.4.0)
     drb (2.2.0)
       ruby2_keywords
@@ -110,11 +111,11 @@ GEM
     matrix (0.4.2)
     method_source (1.0.0)
     mini_mime (1.1.5)
-    minitest (5.21.0)
+    minitest (5.22.2)
     mutex_m (0.2.0)
     net-http (0.4.1)
       uri
-    net-imap (0.4.9.1)
+    net-imap (0.4.10)
       date
       net-protocol
     net-pop (0.1.2)
@@ -126,26 +127,27 @@ GEM
     net-ssh (7.2.1)
     netaddr (2.0.6)
     nio4r (2.7.0)
-    nokogiri (1.16.0-aarch64-linux)
+    nokogiri (1.16.2-aarch64-linux)
       racc (~> 1.4)
-    nokogiri (1.16.0-arm64-darwin)
+    nokogiri (1.16.2-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.16.0-x86_64-darwin)
+    nokogiri (1.16.2-x86_64-darwin)
       racc (~> 1.4)
-    nokogiri (1.16.0-x86_64-linux)
+    nokogiri (1.16.2-x86_64-linux)
       racc (~> 1.4)
-    octokit (8.0.0)
+    octokit (8.1.0)
+      base64
       faraday (>= 1, < 3)
       sawyer (~> 0.9)
     openssl (3.2.0)
     openssl-signature_algorithm (1.3.0)
       openssl (> 2.0)
-    pagerduty (4.0.0)
+    pagerduty (4.0.1)
     parallel (1.24.0)
-    parser (3.3.0.2)
+    parser (3.3.0.5)
       ast (~> 2.4.1)
       racc
-    pg (1.5.4)
+    pg (1.5.5)
     prettier_print (1.2.1)
     pry (0.14.2)
       coderay (~> 1.1)
@@ -157,7 +159,7 @@ GEM
     puma (6.4.2)
       nio4r (~> 2.0)
     racc (1.7.3)
-    rack (3.0.8)
+    rack (3.0.9)
     rack-test (2.1.0)
       rack (>= 1.3)
     rack-unreloader (2.1.0)
@@ -176,7 +178,7 @@ GEM
     refrigerator (1.7.0)
     regexp_parser (2.9.0)
     rexml (3.2.6)
-    roda (3.75.0)
+    roda (3.77.0)
       rack
     rodauth (2.33.0)
       roda (>= 2.6.0)
@@ -186,24 +188,24 @@ GEM
       chunky_png (~> 1.0)
       rqrcode_core (~> 1.0)
     rqrcode_core (1.2.0)
-    rspec (3.12.0)
-      rspec-core (~> 3.12.0)
-      rspec-expectations (~> 3.12.0)
-      rspec-mocks (~> 3.12.0)
-    rspec-core (3.12.2)
-      rspec-support (~> 3.12.0)
-    rspec-expectations (3.12.3)
+    rspec (3.13.0)
+      rspec-core (~> 3.13.0)
+      rspec-expectations (~> 3.13.0)
+      rspec-mocks (~> 3.13.0)
+    rspec-core (3.13.0)
+      rspec-support (~> 3.13.0)
+    rspec-expectations (3.13.0)
       diff-lcs (>= 1.2.0, < 2.0)
-      rspec-support (~> 3.12.0)
-    rspec-mocks (3.12.6)
+      rspec-support (~> 3.13.0)
+    rspec-mocks (3.13.0)
       diff-lcs (>= 1.2.0, < 2.0)
-      rspec-support (~> 3.12.0)
-    rspec-support (3.12.1)
-    rubocop (1.59.0)
+      rspec-support (~> 3.13.0)
+    rspec-support (3.13.0)
+    rubocop (1.60.2)
       json (~> 2.3)
       language_server-protocol (>= 3.17.0)
       parallel (~> 1.10)
-      parser (>= 3.2.2.4)
+      parser (>= 3.3.0.2)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 1.8, < 3.0)
       rexml (>= 3.2.5, < 4.0)
@@ -234,12 +236,10 @@ GEM
     ruby2_keywords (0.0.5)
     safety_net_attestation (0.4.0)
       jwt (~> 2.0)
-    sassc (2.4.0)
-      ffi (~> 1.9)
     sawyer (0.9.2)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
-    sequel (5.76.0)
+    sequel (5.77.0)
       bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
@@ -253,10 +253,10 @@ GEM
     simplecov-html (0.12.3)
     simplecov_json_formatter (0.1.4)
     smart_properties (1.17.0)
-    standard (1.33.0)
+    standard (1.34.0)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.0)
-      rubocop (~> 1.59.0)
+      rubocop (~> 1.60)
       standard-custom (~> 1.0.0)
       standard-performance (~> 1.3)
     standard-custom (1.0.2)
@@ -265,7 +265,7 @@ GEM
     standard-performance (1.3.1)
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.20.2)
-    stripe (10.5.0)
+    stripe (10.9.0)
     syntax_tree (6.2.0)
       prettier_print (>= 1.2.0)
     tilt (2.3.0)
@@ -289,7 +289,7 @@ GEM
       openssl (>= 2.2)
       safety_net_attestation (~> 0.4.0)
       tpm-key_attestation (~> 0.12.0)
-    webmock (3.19.1)
+    webmock (3.22.0)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
@@ -300,6 +300,7 @@ GEM
 PLATFORMS
   aarch64-linux
   arm64-darwin-22
+  arm64-darwin-23
   x86_64-darwin-20
   x86_64-linux
 
@@ -341,20 +342,19 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
-  sassc (>= 2)
   sequel (>= 5.62)
   sequel-annotate
   sequel_pg (>= 1.8)
   simplecov
   standard (>= 1.24.3)
   stripe
-  tilt (>= 2.0.9)
+  tilt (>= 2.2)
   warning
   webauthn (~> 3.1)
   webmock
 
 RUBY VERSION
-   ruby 3.2.2p53
+   ruby 3.2.3p157
 
 BUNDLED WITH
    2.4.10

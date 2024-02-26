@@ -112,9 +112,13 @@ class Sshable < Sequel::Model
     end
 
     # Cache miss.
-    sess = Net::SSH.start(host, unix_user, **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)))
+    sess = start_fresh_session
     Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
     sess
+  end
+
+  def start_fresh_session
+    Net::SSH.start(host, unix_user, **COMMON_SSH_ARGS.merge(key_data: keys.map(&:private_key)))
   end
 
   def invalidate_cache_entry

@@ -11,7 +11,7 @@ RSpec.describe Clover, "postgres" do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id,
       location: "hetzner-fsn1",
-      server_name: "pg-with-permission",
+      name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 100
     ).subject
@@ -21,7 +21,7 @@ RSpec.describe Clover, "postgres" do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project_wo_permissions.id,
       location: "hetzner-fsn1",
-      server_name: "pg-without-permission",
+      name: "pg-without-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 100
     ).subject
@@ -68,8 +68,8 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
-        expect(page).to have_content pg.server_name
-        expect(page).to have_no_content pg_wo_permission.server_name
+        expect(page).to have_content pg.name
+        expect(page).to have_no_content pg_wo_permission.name
       end
     end
 
@@ -82,6 +82,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: name
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -99,6 +100,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: "invalid name"
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -112,9 +114,10 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
 
-        fill_in "Name", with: pg.server_name
+        fill_in "Name", with: pg.name
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -134,6 +137,7 @@ RSpec.describe Clover, "postgres" do
         fill_in "Name", with: "new-pg-db"
         choose option: "hetzner-fsn1"
         choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
 
         click_button "Create"
 
@@ -165,12 +169,12 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
-        expect(page).to have_content pg.server_name
+        expect(page).to have_content pg.name
 
         click_link "Show", href: "#{project.path}#{pg.path}"
 
-        expect(page.title).to eq("Ubicloud - #{pg.server_name}")
-        expect(page).to have_content pg.server_name
+        expect(page.title).to eq("Ubicloud - #{pg.name}")
+        expect(page).to have_content pg.name
       end
 
       it "raises forbidden when does not have permissions" do
@@ -221,7 +225,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "does not show reset superuser password for restoring database" do
-        pg.server.update(timeline_access: "fetch")
+        pg.representative_server.update(timeline_access: "fetch")
 
         visit "#{project.path}#{pg.path}"
         expect(page).to have_no_content "Reset superuser password"
@@ -232,7 +236,7 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}"
         expect(page).to have_content "Reset superuser password"
 
-        pg.server.update(timeline_access: "fetch")
+        pg.representative_server.update(timeline_access: "fetch")
         fill_in "New password", with: "DummyPassword123"
         fill_in "New password (repeat)", with: "DummyPassword123"
         click_button "Reset"
@@ -242,16 +246,97 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "firewall" do
+      it "can show default firewall rules" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        expect(page).to have_content "Firewall Rules"
+        expect(page).to have_content "0.0.0.0/0"
+        expect(page).to have_content "5432"
+      end
+
+      it "can delete firewall rules" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(page.body).to eq({message: "Firewall rule deleted"}.to_json)
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+
+      it "can not delete firewall rules when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+
+        expect { find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can not delete firewall rules if not exist" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
+        expect(PostgresFirewallRule).to receive(:from_ubid).and_return(nil)
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq(404)
+      end
+
+      it "does not show create firewall rule when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+
+        expect { find_by_id "fwr-create" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can create firewall rule" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        fill_in "cidr", with: "1.1.1.2"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_content "1.1.1.2/32"
+        expect(page).to have_content "5432"
+
+        fill_in "cidr", with: "12.12.12.0/26"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+
+        fill_in "cidr", with: "fd00::/64"
+        click_button "Create"
+        expect(page).to have_content "Firewall rule is created"
+        expect(page.status_code).to eq(200)
+        expect(page).to have_content "fd00::/64"
+
+        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+    end
+
     describe "delete" do
       it "can delete PostgreSQL database" do
         visit "#{project.path}#{pg.path}"
 
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
+        btn = find "#postgres-delete-#{pg.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Deleting #{pg.server_name}"}.to_json)
+        expect(page.body).to eq({message: "Deleting #{pg.name}"}.to_json)
         expect(SemSnap.new(pg.id).set?("destroy")).to be true
       end
 

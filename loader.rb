@@ -19,7 +19,7 @@ Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) {
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
 Unreloader.autoload("#{__dir__}/ubid.rb") { "UBID" }
 
-AUTOLOAD_CONSTANTS = []
+AUTOLOAD_CONSTANTS = ["DB", "UBID"]
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
@@ -77,11 +77,27 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
 end
 
 autoload_normal.call("model", flat: true)
-%w[lib clover.rb clover_web.rb clover_api.rb routes/clover_base.rb].each { autoload_normal.call(_1) }
+%w[lib clover.rb clover_web.rb clover_api.rb routes/clover_base.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers serializers/web serializers/api].each { autoload_normal.call(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
 
 if Config.production?
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
+end
+
+def clover_freeze
+  return unless Config.production?
+  require "refrigerator"
+
+  # Take care of library dependencies that modify core classes.
+
+  # For at least Puma, per
+  # https://github.com/jeremyevans/roda-sequel-stack/blob/931e810a802b2ab14628111cfce596998316b556/config.ru#L41C6-L42C1
+  require "yaml"
+
+  # Also for at least puma, but not itemized by the roda-sequel-stack
+  # project for some reason.
+  require "nio4r"
+  Refrigerator.freeze
 end

@@ -5,7 +5,7 @@ class CloverWeb
     @serializer = Serializers::Web::Postgres
 
     r.on String do |pg_name|
-      pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:server_name] => pg_name} }.first
+      pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
 
       unless pg
         response.status = 404
@@ -21,7 +21,43 @@ class CloverWeb
       r.delete true do
         Authorization.authorize(@current_user.id, "Postgres:delete", pg.id)
         pg.incr_destroy
-        return {message: "Deleting #{pg.server_name}"}.to_json
+        return {message: "Deleting #{pg.name}"}.to_json
+      end
+
+      r.on "firewall-rule" do
+        r.post true do
+          Authorization.authorize(@current_user.id, "Postgres:Firewall:edit", pg.id)
+
+          DB.transaction do
+            PostgresFirewallRule.create_with_id(
+              postgres_resource_id: pg.id,
+              cidr: r.params["cidr"]
+            )
+            pg.incr_update_firewall_rules
+          end
+
+          flash["notice"] = "Firewall rule is created"
+
+          r.redirect "#{@project.path}#{pg.path}"
+        end
+
+        r.is String do |firewall_rule_ubid|
+          r.delete true do
+            Authorization.authorize(@current_user.id, "Postgres:Firewall:edit", pg.id)
+            fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid)
+            unless fwr
+              response.status = 404
+              r.halt
+            end
+
+            DB.transaction do
+              fwr.destroy
+              pg.incr_update_firewall_rules
+            end
+
+            return {message: "Firewall rule deleted"}.to_json
+          end
+        end
       end
 
       r.post "restore" do
@@ -31,7 +67,7 @@ class CloverWeb
         st = Prog::Postgres::PostgresResourceNexus.assemble(
           project_id: @project.id,
           location: pg.location,
-          server_name: r.params["name"],
+          name: r.params["name"],
           target_vm_size: pg.target_vm_size,
           target_storage_size_gib: pg.target_storage_size_gib,
           parent_id: pg.id,
@@ -47,7 +83,7 @@ class CloverWeb
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
 
-        unless pg.server.primary?
+        unless pg.representative_server.primary?
           flash["error"] = "Superuser password cannot be updated during restore!"
           return redirect_back_with_inputs
         end
@@ -55,7 +91,7 @@ class CloverWeb
         Validation.validate_postgres_superuser_password(r.params["original_password"], r.params["repeat_password"])
 
         pg.update(superuser_password: r.params["original_password"])
-        pg.server.incr_update_superuser_password
+        pg.representative_server.incr_update_superuser_password
 
         flash["notice"] = "The superuser password will be updated in a few seconds"
 

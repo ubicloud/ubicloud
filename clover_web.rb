@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require "tilt/sass"
+require "tilt"
+require "tilt/erubi"
 
 class CloverWeb < Roda
   include CloverBase
@@ -8,12 +9,16 @@ class CloverWeb < Roda
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
-  plugin :default_headers,
+  plugin :default_headers, {
     "Content-Type" => "text/html",
-    # 'Strict-Transport-Security'=>'max-age=16070400;', # Uncomment if only allowing https:// access
     "X-Frame-Options" => "deny",
     "X-Content-Type-Options" => "nosniff",
     "X-XSS-Protection" => "1; mode=block"
+  }.merge(
+    # :nocov:
+    Config.production? ? {"Strict-Transport-Security" => "max-age=15;"} : {}
+    # :nocov:
+  )
 
   plugin :content_security_policy do |csp|
     csp.default_src :none
@@ -30,7 +35,7 @@ class CloverWeb < Roda
   plugin :disallow_file_uploads
   plugin :flash
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
-  plugin :render, escape: true, layout: "./layouts/app"
+  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true}
   plugin :public
   plugin :Integer_matcher_max
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
@@ -292,6 +297,10 @@ class CloverWeb < Roda
   def redirect_back_with_inputs
     flash["old"] = request.params
     request.redirect env["HTTP_REFERER"]
+  end
+
+  def has_project_permission(actions)
+    @project_permissions.intersection(Authorization.expand_actions(actions)).any?
   end
 
   hash_branch("dashboard") do |r|

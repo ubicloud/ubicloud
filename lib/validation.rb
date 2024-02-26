@@ -3,11 +3,9 @@
 require "time"
 
 module Validation
-  class ValidationFailed < StandardError
-    attr_reader :errors
-    def initialize(errors)
-      @errors = errors
-      super("Validation failed for following fields: #{errors.keys.join(", ")}")
+  class ValidationFailed < CloverError
+    def initialize(details)
+      super(400, "Invalid request", "Validation failed for following fields: #{details.keys.join(", ")}", details)
     end
   end
 
@@ -57,13 +55,19 @@ module Validation
     vm_size
   end
 
+  def self.validate_postgres_ha_type(ha_type)
+    unless Option::PostgresHaOptions.find { _1.name == ha_type }
+      fail ValidationFailed.new({ha_type: "\"#{ha_type}\" is not a valid PostgreSQL high availability option. Available options: #{Option::PostgresHaOptions.map(&:name)}"})
+    end
+  end
+
   def self.validate_os_user_name(os_user_name)
     msg = "OS user name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32."
     fail ValidationFailed.new({user: msg}) unless os_user_name&.match(ALLOWED_OS_USER_NAME_PATTERN)
   end
 
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
-    allowed_keys = [:encrypted, :size_gib, :boot, :use_bdev_ubi, :skip_sync]
+    allowed_keys = [:encrypted, :size_gib, :boot, :skip_sync]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
       fail ValidationFailed.new({boot_disk_index: "Boot disk index must be between 0 and #{storage_volumes.length - 1}"})

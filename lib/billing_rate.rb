@@ -25,8 +25,12 @@ class BillingRate
       "#{resource_family} Address"
     when "PostgresCores"
       "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database"
+    when "PostgresStandbyCores"
+      "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database (HA Standby)"
     when "PostgresStorage"
       "#{amount.to_i} GiB Storage for PostgreSQL Database"
+    when "PostgresStandbyStorage"
+      "#{amount.to_i} GiB Storage for PostgreSQL Database (HA Standby)"
     when "GitHubRunnerMinutes"
       "#{resource_family} GitHub Runner"
     else

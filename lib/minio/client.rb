@@ -9,10 +9,13 @@ REGION = "us-east-1"
 ADMIN_URI_PATH = "/minio/admin/v3"
 
 class Minio::Client
-  def initialize(endpoint:, access_key:, secret_key:)
+  def initialize(endpoint:, access_key:, secret_key:, ssl_ca_file_data:, socket: nil)
+    ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", Digest::SHA256.hexdigest(ssl_ca_file_data) + ".crt")
+    Util.safe_write_to_file(ca_bundle_filename, ssl_ca_file_data) unless File.exist?(ca_bundle_filename)
+
     @creds = {access_key: access_key, secret_key: secret_key}
     @endpoint = endpoint
-    @client = Excon.new(endpoint)
+    @client = Excon.new(endpoint, socket: socket, ssl_ca_file: ca_bundle_filename)
     @signer = Minio::HeaderSigner.new
     @crypto = Minio::Crypto.new
   end
@@ -77,6 +80,10 @@ class Minio::Client
     response.status
   end
 
+  def get_presigned_url(method, bucket_name, object_name, expires)
+    @signer.presign_v4(method, s3_uri("#{bucket_name}/#{object_name}"), REGION, @creds, Time.now.utc, expires)
+  end
+
   def create_bucket(bucket_name)
     response = send_request("PUT", s3_uri(bucket_name))
     response.status
@@ -132,8 +139,27 @@ class Minio::Client
     objects
   end
 
-  def send_request(method, uri, body = nil)
-    headers = @signer.build_headers(method, uri, body, @creds, REGION)
+  def set_lifecycle_policy(bucket_name, policy_id, expiration_days)
+    raise "Error: policy_id must be all alphanumeric with the length between 5 and 32" unless /\A[a-z0-9]{5,32}\z/.match?(policy_id)
+    raise "Error: expiration_days must be an integer between 0 and 999" unless expiration_days.is_a?(Integer) && expiration_days >= 0 && expiration_days <= 999
+    policy = <<~LIFECYCLE_CONFIGURATION
+<LifecycleConfiguration>
+  <Rule>
+    <ID>#{policy_id}</ID>
+    <Status>Enabled</Status>
+    <Filter></Filter>
+    <Expiration>
+      <Days>#{expiration_days}</Days>
+    </Expiration>
+  </Rule>
+</LifecycleConfiguration>
+    LIFECYCLE_CONFIGURATION
+    response = send_request("PUT", s3_uri("#{bucket_name}?lifecycle"), policy, needs_md5: true)
+    response.status
+  end
+
+  def send_request(method, uri, body = nil, needs_md5: false)
+    headers = @signer.build_headers(method, uri, body, @creds, REGION, needs_md5)
 
     full_path = uri.path + (uri.query ? "?" + uri.query : "")
     response = @client.request(method: method, path: full_path, headers: headers, body: body)

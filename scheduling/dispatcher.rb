@@ -18,12 +18,8 @@ class Scheduling::Dispatcher
     end
 
     Strand.dataset.where(
-      Sequel.lit("(lease IS NULL OR lease < now()) AND schedule < now()")
+      Sequel.lit("(lease IS NULL OR lease < now()) AND schedule < now() AND exitval IS NULL")
     ).order_by(:schedule).limit(idle_connections)
-  end
-
-  def exception_to_hash(ex)
-    {exception: {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace, cause: ex.cause.inspect}}
   end
 
   def start_strand(strand)
@@ -51,12 +47,12 @@ class Scheduling::Dispatcher
     Thread.new do
       strand.run Strand::LEASE_EXPIRATION / 4
     rescue => ex
-      Clog.emit("exception terminates thread") { exception_to_hash(ex) }
+      Clog.emit("exception terminates thread") { Util.exception_to_hash(ex) }
 
       loop do
         ex = ex.cause
         break unless ex
-        Clog.emit("nested exception") { exception_to_hash(ex) }
+        Clog.emit("nested exception") { Util.exception_to_hash(ex) }
       end
     ensure
       # Adequate to unblock IO.select.

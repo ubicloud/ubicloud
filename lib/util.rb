@@ -20,6 +20,14 @@ module Util
     end
   end
 
+  def self.create_root_certificate(common_name:, duration:)
+    create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{common_name}",
+      extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
+      duration: duration
+    ).map(&:to_pem)
+  end
+
   def self.create_certificate(subject:, duration:, extensions: [], issuer_cert: nil, issuer_key: nil)
     cert = OpenSSL::X509::Certificate.new
     key = OpenSSL::PKey::EC.generate("prime256v1")
@@ -51,5 +59,19 @@ module Util
     cert.sign(issuer_key, OpenSSL::Digest.new("SHA256"))
 
     [cert, key]
+  end
+
+  def self.exception_to_hash(ex)
+    {exception: {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace, cause: ex.cause.inspect}}
+  end
+
+  def self.safe_write_to_file(filename, content)
+    FileUtils.mkdir_p(File.dirname(filename))
+    temp_filename = filename + ".tmp"
+    File.open("#{temp_filename}.lock", File::RDWR | File::CREAT) do |lock_file|
+      lock_file.flock(File::LOCK_EX)
+      File.write(temp_filename, content)
+      File.rename(temp_filename, filename)
+    end
   end
 end

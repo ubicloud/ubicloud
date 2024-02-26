@@ -17,7 +17,11 @@ RSpec.describe Prog::Minio::SetupMinio do
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",
-      private_subnet_id: ps.id
+      private_subnet_id: ps.id,
+      root_cert_1: "root_cert_1",
+      root_cert_key_1: "root_cert_key_1",
+      root_cert_2: "root_cert_2",
+      root_cert_key_2: "root_cert_key_2"
     )
 
     mp = MinioPool.create_with_id(
@@ -31,7 +35,9 @@ RSpec.describe Prog::Minio::SetupMinio do
     MinioServer.create_with_id(
       minio_pool_id: mp.id,
       vm_id: vm.id,
-      index: 0
+      index: 0,
+      cert: "cert",
+      cert_key: "key"
     )
   }
 
@@ -72,6 +78,7 @@ MINIO_VOLUMES="/minio/dat1"
 MINIO_OPTS="--console-address :9001"
 MINIO_ROOT_USER="minio-admin"
 MINIO_ROOT_PASSWORD="dummy-password"
+MINIO_SERVER_URL="https://minio-cluster-name.minio.ubicloud.com:9000"
 ECHO
       minio_hosts = <<ECHO
 ::1 ip6-localhost ip6-loopback
@@ -84,9 +91,16 @@ ff02::3 ip6-allhosts
 ECHO
       JSON.generate({
         minio_config: minio_config,
-        hosts: minio_hosts
+        hosts: minio_hosts,
+        cert: "cert",
+        cert_key: "key",
+        ca_bundle: "root_cert_1" + "root_cert_2"
       }).chomp
     }
+
+    before do
+      allow(DnsZone).to receive(:where).and_return([instance_double(DnsZone, name: "minio.ubicloud.com")])
+    end
 
     it "configures minio if not started" do
       expect(nx.minio_server.cluster.servers.first).to receive(:private_ipv4_address).and_return("192.168.0.0")

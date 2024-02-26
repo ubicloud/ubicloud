@@ -26,11 +26,11 @@ RSpec.describe Invoice do
 
     it "not charge if less than minimum charge threshold" do
       allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      invoice.content["cost"] = 0.5
+      invoice.content["cost"] = 0.4
       expect(invoice).to receive(:update).with(status: "below_minimum_threshold")
       expect do
         expect(invoice.charge).to be_nil
-      end.to output("Invoice[1va3atns1h3j3pm07fyy7ey050] cost is less than minimum charge cost: $0.5\n").to_stdout
+      end.to output("Invoice[1va3atns1h3j3pm07fyy7ey050] cost is less than minimum charge cost: $0.4\n").to_stdout
     end
 
     it "not charge if doesn't have billing info" do

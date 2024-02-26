@@ -14,7 +14,7 @@
       "components/page_header",
       locals: {
         title: "PostgreSQL Databases",
-        right_items: @project_permissions.include?("Postgres:create") ? [
+        right_items: has_project_permission("Postgres:create") ? [
           render("components/button", locals: { text: "Create PostgreSQL Database", link: "postgres/create" })
         ] : []
       }
@@ -58,7 +58,7 @@
       icon: "hero-circle-stack",
       title: "No PostgreSQL databases",
       description: "You don't have permission to create PostgreSQL database."
-    }.merge(@project_permissions.include?("Postgres:create") ? {
+    }.merge(has_project_permission("Postgres:create") ? {
       description: "Get started by creating a new PostgreSQL database.",
       button_link: "#{@project_data[:path]}/postgres/create",
       button_title: "New PostgreSQL Database"

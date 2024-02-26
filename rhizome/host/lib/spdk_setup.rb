@@ -56,10 +56,10 @@ class SpdkSetup
       fail "BUG: unexpected architecture"
     end
 
-    # YYY: Support v23.09-ubi-0.2 on arm64
     {
       ["v23.09", :arm64] => "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-arm64.tar.gz",
       ["v23.09", :x64] => "https://github.com/ubicloud/spdk/releases/download/v23.09/spdk-23.09-x64.tar.gz",
+      ["v23.09-ubi-0.2", :arm64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2-arm64/ubicloud-spdk-ubuntu-22.04-arm64.tar.gz",
       ["v23.09-ubi-0.2", :x64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2/ubicloud-spdk-ubuntu-22.04-x64.tar.gz"
     }.fetch([@spdk_version, arch])
   end
@@ -96,7 +96,7 @@ ExecStart=#{vhost_binary} -S #{SpdkPath.vhost_dir.shellescape} \
 --huge-dir #{hugepages_dir.shellescape} \
 --iova-mode va \
 --rpc-socket #{rpc_sock.shellescape} \
---cpumask [0] \
+--cpumask [0,1] \
 --disable-cpumask-locks
 ExecReload=/bin/kill -HUP $MAINPID
 LimitMEMLOCK=8400113664

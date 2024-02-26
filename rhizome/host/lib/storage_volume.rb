@@ -23,7 +23,7 @@ class StorageVolume
     @use_bdev_ubi = params["use_bdev_ubi"] || false
     @skip_sync = params["skip_sync"] || false
     @image_path = vp.image_path(params["image"]) if params["image"]
-    @device = (params["storage_device"] || DEFAULT_STORAGE_DEVICE)
+    @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
 
     # Old VMs didn't have the spdk_version field. Fill that in with legacy
     # SPDK version for backward compatibility.

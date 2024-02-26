@@ -107,7 +107,8 @@ RSpec.describe Prog::Vm::HostNexus do
         Prog::LearnCores,
         Prog::LearnStorage,
         Prog::InstallDnsmasq,
-        Prog::SetupSysstat
+        Prog::SetupSysstat,
+        Prog::SetupNftables
       ])
     end
 
@@ -132,7 +133,8 @@ RSpec.describe Prog::Vm::HostNexus do
       allow(vm_host).to receive(:id).and_return(host.id)
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
       expect(vm_host).to receive(:update).with(arch: "arm64")
-      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
+      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2, used_cores: 1)
+      expect(vm_host).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
         instance_double(Strand, prog: "LearnArch", exitval: {"arch" => "arm64"}),
@@ -158,7 +160,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "crashes if an expected field is not set for LearnCores" do
       expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnCores", exitval: {})])
-      expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"total_sockets\""
+      expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"total_cores\""
     end
 
     it "crashes if an expected field is not set for LearnStorage" do

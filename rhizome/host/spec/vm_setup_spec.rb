@@ -24,43 +24,74 @@ RSpec.describe VmSetup do
     expect(upper.to_s).to eq("2a01:4f9:2b:35b:7e41::/80")
   end
 
-  it "templates user YAML" do
-    vps = instance_spy(VmPath)
-    expect(vs).to receive(:vp).and_return(vps).at_least(:once)
-    vs.write_user_data("some_user", "some_ssh_key")
-    expect(vps).to have_received(:write_user_data) {
-      expect(_1).to match(/some_user/)
-      expect(_1).to match(/some_ssh_key/)
-    }
+  describe "#write_user_data" do
+    let(:vps) { instance_spy(VmPath) }
+
+    before { expect(vs).to receive(:vp).and_return(vps).at_least(:once) }
+
+    it "templates user YAML with no swap" do
+      vs.write_user_data("some_user", "some_ssh_key", nil)
+      expect(vps).to have_received(:write_user_data) {
+        expect(_1).to match(/some_user/)
+        expect(_1).to match(/some_ssh_key/)
+      }
+    end
+
+    it "templates user YAML with swap" do
+      vs.write_user_data("some_user", "some_ssh_key", 123)
+      expect(vps).to have_received(:write_user_data) {
+        expect(_1).to match(/some_user/)
+        expect(_1).to match(/some_ssh_key/)
+        expect(_1).to match(/size: 123/)
+      }
+    end
+
+    it "fails if the swap is not an integer" do
+      expect {
+        vs.write_user_data("some_user", "some_ssh_key", "123")
+      }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
+    end
   end
 
   describe "#download_boot_image" do
     it "can download an image" do
       expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
       expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/tmp/ubuntu-jammy.img.tmp")
+        expect(path).to eq("/var/storage/images/ubuntu-jammy.img.tmp")
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
       expect(Arch).to receive(:render).and_return("amd64").at_least(:once)
-      expect(vs).to receive(:r).with("curl -f -L10 -o /tmp/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-amd64.img")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /tmp/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw")
-      expect(FileUtils).to receive(:rm_r).with("/tmp/ubuntu-jammy.img.tmp")
+      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-amd64.img")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/ubuntu-jammy.img.tmp")
 
       vs.download_boot_image("ubuntu-jammy")
     end
 
-    it "can download image with custom URL that has query params using azcopy" do
+    it "can download vhd image with custom URL that has query params using curl" do
       expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
       expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/tmp/github-ubuntu-2204.vhd.tmp")
+        expect(path).to eq("/var/storage/images/github-ubuntu-2204.vhd.tmp")
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(vs).to receive(:r).with("which azcopy")
-      expect(vs).to receive(:r).with("AZCOPY_CONCURRENCY_VALUE=5 azcopy copy https://images.blob.core.windows.net/images/ubuntu2204.vhd\\?sp\\=r\\&st\\=2023-09-05T22:44:05Z\\&se\\=2023-10-07T06:44:05 /tmp/github-ubuntu-2204.vhd.tmp")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /tmp/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw")
-      expect(FileUtils).to receive(:rm_r).with("/tmp/github-ubuntu-2204.vhd.tmp")
+      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.vhd.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
+      expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /var/storage/images/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.vhd.tmp")
 
-      vs.download_boot_image("github-ubuntu-2204", custom_url: "https://images.blob.core.windows.net/images/ubuntu2204.vhd?sp=r&st=2023-09-05T22:44:05Z&se=2023-10-07T06:44:05")
+      vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
+    end
+
+    it "does not convert image if it's in raw format already" do
+      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/var/storage/images/github-ubuntu-2204.raw.tmp")
+      end.and_yield
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
+      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.raw.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
+      expect(File).to receive(:rename).with("/var/storage/images/github-ubuntu-2204.raw.tmp", "/var/storage/images/github-ubuntu-2204.raw")
+      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.raw.tmp")
+
+      vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
     end
 
     it "can use an image that's already downloaded" do
@@ -119,8 +150,6 @@ RSpec.describe VmSetup do
       expect(sv_2).to receive(:purge_spdk_artifacts)
       expect(sv_2).to receive(:storage_root).and_return("/var/storage/test")
 
-      allow(FileUtils).to receive(:rm_r).with("/var/storage/test")
-
       vs.purge_storage
     end
 
@@ -140,6 +169,9 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:unmount_hugepages)
       expect(vs).to receive(:r).with("deluser --remove-home test")
       expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
+
+      expect(vs.vp).to receive(:read_public_ipv4).and_return("12.12.12.12")
+      expect(vs).to receive(:block_ip4)
 
       vs.purge
     end
@@ -224,6 +256,7 @@ RSpec.describe VmSetup do
       clover_ephemeral = NetAddr.parse_net("fddf:53d2:4c89:2305:8000::/65")
       ip4 = "192.168.1.100"
 
+      expect(vs).to receive(:unblock_ip4).with("192.168.1.100")
       expect(vs).to receive(:interfaces).with([], true)
       expect(vs).to receive(:setup_veths_6) {
         expect(_1.to_s).to eq(guest_ephemeral.to_s)
@@ -260,7 +293,10 @@ RSpec.describe VmSetup do
 
       gua = "fddf:53d2:4c89:2305:46a0::/79"
       ip4 = "123.123.123.123"
-      nics = [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "ncaka58xyg", "3e:bd:a5:96:f7:b9")]
+      nics = [
+        %w[fd48:666c:a296:ce4b:2cc6::/79 192.168.5.50/32 ncaka58xyg 3e:bd:a5:96:f7:b9],
+        %w[fddf:53d2:4c89:2305:46a0::/79 10.10.10.10/32 ncbbbbbbbb fb:55:dd:ba:21:0a]
+      ].map { VmSetup::Nic.new(*_1) }
 
       expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)
 table ip raw {
@@ -271,7 +307,7 @@ table ip raw {
     udp sport 67 udp dport 68 accept
 
     # avoid ip4 spoofing
-    ether saddr 3e:bd:a5:96:f7:b9 ip saddr != 192.168.5.50/32 drop
+    ether saddr {3e:bd:a5:96:f7:b9, fb:55:dd:ba:21:0a} ip saddr != {192.168.5.50/32, 10.10.10.10/32, 123.123.123.123} drop
   }
   chain postrouting {
     type filter hook postrouting priority raw; policy accept;
@@ -284,7 +320,7 @@ table ip6 raw {
     type filter hook prerouting priority raw; policy accept;
     # avoid ip6 spoofing
     ether saddr 3e:bd:a5:96:f7:b9 ip6 saddr != {fddf:53d2:4c89:2305:46a0::/80,fd48:666c:a296:ce4b:2cc6::/79,fe80::3cbd:a5ff:fe96:f7b9} drop
-    
+    ether saddr fb:55:dd:ba:21:0a ip6 saddr != fddf:53d2:4c89:2305:46a0::/79 drop
   }
 }
 # NAT4 rules
@@ -297,6 +333,7 @@ table ip nat {
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
     ip saddr 192.168.5.50 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 123.123.123.123
+    ip saddr 192.168.5.50 ip daddr 192.168.5.50 snat to 123.123.123.123
   }
 }
 
@@ -312,6 +349,35 @@ NFTABLES_CONF
       expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/hugepages")
       expect(vs).to receive(:r).with("mount -t hugetlbfs -o uid=test,size=2G nodev /vm/test/hugepages")
       vs.hugepages(2)
+    end
+  end
+
+  describe "#unblock_ip4" do
+    it "can unblock ip4" do
+      f = instance_double(File)
+      expect(File).to receive(:open) do |path, *_args|
+        expect(path).to eq("/etc/nftables.d/test.conf.tmp")
+      end.and_yield(f)
+
+      expect(f).to receive(:flock).with(File::LOCK_EX | File::LOCK_NB)
+      expect(f).to receive(:puts).with(<<NFTABLES_CONF)
+#!/usr/sbin/nft -f
+add element inet drop_unused_ip_packets allowed_ipv4_addresses { 1.1.1.1 }
+NFTABLES_CONF
+      expect(File).to receive(:rename).with("/etc/nftables.d/test.conf.tmp", "/etc/nftables.d/test.conf")
+
+      expect(vs).to receive(:r).with("systemctl reload nftables")
+
+      vs.unblock_ip4("1.1.1.1/32")
+    end
+  end
+
+  describe "#block_ip4" do
+    it "can block ip4" do
+      expect(FileUtils).to receive(:rm_f).with("/etc/nftables.d/test.conf")
+      expect(vs).to receive(:r).with("systemctl reload nftables")
+
+      vs.block_ip4
     end
   end
 end
