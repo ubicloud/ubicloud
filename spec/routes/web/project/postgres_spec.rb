@@ -244,6 +244,14 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(200)
         expect(page).to have_content "Superuser password cannot be updated during restore!"
       end
+
+      it "can restart PostgreSQL database" do
+        visit "#{project.path}#{pg.path}"
+        expect(page).to have_content "Restart"
+        click_button "Restart"
+
+        expect(page.status_code).to eq(200)
+      end
     end
 
     describe "firewall" do

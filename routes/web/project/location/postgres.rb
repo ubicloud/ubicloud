@@ -97,6 +97,15 @@ class CloverWeb
 
         r.redirect "#{@project.path}#{pg.path}"
       end
+
+      r.post "restart" do
+        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+        pg.servers.each do |s|
+          s.incr_restart
+        rescue Sequel::ForeignKeyConstraintViolation
+        end
+        r.redirect "#{@project.path}#{pg.path}"
+      end
     end
   end
 end
