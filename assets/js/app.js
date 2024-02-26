@@ -92,6 +92,12 @@ $(".delete-btn").on("click", function (event) {
     });
 });
 
+$(".restart-btn").on("click", function (event) {
+  if (!confirm("Are you sure to restart?")) {
+    event.preventDefault();
+  }
+});
+
 $(".copieble-content").on("click", ".copy-button", function (event) {
   let parent = $(this).parent();
   let content = parent.data("content");
