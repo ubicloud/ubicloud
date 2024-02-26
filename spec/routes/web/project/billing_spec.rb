@@ -50,7 +50,7 @@ RSpec.describe Clover, "billing" do
       expect(Stripe::Checkout::Session).to receive(:create).and_return(OpenStruct.new({url: "#{project.path}/billing/success?session_id=session_123"}))
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}})
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}})
 
       visit project.path
@@ -72,8 +72,8 @@ RSpec.describe Clover, "billing" do
 
     it "can update billing info" do
       expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "Old Inc.", "address" => {"country" => "NL"}},
-        {"name" => "New Inc.", "address" => {"country" => "US"}}
+        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "456789"}}
       ).twice
       expect(Stripe::Customer).to receive(:update).with(billing_info.stripe_id, anything)
 
@@ -82,16 +82,18 @@ RSpec.describe Clover, "billing" do
       expect(page.title).to eq("Ubicloud - Project Billing")
       fill_in "Billing Name", with: "New Inc."
       select "United States", from: "Country"
+      fill_in "Tax ID (Optional)", with: "456789"
 
       click_button "Update"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_field("Billing Name", with: "New Inc.")
       expect(page).to have_field("Country", with: "US")
+      expect(page).to have_field("Tax ID (Optional)", with: "456789")
     end
 
     it "can add new payment method" do
-      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).twice
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}})
       expect(Stripe::Checkout::Session).to receive(:create).and_return(OpenStruct.new({url: "#{project.path}/billing/success?session_id=session_123"}))
@@ -126,7 +128,7 @@ RSpec.describe Clover, "billing" do
     end
 
     it "can't delete last payment method" do
-      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}})
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
 
       visit "#{project.path}/billing"
@@ -143,7 +145,7 @@ RSpec.describe Clover, "billing" do
 
     it "can delete payment method" do
       payment_method_2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
-      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}})
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return({"card" => {"brand" => "mastercard"}})
       expect(Stripe::PaymentMethod).to receive(:detach).with(payment_method.stripe_id)
@@ -197,7 +199,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show invoice details" do
-        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         10.times do
           billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
@@ -251,7 +253,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show invoice full page for generating PDF" do
-        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
 
