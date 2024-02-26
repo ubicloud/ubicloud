@@ -450,6 +450,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_configure_set?).and_yield
       expect { nx.wait }.to hop("configure")
     end
+
+    it "pushes restart if restart is set" do
+      expect(nx).to receive(:when_restart_set?).and_yield
+      expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
+      expect { nx.wait }.to hop("restart")
+    end
   end
 
   describe "#update_firewall_rules" do

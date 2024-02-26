@@ -10,7 +10,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup, :configure, :update_firewall_rules, :take_over, :destroy
+  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
+  semaphore :restart, :configure, :update_firewall_rules, :take_over, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil)
     DB.transaction do
@@ -272,6 +273,10 @@ SQL
       hop_configure
     end
 
+    when_restart_set? do
+      push self.class, frame, "restart"
+    end
+
     nap 30
   end
 
@@ -343,6 +348,7 @@ SQL
   end
 
   label def restart
+    decr_restart
     vm.sshable.cmd("sudo postgres/bin/restart")
     pop "postgres server is restarted"
   end
