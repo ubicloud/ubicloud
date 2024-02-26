@@ -8,7 +8,7 @@ if (suite = ENV.delete("COVERAGE"))
     minimum_coverage line: 100, branch: 100
     minimum_coverage_by_file line: 100, branch: 100
 
-    command_name suite
+    command_name "#{suite}#{ENV["TEST_ENV_NUMBER"]}"
 
     # rhizome (dataplane) and controlplane should have separate coverage reports.
     # They will have different coverage suites in future.
