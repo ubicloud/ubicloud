@@ -23,13 +23,24 @@ EOS
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
       expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
 Mounted on                   1B-blocks        Avail
-/var/storage/devices/stor1   205520896     99571712
-/var/storage/devices/stor2  3331416064   3331276800
+/var/storage/devices/stor1  6205520896   3099571712
+/var/storage/devices/stor2  3331416064   1531276800
 EOS
-      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 3, total_storage_gib: 15)
-      expect { ls.start }.to exit({"total_storage_gib" => 3, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
-        StorageDevice.map(&:name).sort
-      }.from(%w[stor1]).to(%w[stor1 stor2])
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      expect { ls.start }.to exit({"total_storage_gib" => 8, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
+        StorageDevice.map { |sd|
+          sd.values.slice(
+            :name, :available_storage_gib, :total_storage_gib
+          )
+        }.sort_by { _1[:name] }
+      }.from(
+        [{name: "stor1", total_storage_gib: 100, available_storage_gib: 100}]
+      ).to(
+        [
+          {name: "stor1", total_storage_gib: 5, available_storage_gib: 2},
+          {name: "stor2", total_storage_gib: 3, available_storage_gib: 1}
+        ]
+      )
     end
   end
 
@@ -37,7 +48,7 @@ EOS
     subject(:ls) { described_class.new(Strand.new) }
 
     let(:sshable) { instance_double(Sshable) }
-    let(:vmh) { instance_double(VmHost, id: "746976d6-315b-8f71-95e6-367c4ac068d7", storage_devices: []) }
+    let(:vmh) { instance_double(VmHost, id: "746976d6-315b-8f71-95e6-367c4ac068d7") }
 
     before do
       expect(ls).to receive(:sshable).and_return(sshable).at_least(:once)

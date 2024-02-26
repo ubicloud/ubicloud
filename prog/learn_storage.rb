@@ -24,16 +24,13 @@ class Prog::LearnStorage < Prog::Base
 
   def df_command(path = "") = "df -B1 --output=target,size,avail #{path}"
 
-  def storage_device(name)
-    vm_host.storage_devices.find { _1.name == name } || StorageDevice.new_with_id(vm_host_id: vm_host.id, name: name)
-  end
-
   def make_model_instances
     devices = DfRecord.parse_all(sshable.cmd(df_command))
     if devices.none? { _1.optional_name }
       rec = DfRecord.parse_all(sshable.cmd(df_command("/var/storage"))).first
       [
-        storage_device("DEFAULT").set(
+        StorageDevice.new_with_id(
+          vm_host_id: vm_host.id, name: "DEFAULT",
           # reserve 5G the host.
           available_storage_gib: [rec.avail_gib - 5, 0].max,
           total_storage_gib: rec.size_gib
@@ -42,7 +39,8 @@ class Prog::LearnStorage < Prog::Base
     else
       devices.filter_map do |rec|
         next unless (name = rec.optional_name)
-        storage_device(name).set(
+        StorageDevice.new_with_id(
+          vm_host_id: vm_host.id, name: name,
           available_storage_gib: rec.avail_gib,
           total_storage_gib: rec.size_gib
         )
@@ -52,10 +50,17 @@ class Prog::LearnStorage < Prog::Base
 
   label def start
     total, avail = make_model_instances.each_with_object([0, 0]) { |sd, accum|
-      sd.save_changes
+      sd.skip_auto_validations(:unique) do
+        sd.insert_conflict(target: [:vm_host_id, :name],
+          update: {
+            total_storage_gib: Sequel[:excluded][:total_storage_gib],
+            available_storage_gib: Sequel[:excluded][:available_storage_gib]
+          }).save_changes
+      end
       accum[0] += sd.total_storage_gib
       accum[1] += sd.available_storage_gib
     }
+
     pop({"total_storage_gib" => total, "available_storage_gib" => avail,
          "msg" => "created StorageDevice records"})
   end
