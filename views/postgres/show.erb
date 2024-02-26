@@ -203,29 +203,53 @@
       </table>
     </div>
   <% end %>
-  <!-- Delete Card -->
-  <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
+  <% if Authorization.has_permission?(@current_user.id, ["Postgres:edit", "Postgres:delete"], @pg[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h3 class="text-base font-semibold leading-6 text-gray-900">Delete PostgreSQL database</h3>
-            <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this PostgreSQL database.</p>
+      <!-- Restart Card -->
+      <% if Authorization.has_permission?(@current_user.id, "Postgres:edit", @pg[:id]) %>
+        <div class="px-4 py-5 sm:p-6">
+          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restart" %>" role="form" method="POST">
+            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restart") %>
+            <div class="sm:flex sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Restart PostgreSQL database</h3>
+                <div class="mt-2 text-sm text-gray-500">
+                  <p>This action will restart the PostgreSQL database. The database will be offline momentarily, and all
+                    connections will be dropped.</p>
+                </div>
+              </div>
+              <div id="postgres-restart-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== render("components/form/submit_button", locals: { text: "Restart", extra_class: "restart-btn" }) %>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      <% end %>
+      <!-- Delete Card -->
+      <% if Authorization.has_permission?(@current_user.id, "Postgres:delete", @pg[:id]) %>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Delete PostgreSQL database</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>This action will permanently delete this PostgreSQL database.</p>
+              </div>
+            </div>
+            <div id="postgres-delete-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== render(
+                "components/delete_button",
+                locals: {
+                  url: request.path,
+                  confirmation: @pg[:name],
+                  redirect: "#{@project_data[:path]}/postgres"
+                }
+              ) %>
             </div>
           </div>
-          <div id="postgres-delete-<%=@pg[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                url: request.path,
-                confirmation: @pg[:name],
-                redirect: "#{@project_data[:path]}/postgres"
-              }
-            ) %>
-          </div>
         </div>
-      </div>
+      <% end %>
     </div>
   <% end %>
 </div>
