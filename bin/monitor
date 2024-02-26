@@ -15,6 +15,7 @@ loop do
   resources = MONITORABLE_RESOURCE_TYPES.flat_map { _1.all }
 
   resources.each do |r|
+    break if Thread.list.count + 2 > Config.max_monitor_threads
     ssh_threads[r.id] ||= Thread.new do
       loop do
         sessions[r.id] = r.init_health_monitor_session

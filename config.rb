@@ -48,6 +48,7 @@ module Config
   optional :stripe_secret_key, string, clear: true
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
+  override :max_monitor_threads, 32, int
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
