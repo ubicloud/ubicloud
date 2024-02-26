@@ -2,7 +2,7 @@
 
 ENV["RACK_ENV"] = "test"
 require_relative "../../model"
-raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
+raise "test database doesn't end with test" if DB.opts[:database] && !/test\d*\z/.match?(DB.opts[:database])
 
 require_relative "../spec_helper"
 

@@ -144,6 +144,8 @@ GEM
       openssl (> 2.0)
     pagerduty (4.0.1)
     parallel (1.24.0)
+    parallel_tests (4.5.1)
+      parallel
     parser (3.3.0.5)
       ast (~> 2.4.1)
       racc
@@ -274,6 +276,9 @@ GEM
       bindata (~> 2.4)
       openssl (> 2.0)
       openssl-signature_algorithm (~> 1.0)
+    turbo_tests (2.2.0)
+      parallel_tests (>= 3.3.0, < 5)
+      rspec (>= 3.10)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     unaccent (0.4.0)
@@ -349,6 +354,7 @@ DEPENDENCIES
   standard (>= 1.24.3)
   stripe
   tilt (>= 2.2)
+  turbo_tests
   warning
   webauthn (~> 3.1)
   webmock

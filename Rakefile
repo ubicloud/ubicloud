@@ -1,49 +1,51 @@
 # frozen_string_literal: true
 
-# Migrate
+require "sequel"
 
-migrate = lambda do |env, version|
+# Migrate
+migrate = lambda do |env, version, db: nil|
   ENV["RACK_ENV"] = env
   require "bundler/setup"
   Bundler.setup
   require "logger"
-  require "sequel"
   require_relative "db"
   Sequel.extension :migration
-  DB.extension :pg_enum
 
-  DB.loggers << Logger.new($stdout) if DB.loggers.empty?
-  Sequel::Migrator.apply(DB, "migrate", version)
+  db ||= DB
+  db.extension :pg_enum
+
+  db.loggers << Logger.new($stdout) if db.loggers.empty?
+  Sequel::Migrator.apply(db, "migrate", version)
 
   # Check if the alternate-user password hash user needs to run
   # migrations.  It's desirable to avoid always connecting to run
   # migrations, since, almost always, there will be nothing to do and
   # it gluts output.
-  case DB[<<SQL].get
+  case db[<<SQL].get
 SELECT count(*)
 FROM pg_class
 WHERE relnamespace = 'public'::regnamespace AND relname = 'account_password_hashes'
 SQL
   when 0
-    user = DB.get(Sequel.lit("current_user"))
+    user = db.get(Sequel.lit("current_user"))
     ph_user = "#{user}_password"
 
     # NB: this grant/revoke cannot be transaction-isolated, so, in
     # sensitive settings, it would be good to check role access.
-    DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
-    Sequel.postgres(**DB.opts.merge(user: ph_user)) do |db|
-      db.loggers << Logger.new($stdout) if db.loggers.empty?
-      Sequel::Migrator.run(db, "migrate/ph", table: "schema_migrations_password")
+    db["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
+    Sequel.postgres(**db.opts.merge(user: ph_user)) do |ph_db|
+      ph_db.loggers << Logger.new($stdout) if ph_db.loggers.empty?
+      Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
 
       if Config.test?
         # User doesn't have permission to run TRUNCATE on password hash tables, so DatabaseCleaner
         # can't clean Rodauth tables between test runs. While running migrations for test database,
         # we allow it, so cleaner can clean them.
-        db["GRANT TRUNCATE ON account_password_hashes TO ?", user.to_sym].get
-        db["GRANT TRUNCATE ON account_previous_password_hashes TO ?", user.to_sym].get
+        ph_db["GRANT TRUNCATE ON account_password_hashes TO ?", user.to_sym].get
+        ph_db["GRANT TRUNCATE ON account_previous_password_hashes TO ?", user.to_sym].get
       end
     end
-    DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
+    db["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
   when 1
     # Already ran the "ph" migration as the alternate user.  This
     # branch is taken nearly all the time in a production situation.
@@ -91,6 +93,29 @@ task :prod_up do
   migrate.call("production", nil)
 end
 
+# Database setup
+desc "Setup database"
+task :setup_database, [:env, :parallel] do |_, args|
+  raise "env must be test or dev" if !["test", "development"].include?(args[:env])
+  raise "parallel can only be used in test" if args[:parallel] && args[:env] != "test"
+
+  database_count = args[:parallel] ? `nproc`.to_i : 1
+  threads = []
+  database_count.times do |i|
+    threads << Thread.new do
+      puts "Creating database #{i}..."
+      database_name = "clover_#{args[:env]}#{args[:parallel] ? i : ""}"
+      `dropdb --if-exists -U postgres #{database_name}`
+      `createdb -U postgres -O clover #{database_name}`
+      `psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}`
+      db = Sequel.connect("postgres:///#{database_name}?user=clover")
+      migrate.call(args[:env], nil, db: db)
+    end
+  end
+
+  threads.each(&:join)
+end
+
 desc "Generate a new .env.rb"
 task :overwrite_envrb do
   require "securerandom"
@@ -101,7 +126,7 @@ task :overwrite_envrb do
 case ENV["RACK_ENV"] ||= "development"
 when "test"
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
-  ENV["CLOVER_DATABASE_URL"] ||= 'postgres:///clover_test?user=clover'
+  ENV["CLOVER_DATABASE_URL"] ||= 'postgres:///clover_test#{ENV["TEST_ENV_NUMBER"]}?user=clover'
   ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
 else
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"

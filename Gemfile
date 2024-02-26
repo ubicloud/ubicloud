@@ -47,6 +47,7 @@ group :development do
   gem "rubocop-sequel"
   gem "standard", ">= 1.24.3"
   gem "simplecov"
+  gem "turbo_tests"
 end
 
 group :test do

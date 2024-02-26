@@ -3,6 +3,7 @@ coverage
 spec/examples.txt
 demo/.env
 var/*
+tmp/*
 
 # rhizome/Gemfile is combination of all Gemfiles in subdirectories, so does rhizome/Gemfile.lock
 rhizome/*/Gemfile.lock

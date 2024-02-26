@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
-raise "test database doesn't end with test" if DB.opts[:database] && !DB.opts[:database].end_with?("test")
+raise "test database doesn't end with test" if DB.opts[:database] && !/test\d*\z/.match?(DB.opts[:database])
 
 TEST_USER_EMAIL = "user@example.com"
 TEST_USER_PASSWORD = "Secret@Password123"
