@@ -44,7 +44,9 @@ RSpec.describe InvoiceGenerator do
         "country" => "NL",
         "city" => nil,
         "state" => nil,
-        "postal_code" => nil
+        "postal_code" => nil,
+        "tax_id" => "123456",
+        "company_name" => nil
       } : nil,
       "issuer_info" => {
         "address" => "310 Santa Ana Avenue",
@@ -134,7 +136,7 @@ RSpec.describe InvoiceGenerator do
 
   it "generates invoice for project with billing info" do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
-    expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}}).at_least(:once)
+    expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"country" => "NL"}}).at_least(:once)
 
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
     bi = BillingInfo.create_with_id(stripe_id: "cs_1234567890")

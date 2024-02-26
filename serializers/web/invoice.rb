@@ -36,6 +36,8 @@ class Serializers::Web::Invoice < Serializers::Base
         billing_city: inv.content.dig("billing_info", "city"),
         billing_state: inv.content.dig("billing_info", "state"),
         billing_postal_code: inv.content.dig("billing_info", "postal_code"),
+        tax_id: inv.content.dig("billing_info", "tax_id"),
+        company_name: inv.content.dig("billing_info", "company_name"),
         issuer_address: inv.content.dig("issuer_info", "address"),
         issuer_country: ISO3166::Country.new(inv.content.dig("issuer_info", "country"))&.common_name,
         issuer_city: inv.content.dig("issuer_info", "city"),

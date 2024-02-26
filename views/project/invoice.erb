@@ -63,8 +63,16 @@
         <div class="mt-8 grid grid-cols-2 gap-3">
           <div>
             <h3 class="text-lg font-semibold text-gray-800">Bill to:</h3>
-            <h3 class="text-lg font-semibold text-gray-800"><%= @invoice_data[:billing_name] %></h3>
+            <h3 class="text-lg font-semibold text-gray-800">
+              <%= @invoice_data[:billing_name] %>
+              <% if @invoice_data[:company_name] %>
+                - <%= @invoice_data[:company_name] %>
+              <% end %>
+            </h3>
             <address class="mt-2 not-italic text-gray-500">
+              <% if @invoice_data[:tax_id] %>
+                Tax ID: <%= @invoice_data[:tax_id] %> <br>
+              <% end %>
               <%= @invoice_data[:billing_address] %>,<br>
               <%= @invoice_data[:billing_city] %>,
               <%= @invoice_data[:billing_state] %>

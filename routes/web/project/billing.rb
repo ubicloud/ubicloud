@@ -34,6 +34,10 @@ class CloverWeb
             postal_code: r.params["postal_code"],
             line1: r.params["address"],
             line2: nil
+          },
+          metadata: {
+            tax_id: r.params["tax_id"],
+            company_name: r.params["company_name"]
           }
         })
 

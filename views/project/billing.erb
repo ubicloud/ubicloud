@@ -142,6 +142,26 @@
                     }
                   ) %>
                 </div>
+                <div class="sm:col-span-4">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "tax_id",
+                      label: "Tax ID (Optional)",
+                      value: @billing_info_data[:tax_id]
+                    }
+                  ) %>
+                </div>
+                <div class="sm:col-span-4">
+                  <%== render(
+                    "components/form/text",
+                    locals: {
+                      name: "company_name",
+                      label: "Company Name (Optional)",
+                      value: @billing_info_data[:company_name]
+                    }
+                  ) %>
+                </div>
               </div>
             </div>
           </div>

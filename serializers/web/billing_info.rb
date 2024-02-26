@@ -14,7 +14,9 @@ class Serializers::Web::BillingInfo < Serializers::Base
       country: bi.stripe_data["address"]["country"],
       city: bi.stripe_data["address"]["city"],
       state: bi.stripe_data["address"]["state"],
-      postal_code: bi.stripe_data["address"]["postal_code"]
+      postal_code: bi.stripe_data["address"]["postal_code"],
+      tax_id: bi.stripe_data["metadata"]["tax_id"],
+      company_name: bi.stripe_data["metadata"]["company_name"]
     } : {})
   end
 
