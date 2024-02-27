@@ -12,7 +12,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
     ))
   }
 
-  let(:spdk_version) { "v23.09" }
+  let(:spdk_version) { "v23.09-ubi-0.2" }
   let(:sshable) {
     instance_double(Sshable)
   }

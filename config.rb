@@ -101,7 +101,7 @@ module Config
   override :minio_version, "minio_20231007150738.0.0_amd64"
 
   # Spdk
-  override :spdk_version, "v23.09"
+  override :spdk_version, "v23.09-ubi-0.2"
 
   # Pagerduty
   optional :pagerduty_key, string, clear: true

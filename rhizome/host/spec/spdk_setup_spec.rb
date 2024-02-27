@@ -68,8 +68,8 @@ RSpec.describe SpdkSetup do
 
   describe "#create_hugepages_mount" do
     it "creates the hugepages mount" do
-      expect(spdk_setup).to receive(:r).with("sudo --user=spdk mkdir -p /home/spdk/hugepages.#{spdk_version}")
-      expect(File).to receive(:write).with("/lib/systemd/system/home-spdk-hugepages.#{spdk_version}.mount", /.*/)
+      expect(spdk_setup).to receive(:r).with("sudo --user=spdk mkdir -p /home/spdk/hugepages.#{spdk_version.tr("-", ".")}")
+      expect(File).to receive(:write).with("/lib/systemd/system/home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount", /.*/)
       expect { spdk_setup.create_hugepages_mount }.not_to raise_error
     end
   end
@@ -77,7 +77,7 @@ RSpec.describe SpdkSetup do
   describe "#enable_services" do
     it "enables services" do
       expect(spdk_setup).to receive(:r).with("systemctl enable spdk-#{spdk_version}.service")
-      expect(spdk_setup).to receive(:r).with("systemctl enable home-spdk-hugepages.#{spdk_version}.mount")
+      expect(spdk_setup).to receive(:r).with("systemctl enable home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
       expect { spdk_setup.enable_services }.not_to raise_error
     end
   end
@@ -85,7 +85,7 @@ RSpec.describe SpdkSetup do
   describe "#start_services" do
     it "starts services" do
       expect(spdk_setup).to receive(:r).with("systemctl start spdk-#{spdk_version}.service")
-      expect(spdk_setup).to receive(:r).with("systemctl start home-spdk-hugepages.#{spdk_version}.mount")
+      expect(spdk_setup).to receive(:r).with("systemctl start home-spdk-hugepages.#{spdk_version.tr("-", ".")}.mount")
       expect { spdk_setup.start_services }.not_to raise_error
     end
   end

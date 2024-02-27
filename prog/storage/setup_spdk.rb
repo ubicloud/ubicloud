@@ -4,8 +4,6 @@ class Prog::Storage::SetupSpdk < Prog::Base
   subject_is :sshable, :vm_host
 
   SUPPORTED_SPDK_VERSIONS = [
-    ["v23.09", "arm64"],
-    ["v23.09", "x64"],
     ["v23.09-ubi-0.2", "x64"],
     ["v23.09-ubi-0.2", "arm64"]
   ]
