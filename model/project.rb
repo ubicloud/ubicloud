@@ -14,6 +14,7 @@ class Project < Sequel::Model
   many_to_many :postgres_resources, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
+  one_to_many :concessions
 
   dataset_module Authorization::Dataset
 
