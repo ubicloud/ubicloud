@@ -64,7 +64,7 @@ jobs:
         CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
         HETZNER_PASSWORD: ${{ secrets.HETZNER_PASSWORD }}
-      run: foreman start
+      run: timeout 40m foreman start
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
