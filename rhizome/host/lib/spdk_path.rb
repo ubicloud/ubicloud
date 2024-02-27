@@ -3,7 +3,7 @@
 # YYY: Remove all checks against this after upgrading all legacy systems
 LEGACY_SPDK_VERSION = "LEGACY_SPDK_VERSION"
 
-DEFAULT_SPDK_VERSION = "v23.09"
+DEFAULT_SPDK_VERSION = "v23.09-ubi-0.2"
 
 module SpdkPath
   def self.user

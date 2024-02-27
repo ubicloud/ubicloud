@@ -108,16 +108,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vm_host.sshable.cmd("sudo chmod a+rw #{tmp_dir}")
     vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
 
-    hop_install_bdev_ubid
-  end
-
-  label def install_bdev_ubid
-    version = "v23.09-ubi-0.2"
-    hop_wait if vm_host.spdk_installations.find { _1.version == version } || retval&.dig("msg") == "SPDK was setup"
-
-    # disable the default installation and install a bdev_ubi enabled spdk
-    vm_host.spdk_installations_dataset.update(allocation_weight: 0)
-    push Prog::Storage::SetupSpdk, {subject_id: vm_host.id, version: version, start_service: true, allocation_weight: 100}
+    hop_wait
   end
 
   label def wait

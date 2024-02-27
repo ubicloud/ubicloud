@@ -121,25 +121,14 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#run_integration_specs" do
-    it "hops to install_bdev_ubid" do
+    it "hops to wait" do
       tmp_dir = "/var/storage/tests"
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:cmd).with(
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
-      expect { hs_test.run_integration_specs }.to hop("install_bdev_ubid")
-    end
-  end
-
-  describe "#install_bdev_ubid" do
-    it "hops to wait if it's installed" do
-      expect(hs_test).to receive(:retval).and_return({"msg" => "SPDK was setup"})
-      expect { hs_test.install_bdev_ubid }.to hop("wait")
-    end
-
-    it "setups spdk with bdev_ubi" do
-      expect { hs_test.install_bdev_ubid }.to hop("start", "Storage::SetupSpdk")
+      expect { hs_test.run_integration_specs }.to hop("wait")
     end
   end
 
