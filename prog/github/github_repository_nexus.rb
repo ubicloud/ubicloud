@@ -22,9 +22,27 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     @client ||= Github.installation_client(github_repository.installation.installation_id).tap { _1.auto_paginate = true }
   end
 
+  # We dynamically adjust the polling interval based on the remaining rate
+  # limit. It's 5 minutes by default, but it can be increased if the rate limit
+  # is low.
+  def polling_interval
+    @polling_interval ||= 5 * 60
+  end
+
   def check_queued_jobs
     queued_runs = client.repository_workflow_runs(github_repository.name, {status: "queued"})[:workflow_runs]
     Clog.emit("polled queued runs") { {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count}} }
+
+    # We check the rate limit after the first API call to avoid unnecessary API
+    # calls to fetch only the rate limit. Every response includes the rate limit
+    # information in the headers.
+    remaining_quota = client.rate_limit.remaining / client.rate_limit.limit.to_f
+    if remaining_quota < 0.1
+      Clog.emit("low remaining quota") { {low_remaining_quota: {repository_name: github_repository.name, limit: client.rate_limit.limit, remaining: client.rate_limit.remaining}} }
+      @polling_interval = (client.rate_limit.resets_at - Time.now).to_i
+      return
+    end
+
     queued_labels = Hash.new(0)
     queued_runs.each do |run|
       jobs = client.workflow_run_attempt_jobs(github_repository.name, run[:id], run[:run_attempt])[:jobs]
@@ -56,6 +74,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         )
       end
     end
+
+    @polling_interval = (remaining_quota < 0.5) ? 15 * 60 : 5 * 60
   end
 
   def before_run
@@ -80,7 +100,9 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       end
     end
 
-    nap 5 * 60
+    # check_queued_jobs may have changed the default polling interval based on
+    # the remaining rate limit.
+    nap polling_interval
   end
 
   label def destroy
