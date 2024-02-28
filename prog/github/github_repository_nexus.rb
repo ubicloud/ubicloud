@@ -25,6 +25,13 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   def check_queued_jobs
     queued_runs = client.repository_workflow_runs(github_repository.name, {status: "queued"})[:workflow_runs]
     Clog.emit("polled queued runs") { {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count}} }
+
+    remaining_quota = client.rate_limit.remaining / client.rate_limit.limit.to_f
+    if remaining_quota < 0.1
+      Clog.emit("low remaining quota") { {low_remaining_quota: {repository_name: github_repository.name, limit: client.rate_limit.limit, remaining: client.rate_limit.remaining}} }
+      return (client.rate_limit.resets_at - Time.now).to_i
+    end
+
     queued_labels = Hash.new(0)
     queued_runs.each do |run|
       jobs = client.workflow_run_attempt_jobs(github_repository.name, run[:id], run[:run_attempt])[:jobs]
@@ -50,6 +57,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         )
       end
     end
+    (remaining_quota < 0.5) ? 15 * 60 : 5 * 60
   end
 
   def before_run
@@ -62,10 +70,11 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
+    polling_interval = 5 * 60
     should_destroy = (Time.now - github_repository.last_job_at > 6 * 60 * 60)
 
     begin
-      check_queued_jobs
+      polling_interval = check_queued_jobs
     rescue Octokit::NotFound
       Clog.emit("not found repository") { {not_found_repository: {repository_name: github_repository.name}} }
       should_destroy = true
@@ -76,7 +85,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       nap 0
     end
 
-    nap 5 * 60
+    nap polling_interval
   end
 
   label def destroy
