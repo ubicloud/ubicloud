@@ -39,7 +39,7 @@ class Prog::Vm::VmPool < Prog::Base
       skip_sync: vm_pool.storage_skip_sync
     }
     Prog::Vm::Nexus.assemble_with_sshable(
-      "runner",
+      "runneradmin",
       Config.vm_pool_project_id,
       size: vm_pool.vm_size,
       location: vm_pool.location,
