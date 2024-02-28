@@ -47,6 +47,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
         {id: 1, run_attempt: 2, status: "queued"},
         {id: 2, run_attempt: 1, status: "queued"}
       ]})
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).and_return({jobs: [
         {status: "queued", labels: ["ubuntu-latest"]},
         {status: "queued", labels: ["ubicloud"]},
@@ -66,6 +67,23 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4")
       expect(Prog::Vm::GithubRunner).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8")
       nx.check_queued_jobs
+      expect(nx.polling_interval).to eq(5 * 60)
+    end
+
+    it "naps until the resets_at if remaining quota is low" do
+      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
+      now = Time.now
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: now + 8 * 60)).at_least(:once)
+      expect(Time).to receive(:now).and_return(now)
+      nx.check_queued_jobs
+      expect(nx.polling_interval).to eq(8 * 60)
+    end
+
+    it "increases polling interval if remaining quota is lower than 0.5" do
+      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 40, limit: 100)).at_least(:once)
+      nx.check_queued_jobs
+      expect(nx.polling_interval).to eq(15 * 60)
     end
   end
 
