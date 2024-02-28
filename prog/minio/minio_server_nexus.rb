@@ -44,6 +44,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     when_destroy_set? do
       if strand.label != "destroy"
         hop_destroy
+      elsif strand.stack.count > 1
+        pop "operation is cancelled due to the destruction of the minio server"
       end
     end
   end
