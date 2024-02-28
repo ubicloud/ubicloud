@@ -43,7 +43,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-      "runneradmin",
+      "runner",
       Config.github_runner_service_project_id,
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
@@ -135,23 +135,6 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def wait_vm
     nap 5 unless vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
-    hop_create_runner_user
-  end
-
-  label def create_runner_user
-    # Sending addgroup and adduser separately, as there is no way
-    # to force group and user has specific names and ids with a
-    # single command
-    command = <<~COMMAND
-      set -ueo pipefail
-      sudo userdel -rf runner || true
-      sudo addgroup --gid 1001 runner
-      sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
-      echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
-    COMMAND
-
-    vm.sshable.cmd(command.gsub(/^(# .*)?\n/, ""))
-
     hop_setup_environment
   end
 
@@ -194,23 +177,16 @@ class Prog::Vm::GithubRunner < Prog::Base
 
       # We placed the script in the "/usr/local/share/" directory while generating
       # the golden image. However, it needs to be moved to the home directory because
-      # the runner creates some configuration files at the script location. Since the
-      # github runner vm is created with the runneradmin user, directory is first moved
-      # to runneradmin user's home directory. At the end of this script, it will be moved
-      # to runner user's home folder. We move actions-runner separately below for idempotency
-      # purposes, as the first one guarantees to continue in case the script fails after that
-      # line, and the latter guarateens to continue if the script fails after moving
-      # actions-runner from ./ to /home/runner
+      # the runner creates some configuration files at the script location. The "runner"
+      # user doesn't have write permission for the "/usr/local/share/" directory.
       sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
-      sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
-      sudo chown -R runneradmin:runneradmin actions-runner
+      sudo chown -R runner:runner actions-runner
 
       # ./env.sh sets some variables for runner to run properly
       ./actions-runner/env.sh
 
-      # Include /etc/environment in the runneradmin environment to move it to the
-      # runner enviornment at the end of this script, it's otherwise ignored, and
-      # this omission has caused problems.
+      # Include /etc/environment in the runner environment, it's
+      # otherwise ignored, and this omission has caused problems.
       # See https://github.com/actions/runner/issues/1703
       cat <<EOT > ./actions-runner/run-withenv.sh
       #!/bin/bash
@@ -228,10 +204,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       # The `imagedata.json` file contains information about the generated image.
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
       # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
-      cat /imagegeneration/imagedata.json | jq '. += [#{setup_info.to_json}]' > ./actions-runner/.setup_info
-
-      sudo mv ./actions-runner /home/runner/
-      sudo chown -R runner:runner /home/runner/actions-runner
+      cat /imagegeneration/imagedata.json | jq '. += [#{setup_info.to_json}]' > /home/runner/actions-runner/.setup_info
     COMMAND
 
     # Remove comments and empty lines before sending them to the machine
@@ -252,7 +225,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # having to store the encoded_jit_config.
     vm.sshable.cmd("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner " \
                    "--working-directory '/home/runner' --unit #{SERVICE_NAME} --remain-after-exit -- " \
-                   "/home/runner/actions-runner/run-withenv.sh {}",
+                   "./actions-runner/run-withenv.sh {}",
       stdin: response[:encoded_jit_config])
 
     hop_wait

@@ -77,7 +77,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
-      expect(vm.sshable.unix_user).to eq("runneradmin")
+      expect(vm.sshable.unix_user).to eq("runner")
       expect(vm.family).to eq("standard")
       expect(vm.cores).to eq(2)
       expect(vm.projects.map(&:id)).to include(Config.github_runner_service_project_id)
@@ -96,7 +96,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
-      expect(vm.sshable.unix_user).to eq("runneradmin")
+      expect(vm.sshable.unix_user).to eq("runner")
       expect(vm.family).to eq("standard")
       expect(vm.cores).to eq(2)
     end
@@ -261,7 +261,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops if vm is ready" do
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
-      expect { nx.wait_vm }.to hop("create_runner_user")
+      expect { nx.wait_vm }.to hop("setup_environment")
     end
   end
 
@@ -275,20 +275,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
-  describe "#create_runner_user" do
-    it "hops to setup environment" do
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
-        set -ueo pipefail
-        sudo userdel -rf runner || true
-        sudo addgroup --gid 1001 runner
-        sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
-        echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
-      COMMAND
-
-      expect { nx.create_runner_user }.to hop("setup_environment")
-    end
-  end
-
   describe "#setup_environment" do
     it "hops to register_runner" do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
@@ -298,8 +284,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
         source /etc/environment
         sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
-        sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
-        sudo chown -R runneradmin:runneradmin actions-runner
+        sudo chown -R runner:runner actions-runner
         ./actions-runner/env.sh
         cat <<EOT > ./actions-runner/run-withenv.sh
         #!/bin/bash
@@ -308,9 +293,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         EOT
         chmod +x ./actions-runner/run-withenv.sh
         echo "PATH=$PATH" >> ./actions-runner/.env
-        cat /imagegeneration/imagedata.json | jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github"}]' > ./actions-runner/.setup_info
-        sudo mv ./actions-runner /home/runner/
-        sudo chown -R runner:runner /home/runner/actions-runner
+        cat /imagegeneration/imagedata.json | jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github"}]' > /home/runner/actions-runner/.setup_info
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -320,7 +303,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#register_runner" do
     it "registers runner hops" do
       expect(client).to receive(:post).with(/.*generate-jitconfig/, hash_including(name: github_runner.ubid.to_s, labels: [github_runner.label])).and_return({runner: {id: 123}, encoded_jit_config: "AABBCC"})
-      expect(sshable).to receive(:cmd).with("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- /home/runner/actions-runner/run-withenv.sh {}",
+      expect(sshable).to receive(:cmd).with("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner --working-directory '/home/runner' --unit runner-script --remain-after-exit -- ./actions-runner/run-withenv.sh {}",
         stdin: "AABBCC")
       expect(github_runner).to receive(:update).with(runner_id: 123, ready_at: anything)
 
