@@ -229,6 +229,17 @@ RSpec.describe InvoiceGenerator do
     expect(after["credit"]).to eq(11)
     expect(p1.reload.credit).to eq(0)
   end
+
+  it "handles full discount and github runner credits together" do
+    github_runner = GithubRunner.create_with_id(label: "ubicloud", repository_name: "my-repo")
+    generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+    generate_billing_record(p1, github_runner, Sequel::Postgres::PGRange.new(begin_time - 90 * day, end_time + 90 * day))
+
+    p1.update(credit: 0, discount: 100)
+    invoice = described_class.new(begin_time, end_time, save_result: true).run.first.content
+
+    expect(invoice["cost"]).to eq(0)
+  end
 end
 
 # rubocop:enable RSpec/NoExpectationExample
