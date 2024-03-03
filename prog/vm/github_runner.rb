@@ -159,23 +159,6 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def wait_vm
     nap 5 unless vm.strand.label == "wait"
     register_deadline(:wait, 10 * 60)
-    hop_create_runner_user
-  end
-
-  label def create_runner_user
-    # Sending addgroup and adduser separately, as there is no way
-    # to force group and user has specific names and ids with a
-    # single command
-    command = <<~COMMAND
-      set -ueo pipefail
-      sudo userdel -rf runner || true
-      sudo addgroup --gid 1001 runner
-      sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
-      echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
-    COMMAND
-
-    vm.sshable.cmd(command.gsub(/^(# .*)?\n/, ""))
-
     hop_setup_environment
   end
 
@@ -204,6 +187,17 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   label def setup_environment
     command = <<~COMMAND
+      # To make sure the script errors out if any command fails
+      set -ueo pipefail
+
+      # Since standard Github runners have both runneradmin and runner users
+      # VMs of github runners are created with runneradmin user. Adding
+      # runner user and group with the same id and gid as the standard.
+      sudo userdel -rf runner || true
+      sudo addgroup --gid 1001 runner
+      sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
+      echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
+
       # runner unix user needed access to manipulate the Docker daemon.
       # Default GitHub hosted runners have additional adm,systemd-journal groups.
       sudo usermod -a -G docker,adm,systemd-journal runner

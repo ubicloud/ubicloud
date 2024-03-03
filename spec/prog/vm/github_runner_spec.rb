@@ -351,7 +351,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops if vm is ready" do
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:strand).and_return(Strand.new(label: "wait"))
-      expect { nx.wait_vm }.to hop("create_runner_user")
+      expect { nx.wait_vm }.to hop("setup_environment")
     end
   end
 
@@ -365,25 +365,16 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
   end
 
-  describe "#create_runner_user" do
-    it "hops to setup environment" do
+  describe "#setup_environment" do
+    it "hops to register_runner" do
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
         sudo userdel -rf runner || true
         sudo addgroup --gid 1001 runner
         sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
         echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
-      COMMAND
-
-      expect { nx.create_runner_user }.to hop("setup_environment")
-    end
-  end
-
-  describe "#setup_environment" do
-    it "hops to register_runner" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
-      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
         sudo usermod -a -G docker,adm,systemd-journal runner
         sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
         source /etc/environment
