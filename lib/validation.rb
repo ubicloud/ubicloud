@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "time"
+require "netaddr"
 
 module Validation
   class ValidationFailed < CloverError
@@ -26,6 +27,8 @@ module Validation
 
   # Minio user name, we are using ALLOWED_OS_USER_NAME_PATTERN with min length of 3
   ALLOWED_MINIO_USERNAME_PATTERN = '\A[a-z_][a-z0-9_-]{2,31}\z'
+
+  ALLOWED_PORT_RANGE_PATTERN = '\A(\d+)(?:\.\.(\d+))?\z'
 
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
@@ -106,5 +109,27 @@ module Validation
     unless messages.empty?
       fail ValidationFailed.new({"original_password" => messages.map { _1 }})
     end
+  end
+
+  def self.validate_cidr(cidr)
+    NetAddr::IPv4Net.parse(cidr)
+  rescue NetAddr::ValidationError
+    fail ValidationFailed.new({CIDR: "Invalid CIDR"})
+  end
+
+  def self.validate_port_range(port_range)
+    fail ValidationFailed.new({port_range: "Invalid port range"}) unless (match = port_range.match(ALLOWED_PORT_RANGE_PATTERN))
+    start_port = match[1].to_i
+
+    if match[2]
+      end_port = match[2].to_i
+      fail ValidationFailed.new({port_range: "Start port must be between 0 to 65535"}) unless (0..65535).cover?(start_port)
+      fail ValidationFailed.new({port_range: "End port must be between 0 to 65535"}) unless (0..65535).cover?(end_port)
+      fail ValidationFailed.new({port_range: "Start port must be smaller than or equal to end port"}) unless start_port <= end_port
+    else
+      fail ValidationFailed.new({port_range: "Port must be between 0 to 65535"}) unless (0..65535).cover?(start_port)
+    end
+
+    end_port ? [start_port, end_port] : [start_port]
   end
 end
