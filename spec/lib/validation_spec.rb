@@ -199,5 +199,37 @@ RSpec.describe Validation do
         expect { described_class.validate_postgres_superuser_password("Different12345", "dIFFERENT12345") }.to raise_error(described_class::ValidationFailed)
       end
     end
+
+    describe "#validate_port_range" do
+      it "valid port range" do
+        expect(described_class.validate_port_range("1234")).to eq([1234])
+        expect(described_class.validate_port_range("1234..1235")).to eq([1234, 1235])
+        expect(described_class.validate_port_range("1234..1234")).to eq([1234, 1234])
+      end
+
+      it "invalid port range" do
+        expect { described_class.validate_port_range("") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_port_range("65555") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_port_range("0..65555") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_port_range("10..9") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_port_range("65556..65556") }.to raise_error described_class::ValidationFailed
+      end
+    end
+
+    describe "#validate_cidr" do
+      it "valid cidr" do
+        expect { described_class.validate_cidr("0.0.0.0/0") }.not_to raise_error
+        expect { described_class.validate_cidr("0.0.0.0/1") }.not_to raise_error
+        expect { described_class.validate_cidr("192.168.1.0/24") }.not_to raise_error
+        expect { described_class.validate_cidr("255.255.255.255/0") }.not_to raise_error
+      end
+
+      it "invalid cidr" do
+        expect { described_class.validate_cidr("192.168.1.256/24") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_cidr("10.256.0.0/8") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_cidr("172.16.0.0/33") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_cidr("not_a_cidr") }.to raise_error described_class::ValidationFailed
+      end
+    end
   end
 end
