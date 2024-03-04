@@ -67,33 +67,13 @@ RSpec.describe Prog::DownloadBootImage do
   end
 
   describe "#learn_storage" do
-    it "starts a number of sub-programs" do
-      expect(dbi).to receive(:bud).with(Prog::LearnStorage)
-      expect { dbi.learn_storage }.to hop("wait_learn_storage")
-    end
-  end
-
-  describe "#wait_learn_storage" do
-    it "updates the vm_host record from the finished programs" do
-      expect(vm_host).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
-      expect(dbi).to receive(:reap).and_return([
-        instance_double(Strand, prog: "LearnStorage", exitval: {"total_storage_gib" => 300, "available_storage_gib" => 500}),
-        instance_double(Strand, prog: "ArbitraryOtherProg")
-      ])
-
-      expect { dbi.wait_learn_storage }.to hop("activate_host")
+    it "pushes the learn storage program" do
+      expect { dbi.learn_storage }.to hop("start", "LearnStorage")
     end
 
-    it "crashes if an expected field is not set for LearnStorage" do
-      expect(dbi).to receive(:reap).and_return([instance_double(Strand, prog: "LearnStorage", exitval: {})])
-      expect { dbi.wait_learn_storage }.to raise_error KeyError, "key not found: \"total_storage_gib\""
-    end
-
-    it "donates to children if they are not exited yet" do
-      expect(dbi).to receive(:reap).and_return([])
-      expect(dbi).to receive(:leaf?).and_return(false)
-      expect(dbi).to receive(:donate).and_call_original
-      expect { dbi.wait_learn_storage }.to nap(0)
+    it "hops once SetupHugepages has returned" do
+      dbi.strand.retval = {"total_storage_gib" => 300, "available_storage_gib" => 500}
+      expect { dbi.learn_storage }.to hop("activate_host")
     end
   end
 

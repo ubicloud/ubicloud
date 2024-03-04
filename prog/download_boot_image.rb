@@ -49,27 +49,16 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def learn_storage
-    bud Prog::LearnStorage
-    hop_wait_learn_storage
-  end
-
-  label def wait_learn_storage
-    reap.each do |st|
-      case st.prog
-      when "LearnStorage"
-        kwargs = {
-          total_storage_gib: st.exitval.fetch("total_storage_gib"),
-          available_storage_gib: st.exitval.fetch("available_storage_gib")
-        }
-
-        vm_host.update(**kwargs)
-      end
-    end
-
-    if leaf?
+    if retval
+      kwargs = {
+        total_storage_gib: retval.fetch("total_storage_gib"),
+        available_storage_gib: retval.fetch("available_storage_gib")
+      }
+      vm_host.update(**kwargs)
       hop_activate_host
     end
-    donate
+
+    push Prog::LearnStorage
   end
 
   label def activate_host
