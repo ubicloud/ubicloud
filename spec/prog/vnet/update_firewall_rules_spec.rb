@@ -83,8 +83,7 @@ elements = {fd00::/64 . 0-9999,fd00::1/128 . 10000-65535}
 
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
-    ip protocol tcp counter flow offload @ubi_flowtable
-    ip protocol udp counter flow offload @ubi_flowtable
+    meta l4proto { tcp, udp } flow offload @ubi_flowtable
     meta l4proto { tcp, udp } th dport 111 drop
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
@@ -162,8 +161,7 @@ table inet fw_table {
 
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
-    ip protocol tcp counter flow offload @ubi_flowtable
-    ip protocol udp counter flow offload @ubi_flowtable
+    meta l4proto { tcp, udp } flow offload @ubi_flowtable
     meta l4proto { tcp, udp } th dport 111 drop
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
