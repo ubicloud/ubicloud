@@ -14,6 +14,7 @@ class PostgresResource < Sequel::Model
 
   plugin :association_dependencies, firewall_rules: :destroy
   dataset_module Authorization::Dataset
+  dataset_module Pagination
 
   include ResourceMethods
   include SemaphoreMethods
