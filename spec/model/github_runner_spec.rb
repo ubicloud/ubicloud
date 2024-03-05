@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe GithubRunner do
   subject(:github_runner) { described_class.new }
 
-  let(:vm) { instance_double(Vm, sshable: instance_double(Sshable)) }
+  let(:vm) { instance_double(Vm, sshable: instance_double(Sshable), cores: 2) }
 
   before do
     allow(github_runner).to receive_messages(vm: vm)

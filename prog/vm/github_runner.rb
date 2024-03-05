@@ -126,9 +126,22 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def start
+    hop_wait_concurrency_limit unless concurrency_available?
+    hop_allocate_vm
+  end
+
+  label def wait_concurrency_limit
+    Clog.emit("Waiting for customer concurrency limit") { {github_runner: github_runner.values} }
+
+    hop_allocate_vm if concurrency_available?
+    nap 5
+  end
+
+  label def allocate_vm
     picked_vm = pick_vm
     github_runner.update(vm_id: picked_vm.id)
     picked_vm.update(name: github_runner.ubid.to_s)
+
     hop_wait_vm
   end
 
@@ -153,6 +166,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     vm.sshable.cmd(command.gsub(/^(# .*)?\n/, ""))
 
     hop_setup_environment
+  end
+
+  def concurrency_available?
+    github_runner.installation.project_dataset.for_update.all
+    github_runner.installation.project.runner_core_limit > github_runner.installation.project.github_installations.sum(&:total_active_runner_cores)
   end
 
   def setup_info
