@@ -17,11 +17,15 @@ RSpec.describe Prog::Vm::Nexus do
       init_vector: "iv", auth_data: "somedata"
     ) { _1.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
     si = SpdkInstallation.new(version: "v1") { _1.id = SpdkInstallation.generate_uuid }
-    disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0)
+    dev1 = StorageDevice.new(name: "nvme0") { _1.id = StorageDevice.generate_uuid }
+    dev2 = StorageDevice.new(name: "DEFAULT") { _1.id = StorageDevice.generate_uuid }
+    disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false)
     disk_1.spdk_installation = si
     disk_1.key_encryption_key_1 = kek
-    disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1)
+    disk_1.storage_device = dev1
+    disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true)
     disk_2.spdk_installation = si
+    disk_2.storage_device = dev2
     vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1").tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
@@ -183,6 +187,17 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  describe "#storage_volumes" do
+    it "includes all storage volumes" do
+      expect(nx.storage_volumes).to eq([
+        {"boot" => true, "disk_index" => 0, "image" => nil, "size_gib" => 20, "device_id" => "vm4hjdwr_0", "encrypted" => true,
+         "spdk_version" => "v1", "use_bdev_ubi" => false, "skip_sync" => false, "storage_device" => "nvme0"},
+        {"boot" => false, "disk_index" => 1, "image" => nil, "size_gib" => 15, "device_id" => "vm4hjdwr_1", "encrypted" => false,
+         "spdk_version" => "v1", "use_bdev_ubi" => true, "skip_sync" => true, "storage_device" => "DEFAULT"}
+      ])
+    end
+  end
+
   describe "#create_unix_user" do
     it "runs adduser" do
       sshable = instance_double(Sshable)
@@ -288,6 +303,7 @@ RSpec.describe Prog::Vm::Nexus do
       assigned_address = AssignedVmAddress.new(ip: NetAddr::IPv4Net.parse("10.0.0.1"))
 
       expect(nx).to receive(:allocate).and_return(vmh_id)
+      expect(nx).to receive(:allocate_storage_devices).and_return([])
       expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
       expect(vm).to receive(:ip4_enabled).and_return(true).twice
       expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
@@ -301,6 +317,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "fails if there is no ip address available but the vm is ip4 enabled" do
       expect(vmh).to receive(:ip4_random_vm_network).and_return([nil, nil])
       expect(vm).to receive(:ip4_enabled).and_return(true).at_least(:once)
+      expect(nx).to receive(:allocate_storage_devices).and_return([])
       expect { nx.start }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
 
@@ -324,6 +341,7 @@ RSpec.describe Prog::Vm::Nexus do
       # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
       expect(nx).to receive(:allocate).and_return(vmh_id).twice
       allow(Vm).to receive_message_chain(:join, :where).and_return([vm, vm], [vm]) # rubocop:disable RSpec/MessageChain
+      expect(nx).to receive(:allocate_storage_devices).and_return([]).at_least(:once)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
@@ -403,6 +421,15 @@ RSpec.describe Prog::Vm::Nexus do
       }.to raise_error(RuntimeError, "concurrent allocation_state modification requires re-allocation")
     end
 
+    it "fails if requested distinct storage devices, but only 1 device exists" do
+      new_host
+      allow(nx).to receive(:frame).and_return({
+        "storage_volumes" => [{"size_gib" => 5}, {"size_gib" => 10}],
+        "distinct_storage_devices" => true
+      })
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+    end
+
     it "fails if there are no VmHosts" do
       expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
@@ -452,8 +479,69 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx.allocate).to eq vmh.reload.id
       expect(vmh.used_cores).to eq(initial_vmh.used_cores + 1)
       expect(vmh.used_hugepages_1g).to eq(initial_vmh.used_hugepages_1g + 8)
-      expect(vmh.available_storage_gib).to eq(initial_vmh.available_storage_gib - 25)
-      expect(vmh.storage_devices_dataset[name: "DEFAULT"].available_storage_gib).to eq(initial_vmh.available_storage_gib - 25)
+    end
+  end
+
+  describe "#allocate_storage_devices" do
+    let(:vmh) {
+      id = VmHost.generate_uuid
+      Sshable.create { _1.id = id }
+      host = VmHost.create(location: "xyz") { _1.id = id }
+      SpdkInstallation.create(vm_host_id: id, version: "v1", allocation_weight: 100) { _1.id = id }
+      StorageDevice.create(
+        vm_host_id: host.id, name: "nvme0",
+        available_storage_gib: 100, total_storage_gib: 50
+      ) { _1.id = StorageDevice.generate_uuid }
+      StorageDevice.create(
+        vm_host_id: host.id, name: "DEFAULT",
+        available_storage_gib: 100, total_storage_gib: 100
+      ) { _1.id = host.id }
+      host
+    }
+
+    it "can allocate storage on the same device" do
+      storage_volumes = [{"size_gib" => 5}, {"size_gib" => 10}]
+      allow(nx).to receive(:frame).and_return({
+        "distinct_storage_devices" => false
+      })
+
+      volumes = nx.allocate_storage_devices(vmh, storage_volumes)
+      expect(volumes[0]["storage_device_id"]).not_to be_nil
+      expect(volumes[0]["storage_device_id"]).to eq(volumes[1]["storage_device_id"])
+    end
+
+    it "can allocate storage on distinct devices" do
+      storage_volumes = [{"size_gib" => 5}, {"size_gib" => 10}]
+      allow(nx).to receive(:frame).and_return({
+        "distinct_storage_devices" => true
+      })
+
+      volumes = nx.allocate_storage_devices(vmh, storage_volumes)
+      expect(volumes[0]["storage_device_id"]).not_to be_nil
+      expect(volumes[1]["storage_device_id"]).not_to be_nil
+      expect(volumes[0]["storage_device_id"]).not_to eq(volumes[1]["storage_device_id"])
+    end
+
+    it "fails if not enough space left" do
+      storage_volumes = [{"size_gib" => 65}, {"size_gib" => 160}]
+      allow(nx).to receive(:frame).and_return({
+        "distinct_storage_devices" => false
+      })
+
+      expect {
+        nx.allocate_storage_devices(vmh, storage_volumes)
+      }.to raise_error RuntimeError, "Storage device allocation failed"
+    end
+
+    it "skips the first device if it is too small" do
+      storage_volumes = [{"size_gib" => 51}, {"size_gib" => 30}]
+      allow(nx).to receive(:frame).and_return({
+        "distinct_storage_devices" => false
+      })
+
+      volumes = nx.allocate_storage_devices(vmh, storage_volumes)
+      expect(volumes[0]["storage_device_id"]).not_to be_nil
+      expect(volumes[0]["storage_device_id"]).to eq(volumes[1]["storage_device_id"])
     end
   end
 
@@ -466,19 +554,39 @@ RSpec.describe Prog::Vm::Nexus do
       host
     }
 
+    let(:storage_device) {
+      StorageDevice.create(vm_host_id: vmh.id, name: "nvme0", available_storage_gib: 100, total_storage_gib: 100) { _1.id = vmh.id }
+    }
+
     it "creates without encryption key if storage is not encrypted" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: false}])
+      st = described_class.assemble("some_ssh_key", prj.id)
       nx = described_class.new(st)
-      nx.create_storage_volume_records(vmh)
+      volumes = [{
+        "size_gib" => 5,
+        "use_bdev_ubi" => false,
+        "skip_sync" => false,
+        "encrypted" => false,
+        "boot" => false,
+        "storage_device_id" => storage_device.id
+      }]
+      nx.create_storage_volume_records(vmh, volumes)
       expect(StorageKeyEncryptionKey.count).to eq(0)
       expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
       expect(nx.storage_secrets.count).to eq(0)
     end
 
     it "creates with encryption key if storage is encrypted" do
-      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{encrypted: true}])
+      st = described_class.assemble("some_ssh_key", prj.id)
       nx = described_class.new(st)
-      nx.create_storage_volume_records(vmh)
+      volumes = [{
+        "size_gib" => 5,
+        "use_bdev_ubi" => false,
+        "skip_sync" => false,
+        "encrypted" => true,
+        "boot" => false,
+        "storage_device_id" => storage_device.id
+      }]
+      nx.create_storage_volume_records(vmh, volumes)
       expect(StorageKeyEncryptionKey.count).to eq(1)
       expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
       expect(nx.storage_secrets.count).to eq(1)
@@ -692,6 +800,12 @@ RSpec.describe Prog::Vm::Nexus do
       before do
         expect(vm).to receive(:vm_host).and_return(vm_host)
         expect(vm).to receive(:update).with(display_state: "deleting")
+        vol = instance_double(VmStorageVolume)
+        dev = instance_double(StorageDevice)
+        allow(vm_host).to receive(:storage_devices).and_return([dev])
+        allow(dev).to receive(:available_storage_gib).and_return(100)
+        allow(vol).to receive_messages(storage_device: dev, size_gib: 5)
+        allow(vm).to receive(:vm_storage_volumes).and_return([vol])
       end
 
       it "absorbs an already deleted errors as a success" do
@@ -702,8 +816,8 @@ RSpec.describe Prog::Vm::Nexus do
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
-        expect(vm).to receive(:vm_storage_volumes).and_return([]).at_least(:once)
         expect(vm).to receive(:destroy).and_return(true)
+        expect(vm_host.storage_devices.first).to receive(:update).with({available_storage_gib: 105})
 
         expect { nx.destroy }.to exit({"msg" => "vm deleted"})
       end
@@ -726,23 +840,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
-        expect(vm).to receive(:vm_storage_volumes).and_return([]).at_least(:once)
-
-        expect(vm).to receive(:destroy)
-
-        expect { nx.destroy }.to exit({"msg" => "vm deleted"})
-      end
-
-      it "updates storage_device, deletes and when all commands are succeeded and storage_volumes non-empty" do
-        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
-        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
-        expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
-        expect(nx).to receive(:vm_storage_size_gib).and_return(5).at_least(:once)
-
-        sd = instance_double(Sequel::Dataset)
-        expect(StorageDevice).to receive(:dataset).and_return(sd)
-        expect(sd).to receive(:where).and_return(sd)
-        expect(sd).to receive(:update).with(available_storage_gib: Sequel[:available_storage_gib] + 5)
+        expect(vm_host.storage_devices.first).to receive(:update).with({available_storage_gib: 105})
 
         expect(vm).to receive(:destroy)
 
@@ -763,6 +861,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:nics).and_return([nic])
       expect(vm).to receive(:update).with(display_state: "deleting")
       expect(vm).to receive(:destroy)
+      allow(vm).to receive(:vm_storage_volumes).and_return([])
 
       expect { nx.destroy }.to exit({"msg" => "vm deleted"})
     end
