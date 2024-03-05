@@ -34,7 +34,7 @@ class Prog::LearnStorage < Prog::Base
       total_storage_gib: rec.size_gib
     )]
 
-    devices.filter_map do |rec|
+    devices.each do |rec|
       next unless (name = rec.optional_name)
       sds << StorageDevice.new_with_id(
         vm_host_id: vm_host.id, name: name,
