@@ -9,13 +9,19 @@ RSpec.describe Prog::LearnStorage do
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
       expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
 Mounted on                   1B-blocks        Avail
+/                            205520896     99571712
+/var/storage/devices/stor1   205520896     99571712
+/var/storage/devices/stor2  3331416064   3331276800
+EOS
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
 /var/storage/devices/stor1   205520896     99571712
 /var/storage/devices/stor2  3331416064   3331276800
 EOS
 
       expect { ls.start }.to exit({"total_storage_gib" => 3, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
         StorageDevice.map(&:name).sort
-      }.from([]).to(%w[stor1 stor2])
+      }.from([]).to(%w[DEFAULT stor1 stor2])
     end
 
     it "exits, updating existing StorageDevice model instances" do
@@ -23,11 +29,17 @@ EOS
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
       expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
 Mounted on                   1B-blocks        Avail
+/                           6205520896     99571712
+/var/storage/devices/stor1  6205520896   3099571712
+/var/storage/devices/stor2  3331416064   1531276800
+EOS
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
 /var/storage/devices/stor1  6205520896   3099571712
 /var/storage/devices/stor2  3331416064   1531276800
 EOS
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      expect { ls.start }.to exit({"total_storage_gib" => 8, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
+      expect { ls.start }.to exit({"total_storage_gib" => 13, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
         StorageDevice.map { |sd|
           sd.values.slice(
             :name, :available_storage_gib, :total_storage_gib
@@ -37,6 +49,7 @@ EOS
         [{name: "stor1", total_storage_gib: 100, available_storage_gib: 100}]
       ).to(
         [
+          {name: "DEFAULT", total_storage_gib: 5, available_storage_gib: 0},
           {name: "stor1", total_storage_gib: 5, available_storage_gib: 2},
           {name: "stor2", total_storage_gib: 3, available_storage_gib: 1}
         ]
@@ -68,7 +81,13 @@ Mounted on                   1B-blocks        Avail
 /var/storage/devices/stor2  3331416064   3331276800
 EOS
 
-      expect(ls.make_model_instances.map(&:name)).to eq(%w[stor1 stor2])
+      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
+Mounted on                   1B-blocks        Avail
+/var/storage/devices/stor1   205520896     99571712
+/var/storage/devices/stor2  3331416064   3331276800
+EOS
+
+      expect(ls.make_model_instances.map(&:name)).to eq(%w[DEFAULT stor1 stor2])
     end
 
     it "can use any file system that is present at '/var/storage'" do
