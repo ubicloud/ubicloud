@@ -26,26 +26,24 @@ class Prog::LearnStorage < Prog::Base
 
   def make_model_instances
     devices = DfRecord.parse_all(sshable.cmd(df_command))
-    if devices.none? { _1.optional_name }
-      rec = DfRecord.parse_all(sshable.cmd(df_command("/var/storage"))).first
-      [
-        StorageDevice.new_with_id(
-          vm_host_id: vm_host.id, name: "DEFAULT",
-          # reserve 5G the host.
-          available_storage_gib: [rec.avail_gib - 5, 0].max,
-          total_storage_gib: rec.size_gib
-        )
-      ]
-    else
-      devices.filter_map do |rec|
-        next unless (name = rec.optional_name)
-        StorageDevice.new_with_id(
-          vm_host_id: vm_host.id, name: name,
-          available_storage_gib: rec.avail_gib,
-          total_storage_gib: rec.size_gib
-        )
-      end
+    rec = DfRecord.parse_all(sshable.cmd(df_command("/var/storage"))).first
+    sds = [StorageDevice.new_with_id(
+      vm_host_id: vm_host.id, name: "DEFAULT",
+      # reserve 5G the host.
+      available_storage_gib: [rec.avail_gib - 5, 0].max,
+      total_storage_gib: rec.size_gib
+    )]
+
+    devices.filter_map do |rec|
+      next unless (name = rec.optional_name)
+      sds << StorageDevice.new_with_id(
+        vm_host_id: vm_host.id, name: name,
+        available_storage_gib: rec.avail_gib,
+        total_storage_gib: rec.size_gib
+      )
     end
+
+    sds
   end
 
   label def start
