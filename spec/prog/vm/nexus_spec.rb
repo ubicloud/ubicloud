@@ -430,11 +430,9 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx.allocate).to eq snug.id
     end
 
-    it "prefers hosts with fewer used cores" do
-      idle = new_host
-      new_host(used_cores: 70)
-      expect(nx.allocation_dataset.map { _1[:used_cores] }).to eq([0, 70])
-      expect(nx.allocate).to eq idle.id
+    it "prefers hosts with up to 75% used cores" do
+      (0..80).step(10) { new_host(used_cores: _1) }
+      expect(nx.allocation_dataset.map { _1[:used_cores] }).to eq([60, 50, 70, 40, 30, 20, 10, 0])
     end
 
     it "can use all cores" do

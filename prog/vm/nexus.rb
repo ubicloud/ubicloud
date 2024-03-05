@@ -178,7 +178,7 @@ AND vm_host.available_storage_gib > ?
 AND vm_host.allocation_state = 'accepting'
 AND vm_host.location = ?
 AND vm_host.arch = ?
-ORDER BY mem_ratio, used_cores
+ORDER BY mem_ratio, abs(used_cores - total_cores * 0.75)
 SQL
   end
 
