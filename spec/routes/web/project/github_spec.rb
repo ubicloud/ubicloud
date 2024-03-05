@@ -98,7 +98,8 @@ RSpec.describe Clover, "github" do
         vm_id: vm.id
       )
       Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
-
+      runner_st = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
+      runner_st.update(label: "wait_concurrency_limit")
       visit "#{project.path}/github"
 
       expect(page.status_code).to eq(200)
@@ -111,6 +112,8 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "deleted"
       expect(page).to have_link runner2.workflow_job["workflow_name"], href: runner2.run_url
       expect(page).to have_link runner2.workflow_job["name"], href: runner2.job_url
+      expect(page).to have_content runner_st.ubid
+      expect(page).to have_content "reached_concurrency_limit"
     end
   end
 end

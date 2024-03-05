@@ -22,6 +22,8 @@ class Serializers::Web::GithubRunner < Serializers::Base
                   runner.vm.display_state
                 elsif runner.strand.label == "wait_vm_destroy"
                   "deleted"
+                elsif runner.strand.label == "wait_concurrency_limit"
+                  "reached_concurrency_limit"
                 else
                   "not_created"
                 end

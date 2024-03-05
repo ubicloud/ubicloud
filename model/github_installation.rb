@@ -14,4 +14,10 @@ class GithubInstallation < Sequel::Model
     end
     "https://github.com/settings/installations/#{installation_id}"
   end
+
+  def total_active_runner_cores
+    runner_labels = runners_dataset.left_join(:strand, id: :id).exclude(Sequel[:strand][:label] => "start").exclude(Sequel[:strand][:label] => "wait_concurrency_limit").select_map(Sequel[:github_runner][:label])
+    vm_size_data_set = runner_labels.map { |label| Github.runner_labels[label]["vm_size"] }
+    vm_size_data_set.sum { |size| Validation.validate_vm_size(size).vcpu }
+  end
 end
