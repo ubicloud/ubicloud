@@ -3,7 +3,7 @@
 </p>
 
 
-# Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml)
+# Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml) <a href="https://app.greptile.com/repo/ubicloud"><img src="https://img.shields.io/badge/learn_with-greptile-%091B12?color=%091B12" alt="Learn this repo using Greptile"></a>
 
 Ubicloud is an open, free, and portable cloud. Think of it as an open alternative to
 cloud providers, like what Linux is to proprietary operating systems.
@@ -133,6 +133,10 @@ design, we use [Tailwind CSS](https://tailwindcss.com) with components from
 If you’d like to start hacking with Ubicloud, any method of obtaining Ruby and Postgres 
 versions is acceptable. If you have no opinion on this, our development team uses `asdf-vm` 
 as [documented here in detail](DEVELOPERS.md).
+
+[Greptile](https://greptile.com/) provides an AI/LLM that indexes
+Ubicloud's source code [can answer questions about
+it](https://learnthisrepo.com/ubicloud).
 
 ## FAQ
 
