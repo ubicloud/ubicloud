@@ -203,7 +203,11 @@ SQL
 
   def create_storage_volume_records(vm_host)
     frame["storage_volumes"].each_with_index do |volume, disk_index|
-      key_encryption_key = if volume["encrypted"]
+      spdk_installation_id = allocate_spdk_installation(vm_host.spdk_installations)
+
+      # To test the effect of encryption on the performance, encrypt for bdev_ubi
+      # hosts in a hacky way by 50%. It will be removed once the test is completed.
+      key_encryption_key = if volume["encrypted"] || (SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && rand < 0.5)
         key_wrapping_algorithm = "aes-256-gcm"
         cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
         key_wrapping_key = cipher.random_key
@@ -216,8 +220,6 @@ SQL
           auth_data: "#{vm.inhost_name}_#{disk_index}"
         )
       end
-
-      spdk_installation_id = allocate_spdk_installation(vm_host.spdk_installations)
 
       VmStorageVolume.create_with_id(
         vm_id: vm.id,
