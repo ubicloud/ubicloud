@@ -67,6 +67,7 @@ table inet fw_table {
     type filter hook forward priority filter; policy drop;
     ip protocol tcp counter flow offload @ubi_flowtable
     ip protocol udp counter flow offload @ubi_flowtable
+    meta l4proto { tcp, udp } th dport 111 drop
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
