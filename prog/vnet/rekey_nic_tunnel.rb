@@ -103,9 +103,9 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
 
     def create_xfrm_state(src, dst, spi, is_ipv4)
       key = @tunnel.src_nic.encryption_key
-      @nic.vm.vm_host.sshable.cmd("sudo ip -n #{@namespace} xfrm state add " \
+      @nic.vm.vm_host.sshable.cmd("sudo -- xargs -I {} -- ip -n #{@namespace} xfrm state add " \
         "src #{src} dst #{dst} proto esp spi #{spi} reqid #{@reqid} mode tunnel " \
-        "aead 'rfc4106(gcm(aes))' #{key} 128 #{is_ipv4 ? "sel src 0.0.0.0/0 dst 0.0.0.0/0" : ""}")
+        "aead 'rfc4106(gcm(aes))' {} 128 #{is_ipv4 ? "sel src 0.0.0.0/0 dst 0.0.0.0/0" : ""}", stdin: key)
     end
 
     def policy_exists?(src, dst)
