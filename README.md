@@ -10,7 +10,7 @@ cloud providers, like what Linux is to proprietary operating systems.
 
 Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, OVH, 
 and AWS Bare Metal. You can set it up yourself on these providers or you can use our 
-managed service. We're currently in public alpha.
+managed service. We're currently in public beta.
 
 ## Quick start
 
