@@ -132,4 +132,25 @@ module Validation
 
     end_port ? [start_port, end_port] : [start_port]
   end
+
+  def self.validate_request_body(request_body, required_keys, allowed_optional_keys = [])
+    begin
+      request_body_params = JSON.parse(request_body)
+    rescue JSON::ParserError
+      fail ValidationFailed.new({body: "Request body isn't a valid JSON object."})
+    end
+
+    missing_required_keys = required_keys - request_body_params.keys
+    unless missing_required_keys.empty?
+      fail ValidationFailed.new({body: "Request body must include required parameters: #{missing_required_keys.join(", ")}"})
+    end
+
+    allowed_keys = required_keys + allowed_optional_keys
+    unallowed_keys = request_body_params.keys - allowed_keys
+    if unallowed_keys.any?
+      fail ValidationFailed.new({body: "Only following parameters are allowed: #{allowed_keys.join(", ")}"})
+    end
+
+    request_body_params
+  end
 end
