@@ -206,6 +206,8 @@ class Prog::Vm::HostNexus < Prog::Base
       hop_prep_reboot
     end
 
+    Clog.emit("vm host utilization") { {vm_host_utilization: vm_host.values.slice(:location, :arch, :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :total_storage_gib, :available_storage_gib).merge({vms_count: vm_host.vms_dataset.count})} }
+
     nap 30
   end
 
