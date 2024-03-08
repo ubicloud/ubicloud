@@ -46,6 +46,7 @@ class CloverWeb
         return error("Unregistered installation")
       end
       installation.runners.each(&:incr_destroy)
+      installation.repositories.each(&:incr_destroy)
       installation.destroy
       return success("GithubInstallation[#{installation.ubid}] deleted")
     end
