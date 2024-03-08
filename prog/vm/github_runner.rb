@@ -13,9 +13,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     DB.transaction do
+      repository = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name).subject
       github_runner = GithubRunner.create_with_id(
         installation_id: installation.id,
         repository_name: repository_name,
+        repository_id: repository.id,
         label: label
       )
 

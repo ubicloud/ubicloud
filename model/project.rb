@@ -53,6 +53,7 @@ class Project < Sequel::Model
 
       github_installations.each do
         Github.app_client.delete_installation(_1.installation_id)
+        _1.repositories.each(&:incr_destroy)
         _1.destroy
       end
 
