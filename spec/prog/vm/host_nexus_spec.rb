@@ -225,6 +225,8 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait" do
     it "naps" do
+      expect(vm_host).to receive(:values).and_return({location: "hetzner-hel1", arch: "x64", total_cores: 4})
+      expect(vm_host).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, count: 2))
       expect { nx.wait }.to nap(30)
     end
 
