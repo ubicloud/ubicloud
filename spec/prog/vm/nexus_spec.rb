@@ -716,6 +716,7 @@ RSpec.describe Prog::Vm::Nexus do
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
+        expect(vm).to receive(:vm_storage_volumes).and_return([]).at_least(:once)
         expect(vm).to receive(:destroy).and_return(true)
 
         expect { nx.destroy }.to exit({"msg" => "vm deleted"})
@@ -739,6 +740,23 @@ RSpec.describe Prog::Vm::Nexus do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
+        expect(vm).to receive(:vm_storage_volumes).and_return([]).at_least(:once)
+
+        expect(vm).to receive(:destroy)
+
+        expect { nx.destroy }.to exit({"msg" => "vm deleted"})
+      end
+
+      it "updates storage_device, deletes and when all commands are succeeded and storage_volumes non-empty" do
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
+        expect(nx).to receive(:vm_storage_size_gib).and_return(5).at_least(:once)
+
+        sd = instance_double(Sequel::Dataset)
+        expect(StorageDevice).to receive(:dataset).and_return(sd)
+        expect(sd).to receive(:where).and_return(sd)
+        expect(sd).to receive(:update).with(available_storage_gib: Sequel[:available_storage_gib] + 5)
 
         expect(vm).to receive(:destroy)
 
