@@ -170,7 +170,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def allocation_dataset
     DB[<<SQL, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm_storage_size_gib, vm.location, vm.arch]
-SELECT *, vm_host.total_mem_gib / vm_host.total_cores AS mem_ratio
+SELECT *
 FROM vm_host
 WHERE vm_host.used_cores + ? <= least(vm_host.total_cores, vm_host.total_mem_gib / ?)
 AND vm_host.used_hugepages_1g + ? <= vm_host.total_hugepages_1g
@@ -178,7 +178,7 @@ AND vm_host.available_storage_gib > ?
 AND vm_host.allocation_state = 'accepting'
 AND vm_host.location = ?
 AND vm_host.arch = ?
-ORDER BY mem_ratio, used_cores
+ORDER BY random()
 SQL
   end
 
