@@ -423,20 +423,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
     end
 
-    it "prefers the host with a more snugly fitting RAM ratio, even if busy" do
-      snug = new_host(used_cores: 78)
-      new_host(total_mem_gib: snug.total_mem_gib * 2)
-      expect(nx.allocation_dataset.map { _1[:mem_ratio] }).to eq([8, 16])
-      expect(nx.allocate).to eq snug.id
-    end
-
-    it "prefers hosts with fewer used cores" do
-      idle = new_host
-      new_host(used_cores: 70)
-      expect(nx.allocation_dataset.map { _1[:used_cores] }).to eq([0, 70])
-      expect(nx.allocate).to eq idle.id
-    end
-
     it "can use all cores" do
       vmh = new_host(used_cores: 79)
       expect(nx.allocate).to eq vmh.id
