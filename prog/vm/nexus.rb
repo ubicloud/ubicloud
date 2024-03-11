@@ -499,6 +499,11 @@ SQL
         used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib,
         available_storage_gib: Sequel[:available_storage_gib] + vm_storage_size_gib
       )
+
+      StorageDevice.dataset.where(vm_host_id: vm.vm_host_id, name: "DEFAULT").update(
+        available_storage_gib: Sequel[:available_storage_gib] + vm_storage_size_gib
+      )
+
       vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy
     end
