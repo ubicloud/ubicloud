@@ -4,13 +4,27 @@ require "excon"
 
 class Prog::Heartbeat < Prog::Base
   CONNECTED_APPLICATION_QUERY = <<SQL
-SELECT count(DISTINCT application_name)
-FROM pg_stat_activity
-WHERE application_name ~ '^(bin/respirate|bin/monitor|.*/puma)$'
+SELECT
+  (regexp_matches(application_name, '/(puma|monitor|respirate)$'))[1]
+FROM
+  (SELECT DISTINCT application_name FROM pg_stat_activity) AS psa
+ORDER BY 1
 SQL
 
+  EXPECTED = %w[monitor puma respirate].freeze
+
+  def fetch_connected
+    DB[CONNECTED_APPLICATION_QUERY].flat_map(&:values).freeze
+  end
+
   label def wait
-    nap 10 unless DB.get(CONNECTED_APPLICATION_QUERY) == 3
+    if (connected = fetch_connected) != EXPECTED
+      Clog.emit("some expected connected clover services are missing") {
+        {heartbeat_missing: {difference: EXPECTED.difference(connected)}}
+      }
+      nap 10
+    end
+
     Excon.get(Config.heartbeat_url, read_timeout: 2, write_timeout: 2, connect_timeout: 2)
     nap 10
   rescue Excon::Error::Timeout => e
