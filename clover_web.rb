@@ -15,7 +15,7 @@ class CloverWeb < Roda
     "X-Content-Type-Options" => "nosniff"
   }.merge(
     # :nocov:
-    Config.production? ? {"Strict-Transport-Security" => "max-age=15; includeSubDomains"} : {}
+    Config.production? ? {"Strict-Transport-Security" => "max-age=300; includeSubDomains"} : {}
     # :nocov:
   )
 
