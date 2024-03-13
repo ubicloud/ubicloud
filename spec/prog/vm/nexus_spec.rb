@@ -26,7 +26,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true)
     disk_2.spdk_installation = si
     disk_2.storage_device = dev2
-    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1").tap {
+    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1", created_at: Time.now).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
@@ -674,7 +674,9 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#create_billing_record" do
     before do
-      expect(vm).to receive(:update).with(display_state: "running").and_return(true)
+      now = Time.now
+      expect(Time).to receive(:now).and_return(now).at_least(:once)
+      expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned")
     end
 
