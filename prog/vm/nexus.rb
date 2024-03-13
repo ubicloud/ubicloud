@@ -346,7 +346,8 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       vm.update(
         vm_host_id: vm_host_id,
         ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
-        local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s
+        local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s,
+        allocated_at: Time.now
       )
 
       Clog.emit("vm allocated") { {vm: vm.values, allocation: {vm_ubid: vm.ubid, vm_host_ubid: vm_host.ubid}} }
@@ -452,7 +453,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
   end
 
   label def create_billing_record
-    vm.update(display_state: "running")
+    vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned") { {vm: vm.values, provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: Time.now - vm.created_at}} }
     project = vm.projects.first
     hop_wait unless project.billable
