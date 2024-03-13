@@ -13,6 +13,8 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
     allowed_ingress_ip6_port_set = consolidate_rules(rules.select { _1.ip6? && _1.port_range })
     guest_ephemeral = subdivide_network(vm.ephemeral_net6).first.to_s
 
+    globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
+
     vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<TEMPLATE)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
@@ -58,6 +60,18 @@ table inet fw_table {
     elements = { #{generate_private_ip6_list} }
   }
 
+  set globally_blocked_ipv4s {
+    type ipv4_addr;
+    flags interval;
+#{globally_blocked_ipv4s.empty? ? "" : "elements = {#{globally_blocked_ipv4s}}"}
+  }
+
+  set globally_blocked_ipv6s {
+    type ipv6_addr;
+    flags interval;
+#{globally_blocked_ipv6s.empty? ? "" : "elements = {#{globally_blocked_ipv6s}}"}
+  }
+
   flowtable ubi_flowtable {
     hook ingress priority filter
     devices = { #{vm.nics.map(&:ubid_to_tap_name).join(",")}, vethi#{vm.inhost_name} }
@@ -67,6 +81,10 @@ table inet fw_table {
     type filter hook forward priority filter; policy drop;
     meta l4proto { tcp, udp } flow offload @ubi_flowtable
     meta l4proto { tcp, udp } th dport 111 drop
+    ip saddr @globally_blocked_ipv4s drop
+    ip6 saddr @globally_blocked_ipv6s drop
+    ip daddr @globally_blocked_ipv4s drop
+    ip6 daddr @globally_blocked_ipv6s drop
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
@@ -86,6 +104,22 @@ table inet fw_table {
 TEMPLATE
 
     pop "firewall rule is added"
+  end
+
+  def generate_globally_blocked_lists
+    globally_blocked_ipv4s = []
+    globally_blocked_ipv6s = []
+
+    GloballyBlockedDnsname.each do |globally_blocked_dnsname|
+      ips = globally_blocked_dnsname.ip_list
+      ips.each do |ip|
+        globally_blocked_ipv4s << "#{ip}/32" if ip.ipv4?
+        globally_blocked_ipv6s << "#{ip}/128" if ip.ipv6?
+      end
+    end
+    summ_ipv4 = NetAddr.summ_IPv4Net(globally_blocked_ipv4s.map { NetAddr::IPv4Net.parse(_1.to_s) })
+    summ_ipv6 = NetAddr.summ_IPv6Net(globally_blocked_ipv6s.map { NetAddr::IPv6Net.parse(_1.to_s) })
+    [summ_ipv4.join(", "), summ_ipv6.join(", ")]
   end
 
   # This method is needed to properly consolidate port_ranges + cidrs.

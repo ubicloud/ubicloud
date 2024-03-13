@@ -18,6 +18,7 @@ RSpec.describe Prog::Vnet::UpdateFirewallRules do
 
   describe "update_firewall_rules" do
     it "populates elements if there are fw rules" do
+      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: Sequel.lit("ARRAY['123.123.123.123'::inet, '2a00:1450:400e:811::200e'::inet]"))
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewalls).and_return([instance_double(Firewall, name: "fw_table", firewall_rules: [
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil),
@@ -76,6 +77,18 @@ elements = {fd00::/64 . 0-9999,fd00::1/128 . 10000-65535}
     elements = { fd00::/64 }
   }
 
+  set globally_blocked_ipv4s {
+    type ipv4_addr;
+    flags interval;
+elements = {123.123.123.123/32}
+  }
+
+  set globally_blocked_ipv6s {
+    type ipv6_addr;
+    flags interval;
+elements = {2a00:1450:400e:811::200e/128}
+  }
+
   flowtable ubi_flowtable {
     hook ingress priority filter
     devices = { tap0, vethix }
@@ -85,6 +98,10 @@ elements = {fd00::/64 . 0-9999,fd00::1/128 . 10000-65535}
     type filter hook forward priority filter; policy drop;
     meta l4proto { tcp, udp } flow offload @ubi_flowtable
     meta l4proto { tcp, udp } th dport 111 drop
+    ip saddr @globally_blocked_ipv4s drop
+    ip6 saddr @globally_blocked_ipv6s drop
+    ip daddr @globally_blocked_ipv4s drop
+    ip6 daddr @globally_blocked_ipv6s drop
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
@@ -154,6 +171,18 @@ table inet fw_table {
     elements = { fd00::/64 }
   }
 
+  set globally_blocked_ipv4s {
+    type ipv4_addr;
+    flags interval;
+
+  }
+
+  set globally_blocked_ipv6s {
+    type ipv6_addr;
+    flags interval;
+
+  }
+
   flowtable ubi_flowtable {
     hook ingress priority filter
     devices = { tap0, vethix }
@@ -163,6 +192,10 @@ table inet fw_table {
     type filter hook forward priority filter; policy drop;
     meta l4proto { tcp, udp } flow offload @ubi_flowtable
     meta l4proto { tcp, udp } th dport 111 drop
+    ip saddr @globally_blocked_ipv4s drop
+    ip6 saddr @globally_blocked_ipv6s drop
+    ip daddr @globally_blocked_ipv4s drop
+    ip6 daddr @globally_blocked_ipv6s drop
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
