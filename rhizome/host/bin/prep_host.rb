@@ -67,6 +67,7 @@ fw_dir = File.dirname(CloudHypervisor::FIRMWARE.path)
 FileUtils.mkdir_p(fw_dir)
 FileUtils.cd fw_dir do
   r "curl -L3 -o #{CloudHypervisor::FIRMWARE.name.shellescape} #{CloudHypervisor::FIRMWARE.url.shellescape}"
+  CloudHypervisor::NEW_FIRMWARE.download
 end
 
 # Err towards listing ('l') and not restarting services by default,
