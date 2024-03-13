@@ -111,7 +111,7 @@ TEMPLATE
     globally_blocked_ipv6s = []
 
     GloballyBlockedDnsname.each do |globally_blocked_dnsname|
-      ips = globally_blocked_dnsname.ip_list
+      ips = globally_blocked_dnsname.ip_list || []
       ips.each do |ip|
         globally_blocked_ipv4s << "#{ip}/32" if ip.ipv4?
         globally_blocked_ipv6s << "#{ip}/128" if ip.ipv6?

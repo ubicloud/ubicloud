@@ -124,6 +124,9 @@ ADD_RULES
     end
 
     it "does not pass elements if there are not fw rules" do
+      # An address to block but not discovered the ip_list, yet.
+      GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: nil)
+
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewalls).and_return([])
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)
