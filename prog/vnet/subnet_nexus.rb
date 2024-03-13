@@ -154,7 +154,18 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     addr = NetAddr::IPv4Net.parse(private_range)
 
     selected_addr = addr.nth_subnet(26, SecureRandom.random_number(2**(26 - addr.netmask.prefix_len) - 1).to_i + 1)
-    return random_private_ipv4(location) unless PrivateSubnet.where(net4: selected_addr.to_s, location: location).first.nil?
+    # We're excluding the 172.17.0.0 subnet to avoid conflicts with Docker,
+    # which uses this range by default. Docker, pre-installed on runners,
+    # automatically sets up a bridge network using 172.17.0.0/16 and subsequent
+    # subnets (e.g., 172.18.0.0/16). If a subnet is in use, Docker moves to the
+    # next available one. However, since dnsmasq assigns private IP addresses
+    # post-VM initialization, there's a race condition: Docker can assign its
+    # address before the VM is necessarily aware of its virtual networking
+    # address information, leading to routing clashes that render IPv4 internet
+    # access inoperable in some interleavings.
+    if PrivateSubnet[net4: selected_addr.to_s, location: location] || selected_addr.network.to_s == "172.17.0.0"
+      return random_private_ipv4(location)
+    end
 
     selected_addr
   end
