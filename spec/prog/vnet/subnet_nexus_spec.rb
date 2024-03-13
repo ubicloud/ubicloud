@@ -279,8 +279,8 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "finds a new subnet if the one it found is taken" do
       expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/12").twice
       expect(SecureRandom).to receive(:random_number).with(16383).and_return(1, 2)
-      expect(PrivateSubnet).to receive(:where).with(net4: "172.16.0.128/26", location: "hetzner-hel1").and_return([true])
-      expect(PrivateSubnet).to receive(:where).with(net4: "172.16.0.192/26", location: "hetzner-hel1").and_return([])
+      expect(PrivateSubnet).to receive(:[]).with(net4: "172.16.0.128/26", location: "hetzner-hel1").and_return([true])
+      expect(PrivateSubnet).to receive(:[]).with(net4: "172.16.0.192/26", location: "hetzner-hel1").and_return(nil)
       expect(described_class.random_private_ipv4("hetzner-hel1").to_s).to eq("172.16.0.192/26")
     end
   end
