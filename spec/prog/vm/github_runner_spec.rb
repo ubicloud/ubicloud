@@ -87,7 +87,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64")
       expect(VmPool).to receive(:where).with(
         vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
-        storage_size_gib: 150, storage_encrypted: false,
+        storage_size_gib: 150, storage_encrypted: true,
         storage_skip_sync: true, arch: "x64"
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
@@ -105,7 +105,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64")
       expect(VmPool).to receive(:where).with(
         vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
-        storage_size_gib: 150, storage_encrypted: false,
+        storage_size_gib: 150, storage_encrypted: true,
         storage_skip_sync: true, arch: "arm64"
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
