@@ -252,9 +252,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
     storage_volumes.each_with_index do |volume, disk_index|
       spdk_installation_id = allocate_spdk_installation(vm_host.spdk_installations)
 
-      # To test the effect of encryption on the performance, encrypt for bdev_ubi
-      # hosts in a hacky way by 50%. It will be removed once the test is completed.
-      key_encryption_key = if volume["encrypted"] || (SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && rand < 0.5)
+      key_encryption_key = if volume["encrypted"]
         key_wrapping_algorithm = "aes-256-gcm"
         cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
         key_wrapping_key = cipher.random_key

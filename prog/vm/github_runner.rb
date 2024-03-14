@@ -32,7 +32,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       boot_image: label_data["boot_image"],
       location: label_data["location"],
       storage_size_gib: label_data["storage_size_gib"],
-      storage_encrypted: false,
+      storage_encrypted: true,
       storage_skip_sync: skip_sync,
       arch: label_data["arch"]
     ).first
@@ -49,7 +49,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       size: label_data["vm_size"],
       location: label_data["location"],
       boot_image: label_data["boot_image"],
-      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: false, skip_sync: skip_sync}],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: skip_sync}],
       enable_ip4: true,
       arch: label_data["arch"],
       allow_only_ssh: true,
