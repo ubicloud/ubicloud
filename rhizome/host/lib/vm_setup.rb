@@ -43,6 +43,28 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
+  def prep_loadbalancer(ip4, local_ip4, target_ips)
+    unblock_ip4(ip4)
+    interfaces([], false)
+    r "ip -n #{q_vm} link set dev vethi#{q_vm} up"
+    routes4(ip4, local_ip4, [])
+    config = <<~NFTABLES
+table ip nat {
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+    ct state established,related,new counter dnat to numgen inc mod #{target_ips.count} map { 0 : #{target_ips.first}, 1 : #{target_ips.last} }
+  }
+
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+    ct state established,related,new counter snat to #{ip4}
+  }
+}
+NFTABLES
+    vp.write_nftables_conf(config)
+    apply_nftables
+  end
+
   def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_volumes, storage_secrets, swap_size_bytes)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     cloudinit(unix_user, public_key, nics, swap_size_bytes)
