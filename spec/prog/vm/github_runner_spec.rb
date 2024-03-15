@@ -271,6 +271,13 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe "#wait_concurrency_limit" do
+    before do
+      2.times do |i|
+        ssh = Sshable.create_with_id(host: "0.0.0.#{i}")
+        VmHost.create(location: "github-runners", allocation_state: "accepting", arch: (i == 0) ? "x64" : "arm64", total_cores: 16, used_cores: 16) { _1.id = ssh.id }
+      end
+    end
+
     it "waits until customer concurrency limit frees up" do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
@@ -294,6 +301,33 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
 
+      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    end
+
+    it "hops to allocate_vm when customer concurrency limit is full but the overall utilization is low" do
+      dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
+
+      installation = instance_double(GithubInstallation, total_active_runner_cores: 2)
+      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
+
+      expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
+      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
+      VmHost[arch: "x64"].update(used_cores: 8)
+      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    end
+
+    it "hops to allocate_vm when customer concurrency limit is full but the overall utilization is low for arm, too" do
+      dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
+
+      installation = instance_double(GithubInstallation, total_active_runner_cores: 2)
+      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
+
+      expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
+      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
+      expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
+      VmHost[arch: "arm64"].update(used_cores: 8)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
   end
