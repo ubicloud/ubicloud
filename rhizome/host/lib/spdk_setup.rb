@@ -217,6 +217,21 @@ SPDK_HUGEPAGES_MOUNT
     r "systemctl start #{spdk_service}"
   end
 
+  def stop_and_remove_services
+    r "systemctl stop #{spdk_service}"
+    r "systemctl stop #{hugepages_mount_service}"
+    r "systemctl disable #{spdk_service}"
+    r "systemctl disable #{hugepages_mount_service}"
+    FileUtils.rm_f("/lib/systemd/system/#{spdk_service}")
+    FileUtils.rm_f("/lib/systemd/system/#{hugepages_mount_service}")
+  end
+
+  def remove_paths
+    FileUtils.rm_f(conf_path)
+    FileUtils.rm_rf(hugepages_dir)
+    FileUtils.rm_rf(install_path)
+  end
+
   def verify_spdk
     status = (r "systemctl is-active #{spdk_service}").strip
     fail "SPDK failed to start" unless status == "active"
