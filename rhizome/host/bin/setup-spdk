@@ -29,4 +29,7 @@ when "start"
   spdk_setup.start_services
 when "verify"
   spdk_setup.verify_spdk
+when "remove"
+  spdk_setup.stop_and_remove_services
+  spdk_setup.remove_paths
 end

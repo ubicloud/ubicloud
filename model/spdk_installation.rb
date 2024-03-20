@@ -7,6 +7,7 @@ LEGACY_SPDK_VERSION = "LEGACY_SPDK_VERSION"
 
 class SpdkInstallation < Sequel::Model
   many_to_one :vm_host
+  one_to_many :vm_storage_volumes
 
   def self.generate_uuid
     UBID.generate(UBID::TYPE_ETC).to_uuid
