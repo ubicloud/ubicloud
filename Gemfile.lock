@@ -126,7 +126,7 @@ GEM
       net-protocol
     net-ssh (7.2.1)
     netaddr (2.0.6)
-    nio4r (2.7.0)
+    nio4r (2.7.1)
     nokogiri (1.16.3-aarch64-linux)
       racc (~> 1.4)
     nokogiri (1.16.3-arm64-darwin)
@@ -161,7 +161,7 @@ GEM
     puma (6.4.2)
       nio4r (~> 2.0)
     racc (1.7.3)
-    rack (3.0.9.1)
+    rack (3.0.10)
     rack-test (2.1.0)
       rack (>= 1.3)
     rack-unreloader (2.1.0)
