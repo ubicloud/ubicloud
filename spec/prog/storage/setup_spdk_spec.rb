@@ -22,7 +22,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
       location: "xyz",
       arch: "x64",
       used_hugepages_1g: 0,
-      total_hugepages_1g: 1
+      total_hugepages_1g: 2
     ) { _1.id = "adec2977-74a9-8b71-8473-cf3940a45ac5" }
   }
 
@@ -75,7 +75,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
   describe "#update_database" do
     it "updates the database and exits" do
       expect { setup_spdk.update_database }.to exit({"msg" => "SPDK was setup"})
-      expect(vm_host.reload.used_hugepages_1g).to eq(1)
+      expect(vm_host.reload.used_hugepages_1g).to eq(2)
     end
 
     it "doesn't reserve a hugepage if service didn't start" do
