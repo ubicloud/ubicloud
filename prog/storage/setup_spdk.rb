@@ -29,7 +29,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
 
     fail "Can't install more than 2 SPDKs on a host" if vm_host.spdk_installations.length > 1
 
-    fail "No available hugepages" if frame["start_service"] && vm_host.used_hugepages_1g == vm_host.total_hugepages_1g
+    fail "No available hugepages" if frame["start_service"] && vm_host.used_hugepages_1g > vm_host.total_hugepages_1g - 2
 
     SpdkInstallation.create(
       version: frame["version"],
@@ -64,7 +64,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
     ).update(allocation_weight: frame["allocation_weight"])
 
     if frame["start_service"]
-      VmHost.where(id: vm_host.id).update(used_hugepages_1g: Sequel[:used_hugepages_1g] + 1)
+      VmHost.where(id: vm_host.id).update(used_hugepages_1g: Sequel[:used_hugepages_1g] + 2)
     end
 
     pop "SPDK was setup"
