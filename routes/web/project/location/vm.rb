@@ -27,7 +27,7 @@ class CloverWeb
           port_range = if r.params["port_range"].empty?
             [0, 65535]
           else
-            r.params["port_range"].split("..").map(&:to_i)
+            Validation.validate_port_range(r.params["port_range"])
           end
 
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
