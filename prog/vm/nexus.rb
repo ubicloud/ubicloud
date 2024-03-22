@@ -340,12 +340,6 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       create_storage_volume_records(vm_host, storage_volumes)
     end
 
-    Clog.emit("vm allocated") do
-      {allocation: {vm_host_ubid: vm_host.ubid, ip4: ip4, address: address&.cidr&.to_s,
-                    routed_to: if (ahid = address&.routed_to_host_id)
-                                 UBID.from_uuidish(ahid).to_s
-                               end}}
-    end
     fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
 
     DB.transaction do
@@ -354,6 +348,8 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
         ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
         local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s
       )
+
+      Clog.emit("vm allocated") { {vm: vm.values, allocation: {vm_ubid: vm.ubid, vm_host_ubid: vm_host.ubid}} }
 
       AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
     end
