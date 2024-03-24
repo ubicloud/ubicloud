@@ -459,7 +459,7 @@ EOS
     }
   end
 
-  def download_boot_image(boot_image, custom_url: nil, ca_path: nil)
+  def download_boot_image(boot_image, force: false, custom_url: nil, ca_path: nil)
     urls = {
       "ubuntu-jammy" => "https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
       "almalinux-9.1" => Arch.render(x64: "x86_64", arm64: "aarch64").yield_self { "https://repo.almalinux.org/almalinux/9/cloud/#{_1}/images/AlmaLinux-9-GenericCloud-latest.#{_1}.qcow2" },
@@ -470,42 +470,42 @@ EOS
 
     download = urls.fetch(boot_image) || custom_url
     image_path = vp.image_path(boot_image)
-    unless File.exist?(image_path)
-      fail "Must provide custom_url for #{boot_image} image" if download.nil?
-      FileUtils.mkdir_p vp.image_root
+    return if File.exist?(image_path) && !force
 
-      # If image URL has query parameter such as SAS token, File.extname returns
-      # it too. We need to remove them and only get extension.
-      image_ext = File.extname(URI.parse(download).path)
-      initial_format = case image_ext
-      when ".qcow2", ".img"
-        "qcow2"
-      when ".vhd"
-        "vpc"
-      when ".raw"
-        "raw"
-      else
-        fail "Unsupported boot_image format: #{image_ext}"
-      end
+    fail "Must provide custom_url for #{boot_image} image" if download.nil?
+    FileUtils.mkdir_p vp.image_root
 
-      # Use of File::EXCL provokes a crash rather than a race
-      # condition if two VMs are lazily getting their images at the
-      # same time.
-      temp_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
+    # If image URL has query parameter such as SAS token, File.extname returns
+    # it too. We need to remove them and only get extension.
+    image_ext = File.extname(URI.parse(download).path)
+    initial_format = case image_ext
+    when ".qcow2", ".img"
+      "qcow2"
+    when ".vhd"
+      "vpc"
+    when ".raw"
+      "raw"
+    else
+      fail "Unsupported boot_image format: #{image_ext}"
+    end
+
+    File.open(File.join(vp.image_root, boot_image + ".lock"), File::RDWR | File::CREAT) do |lock|
+      fail "Another vm is downloading #{boot_image}" unless lock.flock(File::LOCK_EX | File::LOCK_NB)
+
+      download_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
       ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
-      File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-        r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}#{ca_arg}"
+      File.open(download_path, File::RDWR | File::CREAT, 0o644) do
+        r "curl -f -L10 -o #{download_path.shellescape} #{download.shellescape}#{ca_arg}"
       end
 
-      if initial_format == "raw"
-        File.rename(temp_path, image_path)
-      else
+      temp_path = File.join(vp.image_root, boot_image + ".raw.tmp")
+      if initial_format != "raw"
         # Images are presumed to be atomically renamed into the path,
         # i.e. no partial images will be passed to qemu-image.
-        r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
+        r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{download_path.shellescape} #{temp_path.shellescape}"
+        rm_if_exists(download_path)
       end
-
-      rm_if_exists(temp_path)
+      File.rename(temp_path, image_path)
     end
   end
 

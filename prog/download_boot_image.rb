@@ -26,11 +26,9 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def wait_draining
-    unless vm_host.vms.empty?
-      nap 15
-    end
-    sshable.cmd("sudo rm -f /var/storage/images/#{image_name.shellescape}.raw")
-    hop_download
+    hop_download if vm_host.vms.empty?
+
+    nap 15
   end
 
   label def download
@@ -73,6 +71,9 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def activate_host
+    # Verify that the image was downloaded
+    sshable.cmd("ls /var/storage/images/#{image_name}.raw")
+
     vm_host.update(allocation_state: "accepting")
 
     pop "#{image_name} downloaded"
