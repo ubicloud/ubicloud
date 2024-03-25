@@ -176,6 +176,20 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
     end
 
+    # After the above deletion, the vetho interface may still exist because the
+    # namespace deletion does not handle related interface deletion
+    # in an atomic way. The command returns success and the cleanup of the
+    # vetho* interface may be done a little bit later. Here, we wait for the
+    # interface to disappear before going ahead because the ip link add command
+    # is not idempotent, either.
+    5.times do
+      if File.exist?("/sys/class/net/vetho#{q_vm}")
+        sleep 0.1
+      else
+        break
+      end
+    end
+
     r "ip netns add #{q_vm}"
 
     # Generate MAC addresses rather than letting Linux do it to avoid
