@@ -85,9 +85,10 @@ class SpdkSetup
     end
   end
 
-  def create_service
+  def create_service(cpu_count:)
     user = SpdkPath.user
     vhost_binary = SpdkPath.bin(@spdk_version, vhost_target)
+    cpumask = (0..cpu_count - 1).to_a.join(",")
     File.write("/lib/systemd/system/#{spdk_service}", <<SPDK_SERVICE
 [Unit]
 Description=Block Storage Service #{@spdk_version}
@@ -99,7 +100,7 @@ ExecStart=#{vhost_binary} -S #{SpdkPath.vhost_dir.shellescape} \
 --huge-dir #{hugepages_dir.shellescape} \
 --iova-mode va \
 --rpc-socket #{rpc_sock.shellescape} \
---cpumask [0,1] \
+--cpumask [#{cpumask}] \
 --disable-cpumask-locks \
 --config #{conf_path.shellescape}
 ExecReload=/bin/kill -HUP $MAINPID
