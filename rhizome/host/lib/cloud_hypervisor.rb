@@ -1,9 +1,10 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/arch"
+require_relative "../../common/lib/util"
 
 module CloudHypervisor
-  FirmwareClass = Struct.new(:version, :name) {
+  FirmwareClassLegacy = Struct.new(:version, :name) {
     def url
       "https://github.com/fdr/edk2/releases/download/#{version}/#{name}"
     end
@@ -13,10 +14,26 @@ module CloudHypervisor
     end
   }
 
+  FirmwareClass = Struct.new(:arch, :version) {
+    def url
+      "https://github.com/ubicloud/build-edk2-firmware/releases/download/edk2-stable#{version}-#{arch}/CLOUDHV-#{arch}.fd"
+    end
+
+    def path
+      "/opt/fw/CLOUDHV-#{arch}-#{version}.fd"
+    end
+
+    def download
+      r "curl -L3 -o #{(path + ".tmp").shellescape} #{url.shellescape}"
+    end
+  }
+
+  NEW_FIRMWARE = FirmwareClass.new(Arch.render, Arch.render(x64: "202402", arm64: "202211"))
+
   FIRMWARE = if Arch.arm64?
-    FirmwareClass.new("edk2-stable202308", "CLOUDHV_EFI.fd")
+    FirmwareClassLegacy.new("edk2-stable202308", "CLOUDHV_EFI.fd")
   elsif Arch.x64?
-    FirmwareClass.new("edk2-stable202302", "CLOUDHV.fd")
+    FirmwareClassLegacy.new("edk2-stable202302", "CLOUDHV.fd")
   else
     fail "BUG: unexpected architecture"
   end

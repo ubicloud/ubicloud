@@ -65,7 +65,7 @@ else
       command = "#{command} < #{dir}/var/proc/#{name}.stdin"
     end
 
-    command = "/bin/bash -c '#{command} > #{dir}/var/log/#{name}.stdout 2> #{dir}/var/log/#{name}.stderr'"
+    command = "/bin/bash -c '#{command}'"
     r "sudo systemd-run --working-directory #{dir} --unit #{name} --remain-after-exit #{command}"
   end
 end
