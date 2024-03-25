@@ -62,7 +62,7 @@ RSpec.describe SpdkSetup do
   describe "#create_service" do
     it "creates the service file" do
       expect(File).to receive(:write).with("/lib/systemd/system/spdk-#{spdk_version}.service", /.*/)
-      expect { spdk_setup.create_service }.not_to raise_error
+      expect { spdk_setup.create_service(cpu_count: 4) }.not_to raise_error
     end
   end
 
