@@ -10,7 +10,7 @@
     "watch": "npx tailwindcss -o assets/css/app.css --watch"
   },
   "engines": {
-    "node": "21.6.2",
-    "npm": "10.2.4"
+    "node": "21.7.1",
+    "npm": "10.5.0"
   }
 }
