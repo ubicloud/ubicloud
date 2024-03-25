@@ -28,7 +28,7 @@ table inet drop_unused_ip_packets {
   set blocked_ipv4_addresses {
     type ipv4_addr;
     flags interval;
-    elements = {#{ip_ranges_to_block.join(",")}}
+#{ip_ranges_to_block.empty? ? "" : "elements = {#{ip_ranges_to_block.join(",")}}"}
   }
 
   chain prerouting {
