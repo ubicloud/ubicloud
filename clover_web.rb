@@ -323,10 +323,11 @@ class CloverWeb < Roda
     end
     check_csrf!
 
-    rodauth.load_memory
-    rodauth.check_active_session
     @current_user = Account[rodauth.session_value]
     r.rodauth
+    rodauth.load_memory
+    rodauth.check_active_session
+
     r.root do
       r.redirect rodauth.login_route
     end
