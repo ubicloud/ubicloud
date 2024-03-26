@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch(:project_location_prefix, "postgres") do |r|
+  hash_branch(:project_location_database_prefix, "postgres") do |r|
     @serializer = Serializers::Api::Postgres
 
     r.get true do

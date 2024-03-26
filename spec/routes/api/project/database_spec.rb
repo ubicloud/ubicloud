@@ -2,14 +2,14 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Clover, "vm" do
+RSpec.describe Clover, "database" do
   let(:user) { create_account }
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ubid}/pg"
+      get "/api/project/#{project.ubid}/database"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -23,7 +23,7 @@ RSpec.describe Clover, "vm" do
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
     end
 
-    it "success all vms" do
+    it "success all databases" do
       Prog::Postgres::PostgresResourceNexus.assemble(
         project_id: project.id,
         location: "hetzner-hel1",
@@ -40,7 +40,7 @@ RSpec.describe Clover, "vm" do
         target_storage_size_gib: 100
       )
 
-      get "/api/project/#{project.ubid}/postgres"
+      get "/api/project/#{project.ubid}/database"
 
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(2)
