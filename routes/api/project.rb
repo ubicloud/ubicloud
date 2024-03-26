@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch("project") do |r|
+  hash_branch("projects") do |r|
     @serializer = Serializers::Api::Project
 
     r.get true do

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch(:project_prefix, "location") do |r|
+  hash_branch(:project_prefix, "locations") do |r|
     r.on String do |location_name|
       @location = location_name
 

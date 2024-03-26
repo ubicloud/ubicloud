@@ -15,56 +15,56 @@ RSpec.describe Clover, "vm" do
 
   describe "unauthenticated" do
     it "not location list" do
-      get "/api/project/#{project.ubid}/location/#{vm.location}/vm"
+      get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not create" do
-      post "/api/project/#{project.ubid}/location/#{vm.location}/vm/foo_name"
+      post "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/foo_name"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not delete" do
-      delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
+      delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not delete ubid" do
-      delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+      delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/#{vm.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not get" do
-      get "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
+      get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not get ubid" do
-      get "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+      get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/#{vm.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not create firewall rule" do
-      post "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule"
+      post "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not delete firewall rule" do
-      delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule/foo_ubid"
+      delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules/foo_ubid"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -78,7 +78,7 @@ RSpec.describe Clover, "vm" do
 
     describe "list" do
       it "empty" do
-        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm"
+        get "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms"
 
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
@@ -88,7 +88,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success single" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm"
+        get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms"
 
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
@@ -100,7 +100,7 @@ RSpec.describe Clover, "vm" do
       it "success multiple" do
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
 
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm"
+        get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms"
 
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
@@ -110,7 +110,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "ubid not exist" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/foo_ubid"
+        get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/foo_ubid"
 
         expect(last_response.status).to eq(404)
       end
@@ -118,7 +118,7 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -131,7 +131,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success with ipv4" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -147,7 +147,7 @@ RSpec.describe Clover, "vm" do
       it "success with private subnet" do
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").ubid
 
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -164,7 +164,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid name" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/invalid_name", {
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/invalid_name", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -179,7 +179,7 @@ RSpec.describe Clover, "vm" do
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
         expect(Project).to receive(:from_ubid).and_return(project)
 
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -191,14 +191,14 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid body" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", "invalid_body"
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/test-vm", "invalid_body"
 
         expect(last_response.status).to eq(400)
         expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Request body isn't a valid JSON object.")
       end
 
       it "missing required key" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/test-vm", {
           unix_user: "ubi"
         }.to_json
 
@@ -207,7 +207,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "non allowed key" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/api/projects/#{project.ubid}/locations/#{TEST_LOCATION}/vms/test-vm", {
           public_key: "ssh key",
           foo_key: "foo_val"
         }.to_json
@@ -217,7 +217,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "firewall-rule" do
-        post "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule", {
+        post "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules", {
           cidr: "0.0.0.0/0",
           port_range: "100..101"
         }.to_json
@@ -226,7 +226,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "firewall-rule vm ubid" do
-        post "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}/firewall-rule", {
+        post "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/#{vm.ubid}/firewall-rules", {
           cidr: "0.0.0.0/0",
           port_range: "100..1012"
         }.to_json
@@ -235,7 +235,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "firewall-rule no port range" do
-        post "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule", {
+        post "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules", {
           cidr: "0.0.0.0/1"
         }.to_json
 
@@ -243,7 +243,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "firewall-rule single port" do
-        post "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule", {
+        post "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules", {
           cidr: "0.0.0.0/1",
           port_range: "11111"
         }.to_json
@@ -254,28 +254,28 @@ RSpec.describe Clover, "vm" do
 
     describe "show" do
       it "success" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
+        get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
       end
 
       it "success ubid" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+        get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/#{vm.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
       end
 
       it "not found" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/not-exists-vm"
+        get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/not-exists-vm"
 
         expect(last_response.status).to eq(404)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
       end
 
       it "firewall" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule"
+        get "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["description"]).to eq("Default firewall")
@@ -284,47 +284,47 @@ RSpec.describe Clover, "vm" do
 
     describe "delete" do
       it "success" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
+        delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end
 
       it "success ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+        delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/#{vm.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end
 
       it "not exist" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/foo_name"
+        delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/foo_name"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
       it "not exist ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/foo_ubid"
+        delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/foo_ubid"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
       it "firewall-rule" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
+        delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
 
         expect(last_response.status).to eq(204)
       end
 
       it "firewall-rule ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}/firewall-rule/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
+        delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/ubid/#{vm.ubid}/firewall-rules/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
 
         expect(last_response.status).to eq(204)
       end
 
       it "firewall-rule not exist" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule/foo_ubid"
+        delete "/api/projects/#{project.ubid}/locations/#{vm.location}/vms/#{vm.name}/firewall-rules/foo_ubid"
 
         expect(last_response.status).to eq(204)
       end

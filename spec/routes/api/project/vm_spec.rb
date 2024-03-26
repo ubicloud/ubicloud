@@ -11,7 +11,7 @@ RSpec.describe Clover, "vm" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ubid}/vm"
+      get "/api/projects/#{project.ubid}/vms"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -27,7 +27,7 @@ RSpec.describe Clover, "vm" do
       Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2", location: "hetzner-fsn1")
       Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2", location: vm.location)
 
-      get "/api/project/#{project.ubid}/vm"
+      get "/api/projects/#{project.ubid}/vms"
 
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(3)

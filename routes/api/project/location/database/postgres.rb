@@ -71,7 +71,7 @@ class CloverApi
       request.halt
     end
 
-    request.on "firewall-rule" do
+    request.on "firewall-rules" do
       request.post true do
         Authorization.authorize(user.id, "Postgres:Firewall:edit", pg.id)
 

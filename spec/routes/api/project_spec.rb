@@ -9,21 +9,21 @@ RSpec.describe Clover, "vm" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project"
+      get "/api/projects"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not create" do
-      post "/api/project"
+      post "/api/projects"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
     it "not delete" do
-      delete "api/project/#{project.ubid}"
+      delete "api/projects/#{project.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -38,7 +38,7 @@ RSpec.describe Clover, "vm" do
     describe "list" do
       it "success" do
         project
-        get "/api/project"
+        get "/api/projects"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body).length).to eq(2)
@@ -47,7 +47,7 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
-        post "/api/project", {
+        post "/api/projects", {
           name: "test-project",
           provider: "hetzner"
         }
@@ -59,7 +59,7 @@ RSpec.describe Clover, "vm" do
 
     describe "delete" do
       it "success" do
-        delete "api/project/#{project.ubid}"
+        delete "api/projects/#{project.ubid}"
 
         expect(last_response.status).to eq(204)
 
@@ -69,7 +69,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success with non-existing project" do
-        delete "api/project/non_existing_id"
+        delete "api/projects/non_existing_id"
 
         expect(last_response.status).to eq(204)
       end
@@ -77,7 +77,7 @@ RSpec.describe Clover, "vm" do
       it "can not delete project when it has resources" do
         Prog::Vm::Nexus.assemble("key", project.id, name: "vm1")
 
-        delete "api/project/#{project.ubid}"
+        delete "api/projects/#{project.ubid}"
 
         expect(last_response.status).to eq(409)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("'#{project.name}' project has some resources. Delete all related resources first.")
@@ -86,7 +86,7 @@ RSpec.describe Clover, "vm" do
       it "not authorized" do
         u = create_account("test@test.com")
         p = u.create_project_with_default_policy("project-1")
-        delete "api/project/#{p.ubid}"
+        delete "api/projects/#{p.ubid}"
 
         expect(last_response.status).to eq(403)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, you don't have permission to continue with this request.")
@@ -95,14 +95,14 @@ RSpec.describe Clover, "vm" do
 
     describe "show" do
       it "success" do
-        get "/api/project/#{project.ubid}"
+        get "/api/projects/#{project.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(project.name)
       end
 
       it "not found" do
-        get "/api/project/08s56d4kaj94xsmrnf5v5m3mav"
+        get "/api/projects/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(last_response.status).to eq(404)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
@@ -111,7 +111,7 @@ RSpec.describe Clover, "vm" do
       it "not authorized" do
         u = create_account("test@test.com")
         p = u.create_project_with_default_policy("project-1")
-        get "/api/project/#{p.ubid}"
+        get "/api/projects/#{p.ubid}"
 
         expect(last_response.status).to eq(403)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, you don't have permission to continue with this request.")

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch(:project_location_prefix, "private-subnet") do |r|
+  hash_branch(:project_location_prefix, "private-subnets") do |r|
     @serializer = Serializers::Api::PrivateSubnet
 
     r.get true do

@@ -9,7 +9,7 @@ RSpec.describe Clover, "database" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/database"
+      get "/api/projects/#{project.ubid}/location/#{TEST_LOCATION}/databases"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -40,7 +40,7 @@ RSpec.describe Clover, "database" do
         target_storage_size_gib: 100
       )
 
-      get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/database"
+      get "/api/projects/#{project.ubid}/location/#{TEST_LOCATION}/databases"
 
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(1)
