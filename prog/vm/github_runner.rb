@@ -238,7 +238,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       ./actions-runner/env.sh
 
       # Include /etc/environment in the runneradmin environment to move it to the
-      # runner enviornment at the end of this script, it's otherwise ignored, and
+      # runner environment at the end of this script, it's otherwise ignored, and
       # this omission has caused problems.
       # See https://github.com/actions/runner/issues/1703
       cat <<EOT > ./actions-runner/run-withenv.sh
