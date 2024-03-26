@@ -73,14 +73,11 @@ class Prog::Vm::HostNexus < Prog::Base
       when "LearnCores"
         total_cores = st.exitval.fetch("total_cores")
         total_cpus = st.exitval.fetch("total_cpus")
-        # Currently all SPDK installations share vcpus 0 and 1.
-        spdk_cores = (2 * total_cores) / total_cpus
         kwargs = {
           total_sockets: st.exitval.fetch("total_sockets"),
           total_dies: st.exitval.fetch("total_dies"),
           total_cores: total_cores,
-          total_cpus: total_cpus,
-          used_cores: spdk_cores
+          total_cpus: total_cpus
         }
 
         vm_host.update(**kwargs)
@@ -124,6 +121,9 @@ class Prog::Vm::HostNexus < Prog::Base
   label def wait_setup_spdk
     reap
     if leaf?
+      spdk_installation = vm_host.spdk_installations.first
+      spdk_cores = (spdk_installation.cpu_count * vm_host.total_cores) / vm_host.total_cpus
+      vm_host.update(used_cores: spdk_cores)
       hop_prep_reboot
     end
     donate

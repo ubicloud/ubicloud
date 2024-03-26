@@ -130,7 +130,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:leaf?).and_return(true)
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
       expect(vm_host).to receive(:update).with(arch: "arm64")
-      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2, used_cores: 1)
+      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
       expect(vm_host).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
@@ -209,7 +209,14 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:reap).and_return([])
       expect(nx).to receive(:leaf?).and_return true
       vmh = instance_double(VmHost)
-      nx.instance_variable_set(:@vm_host, vmh)
+      spdk_installation = SpdkInstallation.new(cpu_count: 4)
+      allow(vmh).to receive_messages(
+        spdk_installations: [spdk_installation],
+        total_cores: 48,
+        total_cpus: 96
+      )
+      allow(nx).to receive(:vm_host).and_return(vmh)
+      expect(vmh).to receive(:update).with({used_cores: 2})
 
       expect { nx.wait_setup_spdk }.to hop("prep_reboot")
     end
