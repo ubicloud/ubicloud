@@ -27,7 +27,8 @@ class CloverWeb < Roda
     csp.style_src :self, "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css"
     csp.img_src :self, "data: image/svg+xml"
     csp.form_action :self, "https://checkout.stripe.com"
-    csp.script_src :self, "https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js", "https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js", "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"
+    csp.script_src :self, "https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js", "https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js", "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js", "https://challenges.cloudflare.com/turnstile/v0/api.js"
+    csp.frame_src :self, "https://challenges.cloudflare.com"
     csp.connect_src :self
     csp.base_uri :none
     csp.frame_ancestors :none
@@ -167,6 +168,7 @@ class CloverWeb < Roda
     create_account_set_password? true
     password_confirm_label "Password Confirmation"
     before_create_account do
+      Validation.validate_cloudflare_turnstile(param("cf-turnstile-response"))
       account[:id] = Account.generate_uuid
       account[:name] = param("name")
       Validation.validate_account_name(account[:name])

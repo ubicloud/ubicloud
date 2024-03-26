@@ -86,6 +86,8 @@ module Config
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
   override :hetzner_ssh_key, string
   override :minimum_invoice_charge_threshold, 0.5, float
+  optional :cloudflare_turnstile_site_key, string
+  optional :cloudflare_turnstile_secret_key, string
 
   # GitHub Runner App
   optional :github_app_name, string

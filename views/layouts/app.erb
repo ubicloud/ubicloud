@@ -31,6 +31,9 @@
         crossorigin="anonymous"
       ></script>
     <% end %>
+    <% if @enable_cloudflare_turnstile %>
+      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
+    <% end %>
   </head>
 
   <body class="h-full">
