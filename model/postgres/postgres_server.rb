@@ -110,6 +110,8 @@ class PostgresServer < Sequel::Model
       .map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_receive_lsn()").chomp} }
       .max_by { lsn2int(_1[:lsn]) }
 
+    return nil if target.nil?
+
     if resource.ha_type == PostgresResource::HaType::ASYNC
       return nil if lsn_monitor.last_known_lsn.nil?
       return nil if lsn_diff(lsn_monitor.last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
