@@ -22,7 +22,8 @@ RSpec.describe Prog::Storage::SetupSpdk do
       location: "xyz",
       arch: "x64",
       used_hugepages_1g: 0,
-      total_hugepages_1g: 2
+      total_hugepages_1g: 2,
+      total_cpus: 96
     ) { _1.id = "adec2977-74a9-8b71-8473-cf3940a45ac5" }
   }
 
@@ -54,7 +55,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
 
   describe "#install_spdk" do
     it "installs and hops to start_service" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk install #{spdk_version}")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk install #{spdk_version} 4")
       expect { setup_spdk.install_spdk }.to hop("start_service")
     end
   end
@@ -82,6 +83,20 @@ RSpec.describe Prog::Storage::SetupSpdk do
       allow(setup_spdk).to receive(:frame).and_return({"version" => spdk_version, "start_service" => false})
       expect { setup_spdk.update_database }.to exit({"msg" => "SPDK was setup"})
       expect(vm_host.reload.used_hugepages_1g).to eq(0)
+    end
+  end
+
+  describe "#spdk_cpu_count" do
+    it "uses 2 cpus for AX161" do
+      expect(setup_spdk.spdk_cpu_count(total_host_cpus: 64)).to eq(2)
+    end
+
+    it "uses 4 cpus for RX220" do
+      expect(setup_spdk.spdk_cpu_count(total_host_cpus: 80)).to eq(4)
+    end
+
+    it "uses 4 cpus for AX162" do
+      expect(setup_spdk.spdk_cpu_count(total_host_cpus: 96)).to eq(4)
     end
   end
 end
