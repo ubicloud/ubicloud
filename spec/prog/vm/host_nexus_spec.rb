@@ -16,7 +16,12 @@ RSpec.describe Prog::Vm::HostNexus do
     }
   }
 
-  let(:vms) { [instance_double(Vm, mem_gib: 1), instance_double(Vm, mem_gib: 2)] }
+  let(:vms) {
+    [
+      instance_double(Vm, mem_gib: 1, strand: instance_double(Strand, label: "prep"), display_state: "rebooting"),
+      instance_double(Vm, mem_gib: 2, strand: instance_double(Strand, label: "wait"), display_state: "rebooting")
+    ]
+  }
   let(:vm_host) { instance_double(VmHost, vms: vms) }
   let(:sshable) { instance_double(Sshable) }
 
@@ -232,6 +237,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "hops to prep_reboot when needed" do
       expect(nx).to receive(:when_reboot_set?).and_yield
+      expect(nx.vm_host).to receive(:update).with(allocation_state: "rebooting")
       expect { nx.wait }.to hop("prep_reboot")
     end
   end
@@ -264,6 +270,17 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
       expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
       expect(vms).to all receive(:update).with(display_state: "rebooting")
+      expect(nx).to receive(:decr_reboot)
+      expect { nx.prep_reboot }.to hop("reboot")
+    end
+
+    it "prep_reboot skips vms that are not even prepped yet" do
+      expect(nx).to receive(:get_boot_id).and_return("xyz")
+      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
+      unprepped_vms = [instance_double(Vm, strand: instance_double(Strand, label: "create_unix_user")), instance_double(Vm, strand: instance_double(Strand, label: "start"))]
+      expect(vm_host).to receive(:vms).and_return(vms + unprepped_vms)
+      expect(vms).to all receive(:update).with(display_state: "rebooting")
+      unprepped_vms.each { |vm| expect(vm).not_to receive(:update) }
       expect(nx).to receive(:decr_reboot)
       expect { nx.prep_reboot }.to hop("reboot")
     end
@@ -302,6 +319,15 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "start_vms starts vms & hops to wait" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
+      expect(vm_host).to receive(:update).with(allocation_state: "accepting")
+      expect { nx.start_vms }.to hop("wait")
+    end
+
+    it "start_vms skips vms that are not rebooting" do
+      non_rebooting_vms = [instance_double(Vm, display_state: "running"), instance_double(Vm, display_state: "creating")]
+      expect(vm_host).to receive(:vms).and_return(vms + non_rebooting_vms)
+      expect(vms).to all receive(:incr_start_after_host_reboot)
+      non_rebooting_vms.each { |vm| expect(vm).not_to receive(:incr_start_after_host_reboot) }
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
       expect { nx.start_vms }.to hop("wait")
     end

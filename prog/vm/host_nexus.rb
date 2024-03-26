@@ -133,9 +133,10 @@ class Prog::Vm::HostNexus < Prog::Base
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
-    vm_host.vms.each { |vm|
+    vm_host.vms.each do |vm|
+      next if ["start", "create_unix_user"].include?(vm.strand.label) # rubocop:disable Performance/CollectionLiteralInLoop
       vm.update(display_state: "rebooting")
-    }
+    end
 
     decr_reboot
 
@@ -192,9 +193,10 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start_vms
-    vm_host.vms.each { |vm|
+    vm_host.vms.each do |vm|
+      next unless vm.display_state == "rebooting"
       vm.incr_start_after_host_reboot
-    }
+    end
 
     vm_host.update(allocation_state: "accepting")
 
@@ -203,6 +205,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def wait
     when_reboot_set? do
+      vm_host.update(allocation_state: "rebooting")
       hop_prep_reboot
     end
 
