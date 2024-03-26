@@ -93,12 +93,17 @@ RSpec.describe PostgresServer do
   describe "#failover_target" do
     before do
       postgres_server.timeline_access = "push"
-      expect(resource).to receive(:servers).and_return([
+      allow(resource).to receive(:servers).and_return([
         postgres_server,
         instance_double(described_class, ubid: "pgubidstandby1", standby?: true, strand: instance_double(Strand, label: "wait_catch_up")),
         instance_double(described_class, ubid: "pgubidstandby2", standby?: true, run_query: "1/5", strand: instance_double(Strand, label: "wait")),
         instance_double(described_class, ubid: "pgubidstandby3", standby?: true, run_query: "1/10", strand: instance_double(Strand, label: "wait"))
       ])
+    end
+
+    it "returns nil if there is no standby" do
+      expect(resource).to receive(:servers).and_return([postgres_server]).at_least(:once)
+      expect(postgres_server.failover_target).to be_nil
     end
 
     it "returns the standby with highest lsn in sync replication" do
