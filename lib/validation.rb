@@ -2,6 +2,7 @@
 
 require "time"
 require "netaddr"
+require "excon"
 
 module Validation
   class ValidationFailed < CloverError
@@ -236,6 +237,20 @@ module Validation
       effective_quota_value = project.effective_quota_value(resource_type)
 
       fail ValidationFailed.new({size: "Insufficient quota for requested size. Requested core count: #{requested_core_count}, currently used core count: #{current_used_core_count}, maximum allowed core count: #{effective_quota_value}, remaining core count: #{effective_quota_value - current_used_core_count}"})
+    end
+  end
+
+  def self.validate_cloudflare_turnstile(cf_response)
+    return unless Config.cloudflare_turnstile_site_key
+
+    response = Excon.post("https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      headers: {"Content-Type" => "application/x-www-form-urlencoded"},
+      body: URI.encode_www_form(secret: Config.cloudflare_turnstile_secret_key, response: cf_response),
+      expects: 200)
+    response_hash = JSON.parse(response.body)
+    unless response_hash["success"]
+      Clog.emit("cloudflare turnstile validation failed") { {cf_validation_failed: response_hash["error-codes"]} }
+      fail ValidationFailed.new({cloudflare_turnstile: "Validation failed. Please try again."})
     end
   end
 end
