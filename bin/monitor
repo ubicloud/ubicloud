@@ -3,7 +3,7 @@
 
 require_relative "../loader"
 
-MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner, VmHost]
+MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner, VmHost, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists)]
 
 sessions = {}
 ssh_threads = {}
