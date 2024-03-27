@@ -190,6 +190,14 @@ class Prog::Vm::GithubRunner < Prog::Base
       # To make sure the script errors out if any command fails
       set -ueo pipefail
 
+      # In case the script is run until we mv to /home/runner but the state
+      # could not progress because of any reason (e.g. deployment, runner
+      # failure), the idempotency is broken. The script needs to be copied back
+      # to the home directory of the runneradmin. More information regarding the
+      # operation can be found in the middle of the script where we chown the
+      # actions-runner.
+      sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
+
       # Since standard Github runners have both runneradmin and runner users
       # VMs of github runners are created with runneradmin user. Adding
       # runner user and group with the same id and gid as the standard.
@@ -225,7 +233,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       # line, and the latter guarateens to continue if the script fails after moving
       # actions-runner from ./ to /home/runner
       sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
-      sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
       sudo chown -R runneradmin:runneradmin actions-runner
 
       # ./env.sh sets some variables for runner to run properly

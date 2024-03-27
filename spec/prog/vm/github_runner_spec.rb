@@ -371,6 +371,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
+        sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
         sudo userdel -rf runner || true
         sudo addgroup --gid 1001 runner
         sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
@@ -379,7 +380,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
         source /etc/environment
         sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
-        sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
         sudo chown -R runneradmin:runneradmin actions-runner
         ./actions-runner/env.sh
         cat <<EOT > ./actions-runner/run-withenv.sh
