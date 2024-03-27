@@ -461,7 +461,7 @@ EOS
 
   def download_boot_image(boot_image, custom_url: nil, ca_path: nil)
     urls = {
-      "ubuntu-jammy" => "https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
+      "ubuntu-jammy" => "https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
       "almalinux-9.1" => Arch.render(x64: "x86_64", arm64: "aarch64").yield_self { "https://repo.almalinux.org/almalinux/9/cloud/#{_1}/images/AlmaLinux-9-GenericCloud-latest.#{_1}.qcow2" },
       "github-ubuntu-2204" => nil,
       "github-ubuntu-2004" => nil,

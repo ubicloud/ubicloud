@@ -61,7 +61,7 @@ RSpec.describe VmSetup do
       end.and_yield
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
       expect(Arch).to receive(:render).and_return("amd64").at_least(:once)
-      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/releases/jammy/release-20231010/ubuntu-22.04-server-cloudimg-amd64.img")
+      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-amd64.img")
       expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw")
       expect(FileUtils).to receive(:rm_r).with("/var/storage/images/ubuntu-jammy.img.tmp")
 
