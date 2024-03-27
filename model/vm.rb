@@ -20,7 +20,8 @@ class Vm < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
+  include HealthMonitorMethods
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup
 
   include Authorization::HyperTagMethods
 
@@ -152,6 +153,27 @@ class Vm < Sequel::Model
 
   def storage_encrypted?
     vm_storage_volumes.all? { !_1.key_encryption_key_1_id.nil? }
+  end
+
+  def init_health_monitor_session
+    {
+      ssh_session: vm_host.sshable.start_fresh_session
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      session[:ssh_session].exec!("systemctl is-active #{inhost_name} #{inhost_name}-dnsmasq").split("\n").all?("active") ? "up" : "down"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
+      incr_checkup
+    end
+
+    pulse
   end
 
   def self.redacted_columns

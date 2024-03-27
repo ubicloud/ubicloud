@@ -4,7 +4,7 @@
 require_relative "../loader"
 clover_freeze
 
-MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner, VmHost]
+MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner, VmHost, Vm.left_join(:sshable, id: :id).where(Sequel[:sshable][:id] => nil)]
 resources = {}
 mutex = Mutex.new
 
