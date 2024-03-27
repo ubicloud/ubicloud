@@ -758,6 +758,20 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
       expect { nx.wait }.to hop("update_firewall_rules")
     end
+
+    it "hops to unavailable based on the vm's available status" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
+      expect { nx.wait }.to hop("unavailable")
+
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(true)
+      expect { nx.wait }.to nap(30)
+    end
   end
 
   describe "#update_firewall_rules" do
@@ -780,6 +794,28 @@ RSpec.describe Prog::Vm::Nexus do
     it "hops to run if firewall rules are updated" do
       expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_firewall_rules }.to hop("wait")
+    end
+  end
+
+  describe "#unavailable" do
+    it "creates a page if vm is unavailable" do
+      expect(Prog::PageNexus).to receive(:assemble)
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "resolves the page if vm is available" do
+      pg = instance_double(Page)
+      expect(pg).to receive(:incr_resolve)
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(pg)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "does not resolves the page if there is none" do
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(nil)
+      expect { nx.unavailable }.to hop("wait")
     end
   end
 
@@ -887,6 +923,16 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:update).with(display_state: "running")
 
       expect { nx.start_after_host_reboot }.to hop("update_firewall_rules")
+    end
+  end
+
+  describe "#available?" do
+    it "returns the available status" do
+      vh = instance_double(VmHost, sshable: instance_double(Sshable))
+      expect(vh.sshable).to receive(:cmd).and_return("active\nactive\n")
+      expect(vm).to receive(:vm_host).and_return(vh)
+      expect(vm).to receive(:inhost_name).and_return("vmxxxx").at_least(:once)
+      expect(nx.available?).to be true
     end
   end
 end

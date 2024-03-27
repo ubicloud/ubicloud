@@ -8,7 +8,7 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
@@ -488,6 +488,14 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       hop_update_firewall_rules
     end
 
+    when_checkup_set? do
+      hop_unavailable if !available?
+    rescue Sshable::SshError
+      # Host is likely to be down, which will be handled by HostNexus. We still
+      # go to the unavailable state for keeping track of the state.
+      hop_unavailable
+    end
+
     nap 30
   end
 
@@ -501,6 +509,23 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
     reap
     hop_wait if leaf?
     donate
+  end
+
+  label def unavailable
+    begin
+      if available?
+        Page.from_tag_parts("VmUnavailable", vm.ubid)&.incr_resolve
+        decr_checkup
+        hop_wait
+      else
+        Prog::PageNexus.assemble("#{vm} is unavailable", vm.ubid, "VmUnavailable", vm.ubid)
+      end
+    rescue Sshable::SshError
+      # Host is likely to be down, which will be handled by HostNexus. No need
+      # to create a page for this case.
+    end
+
+    nap 30
   end
 
   label def prevent_destroy
@@ -574,5 +599,9 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
     decr_start_after_host_reboot
 
     hop_update_firewall_rules
+  end
+
+  def available?
+    host.sshable.cmd("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").split("\n").all?("active")
   end
 end
