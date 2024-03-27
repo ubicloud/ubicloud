@@ -2,62 +2,96 @@
 # frozen_string_literal: true
 
 require_relative "../loader"
-
-MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner]
-
-sessions = {}
-ssh_threads = {}
-pulse_threads = {}
-
 clover_freeze
 
-loop do
-  resources = MONITORABLE_RESOURCE_TYPES.flat_map { _1.all }
+MONITORABLE_RESOURCE_TYPES = [PostgresServer, MinioServer, GithubRunner]
+resources = {}
+mutex = Mutex.new
 
-  resources.each do |r|
-    break if Thread.list.count + 2 > Config.max_monitor_threads
-    ssh_threads[r.id] ||= Thread.new do
-      loop do
-        sessions[r.id] = r.init_health_monitor_session
-
-        loop do
-          sessions[r.id][:ssh_session].process
-        rescue => ex
-          Clog.emit("Processing SSH session is failed. Trying to reestablish the connection") { {health_monitor_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-          break
-        end
-      rescue => ex
-        Clog.emit("Establishing the SSH session is failed") { {health_monitor_reestablish_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-
-        begin
-          r.reload
-        rescue Sequel::NoExistingObject
-          Clog.emit("Resource is deleted") { {health_monitor_resource_deleted: {ubid: r.ubid}} }
-          sessions.delete(r.id)
-          ssh_threads.delete(r.id)
-          pulse_threads.delete(r.id)&.kill
-          break
-        end
-
-        sleep 5
+producer = Thread.new do
+  loop do
+    mutex.synchronize do
+      MONITORABLE_RESOURCE_TYPES.flat_map { _1.all }.each do |r|
+        resources[r.id] ||= {
+          model: r,
+          session: r.reload.init_health_monitor_session,
+          ssh_thread: nil,
+          pulse: {}
+        }
+      rescue Sequel::NoExistingObject
       end
     end
-
-    pulse_threads[r.id] ||= Thread.new do
-      pulse = {}
-      loop do
-        pulse = r.check_pulse(session: sessions[r.id], previous_pulse: pulse) if sessions[r.id]
-        Clog.emit("Got new pulse") { {got_pulse: {ubid: r.ubid, pulse: pulse}} }
-        sleep r.monitoring_interval
-      rescue RuntimeError, IOError => ex
-        Clog.emit("Pulse checking is failed") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-        sleep r.monitoring_interval
-      rescue => ex
-        Clog.emit("Pulse checking is failed permanently!") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-        raise
-      end
-    end
+    sleep 5 * 60
   end
+rescue => ex
+  Clog.emit("Resource loading is failed.") { {health_monitor_resource_load_failure: {exception: Util.exception_to_hash(ex)}} }
 
-  sleep 5 * 60
+  # Since we are in a thread, raised exceptions will not be sent to the main
+  # thread, but the thread we are in will exit, causing not to be able to
+  # monitor new resources. We are exiting the whole process to restart it.
+  # Alternatively, we could just ignore the exception and retry, this keeps
+  # the same behavior as the respirate.
+  ThreadPrinter.run
+  Kernel.exit!
 end
+
+consumer = Thread.new do
+  loop do
+    Clog.emit("Health checks couldn't be completed.") { {health_monitor_overload: {incomplete_health_check_count: (Thread.list.count - 3) / 2}} } if Thread.list.count > 3
+    mutex.synchronize do
+      keys_to_delete = []
+      resources.each do |r_id, r|
+        while Thread.list.count + 2 > Config.max_monitor_threads
+          sleep 1
+        end
+
+        next if r[:ssh_thread]&.alive?
+
+        r[:ssh_thread] = Thread.new do
+          loop do
+            r[:session] ||= r[:model].reload.init_health_monitor_session
+            r[:session][:ssh_session].process
+          rescue Sequel::NoExistingObject
+            Clog.emit("Resource is deleted.") { {health_monitor_resource_deleted: {ubid: r[:model].ubid}} }
+
+            keys_to_delete << r_id
+            break
+          rescue => ex
+            Clog.emit("Processing SSH session is failed.") { {health_monitor_ssh_failure: {ubid: r[:model].ubid, exception: Util.exception_to_hash(ex)}} }
+
+            # Session could be dead, reestablish it
+            r[:session] = nil
+            sleep 1
+          end
+        end
+
+        Thread.new do
+          r[:pulse] = r[:model].check_pulse(session: r[:session], previous_pulse: r[:pulse])
+          Clog.emit("Got new pulse.") { {got_pulse: {ubid: r[:model].ubid, pulse: r[:pulse]}} }
+        rescue => ex
+          Clog.emit("Pulse checking is failed.") { {pulse_check_failure: {ubid: r[:model].ubid, exception: Util.exception_to_hash(ex)}} }
+        ensure
+          r[:ssh_thread].kill
+        end
+      end
+
+      # Delete resources that are no longer in the database
+      keys_to_delete.each { |key| resources.delete(key) }
+    end
+
+    sleep 5
+  end
+rescue => ex
+  Clog.emit("Resource monitoring is failed.") { {health_monitor_resource_monitor_failure: {exception: Util.exception_to_hash(ex)}} }
+
+  # Since we are in a thread, raised exceptions will not be sent to the main
+  # thread, but the thread we are in will exit, causing not to be able to
+  # monitor new resources. We are exiting the whole process to restart it.
+  # Alternatively, we could just ignore the exception and retry, this keeps
+  # the same behavior as the respirate.
+  ThreadPrinter.run
+  Kernel.exit!
+end
+
+producer.join
+consumer.join
