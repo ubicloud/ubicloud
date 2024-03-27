@@ -122,7 +122,7 @@ GEM
       net-protocol
     net-protocol (0.2.2)
       timeout
-    net-smtp (0.4.0.1)
+    net-smtp (0.5.0)
       net-protocol
     net-ssh (7.2.1)
     netaddr (2.0.6)
@@ -144,7 +144,7 @@ GEM
       openssl (> 2.0)
     pagerduty (4.0.1)
     parallel (1.24.0)
-    parallel_tests (4.5.2)
+    parallel_tests (4.6.0)
       parallel
     parser (3.3.0.5)
       ast (~> 2.4.1)
