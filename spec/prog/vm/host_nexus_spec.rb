@@ -241,6 +241,45 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:when_reboot_set?).and_yield
       expect { nx.wait }.to hop("prep_reboot")
     end
+
+    it "hops to unavailable based on the host's available status" do
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+
+      expect(vm_host).to receive(:values).and_return({location: "hetzner-hel1", arch: "x64", total_cores: 4})
+      expect(vm_host).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, count: 2))
+      expect(nx).to receive(:when_checkup_set?).and_yield
+      expect(nx).to receive(:available?).and_return(true)
+      expect { nx.wait }.to nap(30)
+    end
+  end
+
+  describe "#unavailable" do
+    it "creates a page if host is unavailable" do
+      expect(vm_host).to receive(:ubid).and_return("vhxxxx").at_least(:once)
+      expect(Prog::PageNexus).to receive(:assemble)
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "resolves the page if host is available" do
+      expect(vm_host).to receive(:ubid).and_return("vhxxxx").at_least(:once)
+      expect(Prog::PageNexus).to receive(:assemble)
+      pg = instance_double(Page)
+      expect(pg).to receive(:incr_resolve)
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(pg)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "does not resolves the page if there is none" do
+      expect(vm_host).to receive(:ubid).and_return("vhxxxx").at_least(:once)
+      expect(Prog::PageNexus).to receive(:assemble)
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(nil)
+      expect { nx.unavailable }.to hop("wait")
+    end
   end
 
   describe "#destroy" do
@@ -361,6 +400,16 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 5, used_hugepages_1g: 4)
       expect { nx.verify_hugepages }.to hop("start_vms")
+    end
+  end
+
+  describe "#available?" do
+    it "returns the available status" do
+      expect(sshable).to receive(:cmd).and_return("true")
+      expect(nx.available?).to be true
+
+      expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
+      expect(nx.available?).to be false
     end
   end
 end
