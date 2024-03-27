@@ -247,4 +247,27 @@ RSpec.describe VmHost do
     expect(SecureRandom).to receive(:random_number).with(32767).and_return(5, 10)
     expect(vh.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.20")
   end
+
+  it "initiates a new health monitor session" do
+    expect(vh.sshable).to receive(:start_fresh_session)
+    vh.init_health_monitor_session
+  end
+
+  it "checks pulse" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    expect(session[:ssh_session]).to receive(:exec!).and_return("true\n")
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+
+    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(vh).to receive(:incr_checkup)
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
 end
