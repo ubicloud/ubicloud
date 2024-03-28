@@ -262,7 +262,7 @@ RSpec.describe Clover, "project" do
         end
 
         expect(page.title).to eq("Ubicloud - #{project.name} - Policy")
-        expect(page).to have_content project.access_policies.first.body.to_json
+        expect(page).to have_content project.access_policies.first.transform_to_names.body.to_json
       end
 
       it "raises forbidden when does not have permissions" do
@@ -274,21 +274,41 @@ RSpec.describe Clover, "project" do
       end
 
       it "can update policy" do
-        current_policy = project.access_policies.first.body
+        current_policy = project.access_policies.first
         new_policy = {
           acls: [
-            {actions: ["Project:policy"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
+            {actions: ["Project:policy"], objects: project.hyper_tag_name, subjects: user.policy_tag_name}
           ]
         }
 
         visit "#{project.path}/policy"
 
-        expect(page).to have_content current_policy.to_json
+        expect(page).to have_content current_policy.transform_to_names.body.to_json
 
         fill_in "body", with: new_policy.to_json
         click_button "Update"
 
         expect(page).to have_content new_policy.to_json
+      end
+
+      it "can not update policy with a non-existent user" do
+        current_policy = project.access_policies.first
+        new_policy = {
+          acls: [
+            {actions: ["Project:policy"], objects: project.hyper_tag_name, subjects: "user/new@example.com"}
+          ]
+        }
+
+        visit "#{project.path}/policy"
+
+        expect(page).to have_content current_policy.transform_to_names.body.to_json
+
+        fill_in "body", with: new_policy.to_json
+        click_button "Update"
+
+        expect(page).to have_content "Validation failed for following fields: body"
+        expect(page).to have_content "'user/new@example.com' doesn't exists in your project."
+        expect(current_policy.body).to eq(project.access_policies.first.body)
       end
 
       it "can not update policy when it is not valid JSON" do
