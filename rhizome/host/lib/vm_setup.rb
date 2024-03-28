@@ -114,6 +114,13 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     block_ip4
 
     begin
+      pids = r "ip netns pids #{q_vm}"
+      pids.split.each { |pid| r "kill -9 #{pid}" }
+    rescue CommandFail => ex
+      raise unless ex.stderr.include?("Cannot open network namespace: No such file or directory")
+    end
+
+    begin
       r "ip netns del #{q_vm}"
     rescue CommandFail => ex
       raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
