@@ -140,7 +140,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     unless utilization < 70
       Clog.emit("Waiting for customer concurrency limit, utilization is high") { {github_runner: github_runner.values, utilization: utilization} }
-      nap 5
+      nap rand(5..15)
     end
 
     Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { {github_runner: github_runner.values, utilization: utilization} }
