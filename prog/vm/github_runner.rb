@@ -138,7 +138,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       sum(:used_cores) * 100.0 / sum(:total_cores)
     }.first.to_f
 
-    unless utilization < 60
+    unless utilization < 70
       Clog.emit("Waiting for customer concurrency limit, utilization is high") { {github_runner: github_runner.values, utilization: utilization} }
       nap 5
     end
