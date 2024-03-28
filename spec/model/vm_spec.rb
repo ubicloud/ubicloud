@@ -107,4 +107,34 @@ RSpec.describe Vm do
       expect(vm.ephemeral_net4).to be_nil
     end
   end
+
+  it "initiates a new health monitor session" do
+    vh = instance_double(VmHost, sshable: instance_double(Sshable))
+    expect(vm).to receive(:vm_host).and_return(vh).at_least(:once)
+    expect(vh.sshable).to receive(:start_fresh_session)
+    vm.init_health_monitor_session
+  end
+
+  it "checks pulse" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "down",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+
+    expect(vm).to receive(:inhost_name).and_return("vmxxxx").at_least(:once)
+    expect(session[:ssh_session]).to receive(:exec!).and_return("active\nactive\n")
+    expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+
+    expect(session[:ssh_session]).to receive(:exec!).and_return("active\ninactive\n")
+    expect(vm).to receive(:incr_checkup)
+    expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+
+    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(vm).to receive(:incr_checkup)
+    expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
 end

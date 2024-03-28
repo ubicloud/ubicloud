@@ -2,7 +2,7 @@
 
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
-  semaphore :reboot, :destroy
+  semaphore :checkup, :reboot, :destroy
 
   def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version)
     DB.transaction do
@@ -206,8 +206,22 @@ class Prog::Vm::HostNexus < Prog::Base
       hop_prep_reboot
     end
 
+    when_checkup_set? do
+      hop_unavailable if !available?
+    end
+
     Clog.emit("vm host utilization") { {vm_host_utilization: vm_host.values.slice(:location, :arch, :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :total_storage_gib, :available_storage_gib).merge({vms_count: vm_host.vms_dataset.count})} }
 
+    nap 30
+  end
+
+  label def unavailable
+    Prog::PageNexus.assemble("#{vm_host} is unavailable", vm_host.ubid, "VmHostUnavailable", vm_host.ubid)
+    if available?
+      Page.from_tag_parts("VmHostUnavailable", vm_host.ubid)&.incr_resolve
+      decr_checkup
+      hop_wait
+    end
     nap 30
   end
 
@@ -232,5 +246,12 @@ class Prog::Vm::HostNexus < Prog::Base
 
   def get_boot_id
     sshable.cmd("cat /proc/sys/kernel/random/boot_id").strip
+  end
+
+  def available?
+    sshable.cmd("true")
+    true
+  rescue
+    false
   end
 end

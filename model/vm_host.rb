@@ -17,7 +17,8 @@ class VmHost < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :reboot, :destroy
+  include HealthMonitorMethods
+  semaphore :checkup, :reboot, :destroy
 
   def host_prefix
     net6.netmask.prefix_len
@@ -203,5 +204,27 @@ class VmHost < Sequel::Model
     end
 
     Hosting::Apis.reset_server(self)
+  end
+
+  def init_health_monitor_session
+    {
+      ssh_session: sshable.start_fresh_session
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      session[:ssh_session].exec!("true")
+      "up"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
+      incr_checkup
+    end
+
+    pulse
   end
 end
