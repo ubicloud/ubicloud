@@ -444,6 +444,12 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vmh.reload.used_cores).to eq(1)
     end
 
+    it "matches all locations for github-runners" do
+      vm.location = "github-runners"
+      vmh = new_host(location: "somewhere-weird")
+      expect(nx.allocate).to eq vmh.id
+    end
+
     it "does not match if there is not enough storage capacity" do
       new_host(available_storage_gib: 10)
       expect(vm.storage_size_gib).to eq(35)
