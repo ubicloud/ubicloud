@@ -161,6 +161,24 @@ RSpec.describe VmSetup do
 
   describe "#purge" do
     it "can purge" do
+      expect(vs).to receive(:r).with("ip netns pids test").and_return("")
+      expect(vs).to receive(:r).with("ip netns del test")
+      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
+      expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
+      expect(vs).to receive(:r).with("systemctl daemon-reload")
+      expect(vs).to receive(:purge_storage)
+      expect(vs).to receive(:unmount_hugepages)
+      expect(vs).to receive(:r).with("deluser --remove-home test")
+      expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
+      expect(vs).to receive(:block_ip4)
+
+      vs.purge
+    end
+
+    it "kills active processes and purges" do
+      expect(vs).to receive(:r).with("ip netns pids test").and_return("123\n456")
+      expect(vs).to receive(:r).with("kill -9 123")
+      expect(vs).to receive(:r).with("kill -9 456")
       expect(vs).to receive(:r).with("ip netns del test")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test.service")
       expect(FileUtils).to receive(:rm_f).with("/etc/systemd/system/test-dnsmasq.service")
