@@ -288,7 +288,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
 
-      expect { nx.wait_concurrency_limit }.to nap(5)
+      expect { nx.wait_concurrency_limit }.to nap
     end
 
     it "hops to allocate_vm when customer concurrency limit frees up" do
