@@ -886,7 +886,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:update).with(display_state: "starting")
       expect(vm).to receive(:update).with(display_state: "running")
 
-      expect { nx.start_after_host_reboot }.to hop("wait")
+      expect { nx.start_after_host_reboot }.to hop("update_firewall_rules")
     end
   end
 end

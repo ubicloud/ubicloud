@@ -573,6 +573,6 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
 
     decr_start_after_host_reboot
 
-    hop_wait
+    hop_update_firewall_rules
   end
 end
