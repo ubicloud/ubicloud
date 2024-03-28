@@ -125,6 +125,13 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(github_repository).to receive(:incr_destroy)
       expect { nx.wait }.to nap(0)
     end
+
+    it "does not poll if it is disabled" do
+      expect(Config).to receive(:enable_github_workflow_poller).and_return(false)
+      expect(nx).not_to receive(:check_queued_jobs)
+
+      expect { nx.wait }.to nap(5 * 60)
+    end
   end
 
   describe "#destroy" do

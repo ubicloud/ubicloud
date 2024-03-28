@@ -91,7 +91,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     nap 15 * 60 if Time.now - github_repository.last_job_at > 6 * 60 * 60
 
     begin
-      check_queued_jobs
+      check_queued_jobs if Config.enable_github_workflow_poller
     rescue Octokit::NotFound
       Clog.emit("not found repository") { {not_found_repository: {repository_name: github_repository.name}} }
       if github_repository.runners.count == 0
