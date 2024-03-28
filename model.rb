@@ -15,6 +15,7 @@ Sequel::Model.plugin :column_encryption do |enc|
   enc.key 0, Config.clover_column_encryption_key
 end
 Sequel::Model.plugin :many_through_many
+Sequel::Model.plugin :insert_conflict
 
 module SemaphoreMethods
   def self.included(base)

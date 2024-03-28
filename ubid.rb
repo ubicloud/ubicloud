@@ -68,6 +68,7 @@ class UBID
   TYPE_FIREWALL_RULE = "fr"
   TYPE_FIREWALL = "fw"
   TYPE_POSTGRES_FIREWALL_RULE = "pf"
+  TYPE_GITHUB_REPOSITORY = "gp"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"

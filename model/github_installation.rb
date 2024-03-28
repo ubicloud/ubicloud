@@ -5,6 +5,7 @@ require_relative "../model"
 class GithubInstallation < Sequel::Model
   many_to_one :project
   one_to_many :runners, key: :installation_id, class: :GithubRunner
+  one_to_many :repositories, key: :installation_id, class: :GithubRepository
 
   include ResourceMethods
 
