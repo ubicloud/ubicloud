@@ -173,10 +173,16 @@ class CloverWeb < Roda
         button_title: "Reset Password",
         button_link: reset_password_email_link)
     end
+    after_reset_password do
+      remove_all_active_sessions_except_current
+    end
 
     change_password_redirect "/account/change-password"
     change_password_route "account/change-password"
     change_password_view { view "account/change_password", "My Account" }
+    after_change_password do
+      remove_all_active_sessions_except_current
+    end
 
     change_login_redirect "/account/change-login"
     change_login_route "account/change-login"
@@ -192,6 +198,9 @@ class CloverWeb < Roda
           "For any questions or assistance, reach out to our team at support@ubicloud.com."],
         button_title: "Verify Email",
         button_link: verify_login_change_email_link)
+    end
+    after_verify_login_change do
+      remove_all_active_sessions_except_current
     end
 
     close_account_redirect "/login"
