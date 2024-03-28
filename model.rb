@@ -130,10 +130,6 @@ module HealthMonitorMethods
       reading_chg: (previous_pulse[:reading] == reading) ? previous_pulse[:reading_chg] : Time.now
     }.merge(data)
   end
-
-  def monitoring_interval
-    5
-  end
 end
 
 if (level = Config.database_logger_level)
