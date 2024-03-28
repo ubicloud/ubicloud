@@ -74,7 +74,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     should_destroy = (Time.now - github_repository.last_job_at > 6 * 60 * 60)
 
     begin
-      polling_interval = check_queued_jobs
+      polling_interval = check_queued_jobs if Config.enable_github_workflow_poller
     rescue Octokit::NotFound
       Clog.emit("not found repository") { {not_found_repository: {repository_name: github_repository.name}} }
       should_destroy = true

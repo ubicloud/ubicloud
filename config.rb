@@ -95,6 +95,7 @@ module Config
   optional :github_app_webhook_secret, string, clear: true
   optional :vm_pool_project_id, string
   optional :github_runner_service_project_id, string
+  override :enable_github_workflow_poller, true, bool
 
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
