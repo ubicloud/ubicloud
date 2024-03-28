@@ -198,12 +198,19 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
         vm_host.used_cores + ? <= least(vm_host.total_cores, vm_host.total_mem_gib / ?)
         AND vm_host.used_hugepages_1g + ? <= vm_host.total_hugepages_1g
         AND vm_host.allocation_state = 'accepting'
-        AND vm_host.location = ?
         AND vm_host.arch = ?
-      ORDER BY random()
     SQL
 
-    DB[device_allocation_query, vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.location, vm.arch]
+    query_param_list = [vm.cores, vm.mem_gib_ratio, vm.mem_gib, vm.arch]
+
+    if vm.location != "github-runners"
+      device_allocation_query += " AND vm_host.location = ?"
+      query_param_list.append(vm.location)
+    end
+
+    device_allocation_query += " ORDER BY random()"
+
+    DB[device_allocation_query, *query_param_list]
   end
 
   def allocate
