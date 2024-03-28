@@ -33,6 +33,8 @@ class BillingRate
       "#{amount.to_i} GiB Storage for PostgreSQL Database (HA Standby)"
     when "GitHubRunnerMinutes"
       "#{resource_family} GitHub Runner"
+    when "GitHubRunnerConcurrency"
+      "Additional GitHub Runner Concurrency"
     else
       fail "BUG: Unknown resource type for line item description"
     end
