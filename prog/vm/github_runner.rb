@@ -299,22 +299,33 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     hop_wait
   rescue Octokit::Conflict => e
-    unless e.message.include?("Already exists")
-      raise e
-    end
+    raise e unless e.message.include?("Already exists")
+
     # If the runner already exists at GitHub side, this suggests that the
-    # process terminated prematurely before start the runner script and hop wait.
-    # We need to locate the 'runner_id' using the name and delete it.
-    # After this, we can register the runner again.
+    # process terminated prematurely before hop wait. We can't be sure if the
+    # script was started or not without checking the runner status. We need to
+    # locate the runner using the name and decide delete or continue to wait.
     runners = github_client.paginate("/repos/#{github_runner.repository_name}/actions/runners") do |data, last_response|
       data[:runners].concat last_response.data[:runners]
     end
     unless (runner = runners[:runners].find { _1[:name] == github_runner.ubid.to_s })
       fail "BUG: Failed with runner already exists error but couldn't find it"
     end
-    Clog.emit("Deleting GithubRunner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner[:id]})} }
-    github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner[:id]}")
-    nap 5
+
+    runner_id = runner.fetch(:id)
+    # If the runner script is not started yet, we can delete the runner and
+    # register it again.
+    if vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp == "dead"
+      Clog.emit("Deregistering runner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner_id})} }
+      github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner_id}")
+      nap 5
+    end
+
+    # The runner script is already started. We persist the runner_id and allow
+    # wait label to decide the next step.
+    Clog.emit("The runner already exists but the runner script is started too") { {github_runner: github_runner.values.merge({runner_id: runner_id})} }
+    github_runner.update(runner_id: runner_id, ready_at: Time.now)
+    hop_wait
   end
 
   label def wait
