@@ -22,12 +22,14 @@ RSpec.describe Prog::DownloadBootImage do
 
   describe "#wait_draining" do
     it "waits draining" do
-      expect(vm_host).to receive(:vms).and_return([instance_double(Vm)])
+      dataset = instance_double(Sequel::Dataset)
+      expect(vm_host).to receive(:vms_dataset).and_return(dataset)
+      expect(dataset).to receive(:where).with(boot_image: "my-image").and_return([instance_double(Vm)])
       expect { dbi.wait_draining }.to nap(15)
     end
 
     it "hops if it's drained" do
-      expect(vm_host).to receive(:vms).and_return([])
+      expect(vm_host).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, where: []))
       expect(sshable).to receive(:cmd).with("sudo rm -f /var/storage/images/my-image.raw")
       expect { dbi.wait_draining }.to hop("download")
     end

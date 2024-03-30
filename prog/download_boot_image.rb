@@ -26,9 +26,8 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def wait_draining
-    unless vm_host.vms.empty?
-      nap 15
-    end
+    nap 15 unless vm_host.vms_dataset.where(boot_image: image_name).empty?
+
     sshable.cmd("sudo rm -f /var/storage/images/#{image_name.shellescape}.raw")
     hop_download
   end
