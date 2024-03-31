@@ -77,20 +77,6 @@ RSpec.describe Clover, "postgres" do
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
     end
 
-    it "not create firewall rule" do
-      post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule"
-
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
-    end
-
-    it "not delete firewall rule" do
-      delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
-
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
-    end
-
     it "not restore" do
       post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/restore"
 
@@ -205,31 +191,6 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: size, ha_type")
       end
 
-      it "firewall-rule" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule", {
-          cidr: "0.0.0.0/24"
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-      end
-
-      it "firewall-rule pg ubid" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/firewall-rule", {
-          cidr: "0.0.0.0/24"
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-      end
-
-      it "firewall-rule invalid cidr" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule", {
-          cidr: "0.0.0"
-        }.to_json
-
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["CIDR"]).to eq("Invalid CIDR")
-      end
-
       it "restore" do
         stub_const("Backup", Struct.new(:last_modified))
         restore_target = Time.now.utc
@@ -324,13 +285,6 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(404)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
       end
-
-      it "show firewall" do
-        get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/firewall-rule"
-
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)[0]["cidr"]).to eq("0.0.0.0/0")
-      end
     end
 
     describe "delete" do
@@ -360,24 +314,6 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
-      end
-
-      it "firewall-rule" do
-        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule/#{pg.firewall_rules.first.ubid}"
-
-        expect(last_response.status).to eq(204)
-      end
-
-      it "firewall-rule ubid" do
-        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/firewall-rule/#{pg.firewall_rules.first.ubid}"
-
-        expect(last_response.status).to eq(204)
-      end
-
-      it "firewall-rule not exist" do
-        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
-
-        expect(last_response.status).to eq(204)
       end
     end
   end

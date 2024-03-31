@@ -71,50 +71,6 @@ class CloverApi
       request.halt
     end
 
-    request.on "firewall-rule" do
-      request.post true do
-        Authorization.authorize(user.id, "Postgres:Firewall:edit", pg.id)
-
-        required_parameters = ["cidr"]
-
-        request_body_params = Validation.validate_request_body(request.body.read, required_parameters)
-
-        Validation.validate_cidr(request_body_params["cidr"])
-
-        DB.transaction do
-          PostgresFirewallRule.create_with_id(
-            postgres_resource_id: pg.id,
-            cidr: request_body_params["cidr"]
-          )
-          pg.incr_update_firewall_rules
-        end
-
-        serialize(pg, :detailed)
-      end
-
-      request.get true do
-        Authorization.authorize(user.id, "Postgres:Firewall:view", pg.id)
-        Serializers::Api::PostgresFirewallRule.serialize(pg.firewall_rules)
-      end
-
-      request.is String do |firewall_rule_ubid|
-        request.delete true do
-          Authorization.authorize(user.id, "Postgres:Firewall:edit", pg.id)
-          fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid)
-
-          if fwr
-            DB.transaction do
-              fwr.destroy
-              pg.incr_update_firewall_rules
-            end
-          end
-
-          response.status = 204
-          request.halt
-        end
-      end
-    end
-
     request.post "restore" do
       Authorization.authorize(user.id, "Postgres:create", project.id)
       Authorization.authorize(user.id, "Postgres:view", pg.id)
