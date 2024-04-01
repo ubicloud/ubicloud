@@ -373,6 +373,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         set -ueo pipefail
         sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
         sudo userdel -rf runner || true
+        sudo groupdel -f runner || true
         sudo addgroup --gid 1001 runner
         sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
         echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
