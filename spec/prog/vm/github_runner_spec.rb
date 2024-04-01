@@ -377,6 +377,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
         echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
         sudo usermod -a -G docker,adm,systemd-journal runner
+        sudo usermod -a -G sudo,adm runneradmin
         sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
         source /etc/environment
         sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./

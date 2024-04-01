@@ -210,6 +210,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       # Default GitHub hosted runners have additional adm,systemd-journal groups.
       sudo usermod -a -G docker,adm,systemd-journal runner
 
+      # runneradmin user on default Github hosted runners is a member of adm and
+      # sudo groups. Having sudo access also allows us getting journalctl logs in
+      # case of any issue on the destroy state below by runneradmin user.
+      sudo usermod -a -G sudo,adm runneradmin
+
       # Some configuration files such as $PATH related to the user's home directory
       # need to be changed. GitHub recommends to run post-generation scripts after
       # initial boot.
