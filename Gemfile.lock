@@ -233,7 +233,7 @@ GEM
       rubocop-capybara (~> 2.17)
       rubocop-factory_bot (~> 2.22)
       rubocop-rspec_rails (~> 2.28)
-    rubocop-rspec_rails (2.28.1)
+    rubocop-rspec_rails (2.28.2)
       rubocop (~> 1.40)
     rubocop-sequel (0.3.4)
       rubocop (~> 1.0)
@@ -243,7 +243,7 @@ GEM
     sawyer (0.9.2)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
-    sequel (5.78.0)
+    sequel (5.79.0)
       bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
