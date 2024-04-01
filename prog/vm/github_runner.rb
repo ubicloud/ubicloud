@@ -228,10 +228,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       # the runner creates some configuration files at the script location. Since the
       # github runner vm is created with the runneradmin user, directory is first moved
       # to runneradmin user's home directory. At the end of this script, it will be moved
-      # to runner user's home folder. We move actions-runner separately below for idempotency
-      # purposes, as the first one guarantees to continue in case the script fails after that
-      # line, and the latter guarateens to continue if the script fails after moving
-      # actions-runner from ./ to /home/runner
+      # to runner user's home folder. We are checking first whether actions-runner exists
+      # under "usr/local/share to make sure that the script can be run multiple times idempotently.
       sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
       sudo chown -R runneradmin:runneradmin actions-runner
 
