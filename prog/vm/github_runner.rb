@@ -201,7 +201,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       # Since standard Github runners have both runneradmin and runner users
       # VMs of github runners are created with runneradmin user. Adding
       # runner user and group with the same id and gid as the standard.
+      # Although userdel command deletes the group as well, separate groupdel
+      # command is added to make sure that script can run idempotently if failing
+      # after addgroup but before adduser command below.
       sudo userdel -rf runner || true
+      sudo groupdel -f runner || true
       sudo addgroup --gid 1001 runner
       sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
       echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
