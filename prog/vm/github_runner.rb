@@ -105,8 +105,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
-  SERVICE_NAME = "runner-script"
-
   def vm
     @vm ||= github_runner.vm
   end
@@ -293,7 +291,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # We initiate an API call and a SSH connection under the same label to avoid
     # having to store the encoded_jit_config.
     vm.sshable.cmd("sudo -- xargs -I{} -- systemd-run --uid runner --gid runner " \
-                   "--working-directory '/home/runner' --unit #{SERVICE_NAME} --remain-after-exit -- " \
+                   "--working-directory '/home/runner' --unit runner-script --remain-after-exit -- " \
                    "/home/runner/actions-runner/run-withenv.sh {}",
       stdin: response[:encoded_jit_config])
 
@@ -315,7 +313,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     runner_id = runner.fetch(:id)
     # If the runner script is not started yet, we can delete the runner and
     # register it again.
-    if vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp == "dead"
+    if vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp == "dead"
       Clog.emit("Deregistering runner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner_id})} }
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner_id}")
       nap 5
@@ -329,7 +327,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait
-    case vm.sshable.cmd("systemctl show -p SubState --value #{SERVICE_NAME}").chomp
+    case vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp
     when "exited"
       github_runner.incr_destroy
       nap 15
