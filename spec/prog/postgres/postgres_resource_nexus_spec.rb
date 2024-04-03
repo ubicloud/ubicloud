@@ -301,7 +301,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "increments update_firewall_rules semaphore of postgres server when update_firewall_rules is set" do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
-      expect(postgres_resource.representative_server).to receive(:incr_update_firewall_rules)
+      expect(postgres_resource.servers).to all(receive(:incr_update_firewall_rules))
       expect { nx.wait }.to nap(30)
     end
   end

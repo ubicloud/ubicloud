@@ -169,7 +169,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     when_update_firewall_rules_set? do
-      postgres_resource.representative_server.incr_update_firewall_rules
+      postgres_resource.servers.each(&:incr_update_firewall_rules)
       decr_update_firewall_rules
     end
 
