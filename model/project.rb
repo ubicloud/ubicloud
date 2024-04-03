@@ -66,7 +66,7 @@ class Project < Sequel::Model
     begin_time = invoices.first&.end_time || Time.new(Time.now.year, Time.now.month, 1)
     end_time = Time.now
 
-    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_id: id).run.first)
+    if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id]).run.first)
       return invoice
     end
 
