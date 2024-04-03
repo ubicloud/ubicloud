@@ -31,6 +31,7 @@ class Serializers::Web::Invoice < Serializers::Base
     base(inv).merge(
       {
         billing_name: inv.content.dig("billing_info", "name"),
+        billing_email: inv.content.dig("billing_info", "email"),
         billing_address: inv.content.dig("billing_info", "address"),
         billing_country: ISO3166::Country.new(inv.content.dig("billing_info", "country"))&.common_name,
         billing_city: inv.content.dig("billing_info", "city"),
