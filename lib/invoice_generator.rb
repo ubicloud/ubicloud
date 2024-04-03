@@ -103,7 +103,7 @@ class InvoiceGenerator
             # BigDecimal, it fails the check.
             # Finally, we use save_changes instead of update because it is not possible to
             # pass validate: false to update.
-            project.credit = Sequel[:credit] - project_content[:credit]
+            project.credit = Sequel[:credit] - project_content[:credit].round(3)
             project.save_changes(validate: false)
           end
         else
