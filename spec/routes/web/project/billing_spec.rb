@@ -235,7 +235,7 @@ RSpec.describe Clover, "billing" do
         br_previous = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         br_current = billing_record(Time.parse("2023-07-01"), Time.parse("2023-07-15"))
         invoice_previous = InvoiceGenerator.new(br_previous.span.begin, br_previous.span.end, save_result: true).run.first
-        invoice_current = InvoiceGenerator.new(br_current.span.begin, br_current.span.end, project_id: project.id).run.first
+        invoice_current = InvoiceGenerator.new(br_current.span.begin, br_current.span.end, project_ids: [project.id]).run.first
 
         visit "#{project.path}/billing"
 

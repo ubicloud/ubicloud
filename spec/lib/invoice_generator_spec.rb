@@ -153,7 +153,7 @@ RSpec.describe InvoiceGenerator do
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, end_time))
     generate_billing_record(p2, vm2, Sequel::Postgres::PGRange.new(begin_time, end_time))
 
-    invoices = described_class.new(begin_time, end_time, project_id: p1.id).run
+    invoices = described_class.new(begin_time, end_time, project_ids: [p1.id]).run
     expect(invoices.count).to eq(1)
   end
 
