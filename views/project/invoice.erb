@@ -46,6 +46,9 @@
           <div>
             <img class="h-8 w-auto" src="/logo-primary.png" alt="Ubicloud">
             <address class="mt-4 not-italic text-gray-800">
+              <% if @invoice_data[:issuer_name] %>
+                <span class="font-semibold"><%= @invoice_data[:issuer_name] %></span><br>
+              <% end %>
               <%= @invoice_data[:issuer_address] %>,<br>
               <%= @invoice_data[:issuer_city] %>,
               <%= @invoice_data[:issuer_state] %>

@@ -49,6 +49,7 @@ RSpec.describe InvoiceGenerator do
         "company_name" => nil
       } : nil,
       "issuer_info" => {
+        "name" => "Ubicloud Inc.",
         "address" => "310 Santa Ana Avenue",
         "country" => "US",
         "city" => "San Francisco",
