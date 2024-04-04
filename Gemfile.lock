@@ -95,7 +95,7 @@ GEM
     hashdiff (1.1.0)
     i18n (1.14.4)
       concurrent-ruby (~> 1.0)
-    json (2.7.1)
+    json (2.7.2)
     jwt (2.8.1)
       base64
     language_server-protocol (3.17.0.3)
@@ -144,7 +144,7 @@ GEM
       openssl (> 2.0)
     pagerduty (4.0.1)
     parallel (1.24.0)
-    parallel_tests (4.6.0)
+    parallel_tests (4.6.1)
       parallel
     parser (3.3.0.5)
       ast (~> 2.4.1)
@@ -228,7 +228,7 @@ GEM
       rubocop-ast (>= 1.30.0, < 2.0)
     rubocop-rake (0.6.0)
       rubocop (~> 1.0)
-    rubocop-rspec (2.28.0)
+    rubocop-rspec (2.29.1)
       rubocop (~> 1.40)
       rubocop-capybara (~> 2.17)
       rubocop-factory_bot (~> 2.22)
