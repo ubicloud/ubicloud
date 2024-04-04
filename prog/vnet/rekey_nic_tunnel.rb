@@ -3,6 +3,12 @@
 class Prog::Vnet::RekeyNicTunnel < Prog::Base
   subject_is :nic
 
+  def before_run
+    if nic.destroy_set?
+      pop "nic.destroy semaphore is set"
+    end
+  end
+
   label def add_subnet_addr
     addr = nic.private_subnet.net4.nth(1).to_s + nic.private_subnet.net4.netmask.to_s
     nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} addr replace #{addr} dev #{nic.ubid_to_tap_name}")
@@ -103,9 +109,13 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
 
     def create_xfrm_state(src, dst, spi, is_ipv4)
       key = @tunnel.src_nic.encryption_key
-      @nic.vm.vm_host.sshable.cmd("sudo -- xargs -I {} -- ip -n #{@namespace} xfrm state add " \
-        "src #{src} dst #{dst} proto esp spi #{spi} reqid #{@reqid} mode tunnel " \
-        "aead 'rfc4106(gcm(aes))' {} 128 #{is_ipv4 ? "sel src 0.0.0.0/0 dst 0.0.0.0/0" : ""}", stdin: key)
+      begin
+        @nic.vm.vm_host.sshable.cmd("sudo -- xargs -I {} -- ip -n #{@namespace} xfrm state add " \
+          "src #{src} dst #{dst} proto esp spi #{spi} reqid #{@reqid} mode tunnel " \
+          "aead 'rfc4106(gcm(aes))' {} 128 #{is_ipv4 ? "sel src 0.0.0.0/0 dst 0.0.0.0/0" : ""}", stdin: key)
+      rescue Sshable::SshError => e
+        raise e unless e.message.include?("File exists")
+      end
     end
 
     def policy_exists?(src, dst)

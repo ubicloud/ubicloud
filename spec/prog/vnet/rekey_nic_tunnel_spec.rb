@@ -38,6 +38,18 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
     nx.instance_variable_set(:@nic, tunnel.src_nic)
   end
 
+  describe "#before_run" do
+    it "pops when destroy is set" do
+      Strand.create(prog: "Vnet:NicNexus", label: "wait_vm") { _1.id = tunnel.src_nic.id }
+      tunnel.src_nic.incr_destroy
+      expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set"})
+    end
+
+    it "doesn't do anything if destroy is not set" do
+      expect { nx.before_run }.not_to exit({"msg" => "nic.destroy semaphore is set"})
+    end
+  end
+
   describe "#add_subnet_addr" do
     it "adds the subnet net4 address to the nic" do
       allow(tunnel.src_nic.vm).to receive_messages(ephemeral_net6: NetAddr.parse_net("2a01:4f8:10a:128b:4919::/80"), inhost_name: "hellovm")
@@ -87,7 +99,8 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
 
     it "creates new state and policy for src" do
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
+      # If state exists, silently skips
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_raise Sshable::SshError.new("File exists", "", "", nil, nil)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src 10.0.0.1/32 dst 10.0.0.2/32 dir out").and_return("non_empty")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy update src 10.0.0.1/32 dst 10.0.0.2/32 dir out tmpl src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp reqid 86879 mode tunnel")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm xfrm policy show src fd10:9b0b:6b4b:8fbb:abc::/128 dst fd10:9b0b:6b4b:8fbb:def::/128 dir out").and_return("non_empty")
@@ -95,6 +108,12 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm route replace fd10:9b0b:6b4b:8fbb:def::/128 dev vethihellovm")
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm route replace 10.0.0.2/32 dev vethihellovm")
       expect { nx.setup_outbound }.to exit({"msg" => "outbound_setup is complete"})
+    end
+
+    it "raises error if state creation fails" do
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe2222222 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 sel src 0.0.0.0/0 dst 0.0.0.0/0", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579")
+      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo -- xargs -I {} -- ip -n hellovm xfrm state add src 2a01:4f8:10a:128b:4919:8000:: dst 2a01:4f8:10a:128b:4919:8000:: proto esp spi 0xe3333333 reqid 86879 mode tunnel aead 'rfc4106(gcm(aes))' {} 128 ", stdin: "0x736f6d655f656e6372797074696f6e5f6b6579").and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
+      expect { nx.setup_outbound }.to raise_error(Sshable::SshError)
     end
 
     it "skips tunnel if its src_nic doesn't have rekey_payload" do

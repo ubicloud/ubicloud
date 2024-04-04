@@ -86,48 +86,27 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect { nx.wait_vm }.to nap(60)
     end
 
-    it "naps 1 if nothing to do and vm exists" do
+    it "naps 5 if nothing to do and vm exists" do
       vm = instance_double(Vm)
       expect(nic).to receive(:vm).and_return(vm)
-      expect { nx.wait_vm }.to nap(1)
+      expect { nx.wait_vm }.to nap(5)
     end
 
-    it "starts setup and pings subnet" do
+    it "starts setup and naps" do
       vm = instance_double(Vm)
       expect(nic).to receive(:vm).and_return(vm)
       expect(nx).to receive(:when_setup_nic_set?).and_yield
-      expect { nx.wait_vm }.to hop("add_subnet_addr")
-    end
-  end
-
-  describe "#add_subnet_addr" do
-    it "buds RekeyNicTunnel with add_subnet_addr" do
-      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr)
-      expect { nx.add_subnet_addr }.to hop("wait_add_subnet_addr")
-    end
-  end
-
-  describe "#wait_add_subnet_addr" do
-    let(:nic) { instance_double(Nic) }
-
-    before do
-      allow(nx).to receive(:nic).and_return(nic)
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr)
+      expect { nx.wait_vm }.to nap(5)
     end
 
-    it "donates if nothing to do" do
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect { nx.wait_add_subnet_addr }.to nap(0)
-    end
-
-    it "starts to wait_setup and pings subnet" do
-      ps = instance_double(PrivateSubnet)
+    it "pings subnet and hops wait_setup if add_subnet_addr is completed" do
+      vm = instance_double(Vm)
+      expect(nic).to receive(:vm).and_return(vm)
+      expect(nx).to receive(:retval).and_return({"msg" => "add_subnet_addr is complete"})
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:incr_add_new_nic)
-
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(nx).to receive(:reap).and_return(true)
-      expect { nx.wait_add_subnet_addr }.to hop("wait_setup")
+      expect { nx.wait_vm }.to hop("wait_setup")
     end
   end
 
@@ -165,33 +144,21 @@ RSpec.describe Prog::Vnet::NicNexus do
   end
 
   describe "#repopulate" do
-    it "buds RekeyNicTunnel with add_subnet_addr" do
-      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr)
-      expect { nx.repopulate }.to hop("wait_repopulate")
-    end
-  end
-
-  describe "#wait_repopulate" do
-    let(:nic) { instance_double(Nic) }
+    let(:nic) { instance_double(Nic, private_subnet: instance_double(PrivateSubnet)) }
 
     before do
       allow(nx).to receive(:nic).and_return(nic)
     end
 
-    it "donates if nothing to do" do
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect { nx.wait_repopulate }.to nap(0)
+    it "pushes RekeyNicTunnel with add_subnet_addr" do
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr)
+      nx.repopulate
     end
 
-    it "starts to wait and increments refresh_keys if bud is complete" do
-      ps = instance_double(PrivateSubnet)
-      expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(ps).to receive(:incr_refresh_keys)
-
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(nx).to receive(:reap).and_return(true)
-      expect { nx.wait_repopulate }.to hop("wait")
+    it "pings subnet and hops wait if add_subnet_addr is completed" do
+      expect(nx).to receive(:retval).and_return({"msg" => "add_subnet_addr is complete"})
+      expect(nic.private_subnet).to receive(:incr_refresh_keys).and_return(true)
+      expect { nx.repopulate }.to hop("wait")
     end
   end
 
@@ -202,73 +169,50 @@ RSpec.describe Prog::Vnet::NicNexus do
       allow(nx).to receive(:nic).and_return(nic)
     end
 
-    it "buds rekey with setup_inbound and hops to wait_rekey_inbound" do
-      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound).and_return(true)
-      expect { nx.start_rekey }.to hop("wait_rekey_inbound")
+    it "pushes rekey with setup_inbound and naps" do
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound)
+      nx.start_rekey
     end
 
-    it "reaps and donates if setup_inbound is continuing" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:reap).and_return(true)
-      expect { nx.wait_rekey_inbound }.to nap(0)
+    it "hops to wait_rekey_outbound_trigger if inbound_setup is completed" do
+      expect(nx).to receive(:retval).and_return({"msg" => "inbound_setup is complete"})
+      expect(nx).to receive(:decr_start_rekey)
+      expect { nx.start_rekey }.to hop("wait_rekey_outbound_trigger")
     end
 
-    it "reaps and hops to wait_rekey_outbound_trigger if setup_inbound is completed" do
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:decr_start_rekey).and_return(true)
-      expect { nx.wait_rekey_inbound }.to hop("wait_rekey_outbound_trigger")
-    end
-
-    it "if outbound setup is not triggered, just donate" do
+    it "if outbound setup is not triggered, just naps" do
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_return(false)
       expect { nx.wait_rekey_outbound_trigger }.to nap(5)
     end
 
-    it "if outbound setup is triggered, hops to setup_outbound" do
+    it "if outbound setup is triggered, pushes setup_outbound and naps" do
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_yield
-      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound).and_return(true)
-      expect { nx.wait_rekey_outbound_trigger }.to hop("wait_rekey_outbound")
+      expect(nx).to receive(:decr_trigger_outbound_update)
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound)
+      expect { nx.wait_rekey_outbound_trigger }.to nap(5)
     end
 
-    it "wait_rekey_outbound reaps and donates if setup_outbound is continuing" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:donate).and_return(true)
-      nx.wait_rekey_outbound
+    it "hops to wait_rekey_old_state_drop_trigger if outbound_setup is completed" do
+      expect(nx).to receive(:retval).and_return({"msg" => "outbound_setup is complete"})
+      expect { nx.wait_rekey_outbound_trigger }.to hop("wait_rekey_old_state_drop_trigger")
     end
 
-    it "wait_rekey_outbound reaps and hops to wait_rekey_old_state_drop_trigger if setup_outbound is completed" do
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:decr_trigger_outbound_update).and_return(true)
-      expect { nx.wait_rekey_outbound }.to hop("wait_rekey_old_state_drop_trigger")
-    end
-
-    it "wait_rekey_old_state_drop_trigger donates if trigger is not set" do
+    it "wait_rekey_old_state_drop_trigger naps if trigger is not set" do
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_return(false)
 
       expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
     end
 
-    it "wait_rekey_old_state_drop_trigger hops to wait_rekey_old_state_drop if trigger is set" do
+    it "wait_rekey_old_state_drop_trigger pushes drop_old_state and naps if trigger is set" do
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_yield
-      expect(nx).to receive(:bud).with(Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state).and_return(true)
-      expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait_rekey_old_state_drop")
+      expect(nx).to receive(:decr_old_state_drop_trigger)
+      expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state)
+      expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
     end
 
-    it "wait_rekey_old_state_drop reaps and donates if drop_old_state is continuing" do
-      expect(nx).to receive(:leaf?).and_return(false)
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:donate).and_return(true)
-      nx.wait_rekey_old_state_drop
-    end
-
-    it "wait_rekey_old_state_drop reaps and hops to wait if drop_old_state is completed" do
-      expect(nx).to receive(:leaf?).and_return(true)
-      expect(nx).to receive(:reap).and_return(true)
-      expect(nx).to receive(:decr_old_state_drop_trigger).and_return(true)
-      expect { nx.wait_rekey_old_state_drop }.to hop("wait")
+    it "hops to wait if drop_old_state is completed" do
+      expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
+      expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
     end
   end
 
