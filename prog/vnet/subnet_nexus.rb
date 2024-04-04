@@ -109,7 +109,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       rekeying_nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
       end
-
       hop_wait
     end
 

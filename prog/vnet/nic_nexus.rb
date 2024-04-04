@@ -29,24 +29,17 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def wait_vm
     nap 60 unless nic.vm
-    when_setup_nic_set? do
-      hop_add_subnet_addr
-    end
-    nap 1
-  end
 
-  label def add_subnet_addr
-    bud Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
-    hop_wait_add_subnet_addr
-  end
-
-  label def wait_add_subnet_addr
-    reap
-    if leaf?
+    if retval&.dig("msg") == "add_subnet_addr is complete"
       nic.private_subnet.incr_add_new_nic
       hop_wait_setup
     end
-    donate
+
+    when_setup_nic_set? do
+      push Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
+    end
+
+    nap 5
   end
 
   label def wait_setup
@@ -74,72 +67,50 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def repopulate
-    bud Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
-    hop_wait_repopulate
-  end
+    decr_repopulate
 
-  label def wait_repopulate
-    reap
-    if leaf?
-      decr_repopulate
+    if retval&.dig("msg") == "add_subnet_addr is complete"
       nic.private_subnet.incr_refresh_keys
       hop_wait
     end
 
-    donate
+    push Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
   end
 
   label def start_rekey
-    bud Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
-    hop_wait_rekey_inbound
-  end
+    decr_start_rekey
 
-  label def wait_rekey_inbound
-    reap
-    if leaf?
-      decr_start_rekey
+    if retval&.dig("msg") == "inbound_setup is complete"
       hop_wait_rekey_outbound_trigger
     end
 
-    donate
+    push Prog::Vnet::RekeyNicTunnel, {}, :setup_inbound
   end
 
   label def wait_rekey_outbound_trigger
-    when_trigger_outbound_update_set? do
-      bud Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
-      hop_wait_rekey_outbound
-    end
-
-    nap 5
-  end
-
-  label def wait_rekey_outbound
-    reap
-    if leaf?
-      decr_trigger_outbound_update
+    if retval&.dig("msg") == "outbound_setup is complete"
       hop_wait_rekey_old_state_drop_trigger
     end
 
-    donate
-  end
-
-  label def wait_rekey_old_state_drop_trigger
-    when_old_state_drop_trigger_set? do
-      bud Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
-      hop_wait_rekey_old_state_drop
+    when_trigger_outbound_update_set? do
+      decr_trigger_outbound_update
+      push Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
     end
 
     nap 5
   end
 
-  label def wait_rekey_old_state_drop
-    reap
-    if leaf?
-      decr_old_state_drop_trigger
+  label def wait_rekey_old_state_drop_trigger
+    if retval&.dig("msg")&.include?("drop_old_state is complete")
       hop_wait
     end
 
-    donate
+    when_old_state_drop_trigger_set? do
+      decr_old_state_drop_trigger
+      push Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
+    end
+
+    nap 5
   end
 
   label def destroy
