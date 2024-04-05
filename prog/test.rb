@@ -95,6 +95,11 @@ class Prog::Test < Prog::Base
     hop_pusher1
   end
 
+  label def extend_deadline
+    register_deadline(:pusher2, 1, allow_extension: true)
+    hop_pusher1
+  end
+
   label def set_popping_deadline1
     push Prog::Test, {}, :set_popping_deadline2
   end

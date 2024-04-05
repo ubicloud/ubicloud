@@ -175,6 +175,14 @@ RSpec.describe Prog::Base do
       expect {
         st.unsynchronized_run
       }.not_to change { st.stack.first["deadline_at"] }
+
+      # allow to explicitly extend deadline
+      st.label = :extend_deadline
+      st.stack.first["deadline_at"] = Time.now
+      st.stack.first["deadline_target"] = :pusher2
+      expect {
+        st.unsynchronized_run
+      }.to change { st.stack.first["deadline_at"] }
     end
 
     it "triggers a page exactly once when deadline is expired" do
