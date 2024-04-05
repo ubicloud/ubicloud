@@ -214,8 +214,8 @@ end
   def register_deadline(deadline_target, deadline_in)
     current_frame = strand.stack.first
     if (deadline_at = current_frame["deadline_at"]).nil? ||
-        Time.parse(deadline_at.to_s) > Time.now + deadline_in ||
-        (old_deadline_target = current_frame["deadline_target"]) != deadline_target
+        (old_deadline_target = current_frame["deadline_target"]) != deadline_target ||
+        Time.parse(deadline_at.to_s) > Time.now + deadline_in
 
       if old_deadline_target != deadline_target && (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, old_deadline_target))
         pg.incr_resolve
