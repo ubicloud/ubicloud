@@ -118,6 +118,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   label def destroy
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
+      register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
+
       Clog.emit "Cannot destroy subnet with active nics, first clean up the attached resources" do
         {private_subnet: private_subnet.values}
       end

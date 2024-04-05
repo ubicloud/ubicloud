@@ -334,9 +334,26 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       instance_double(Nic, vm_id: nil)
     }
 
-    it "fails if there are active resources" do
-      expect(ps).to receive(:nics).and_return([nic])
+    let(:vm) {
+      Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "dummy-location").tap {
+        _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
+      }
+    }
+
+    it "extends deadline if a vm prevents destroy" do
+      expect(ps).to receive(:nics).and_return([nic]).twice
       expect(nic).to receive(:vm_id).and_return("vm-id")
+      expect(nic).to receive(:vm).and_return(vm)
+      expect(vm).to receive(:prevent_destroy_set?).and_return(true)
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, allow_extension: true)
+
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "fails if there are active resources" do
+      expect(ps).to receive(:nics).and_return([nic]).twice
+      expect(nic).to receive(:vm_id).and_return("vm-id")
+      expect(nic).to receive(:vm).and_return(nil)
       expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources").and_call_original
 
       expect { nx.destroy }.to nap(5)
