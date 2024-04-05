@@ -372,6 +372,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait_vm_destroy
+    register_deadline(nil, 10 * 60, allow_extension: true) if vm&.prevent_destroy_set?
     nap 10 unless vm.nil?
 
     github_runner.destroy

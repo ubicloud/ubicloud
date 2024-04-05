@@ -572,8 +572,14 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.wait_vm_destroy }.to nap(10)
     end
 
+    it "extends deadline if vm prevents destroy" do
+      expect(vm).to receive(:prevent_destroy_set?).and_return(true)
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, allow_extension: true)
+      expect { nx.wait_vm_destroy }.to nap(10)
+    end
+
     it "pops if vm destroyed" do
-      expect(nx).to receive(:vm).and_return(nil)
+      expect(nx).to receive(:vm).and_return(nil).twice
       expect(github_runner).to receive(:destroy)
 
       expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
