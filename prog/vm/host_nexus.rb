@@ -196,7 +196,7 @@ class Prog::Vm::HostNexus < Prog::Base
       vm.incr_start_after_host_reboot
     }
 
-    vm_host.update(allocation_state: "accepting")
+    vm_host.update(allocation_state: "accepting") if vm_host.allocation_state == "unprepared"
 
     hop_wait
   end
