@@ -211,10 +211,11 @@ end
     fail Hop.new(@strand.prog, @strand.label, {label: label, retval: nil})
   end
 
-  def register_deadline(deadline_target, deadline_in)
+  def register_deadline(deadline_target, deadline_in, allow_extension: false)
     current_frame = strand.stack.first
     if (deadline_at = current_frame["deadline_at"]).nil? ||
         (old_deadline_target = current_frame["deadline_target"]) != deadline_target ||
+        allow_extension ||
         Time.parse(deadline_at.to_s) > Time.now + deadline_in
 
       if old_deadline_target != deadline_target && (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, old_deadline_target))
