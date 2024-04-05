@@ -307,9 +307,22 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.verify_spdk }.to hop("verify_hugepages")
     end
 
-    it "start_vms starts vms & hops to wait" do
+    it "start_vms starts vms & becomes accepting & hops to wait if unprepared" do
       expect(vms).to all receive(:incr_start_after_host_reboot)
+      expect(vm_host).to receive(:allocation_state).and_return("unprepared")
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
+      expect { nx.start_vms }.to hop("wait")
+    end
+
+    it "start_vms starts vms & hops to wait if accepting" do
+      expect(vms).to all receive(:incr_start_after_host_reboot)
+      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      expect { nx.start_vms }.to hop("wait")
+    end
+
+    it "start_vms starts vms & hops to wait if draining" do
+      expect(vms).to all receive(:incr_start_after_host_reboot)
+      expect(vm_host).to receive(:allocation_state).and_return("draining")
       expect { nx.start_vms }.to hop("wait")
     end
 
