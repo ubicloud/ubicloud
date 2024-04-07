@@ -41,7 +41,9 @@ RSpec.describe Clover, "vm" do
         get "/api/project"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body).length).to eq(2)
+        parsed_body = JSON.parse(last_response.body)
+        expect(parsed_body["count"]).to eq(2)
+        expect(parsed_body["next_cursor"]).to be_nil
       end
     end
 

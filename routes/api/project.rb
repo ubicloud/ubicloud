@@ -5,9 +5,17 @@ class CloverApi
     @serializer = Serializers::Api::Project
 
     r.get true do
-      projects = Project.authorized(@current_user.id, "Project:view").all.filter(&:visible)
+      result = Project.authorized(@current_user.id, "Project:view").where(visible: true).paginated_result(
+        cursor: r.params["cursor"],
+        page_size: r.params["page_size"],
+        order_column: r.params["order_column"]
+      )
 
-      serialize(projects)
+      {
+        items: serialize(result[:records]),
+        next_cursor: result[:next_cursor],
+        count: result[:count]
+      }
     end
 
     r.post true do

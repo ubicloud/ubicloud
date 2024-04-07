@@ -16,6 +16,7 @@ class Project < Sequel::Model
   one_to_many :invoices, order: Sequel.desc(:created_at)
 
   dataset_module Authorization::Dataset
+  dataset_module Pagination
 
   plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy
 
