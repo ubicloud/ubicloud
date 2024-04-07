@@ -51,7 +51,9 @@ RSpec.describe Invoice do
     it "not charge if payment method fails" do
       allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
       invoice.content["billing_info"] = {"id" => billing_info.id}
-      expect(Stripe::PaymentIntent).to receive(:create).and_return(OpenStruct.new(status: "failed")).at_least(:once)
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "failed")).at_least(:once)
+      # rubocop:enable RSpec/VerifiedDoubles
       expect do
         expect(invoice.charge).to be_nil
       end.to output("Invoice[1va3atns1h3j3pm07fyy7ey050] couldn't charge with PaymentMethod[#{payment_method.ubid}]: failed
@@ -62,11 +64,13 @@ Invoice[1va3atns1h3j3pm07fyy7ey050] couldn't charge with any payment method\n").
       allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
       invoice.content["billing_info"] = {"id" => billing_info.id}
 
-      expect(Stripe::PaymentIntent).to receive(:create).and_return(OpenStruct.new(status: "succeeded", id: "pi_1234567890")).with(hash_including(
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890")).with(hash_including(
         amount: 1000,
         customer: billing_info.stripe_id,
         payment_method: payment_method.stripe_id
       )).at_least(:once)
+      # rubocop:enable RSpec/VerifiedDoubles
       expect(invoice).to receive(:save).with(columns: [:status, :content])
       expect do
         expect(invoice.charge).to eq("pi_1234567890")
