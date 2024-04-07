@@ -52,10 +52,18 @@ RSpec.describe Clover, "vm" do
         post "/api/project", {
           name: "test-project",
           provider: "hetzner"
-        }
+        }.to_json
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-project")
+      end
+
+      it "missing parameter" do
+        post "/api/project", {
+          name: "test-project"
+        }.to_json
+
+        expect(last_response.status).to eq(400)
       end
     end
 
