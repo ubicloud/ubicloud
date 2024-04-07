@@ -81,5 +81,5 @@ Sequel/ColumnDefault:
 Capybara/ClickLinkOrButtonStyle:
   EnforcedStyle: strict
 
-RSpec/Rails/HaveHttpStatus:
+RSpecRails/HaveHttpStatus:
   Enabled: false
