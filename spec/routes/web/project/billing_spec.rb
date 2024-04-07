@@ -47,7 +47,9 @@ RSpec.describe Clover, "billing" do
     end
 
     it "can create billing info" do
-      expect(Stripe::Checkout::Session).to receive(:create).and_return(OpenStruct.new({url: "#{project.path}/billing/success?session_id=session_123"}))
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
+      # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
@@ -96,7 +98,9 @@ RSpec.describe Clover, "billing" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}})
-      expect(Stripe::Checkout::Session).to receive(:create).and_return(OpenStruct.new({url: "#{project.path}/billing/success?session_id=session_123"}))
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
+      # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"payment_method" => "pm_222222222"})
 
