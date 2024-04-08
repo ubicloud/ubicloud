@@ -3,7 +3,7 @@
 class Serializers::Api::Project < Serializers::Base
   def self.base(p)
     {
-      ubid: p.ubid,
+      id: p.ubid,
       path: p.path,
       name: p.name,
       credit: p.credit.to_f,
