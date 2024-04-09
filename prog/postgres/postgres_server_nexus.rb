@@ -264,6 +264,7 @@ SQL
 
     when_checkup_set? do
       hop_unavailable if !available?
+      decr_checkup
     end
 
     when_update_firewall_rules_set? do
