@@ -490,6 +490,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
 
     when_checkup_set? do
       hop_unavailable if !available?
+      decr_checkup
     rescue Sshable::SshError
       # Host is likely to be down, which will be handled by HostNexus. We still
       # go to the unavailable state for keeping track of the state.

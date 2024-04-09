@@ -106,8 +106,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def wait
     when_checkup_set? do
-      decr_checkup
       hop_unavailable if !available?
+      decr_checkup
     end
 
     when_reconfigure_set? do

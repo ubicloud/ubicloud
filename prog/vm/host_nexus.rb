@@ -208,6 +208,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
     when_checkup_set? do
       hop_unavailable if !available?
+      decr_checkup
     end
 
     Clog.emit("vm host utilization") { {vm_host_utilization: vm_host.values.slice(:location, :arch, :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :total_storage_gib, :available_storage_gib).merge({vms_count: vm_host.vms_dataset.count})} }
