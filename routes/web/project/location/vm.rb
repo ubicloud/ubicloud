@@ -30,9 +30,10 @@ class CloverWeb
             Validation.validate_port_range(r.params["port_range"])
           end
 
+          parsed_cidr = Validation.validate_cidr(r.params["cidr"])
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
-          vm.firewalls.first.insert_firewall_rule(r.params["cidr"], pg_range)
+          vm.firewalls.first.insert_firewall_rule(parsed_cidr.to_s, pg_range)
           flash["notice"] = "Firewall rule is created"
 
           r.redirect "#{@project.path}#{vm.path}"

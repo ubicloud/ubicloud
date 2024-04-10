@@ -212,6 +212,10 @@ RSpec.describe Validation do
         expect { described_class.validate_cidr("0.0.0.0/1") }.not_to raise_error
         expect { described_class.validate_cidr("192.168.1.0/24") }.not_to raise_error
         expect { described_class.validate_cidr("255.255.255.255/0") }.not_to raise_error
+
+        expect { described_class.validate_cidr("::/0") }.not_to raise_error
+        expect { described_class.validate_cidr("::1/128") }.not_to raise_error
+        expect { described_class.validate_cidr("2001:db8::/32") }.not_to raise_error
       end
 
       it "invalid cidr" do
@@ -219,6 +223,9 @@ RSpec.describe Validation do
         expect { described_class.validate_cidr("10.256.0.0/8") }.to raise_error described_class::ValidationFailed
         expect { described_class.validate_cidr("172.16.0.0/33") }.to raise_error described_class::ValidationFailed
         expect { described_class.validate_cidr("not_a_cidr") }.to raise_error described_class::ValidationFailed
+
+        expect { described_class.validate_cidr("::1/129") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_cidr("::1/::1") }.to raise_error described_class::ValidationFailed
       end
     end
 
