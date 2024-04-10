@@ -186,9 +186,6 @@ class Minio::Client
     # when we implement new APIs.
     is_truncated = doc.xpath("//xmlns:IsTruncated").text.casecmp("true").zero?
     continuation_token = doc.xpath("//xmlns:NextContinuationToken").text
-    if continuation_token && encoding_type == "url"
-      continuation_token = CGI.escape(continuation_token)
-    end
     [objects, is_truncated, continuation_token]
   end
 
