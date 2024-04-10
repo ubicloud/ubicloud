@@ -332,7 +332,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "12.12.12.0/26"
         expect(page).to have_content "443"
 
-        expect(SemSnap.new(vm.id).set?("update_firewall_rules")).to be true
+        expect(SemSnap.new(vm.private_subnets.first.id).set?("update_firewall_rules")).to be true
       end
     end
 

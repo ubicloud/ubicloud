@@ -6,13 +6,15 @@ class PrivateSubnet < Sequel::Model
   many_to_many :vms, join_table: Nic.table_name, left_key: :private_subnet_id, right_key: :vm_id
   one_to_many :nics, key: :private_subnet_id
   one_to_one :strand, key: :id
-  one_to_many :firewall_rules
+  one_to_many :firewalls
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
     "172.16.0.0/12",
     "192.168.0.0/16"
   ].freeze
+
+  plugin :association_dependencies, firewalls: :destroy
 
   dataset_module Pagination
   dataset_module Authorization::Dataset
@@ -42,7 +44,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   include SemaphoreMethods
-  semaphore :destroy, :refresh_keys, :add_new_nic
+  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
 
   def self.random_subnet
     PRIVATE_SUBNET_RANGES.sample

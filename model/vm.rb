@@ -11,9 +11,8 @@ class Vm < Sequel::Model
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
   one_to_many :vm_storage_volumes, key: :vm_id, order: Sequel.desc(:boot)
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
-  one_to_many :firewalls, key: :vm_id
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, firewalls: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy
 
   dataset_module Pagination
   dataset_module Authorization::Dataset
@@ -30,6 +29,10 @@ class Vm < Sequel::Model
   end
 
   include Authorization::TaggableMethods
+
+  def firewalls
+    private_subnets.flat_map(&:firewalls)
+  end
 
   def display_location
     LocationNameConverter.to_display_name(location)

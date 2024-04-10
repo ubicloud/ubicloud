@@ -72,7 +72,7 @@ class Prog::Vm::Nexus < Prog::Base
           raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
           raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
         else
-          subnet_s = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location)
+          subnet_s = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location, allow_only_ssh: allow_only_ssh)
           subnet = PrivateSubnet[subnet_s.id]
         end
         nic_s = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic")
@@ -89,10 +89,6 @@ class Prog::Vm::Nexus < Prog::Base
         name: name, family: vm_size.family, cores: cores, location: location,
         boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
-
-      port_range = allow_only_ssh ? 22..22 : 0..65535
-      fw = Firewall.create_with_id(vm_id: vm.id, name: "#{name}-default")
-      ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
 
       vm.associate_with_project(project)
 

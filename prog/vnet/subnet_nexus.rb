@@ -2,9 +2,9 @@
 
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
-  semaphore :destroy, :refresh_keys, :add_new_nic
+  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
 
-  def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil)
+  def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -20,6 +20,10 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
       ps.associate_with_project(project)
+      port_range = allow_only_ssh ? 22..22 : 0..65535
+      fw = Firewall.create_with_id(private_subnet_id: ubid.to_uuid, name: "#{name}-default")
+      ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
+
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
   end
@@ -42,6 +46,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     when_add_new_nic_set? do
       private_subnet.update(state: "adding_new_nic")
       hop_add_new_nic
+    end
+
+    when_update_firewall_rules_set? do
+      private_subnet.vms.map(&:incr_update_firewall_rules)
+      decr_update_firewall_rules
     end
 
     if private_subnet.last_rekey_at < Time.now - 60 * 60 * 24

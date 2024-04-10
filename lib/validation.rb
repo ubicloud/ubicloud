@@ -121,9 +121,15 @@ module Validation
   end
 
   def self.validate_cidr(cidr)
-    NetAddr::IPv4Net.parse(cidr)
+    if cidr.include?(".")
+      NetAddr::IPv4Net.parse(cidr)
+    elsif cidr.include?(":")
+      NetAddr::IPv6Net.parse(cidr)
+    else
+      fail ValidationFailed.new({cidr: "Invalid CIDR"})
+    end
   rescue NetAddr::ValidationError
-    fail ValidationFailed.new({CIDR: "Invalid CIDR"})
+    fail ValidationFailed.new({cidr: "Invalid CIDR"})
   end
 
   def self.validate_port_range(port_range)
