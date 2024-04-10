@@ -27,11 +27,12 @@ class CloverWeb
       r.on "firewall-rule" do
         r.post true do
           Authorization.authorize(@current_user.id, "Postgres:Firewall:edit", pg.id)
+          parsed_cidr = Validation.validate_cidr(r.params["cidr"])
 
           DB.transaction do
             PostgresFirewallRule.create_with_id(
               postgres_resource_id: pg.id,
-              cidr: r.params["cidr"]
+              cidr: parsed_cidr.to_s
             )
             pg.incr_update_firewall_rules
           end

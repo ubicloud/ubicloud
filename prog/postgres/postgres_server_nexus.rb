@@ -292,7 +292,6 @@ SQL
 
     # create a new set of firewall rules
     postgres_server.create_resource_firewall_rules
-    vm.incr_update_firewall_rules
 
     hop_wait
   end

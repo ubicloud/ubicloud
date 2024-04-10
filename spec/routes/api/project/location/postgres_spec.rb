@@ -227,7 +227,7 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["CIDR"]).to eq("Invalid CIDR")
+        expect(JSON.parse(last_response.body)["error"]["details"]["cidr"]).to eq("Invalid CIDR")
       end
 
       it "restore" do
