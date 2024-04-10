@@ -18,9 +18,9 @@ RSpec.describe Firewall do
     end
 
     it "increments VMs update_firewall_rules if there is a VM" do
-      vm = instance_double(Vm)
-      expect(fw).to receive(:vm).and_return(vm)
-      expect(vm).to receive(:incr_update_firewall_rules)
+      private_subnet = instance_double(PrivateSubnet)
+      expect(fw).to receive(:private_subnet).and_return(private_subnet)
+      expect(private_subnet).to receive(:incr_update_firewall_rules)
       fw.insert_firewall_rule("0.0.0.0/0", nil)
     end
   end

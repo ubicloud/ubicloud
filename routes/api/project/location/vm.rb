@@ -95,7 +95,7 @@ class CloverApi
 
         request_body_params = Validation.validate_request_body(request.body.read, required_parameters, allowed_optional_parameters)
 
-        Validation.validate_cidr(request_body_params["cidr"])
+        parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
         port_range = if request_body_params["port_range"].nil?
           [0, 65535]
         else
@@ -104,7 +104,7 @@ class CloverApi
 
         pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
-        vm.firewalls.first.insert_firewall_rule(request_body_params["cidr"], pg_range)
+        vm.firewalls.first.insert_firewall_rule(parsed_cidr.to_s, pg_range)
 
         serialize(vm, :detailed)
       end

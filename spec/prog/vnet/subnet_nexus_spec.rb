@@ -24,43 +24,27 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "uses ipv6_addr if passed and creates entities" do
-      ps = instance_double(PrivateSubnet, id: "57afa8a7-2357-4012-9632-07fbe13a3133")
-      expect(ps).to receive(:associate_with_project).with(prj).and_return(true)
-      expect(PrivateSubnet).to receive(:create).with(
-        name: "default-ps",
-        location: "hetzner-hel1",
-        net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "10.0.0.0/26",
-        state: "waiting"
-      ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv4).and_return("10.0.0.0/26")
-      expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
-      described_class.assemble(
+      ps = described_class.assemble(
         prj.id,
         name: "default-ps",
         location: "hetzner-hel1",
         ipv6_range: "fd10:9b0b:6b4b:8fbb::/64"
       )
+
+      expect(ps.subject.net6.to_s).to eq("fd10:9b0b:6b4b:8fbb::/64")
     end
 
     it "uses ipv4_addr if passed and creates entities" do
-      ps = instance_double(PrivateSubnet, id: "57afa8a7-2357-4012-9632-07fbe13a3133")
-      expect(ps).to receive(:associate_with_project).with(prj).and_return(true)
-      expect(PrivateSubnet).to receive(:create).with(
-        name: "default-ps",
-        location: "hetzner-hel1",
-        net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "10.0.0.0/26",
-        state: "waiting"
-      ).and_return(ps)
       expect(described_class).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/64")
-      expect(Strand).to receive(:create).with(prog: "Vnet::SubnetNexus", label: "wait").and_yield(Strand.new).and_return(Strand.new)
-      described_class.assemble(
+      ps = described_class.assemble(
         prj.id,
         name: "default-ps",
         location: "hetzner-hel1",
         ipv4_range: "10.0.0.0/26"
       )
+
+      expect(ps.subject.net4.to_s).to eq("10.0.0.0/26")
     end
   end
 
@@ -131,6 +115,14 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "increments refresh_keys if it passed more than a day" do
       expect(ps).to receive(:last_rekey_at).and_return(Time.now - 60 * 60 * 24 - 1)
       expect(ps).to receive(:incr_refresh_keys).and_return(true)
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "triggers update_firewall_rules if when_update_firewall_rules_set?" do
+      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
+      expect(ps).to receive(:vms).and_return([instance_double(Vm, id: "vm1")]).at_least(:once)
+      expect(ps.vms.first).to receive(:incr_update_firewall_rules).and_return(true)
+      expect(nx).to receive(:decr_update_firewall_rules).and_return(true)
       expect { nx.wait }.to nap(30)
     end
 
