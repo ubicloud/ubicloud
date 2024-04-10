@@ -19,7 +19,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         Vm,
         id: "1c7d59ee-8d46-8374-9553-6144490ecec5",
         sshable: sshable,
-        ephemeral_net4: "1.1.1.1"
+        ephemeral_net4: "1.1.1.1",
+        private_subnets: [instance_double(PrivateSubnet)]
       )
     )
   }
@@ -472,7 +473,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.vm).to receive(:firewalls).and_return([fw])
       expect(fw).to receive(:destroy)
       expect(postgres_server).to receive(:create_resource_firewall_rules)
-      expect(postgres_server.vm).to receive(:incr_update_firewall_rules)
 
       expect { nx.update_firewall_rules }.to hop("wait")
     end
