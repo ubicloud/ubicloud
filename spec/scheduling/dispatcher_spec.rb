@@ -13,6 +13,11 @@ RSpec.describe Scheduling::Dispatcher do
       expect(Clog).to receive(:emit).with("Not enough database connections.").and_call_original
       di.scan
     end
+
+    it "does not return work when shutting down" do
+      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
+      expect(di.scan).to eq([])
+    end
   end
 
   describe "#wait_cohort" do
@@ -31,6 +36,22 @@ RSpec.describe Scheduling::Dispatcher do
       expect(di.notifiers).to eq([incomplete_r])
     ensure
       [complete_r, complete_w, incomplete_r, incomplete_w].each(&:close)
+    end
+
+    it "exits if all strands have finished when shutting down" do
+      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
+      expect(Kernel).to receive(:exit)
+      di.wait_cohort
+    end
+
+    it "waits for running strands when shutting down" do
+      complete_r, complete_w = IO.pipe
+      complete_w.close
+      di.notifiers.concat([complete_r])
+      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
+      expect(di.wait_cohort).to eq 1
+    ensure
+      [complete_r, complete_w].each(&:close)
     end
   end
 
@@ -121,6 +142,13 @@ RSpec.describe Scheduling::Dispatcher do
       notif = di.start_strand(st)
       notif.read
       di.wait_cohort
+    end
+
+    it "does not start new strands when shutting down" do
+      expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
+      expect(di).to receive(:scan).and_return([Strand.new(prog: "Test", label: "test")])
+      expect(di).not_to receive(:start_strand)
+      di.start_cohort
     end
   end
 end

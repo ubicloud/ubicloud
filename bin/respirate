@@ -4,6 +4,7 @@
 require_relative "../loader"
 
 d = Scheduling::Dispatcher.new
+Signal.trap("TERM") { d.shutdown }
 
 if Config.heartbeat_url
   puts "Starting heartbeat prog"

@@ -1,14 +1,20 @@
 # frozen_string_literal: true
 
 class Scheduling::Dispatcher
-  attr_reader :notifiers
+  attr_reader :notifiers, :shutting_down
 
   def initialize
     @apoptosis_timeout = Strand::LEASE_EXPIRATION - 29
     @notifiers = []
+    @shutting_down = false
+  end
+
+  def shutdown
+    @shutting_down = true
   end
 
   def scan
+    return [] if shutting_down
     idle_connections = Config.db_pool - @notifiers.count - 1
     if idle_connections < 1
       Clog.emit("Not enough database connections.") do
@@ -65,11 +71,17 @@ class Scheduling::Dispatcher
 
   def start_cohort
     scan.each do |strand|
+      break if shutting_down
       @notifiers << start_strand(strand)
     end
   end
 
   def wait_cohort
+    if shutting_down
+      Clog.emit("Shutting down.") { {unfinished_strand_count: @notifiers.length} }
+      Kernel.exit if @notifiers.empty?
+    end
+
     return 0 if @notifiers.empty?
     ready, _, _ = IO.select(@notifiers)
     ready.each(&:close)
