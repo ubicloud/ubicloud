@@ -163,6 +163,30 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be true
       end
 
+      it "boot image doesn't passed" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "invalid boot image" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "invalid-boot-image",
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["boot_image"]).to eq("\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-jammy\", \"almalinux-9.1\"]")
+      end
+
       it "invalid name" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/invalid_name", {
           public_key: "ssh key",

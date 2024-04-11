@@ -35,6 +35,14 @@ class CloverApi
 
         request_body_params = Validation.validate_request_body(r.body.read, required_parameters, allowed_optional_parameters)
 
+        # Generally parameter validation is handled in progs while creating resources.
+        # Since Vm::Nexus both handles VM creation requests from user and also Postgres
+        # service, moved the boot_image validation here to not allow users to pass
+        # postgres image as boot image while creating a VM.
+        if request_body_params["boot_image"]
+          Validation.validate_boot_image(request_body_params["boot_image"])
+        end
+
         if request_body_params["private_subnet_id"]
           ps_id = UBID.parse(request_body_params["private_subnet_id"]).to_uuid
           Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)

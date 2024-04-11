@@ -231,5 +231,17 @@ RSpec.describe Validation do
         expect { described_class.validate_cidr("not_a_cidr") }.to raise_error described_class::ValidationFailed
       end
     end
+
+    describe "#validate_boot_image" do
+      it "valid boot image" do
+        expect { described_class.validate_boot_image("ubuntu-jammy") }.not_to raise_error
+        expect { described_class.validate_boot_image("almalinux-9.1") }.not_to raise_error
+      end
+
+      it "invalid boot image" do
+        expect { described_class.validate_boot_image("invalid-boot-image") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_boot_image("postgres-ubuntu-2204") }.to raise_error described_class::ValidationFailed
+      end
+    end
   end
 end
