@@ -58,6 +58,12 @@ module Validation
     vm_size
   end
 
+  def self.validate_boot_image(image_name)
+    unless Option::BootImages.find { _1.name == image_name }
+      fail ValidationFailed.new({boot_image: "\"#{image_name}\" is not a valid boot image name. Available boot image names are: #{Option::BootImages.map(&:name)}"})
+    end
+  end
+
   def self.validate_postgres_ha_type(ha_type)
     unless Option::PostgresHaOptions.find { _1.name == ha_type }
       fail ValidationFailed.new({ha_type: "\"#{ha_type}\" is not a valid PostgreSQL high availability option. Available options: #{Option::PostgresHaOptions.map(&:name)}"})
