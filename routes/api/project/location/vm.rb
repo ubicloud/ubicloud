@@ -44,9 +44,12 @@ class CloverApi
         end
 
         if request_body_params["private_subnet_id"]
-          ps_id = UBID.parse(request_body_params["private_subnet_id"]).to_uuid
-          Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
-          request_body_params["private_subnet_id"] = ps_id
+          ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
+          unless ps
+            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{request_body_params["private_subnet_id"]}\" is not found"})
+          end
+          Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps.id)
+          request_body_params["private_subnet_id"] = ps.id
         end
 
         st = Prog::Vm::Nexus.assemble(
