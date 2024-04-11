@@ -18,7 +18,7 @@ class CloverApi
       }
     end
 
-    r.on "ubid" do
+    r.on "id" do
       r.on String do |pg_ubid|
         pg = PostgresResource.from_ubid(pg_ubid)
         handle_pg_requests(@current_user, pg, @project)
