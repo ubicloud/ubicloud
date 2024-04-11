@@ -10,6 +10,7 @@ require "bundler/setup"
 Bundler.setup
 
 require_relative "config"
+require "mail"
 require "rack/unreloader"
 
 REPL = false unless defined? REPL
@@ -84,6 +85,28 @@ AUTOLOAD_CONSTANTS.freeze
 
 if Config.production?
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
+end
+
+case Config.mail_driver
+when :smtp
+  ::Mail.defaults do
+    delivery_method :smtp, {
+      address: Config.smtp_hostname,
+      port: Config.smtp_port,
+      user_name: Config.smtp_user,
+      password: Config.smtp_password,
+      authentication: :plain,
+      enable_starttls: Config.smtp_tls
+    }
+  end
+when :logger
+  ::Mail.defaults do
+    delivery_method :logger
+  end
+when :test
+  ::Mail.defaults do
+    delivery_method :test
+  end
 end
 
 def clover_freeze

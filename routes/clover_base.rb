@@ -17,30 +17,6 @@ module CloverBase
       # :nocov:
     end
     base.plugin :common_logger, logger
-
-    # :nocov:
-    case Config.mail_driver
-    when :smtp
-      ::Mail.defaults do
-        delivery_method :smtp, {
-          address: Config.smtp_hostname,
-          port: Config.smtp_port,
-          user_name: Config.smtp_user,
-          password: Config.smtp_password,
-          authentication: :plain,
-          enable_starttls: Config.smtp_tls
-        }
-      end
-    when :logger
-      ::Mail.defaults do
-        delivery_method :logger
-      end
-    when :test
-      ::Mail.defaults do
-        delivery_method :test
-      end
-    end
-    # :nocov:
   end
 
   # Assign some HTTP response codes to common exceptions.
@@ -80,24 +56,6 @@ module CloverBase
 
   def serialize(data, structure = :default)
     @serializer.new(structure).serialize(data)
-  end
-
-  def send_email(receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil)
-    html = render "/email/layout", locals: {subject: subject, greeting: greeting, body: body, button_title: button_title, button_link: button_link}
-    Mail.deliver do
-      from Config.mail_from
-      to receiver
-      subject subject
-
-      text_part do
-        body "#{greeting}\n#{Array(body).join("\n")}\n#{button_link}"
-      end
-
-      html_part do
-        content_type "text/html; charset=UTF-8"
-        body html
-      end
-    end
   end
 
   def fetch_location_based_prices(*resource_types)
