@@ -57,7 +57,7 @@ RSpec.describe Clover, "postgres" do
     end
 
     it "not delete ubid" do
-      delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}"
+      delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -71,7 +71,7 @@ RSpec.describe Clover, "postgres" do
     end
 
     it "not get ubid" do
-      get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}"
+      get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -99,7 +99,7 @@ RSpec.describe Clover, "postgres" do
     end
 
     it "not restore ubid" do
-      post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/restore"
+      post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/restore"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -113,7 +113,7 @@ RSpec.describe Clover, "postgres" do
     end
 
     it "not reset super user password ubid" do
-      post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/reset-superuser-password"
+      post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/reset-superuser-password"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -214,7 +214,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule pg ubid" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/firewall-rule", {
+        post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/firewall-rule", {
           cidr: "0.0.0.0/24"
         }.to_json
 
@@ -283,7 +283,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "reset password ubid" do
-        post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/reset-superuser-password", {
+        post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/reset-superuser-password", {
           password: "DummyPassword123"
         }.to_json
 
@@ -312,7 +312,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "success ubid" do
-        get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}"
+        get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(pg.name)
@@ -326,7 +326,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "show firewall" do
-        get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/firewall-rule"
+        get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)[0]["cidr"]).to eq("0.0.0.0/0")
@@ -342,7 +342,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "success ubid" do
-        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}"
+        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(pg.id).set?("destroy")).to be true
@@ -356,7 +356,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "not exist ubid" do
-        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/foo_ubid"
+        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/foo_ubid"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
@@ -369,7 +369,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule ubid" do
-        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/ubid/#{pg.ubid}/firewall-rule/#{pg.firewall_rules.first.ubid}"
+        delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/firewall-rule/#{pg.firewall_rules.first.ubid}"
 
         expect(last_response.status).to eq(204)
       end

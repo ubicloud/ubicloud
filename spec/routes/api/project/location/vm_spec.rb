@@ -36,7 +36,7 @@ RSpec.describe Clover, "vm" do
     end
 
     it "not delete ubid" do
-      delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+      delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -50,7 +50,7 @@ RSpec.describe Clover, "vm" do
     end
 
     it "not get ubid" do
-      get "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+      get "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -110,7 +110,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "ubid not exist" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/foo_ubid"
+        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/foo_ubid"
 
         expect(last_response.status).to eq(404)
       end
@@ -226,7 +226,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "firewall-rule vm ubid" do
-        post "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}/firewall-rule", {
+        post "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}/firewall-rule", {
           cidr: "0.0.0.0/0",
           port_range: "100..1012"
         }.to_json
@@ -261,7 +261,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success ubid" do
-        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+        get "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
@@ -291,7 +291,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}"
+        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
@@ -305,7 +305,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "not exist ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/foo_ubid"
+        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/foo_ubid"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
@@ -318,7 +318,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "firewall-rule ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/ubid/#{vm.ubid}/firewall-rule/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
+        delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}/firewall-rule/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
 
         expect(last_response.status).to eq(204)
       end

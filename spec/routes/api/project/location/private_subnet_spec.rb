@@ -36,7 +36,7 @@ RSpec.describe Clover, "private_subnet" do
     end
 
     it "not delete ubid" do
-      delete "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/ubid/#{ps.ubid}"
+      delete "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/id/#{ps.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -50,7 +50,7 @@ RSpec.describe Clover, "private_subnet" do
     end
 
     it "not get ubid" do
-      get "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/ubid/#{ps.ubid}"
+      get "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/id/#{ps.ubid}"
 
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
@@ -139,8 +139,8 @@ RSpec.describe Clover, "private_subnet" do
         expect(JSON.parse(last_response.body)["name"]).to eq(ps.name)
       end
 
-      it "success ubid" do
-        get "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/ubid/#{ps.ubid}"
+      it "success id" do
+        get "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/id/#{ps.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(ps.name)
@@ -168,8 +168,8 @@ RSpec.describe Clover, "private_subnet" do
         expect(SemSnap.new(ps.id).set?("destroy")).to be true
       end
 
-      it "success ubid" do
-        delete "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/ubid/#{ps.ubid}"
+      it "success id" do
+        delete "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/id/#{ps.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(ps.id).set?("destroy")).to be true

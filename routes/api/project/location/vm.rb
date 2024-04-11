@@ -18,7 +18,7 @@ class CloverApi
       }
     end
 
-    r.on "ubid" do
+    r.on "id" do
       r.on String do |vm_ubid|
         vm = Vm.from_ubid(vm_ubid)
         handle_vm_requests(@current_user, vm)

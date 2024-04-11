@@ -18,7 +18,7 @@ class CloverApi
       }
     end
 
-    r.on "ubid" do
+    r.on "id" do
       r.is String do |ps_id|
         ps = PrivateSubnet.from_ubid(ps_id)
         handle_ps_requests(@current_user, ps)
