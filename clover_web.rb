@@ -114,7 +114,7 @@ class CloverWeb < Roda
       verify_account_set_password? false
 
       send_verify_account_email do
-        scope.send_email(email_to, "Welcome to Ubicloud: Please Verify Your Account",
+        Util.send_email(email_to, "Welcome to Ubicloud: Please Verify Your Account",
           greeting: "Welcome to Ubicloud,",
           body: ["To complete your registration and activate your account, click the button below.",
             "If you did not initiate this registration process, you may disregard this message.",
@@ -165,7 +165,7 @@ class CloverWeb < Roda
 
     send_reset_password_email do
       user = Account[account_id]
-      scope.send_email(user.email, "Reset Ubicloud Account Password",
+      Util.send_email(user.email, "Reset Ubicloud Account Password",
         greeting: "Hello #{user.name},",
         body: ["We received a request to reset your account password. To reset your password, click the button below.",
           "If you did not initiate this request, no action is needed. Your account remains secure.",
@@ -191,7 +191,7 @@ class CloverWeb < Roda
     verify_login_change_view { view "auth/verify_login_change", "Verify Email Change" }
     send_verify_login_change_email do |new_login|
       user = Account[account_id]
-      scope.send_email(email_to, "Please Verify New Email Address for Ubicloud",
+      Util.send_email(email_to, "Please Verify New Email Address for Ubicloud",
         greeting: "Hello #{user.name},",
         body: ["We received a request to change your account email to '#{new_login}'. To verify new email, click the button below.",
           "If you did not initiate this request, no action is needed. Current email address can be used to login your account.",

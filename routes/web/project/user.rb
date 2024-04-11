@@ -18,7 +18,7 @@ class CloverWeb
 
       user&.associate_with_project(@project)
 
-      send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+      Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
         greeting: "Hello,",
         body: ["You're invited by '#{@current_user.name}' to join the '#{@project.name}' project on Ubicloud.",
           "To join project, click the button below.",

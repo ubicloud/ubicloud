@@ -2,7 +2,6 @@
 
 require_relative "model"
 
-require "mail"
 require "roda"
 
 class Clover < Roda
