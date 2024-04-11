@@ -243,5 +243,30 @@ RSpec.describe Validation do
         expect { described_class.validate_boot_image("postgres-ubuntu-2204") }.to raise_error described_class::ValidationFailed
       end
     end
+
+    describe "#validate_short_text" do
+      it "valid short text" do
+        expect { described_class.validate_short_text("abcABC123()!?* ", "name") }.not_to raise_error
+      end
+
+      it "invalid short text" do
+        expect { described_class.validate_short_text("", "name") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_short_text("a" * 256, "name") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_short_text("'", "name") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_short_text("%", "name") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_short_text("~", "name") }.to raise_error described_class::ValidationFailed
+      end
+    end
+
+    describe "#validate_usage_limit" do
+      it "valid usage limit" do
+        expect(described_class.validate_usage_limit("123")).to eq(123)
+      end
+
+      it "invalid usage limit" do
+        expect { described_class.validate_usage_limit("abc") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_usage_limit("0") }.to raise_error described_class::ValidationFailed
+      end
+    end
   end
 end

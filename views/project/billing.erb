@@ -301,3 +301,111 @@
     ) %>
   </form>
 <% end %>
+<br/>
+<!-- Usage alerts -->
+<div>
+  <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Usage Alerts
+      </h3>
+    </div>
+  </div>
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <!-- Add usage alert -->
+      <div class="px-4 py-5 sm:p-6">
+        <form action="<%= "#{@project_data[:path]}/usage-alert" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}/usage-alert") %>
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
+              <p class="mt-1 text-sm text-gray-500">
+                Usage alerts will be sent to your email address. If you want to send alerts to specific email
+                addresses, you need to log in with that email address.
+                <br/>
+                <br/>
+                Please note that alerts are only for informational purposes and no action is taken automatically.
+              </p>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-5 sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "alert_name",
+                    label: "Alert Name",
+                    type: "text",
+                    attributes: {
+                      required: true,
+                      placeholder: "Alert Name"
+                    },
+                    extra_class: "pr-3"
+                  }
+                ) %>
+              </div>
+              <div class="col-span-5 sm:col-span-3">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "limit",
+                    label: "Limit",
+                    type: "number",
+                    attributes: {
+                      required: true,
+                      placeholder: "100"
+                    },
+                    extra_class: "pr-3"
+                  }
+                ) %>
+              </div>
+              <div class="col-span-2 sm:col-span-3 flex justify-begin items-end">
+                <%== render("components/form/submit_button", locals: { text: "Add" }) %>
+              </div>
+            </div>
+          </div>
+        </form>
+
+      </div>
+      <!-- List alerts -->
+      <% if @usage_alerts.count > 0 %>
+        <table class="min-w-full divide-y divide-gray-300">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Name</th>
+              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Limit</th>
+              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">E-mail</th>
+              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-4">
+                <span class="sr-only">Remove</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <% @usage_alerts.each do |alert| %>
+              <tr id="alert-<%= alert[:ubid]%>" class="whitespace-nowrap text-sm font-medium">
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:name] %></td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:limit] %></td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:email] %></td>
+                <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                  <%== render(
+                    "components/delete_button",
+                    locals: {
+                      text: "Remove",
+                      url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
+                      confirmation: alert[:name],
+                      redirect: "#{@project_data[:path]}/usage-alert"
+                    }
+                  ) %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <div class="text-center p-4">
+          No usage alerts...
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

@@ -30,6 +30,10 @@ module Validation
 
   ALLOWED_PORT_RANGE_PATTERN = '\A(\d+)(?:\.\.(\d+))?\z'
 
+  # - Max length 63
+  # - Alphanumeric, hyphen, underscore, space, parantheses, exclamation, question mark, star
+  ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?\*\(\) ]{1,63}\z}
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
@@ -162,5 +166,16 @@ module Validation
     end
 
     request_body_params
+  end
+
+  def self.validate_usage_limit(limit)
+    limit_integer = limit.to_i
+    fail ValidationFailed.new({limit: "Limit is not a valid integer."}) if limit_integer.to_s != limit
+    fail ValidationFailed.new({limit: "Limit must be greater than 0."}) if limit_integer <= 0
+    limit_integer
+  end
+
+  def self.validate_short_text(text, field_name)
+    fail ValidationFailed.new({field_name: "The #{field_name} must have max length 63 and only contain alphanumeric characters, hyphen, underscore, space, parantheses, exclamation, question mark and star."}) unless text.match(ALLOWED_SHORT_TEXT_PATTERN)
   end
 end
