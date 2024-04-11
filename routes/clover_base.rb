@@ -116,13 +116,6 @@ module CloverBase
     end
   end
 
-  def base_url
-    # :nocov:
-    port = ":#{request.port}" if request.port != Rack::Request::DEFAULT_PORTS[request.scheme]
-    # :nocov:
-    "#{request.scheme}://#{request.host}#{port}"
-  end
-
   module ClassMethods
     def autoload_routes(route)
       route_path = "routes/#{route}"

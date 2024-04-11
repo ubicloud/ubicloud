@@ -24,7 +24,7 @@ class CloverWeb
           "To join project, click the button below.",
           "For any questions or assistance, reach out to our team at support@ubicloud.com."],
         button_title: "Join Project",
-        button_link: "#{base_url}#{@project.path}/dashboard")
+        button_link: "#{Config.base_url}#{@project.path}/dashboard")
 
       flash["notice"] = "Invitation sent successfully to '#{email}'. You need to add some policies to allow new user to operate in the project.
                         If this user doesn't have account, they will need to create an account and you'll need to add them again."
