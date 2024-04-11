@@ -275,5 +275,52 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_content "Resource not found"
       end
     end
+
+    describe "usage alerts" do
+      before do
+        UsageAlert.create_with_id(project_id: project.id, user_id: user.id, name: "alert-1", limit: 100)
+        UsageAlert.create_with_id(project_id: project_wo_permissions.id, user_id: user.id, name: "alert-2", limit: 100)
+      end
+
+      it "can list usage alerts" do
+        visit "#{project.path}/billing"
+        expect(page).to have_content "alert-1"
+        expect(page).to have_no_content "alert-2"
+      end
+
+      it "can create usage alert" do
+        visit "#{project.path}/billing"
+        fill_in "alert_name", with: "alert-3"
+        fill_in "limit", with: 200
+        click_button "Add"
+
+        expect(page).to have_content "alert-3"
+      end
+
+      it "can delete usage alert" do
+        visit "#{project.path}/billing"
+        expect(page).to have_content "alert-1"
+
+        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript enginer.
+        btn = find "#alert-#{project.usage_alerts.first.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        visit "#{project.path}/billing"
+        expect(page).to have_no_content "alert-1"
+      end
+
+      it "returns 404 if usage alert not found" do
+        visit project.path + "/billing"
+        expect(page).to have_content "alert-1"
+
+        btn = find "#alert-#{project.usage_alerts.first.ubid} .delete-btn"
+
+        project.usage_alerts.first.destroy
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(page.status_code).to eq(404)
+      end
+    end
   end
 end

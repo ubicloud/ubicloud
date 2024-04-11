@@ -19,6 +19,8 @@ class CloverWeb
         @invoices = Serializers::Web::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
       end
 
+      @usage_alerts = Serializers::Web::UsageAlert.serialize(@project.usage_alerts_dataset.eager(:user))
+
       view "project/billing"
     end
 
