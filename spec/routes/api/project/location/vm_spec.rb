@@ -184,6 +184,20 @@ RSpec.describe Clover, "vm" do
         expect(JSON.parse(last_response.body)["error"]["details"]["boot_image"]).to eq("\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-jammy\", \"almalinux-9.1\"]")
       end
 
+      it "invalid ps id" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+          private_subnet_id: "invalid-ubid",
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["private_subnet_id"]).to eq("Private subnet with the given id \"invalid-ubid\" is not found")
+      end
+
       it "invalid name" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/invalid_name", {
           public_key: "ssh key",
