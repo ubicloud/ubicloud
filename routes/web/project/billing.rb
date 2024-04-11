@@ -49,8 +49,8 @@ class CloverWeb
         mode: "setup",
         customer_creation: "always",
         billing_address_collection: "required",
-        success_url: "#{base_url}#{@project.path}/billing/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url: "#{base_url}#{@project.path}/billing"
+        success_url: "#{Config.base_url}#{@project.path}/billing/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url: "#{Config.base_url}#{@project.path}/billing"
       )
 
       r.redirect checkout.url, 303
@@ -83,8 +83,8 @@ class CloverWeb
           payment_method_types: ["card"],
           mode: "setup",
           customer: billing_info.stripe_id,
-          success_url: "#{base_url}#{@project.path}/billing/success?session_id={CHECKOUT_SESSION_ID}",
-          cancel_url: "#{base_url}#{@project.path}/billing"
+          success_url: "#{Config.base_url}#{@project.path}/billing/success?session_id={CHECKOUT_SESSION_ID}",
+          cancel_url: "#{Config.base_url}#{@project.path}/billing"
         )
 
         r.redirect checkout.url, 303

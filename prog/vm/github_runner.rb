@@ -182,7 +182,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         "Location" => vm.vm_host.location,
         "Datacenter" => vm.vm_host.data_center,
         "Project" => github_runner.installation.project.ubid,
-        "Console URL" => "https://console.ubicloud.com#{github_runner.installation.project.path}/github"
+        "Console URL" => "#{Config.base_url}#{github_runner.installation.project.path}/github"
       }.map { "#{_1}: #{_2}" }.join("\n")
     }
   end

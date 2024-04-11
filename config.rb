@@ -63,6 +63,7 @@ module Config
   override :smtp_tls, true, bool
 
   # Override -- value is returned or the set default.
+  override :base_url, "http://localhost:9292", string
   override :database_timeout, 10, int
   override :db_pool, 5, int
   override :deployment, "production", string

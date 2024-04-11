@@ -361,7 +361,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
 
-      expect(nx.setup_info[:detail]).to eq("Name: #{github_runner.ubid}\nLabel: ubicloud-standard-4\nArch: \nImage: \nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\nVM Pool: vpskahr7hcf26p614czkcvh8z1\nLocation: hetzner-hel1\nDatacenter: FSN1-DC8\nProject: pjwnadpt27b21p81d7334f11rx\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github")
+      expect(nx.setup_info[:detail]).to eq("Name: #{github_runner.ubid}\nLabel: ubicloud-standard-4\nArch: \nImage: \nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\nVM Pool: vpskahr7hcf26p614czkcvh8z1\nLocation: hetzner-hel1\nDatacenter: FSN1-DC8\nProject: pjwnadpt27b21p81d7334f11rx\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github")
     end
   end
 
@@ -391,7 +391,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         EOT
         chmod +x ./actions-runner/run-withenv.sh
         echo "PATH=$PATH" >> ./actions-runner/.env
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: https://console.ubicloud.com/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
         sudo mv ./actions-runner /home/runner/
         sudo chown -R runner:runner /home/runner/actions-runner
       COMMAND
