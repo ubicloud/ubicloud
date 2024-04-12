@@ -45,8 +45,8 @@ module Validation
   end
 
   def self.validate_provider(provider)
-    msg = "\"#{provider}\" is not a valid provider. Available providers: #{Option::Providers.keys}"
-    fail ValidationFailed.new({provider: msg}) unless Option::Providers.key?(provider)
+    msg = "\"#{provider}\" is not a valid provider. Available providers: #{Option::PROVIDERS.keys}"
+    fail ValidationFailed.new({provider: msg}) unless Option::PROVIDERS.key?(provider)
   end
 
   def self.validate_location(location, provider = nil)
