@@ -1,0 +1,11 @@
+[
+  {
+    provider_display_name: Hetzner,
+    provider_internal_name: hetzner,
+    locations: [
+      {display_name: eu-central-h1, internal_name: hetzner-fsn1, visible: true },
+      {display_name: eu-north-h1, internal_name: hetzner-hel1, visible: true },
+      {display_name: github-runners, internal_name: github-runners, visible: false }
+    ]
+  }
+]

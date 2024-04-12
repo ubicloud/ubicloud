@@ -6,7 +6,7 @@ REPL = true
 require_relative "../loader"
 require "timeout"
 
-LOCATIONS = Option::Locations.map { |l| [l.name, "#{l.provider.display_name} #{l.display_name}"] }.to_h
+LOCATIONS = Option::LOCATIONS.map { |l| [l.name, "#{l.provider.display_name} #{l.display_name}"] }.to_h
 
 def get_input(msg, default = nil)
   prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
