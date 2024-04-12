@@ -15,9 +15,10 @@ class CloverWeb
       fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
       parsed_size = Validation.validate_postgres_size(r.params["size"])
+      location = LocationNameConverter.to_internal_name(r.params["location"])
       st = Prog::Postgres::PostgresResourceNexus.assemble(
         project_id: @project.id,
-        location: r.params["location"],
+        location: location,
         name: r.params["name"],
         target_vm_size: parsed_size.vm_size,
         target_storage_size_gib: parsed_size.storage_size_gib,

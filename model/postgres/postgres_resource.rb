@@ -30,12 +30,16 @@ class PostgresResource < Sequel::Model
     enc.column :server_cert_key
   end
 
+  def display_location
+    LocationNameConverter.to_display_name(location)
+  end
+
   def path
-    "/location/#{location}/postgres/#{name}"
+    "/location/#{display_location}/postgres/#{name}"
   end
 
   def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/postgres/#{name}"
+    "project/#{project.ubid}/location/#{display_location}/postgres/#{name}"
   end
 
   def display_state

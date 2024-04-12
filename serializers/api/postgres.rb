@@ -6,7 +6,7 @@ class Serializers::Api::Postgres < Serializers::Base
       id: pg.ubid,
       name: pg.name,
       state: pg.display_state,
-      location: pg.location,
+      location: pg.display_location,
       vm_size: pg.target_vm_size,
       storage_size_gib: pg.target_storage_size_gib,
       ha_type: pg.ha_type

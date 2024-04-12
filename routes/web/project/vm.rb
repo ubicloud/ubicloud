@@ -17,13 +17,14 @@ class CloverWeb
       ps_id = r.params["private-subnet-id"].empty? ? nil : UBID.parse(r.params["private-subnet-id"]).to_uuid
       Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
 
+      location = LocationNameConverter.to_internal_name(r.params["location"])
       st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
         @project.id,
         name: r.params["name"],
         unix_user: r.params["user"],
         size: r.params["size"],
-        location: r.params["location"],
+        location: location,
         boot_image: r.params["boot-image"],
         private_subnet_id: ps_id,
         enable_ip4: r.params.key?("enable-ip4")

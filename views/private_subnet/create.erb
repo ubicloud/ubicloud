@@ -46,7 +46,7 @@
                   locals: {
                     name: "location",
                     label: "Location",
-                    options: Option.locations_for_provider(@project_data.dig(:provider, :name)).to_h { |l| [l.name, l.display_name] },
+                    options: Option.locations_for_provider(@project_data.dig(:provider, :name)).to_h { |l| [l.display_name, l.display_name] },
                     attributes: {
                       required: true
                     }
