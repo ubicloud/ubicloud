@@ -16,19 +16,19 @@ module Validation
   # - Not start or end with a hyphen
   # Adapted from https://stackoverflow.com/a/7933253
   # Do not allow uppercase letters to not deal with case sensitivity
-  ALLOWED_NAME_PATTERN = '\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z'
+  ALLOWED_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}
 
   # Different operating systems have different conventions.
   # Below are reasonable restrictions that works for most (all?) systems.
   # - Max length 32
   # - Only lowercase letters, numbers, hyphens and underscore
   # - Not start with a hyphen or number
-  ALLOWED_OS_USER_NAME_PATTERN = '\A[a-z_][a-z0-9_-]{0,31}\z'
+  ALLOWED_OS_USER_NAME_PATTERN = %r{\A[a-z_][a-z0-9_-]{0,31}\z}
 
   # Minio user name, we are using ALLOWED_OS_USER_NAME_PATTERN with min length of 3
-  ALLOWED_MINIO_USERNAME_PATTERN = '\A[a-z_][a-z0-9_-]{2,31}\z'
+  ALLOWED_MINIO_USERNAME_PATTERN = %r{\A[a-z_][a-z0-9_-]{2,31}\z}
 
-  ALLOWED_PORT_RANGE_PATTERN = '\A(\d+)(?:\.\.(\d+))?\z'
+  ALLOWED_PORT_RANGE_PATTERN = %r{\A(\d+)(?:\.\.(\d+))?\z}
 
   # - Max length 63
   # - Alphanumeric, hyphen, underscore, space, parantheses, exclamation, question mark, star
