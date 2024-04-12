@@ -1,26 +1,40 @@
 # frozen_string_literal: true
 
-module Option
-  Provider = Struct.new(:name, :display_name) do
-    self::HETZNER = "hetzner"
-  end
-  Providers = [
-    [Provider::HETZNER, "Hetzner"]
-  ].map { |args| [args[0], Provider.new(*args)] }.to_h.freeze
+require "yaml"
 
+module Option
+  providers = YAML.load_file("config/providers.yml")
+
+  Provider = Struct.new(:name, :display_name)
   Location = Struct.new(:provider, :name, :display_name, :visible)
-  Locations = [
-    [Providers[Provider::HETZNER], "hetzner-hel1", "Finland", true],
-    [Providers[Provider::HETZNER], "hetzner-fsn1", "Germany", true],
-    [Providers[Provider::HETZNER], "github-runners", "GitHub Runner", false]
-  ].map { |args| Location.new(*args) }.freeze
+
+  PROVIDERS = {}
+  LOCATIONS = []
+
+  providers.each do |provider|
+    provider_internal_name = provider["provider_internal_name"]
+    PROVIDERS[provider_internal_name] = Provider.new(provider_internal_name, provider["provider_display_name"])
+    Provider.const_set(provider_internal_name.gsub(/[^a-zA-Z]/, "_").upcase, provider_internal_name)
+
+    provider["locations"].each do |location|
+      LOCATIONS.push(Location.new(
+        PROVIDERS[provider_internal_name],
+        location["internal_name"],
+        location["display_name"],
+        location["visible"]
+      ))
+    end
+  end
+
+  PROVIDERS.freeze
+  LOCATIONS.freeze
 
   def self.locations_for_provider(provider, only_visible: true)
-    Option::Locations.select { (!only_visible || _1.visible) && (provider.nil? || _1.provider.name == provider) }
+    Option::LOCATIONS.select { (!only_visible || _1.visible) && (provider.nil? || _1.provider.name == provider) }
   end
 
   def self.postgres_locations_for_provider(provider)
-    Option::Locations.select { _1.name == "hetzner-fsn1" }
+    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" }
   end
 
   BootImage = Struct.new(:name, :display_name)

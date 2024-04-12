@@ -9,7 +9,7 @@ class Serializers::Web::Project < Serializers::Base
       name: p.name,
       credit: p.credit.to_f,
       discount: p.discount,
-      provider: Option::Providers[p.provider]
+      provider: Option::PROVIDERS[p.provider]
     }
   end
 

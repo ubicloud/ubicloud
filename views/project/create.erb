@@ -31,7 +31,7 @@
               locals: {
                 name: "provider",
                 label: "Provider",
-                options: Option::Providers.map { [_1, _2.display_name] }.to_h,
+                options: Option::PROVIDERS.map { [_1, _2.display_name] }.to_h,
                 attributes: {
                   required: true
                 }
