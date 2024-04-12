@@ -53,12 +53,12 @@ RSpec.describe PrivateSubnet do
 
   describe "ui utility methods" do
     it "returns path" do
-      expect(private_subnet.path).to eq "/location/hetzner-hel1/private-subnet/ps"
+      expect(private_subnet.path).to eq "/location/eu-north-h1/private-subnet/ps"
     end
 
     it "returns tag name" do
       pr = instance_double(Project, ubid: "prjubid")
-      expect(private_subnet.hyper_tag_name(pr)).to eq "project/prjubid/location/hetzner-hel1/private-subnet/ps"
+      expect(private_subnet.hyper_tag_name(pr)).to eq "project/prjubid/location/eu-north-h1/private-subnet/ps"
     end
   end
 

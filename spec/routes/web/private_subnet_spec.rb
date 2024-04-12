@@ -71,7 +71,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
         name = "dummy-ps"
         fill_in "Name", with: name
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
 
         click_button "Create"
 
@@ -88,7 +88,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
 
         fill_in "Name", with: "invalid name"
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
 
         click_button "Create"
 
@@ -104,7 +104,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
 
         fill_in "Name", with: private_subnet.name
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
 
         click_button "Create"
 
