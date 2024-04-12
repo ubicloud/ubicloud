@@ -18,13 +18,17 @@ class PrivateSubnet < Sequel::Model
   dataset_module Authorization::Dataset
   include Authorization::HyperTagMethods
   def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/private-subnet/#{name}"
+    "project/#{project.ubid}/location/#{display_location}/private-subnet/#{name}"
   end
 
   include Authorization::TaggableMethods
 
+  def display_location
+    LocationNameConverter.to_display_name(location)
+  end
+
   def path
-    "/location/#{location}/private-subnet/#{name}"
+    "/location/#{display_location}/private-subnet/#{name}"
   end
 
   include ResourceMethods
