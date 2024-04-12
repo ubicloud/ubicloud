@@ -8,7 +8,7 @@ class Serializers::Api::Vm < Serializers::Base
       id: vm.ubid,
       name: vm.name,
       state: vm.display_state,
-      location: vm.location,
+      location: vm.display_location,
       size: vm.display_size,
       unix_user: vm.unix_user,
       storage_size_gib: vm.storage_size_gib,

@@ -8,7 +8,7 @@ class Serializers::Web::PrivateSubnet < Serializers::Base
       path: ps.path,
       name: ps.name,
       state: ps.display_state,
-      location: ps.location,
+      location: ps.display_location,
       net4: ps.net4.to_s,
       net6: ps.net6.to_s
     }

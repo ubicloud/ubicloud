@@ -26,13 +26,17 @@ class Vm < Sequel::Model
   include Authorization::HyperTagMethods
 
   def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{location}/vm/#{name}"
+    "project/#{project.ubid}/location/#{display_location}/vm/#{name}"
   end
 
   include Authorization::TaggableMethods
 
+  def display_location
+    LocationNameConverter.to_display_name(location)
+  end
+
   def path
-    "/location/#{location}/vm/#{name}"
+    "/location/#{display_location}/vm/#{name}"
   end
 
   def ephemeral_net4

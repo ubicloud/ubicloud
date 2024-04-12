@@ -2,8 +2,8 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "location") do |r|
-    r.on String do |location_name|
-      @location = location_name
+    r.on String do |location_display_name|
+      @location = LocationNameConverter.to_internal_name(location_display_name)
 
       r.hash_branches(:project_location_prefix)
     end
