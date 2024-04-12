@@ -5,7 +5,7 @@ raise "test database doesn't end with test" if DB.opts[:database] && !/test\d*\z
 
 TEST_USER_EMAIL = "user@example.com"
 TEST_USER_PASSWORD = "Secret@Password123"
-TEST_LOCATION = "hetzner-hel1"
+TEST_LOCATION = "eu-north-h1"
 
 def create_account(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD, with_project: true, enable_otp: false, enable_webauthn: false)
   hash = Argon2::Password.new({

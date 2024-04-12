@@ -62,6 +62,6 @@ RSpec.describe MinioCluster do
 
   it "returns hyper tag name properly" do
     project = instance_double(Project, ubid: "project-ubid")
-    expect(mc.hyper_tag_name(project)).to eq("project/project-ubid/location/hetzner-hel1/minio-cluster/minio-cluster-name")
+    expect(mc.hyper_tag_name(project)).to eq("project/project-ubid/location/eu-north-h1/minio-cluster/minio-cluster-name")
   end
 end
