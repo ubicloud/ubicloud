@@ -80,7 +80,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
         fill_in "Name", with: name
-        choose option: "hetzner-fsn1"
+        choose option: "eu-central-h1"
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -98,7 +98,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
 
         fill_in "Name", with: "invalid name"
-        choose option: "hetzner-fsn1"
+        choose option: "eu-central-h1"
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -115,7 +115,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
 
         fill_in "Name", with: pg.name
-        choose option: "hetzner-fsn1"
+        choose option: "eu-central-h1"
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -135,7 +135,7 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Project doesn't have valid billing information"
 
         fill_in "Name", with: "new-pg-db"
-        choose option: "hetzner-fsn1"
+        choose option: "eu-central-h1"
         choose option: "standard-2"
         choose option: PostgresResource::HaType::NONE
 
@@ -186,7 +186,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "raises not found when PostgreSQL database not exists" do
-        visit "#{project.path}/location/hetzner-fsn1/postgres/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/eu-central-h1/postgres/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - Resource not found")
         expect(page.status_code).to eq(404)
