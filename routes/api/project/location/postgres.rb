@@ -6,7 +6,7 @@ class CloverApi
 
     r.get true do
       result = @project.postgres_resources_dataset.where(location: @location).authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand).paginated_result(
-        cursor: r.params["cursor"],
+        start_after: r.params["start_after"],
         page_size: r.params["page_size"],
         order_column: r.params["order_column"]
       )

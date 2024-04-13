@@ -6,7 +6,7 @@ class CloverApi
 
     r.get true do
       result = @project.vms_dataset.authorized(@current_user.id, "Vm:view").paginated_result(
-        cursor: r.params["cursor"],
+        start_after: r.params["start_after"],
         page_size: r.params["page_size"],
         order_column: r.params["order_column"]
       )

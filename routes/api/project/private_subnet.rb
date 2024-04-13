@@ -6,7 +6,7 @@ class CloverApi
 
     r.get true do
       result = @project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").eager(nics: [:private_subnet]).paginated_result(
-        cursor: r.params["cursor"],
+        start_after: r.params["start_after"],
         page_size: r.params["page_size"],
         order_column: r.params["order_column"]
       )

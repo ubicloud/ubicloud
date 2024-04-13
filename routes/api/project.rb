@@ -6,14 +6,13 @@ class CloverApi
 
     r.get true do
       result = Project.authorized(@current_user.id, "Project:view").where(visible: true).paginated_result(
-        cursor: r.params["cursor"],
+        start_after: r.params["start_after"],
         page_size: r.params["page_size"],
         order_column: r.params["order_column"]
       )
 
       {
         items: serialize(result[:records]),
-        next_cursor: result[:next_cursor],
         count: result[:count]
       }
     end
