@@ -33,9 +33,9 @@ RSpec.describe Pagination do
         expect(result[:count]).to eq(2)
       end
 
-      it "next cursor" do
-        result = project.vms_dataset.paginated_result(page_size: 1, order_column: "name")
-        expect(result[:next_cursor]).to eq(second_vm.ubid)
+      it "last resource" do
+        result = project.vms_dataset.paginated_result(page_size: 3, order_column: "name")
+        expect(result[:records][-1].name).to eq(second_vm.name)
       end
 
       it "partial name" do
@@ -62,9 +62,10 @@ RSpec.describe Pagination do
         expect(result[:records].length).to eq(1)
       end
 
-      it "cursor" do
-        result = project.vms_dataset.paginated_result(start_after: first_vm.ubid)
-        expect(result[:records][0].ubid).to eq(second_vm.ubid)
+      it "empty page" do
+        result = project.vms_dataset.paginated_result(start_after: second_vm.name, order_column: "name")
+        expect(result[:records].length).to eq(0)
+        expect(result[:count]).to eq(2)
       end
     end
 
