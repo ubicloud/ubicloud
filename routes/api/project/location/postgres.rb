@@ -13,7 +13,7 @@ class CloverApi
 
       {
         items: serialize(result[:records]),
-        next_cursor: result[:next_cursor],
+        next_value: result[:next_value],
         count: result[:count]
       }
     end

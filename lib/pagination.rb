@@ -26,16 +26,16 @@ module Pagination
       fail Validation::ValidationFailed.new(order_column: "Supported ordering columns: #{supported_order_columns.join(", ")}")
     end
 
-    # Get page_size + 1 records to return the last element as the next_cursor
+    # Get page_size + 1 records to return the last element as the next_value
     # by popping it from the records
     query = model.order(order_column_sym).limit(page_size + 1)
     query = query.where(Sequel[model.table_name][order_column_sym] >= start_with) if start_with
     page_records = query.all
 
     if page_records.length > page_size
-      next_cursor = page_records.pop.send(order_column_sym)
+      next_value = page_records.pop.send(order_column_sym)
     end
 
-    {records: page_records, next_cursor: next_cursor, count: count}
+    {records: page_records, next_value: next_value, count: count}
   end
 end
