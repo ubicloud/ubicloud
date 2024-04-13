@@ -83,7 +83,6 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
         expect(parsed_body["items"]).to eq([])
-        expect(parsed_body["next_cursor"]).to be_nil
         expect(parsed_body["count"]).to eq(0)
       end
 
@@ -93,7 +92,6 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
         expect(parsed_body["items"].length).to eq(1)
-        expect(parsed_body["next_cursor"]).to be_nil
         expect(parsed_body["count"]).to eq(1)
       end
 
@@ -105,7 +103,6 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
         expect(parsed_body["items"].length).to eq(2)
-        expect(parsed_body["next_cursor"]).to be_nil
         expect(parsed_body["count"]).to eq(2)
       end
 
