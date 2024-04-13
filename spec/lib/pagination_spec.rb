@@ -35,7 +35,7 @@ RSpec.describe Pagination do
 
       it "next cursor" do
         result = project.vms_dataset.paginated_result(page_size: 1, order_column: "name")
-        expect(result[:next_cursor]).to eq(second_vm.ubid)
+        expect(result[:next_cursor]).to eq(second_vm.name)
       end
 
       it "negative page size" do
@@ -58,14 +58,19 @@ RSpec.describe Pagination do
       end
 
       it "cursor" do
-        result = project.vms_dataset.paginated_result(cursor: second_vm.ubid)
+        result = project.vms_dataset.paginated_result(start_with: second_vm.ubid)
         expect(result[:records][0].ubid).to eq(second_vm.ubid)
+      end
+
+      it "non-existing name" do
+        result = project.vms_dataset.paginated_result(start_with: "dum", order_column: "name")
+        expect(result[:records][0].name).to eq(first_vm.name)
       end
     end
 
     describe "unsuccesful" do
-      it "invalid cursor" do
-        expect { project.vms_dataset.paginated_result(cursor: "invalidubid") }.to raise_error(Validation::ValidationFailed)
+      it "invalid start_with" do
+        expect { project.vms_dataset.paginated_result(start_with: "invalidubid") }.to raise_error(Validation::ValidationFailed)
       end
 
       it "invalid order column" do

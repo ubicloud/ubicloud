@@ -45,6 +45,13 @@ RSpec.describe Clover, "vm" do
         expect(parsed_body["count"]).to eq(2)
         expect(parsed_body["next_cursor"]).to be_nil
       end
+
+      it "invalid order column" do
+        project
+        get "/api/project?order_column=name"
+
+        expect(last_response.status).to eq(400)
+      end
     end
 
     describe "create" do
