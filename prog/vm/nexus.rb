@@ -14,7 +14,7 @@ class Prog::Vm::Nexus < Prog::Base
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
-    distinct_storage_devices: false)
+    distinct_storage_devices: false, force_host_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -102,7 +102,8 @@ class Prog::Vm::Nexus < Prog::Base
         stack: [{
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
-          "distinct_storage_devices" => distinct_storage_devices
+          "distinct_storage_devices" => distinct_storage_devices,
+          "force_host_id" => force_host_id
         }]
       ) { _1.id = vm.id }
     end
@@ -214,11 +215,17 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
   end
 
   def allocate
-    vm_host_id = allocation_dataset.limit(1).get(:id)
+    vm_host_id = frame["force_host_id"] || allocation_dataset.limit(1).get(:id)
     fail "#{vm} no space left on any eligible hosts for #{vm.location}" unless vm_host_id
 
+    allocation_state_filter = if frame["force_host_id"]
+      {}
+    else
+      {allocation_state: "accepting"}
+    end
+
     fail "concurrent allocation_state modification requires re-allocation" if VmHost.dataset
-      .where(id: vm_host_id, allocation_state: "accepting")
+      .where(id: vm_host_id, **allocation_state_filter)
       .update(
         used_cores: Sequel[:used_cores] + vm.cores,
         used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib
