@@ -486,6 +486,31 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vmh.used_cores).to eq(initial_vmh.used_cores + 1)
       expect(vmh.used_hugepages_1g).to eq(initial_vmh.used_hugepages_1g + 8)
     end
+
+    it "can force allocating a host" do
+      new_host(location: "hetzner-hel1")
+      vmh2 = new_host(location: "hetzner-hel1")
+      new_host(location: "hetzner-hel1")
+
+      st = described_class.assemble("some_ssh_key", prj.id, force_host_id: vmh2.id)
+      nx = described_class.new(st)
+
+      expect(nx.allocate).to eq vmh2.id
+    end
+
+    it "doesn't allocate draining hosts normally" do
+      new_host(allocation_state: "draining")
+      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
+    end
+
+    it "can force allocating a draining host" do
+      vmh = new_host(allocation_state: "draining")
+
+      st = described_class.assemble("some_ssh_key", prj.id, force_host_id: vmh.id)
+      nx = described_class.new(st)
+
+      expect(nx.allocate).to eq vmh.id
+    end
   end
 
   describe "#allocate_storage_devices" do
