@@ -259,7 +259,7 @@ RSpec.describe Prog::Vm::Nexus do
       end
       expect(sshable).to receive(:cmd).with(/sudo host\/bin\/prepvm/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
 
-      expect { nx.prep }.to nap(5)
+      expect { nx.prep }.to nap(1)
     end
 
     it "naps if prep command is in progress" do
@@ -267,7 +267,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("InProgress")
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
-      expect { nx.prep }.to nap(5)
+      expect { nx.prep }.to nap(1)
     end
 
     it "generates local_ipv4 if not set" do

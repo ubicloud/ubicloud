@@ -429,7 +429,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/prepvm.rb #{params_path.shellescape}' prep_#{q_vm}", stdin: secrets_json)
     end
 
-    nap 5
+    nap 1
   end
 
   label def wait_firewall_rules_before_run
