@@ -81,7 +81,7 @@ RSpec.describe Prog::DownloadBootImage do
         instance_double(Strand, prog: "ArbitraryOtherProg")
       ])
 
-      expect { dbi.wait_learn_storage }.to hop("activate_host")
+      expect { dbi.wait_learn_storage }.to exit({"msg" => "my-image downloaded"})
     end
 
     it "crashes if an expected field is not set for LearnStorage" do
@@ -94,14 +94,6 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi).to receive(:leaf?).and_return(false)
       expect(dbi).to receive(:donate).and_call_original
       expect { dbi.wait_learn_storage }.to nap(0)
-    end
-  end
-
-  describe "#activate_host" do
-    it "activates vm host again" do
-      expect {
-        expect { dbi.activate_host }.to exit({"msg" => "my-image downloaded"})
-      }.to change { vm_host.reload.allocation_state }.from("unprepared").to("accepting")
     end
   end
 end

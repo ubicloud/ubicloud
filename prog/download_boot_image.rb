@@ -67,14 +67,8 @@ class Prog::DownloadBootImage < Prog::Base
     end
 
     if leaf?
-      hop_activate_host
+      pop "#{image_name} downloaded"
     end
     donate
-  end
-
-  label def activate_host
-    vm_host.update(allocation_state: "accepting")
-
-    pop "#{image_name} downloaded"
   end
 end
