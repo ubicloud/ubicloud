@@ -256,7 +256,7 @@ RSpec.describe Prog::Vm::Nexus do
           "swap_size_bytes" => nil
         })
       end
-      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/prepvm/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
+      expect(sshable).to receive(:cmd).with(/sudo host\/bin\/setup-vm prep #{nx.vm_name}/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
 
       expect { nx.prep }.to nap(1)
     end
@@ -884,7 +884,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
-        expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
         expect(vm).to receive(:destroy).and_return(true)
 
         expect { nx.destroy }.to exit({"msg" => "vm deleted"})
@@ -907,7 +907,7 @@ RSpec.describe Prog::Vm::Nexus do
       it "deletes and pops when all commands are succeeded" do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
-        expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete #{nx.vm_name}/)
 
         expect(vm).to receive(:destroy)
 
@@ -944,7 +944,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "can start a vm after reboot" do
       expect(sshable).to receive(:cmd).with(
-        /sudo host\/bin\/recreate-unpersisted \/vm\/vm[0-9a-z]+\/prep.json/,
+        /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
       )
       expect(sshable).to receive(:cmd).with(/sudo systemctl start vm[0-9a-z]+/)
