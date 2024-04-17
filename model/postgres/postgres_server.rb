@@ -165,7 +165,8 @@ class PostgresServer < Sequel::Model
   end
 
   def create_resource_firewall_rules
-    fw = Firewall.create_with_id(private_subnet_id: vm.private_subnets.first.id, name: ubid.to_s, description: "Postgres default firewall")
+    fw = Firewall.create_with_id(name: ubid.to_s, description: "Postgres default firewall")
+    fw.add_private_subnet(vm.private_subnets.first)
     resource.firewall_rules.each do |pg_fwr|
       fw.insert_firewall_rule(pg_fwr.cidr.to_s, Sequel.pg_range(5432..5432))
     end
