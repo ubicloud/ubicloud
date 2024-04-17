@@ -25,6 +25,15 @@ class GithubRunner < Sequel::Model
     "http://github.com/#{repository_name}/settings/actions/runners/#{runner_id}" if runner_id
   end
 
+  def display_state
+    return vm.display_state if vm
+    case strand&.label
+    when "wait_vm_destroy" then "deleted"
+    when "wait_concurrency_limit" then "reached_concurrency_limit"
+    else "not_created"
+    end
+  end
+
   def init_health_monitor_session
     {
       ssh_session: vm.sshable.start_fresh_session

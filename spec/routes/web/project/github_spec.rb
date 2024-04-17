@@ -81,10 +81,8 @@ RSpec.describe Clover, "github" do
     end
 
     it "can list active runners" do
-      runner1_st = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
-      runner1_st.update(label: "wait_vm_destroy")
-      vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").subject
-      runner2 = GithubRunner.create_with_id(
+      runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
+      runner_with_job = GithubRunner.create_with_id(
         installation_id: installation.id,
         label: "ubicloud",
         repository_name: "my-repo",
@@ -95,25 +93,29 @@ RSpec.describe Clover, "github" do
           "run_id" => 456,
           "workflow_name" => "test-workflow"
         },
-        vm_id: vm.id
+        vm_id: Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").id
       )
-      Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
-      runner_st = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
-      runner_st.update(label: "wait_concurrency_limit")
+      runner_not_created = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
+      runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_concurrency_limit")
+      runner_wo_strand = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo")
+
       visit "#{project.path}/github"
 
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runners")
-      expect(page).to have_content runner1_st.ubid
-      expect(page).to have_content "Runner doesn't have a job yet"
-      expect(page).to have_content runner2.ubid
-      expect(page).to have_content "creating"
-      expect(page).to have_content "not_created"
+      expect(page).to have_content runner_deleted.ubid
       expect(page).to have_content "deleted"
-      expect(page).to have_link runner2.workflow_job["workflow_name"], href: runner2.run_url
-      expect(page).to have_link runner2.workflow_job["name"], href: runner2.job_url
-      expect(page).to have_content runner_st.ubid
+      expect(page).to have_content "Runner doesn't have a job yet"
+      expect(page).to have_content runner_with_job.ubid
+      expect(page).to have_content "creating"
+      expect(page).to have_link runner_with_job.workflow_job["workflow_name"], href: runner_with_job.run_url
+      expect(page).to have_link runner_with_job.workflow_job["name"], href: runner_with_job.job_url
+      expect(page).to have_content runner_not_created.ubid
+      expect(page).to have_content "not_created"
+      expect(page).to have_content runner_concurrency_limit.ubid
       expect(page).to have_content "reached_concurrency_limit"
+      expect(page).to have_content runner_wo_strand.ubid
+      expect(page).to have_content "not_created"
     end
   end
 end

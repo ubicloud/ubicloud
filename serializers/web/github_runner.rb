@@ -18,15 +18,7 @@ class Serializers::Web::GithubRunner < Serializers::Base
         workflow_name: runner.workflow_job["workflow_name"],
         head_branch: runner.workflow_job["head_branch"]
       } : nil,
-      vm_state: if runner.vm
-                  runner.vm.display_state
-                elsif runner.strand.label == "wait_vm_destroy"
-                  "deleted"
-                elsif runner.strand.label == "wait_concurrency_limit"
-                  "reached_concurrency_limit"
-                else
-                  "not_created"
-                end
+      state: runner.display_state
     }
   end
 
