@@ -34,7 +34,7 @@ module Github
     @@runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
   end
 
-  def self.failed_deliveries(since, max_page = 20)
+  def self.failed_deliveries(since, max_page = 50)
     client = Github.app_client
     all_deliveries = client.get("/app/hook/deliveries?per_page=100")
     page = 1
