@@ -9,7 +9,7 @@ class Serializers::Api::Vm < Serializers::Base
       name: vm.name,
       state: vm.display_state,
       location: vm.location,
-      display_size: vm.display_size,
+      size: vm.display_size,
       unix_user: vm.unix_user,
       storage_size_gib: vm.storage_size_gib,
       ip6: vm.ephemeral_net6&.nth(2),
