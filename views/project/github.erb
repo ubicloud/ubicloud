@@ -32,7 +32,7 @@
               <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Runner</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Repository</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Label</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Vm</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Branch</th>
               <th scope="col" class="relative py-3.5 pl-3 pr-4 text-left text-sm font-semibold text-gray-900 sm:pr-6">Workflow Job</th>
             </tr>
@@ -55,7 +55,7 @@
                     <%= runner[:label] %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%== render("components/vm_state_label", locals: { state: runner[:vm_state] }) %>
+                    <%== render("components/vm_state_label", locals: { state: runner[:state] }) %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     <%= runner.dig(:workflow_job, :head_branch) || "-" %>
