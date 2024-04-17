@@ -22,7 +22,7 @@ RSpec.describe Prog::InstallDnsmasq do
     it "donates if any sub-progs are still running" do
       expect(idm).to receive(:donate).and_call_original
       expect(idm).to receive(:leaf?).and_return false
-      expect { idm.wait_downloads }.to nap(0)
+      expect { idm.wait_downloads }.to nap(1)
     end
 
     it "hops to compile_and_install when the downloads are done" do
