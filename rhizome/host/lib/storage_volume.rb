@@ -24,10 +24,7 @@ class StorageVolume
     @skip_sync = params["skip_sync"] || false
     @image_path = vp.image_path(params["image"]) if params["image"]
     @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
-
-    # Old VMs didn't have the spdk_version field. Fill that in with legacy
-    # SPDK version for backward compatibility.
-    @spdk_version = params["spdk_version"] || LEGACY_SPDK_VERSION
+    @spdk_version = params["spdk_version"]
   end
 
   def vp

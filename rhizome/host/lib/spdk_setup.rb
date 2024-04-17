@@ -34,10 +34,7 @@ class SpdkSetup
   end
 
   def spdk_service
-    @spdk_service ||=
-      (@spdk_version == LEGACY_SPDK_VERSION) ?
-          "spdk.service" :
-          "spdk-#{@spdk_version}.service"
+    @spdk_service ||= "spdk-#{@spdk_version}.service"
   end
 
   def hugepages_mount_service

@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-# YYY: Remove all checks against this after upgrading all legacy systems
-LEGACY_SPDK_VERSION = "LEGACY_SPDK_VERSION"
-
 DEFAULT_SPDK_VERSION = "v23.09-ubi-0.2"
 
 module SpdkPath
@@ -30,15 +27,11 @@ module SpdkPath
     # Hugepages path can't have any "-" characters. This is because mount
     # service name should match the path, and the "-" s in mount service name
     # are regarded as "/" s in the path.
-    (spdk_version == LEGACY_SPDK_VERSION) ?
-      File.join(home, "hugepages") :
-      File.join(home, "hugepages.#{spdk_version.tr("-", ".")}")
+    File.join(home, "hugepages.#{spdk_version.tr("-", ".")}")
   end
 
   def self.rpc_sock(spdk_version)
-    (spdk_version == LEGACY_SPDK_VERSION) ?
-      File.join(home, "spdk.sock") :
-      File.join(home, "spdk-#{spdk_version}.sock")
+    File.join(home, "spdk-#{spdk_version}.sock")
   end
 
   def self.conf_path(spdk_version)
@@ -50,9 +43,7 @@ module SpdkPath
   end
 
   def self.install_path(spdk_version)
-    (spdk_version == LEGACY_SPDK_VERSION) ?
-      File.join(install_prefix, "spdk") :
-      File.join(install_prefix, "spdk-#{spdk_version}")
+    File.join(install_prefix, "spdk-#{spdk_version}")
   end
 
   def self.bin(version, n)
