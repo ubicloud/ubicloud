@@ -19,9 +19,51 @@ RSpec.describe Firewall do
 
     it "increments VMs update_firewall_rules if there is a VM" do
       private_subnet = instance_double(PrivateSubnet)
-      expect(fw).to receive(:private_subnet).and_return(private_subnet)
+      expect(fw).to receive(:private_subnets).and_return([private_subnet])
       expect(private_subnet).to receive(:incr_update_firewall_rules)
       fw.insert_firewall_rule("0.0.0.0/0", nil)
+    end
+
+    it "associates with a private subnet" do
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      expect(ps).to receive(:incr_update_firewall_rules)
+      fw.associate_with_private_subnet(ps)
+
+      expect(fw.private_subnets.count).to eq(1)
+      expect(fw.private_subnets.first.id).to eq(ps.id)
+    end
+
+    it "disassociates from a private subnet" do
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      fw.associate_with_private_subnet(ps, apply_firewalls: false)
+      expect(fw.private_subnets.count).to eq(1)
+
+      expect(ps).to receive(:incr_update_firewall_rules)
+      fw.disassociate_from_private_subnet(ps)
+      expect(fw.reload.private_subnets.count).to eq(0)
+      expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
+    end
+
+    it "disassociates from a private subnet without applying firewalls" do
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      fw.associate_with_private_subnet(ps, apply_firewalls: false)
+      expect(fw.private_subnets.count).to eq(1)
+
+      expect(ps).not_to receive(:incr_update_firewall_rules)
+      fw.disassociate_from_private_subnet(ps, apply_firewalls: false)
+      expect(fw.reload.private_subnets.count).to eq(0)
+      expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
+    end
+
+    it "destroys firewall" do
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      fw.associate_with_private_subnet(ps, apply_firewalls: false)
+      expect(fw.reload.private_subnets.count).to eq(1)
+      expect(fw.private_subnets).to receive(:map).and_return([ps])
+      expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(1)
+      fw.destroy
+      expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
+      expect(described_class[fw.id]).to be_nil
     end
   end
 end

@@ -6,15 +6,13 @@ class PrivateSubnet < Sequel::Model
   many_to_many :vms, join_table: Nic.table_name, left_key: :private_subnet_id, right_key: :vm_id
   one_to_many :nics, key: :private_subnet_id
   one_to_one :strand, key: :id
-  one_to_many :firewalls
+  many_to_many :firewalls
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
     "172.16.0.0/12",
     "192.168.0.0/16"
   ].freeze
-
-  plugin :association_dependencies, firewalls: :destroy
 
   dataset_module Pagination
   dataset_module Authorization::Dataset
@@ -24,6 +22,13 @@ class PrivateSubnet < Sequel::Model
   end
 
   include Authorization::TaggableMethods
+
+  def destroy
+    DB.transaction do
+      FirewallsPrivateSubnets.where(private_subnet_id: id).all.each(&:destroy)
+      super
+    end
+  end
 
   def display_location
     LocationNameConverter.to_display_name(location)
