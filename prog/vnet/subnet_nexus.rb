@@ -21,8 +21,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
       ps.associate_with_project(project)
       port_range = allow_only_ssh ? 22..22 : 0..65535
-      fw = Firewall.create_with_id(private_subnet_id: ubid.to_uuid, name: "#{name}-default")
+      fw = Firewall.create_with_id(name: "#{name}-default")
       ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
+      fw.associate_with_private_subnet(ps, apply_firewalls: false)
 
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
     end
@@ -137,6 +138,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     decr_destroy
     strand.children.each { _1.destroy }
+    private_subnet.firewalls.map { _1.disassociate_from_private_subnet(private_subnet, apply_firewalls: false) }
 
     if private_subnet.nics.empty?
       DB.transaction do

@@ -72,4 +72,14 @@ RSpec.describe PrivateSubnet do
       expect(private_subnet.display_state).to eq "failed"
     end
   end
+
+  describe "destroy" do
+    it "destroys firewalls private subnets" do
+      ps = described_class.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      fwps = instance_double(FirewallsPrivateSubnets)
+      expect(FirewallsPrivateSubnets).to receive(:where).with(private_subnet_id: ps.id).and_return(instance_double(Sequel::Dataset, all: [fwps]))
+      expect(fwps).to receive(:destroy).once
+      ps.destroy
+    end
+  end
 end

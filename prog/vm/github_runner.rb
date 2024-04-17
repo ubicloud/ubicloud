@@ -352,7 +352,10 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     if vm
-      vm.private_subnets.each { _1.incr_destroy }
+      vm.private_subnets.each do |subnet|
+        subnet.firewalls.map(&:destroy)
+        subnet.incr_destroy
+      end
 
       # If the runner is not assigned any job and we destroy it after a
       # timeline, the workflow_job is nil, in that case, we want to be able to
