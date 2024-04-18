@@ -67,4 +67,11 @@ when "recreate-unpersisted"
     ndp_needed, storage_volumes, storage_secrets,
     multiqueue: max_vcpus > 1
   )
+when "reinstall-systemd-units"
+  vm_setup.install_systemd_unit(
+    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics
+  )
+else
+  puts "Invalid action #{action}"
+  exit 1
 end
