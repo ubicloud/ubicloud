@@ -21,7 +21,7 @@ class Vm < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency
 
   include Authorization::HyperTagMethods
 
@@ -182,6 +182,13 @@ class Vm < Sequel::Model
     end
 
     pulse
+  end
+
+  def update_spdk_version(version)
+    spdk_installation = vm_host.spdk_installations_dataset[version: version]
+    fail "SPDK version #{version} not found on host" unless spdk_installation
+    vm_storage_volumes_dataset.update(spdk_installation_id: spdk_installation.id)
+    incr_update_spdk_dependency
   end
 
   def self.redacted_columns
