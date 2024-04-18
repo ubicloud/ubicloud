@@ -123,7 +123,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:leaf?).and_return false
       expect(nx).to receive(:donate).and_call_original
 
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+      expect { nx.wait_bootstrap_rhizome }.to nap(0)
     end
   end
 
