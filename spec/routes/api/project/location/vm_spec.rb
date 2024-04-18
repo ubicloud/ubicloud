@@ -18,56 +18,56 @@ RSpec.describe Clover, "vm" do
       get "/api/project/#{project.ubid}/location/#{vm.location}/vm"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not create" do
       post "/api/project/#{project.ubid}/location/#{vm.location}/vm/foo_name"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete ubid" do
       delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not get ubid" do
       get "/api/project/#{project.ubid}/location/#{vm.location}/vm/id/#{vm.ubid}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not create firewall rule" do
       post "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete firewall rule" do
       delete "/api/project/#{project.ubid}/location/#{vm.location}/vm/#{vm.name}/firewall-rule/foo_ubid"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
   end
 
