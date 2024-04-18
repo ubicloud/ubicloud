@@ -34,6 +34,42 @@ class CloverApi < Roda
     only_json? true
     use_jwt? true
 
+    # Converting rodauth error response to the common error format of the API
+    json_response_body do |hash|
+      # In case of an error, rodauth returns the error in the following format
+      # {
+      #   (required) "error": "There was an error logging in"
+      #   (optional) "field-error": [
+      #     "password",
+      #     "invalid password"
+      #   ]
+      # }
+      if json_response_error?
+        error_message = hash["error"]
+        type, code = case error_message
+        when "There was an error logging in"
+          ["InvalidCredentials", 401]
+        when "invalid JWT format or claim in Authorization header"
+          ["InvalidRequest", 400]
+        when "Please login to continue"
+          ["LoginRequired", 401]
+        else
+          # :nocov:
+          ["AuthenticationError", 401]
+          # :nocov:
+        end
+
+        hash.clear
+        hash["error"] = {
+          "code" => code,
+          "type" => type,
+          "message" => error_message
+        }
+      end
+
+      hash.to_json
+    end
+
     hmac_secret Config.clover_session_secret
     jwt_secret Config.clover_session_secret
     argon2_secret { Config.clover_session_secret }

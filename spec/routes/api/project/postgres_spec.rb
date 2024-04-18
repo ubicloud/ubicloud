@@ -12,7 +12,7 @@ RSpec.describe Clover, "vm" do
       get "/api/project/#{project.ubid}/pg"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
   end
 

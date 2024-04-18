@@ -39,84 +39,84 @@ RSpec.describe Clover, "postgres" do
       get "/api/project/#{project.ubid}/location/#{pg.location}/postgres"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not create" do
       post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/postgres_name"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete ubid" do
       delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not get ubid" do
       get "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not create firewall rule" do
       post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete firewall rule" do
       delete "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not restore" do
       post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/restore"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not restore ubid" do
       post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/restore"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not reset super user password" do
       post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/#{pg.name}/reset-superuser-password"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not reset super user password ubid" do
       post "/api/project/#{project.ubid}/location/#{pg.location}/postgres/id/#{pg.ubid}/reset-superuser-password"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
   end
 

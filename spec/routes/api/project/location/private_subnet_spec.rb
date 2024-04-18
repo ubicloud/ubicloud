@@ -18,42 +18,42 @@ RSpec.describe Clover, "private_subnet" do
       get "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not create" do
       post "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/foo_name"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/#{ps.name}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not delete ubid" do
       delete "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/id/#{ps.ubid}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/#{ps.name}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
 
     it "not get ubid" do
       get "/api/project/#{project.ubid}/location/#{ps.location}/private-subnet/id/#{ps.ubid}"
 
       expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]).to eq("Please login to continue")
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
   end
 
