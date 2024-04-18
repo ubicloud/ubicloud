@@ -95,6 +95,31 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#update_spdk_version" do
+    let(:vmh) {
+      sshable = Sshable.create_with_id
+      VmHost.create(location: "a") { _1.id = sshable.id }
+    }
+
+    before do
+      expect(vm).to receive(:vm_host).and_return(vmh)
+    end
+
+    it "can update spdk version" do
+      spdk_installation = SpdkInstallation.create(version: "b", allocation_weight: 100, vm_host_id: vmh.id) { _1.id = vmh.id }
+      volume_dataset = instance_double(Sequel::Dataset)
+      expect(vm).to receive(:vm_storage_volumes_dataset).and_return(volume_dataset)
+      expect(volume_dataset).to receive(:update).with(spdk_installation_id: spdk_installation.id)
+      expect(vm).to receive(:incr_update_spdk_dependency)
+
+      vm.update_spdk_version("b")
+    end
+
+    it "fails if spdk installation not found" do
+      expect { vm.update_spdk_version("b") }.to raise_error RuntimeError, "SPDK version b not found on host"
+    end
+  end
+
   describe "#utility functions" do
     it "can compute the ipv4 addresses" do
       as_ad = instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.new(NetAddr.parse_ip("1.1.1.0"), NetAddr::Mask32.new(32)))

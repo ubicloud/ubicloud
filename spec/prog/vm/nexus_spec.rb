@@ -792,6 +792,11 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.wait }.to hop("start_after_host_reboot")
     end
 
+    it "hops to update_spdk_dependency when needed" do
+      expect(nx).to receive(:when_update_spdk_dependency_set?).and_yield
+      expect { nx.wait }.to hop("update_spdk_dependency")
+    end
+
     it "hops to update_firewall_rules when needed" do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
       expect { nx.wait }.to hop("update_firewall_rules")
@@ -822,6 +827,19 @@ RSpec.describe Prog::Vm::Nexus do
     it "hops to wait if firewall rules are applied" do
       expect(nx).to receive(:retval).and_return({"msg" => "firewall rule is added"})
       expect { nx.update_firewall_rules }.to hop("wait")
+    end
+  end
+
+  describe "#update_spdk_dependency" do
+    it "hops to wait after doing the work" do
+      sshable = instance_double(Sshable)
+      vm_host = instance_double(VmHost, sshable: sshable)
+      allow(vm).to receive(:vm_host).and_return(vm_host)
+
+      expect(nx).to receive(:decr_update_spdk_dependency)
+      expect(nx).to receive(:write_params_json)
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
+      expect { nx.update_spdk_dependency }.to hop("wait")
     end
   end
 
