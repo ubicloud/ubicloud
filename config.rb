@@ -100,7 +100,7 @@ module Config
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
   optional :minio_service_project_id, string
-  override :minio_version, "minio_20231007150738.0.0_amd64"
+  override :minio_version, "minio_20240406052602.0.0_amd64"
 
   # Spdk
   override :spdk_version, "v23.09-ubi-0.2"
