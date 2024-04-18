@@ -151,7 +151,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     it "donates if bootstrap rhizome continues" do
       expect(nx).to receive(:leaf?).and_return(false)
       expect(nx).to receive(:donate).and_call_original
-      expect { nx.wait_bootstrap_rhizome }.to nap(1)
+      expect { nx.wait_bootstrap_rhizome }.to nap(0)
     end
 
     it "hops to setup if bootstrap rhizome is done" do
@@ -196,7 +196,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     it "donates if setup continues" do
       expect(nx).to receive(:leaf?).and_return(false)
       expect(nx).to receive(:donate).and_call_original
-      expect { nx.wait_setup }.to nap(1)
+      expect { nx.wait_setup }.to nap(0)
     end
 
     it "hops to wait if setup is done" do
@@ -312,7 +312,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     it "donates if reconfigure continues" do
       expect(nx).to receive(:leaf?).and_return(false)
       expect(nx).to receive(:donate).and_call_original
-      expect { nx.wait_reconfigure }.to nap(1)
+      expect { nx.wait_reconfigure }.to nap(0)
     end
 
     it "hops to wait if reconfigure is done" do
