@@ -360,7 +360,20 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:incr_destroy)
       expect(nx.minio_server).to receive(:destroy)
-      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname)
+      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: nil)
+      expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
+    end
+
+    it "if dnszone exits and vm has ipv4, it gets deleted properly" do
+      DnsZone.create_with_id(project_id: minio_project.id, name: Config.minio_host_name)
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+      expect(nx).to receive(:decr_destroy)
+      expect(nx.minio_server.vm.sshable).to receive(:destroy)
+      expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
+      expect(nx.minio_server.vm).to receive(:incr_destroy)
+      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
+      expect(nx.minio_server).to receive(:destroy)
+      expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: "10.10.10.10")
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
     end
   end
