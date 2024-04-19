@@ -90,7 +90,9 @@ r "sysctl --system"
 
 # For qemu-image convert and mcopy for cloud-init with the nocloud
 # driver.
-r "apt-get -y install qemu-utils mtools"
+# acl is for setfacl, which is used to set permissions and not installed
+# by default in Leaseweb servers.
+r "apt-get -y install qemu-utils mtools acl"
 
 # We need nvme-cli to inspect installed NVMe cards in prod servers when
 # looking into I/O performance issues.
