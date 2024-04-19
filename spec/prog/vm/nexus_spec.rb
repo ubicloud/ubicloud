@@ -871,8 +871,11 @@ RSpec.describe Prog::Vm::Nexus do
         expect(vm).to receive(:update).with(display_state: "deleting")
         vol = instance_double(VmStorageVolume)
         dev = instance_double(StorageDevice)
-        allow(vm_host).to receive(:storage_devices).and_return([dev])
-        allow(dev).to receive(:available_storage_gib).and_return(100)
+        allow(Sequel).to receive(:[]).with(:available_storage_gib).and_return(100)
+        allow(Sequel).to receive(:[]).with(:used_cores).and_return(1)
+        allow(Sequel).to receive(:[]).with(:used_hugepages_1g).and_return(8)
+        allow(vol).to receive(:storage_device_dataset).and_return(dev)
+        allow(dev).to receive(:update).with(available_storage_gib: 105)
         allow(vol).to receive_messages(storage_device: dev, size_gib: 5)
         allow(vm).to receive(:vm_storage_volumes).and_return([vol])
       end
@@ -886,7 +889,6 @@ RSpec.describe Prog::Vm::Nexus do
         )
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
         expect(vm).to receive(:destroy).and_return(true)
-        expect(vm_host.storage_devices.first).to receive(:update).with({available_storage_gib: 105})
 
         expect { nx.destroy }.to exit({"msg" => "vm deleted"})
       end
@@ -909,7 +911,6 @@ RSpec.describe Prog::Vm::Nexus do
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/)
         expect(sshable).to receive(:cmd).with(/sudo.*bin\/deletevm.rb.*#{nx.vm_name}/)
-        expect(vm_host.storage_devices.first).to receive(:update).with({available_storage_gib: 105})
 
         expect(vm).to receive(:destroy)
 

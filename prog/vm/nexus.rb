@@ -581,9 +581,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       end
 
       vm.vm_storage_volumes.each do |vol|
-        dev = vol.storage_device
-        dev ||= StorageDevice.dataset.where(vm_host_id: vm.vm_host_id, name: "DEFAULT").first
-        dev.update(available_storage_gib: dev.available_storage_gib + vol.size_gib)
+        vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
       end
 
       VmHost.dataset.where(id: vm.vm_host_id).update(
