@@ -57,11 +57,6 @@ RSpec.describe Pagination do
         expect(result[:records].length).to eq(100)
       end
 
-      it "non numeric page size" do
-        result = project.vms_dataset.paginated_result(page_size: "foo")
-        expect(result[:records].length).to eq(1)
-      end
-
       it "empty page" do
         result = project.vms_dataset.paginated_result(start_after: second_vm.name, order_column: "name")
         expect(result[:records].length).to eq(0)
@@ -76,6 +71,10 @@ RSpec.describe Pagination do
 
       it "invalid order column" do
         expect { project.vms_dataset.paginated_result(order_column: "non-existing-column") }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "non numeric page size" do
+        expect { project.vms_dataset.paginated_result(page_size: "foo") }.to raise_error(Validation::ValidationFailed)
       end
     end
   end
