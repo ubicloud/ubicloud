@@ -100,6 +100,9 @@ RSpec.describe Clover, "github" do
     end
 
     it "updates job details of runner when receive in_progress action" do
+      expect(Clog).to receive(:emit).with("runner_started")
+      expect(runner).to receive(:vm).and_return(instance_double(Vm, ubid: "vm-ubid", arch: "x64", cores: 2, vm_host: nil, pool_id: nil)).at_least(:once)
+      expect(GithubRunner).to receive(:first).and_return(runner)
       send_webhook("workflow_job", workflow_job_payload(action: "in_progress", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
 
       expect(page.status_code).to eq(200)
@@ -135,7 +138,9 @@ RSpec.describe Clover, "github" do
       job_name: "test job name",
       run_id: 7777777,
       workflow_name: "test workflow name",
-      head_branch: "test head branch"
+      head_branch: "test head branch",
+      created_at: "2024-04-24T16:02:42Z",
+      started_at: "2024-04-24T16:03:40Z"
     }
   end
 

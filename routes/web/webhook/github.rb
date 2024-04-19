@@ -95,6 +95,7 @@ class CloverWeb
 
     case data["action"]
     when "in_progress"
+      runner.log_duration("runner_started", Time.parse(job["started_at"]) - Time.parse(job["created_at"]))
       success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
     when "completed"
       runner.incr_destroy

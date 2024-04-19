@@ -40,7 +40,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     ).first
 
     if (picked_vm = pool&.pick_vm)
-      Clog.emit("Pool is used") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: picked_vm.cores}} }
       return picked_vm
     end
 
@@ -58,7 +57,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       swap_size_bytes: 4294963200 # ~4096MB, the same value with GitHub hosted runners
     )
 
-    Clog.emit("Pool is empty") { {github_runner: {label: github_runner.label, repository_name: github_runner.repository_name, cores: vm_st.subject.cores}} }
     vm_st.subject
   end
 
@@ -154,6 +152,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     picked_vm = pick_vm
     github_runner.update(vm_id: picked_vm.id)
     picked_vm.update(name: github_runner.ubid.to_s)
+    github_runner.reload.log_duration("runner_allocated", Time.now - github_runner.created_at)
 
     hop_wait_vm
   end
@@ -286,6 +285,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     data = {name: github_runner.ubid.to_s, labels: [github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
     response = github_client.post("/repos/#{github_runner.repository_name}/actions/runners/generate-jitconfig", data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
+    github_runner.log_duration("runner_registered", Time.now - github_runner.created_at)
 
     # We initiate an API call and a SSH connection under the same label to avoid
     # having to store the encoded_jit_config.

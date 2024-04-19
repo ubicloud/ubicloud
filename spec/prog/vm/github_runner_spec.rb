@@ -12,7 +12,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   }
 
   let(:github_runner) {
-    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", ready_at: Time.now).tap {
+    GithubRunner.new(installation_id: "", repository_name: "test-repo", label: "ubicloud-standard-4", ready_at: Time.now, created_at: Time.now).tap {
       _1.id = GithubRunner.generate_uuid
     }
   }
@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   before do
     allow(Github).to receive(:installation_client).and_return(client)
     allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123))
-    allow(vm).to receive(:sshable).and_return(sshable)
+    allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94"))
   end
 
   describe ".assemble" do
@@ -73,7 +73,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "provisions a VM if the pool is not existing" do
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
-      expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
@@ -92,7 +91,6 @@ RSpec.describe Prog::Vm::GithubRunner do
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(nil)
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
-      expect(Clog).to receive(:emit).with("Pool is empty").and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
@@ -109,7 +107,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         storage_skip_sync: true, arch: "arm64"
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
-      expect(Clog).to receive(:emit).with("Pool is used").and_call_original
       expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
@@ -337,6 +334,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx).to receive(:pick_vm).and_return(vm)
       expect(github_runner).to receive(:update).with(vm_id: vm.id)
       expect(vm).to receive(:update).with(name: github_runner.ubid)
+      expect(github_runner).to receive(:reload).and_return(github_runner)
+      expect(Clog).to receive(:emit).with("runner_allocated").and_call_original
       expect { nx.allocate_vm }.to hop("wait_vm")
     end
   end
