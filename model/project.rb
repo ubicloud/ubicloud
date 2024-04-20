@@ -69,12 +69,7 @@ class Project < Sequel::Model
     DB.transaction do
       access_tags_dataset.destroy
       access_policies_dataset.destroy
-
-      github_installations.each do
-        Github.app_client.delete_installation(_1.installation_id)
-        _1.repositories.each(&:incr_destroy)
-        _1.destroy
-      end
+      github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(_1) }
 
       # We still keep the project object for billing purposes.
       # These need to be cleaned up manually once in a while.
