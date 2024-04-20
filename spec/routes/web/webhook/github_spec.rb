@@ -48,11 +48,11 @@ RSpec.describe Clover, "github" do
     end
 
     it "destroys installation when receive deleted action" do
+      expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble).with(installation)
       send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubInstallation[#{installation.ubid}] deleted"}.to_json)
-      expect(GithubInstallation[installation.id]).to be_nil
     end
   end
 
