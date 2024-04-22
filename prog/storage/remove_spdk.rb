@@ -38,7 +38,9 @@ class Prog::Storage::RemoveSpdk < Prog::Base
 
   label def update_database
     vm_host = spdk_installation.vm_host
-    VmHost.where(id: vm_host.id).update(used_hugepages_1g: Sequel[:used_hugepages_1g] - 2)
+    VmHost.where(id: vm_host.id).update(
+      used_hugepages_1g: Sequel[:used_hugepages_1g] - spdk_installation.hugepages
+    )
     spdk_installation.destroy
 
     pop "SPDK installation was removed"

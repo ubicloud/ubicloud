@@ -22,7 +22,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
       location: "xyz",
       arch: "x64",
       used_hugepages_1g: 0,
-      total_hugepages_1g: 2,
+      total_hugepages_1g: 20,
       total_cpus: 96
     ) { _1.id = "adec2977-74a9-8b71-8473-cf3940a45ac5" }
   }
@@ -48,7 +48,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
     end
 
     it "fails if not enough hugepages" do
-      expect(vm_host).to receive(:used_hugepages_1g).and_return(1)
+      expect(vm_host).to receive(:used_hugepages_1g).and_return(19)
       expect { setup_spdk.start }.to raise_error RuntimeError, "No available hugepages"
     end
   end
@@ -75,12 +75,16 @@ RSpec.describe Prog::Storage::SetupSpdk do
 
   describe "#update_database" do
     it "updates the database and exits" do
+      hugepages = 3
+      SpdkInstallation.create(version: spdk_version, vm_host_id: vm_host.id, hugepages: hugepages, allocation_weight: 0) { _1.id = vm_host.id }
       expect { setup_spdk.update_database }.to exit({"msg" => "SPDK was setup"})
-      expect(vm_host.reload.used_hugepages_1g).to eq(2)
+      expect(vm_host.reload.used_hugepages_1g).to eq(hugepages)
+      expect(vm_host.spdk_installations.first.allocation_weight).to eq(50)
     end
 
     it "doesn't reserve a hugepage if service didn't start" do
-      allow(setup_spdk).to receive(:frame).and_return({"version" => spdk_version, "start_service" => false})
+      SpdkInstallation.create(version: spdk_version, vm_host_id: vm_host.id, hugepages: 3, allocation_weight: 0) { _1.id = vm_host.id }
+      allow(setup_spdk).to receive(:frame).and_return({"version" => spdk_version, "start_service" => false, "allocation_weight" => 50})
       expect { setup_spdk.update_database }.to exit({"msg" => "SPDK was setup"})
       expect(vm_host.reload.used_hugepages_1g).to eq(0)
     end
