@@ -53,7 +53,7 @@ RSpec.describe Clover, "billing" do
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).twice
 
       visit project.path
 
@@ -97,7 +97,7 @@ RSpec.describe Clover, "billing" do
     it "can add new payment method" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}})
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard"}}).twice
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
       # rubocop:enable RSpec/VerifiedDoubles
@@ -113,6 +113,28 @@ RSpec.describe Clover, "billing" do
       expect(billing_info.payment_methods.count).to eq(2)
       expect(page).to have_content "Visa"
       expect(page).to have_content "Mastercard"
+    end
+
+    it "can't add fraud payment method" do
+      fraud_payment_method = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pmi_1234567890", fraud: true, card_fingerprint: "cfg1234")
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(fraud_payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_222222222").and_return({"card" => {"brand" => "mastercard", "fingerprint" => "cfg1234"}})
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
+      # rubocop:enable RSpec/VerifiedDoubles
+      expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
+      expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"payment_method" => "pm_222222222"})
+
+      visit "#{project.path}/billing"
+
+      click_link "Add Payment Method"
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      expect(billing_info.payment_methods.count).to eq(1)
+      expect(page).to have_content "Visa"
+      expect(page).to have_content("Payment method you added is labeled as fraud. Please contact support.")
     end
 
     it "raises not found when payment method not exists" do
