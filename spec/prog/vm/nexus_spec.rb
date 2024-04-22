@@ -683,22 +683,27 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#wait_sshable" do
-    it "naps if not sshable" do
-      expect(vm).to receive(:ephemeral_net4).and_return("10.0.0.1")
-      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
+    let(:vm_host) { instance_double(VmHost, sshable: instance_double(Sshable)) }
+
+    before do
+      allow(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
+      allow(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:161:24db:2d4e::/79")).at_least(:once)
+    end
+
+    it "starts a new check and waits if Failed" do
+      expect(vm.vm_host.sshable).to receive(:cmd).with("common/bin/daemonizer --check wait_sshable_#{vm.inhost_name}").and_return("Failed")
+      expect(vm.vm_host.sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo host/bin/verify-sshable #{vm.inhost_name} 2a01:4f8:161:24db:2d4f::3 2a01:4f8:161:24db:2d4e::2' wait_sshable_#{vm.inhost_name}")
       expect { nx.wait_sshable }.to nap(1)
     end
 
-    it "hops to wait if sshable" do
-      vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
-      expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
-      expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
-      expect { nx.wait_sshable }.to hop("create_billing_record")
+    it "naps if InProgress" do
+      expect(vm.vm_host.sshable).to receive(:cmd).with("common/bin/daemonizer --check wait_sshable_#{vm.inhost_name}").and_return("InProgress")
+      expect { nx.wait_sshable }.to nap(1)
     end
 
-    it "skips a check if ipv4 is not enabled" do
-      expect(vm.ephemeral_net4).to be_nil
-      expect(vm).not_to receive(:ephemeral_net6)
+    it "hops to create_billing_record if sshable" do
+      expect(vm.vm_host.sshable).to receive(:cmd).with("common/bin/daemonizer --check wait_sshable_#{vm.inhost_name}").and_return("Succeeded")
+      expect(vm.vm_host.sshable).to receive(:cmd).with("common/bin/daemonizer --clean wait_sshable_#{vm.inhost_name}")
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
   end
