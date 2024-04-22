@@ -665,7 +665,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "donates if firewall rules are not updated" do
       expect(nx).to receive(:leaf?).and_return(false)
-      expect { nx.wait_firewall_rules_before_run }.to nap(0)
+      expect { nx.wait_firewall_rules_before_run }.to nap(1)
     end
 
     it "hops to run if firewall rules are updated" do
@@ -825,7 +825,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "naps when nothing to do" do
       expect(nx).to receive(:leaf?).and_return(false)
-      expect { nx.wait_firewall_rules }.to nap(0)
+      expect { nx.wait_firewall_rules }.to nap(1)
     end
 
     it "hops to run if firewall rules are updated" do

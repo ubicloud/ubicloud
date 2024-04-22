@@ -87,7 +87,7 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi).to receive(:reap).and_return([])
       expect(dbi).to receive(:leaf?).and_return(false)
       expect(dbi).to receive(:donate).and_call_original
-      expect { dbi.wait_learn_storage }.to nap(0)
+      expect { dbi.wait_learn_storage }.to nap(1)
     end
   end
 end

@@ -86,7 +86,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:leaf?).and_return false
       expect(nx).to receive(:donate).and_call_original
 
-      expect { nx.wait_bootstrap_rhizome }.to nap(0)
+      expect { nx.wait_bootstrap_rhizome }.to nap(1)
     end
   end
 
@@ -155,7 +155,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:reap).and_return([])
       expect(nx).to receive(:leaf?).and_return(false)
       expect(nx).to receive(:donate).and_call_original
-      expect { nx.wait_prep }.to nap(0)
+      expect { nx.wait_prep }.to nap(1)
     end
   end
 
@@ -181,7 +181,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:leaf?).and_return false
       expect(nx).to receive(:donate).and_call_original
 
-      expect { nx.wait_setup_hugepages }.to nap(0)
+      expect { nx.wait_setup_hugepages }.to nap(1)
     end
   end
 
@@ -219,7 +219,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:leaf?).and_return false
       expect(nx).to receive(:donate).and_call_original
 
-      expect { nx.wait_setup_spdk }.to nap(0)
+      expect { nx.wait_setup_spdk }.to nap(1)
     end
   end
 
