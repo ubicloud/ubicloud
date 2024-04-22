@@ -12,9 +12,8 @@ class Account < Sequel::Model(:accounts)
 
   include Authorization::TaggableMethods
 
-  def create_project_with_default_policy(name, provider: Option::Provider::HETZNER, policy_body: nil)
-    Validation.validate_provider(provider)
-    project = Project.create_with_id(name: name, provider: provider)
+  def create_project_with_default_policy(name, policy_body: nil)
+    project = Project.create_with_id(name: name)
     project.associate_with_project(project)
     associate_with_project(project)
     project.add_access_policy(

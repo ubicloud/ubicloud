@@ -18,7 +18,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
     Prog::Vnet::SubnetNexus.assemble(minio_project.id, name: "minio-cluster-name")
   }
 
-  let(:minio_project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+  let(:minio_project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
   before do
     allow(minio_cluster).to receive(:projects).and_return([minio_project])

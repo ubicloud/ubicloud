@@ -18,11 +18,11 @@ class CloverApi
     end
 
     r.post true do
-      required_parameters = ["name", "provider"]
+      required_parameters = ["name"]
 
       request_body_params = Validation.validate_request_body(r.body.read, required_parameters)
 
-      project = @current_user.create_project_with_default_policy(request_body_params["name"], provider: request_body_params["provider"])
+      project = @current_user.create_project_with_default_policy(request_body_params["name"])
 
       serialize(project)
     end

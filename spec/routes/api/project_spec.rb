@@ -63,8 +63,7 @@ RSpec.describe Clover, "vm" do
     describe "create" do
       it "success" do
         post "/api/project", {
-          name: "test-project",
-          provider: "hetzner"
+          name: "test-project"
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -72,9 +71,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "missing parameter" do
-        post "/api/project", {
-          name: "test-project"
-        }.to_json
+        post "/api/project", {}.to_json
 
         expect(last_response.status).to eq(400)
       end

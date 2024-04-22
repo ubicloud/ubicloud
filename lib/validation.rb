@@ -44,14 +44,9 @@ module Validation
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
-  def self.validate_provider(provider)
-    msg = "\"#{provider}\" is not a valid provider. Available providers: #{Option::PROVIDERS.keys}"
-    fail ValidationFailed.new({provider: msg}) unless Option::PROVIDERS.key?(provider)
-  end
-
-  def self.validate_location(location, provider = nil)
-    available_locs = Option.locations_for_provider(provider, only_visible: false).map(&:name)
-    msg = "Given location is not a valid location for provider \"#{provider}\". Available locations: #{available_locs.map { LocationNameConverter.to_display_name(_1) }}"
+  def self.validate_location(location)
+    available_locs = Option.locations(only_visible: false).map(&:name)
+    msg = "Given location is not a valid location. Available locations: #{available_locs.map { LocationNameConverter.to_display_name(_1) }}"
     fail ValidationFailed.new({provider: msg}) unless available_locs.include?(location)
   end
 

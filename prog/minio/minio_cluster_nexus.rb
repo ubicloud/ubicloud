@@ -14,7 +14,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     end
 
     Validation.validate_vm_size(vm_size)
-    Validation.validate_location(location, project.provider)
+    Validation.validate_location(location)
     Validation.validate_name(cluster_name)
     Validation.validate_minio_username(admin_user)
 

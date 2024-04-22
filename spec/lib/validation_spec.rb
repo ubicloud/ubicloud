@@ -31,16 +31,6 @@ RSpec.describe Validation do
       end
     end
 
-    describe "#validate_provider" do
-      it "valid provider" do
-        expect(described_class.validate_provider("hetzner")).to be_nil
-      end
-
-      it "invalid provider" do
-        expect { described_class.validate_provider("hetzner-cloud") }.to raise_error described_class::ValidationFailed
-      end
-    end
-
     describe "#validate_vm_size" do
       it "valid vm size" do
         expect(described_class.validate_vm_size("standard-2").name).to eq("standard-2")
@@ -54,20 +44,20 @@ RSpec.describe Validation do
     describe "#validate_location" do
       it "valid locations" do
         [
-          ["hetzner-hel1", nil],
-          ["hetzner-hel1", "hetzner"],
-          ["github-runners", "hetzner"]
-        ].each do |location, provider|
-          expect(described_class.validate_location(location, provider)).to be_nil
+          "hetzner-hel1",
+          "hetzner-fsn1",
+          "github-runners"
+        ].each do |location|
+          expect(described_class.validate_location(location)).to be_nil
         end
       end
 
       it "invalid locations" do
         [
-          ["hetzner-hel2", nil],
-          ["hetzner-hel2", "hetzner"]
-        ].each do |location, provider|
-          expect { described_class.validate_location(location, provider) }.to raise_error described_class::ValidationFailed
+          "hetzner-hel2",
+          "hetzner-fsn2"
+        ].each do |location|
+          expect { described_class.validate_location(location) }.to raise_error described_class::ValidationFailed
         end
       end
     end
