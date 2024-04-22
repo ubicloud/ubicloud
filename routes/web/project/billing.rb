@@ -62,13 +62,20 @@ class CloverWeb
       checkout_session = Stripe::Checkout::Session.retrieve(r.params["session_id"])
       setup_intent = Stripe::SetupIntent.retrieve(checkout_session["setup_intent"])
 
+      stripe_id = setup_intent["payment_method"]
+      card_fingerprint = Stripe::PaymentMethod.retrieve(stripe_id)["card"]["fingerprint"]
+      if PaymentMethod.where(fraud: true).select_map(:card_fingerprint).include?(card_fingerprint)
+        flash["error"] = "Payment method you added is labeled as fraud. Please contact support."
+        r.redirect @project.path + "/billing"
+      end
+
       DB.transaction do
         unless (billing_info = @project.billing_info)
           billing_info = BillingInfo.create_with_id(stripe_id: setup_intent["customer"])
           @project.update(billing_info_id: billing_info.id)
         end
 
-        PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: setup_intent["payment_method"])
+        PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint)
       end
 
       r.redirect @project.path + "/billing"
