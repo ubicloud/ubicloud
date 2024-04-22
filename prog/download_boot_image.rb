@@ -54,18 +54,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def wait_learn_storage
-    reap.each do |st|
-      case st.prog
-      when "LearnStorage"
-        kwargs = {
-          total_storage_gib: st.exitval.fetch("total_storage_gib"),
-          available_storage_gib: st.exitval.fetch("available_storage_gib")
-        }
-
-        vm_host.update(**kwargs)
-      end
-    end
-
+    reap
     if leaf?
       pop "#{image_name} downloaded"
     end

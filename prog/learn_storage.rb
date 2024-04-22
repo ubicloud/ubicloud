@@ -47,7 +47,7 @@ class Prog::LearnStorage < Prog::Base
   end
 
   label def start
-    total, avail = make_model_instances.each_with_object([0, 0]) { |sd, accum|
+    make_model_instances.each do |sd|
       sd.skip_auto_validations(:unique) do
         sd.insert_conflict(target: [:vm_host_id, :name],
           update: {
@@ -55,11 +55,8 @@ class Prog::LearnStorage < Prog::Base
             available_storage_gib: Sequel[:excluded][:available_storage_gib]
           }).save_changes
       end
-      accum[0] += sd.total_storage_gib
-      accum[1] += sd.available_storage_gib
-    }
+    end
 
-    pop({"total_storage_gib" => total, "available_storage_gib" => avail,
-         "msg" => "created StorageDevice records"})
+    pop("created StorageDevice records")
   end
 end

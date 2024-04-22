@@ -393,7 +393,8 @@ RSpec.describe Prog::Vm::Nexus do
               arch: "x64"}.merge(args)
       sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
       @host_index += 1
-      host = VmHost.create(**args) { _1.id = sa.id }
+
+      host = VmHost.create(**args.except(:available_storage_gib, :total_storage_gib)) { _1.id = sa.id }
       StorageDevice.create_with_id(
         name: "DEFAULT",
         available_storage_gib: args[:available_storage_gib],
@@ -521,7 +522,7 @@ RSpec.describe Prog::Vm::Nexus do
       SpdkInstallation.create(vm_host_id: id, version: "v1", allocation_weight: 100) { _1.id = id }
       StorageDevice.create(
         vm_host_id: host.id, name: "nvme0",
-        available_storage_gib: 100, total_storage_gib: 50
+        available_storage_gib: 100, total_storage_gib: 150
       ) { _1.id = StorageDevice.generate_uuid }
       StorageDevice.create(
         vm_host_id: host.id, name: "DEFAULT",

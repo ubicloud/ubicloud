@@ -227,4 +227,12 @@ class VmHost < Sequel::Model
 
     pulse
   end
+
+  def available_storage_gib
+    storage_devices.sum { _1.available_storage_gib }
+  end
+
+  def total_storage_gib
+    storage_devices.sum { _1.total_storage_gib }
+  end
 end
