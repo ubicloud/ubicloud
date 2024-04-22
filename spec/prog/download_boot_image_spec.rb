@@ -74,19 +74,13 @@ RSpec.describe Prog::DownloadBootImage do
   end
 
   describe "#wait_learn_storage" do
-    it "updates the vm_host record from the finished programs" do
-      expect(vm_host).to receive(:update).with(total_storage_gib: 300, available_storage_gib: 500)
+    it "exits if progs run properly" do
       expect(dbi).to receive(:reap).and_return([
-        instance_double(Strand, prog: "LearnStorage", exitval: {"total_storage_gib" => 300, "available_storage_gib" => 500}),
+        instance_double(Strand, prog: "LearnStorage", exitval: {"msg" => "created StorageDevice records"}),
         instance_double(Strand, prog: "ArbitraryOtherProg")
       ])
 
       expect { dbi.wait_learn_storage }.to exit({"msg" => "my-image downloaded"})
-    end
-
-    it "crashes if an expected field is not set for LearnStorage" do
-      expect(dbi).to receive(:reap).and_return([instance_double(Strand, prog: "LearnStorage", exitval: {})])
-      expect { dbi.wait_learn_storage }.to raise_error KeyError, "key not found: \"total_storage_gib\""
     end
 
     it "donates to children if they are not exited yet" do

@@ -19,7 +19,7 @@ Mounted on                   1B-blocks        Avail
 /var/storage/devices/stor2  3331416064   3331276800
 EOS
 
-      expect { ls.start }.to exit({"total_storage_gib" => 3, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
+      expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.map(&:name).sort
       }.from([]).to(%w[DEFAULT stor1 stor2])
     end
@@ -39,7 +39,7 @@ Mounted on                   1B-blocks        Avail
 /var/storage/devices/stor2  3331416064   1531276800
 EOS
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
-      expect { ls.start }.to exit({"total_storage_gib" => 13, "available_storage_gib" => 3, "msg" => "created StorageDevice records"}).and change {
+      expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.map { |sd|
           sd.values.slice(
             :name, :available_storage_gib, :total_storage_gib
@@ -54,6 +54,9 @@ EOS
           {name: "stor2", total_storage_gib: 3, available_storage_gib: 1}
         ]
       )
+
+      expect(vmh.reload.available_storage_gib).to eq(3)
+      expect(vmh.reload.total_storage_gib).to eq(13)
     end
   end
 

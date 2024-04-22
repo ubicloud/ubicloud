@@ -79,14 +79,6 @@ class Prog::Vm::HostNexus < Prog::Base
           total_cores: total_cores,
           total_cpus: total_cpus
         }
-
-        vm_host.update(**kwargs)
-      when "LearnStorage"
-        kwargs = {
-          total_storage_gib: st.exitval.fetch("total_storage_gib"),
-          available_storage_gib: st.exitval.fetch("available_storage_gib")
-        }
-
         vm_host.update(**kwargs)
       end
     end
