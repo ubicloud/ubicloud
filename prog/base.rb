@@ -175,7 +175,7 @@ end
 
   def donate
     strand.children.map(&:run)
-    nap 0
+    nap 1
   end
 
   def reap
