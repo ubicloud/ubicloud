@@ -65,6 +65,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
 
   describe "#update_database" do
     it "updates the database and exits" do
+      expect(spdk_installation).to receive(:hugepages).and_return(2)
       expect(spdk_installation).to receive(:destroy)
       expect { remove_spdk.update_database }.to exit({"msg" => "SPDK installation was removed"})
     end
