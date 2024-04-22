@@ -11,7 +11,7 @@ class CloverWeb
     end
 
     r.post true do
-      project = @current_user.create_project_with_default_policy(r.params["name"], provider: r.params["provider"])
+      project = @current_user.create_project_with_default_policy(r.params["name"])
 
       r.redirect project.path
     end

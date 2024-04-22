@@ -19,7 +19,7 @@ class Prog::Vm::Nexus < Prog::Base
     unless (project = Project[project_id])
       fail "No existing project"
     end
-    Validation.validate_location(location, project.provider)
+    Validation.validate_location(location)
     vm_size = Validation.validate_vm_size(size)
 
     storage_volumes ||= [{

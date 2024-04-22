@@ -12,7 +12,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     )
   }
 
-  let(:minio_project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+  let(:minio_project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
     before do

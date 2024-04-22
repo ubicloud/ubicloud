@@ -113,7 +113,7 @@ RSpec.describe MinioServer do
 
   describe "#url" do
     before do
-      minio_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      minio_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       allow(Config).to receive(:minio_service_project_id).and_return(minio_project.id)
     end
 

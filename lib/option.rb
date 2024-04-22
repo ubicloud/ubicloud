@@ -29,11 +29,11 @@ module Option
   PROVIDERS.freeze
   LOCATIONS.freeze
 
-  def self.locations_for_provider(provider, only_visible: true)
-    Option::LOCATIONS.select { (!only_visible || _1.visible) && (provider.nil? || _1.provider.name == provider) }
+  def self.locations(only_visible: true)
+    Option::LOCATIONS.select { !only_visible || _1.visible }
   end
 
-  def self.postgres_locations_for_provider(provider)
+  def self.postgres_locations
     Option::LOCATIONS.select { _1.name == "hetzner-fsn1" }
   end
 

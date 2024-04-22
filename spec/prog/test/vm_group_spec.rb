@@ -106,7 +106,7 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#finish" do
     it "exits" do
-      project = Project.create_with_id(name: "project 1", provider: "hetzner")
+      project = Project.create_with_id(name: "project 1")
       allow(vg_test).to receive(:frame).and_return({"project_id" => project.id})
       expect { vg_test.finish }.to exit({"msg" => "VmGroup tests finished!"})
     end

@@ -29,7 +29,7 @@ RSpec.describe VmPool do
 
   describe ".pick_vm" do
     let(:prj) {
-      Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
     }
     let(:vm) {
       vm = Vm.create_with_id(

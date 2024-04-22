@@ -8,8 +8,7 @@ class Serializers::Web::Project < Serializers::Base
       path: p.path,
       name: p.name,
       credit: p.credit.to_f,
-      discount: p.discount,
-      provider: Option::PROVIDERS[p.provider]
+      discount: p.discount
     }
   end
 

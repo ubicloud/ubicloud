@@ -17,7 +17,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       fail "No existing project"
     end
 
-    Validation.validate_location(location, project.provider)
+    Validation.validate_location(location)
     Validation.validate_name(name)
     Validation.validate_vm_size(target_vm_size)
     Validation.validate_postgres_ha_type(ha_type)

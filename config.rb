@@ -80,7 +80,6 @@ module Config
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
   override :ci_hetzner_sacrificial_server_id, string
-  override :providers, "hetzner", array(string)
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)

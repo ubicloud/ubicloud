@@ -41,7 +41,7 @@ RSpec.describe Prog::Vm::Nexus do
     }
     vm
   }
-  let(:prj) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+  let(:prj) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
     let(:ps) {

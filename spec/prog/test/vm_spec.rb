@@ -47,7 +47,7 @@ RSpec.describe Prog::Test::Vm do
       ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a3::/64"),
       nics: [nic3])
 
-    project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+    project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
     allow(project).to receive(:vms).and_return([vm1, vm2, vm3])
     allow(vm1).to receive(:projects).and_return [project]
     allow(vm_test).to receive_messages(sshable: sshable, vm: vm1)

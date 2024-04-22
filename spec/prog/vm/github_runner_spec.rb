@@ -33,7 +33,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe ".assemble" do
     it "creates github runner and vm with sshable" do
-      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
       st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
@@ -45,7 +45,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "creates github runner with custom size" do
-      project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
       st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-8")
 
@@ -63,10 +63,10 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe ".pick_vm" do
-    let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+    let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
     before do
-      runner_project = Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) }
+      runner_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
     end
 
@@ -118,7 +118,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe ".update_billing_record" do
-    let(:project) { Project.create_with_id(name: "default", provider: "hetzner").tap { _1.associate_with_project(_1) } }
+    let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
     before do
       allow(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project)).at_least(:once)

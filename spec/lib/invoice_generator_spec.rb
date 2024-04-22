@@ -79,7 +79,7 @@ RSpec.describe InvoiceGenerator do
 
   let(:p1) {
     Account.create_with_id(email: "auth1@example.com")
-    Project.create_with_id(name: "cool-project", provider: "hetzner")
+    Project.create_with_id(name: "cool-project")
   }
   let(:vm1) { Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", family: "standard", cores: 2, location: "hetzner-hel1", boot_image: "x") }
 
@@ -147,7 +147,7 @@ RSpec.describe InvoiceGenerator do
   end
 
   it "generates invoice for a single project" do
-    p2 = Project.create_with_id(name: "cool-project", provider: "hetzner")
+    p2 = Project.create_with_id(name: "cool-project")
     vm2 = Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", family: "standard", cores: 2, location: "hetzner-hel1", boot_image: "x")
 
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, end_time))
