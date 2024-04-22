@@ -1,0 +1,41 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+unless (vm = ARGV.shift)
+  puts "expected vm.inhost_name as argument"
+  exit 1
+end
+
+unless (source_ip = ARGV.shift)
+  puts "expected source ip as argument"
+  exit 1
+end
+
+unless (target_ip = ARGV.shift)
+  puts "expected target ip as argument"
+  exit 1
+end
+
+# Here in this script we punch a hole in the firewall to allow the source_ip to
+# connect to the target_ip on port 22. This is a safe operation because the
+# source ip belongs to the same host as the target ip. This is used to verify
+# that the target vm is up and running and is reachable via ssh.
+added = false
+begin
+  r "sudo ip netns exec #{vm} nft add element inet fw_table allowed_ipv6_port_tuple { #{source_ip} . 22 }"
+  added = true
+rescue => e
+  raise unless e.message.include?("File exists")
+end
+
+r "sudo ip netns exec #{vm} ip link set dev lo up"
+r "sudo ip netns exec #{vm} ip addr replace #{source_ip}/128 dev lo"
+
+begin
+  r "sudo ip netns exec #{vm} nc -w 1 -s #{source_ip} #{target_ip} 22"
+ensure
+  r "sudo ip netns exec #{vm} ip addr del #{source_ip}/128 dev lo"
+  r "sudo ip netns exec #{vm} nft delete element inet fw_table allowed_ipv6_port_tuple { #{source_ip} . 22 }" if added
+end
