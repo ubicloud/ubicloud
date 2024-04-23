@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 class CloverError < StandardError
-  attr_reader :code, :title, :message, :details
-  def initialize(code, title, message, details = nil)
+  attr_reader :code, :type, :message, :details
+  def initialize(code, type, message, details = nil)
     @code = code
-    @title = title
+    @type = type
     @message = message
     @details = details
 
@@ -16,6 +16,6 @@ end
 # TODO: Remove the comment once another API use it
 class DependencyError < CloverError
   def initialize(message)
-    super(409, "Dependency Error", message)
+    super(409, "DependencyError", message)
   end
 end

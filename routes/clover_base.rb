@@ -24,15 +24,15 @@ module CloverBase
     case e
     when Sequel::ValidationFailed
       code = 400
-      title = "Invalid request"
+      type = "InvalidRequest"
       message = e.to_s
     when Roda::RodaPlugins::RouteCsrf::InvalidToken
       code = 419
-      title = "Invalid Security Token"
+      type = "InvalidSecurityToken"
       message = "An invalid security token was submitted with this request, and this request could not be processed."
     when CloverError
       code = e.code
-      title = e.title
+      type = e.type
       message = e.message
       details = e.details
     else
@@ -40,7 +40,7 @@ module CloverBase
       warn e.backtrace
 
       code = 500
-      title = "Unexcepted Error"
+      type = "UnexceptedError"
       message = "Sorry, we couldn’t process your request because of an unexpected error."
     end
 
@@ -48,7 +48,7 @@ module CloverBase
 
     {
       code: code,
-      title: title,
+      type: type,
       message: message,
       details: details
     }
