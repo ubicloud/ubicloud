@@ -10,7 +10,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   extend Forwardable
   def_delegators :minio_server, :vm
 
-  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates
+  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning
 
   def self.assemble(minio_pool_id, index)
     unless (minio_pool = MinioPool[minio_pool_id])
@@ -57,6 +57,8 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def start
     nap 5 unless vm.strand.label == "wait"
+    minio_server.incr_initial_provisioning
+
     register_deadline(:wait, 10 * 60)
 
     minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
@@ -117,6 +119,13 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
     when_restart_set? do
       decr_restart
+
+      # We start the minio server only after the initial provisioning is done
+      # for all of the servers in the pool.
+      when_initial_provisioning_set? do
+        decr_initial_provisioning
+      end
+
       push self.class, frame, "minio_restart"
     end
 
@@ -185,6 +194,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   def available?
+    return true if minio_server.initial_provisioning_set?
     server_data = JSON.parse(minio_server.client.admin_info.body)["servers"].find { _1["endpoint"] == minio_server.endpoint }
     server_data["state"] == "online" && server_data["drives"].all? { _1["state"] == "ok" }
   rescue => ex

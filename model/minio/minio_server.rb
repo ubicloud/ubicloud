@@ -17,7 +17,7 @@ class MinioServer < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
 
-  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates
+  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning
 
   plugin :column_encryption do |enc|
     enc.column :cert_key

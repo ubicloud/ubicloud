@@ -259,6 +259,14 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait }.to hop("minio_restart")
     end
 
+    it "pushes minio_restart and decrements initial_provisioning if restart is set" do
+      expect(nx).to receive(:when_restart_set?).and_yield
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(nx).to receive(:decr_initial_provisioning)
+      expect(nx).to receive(:push).with(described_class, {}, "minio_restart").and_call_original
+      expect { nx.wait }.to hop("minio_restart")
+    end
+
     it "hops to refresh_certificates if certificate is checked more than a month ago" do
       expect(nx.minio_server).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 31 - 1)
       expect { nx.wait }.to hop("refresh_certificates")
@@ -409,6 +417,11 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   end
 
   describe "#available?" do
+    it "returns true if initial provisioning is set" do
+      expect(nx.minio_server).to receive(:initial_provisioning_set?).and_return(true)
+      expect(nx.available?).to be(true)
+    end
+
     it "returns true if health check is successful" do
       expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
       stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
