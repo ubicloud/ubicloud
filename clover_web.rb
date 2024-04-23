@@ -184,6 +184,14 @@ class CloverWeb < Roda
       remove_all_active_sessions_except_current
     end
 
+    send_password_changed_email do
+      user = Account[account_id]
+      Util.send_email(email_to, "Ubicloud Account Password Changed",
+        greeting: "Hello #{user.name},",
+        body: ["Someone has changed the password for the account associated to this email address.",
+          "If you did not initiate this request or for any questions, reach out to our team at support@ubicloud.com."])
+    end
+
     change_login_redirect "/account/change-login"
     change_login_route "account/change-login"
     change_login_view { view "account/change_login", "My Account" }
