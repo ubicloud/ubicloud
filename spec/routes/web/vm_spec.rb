@@ -67,7 +67,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
         uncheck "Enable Public IPv4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -90,7 +90,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
         name = "dummy-vm"
         fill_in "Name", with: name
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
         check "Enable Public IPv4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -115,7 +115,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Create new subnet"
         name = "dummy-vm"
         fill_in "Name", with: name
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
         select match: :prefer_exact, text: ps.name
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
@@ -136,7 +136,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: "invalid name"
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -154,7 +154,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         fill_in "Name", with: vm.name
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -174,7 +174,7 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "Project doesn't have valid billing information"
 
         fill_in "Name", with: "dummy-vm"
-        choose option: "hetzner-hel1"
+        choose option: "eu-north-h1"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
