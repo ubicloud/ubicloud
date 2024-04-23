@@ -781,9 +781,47 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  context "with vmhost with allocated resources" do
+    create_host = ->(vm, mod) {
+      sshable = Sshable.create { _1.id = VmHost.generate_uuid }
+      VmHost.create(location: "xyz",
+        used_cores: 9,
+        used_hugepages_1g: 10,
+        total_hugepages_1g: 18) { _1.id = sshable.id }.tap {
+        vm.update(vm_host_id: _1.id, unix_user: "test_unix_user", public_key: "test_public_key", boot_image: "test-boot-image")
+      }
+    }
+
+    describe "#suspending" do
+      it "deducts the core and memory count" do
+        vmh = create_host.call(vm, 0)
+        expect(nx.host.sshable).to receive(:cmd).at_least(:once)
+        expect { nx.suspending }.to hop("suspended").and change { vmh.reload.used_cores }.from(9).to(8).and change { vmh.reload.used_hugepages_1g }.from(10).to(2)
+      end
+    end
+
+    describe "#suspended" do
+      it "naps when there's nothing to do" do
+        expect { nx.suspended }.to nap
+      end
+
+      it "unsuspending reallocates the resources" do
+        vmh = create_host.call(vm, -1)
+        expect(nx).to receive(:when_unsuspend_set?).and_yield
+        expect(nx.host.sshable).to receive(:cmd).at_least(:once)
+        expect { nx.suspended }.to hop("wait").and change { vmh.reload.used_cores }.from(9).to(10).and change { vmh.reload.used_hugepages_1g }.from(10).to(18)
+      end
+    end
+  end
+
   describe "#wait" do
     it "naps when nothing to do" do
       expect { nx.wait }.to nap(30)
+    end
+
+    it "hops to suspending when needed" do
+      expect(nx).to receive(:when_suspend_set?).and_yield
+      expect { nx.wait }.to hop("suspending")
     end
 
     it "hops to start_after_host_reboot when needed" do

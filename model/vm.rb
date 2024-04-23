@@ -22,6 +22,7 @@ class Vm < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup
+  semaphore :suspend, :unsuspend
 
   include Authorization::HyperTagMethods
 

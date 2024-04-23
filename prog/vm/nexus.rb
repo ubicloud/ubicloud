@@ -9,6 +9,7 @@ require "base64"
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup
+  semaphore :suspend, :unsuspend
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: "ubuntu-jammy",
@@ -489,6 +490,11 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
   end
 
   label def wait
+    when_suspend_set? do
+      register_deadline(:suspended, 5 * 60)
+      hop_suspending
+    end
+
     when_start_after_host_reboot_set? do
       register_deadline(:wait, 5 * 60)
       hop_start_after_host_reboot
@@ -543,6 +549,44 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
   label def prevent_destroy
     register_deadline(:destroy, 24 * 60 * 60)
     nap 30
+  end
+
+  label def suspending
+    # :nocov:
+    begin
+      host.sshable.cmd("sudo systemctl stop #{q_vm}")
+    rescue Sshable::SshError => ex
+      raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
+    end
+
+    begin
+      host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
+    rescue Sshable::SshError => ex
+      raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
+    end
+    # :nocov:
+
+    VmHost.dataset.where(id: vm.vm_host_id).update(
+      used_cores: Sequel[:used_cores] - vm.cores,
+      used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib
+    )
+
+    decr_suspend
+    hop_suspended
+  end
+
+  label def suspended
+    when_unsuspend_set? do
+      host.sshable.cmd("sudo systemctl start #{q_vm} #{q_vm}-dnsmasq")
+      VmHost.dataset.where(id: vm.vm_host_id).update(
+        used_cores: Sequel[:used_cores] + vm.cores,
+        used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib
+      )
+      decr_unsuspend
+      hop_wait
+    end
+
+    nap 2**35
   end
 
   label def destroy
