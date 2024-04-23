@@ -166,6 +166,7 @@ RSpec.describe PostgresServer do
     }
 
     expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
+    expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end
@@ -184,6 +185,7 @@ RSpec.describe PostgresServer do
     expect(session[:db_connection]).to receive(:[]).with("SELECT pg_current_wal_lsn() AS lsn").and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:primary?).and_return(true)
 
+    expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
     postgres_server.check_pulse(session: session, previous_pulse: pulse)
   end

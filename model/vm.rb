@@ -169,7 +169,7 @@ class Vm < Sequel::Model
     end
     pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
 
-    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup
     end
 

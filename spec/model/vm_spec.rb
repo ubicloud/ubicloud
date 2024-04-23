@@ -130,10 +130,12 @@ RSpec.describe Vm do
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:exec!).and_return("active\ninactive\n")
+    expect(vm).to receive(:reload).and_return(vm)
     expect(vm).to receive(:incr_checkup)
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
 
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(vm).to receive(:reload).and_return(vm)
     expect(vm).to receive(:incr_checkup)
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end

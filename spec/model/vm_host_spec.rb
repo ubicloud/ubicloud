@@ -269,6 +269,7 @@ RSpec.describe VmHost do
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(vh).to receive(:reload).and_return(vh)
     expect(vh).to receive(:incr_checkup)
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
