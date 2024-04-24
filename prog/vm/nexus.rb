@@ -392,8 +392,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
       vm.nics.each { _1.incr_setup_nic }
-      bud Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules
-      hop_wait_firewall_rules_before_run
+      hop_run
     when "NotStarted", "Failed"
       topo = vm.cloud_hypervisor_cpu_topology
 
@@ -432,33 +431,29 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
     nap 1
   end
 
-  label def wait_firewall_rules_before_run
-    reap
-    hop_run if leaf?
-    donate
-  end
-
   label def run
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     hop_wait_sshable
   end
 
   label def wait_sshable
-    case host.sshable.cmd("common/bin/daemonizer --check wait_sshable_#{q_vm}")
-    when "Succeeded"
-      host.sshable.cmd("common/bin/daemonizer --clean wait_sshable_#{q_vm}")
+    unless vm.update_firewall_rules_set?
+      vm.incr_update_firewall_rules
+      # This is the first time we get into this state and we know that
+      # wait_sshable will take definitely more than 15 seconds. So, we nap here
+      # to reduce the amount of load on the control plane unnecessarily.
+      nap 15
+    end
+    addr = vm.ephemeral_net4
+    hop_create_billing_record unless addr
 
-      hop_create_billing_record
-    when "NotStarted", "Failed"
-      # I considered removing wait_sshable altogether, but (very)
-      # occasionally helps us glean interesting information about boot
-      # problems.
-      prefix_len = vm.ephemeral_net6.netmask.prefix_len + 1
-      source_ip = vm.ephemeral_net6.resize(prefix_len).next_sib.nth(3)
-      host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/verify-sshable #{q_vm} #{source_ip} #{vm.ephemeral_net6.nth(2)}' wait_sshable_#{q_vm}")
+    begin
+      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+    rescue SystemCallError
+      nap 1
     end
 
-    nap 1
+    hop_create_billing_record
   end
 
   label def create_billing_record
@@ -512,15 +507,12 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
   end
 
   label def update_firewall_rules
-    decr_update_firewall_rules
-    bud Prog::Vnet::UpdateFirewallRules, {subject_id: vm.id}, :update_firewall_rules
-    hop_wait_firewall_rules
-  end
+    if retval&.dig("msg") == "firewall rule is added"
+      hop_wait
+    end
 
-  label def wait_firewall_rules
-    reap
-    hop_wait if leaf?
-    donate
+    decr_update_firewall_rules
+    push Prog::Vnet::UpdateFirewallRules, {}, :update_firewall_rules
   end
 
   label def unavailable
@@ -608,7 +600,8 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
 
     decr_start_after_host_reboot
 
-    hop_update_firewall_rules
+    vm.incr_update_firewall_rules
+    hop_wait
   end
 
   def available?
