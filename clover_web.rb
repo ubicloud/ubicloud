@@ -44,7 +44,7 @@ class CloverWeb < Roda
   plugin :not_found do
     @error = {
       code: 404,
-      type: "ResourceNotFound",
+      title: "Resource not found",
       message: "Sorry, we couldn’t find the resource you’re looking for."
     }
 

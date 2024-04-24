@@ -15,6 +15,6 @@ RSpec.describe Clover do
   it "handles unexpected errors" do
     expect(Account).to receive(:[]).and_raise(RuntimeError)
     expect { visit "/create-account" }.to output(/RuntimeError.*/).to_stderr
-    expect(page.title).to eq("Ubicloud - UnexceptedError")
+    expect(page.title).to eq("Ubicloud - Unexcepted Error")
   end
 end
