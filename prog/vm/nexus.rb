@@ -201,17 +201,27 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       Sequel.lit("")
     end
 
+    # YYY: We might not need special ordering for github-runners location after
+    # completing the fleet unification. This is a temporary solution to reduce
+    # capacity incidents for VM and PG allocations.
+    ordering_clause = if vm.location != "github-runners"
+      Sequel.lit("ORDER BY random()")
+    else
+      Sequel.lit("ORDER BY vm_host.location = 'github-runners' DESC, random()")
+    end
+
     device_allocation_query += <<-SQL
         vm_host.used_cores + :cores <= least(vm_host.total_cores, vm_host.total_mem_gib / :mem_gib_ratio)
         AND vm_host.used_hugepages_1g + :mem_gib <= vm_host.total_hugepages_1g
         AND vm_host.allocation_state = 'accepting'
         AND vm_host.arch = :arch
         :location_filter
-      ORDER BY random()
+      :ordering_clause
     SQL
 
     DB[device_allocation_query, cores: vm.cores, mem_gib_ratio: vm.mem_gib_ratio,
-      mem_gib: vm.mem_gib, arch: vm.arch, location_filter: location_filter]
+      mem_gib: vm.mem_gib, arch: vm.arch, location_filter: location_filter,
+      ordering_clause: ordering_clause]
   end
 
   def allocate
