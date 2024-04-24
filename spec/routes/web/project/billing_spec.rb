@@ -118,17 +118,17 @@ RSpec.describe Clover, "billing" do
     it "raises not found when payment method not exists" do
       visit "#{project.path}/billing/payment-method/08s56d4kaj94xsmrnf5v5m3mav"
 
-      expect(page.title).to eq("Ubicloud - ResourceNotFound")
+      expect(page.title).to eq("Ubicloud - Resource not found")
       expect(page.status_code).to eq(404)
-      expect(page).to have_content "ResourceNotFound"
+      expect(page).to have_content "Resource not found"
     end
 
     it "raises not found when add payment method if project not exists" do
       visit "#{project.path}/billing/payment-method/create"
 
-      expect(page.title).to eq("Ubicloud - ResourceNotFound")
+      expect(page.title).to eq("Ubicloud - Resource not found")
       expect(page.status_code).to eq(404)
-      expect(page).to have_content "ResourceNotFound"
+      expect(page).to have_content "Resource not found"
     end
 
     it "can't delete last payment method" do
@@ -270,9 +270,9 @@ RSpec.describe Clover, "billing" do
       it "raises not found when invoice not exists" do
         visit "#{project.path}/billing/invoice/08s56d4kaj94xsmrnf5v5m3mav"
 
-        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.title).to eq("Ubicloud - Resource not found")
         expect(page.status_code).to eq(404)
-        expect(page).to have_content "ResourceNotFound"
+        expect(page).to have_content "Resource not found"
       end
     end
 
