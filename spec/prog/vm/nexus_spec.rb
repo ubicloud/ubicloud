@@ -450,6 +450,18 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx.allocate).to eq vmh.id
     end
 
+    it "prioritizes the github-runners location for runners" do
+      new_host(location: "somewhere-weird")
+      new_host(location: "somewhere-weird")
+      new_host(location: "somewhere-weird")
+      vmh = new_host(location: "github-runners")
+      new_host(location: "somewhere-weird")
+      new_host(location: "somewhere-weird")
+      new_host(location: "somewhere-weird")
+      vm.location = "github-runners"
+      expect(nx.allocate).to eq vmh.id
+    end
+
     it "does not match if there is not enough storage capacity" do
       new_host(available_storage_gib: 10)
       expect(vm.storage_size_gib).to eq(35)
