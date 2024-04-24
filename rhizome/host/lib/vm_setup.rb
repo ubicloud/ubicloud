@@ -364,6 +364,13 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       }
       # NAT4 rules
       #{generate_nat4_rules(ip4, nics.first.net4)}
+      table inet fw_table {
+        chain forward_ingress {
+          type filter hook forward priority filter; policy drop;
+          ip saddr 0.0.0.0/0 tcp dport 22 ip daddr #{nics.first.net4} ct state established,related,new counter accept
+          ip saddr #{nics.first.net4} tcp sport 22 ct state established,related counter accept
+        }
+      }
     NFTABLES_CONF
   end
 

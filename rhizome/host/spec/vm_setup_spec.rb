@@ -335,6 +335,13 @@ table ip nat {
   }
 }
 
+table inet fw_table {
+  chain forward_ingress {
+    type filter hook forward priority filter; policy drop;
+    ip saddr 0.0.0.0/0 tcp dport 22 ip daddr 192.168.5.50/32 ct state established,related,new counter accept
+    ip saddr 192.168.5.50/32 tcp sport 22 ct state established,related counter accept
+  }
+}
 NFTABLES_CONF
       expect(vs).to receive(:apply_nftables)
       vs.write_nftables_conf(ip4, gua, nics)
