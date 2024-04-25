@@ -140,7 +140,7 @@ class CloverApi
       Authorization.authorize(user.id, "Postgres:view", pg.id)
 
       unless pg.representative_server.primary?
-        fail CloverError.new(400, "Invalid Request", "Superuser password cannot be updated during restore!")
+        fail CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated during restore!")
       end
 
       required_parameters = ["password"]

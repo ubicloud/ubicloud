@@ -16,7 +16,7 @@ class CloverApi < Roda
     {
       error: {
         code: 404,
-        title: "Resource not found",
+        type: "ResourceNotFound",
         message: "Sorry, we couldn’t find the resource you’re looking for."
       }
     }.to_json

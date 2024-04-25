@@ -6,7 +6,7 @@ require "netaddr"
 module Validation
   class ValidationFailed < CloverError
     def initialize(details)
-      super(400, "Invalid request", "Validation failed for following fields: #{details.keys.join(", ")}", details)
+      super(400, "InvalidRequest", "Validation failed for following fields: #{details.keys.join(", ")}", details)
     end
   end
 

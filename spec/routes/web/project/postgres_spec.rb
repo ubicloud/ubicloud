@@ -188,9 +188,9 @@ RSpec.describe Clover, "postgres" do
       it "raises not found when PostgreSQL database not exists" do
         visit "#{project.path}/location/eu-central-h1/postgres/08s56d4kaj94xsmrnf5v5m3mav"
 
-        expect(page.title).to eq("Ubicloud - Resource not found")
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
-        expect(page).to have_content "Resource not found"
+        expect(page).to have_content "ResourceNotFound"
       end
 
       it "can restore PostgreSQL database" do
