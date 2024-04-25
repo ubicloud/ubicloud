@@ -138,9 +138,9 @@ RSpec.describe Clover, "project" do
       it "raises not found when project not exists" do
         visit "/project/08s56d4kaj94xsmrnf5v5m3mav"
 
-        expect(page.title).to eq("Ubicloud - Resource not found")
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
-        expect(page).to have_content "Resource not found"
+        expect(page).to have_content "ResourceNotFound"
       end
 
       it "can update the project name" do
@@ -247,9 +247,9 @@ RSpec.describe Clover, "project" do
       it "raises not found when user not exists" do
         visit "#{project.path}/user/08s56d4kaj94xsmrnf5v5m3mav"
 
-        expect(page.title).to eq("Ubicloud - Resource not found")
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
-        expect(page).to have_content "Resource not found"
+        expect(page).to have_content "ResourceNotFound"
       end
     end
 
@@ -322,9 +322,9 @@ RSpec.describe Clover, "project" do
 
         visit "#{project.path}/policy/pcqv67qwh9t23k4g88xrjya7eb"
 
-        expect(page.title).to eq("Ubicloud - Resource not found")
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
-        expect(page).to have_content "Resource not found"
+        expect(page).to have_content "ResourceNotFound"
       end
     end
 
