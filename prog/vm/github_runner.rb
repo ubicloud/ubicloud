@@ -158,7 +158,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait_vm
-    nap 5 unless vm.strand.label == "wait"
+    # If the vm is not allocated yet, we know that the vm provisioning will take
+    # definitely more than 18 seconds.
+    nap 18 unless vm.allocated_at
+    nap 1 unless vm.provisioned_at
     register_deadline(:wait, 10 * 60)
     hop_setup_environment
   end
