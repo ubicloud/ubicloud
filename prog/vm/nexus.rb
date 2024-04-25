@@ -404,6 +404,27 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       vm.nics.each { _1.incr_setup_nic }
       hop_run
     when "NotStarted", "Failed"
+      topo = vm.cloud_hypervisor_cpu_topology
+
+      # we don't write secrets to params_json, because it
+      # shouldn't be stored in the host for security reasons.
+      params_json = JSON.pretty_generate({
+        "vm_name" => vm_name,
+        "public_ipv6" => vm.ephemeral_net6.to_s,
+        "public_ipv4" => vm.ip4.to_s || "",
+        "local_ipv4" => local_ipv4,
+        "unix_user" => vm.unix_user,
+        "ssh_public_key" => vm.public_key,
+        "nics" => vm.nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
+        "boot_image" => vm.boot_image,
+        "max_vcpus" => topo.max_vcpus,
+        "cpu_topology" => topo.to_s,
+        "mem_gib" => vm.mem_gib,
+        "ndp_needed" => host.ndp_needed,
+        "storage_volumes" => storage_volumes,
+        "swap_size_bytes" => frame["swap_size_bytes"]
+      })
+
       secrets_json = JSON.generate({
         storage: storage_secrets
       })
@@ -411,37 +432,13 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       # Enable KVM access for VM user.
       host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
 
-      write_params_json
+      # put prep.json
+      host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: params_json)
 
-      host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/setup-vm prep #{q_vm}' prep_#{q_vm}", stdin: secrets_json)
+      host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/prepvm.rb #{params_path.shellescape}' prep_#{q_vm}", stdin: secrets_json)
     end
 
     nap 1
-  end
-
-  def write_params_json
-    topo = vm.cloud_hypervisor_cpu_topology
-
-    # we don't write secrets to params_json, because it
-    # shouldn't be stored in the host for security reasons.
-    params_json = JSON.pretty_generate({
-      "vm_name" => vm_name,
-      "public_ipv6" => vm.ephemeral_net6.to_s,
-      "public_ipv4" => vm.ip4.to_s || "",
-      "local_ipv4" => local_ipv4,
-      "unix_user" => vm.unix_user,
-      "ssh_public_key" => vm.public_key,
-      "nics" => vm.nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
-      "boot_image" => vm.boot_image,
-      "max_vcpus" => topo.max_vcpus,
-      "cpu_topology" => topo.to_s,
-      "mem_gib" => vm.mem_gib,
-      "ndp_needed" => host.ndp_needed,
-      "storage_volumes" => storage_volumes,
-      "swap_size_bytes" => frame["swap_size_bytes"]
-    })
-
-    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: params_json)
   end
 
   label def run
@@ -573,7 +570,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
-      host.sshable.cmd("sudo host/bin/setup-vm delete #{q_vm}")
+      host.sshable.cmd("sudo host/bin/deletevm.rb #{q_vm}")
     end
 
     DB.transaction do
@@ -605,7 +602,7 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       storage: storage_secrets
     })
 
-    host.sshable.cmd("sudo host/bin/setup-vm recreate-unpersisted #{q_vm}", stdin: secrets_json)
+    host.sshable.cmd("sudo host/bin/recreate-unpersisted #{params_path.shellescape}", stdin: secrets_json)
     host.sshable.cmd("sudo systemctl start #{q_vm}")
     vm.nics.each { _1.incr_repopulate }
 
