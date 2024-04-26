@@ -128,6 +128,10 @@ module Config
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
 
+  override :github_ubuntu_2204_version, "20240422.1.0", string
+  override :github_ubuntu_2004_version, "20240422.1.0", string
+  override :postgres_ubuntu_2204_version, "20240226.1.0", string
+
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
   override :allocator_max_random_score, 0.1, float

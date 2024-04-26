@@ -40,17 +40,17 @@ RSpec.describe Prog::DownloadBootImage do
 
     it "generates presigned URL for github-runners images if a custom_url not provided" do
       params_json = {
-        "image_name" => "github-runners-image",
+        "image_name" => "github-ubuntu-2204",
         "url" => "https://minio.example.com/my-image.raw",
-        "version" => "20230303",
+        "version" => "20240422.1.0",
         "sha256sum" => nil,
         "certs" => "certs"
       }.to_json
-      expect(dbi).to receive(:frame).and_return({"image_name" => "github-runners-image", "version" => "20230303"}).at_least(:once)
+      expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-runners-image_20230303").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-runners-image_20230303", stdin: params_json)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_20240422.1.0").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_20240422.1.0", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
