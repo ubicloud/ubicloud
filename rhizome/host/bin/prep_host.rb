@@ -95,8 +95,9 @@ r "sysctl --system"
 r "apt-get -y install qemu-utils mtools acl"
 
 # We need nvme-cli to inspect installed NVMe cards in prod servers when
-# looking into I/O performance issues.
-r "apt-get -y install nvme-cli" if is_prod_env
+# looking into I/O performance issues. systemd-coredump is useful when
+# debugging crashes.
+r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 
 SpdkSetup.prep
 
