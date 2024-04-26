@@ -3,10 +3,16 @@
 require_relative "spec_helper"
 
 RSpec.describe GithubRunner do
-  subject(:github_runner) { described_class.new.tap { _1.id = "ca2eb084-8a36-8618-a16f-7561d7faf3b6" } }
+  subject(:github_runner) {
+    described_class.new(repository_name: "test-repo", label: "ubicloud").tap {
+      _1.id = "ca2eb084-8a36-8618-a16f-7561d7faf3b6"
+    }
+  }
+
+  let(:vm) { instance_double(Vm, sshable: instance_double(Sshable), cores: 2) }
 
   before do
-    allow(github_runner).to receive(:vm).and_return(instance_double(Vm, arch: "x64", cores: 2, ubid: "vm-ubid", pool_id: "pool-id"))
+    allow(github_runner).to receive_messages(installation: instance_double(GithubInstallation), vm: instance_double(Vm, arch: "x64", cores: 2, ubid: "vm-ubid", pool_id: "pool-id"))
     allow(github_runner.vm).to receive_messages(sshable: instance_double(Sshable), vm_host: instance_double(VmHost, ubid: "host-ubid"))
   end
 
@@ -14,6 +20,12 @@ RSpec.describe GithubRunner do
     expect(VmPool).to receive(:[]).with("pool-id").and_return(instance_double(VmPool, ubid: "pool-ubid"))
     expect(Clog).to receive(:emit).with("runner_tested").and_call_original
     github_runner.log_duration("runner_tested", 10)
+  end
+
+  it "provisions a spare runner" do
+    expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_runner.installation, repository_name: github_runner.repository_name, label: github_runner.label)
+      .and_return(instance_double(Strand, subject: instance_double(described_class)))
+    github_runner.provision_spare_runner
   end
 
   it "initiates a new health monitor session" do
