@@ -491,12 +491,11 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.wait }.to nap(15)
     end
 
-    it "registers the runner again if the runner-script is failed" do
+    it "provisions a spare runner and destroys the current one if the runner-script is failed" do
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("failed")
-      expect(client).to receive(:delete)
-      expect(github_runner).to receive(:update).with(runner_id: nil, ready_at: nil)
-
-      expect { nx.wait }.to hop("register_runner")
+      expect(github_runner).to receive(:provision_spare_runner)
+      expect(github_runner).to receive(:incr_destroy)
+      expect { nx.wait }.to nap(0)
     end
 
     it "naps if the runner-script is running" do
