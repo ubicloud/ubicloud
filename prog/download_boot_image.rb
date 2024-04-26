@@ -26,7 +26,7 @@ class Prog::DownloadBootImage < Prog::Base
       if frame["custom_url"]
         frame["custom_url"]
       elsif download_from_blob_storage?
-        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}.raw", 60 * 60).to_s
+        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}-#{version}.raw", 60 * 60).to_s
       end
   end
 
