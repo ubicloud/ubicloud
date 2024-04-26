@@ -41,6 +41,10 @@ class GithubRunner < Sequel::Model
     Clog.emit(message) { {message => values} }
   end
 
+  def provision_spare_runner
+    Prog::Vm::GithubRunner.assemble(installation, repository_name: repository_name, label: label).subject
+  end
+
   def init_health_monitor_session
     {
       ssh_session: vm.sshable.start_fresh_session
