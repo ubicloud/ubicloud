@@ -332,9 +332,10 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.incr_destroy
       nap 15
     when "failed"
-      github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      github_runner.update(runner_id: nil, ready_at: nil)
-      hop_register_runner
+      Clog.emit("The runner script failed") { {github_runner: github_runner.values} }
+      github_runner.provision_spare_runner
+      github_runner.incr_destroy
+      nap 0
     end
 
     # If the runner doesn't pick a job within five minutes, the job may have
@@ -343,8 +344,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
-        github_runner.incr_destroy
         Clog.emit("The runner does not pick a job") { {github_runner: github_runner.values} }
+        github_runner.incr_destroy
         nap 0
       end
     end
