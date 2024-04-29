@@ -35,9 +35,11 @@ class Sshable < Sequel::Model
     stderr = StringIO.new
     exit_code = nil
     exit_signal = nil
+    channel_duration = nil
 
     begin
       connect.open_channel do |ch|
+        channel_duration = Time.now - start
         ch.exec(cmd) do |ch, success|
           ch.on_data do |ch, data|
             $stderr.write(data) if REPL
@@ -86,7 +88,8 @@ class Sshable < Sequel::Model
           embed[:stderr] = stderr_str
           embed[:stdout] = stdout_str
         end
-
+        embed[:channel_duration] = channel_duration
+        embed[:connect_duration] = @connect_duration if @connect_duration
         {ssh: embed}
       end
     end
@@ -112,7 +115,9 @@ class Sshable < Sequel::Model
     end
 
     # Cache miss.
+    start = Time.now
     sess = start_fresh_session
+    @connect_duration = Time.now - start
     Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
     sess
   end

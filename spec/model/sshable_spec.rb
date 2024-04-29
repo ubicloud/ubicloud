@@ -131,6 +131,7 @@ RSpec.describe Sshable do
           end
 
           if log_value
+            sa.instance_variable_set(:@connect_duration, 1.1)
             expect(Clog).to receive(:emit).with("ssh cmd execution") do |&blk|
               dat = blk.call
               if repl_value
