@@ -55,20 +55,6 @@ RSpec.describe Clover, "vm" do
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
-
-    it "not create firewall rule" do
-      post "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule"
-
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
-    end
-
-    it "not delete firewall rule" do
-      delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule/foo_ubid"
-
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
-    end
   end
 
   describe "authenticated" do
@@ -250,41 +236,6 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(400)
         expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: public_key, size, unix_user, boot_image, enable_ip4, private_subnet_id")
       end
-
-      it "firewall-rule" do
-        post "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule", {
-          cidr: "0.0.0.0/0",
-          port_range: "100..101"
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-      end
-
-      it "firewall-rule vm ubid" do
-        post "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}/firewall-rule", {
-          cidr: "0.0.0.0/0",
-          port_range: "100..1012"
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-      end
-
-      it "firewall-rule no port range" do
-        post "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule", {
-          cidr: "0.0.0.0/1"
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-      end
-
-      it "firewall-rule single port" do
-        post "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule", {
-          cidr: "0.0.0.0/1",
-          port_range: "11111"
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-      end
     end
 
     describe "show" do
@@ -307,13 +258,6 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response.status).to eq(404)
         expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
-      end
-
-      it "firewall" do
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule"
-
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["description"]).to eq("Default firewall")
       end
     end
 
@@ -344,24 +288,6 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
-      end
-
-      it "firewall-rule" do
-        delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
-
-        expect(last_response.status).to eq(204)
-      end
-
-      it "firewall-rule ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}/firewall-rule/#{vm.firewalls.map(&:firewall_rules).flatten.first.ubid}"
-
-        expect(last_response.status).to eq(204)
-      end
-
-      it "firewall-rule not exist" do
-        delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/firewall-rule/foo_ubid"
-
-        expect(last_response.status).to eq(204)
       end
     end
   end

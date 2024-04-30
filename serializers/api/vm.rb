@@ -23,10 +23,10 @@ class Serializers::Api::Vm < Serializers::Base
 
   structure(:detailed) do |vm|
     base(vm).merge(
-      {
-        nics: vm.nics.map { |nic| Serializers::Api::Nic.serialize(nic) },
-        firewalls: vm.firewalls.map { |fw| Serializers::Api::Firewall.serialize(fw) }
-      }
+      firewalls: vm.firewalls.map { |fw| Serializers::Api::Firewall.serialize(fw) },
+      private_ipv4: vm.nics.first.private_ipv4.network,
+      private_ipv6: vm.nics.first.private_ipv6.nth(2),
+      subnet: vm.nics.first.private_subnet.name
     )
   end
 end
