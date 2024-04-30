@@ -17,4 +17,10 @@ class Serializers::Web::PrivateSubnet < Serializers::Base
   structure(:default) do |ps|
     base(ps)
   end
+
+  structure(:detailed) do |ps|
+    base(ps).merge(
+      attached_firewalls: ps.firewalls.map { |f| Serializers::Web::Firewall.serialize(f) }
+    )
+  end
 end
