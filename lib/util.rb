@@ -77,12 +77,13 @@ module Util
     end
   end
 
-  def self.send_email(receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil)
+  def self.send_email(receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil, cc: nil)
     html = EmailRenderer.new.render "email/layout", locals: {subject: subject, greeting: greeting, body: body, button_title: button_title, button_link: button_link}
     Mail.deliver do
       from Config.mail_from
       to receiver
       subject subject
+      cc cc
 
       text_part do
         body "#{greeting}\n#{Array(body).join("\n")}\n#{button_link}"
