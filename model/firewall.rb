@@ -9,6 +9,18 @@ class Firewall < Sequel::Model
   plugin :association_dependencies, firewall_rules: :destroy
 
   include ResourceMethods
+  include Authorization::TaggableMethods
+  include Authorization::HyperTagMethods
+  def hyper_tag_name(project)
+    "project/#{project.ubid}/firewall/#{ubid}"
+  end
+
+  dataset_module Pagination
+  dataset_module Authorization::Dataset
+
+  def path
+    "/firewall/#{ubid}"
+  end
 
   def insert_firewall_rule(cidr, port_range)
     fwr = FirewallRule.create_with_id(
