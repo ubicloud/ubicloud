@@ -22,6 +22,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       ps.associate_with_project(project)
       port_range = allow_only_ssh ? 22..22 : 0..65535
       fw = Firewall.create_with_id(name: "#{name}-default")
+      fw.associate_with_project(project)
       ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
       fw.associate_with_private_subnet(ps, apply_firewalls: false)
 
