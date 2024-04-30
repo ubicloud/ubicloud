@@ -60,6 +60,7 @@ RSpec.describe Invoice do
       expect(Clog).to receive(:emit).with("Invoice couldn't charged.").and_call_original.twice
       expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.").and_call_original
       expect(invoice.charge).to be false
+      expect(Mail::TestMailer.deliveries.length).to eq 1
     end
 
     it "fails if PaymentIntent does not raise an exception in case of failure" do
