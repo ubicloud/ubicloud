@@ -6,6 +6,7 @@ require "fileutils"
 require "json"
 require "openssl"
 require "base64"
+require_relative "boot_image"
 require_relative "vm_path"
 require_relative "spdk_path"
 require_relative "spdk_rpc"
@@ -22,7 +23,7 @@ class StorageVolume
     @disk_size_gib = params["size_gib"]
     @use_bdev_ubi = params["use_bdev_ubi"] || false
     @skip_sync = params["skip_sync"] || false
-    @image_path = vp.image_path(params["image"]) if params["image"]
+    @image_path = BootImage.new(params["image"], params["image_version"]).image_path if params["image"]
     @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
     @spdk_version = params["spdk_version"]
   end

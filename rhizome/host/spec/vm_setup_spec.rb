@@ -54,60 +54,12 @@ RSpec.describe VmSetup do
   end
 
   describe "#download_boot_image" do
-    it "can download an image" do
-      expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy.raw").and_return(false)
-      expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/var/storage/images/ubuntu-jammy.img.tmp")
-      end.and_yield
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(Arch).to receive(:render).and_return("amd64").at_least(:once)
-      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy.img.tmp https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-amd64.img")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f qcow2 -O raw /var/storage/images/ubuntu-jammy.img.tmp /var/storage/images/ubuntu-jammy.raw")
-      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/ubuntu-jammy.img.tmp")
-
+    it "can download ubuntu-jammy boot image" do
+      boot_image = instance_double(BootImage)
+      expect(BootImage).to receive(:new).with("ubuntu-jammy", nil).and_return(boot_image)
+      allow(Arch).to receive(:render).and_return("amd64")
+      expect(boot_image).to receive(:download)
       vs.download_boot_image("ubuntu-jammy")
-    end
-
-    it "can download vhd image with custom URL that has query params using curl" do
-      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
-      expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/var/storage/images/github-ubuntu-2204.vhd.tmp")
-      end.and_yield
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.vhd.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
-      expect(vs).to receive(:r).with("qemu-img convert -p -f vpc -O raw /var/storage/images/github-ubuntu-2204.vhd.tmp /var/storage/images/github-ubuntu-2204.raw")
-      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.vhd.tmp")
-
-      vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.vhd?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
-    end
-
-    it "does not convert image if it's in raw format already" do
-      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
-      expect(File).to receive(:open) do |path, *_args|
-        expect(path).to eq("/var/storage/images/github-ubuntu-2204.raw.tmp")
-      end.and_yield
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect(vs).to receive(:r).with("curl -f -L10 -o /var/storage/images/github-ubuntu-2204.raw.tmp http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw\\?X-Amz-Algorithm\\=AWS4-HMAC-SHA256\\&X-Amz-Credential\\=user\\%2F20240112\\%2Fus-east-1\\%2Fs3\\%2Faws4_request\\&X-Amz-Date\\=20240112T132931Z\\&X-Amz-Expires\\=3600\\&X-Amz-SignedHeaders\\=host\\&X-Amz-Signature\\=aabbcc")
-      expect(File).to receive(:rename).with("/var/storage/images/github-ubuntu-2204.raw.tmp", "/var/storage/images/github-ubuntu-2204.raw")
-      expect(FileUtils).to receive(:rm_r).with("/var/storage/images/github-ubuntu-2204.raw.tmp")
-
-      vs.download_boot_image("github-ubuntu-2204", custom_url: "http://minio.ubicloud.com:9000/ubicloud-images/ubuntu-22.04-x64.raw?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=user%2F20240112%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240112T132931Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Signature=aabbcc")
-    end
-
-    it "can use an image that's already downloaded" do
-      expect(File).to receive(:exist?).with("/var/storage/images/almalinux-9.1.raw").and_return(true)
-      vs.download_boot_image("almalinux-9.1")
-    end
-
-    it "fails if custom_url not provided for custom image" do
-      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
-      expect { vs.download_boot_image("github-ubuntu-2204") }.to raise_error RuntimeError, "Must provide custom_url for github-ubuntu-2204 image"
-    end
-
-    it "fails if initial image has unsupported format" do
-      expect(File).to receive(:exist?).with("/var/storage/images/github-ubuntu-2204.raw").and_return(false)
-      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images/")
-      expect { vs.download_boot_image("github-ubuntu-2204", custom_url: "https://example.com/ubuntu.iso") }.to raise_error RuntimeError, "Unsupported boot_image format: .iso"
     end
   end
 

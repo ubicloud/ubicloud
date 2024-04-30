@@ -87,12 +87,4 @@ class VmPath
       write(home(file_name), s)
     end
   end
-
-  def image_root
-    "/var/storage/images/"
-  end
-
-  def image_path(name)
-    File.join(image_root, name + ".raw")
-  end
 end

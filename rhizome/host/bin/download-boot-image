@@ -9,9 +9,10 @@ end
 custom_url = ARGV.shift
 
 require_relative "../../common/lib/util"
-require_relative "../lib/vm_setup"
+require_relative "../lib/boot_image"
 
 certs = $stdin.read
 ca_path = "/usr/lib/ssl/certs/ubicloud_images_blob_storage_certs.crt"
 safe_write_to_file(ca_path, certs)
-VmSetup.new("").download_boot_image(boot_image, custom_url: custom_url, ca_path: ca_path)
+
+BootImage.new(boot_image, nil).download(url: custom_url, ca_path: ca_path)
