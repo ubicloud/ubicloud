@@ -3,12 +3,13 @@
 require_relative "spec_helper"
 
 RSpec.describe Invoice do
-  subject(:invoice) { described_class.new(id: "50d5aae4-311c-843b-b500-77fbc7778050", content: {"cost" => 10}, status: "unpaid") }
+  subject(:invoice) { described_class.new(id: "50d5aae4-311c-843b-b500-77fbc7778050", begin_time: Time.now, end_time: Time.now, created_at: Time.now, content: {"cost" => 10, "subtotal" => 11, "credit" => 1, "discount" => 0, "resources" => []}, status: "unpaid") }
 
   let(:billing_info) { BillingInfo.create_with_id(stripe_id: "cs_1234567890") }
 
   before do
     allow(invoice).to receive(:reload)
+    allow(invoice).to receive(:project).and_return(instance_double(Project, path: "/project/p1"))
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
   end
 
@@ -26,10 +27,12 @@ RSpec.describe Invoice do
     end
 
     it "not charge if less than minimum charge threshold" do
+      invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "customer@example.com"}
       invoice.content["cost"] = 0.4
       expect(invoice).to receive(:update).with(status: "below_minimum_threshold")
       expect(Clog).to receive(:emit).with("Invoice cost is less than minimum charge cost.").and_call_original
       expect(invoice.charge).to be true
+      expect(Mail::TestMailer.deliveries.length).to eq 1
     end
 
     it "not charge if doesn't have billing info" do
@@ -73,7 +76,7 @@ RSpec.describe Invoice do
     end
 
     it "can charge from a correct payment method even some of them are not working" do
-      invoice.content["billing_info"] = {"id" => billing_info.id}
+      invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "customer@example.com"}
       payment_method1 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       payment_method2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2", order: 2)
       payment_method3 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_3", order: 3)
@@ -91,6 +94,7 @@ RSpec.describe Invoice do
       expect(invoice.status).to eq("paid")
       expect(invoice.content["payment_method"]["id"]).to eq(payment_method2.id)
       expect(invoice.content["payment_intent"]).to eq("pi_1234567890")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
     end
   end
 end
