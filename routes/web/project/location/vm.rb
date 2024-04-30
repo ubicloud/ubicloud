@@ -20,42 +20,6 @@ class CloverWeb
         view "vm/show"
       end
 
-      r.on "firewall-rule" do
-        r.post true do
-          Authorization.authorize(@current_user.id, "Vm:Firewall:edit", vm.id)
-
-          port_range = if r.params["port_range"].empty?
-            [0, 65535]
-          else
-            Validation.validate_port_range(r.params["port_range"])
-          end
-
-          parsed_cidr = Validation.validate_cidr(r.params["cidr"])
-          pg_range = Sequel.pg_range(port_range.first..port_range.last)
-
-          vm.firewalls.first.insert_firewall_rule(parsed_cidr.to_s, pg_range)
-          flash["notice"] = "Firewall rule is created"
-
-          r.redirect "#{@project.path}#{vm.path}"
-        end
-
-        r.is String do |firewall_rule_ubid|
-          r.delete true do
-            Authorization.authorize(@current_user.id, "Vm:Firewall:edit", vm.id)
-            fwr = FirewallRule.from_ubid(firewall_rule_ubid)
-            unless fwr
-              response.status = 404
-              r.halt
-            end
-
-            fwr.destroy
-            vm.incr_update_firewall_rules
-
-            return {message: "Firewall rule deleted"}.to_json
-          end
-        end
-      end
-
       r.delete true do
         Authorization.authorize(@current_user.id, "Vm:delete", vm.id)
 
