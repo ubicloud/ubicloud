@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "countries"
+
 class Serializers::Web::Invoice < Serializers::Base
   def self.base(inv)
     {

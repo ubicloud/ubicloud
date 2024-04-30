@@ -4,6 +4,8 @@ require_relative "../model"
 require "stripe"
 
 class Invoice < Sequel::Model
+  many_to_one :project
+
   include ResourceMethods
 
   def path
@@ -30,6 +32,7 @@ class Invoice < Sequel::Model
     if amount < Config.minimum_invoice_charge_threshold
       update(status: "below_minimum_threshold")
       Clog.emit("Invoice cost is less than minimum charge cost.") { {invoice_below_threshold: {ubid: ubid, cost: amount}} }
+      send_success_email(below_threshold: true)
       return true
     end
 
@@ -70,11 +73,28 @@ class Invoice < Sequel::Model
         "payment_intent" => payment_intent.id
       })
       save(columns: [:status, :content])
+      send_success_email
       return true
     end
 
     Clog.emit("Invoice couldn't charged with any payment method.") { {invoice_not_charged: {ubid: ubid}} }
     false
+  end
+
+  def send_success_email(below_threshold: false)
+    ser = Serializers::Web::Invoice.new(:detailed).serialize(self)
+    message = if below_threshold
+      "Since the invoice total of #{ser[:total]} is below our minimum charge threshold, there will be no charges for this month."
+    else
+      "The invoice amount of #{ser[:total]} will be debited from your credit card on file."
+    end
+    Util.send_email(ser[:billing_email], "Ubicloud #{ser[:name]} Invoice ##{ser[:invoice_number]}",
+      greeting: "Dear #{ser[:billing_name]},",
+      body: ["Please find your current invoice ##{ser[:invoice_number]} at the link.",
+        message,
+        "If you have any questions, please send us a support request via support@ubicloud.com, and include your invoice number."],
+      button_title: "View Invoice",
+      button_link: "#{Config.base_url}#{project.path}/billing#{ser[:path]}")
   end
 end
 
