@@ -78,6 +78,7 @@ class Invoice < Sequel::Model
     end
 
     Clog.emit("Invoice couldn't charged with any payment method.") { {invoice_not_charged: {ubid: ubid}} }
+    send_failure_email(errors)
     false
   end
 
@@ -95,6 +96,21 @@ class Invoice < Sequel::Model
         "If you have any questions, please send us a support request via support@ubicloud.com, and include your invoice number."],
       button_title: "View Invoice",
       button_link: "#{Config.base_url}#{project.path}/billing#{ser[:path]}")
+  end
+
+  def send_failure_email(errors)
+    ser = Serializers::Web::Invoice.new(:detailed).serialize(self)
+    Util.send_email(ser[:billing_email], "Urgent: Action Required to Prevent Service Disruption",
+      cc: Config.mail_from,
+      greeting: "Dear #{ser[:billing_name]},",
+      body: ["We hope this message finds you well.",
+        "We've noticed that your credit card on file has been declined with the following errors:",
+        *errors.map { "- #{_1}" },
+        "The invoice amount of #{ser[:total]} tried be debited from your credit card on file.",
+        "To prevent service disruption, please update your payment information within the next two days.",
+        "If you have any questions, please send us a support request via support@ubicloud.com."],
+      button_title: "Update Payment Method",
+      button_link: "#{Config.base_url}#{project.path}/billing")
   end
 end
 
