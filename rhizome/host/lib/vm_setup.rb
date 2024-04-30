@@ -11,6 +11,7 @@ require "uri"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
+require_relative "boot_image"
 
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac)
@@ -480,54 +481,8 @@ EOS
     }
   end
 
-  def download_boot_image(boot_image, custom_url: nil, ca_path: nil)
-    urls = {
-      "ubuntu-jammy" => "https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
-      "almalinux-9.1" => Arch.render(x64: "x86_64", arm64: "aarch64").yield_self { "https://repo.almalinux.org/almalinux/9/cloud/#{_1}/images/AlmaLinux-9-GenericCloud-latest.#{_1}.qcow2" },
-      "github-ubuntu-2204" => nil,
-      "github-ubuntu-2004" => nil,
-      "postgres-ubuntu-2204" => nil
-    }
-
-    download = urls.fetch(boot_image) || custom_url
-    image_path = vp.image_path(boot_image)
-    unless File.exist?(image_path)
-      fail "Must provide custom_url for #{boot_image} image" if download.nil?
-      FileUtils.mkdir_p vp.image_root
-
-      # If image URL has query parameter such as SAS token, File.extname returns
-      # it too. We need to remove them and only get extension.
-      image_ext = File.extname(URI.parse(download).path)
-      initial_format = case image_ext
-      when ".qcow2", ".img"
-        "qcow2"
-      when ".vhd"
-        "vpc"
-      when ".raw"
-        "raw"
-      else
-        fail "Unsupported boot_image format: #{image_ext}"
-      end
-
-      # Use of File::EXCL provokes a crash rather than a race
-      # condition if two VMs are lazily getting their images at the
-      # same time.
-      temp_path = File.join(vp.image_root, boot_image + image_ext + ".tmp")
-      ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
-      File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-        r "curl -f -L10 -o #{temp_path.shellescape} #{download.shellescape}#{ca_arg}"
-      end
-
-      if initial_format == "raw"
-        File.rename(temp_path, image_path)
-      else
-        # Images are presumed to be atomically renamed into the path,
-        # i.e. no partial images will be passed to qemu-image.
-        r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
-      end
-
-      rm_if_exists(temp_path)
-    end
+  def download_boot_image(boot_image)
+    BootImage.new(boot_image, nil).download
   end
 
   # Unnecessary if host has this set before creating the netns, but
