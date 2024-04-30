@@ -25,7 +25,7 @@ RSpec.describe Clover, "vm" do
 
     it "success all vms" do
       Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2", location: "hetzner-fsn1")
-      Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2", location: vm.location)
+      Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-3", location: vm.location)
 
       get "/api/project/#{project.ubid}/vm"
 
