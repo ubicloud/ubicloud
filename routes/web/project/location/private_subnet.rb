@@ -11,7 +11,7 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @ps = serialize(ps)
+      @ps = serialize(ps, :detailed)
 
       r.get true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps.id)

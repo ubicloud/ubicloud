@@ -163,7 +163,6 @@ RSpec.describe Clover, "private subnet" do
         visit "#{project.path}#{private_subnet.path}"
 
         expect(page.title).to eq("Ubicloud - #{private_subnet.name}")
-        expect(page).to have_content nic.name
         expect(page).to have_content nic.private_ipv4.network.to_s
         expect(page).to have_content nic.private_ipv6.nth(2).to_s
       end
