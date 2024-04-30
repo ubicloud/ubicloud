@@ -13,20 +13,14 @@ class Serializers::Api::Vm < Serializers::Base
       unix_user: vm.unix_user,
       storage_size_gib: vm.storage_size_gib,
       ip6: vm.ephemeral_net6&.nth(2),
-      ip4: vm.ephemeral_net4
+      private_ipv6: vm.nics.first.private_ipv6.nth(2),
+      ip4: vm.ephemeral_net4,
+      private_ipv4: vm.nics.first.private_ipv4.network,
+      subnet: vm.nics.first.private_subnet.name
     }
   end
 
   structure(:default) do |vm|
     base(vm)
-  end
-
-  structure(:detailed) do |vm|
-    base(vm).merge(
-      {
-        nics: vm.nics.map { |nic| Serializers::Api::Nic.serialize(nic) },
-        firewalls: vm.firewalls.map { |fw| Serializers::Api::Firewall.serialize(fw) }
-      }
-    )
   end
 end

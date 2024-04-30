@@ -41,55 +41,23 @@
           "SSH Command",
           "<span class='bg-slate-100 text-rose-500 font-mono px-2 py-1 rounded'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm[:unix_user]}@#{@vm[:ip4] || @vm[:ip6]}")}</span>",
           { escape: false }
+        ],
+        ["Private IPv4", @vm[:private_ip4], { copieble: true }],
+        ["Private IPv6", @vm[:private_ip6], { copieble: true }],
+        [
+          "Private subnet",
+          "<a href='#{@project_data[:path]}/location/#{@vm[:location]}/private-subnet/#{@vm[:subnet]}' class='text-rose-500 hover:underline'>#{@vm[:subnet]}</a>",
+          { escape: false }
         ]
       ]
     }
   ) %>
-  <!-- Network Interfaces Card -->
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Network Interfaces
-      </h3>
-    </div>
-  </div>
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <table class="min-w-full divide-y divide-gray-300">
-      <thead class="bg-gray-50">
-        <tr>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Private IPv4</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Private IPv6</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Subnet</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200 bg-white">
-        <% @vm[:nics].each do |nic| %>
-          <tr>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= nic[:name] %></td>
-            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <%== render("components/copieble_content", locals: { content: nic[:private_ipv4], message: "Copied Private IPv4" }) %>
-            </td>
-            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <%== render("components/copieble_content", locals: { content: nic[:private_ipv6], message: "Copied Private IPv6" }) %>
-            </td>
-            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <a
-                href="<%= @project_data[:path] + "/location/" + @vm[:location] + "/private-subnet/" + nic[:subnet_name] %>"
-                class="text-orange-600 hover:text-orange-700"
-              ><%= nic[:subnet_name] %></a>
-            </td>
-          </tr>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
   <!-- Firewall Rules Card -->
-  <% if Authorization.has_permission?(@current_user.id, "Vm:Firewall:view", @vm[:id]) && @vm[:state] != "creating" %>
+  <% if Authorization.has_permission?(@current_user.id, "Vm:Firewall:view", @vm[:id]) %>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          Firewall Rules
+          Applied Firewalls
         </h3>
       </div>
     </div>
@@ -97,63 +65,26 @@
       <table class="min-w-full divide-y divide-gray-300">
         <thead class="bg-gray-50">
           <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Firewall</th>
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Port Range</th>
-            <% if Authorization.has_permission?(@current_user.id, "Vm:Firewall:edit", @vm[:id]) %>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
-            <% end %>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Port Range</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @vm[:firewalls].each do |fw| %>
             <% fw[:firewall_rules].each do |fwr| %>
               <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <% if Authorization.has_permission?(@current_user.id, "Firewall:view", fw[:id]) %>
+                    <a href="<%= "#{@project_data[:path]}/firewall/#{fw[:name]}" %>" class="text-orange-600 hover:text-orange-700"><%= fw[:name] %></a>
+                  <% else %>
+                    <%= fw[:name] %>
+                  <% end %>
+                </td>
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:port_range] %></td>
-                <% if Authorization.has_permission?(@current_user.id, "Vm:Firewall:edit", @vm[:id]) %>
-                  <td
-                    id="fwr-delete-<%=fwr[:ubid]%>"
-                    class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
-                  >
-                    <button
-                      type="button"
-                      data-url="<%= "#{request.path}/firewall-rule/#{fwr[:ubid]}" %>"
-                      data-csrf="<%= csrf_token("#{request.path}/firewall-rule/#{fwr[:ubid]}", "DELETE") %>"
-                      data-redirect="<%= request.path.to_s %>"
-                      class="delete-btn inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
-                    >
-                      <%== render("components/icon", locals: { name: "hero-trash", classes: "h-5 w-5" }) %>
-                    </button>
-                  </td>
-                <% end %>
               </tr>
             <% end %>
-          <% end %>
-          <% if Authorization.has_permission?(@current_user.id, "Vm:Firewall:edit", @vm[:id]) %>
-            <tr>
-              <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST">
-                <%== csrf_tag("#{request.path}/firewall-rule") %>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "cidr",
-                      type: "cidr",
-                      attributes: {
-                        placeholder: "0.0.0.0/0",
-                        required: true
-                      }
-                    }
-                  ) %>
-                </td>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%== render("components/form/text", locals: { name: "port_range", type: "text", attributes: { placeholder: "0..65536" } }) %>
-                </td>
-                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                  <%== render("components/form/submit_button", locals: { text: "Create" }) %>
-                </td>
-              </form>
-            </tr>
           <% end %>
         </tbody>
       </table>

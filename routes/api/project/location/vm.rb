@@ -59,7 +59,7 @@ class CloverApi
           **request_body_params.except(*required_parameters).transform_keys(&:to_sym)
         )
 
-        serialize(st.subject, :detailed)
+        serialize(st.subject)
       end
 
       vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first
@@ -75,7 +75,7 @@ class CloverApi
 
     request.get true do
       Authorization.authorize(user.id, "Vm:view", vm.id)
-      serialize(vm, :detailed)
+      serialize(vm)
     end
 
     request.delete true do
@@ -84,49 +84,6 @@ class CloverApi
 
       response.status = 204
       request.halt
-    end
-
-    request.on "firewall-rule" do
-      request.post true do
-        Authorization.authorize(user.id, "Vm:Firewall:edit", vm.id)
-
-        required_parameters = ["cidr"]
-        allowed_optional_parameters = ["port_range"]
-
-        request_body_params = Validation.validate_request_body(request.body.read, required_parameters, allowed_optional_parameters)
-
-        parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
-        port_range = if request_body_params["port_range"].nil?
-          [0, 65535]
-        else
-          request_body_params["port_range"] = Validation.validate_port_range(request_body_params["port_range"])
-        end
-
-        pg_range = Sequel.pg_range(port_range.first..port_range.last)
-
-        vm.firewalls.first.insert_firewall_rule(parsed_cidr.to_s, pg_range)
-
-        serialize(vm, :detailed)
-      end
-
-      request.get true do
-        Authorization.authorize(user.id, "Vm:Firewall:view", vm.id)
-        Serializers::Api::Firewall.serialize(vm.firewalls.first)
-      end
-
-      request.is String do |firewall_rule_ubid|
-        request.delete true do
-          Authorization.authorize(user.id, "Vm:Firewall:edit", vm.id)
-
-          if (fwr = FirewallRule.from_ubid(firewall_rule_ubid))
-            fwr.destroy
-            vm.incr_update_firewall_rules
-          end
-
-          response.status = 204
-          request.halt
-        end
-      end
     end
   end
 end
