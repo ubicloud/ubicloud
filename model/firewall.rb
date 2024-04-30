@@ -22,6 +22,11 @@ class Firewall < Sequel::Model
     "/firewall/#{name}"
   end
 
+  def remove_firewall_rule(firewall_rule)
+    firewall_rule.destroy
+    private_subnets.map(&:incr_update_firewall_rules)
+  end
+
   def insert_firewall_rule(cidr, port_range)
     fwr = FirewallRule.create_with_id(
       firewall_id: id,
