@@ -25,10 +25,10 @@ RSpec.describe Authorization do
         [[], SecureRandom.uuid, ["Vm:view"], 0],
         [[], users[0].id, "Vm:view", 0],
         [[], users[0].id, ["Vm:view"], 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, "Vm:view", 6],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, ["Vm:view", "Vm:create"], 6],
-        [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name]}], users[0].id, "Vm:view", 6],
-        [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], 6],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, "Vm:view", 8],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, ["Vm:view", "Vm:create"], 8],
+        [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name]}], users[0].id, "Vm:view", 8],
+        [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], 8],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms.map { _1.hyper_tag_name(access_policy.project) }}], users[0].id, "Vm:view", 2],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 0],
@@ -87,7 +87,7 @@ RSpec.describe Authorization do
 
   describe "#authorized_resources" do
     it "returns resource ids when has matched policies" do
-      ids = [vms[0].id, vms[1].id, projects[0].id, users[0].id, vms[0].private_subnets[0].id, vms[1].private_subnets[0].id]
+      ids = [vms[0].id, vms[1].id, projects[0].id, users[0].id, vms[0].private_subnets[0].id, vms[1].private_subnets[0].id, vms[0].firewalls[0].id, vms[1].firewalls[0].id]
       expect(described_class.authorized_resources(users[0].id, "Vm:view").sort).to eq(ids.sort)
     end
 
