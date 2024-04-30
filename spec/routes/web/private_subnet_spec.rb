@@ -169,6 +169,20 @@ RSpec.describe Clover, "private subnet" do
       end
     end
 
+    describe "show firewalls" do
+      it "can show attached firewalls" do
+        private_subnet
+        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw")
+        fw.associate_with_private_subnet(private_subnet)
+
+        visit "#{project.path}#{private_subnet.path}"
+
+        expect(page.title).to eq("Ubicloud - #{private_subnet.name}")
+        expect(page).to have_content fw.name
+        expect(page).to have_content fw.description
+      end
+    end
+
     describe "delete" do
       it "can delete private subnet" do
         visit "#{project.path}#{private_subnet.path}"
