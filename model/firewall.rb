@@ -11,8 +11,9 @@ class Firewall < Sequel::Model
   include ResourceMethods
   include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
+
   def hyper_tag_name(project)
-    "project/#{project.ubid}/firewall/#{name}"
+    "project/#{project.ubid}/firewall/#{ubid}"
   end
 
   dataset_module Pagination
