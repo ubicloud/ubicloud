@@ -32,7 +32,7 @@ module Pagination
       fail Validation::ValidationFailed.new(order_column: "Supported ordering columns: #{supported_order_columns.join(", ")}")
     end
 
-    query = model.order(order_column_sym).limit(page_size)
+    query = order(order_column_sym).limit(page_size)
     query = query.where(Sequel[model.table_name][order_column_sym] > start_after) if start_after
     page_records = query.all
 
