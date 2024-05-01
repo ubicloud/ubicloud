@@ -13,4 +13,10 @@ class Serializers::Api::Firewall < Serializers::Base
   structure(:default) do |firewall|
     base(firewall)
   end
+
+  structure(:detailed) do |firewall|
+    base(firewall).merge({
+      private_subnets: firewall.private_subnets.map { |ps| Serializers::Api::PrivateSubnet.serialize(ps) }
+    })
+  end
 end
