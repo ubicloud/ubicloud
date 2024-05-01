@@ -106,6 +106,22 @@ RSpec.describe Clover, "vm" do
         expect(parsed_body["count"]).to eq(2)
       end
 
+      it "success multiple location with pagination" do
+        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
+        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-3")
+        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-4", location: "hetzner-fsn1")
+
+        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm", {
+          order_column: "name",
+          start_after: "dummy-vm-1"
+        }
+
+        expect(last_response.status).to eq(200)
+        parsed_body = JSON.parse(last_response.body)
+        expect(parsed_body["items"].length).to eq(2)
+        expect(parsed_body["count"]).to eq(3)
+      end
+
       it "ubid not exist" do
         get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/foo_ubid"
 
