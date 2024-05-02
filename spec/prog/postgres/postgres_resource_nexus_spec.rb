@@ -153,12 +153,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
       expect(described_class).to receive(:dns_zone).and_return(dns_zone).twice
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
     end
 
     it "hops even if dns zone is not configured" do
       expect(described_class).to receive(:dns_zone).and_return(nil).twice
-      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+      expect { nx.refresh_dns_record }.to hop("wait")
+    end
+
+    it "hops to wait if initial_provisioning is not set" do
+      expect(nx).to receive(:when_initial_provisioning_set?)
+      expect { nx.refresh_dns_record }.to hop("wait")
     end
   end
 

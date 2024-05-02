@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_resource, :servers, :representative_server
 
-  semaphore :update_firewall_rules, :refresh_dns_record, :destroy
+  semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :destroy
 
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
     unless (project = Project[project_id])
@@ -69,6 +69,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   label def start
     nap 5 unless representative_server.vm.strand.label == "wait"
+
+    postgres_resource.incr_initial_provisioning
     register_deadline(:wait, 10 * 60)
     bud self.class, frame, :trigger_pg_current_xact_id_on_parent if postgres_resource.parent
     hop_refresh_dns_record
@@ -85,7 +87,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
     Prog::Postgres::PostgresResourceNexus.dns_zone&.insert_record(record_name: postgres_resource.hostname, type: "A", ttl: 10, data: representative_server.vm.ephemeral_net4.to_s)
 
-    hop_initialize_certificates
+    when_initial_provisioning_set? do
+      hop_initialize_certificates
+    end
+    hop_wait
   end
 
   label def initialize_certificates
@@ -151,6 +156,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       )
     end
 
+    decr_initial_provisioning
     hop_wait
   end
 
