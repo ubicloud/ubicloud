@@ -132,8 +132,8 @@ module HealthMonitorMethods
     }.merge(data)
   end
 
-  def monitoring_interval
-    5
+  def needs_event_loop_for_pulse_check?
+    false
   end
 end
 

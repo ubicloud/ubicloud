@@ -74,6 +74,10 @@ class MinioServer < Sequel::Model
     pulse
   end
 
+  def needs_event_loop_for_pulse_check?
+    true
+  end
+
   def server_url
     cluster.url || ip4_url
   end

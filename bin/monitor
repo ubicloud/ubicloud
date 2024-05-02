@@ -2,62 +2,54 @@
 # frozen_string_literal: true
 
 require_relative "../loader"
-
-MONITORABLE_RESOURCE_TYPES = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner]
-
-sessions = {}
-ssh_threads = {}
-pulse_threads = {}
-
 clover_freeze
 
-loop do
-  resources = MONITORABLE_RESOURCE_TYPES.flat_map { _1.all }
+MONITORABLE_RESOURCE_TYPES = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner]
+resources = {}
+mutex = Mutex.new
 
-  resources.each do |r|
-    break if Thread.list.count + 2 > Config.max_monitor_threads
-    ssh_threads[r.id] ||= Thread.new do
-      loop do
-        sessions[r.id] = r.init_health_monitor_session
-
-        loop do
-          sessions[r.id][:ssh_session].process
-        rescue => ex
-          Clog.emit("Processing SSH session is failed. Trying to reestablish the connection") { {health_monitor_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-          break
-        end
-      rescue => ex
-        Clog.emit("Establishing the SSH session is failed") { {health_monitor_reestablish_ssh_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-
-        begin
-          r.reload
-        rescue Sequel::NoExistingObject
-          Clog.emit("Resource is deleted") { {health_monitor_resource_deleted: {ubid: r.ubid}} }
-          sessions.delete(r.id)
-          ssh_threads.delete(r.id)
-          pulse_threads.delete(r.id)&.kill
-          break
-        end
-
-        sleep 5
+resource_scanner = Thread.new do
+  loop do
+    mutex.synchronize do
+      Enumerator::Chain.new(*MONITORABLE_RESOURCE_TYPES).each do |r|
+        resources[r.id] ||= MonitorableResource.new(r)
       end
     end
 
-    pulse_threads[r.id] ||= Thread.new do
-      pulse = {}
-      loop do
-        pulse = r.check_pulse(session: sessions[r.id], previous_pulse: pulse)
-        Clog.emit("Got new pulse") { {got_pulse: {ubid: r.ubid, pulse: pulse}} }
-        sleep r.monitoring_interval
-      rescue RuntimeError, IOError => ex
-        Clog.emit("Pulse checking is failed") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-        sleep r.monitoring_interval
-      rescue => ex
-        Clog.emit("Pulse checking is failed permanently!") { {pulse_check_failure: {ubid: r.ubid, exception: Util.exception_to_hash(ex)}} }
-        raise
-      end
-    end
+    sleep 60
   end
-
-  sleep 5 * 60
+rescue => ex
+  Clog.emit("Resource scanning has failed.") { {resource_scanning_failure: {exception: Util.exception_to_hash(ex)}} }
+  ThreadPrinter.run
+  Kernel.exit!
 end
+
+pulse_checker = Thread.new do
+  loop do
+    mutex.synchronize do
+      resources.each do |r_id, r|
+        sleep 1 while Thread.list.count + 2 > Config.max_monitor_threads
+
+        r.force_stop_if_stuck
+
+        Thread.new do
+          r.lock_no_wait do
+            r.open_resource_session
+            r.process_event_loop
+            r.check_pulse
+          end
+        end
+      end
+
+      resources.select { |r_id, r| r.deleted }.each { |r_id, r| resources.delete(r_id) }
+    end
+    sleep 5
+  end
+rescue => ex
+  Clog.emit("Pulse checking has failed.") { {pulse_checking_failure: {exception: Util.exception_to_hash(ex)}} }
+  ThreadPrinter.run
+  Kernel.exit!
+end
+
+resource_scanner.join
+pulse_checker.join
