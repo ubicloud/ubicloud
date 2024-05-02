@@ -32,7 +32,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         boot_image: "ubuntu-jammy",
         enable_ip4: true,
         private_subnet_id: minio_pool.cluster.private_subnet.id,
-        distinct_storage_devices: true
+        distinct_storage_devices: Config.production?
       )
 
       minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { _1.id = ubid.to_uuid }
