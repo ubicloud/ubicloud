@@ -21,7 +21,7 @@ class PostgresResource < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :update_firewall_rules, :refresh_dns_record, :destroy
+  semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :destroy
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
