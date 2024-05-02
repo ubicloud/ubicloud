@@ -18,6 +18,9 @@
         <%== csrf_tag("#{@project_data[:path]}/policy/#{@policy[:ubid]}") %>
         <div class="grid grid-cols-12 gap-6">
           <div class="col-span-full">
+            <% if (error = flash.dig("errors", "body")) %>
+              <p class="text-sm text-red-600 leading-6"><%= error %></p>
+            <% end %>
             <div class="policy-editor text-sm">
               <pre class="bg-gray-50 rounded-lg p-3 h-[60vh] overflow-scroll" contenteditable="true">
                 <%= flash.dig("old", "body") || @policy[:body] %>
