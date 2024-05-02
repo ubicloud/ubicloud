@@ -134,7 +134,7 @@ class PostgresServer < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres")
+      session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", connect_timeout: 4)
       lsn_function = primary? ? "pg_current_wal_lsn()" : "pg_last_wal_receive_lsn()"
       last_known_lsn = session[:db_connection]["SELECT #{lsn_function} AS lsn"].first[:lsn]
       "up"
@@ -158,6 +158,10 @@ class PostgresServer < Sequel::Model
     end
 
     pulse
+  end
+
+  def needs_event_loop_for_pulse_check?
+    true
   end
 
   def health_monitor_socket_path

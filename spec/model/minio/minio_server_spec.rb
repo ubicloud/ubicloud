@@ -111,6 +111,10 @@ RSpec.describe MinioServer do
     expect(ms.endpoint).to eq("minio-cluster-name0.minio.ubicloud.com:9000")
   end
 
+  it "needs event loop for pulse check" do
+    expect(ms).to be_needs_event_loop_for_pulse_check
+  end
+
   describe "#url" do
     before do
       minio_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
