@@ -49,9 +49,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
+      primary = Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now).subject
       postgres_resource.required_standby_count.times do
-        Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: "fetch")
+        Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: "fetch", private_subnet_id: primary.vm.private_subnets.first.id)
       end
 
       Strand.create(prog: "Postgres::PostgresResourceNexus", label: "start") { _1.id = postgres_resource.id }
@@ -157,7 +157,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def wait
     # Create missing standbys
     (postgres_resource.required_standby_count + 1 - postgres_resource.servers.count).times do
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch")
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", private_subnet_id: representative_server.vm.private_subnets.first.id)
     end
 
     when_refresh_dns_record_set? do
