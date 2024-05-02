@@ -28,7 +28,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         PostgresServer,
         vm: instance_double(
           Vm,
-          cores: 1
+          cores: 1,
+          private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")]
         )
       )
     ).as_null_object
@@ -86,13 +87,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       parent.timeline.update(earliest_backup_completed_at: restore_target - 10 * 60)
       expect(parent.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(restore_target - 10 * 60)
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch"))
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
 
       described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 100, parent_id: parent.id, restore_target: restore_target)
     end
 
     it "creates additional servers for HA" do
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_access: "push"))
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_access: "push")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_access: "fetch")).twice
       described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 100, ha_type: "sync")
     end
