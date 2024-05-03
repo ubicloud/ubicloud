@@ -2,7 +2,7 @@
 
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
-  semaphore :destroy, :detach_vm, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger, :setup_nic, :repopulate
+  semaphore :destroy, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger, :setup_nic, :repopulate
 
   def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil)
     unless (subnet = PrivateSubnet[private_subnet_id])
@@ -51,10 +51,6 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait
-    when_detach_vm_set? do
-      hop_detach_vm
-    end
-
     when_repopulate_set? do
       hop_repopulate
     end
@@ -120,30 +116,11 @@ class Prog::Vnet::NicNexus < Prog::Base
     end
 
     decr_destroy
-    strand.children.each { _1.destroy }
 
-    DB.transaction do
-      nic.src_ipsec_tunnels_dataset.destroy
-      nic.dst_ipsec_tunnels_dataset.destroy
-      nic.private_subnet.incr_refresh_keys
-
-      nic.destroy
-    end
+    nic.private_subnet.incr_refresh_keys
+    nic.destroy
 
     pop "nic deleted"
-  end
-
-  label def detach_vm
-    DB.transaction do
-      nic.update(vm_id: nil)
-      nic.src_ipsec_tunnels_dataset.destroy
-      nic.dst_ipsec_tunnels_dataset.destroy
-      nic.private_subnet.incr_refresh_keys
-      strand.children.map { _1.destroy }
-      decr_detach_vm
-    end
-
-    hop_wait
   end
 
   # Generate a MAC with the "local" (generated, non-manufacturer) bit
