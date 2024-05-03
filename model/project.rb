@@ -96,4 +96,6 @@ class Project < Sequel::Model
       end
     end
   end
+
+  feature_flag :postgresql_base_image
 end

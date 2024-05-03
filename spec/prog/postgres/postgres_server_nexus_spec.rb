@@ -46,8 +46,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe ".assemble" do
     it "creates postgres server and vm with sshable" do
+      user_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       postgres_resource = PostgresResource.create_with_id(
-        project_id: "e3e333dd-bd9a-82d2-acc1-1c7c1ee9781f",
+        project_id: user_project.id,
         location: "hetzner-hel1",
         name: "pg-name",
         target_vm_size: "standard-2",
