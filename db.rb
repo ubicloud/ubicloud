@@ -20,7 +20,11 @@ end
 
 postgres_monitor_db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "postgres_monitor_db.crt")
 Util.safe_write_to_file(postgres_monitor_db_ca_bundle_filename, Config.postgres_monitor_database_root_certs)
-POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool, pool_timeout: Config.database_timeout) if Config.postgres_monitor_database_url
+begin
+  POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool, pool_timeout: Config.database_timeout) if Config.postgres_monitor_database_url
+rescue Sequel::DatabaseConnectionError => ex
+  Clog.emit("Failed to connect to Postgres Monitor database") { {database_connection_failed: {exception: Util.exception_to_hash(ex)}} }
+end
 
 # Load Sequel Database/Global extensions here
 # DB.extension :date_arithmetic
