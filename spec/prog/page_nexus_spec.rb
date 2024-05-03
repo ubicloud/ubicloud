@@ -22,6 +22,7 @@ RSpec.describe Prog::PageNexus do
     it "exits when resolved" do
       expect(pn).to receive(:when_resolve_set?).and_yield
       expect(pg).to receive(:resolve)
+      expect(pg).to receive(:destroy)
       expect { pn.wait }.to exit({"msg" => "page is resolved"})
     end
 

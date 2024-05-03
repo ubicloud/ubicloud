@@ -22,6 +22,7 @@ class Prog::PageNexus < Prog::Base
   label def wait
     when_resolve_set? do
       page.resolve
+      page.destroy
       pop "page is resolved"
     end
 
