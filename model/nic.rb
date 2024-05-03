@@ -8,9 +8,12 @@ class Nic < Sequel::Model
   one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: IpsecTunnel
   one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: IpsecTunnel
   one_to_one :strand, key: :id, class: Strand
+  plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy
+
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :destroy, :detach_vm, :start_rekey, :trigger_outbound_update,
+
+  semaphore :destroy, :start_rekey, :trigger_outbound_update,
     :old_state_drop_trigger, :setup_nic, :repopulate
 
   plugin :column_encryption do |enc|

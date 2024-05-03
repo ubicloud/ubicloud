@@ -127,11 +127,6 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect { nx.wait }.to nap(30)
     end
 
-    it "hops to detach vm if needed" do
-      expect(nx).to receive(:when_detach_vm_set?).and_yield
-      expect { nx.wait }.to hop("detach_vm")
-    end
-
     it "hops to start rekey if needed" do
       expect(nx).to receive(:when_start_rekey_set?).and_yield
       expect { nx.wait }.to hop("start_rekey")
@@ -241,10 +236,6 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "destroys nic" do
-      expect(ipsec_tunnels[0]).to receive(:destroy).and_return(true)
-      expect(ipsec_tunnels[1]).to receive(:destroy).and_return(true)
-      expect(nic).to receive(:src_ipsec_tunnels_dataset).and_return(ipsec_tunnels[0])
-      expect(nic).to receive(:dst_ipsec_tunnels_dataset).and_return(ipsec_tunnels[1])
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:incr_refresh_keys).and_return(true)
       expect(nic).to receive(:destroy).and_return(true)
@@ -254,44 +245,6 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "fails if there is vm attached" do
       expect(nic).to receive(:vm).and_return(true)
       expect { nx.destroy }.to nap(5)
-    end
-  end
-
-  describe "#detach_vm" do
-    let(:ps) {
-      PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
-    }
-    let(:nic) {
-      Nic.new(private_subnet_id: ps.id,
-        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
-        private_ipv4: "10.0.0.1",
-        mac: "00:00:00:00:00:00",
-        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { _1.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
-    }
-    let(:ipsec_tunnels) {
-      [
-        instance_double(IpsecTunnel),
-        instance_double(IpsecTunnel)
-      ]
-    }
-
-    before do
-      allow(nx).to receive(:nic).and_return(nic)
-    end
-
-    it "detaches vm and refreshes mesh" do
-      expect(nic).to receive(:update).with(vm_id: nil).and_return(true)
-      expect(nic).to receive(:src_ipsec_tunnels_dataset).and_return(ipsec_tunnels[0])
-      expect(ipsec_tunnels[0]).to receive(:destroy).and_return(true)
-      expect(nic).to receive(:dst_ipsec_tunnels_dataset).and_return(ipsec_tunnels[1])
-      expect(ipsec_tunnels[1]).to receive(:destroy).and_return(true)
-
-      expect(nic).to receive(:private_subnet).and_return(ps)
-      expect(ps).to receive(:incr_refresh_keys).and_return(true)
-
-      expect { nx.detach_vm }.to hop("wait")
     end
   end
 
