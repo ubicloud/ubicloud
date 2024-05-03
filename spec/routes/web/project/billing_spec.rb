@@ -302,6 +302,7 @@ RSpec.describe Clover, "billing" do
       before do
         UsageAlert.create_with_id(project_id: project.id, user_id: user.id, name: "alert-1", limit: 100)
         UsageAlert.create_with_id(project_id: project_wo_permissions.id, user_id: user.id, name: "alert-2", limit: 100)
+        expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).at_least(:once)
       end
 
       it "can list usage alerts" do
