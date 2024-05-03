@@ -4,14 +4,15 @@
 require_relative "../loader"
 clover_freeze
 
-MONITORABLE_RESOURCE_TYPES = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner]
 resources = {}
 mutex = Mutex.new
 
 resource_scanner = Thread.new do
+  monitorable_resource_types = [VmHost, PostgresServer, Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists), MinioServer, GithubRunner]
+
   loop do
     mutex.synchronize do
-      Enumerator::Chain.new(*MONITORABLE_RESOURCE_TYPES).each do |r|
+      Enumerator::Chain.new(*monitorable_resource_types).each do |r|
         resources[r.id] ||= MonitorableResource.new(r)
       end
     end
