@@ -145,11 +145,15 @@ class PostgresServer < Sequel::Model
 
     DB.transaction do
       if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
-        PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { _1.postgres_server_id = id }
-          .insert_conflict(
-            target: :postgres_server_id,
-            update: {last_known_lsn: last_known_lsn}
-          ).save_changes
+        begin
+          PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { _1.postgres_server_id = id }
+            .insert_conflict(
+              target: :postgres_server_id,
+              update: {last_known_lsn: last_known_lsn}
+            ).save_changes
+        rescue Sequel::Error => ex
+          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: {ubid: ubid, last_known_lsn: last_known_lsn, exception: Util.exception_to_hash(ex)}} }
+        end
       end
 
       if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
