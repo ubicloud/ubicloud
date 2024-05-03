@@ -22,6 +22,12 @@ RSpec.describe GithubRunner do
     github_runner.log_duration("runner_tested", 10)
   end
 
+  it "can log duration without a vm" do
+    expect(github_runner).to receive(:vm).and_return(nil)
+    expect(Clog).to receive(:emit).with("runner_tested").and_call_original
+    github_runner.log_duration("runner_tested", 10)
+  end
+
   it "provisions a spare runner" do
     expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_runner.installation, repository_name: github_runner.repository_name, label: github_runner.label)
       .and_return(instance_double(Strand, subject: instance_double(described_class)))

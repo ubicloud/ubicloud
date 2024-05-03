@@ -35,9 +35,12 @@ class GithubRunner < Sequel::Model
   end
 
   def log_duration(message, duration)
-    values = {ubid: ubid, label: label, repository_name: repository_name, duration: duration, vm_ubid: vm.ubid, arch: vm.arch, cores: vm.cores}
-    values[:vm_host_ubid] = vm.vm_host.ubid if vm.vm_host
-    values[:vm_pool_ubid] = VmPool[vm.pool_id].ubid if vm.pool_id
+    values = {ubid: ubid, label: label, repository_name: repository_name, duration: duration}
+    if vm
+      values.merge!(vm_ubid: vm.ubid, arch: vm.arch, cores: vm.cores)
+      values[:vm_host_ubid] = vm.vm_host.ubid if vm.vm_host
+      values[:vm_pool_ubid] = VmPool[vm.pool_id].ubid if vm.pool_id
+    end
     Clog.emit(message) { {message => values} }
   end
 
