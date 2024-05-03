@@ -37,9 +37,9 @@ RSpec.describe Project do
       described_class.feature_flag(:dummy_flag)
       project = described_class.create_with_id(name: "dummy-name")
 
-      expect(project.get_dummy_flag).to be_nil
-      project.set_dummy_flag("new-value")
-      expect(project.get_dummy_flag).to eq "new-value"
+      expect(project.get_ff_dummy_flag).to be_nil
+      project.set_ff_dummy_flag("new-value")
+      expect(project.get_ff_dummy_flag).to eq "new-value"
     end
   end
 
