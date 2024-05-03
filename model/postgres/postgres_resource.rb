@@ -43,7 +43,8 @@ class PostgresResource < Sequel::Model
   end
 
   def display_state
-    return "running" if ["wait", "refresh_certificates"].include?(strand.label)
+    return "unavailable" if representative_server&.strand&.label == "unavailable"
+    return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?
     return "deleting" if destroy_set? || strand.label == "destroy"
     "creating"
   end

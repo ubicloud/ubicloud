@@ -36,18 +36,18 @@ RSpec.describe PostgresResource do
     expect(s).to include("ubi_replication@pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/dat/16/data/server.crt")
   end
 
-  it "returns running as display state if the database is ready" do
+  it "returns display state correctly" do
+    expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "unavailable")))
+    expect(postgres_resource.display_state).to eq("unavailable")
+
+    expect(postgres_resource).to receive(:representative_server).and_return(instance_double(PostgresServer, strand: instance_double(Strand, label: "wait"))).at_least(:once)
     expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
     expect(postgres_resource.display_state).to eq("running")
-  end
 
-  it "returns deleting as display state if the database is being destroyed" do
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).twice
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy")).exactly(3).times
     expect(postgres_resource.display_state).to eq("deleting")
-  end
 
-  it "returns creating as display state for other cases" do
-    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server")).twice
+    expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server"))
     expect(postgres_resource.display_state).to eq("creating")
   end
 end
