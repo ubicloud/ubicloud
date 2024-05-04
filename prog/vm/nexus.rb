@@ -522,6 +522,13 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
   end
 
   label def unavailable
+    # If the VM become unavailable due to host unavailability, it first needs to
+    # go through start_after_host_reboot state to be able to recover.
+    when_start_after_host_reboot_set? do
+      incr_checkup
+      hop_start_after_host_reboot
+    end
+
     begin
       if available?
         Page.from_tag_parts("VmUnavailable", vm.ubid)&.incr_resolve
