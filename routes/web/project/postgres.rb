@@ -16,6 +16,7 @@ class CloverWeb
 
       parsed_size = Validation.validate_postgres_size(r.params["size"])
       location = LocationNameConverter.to_internal_name(r.params["location"])
+      Validation.validate_postgres_location(location)
       st = Prog::Postgres::PostgresResourceNexus.assemble(
         project_id: @project.id,
         location: location,

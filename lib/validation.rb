@@ -50,6 +50,12 @@ module Validation
     fail ValidationFailed.new({provider: msg}) unless available_locs.include?(location)
   end
 
+  def self.validate_postgres_location(location)
+    available_pg_locs = Option.postgres_locations.map(&:name)
+    msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map { LocationNameConverter.to_display_name(_1) }}"
+    fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
+  end
+
   def self.validate_vm_size(size)
     unless (vm_size = Option::VmSizes.find { _1.name == size })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{Option::VmSizes.map(&:name)}"})
