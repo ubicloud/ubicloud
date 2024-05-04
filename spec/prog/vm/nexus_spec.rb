@@ -826,6 +826,12 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#unavailable" do
+    it "hops to start_after_host_reboot when needed" do
+      expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
+      expect(nx).to receive(:incr_checkup)
+      expect { nx.unavailable }.to hop("start_after_host_reboot")
+    end
+
     it "creates a page if vm is unavailable" do
       expect(Prog::PageNexus).to receive(:assemble)
       expect(nx).to receive(:available?).and_return(false)
