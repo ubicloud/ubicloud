@@ -197,7 +197,22 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["private_subnet_id"]).to eq("Private subnet with the given id \"invalid-ubid\" is not found")
+        expect(JSON.parse(last_response.body)["error"]["details"]["private_subnet_id"]).to eq("Private subnet with the given id \"invalid-ubid\" is not found in the location \"eu-north-h1\"")
+      end
+
+      it "invalid ps id in other location" do
+        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").ubid
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+          private_subnet_id: ps_id,
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["private_subnet_id"]).to eq("Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-north-h1\"")
       end
 
       it "invalid name" do
