@@ -28,6 +28,7 @@ class CloverApi
       r.post true do
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
+        Validation.validate_postgres_location(@location)
 
         required_parameters = ["size"]
         allowed_optional_parameters = ["ha_type"]

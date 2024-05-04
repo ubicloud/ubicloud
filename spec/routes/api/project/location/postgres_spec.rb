@@ -160,7 +160,7 @@ RSpec.describe Clover, "postgres" do
 
     describe "create" do
       it "success" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {
           size: "standard-2",
           ha_type: "sync"
         }.to_json
@@ -169,8 +169,18 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres")
       end
 
+      it "invalid location" do
+        post "/api/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
+          size: "standard-2",
+          ha_type: "sync"
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["location"]).to eq("Given location is not a valid postgres location. Available locations: [\"eu-central-h1\"]")
+      end
+
       it "invalid name" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/INVALIDNAME", {
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/INVALIDNAME", {
           size: "standard-2",
           ha_type: "sync"
         }.to_json
@@ -180,14 +190,14 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid body" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-pg", "invalid_body"
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", "invalid_body"
 
         expect(last_response.status).to eq(400)
         expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Request body isn't a valid JSON object.")
       end
 
       it "missing required key" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-pg", {
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
           unix_user: "ha_type"
         }.to_json
 
@@ -196,7 +206,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "non allowed key" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-pg", {
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
           size: "standard-2",
           foo_key: "foo_val"
         }.to_json
