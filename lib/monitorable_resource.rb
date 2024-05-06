@@ -70,8 +70,8 @@ class MonitorableResource
     if @mutex.locked?
       if @pulse_check_started_at + PULSE_TIMEOUT < Time.now
         Clog.emit("Pulse check has stuck.") { {pulse_check_stuck: {ubid: @resource.ubid}} }
-        ThreadPrinter.run
-        Kernel.exit!
+        # ThreadPrinter.run
+        # Kernel.exit!
       end
     end
   end
