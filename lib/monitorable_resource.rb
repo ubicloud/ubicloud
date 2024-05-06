@@ -68,10 +68,9 @@ class MonitorableResource
 
   def force_stop_if_stuck
     if @mutex.locked?
+      Clog.emit("Resource is locked.") { {resource_locked: {ubid: @resource.ubid}} }
       if @pulse_check_started_at + PULSE_TIMEOUT < Time.now
         Clog.emit("Pulse check has stuck.") { {pulse_check_stuck: {ubid: @resource.ubid}} }
-        # ThreadPrinter.run
-        # Kernel.exit!
       end
     end
   end
