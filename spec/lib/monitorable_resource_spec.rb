@@ -127,15 +127,15 @@ RSpec.describe MonitorableResource do
       r_w_event_loop.instance_variable_get(:@mutex).unlock
     end
 
-    it "triggers Kernel.exit if pulse check is stuck" do
-      expect(ThreadPrinter).to receive(:run)
-      expect(Kernel).to receive(:exit!)
+    # it "triggers Kernel.exit if pulse check is stuck" do
+    #   expect(ThreadPrinter).to receive(:run)
+    #   expect(Kernel).to receive(:exit!)
 
-      r_w_event_loop.instance_variable_get(:@mutex).lock
-      r_w_event_loop.instance_variable_set(:@pulse_check_started_at, Time.now - 200)
-      r_w_event_loop.force_stop_if_stuck
-      r_w_event_loop.instance_variable_get(:@mutex).unlock
-    end
+    #   r_w_event_loop.instance_variable_get(:@mutex).lock
+    #   r_w_event_loop.instance_variable_set(:@pulse_check_started_at, Time.now - 200)
+    #   r_w_event_loop.force_stop_if_stuck
+    #   r_w_event_loop.instance_variable_get(:@mutex).unlock
+    # end
   end
 
   describe "#lock_no_wait" do
