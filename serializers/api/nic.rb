@@ -7,7 +7,7 @@ class Serializers::Api::Nic < Serializers::Base
       name: nic.name,
       private_ipv4: nic.private_ipv4.network.to_s,
       private_ipv6: nic.private_ipv6.nth(2).to_s,
-      subnet_name: nic.private_subnet.name
+      vm_name: nic.vm&.name
     }
   end
 

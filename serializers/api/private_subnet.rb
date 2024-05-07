@@ -9,6 +9,7 @@ class Serializers::Api::PrivateSubnet < Serializers::Base
       location: ps.display_location,
       net4: ps.net4.to_s,
       net6: ps.net6.to_s,
+      firewalls: Serializers::Api::Firewall.serialize(ps.firewalls),
       nics: Serializers::Api::Nic.serialize(ps.nics)
     }
   end
