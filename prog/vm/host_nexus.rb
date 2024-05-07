@@ -56,6 +56,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnArch
     bud Prog::LearnCores
     bud Prog::LearnStorage
+    bud Prog::LearnPci
     bud Prog::InstallDnsmasq
     bud Prog::SetupSysstat
     bud Prog::SetupNftables
