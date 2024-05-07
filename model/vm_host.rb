@@ -12,6 +12,7 @@ class VmHost < Sequel::Model
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
   one_to_many :spdk_installations, key: :vm_host_id
   one_to_many :storage_devices, key: :vm_host_id
+  one_to_many :pci_devices, key: :vm_host_id
 
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy
 
