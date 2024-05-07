@@ -11,6 +11,7 @@ class Vm < Sequel::Model
   one_to_one :assigned_vm_address, key: :dst_vm_id, class: :AssignedVmAddress
   one_to_many :vm_storage_volumes, key: :vm_id, order: Sequel.desc(:boot)
   one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id do |ds| ds.active end
+  one_to_many :pci_devices, key: :vm_id, class: :PciDevice
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy
 
