@@ -1,18 +1,31 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-unless (boot_image = ARGV.shift)
-  puts "need boot_image as argument"
+require "json"
+require_relative "../../common/lib/util"
+require_relative "../lib/boot_image"
+
+unless (params = ARGV.shift)
+  puts "need params as argument"
   exit 1
 end
 
-custom_url = ARGV.shift
+params_json = JSON.parse(params)
 
-require_relative "../../common/lib/util"
-require_relative "../lib/boot_image"
+unless (boot_image = params_json["image_name"])
+  puts "need boot_image in params"
+  exit 1
+end
+
+# YYY: version will be mandatory in the future
+version = params_json["version"]
+url = params_json["url"]
+sha256sum = params_json["sha256sum"]
 
 certs = $stdin.read
 ca_path = "/usr/lib/ssl/certs/ubicloud_images_blob_storage_certs.crt"
 safe_write_to_file(ca_path, certs)
 
-BootImage.new(boot_image, nil).download(url: custom_url, ca_path: ca_path)
+BootImage.new(boot_image, version).download(
+  url: url, ca_path: ca_path, sha256sum: sha256sum
+)

@@ -17,6 +17,7 @@ RSpec.describe Prog::Vm::Nexus do
       init_vector: "iv", auth_data: "somedata"
     ) { _1.id = "04a3fe32-4cf0-48f7-909e-e35822864413" }
     si = SpdkInstallation.new(version: "v1") { _1.id = SpdkInstallation.generate_uuid }
+    bi = BootImage.new(name: "my-image", version: "20230303") { _1.id = "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1" }
     dev1 = StorageDevice.new(name: "nvme0") { _1.id = StorageDevice.generate_uuid }
     dev2 = StorageDevice.new(name: "DEFAULT") { _1.id = StorageDevice.generate_uuid }
     disk_1 = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false)
@@ -26,6 +27,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_2 = VmStorageVolume.new(boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true)
     disk_2.spdk_installation = si
     disk_2.storage_device = dev2
+    disk_2.boot_image = bi
     vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1", created_at: Time.now).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
@@ -191,9 +193,9 @@ RSpec.describe Prog::Vm::Nexus do
     it "includes all storage volumes" do
       expect(nx.storage_volumes).to eq([
         {"boot" => true, "disk_index" => 0, "image" => nil, "size_gib" => 20, "device_id" => "vm4hjdwr_0", "encrypted" => true,
-         "spdk_version" => "v1", "use_bdev_ubi" => false, "skip_sync" => false, "storage_device" => "nvme0"},
+         "spdk_version" => "v1", "use_bdev_ubi" => false, "skip_sync" => false, "storage_device" => "nvme0", "image_version" => nil},
         {"boot" => false, "disk_index" => 1, "image" => nil, "size_gib" => 15, "device_id" => "vm4hjdwr_1", "encrypted" => false,
-         "spdk_version" => "v1", "use_bdev_ubi" => true, "skip_sync" => true, "storage_device" => "DEFAULT"}
+         "spdk_version" => "v1", "use_bdev_ubi" => true, "skip_sync" => true, "storage_device" => "DEFAULT", "image_version" => "20230303"}
       ])
     end
   end

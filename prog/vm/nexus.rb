@@ -145,6 +145,7 @@ class Prog::Vm::Nexus < Prog::Base
       {
         "boot" => s.boot,
         "image" => s.boot ? vm.boot_image : nil,
+        "image_version" => s.boot_image&.version,
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
         "disk_index" => s.disk_index,

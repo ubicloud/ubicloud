@@ -418,7 +418,7 @@ RSpec.describe Al do
     end
 
     def create_vm
-      Vm.create_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "")
+      Vm.create_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy")
     end
 
     def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
@@ -563,6 +563,26 @@ RSpec.describe Al do
         _1.instance_variable_set(:@vm, vm)
       }
       expect(nx.storage_secrets.count).to eq(1)
+    end
+
+    it "allocates the latest active boot image for boot volumes" do
+      vmh = VmHost.first
+      BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20220202", activated_at: Time.now)
+      bi = BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20230303", activated_at: Time.now)
+      BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20240404", activated_at: nil)
+      vm = create_vm
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => true}])
+      expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)
+    end
+
+    it "doesn't allocate a boot image if no active boot images are available" do
+      vmh = VmHost.first
+      BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20220202", activated_at: nil)
+      BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20230303", activated_at: nil)
+      BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20240404", activated_at: nil)
+      vm = create_vm
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => true}])
+      expect(vm.vm_storage_volumes.first.boot_image_id).to be_nil
     end
 
     it "calls update_vm" do

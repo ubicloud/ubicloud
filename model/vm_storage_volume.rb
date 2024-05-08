@@ -8,6 +8,7 @@ class VmStorageVolume < Sequel::Model
   many_to_one :storage_device
   many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
+  many_to_one :boot_image
 
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
