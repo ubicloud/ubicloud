@@ -40,7 +40,6 @@ RSpec.describe MonitorableResource do
       # We also use it to flip the @run_event_loop flag to true, so that the
       # loop in the process_event_loop method can exit.
       def r_w_event_loop.sleep(duration)
-        puts "sleeping for #{duration}"
         @run_event_loop = true
       end
     end

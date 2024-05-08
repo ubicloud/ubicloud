@@ -40,8 +40,6 @@ RSpec.describe Clover, "vm" do
         project
         get "/api/project"
 
-        puts last_response.body
-
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
         expect(parsed_body["count"]).to eq(2)
