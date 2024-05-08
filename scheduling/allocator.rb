@@ -82,14 +82,14 @@ module Scheduling::Allocator
       vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6.nth(2))
     end
 
-    def initialize(candidate_host, request)
+    def initialize(candidate_host, request, score_randomization = rand(0..0.2))
       @candidate_host = candidate_host
       @request = request
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
       @storage_allocation = StorageAllocation.new(candidate_host, request)
       @allocations = @vm_host_allocations + [@storage_allocation]
-      @score = calculate_score
+      @score = calculate_score + score_randomization
     end
 
     def is_valid
