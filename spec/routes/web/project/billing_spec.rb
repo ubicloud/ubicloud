@@ -32,6 +32,12 @@ RSpec.describe Clover, "billing" do
     expect(page).to have_content "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
   end
 
+  it "tag payment method fraud after account suspension" do
+    expect(payment_method.reload.fraud).to be(false)
+    user.suspend
+    expect(payment_method.reload.fraud).to be(true)
+  end
+
   context "when Stripe enabled" do
     before do
       allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
