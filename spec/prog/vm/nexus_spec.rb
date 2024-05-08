@@ -285,46 +285,23 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#start" do
     let(:vmh_id) { "46ca6ded-b056-4723-bd91-612959f52f6f" }
-    let(:vmh) {
-      VmHost.new(
-        net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
-        ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2")
-      ) { _1.id = vmh_id }
+    let(:storage_volumes) {
+      [{
+        "use_bdev_ubi" => false,
+        "skip_sync" => true,
+        "size_gib" => 11,
+        "boot" => true
+      }]
     }
 
     before do
-      allow(nx).to receive(:allocate).and_return(vmh_id)
-      allow(VmHost).to receive(:[]).with(vmh_id) { vmh }
-      allow(nx).to receive(:create_storage_volume_records)
+      allow(nx).to receive(:frame).and_return("storage_volumes" => :storage_volumes)
       allow(nx).to receive(:clear_stack_storage_volumes)
       allow(vm).to receive(:update)
     end
 
-    it "allocates the vm to a host with IPv4 address" do
-      address = Address.new(cidr: "0.0.0.0/30", routed_to_host_id: vmh_id)
-      assigned_address = AssignedVmAddress.new(ip: NetAddr::IPv4Net.parse("10.0.0.1"))
-
-      expect(nx).to receive(:allocate).and_return(vmh_id)
-      expect(nx).to receive(:allocate_storage_devices).and_return([])
-      expect(vmh).to receive(:ip4_random_vm_network).and_return(["0.0.0.0", address])
-      expect(vm).to receive(:ip4_enabled).and_return(true).twice
-      expect(AssignedVmAddress).to receive(:create_with_id).and_return(assigned_address)
-      expect(vm).to receive(:assigned_vm_address).and_return(assigned_address)
-      expect(vm).to receive(:sshable).and_return(instance_double(Sshable)).at_least(:once)
-      expect(vm.sshable).to receive(:update).with(host: assigned_address.ip.network)
-
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "fails if there is no ip address available but the vm is ip4 enabled" do
-      expect(vmh).to receive(:ip4_random_vm_network).and_return([nil, nil])
-      expect(vm).to receive(:ip4_enabled).and_return(true).at_least(:once)
-      expect(nx).to receive(:allocate_storage_devices).and_return([])
-      expect { nx.start }.to raise_error(RuntimeError, /no ip4 addresses left/)
-    end
-
     it "creates a page if no capacity left and naps" do
-      expect(nx).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts")).twice
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts")).twice
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
       expect(Page.from_tag_parts("NoCapacity", vm.location, vm.arch)).not_to be_nil
@@ -336,326 +313,94 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
-      expect(nx).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts"))
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts"))
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
 
       # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
-      expect(nx).to receive(:allocate).and_return(vmh_id).twice
-      allow(Vm).to receive_message_chain(:join, :where).and_return([vm, vm], [vm]) # rubocop:disable RSpec/MessageChain
-      expect(nx).to receive(:allocate_storage_devices).and_return([]).at_least(:once)
+      expect(Scheduling::Allocator).to receive(:allocate)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
       # Third run is able to allocate and there are no vms left in the queue, but it's not 15 minutes yet, so we don't resolve the page
+      expect(Scheduling::Allocator).to receive(:allocate)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be false
 
       # Fourth run is able to allocate and there are no vms left in the queue after 15 minutes, so we resolve the page
       Page.active.first.update(created_at: Time.now - 16 * 60)
+      expect(Scheduling::Allocator).to receive(:allocate)
       expect { nx.start }.to hop("create_unix_user")
       expect(Page.active.count).to eq(1)
       expect(Page.active.first.resolve_set?).to be true
     end
 
     it "re-raises exceptions other than lack of capacity" do
-      expect(nx).to receive(:allocate).and_raise(RuntimeError.new("will not allocate because allocating is too mainstream and I'm too cool for that"))
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("will not allocate because allocating is too mainstream and I'm too cool for that"))
       expect {
         nx.start
       }.to raise_error(RuntimeError, "will not allocate because allocating is too mainstream and I'm too cool for that")
     end
-  end
 
-  describe "#allocate" do
-    before do
-      @host_index = 0
-      vm.location = "somewhere-normal"
-      allow(nx).to receive(:frame).and_return({
-        "storage_volumes" => [{
-          "use_bdev_ubi" => false,
-          "skip_sync" => true,
-          "size_gib" => 11,
-          "boot" => true
-        }]
-      })
-    end
-
-    def new_host(**args)
-      args = {allocation_state: "accepting",
-              location: "somewhere-normal",
-              total_sockets: 1,
-              total_cores: 80,
-              total_cpus: 80,
-              total_mem_gib: 640,
-              total_hugepages_1g: 640 - 8,
-              total_storage_gib: 500,
-              available_storage_gib: 200,
-              arch: "x64"}.merge(args)
-      sa = Sshable.create_with_id(host: "127.0.0.#{@host_index}")
-      @host_index += 1
-
-      host = VmHost.create(**args.except(:available_storage_gib, :total_storage_gib)) { _1.id = sa.id }
-      StorageDevice.create_with_id(
-        name: "DEFAULT",
-        available_storage_gib: args[:available_storage_gib],
-        total_storage_gib: args[:total_storage_gib],
-        vm_host_id: host.id
+    it "allocates with expected parameters" do
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        location_filter: ["hetzner-hel1"],
+        location_preference: []
       )
-      SpdkInstallation.create(
-        version: "v29.01",
-        allocation_weight: 100,
-        vm_host_id: host.id
-      ) { _1.id = SpdkInstallation.generate_uuid }
-      host
+      expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "fails if there was a concurrent modification to allocation_state" do
-      vmh = new_host(allocation_state: "draining")
-      ds = instance_double(Sequel::Dataset)
-
-      expect(ds).to receive(:limit).with(1).and_return(ds)
-      expect(ds).to receive(:get).with(:id).and_return(vmh.id)
-      expect(nx).to receive(:allocation_dataset).and_return(ds)
-
-      expect {
-        nx.allocate
-      }.to raise_error(RuntimeError, "concurrent allocation_state modification requires re-allocation")
-    end
-
-    it "fails if requested distinct storage devices, but only 1 device exists" do
-      new_host
-      allow(nx).to receive(:frame).and_return({
-        "storage_volumes" => [{"size_gib" => 5}, {"size_gib" => 10}],
-        "distinct_storage_devices" => true
-      })
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "fails if there are no VmHosts" do
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "only matches when location matches" do
-      vm.location = "somewhere-normal"
-      vmh = new_host(location: "somewhere-weird")
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-
-      vm.location = "somewhere-weird"
-      expect(nx.allocate).to eq vmh.id
-      expect(vmh.reload.used_cores).to eq(1)
-    end
-
-    it "matches all locations for github-runners" do
+    it "considers all locations for github-runners" do
       vm.location = "github-runners"
-      vmh = new_host(location: "somewhere-weird")
-      expect(nx.allocate).to eq vmh.id
-    end
-
-    it "prioritizes the github-runners location for runners" do
-      new_host(location: "somewhere-weird")
-      new_host(location: "somewhere-weird")
-      new_host(location: "somewhere-weird")
-      vmh = new_host(location: "github-runners")
-      new_host(location: "somewhere-weird")
-      new_host(location: "somewhere-weird")
-      new_host(location: "somewhere-weird")
-      vm.location = "github-runners"
-      expect(nx.allocate).to eq vmh.id
-    end
-
-    it "does not match if there is not enough storage capacity" do
-      new_host(available_storage_gib: 10)
-      expect(vm.storage_size_gib).to eq(35)
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "can use all cores" do
-      vmh = new_host(used_cores: 79)
-      expect(nx.allocate).to eq vmh.id
-    end
-
-    it "fails if all cores have been used" do
-      new_host(used_cores: 80)
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "can use all hugepages" do
-      vmh = new_host(used_hugepages_1g: 632 - vm.mem_gib)
-      expect(nx.allocate).to eq vmh.id
-    end
-
-    it "fails if all hugepages have been used" do
-      new_host(used_hugepages_1g: 632 - vm.mem_gib + 1)
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "updates allocated resource columns" do
-      vmh = new_host(location: "hetzner-hel1")
-      st = described_class.assemble("some_ssh_key", prj.id, storage_volumes: [{size_gib: 10}, {size_gib: 15}])
-      nx = described_class.new(st)
-
-      initial_vmh = vmh.dup
-      expect(nx.allocate).to eq vmh.reload.id
-      expect(vmh.used_cores).to eq(initial_vmh.used_cores + 1)
-      expect(vmh.used_hugepages_1g).to eq(initial_vmh.used_hugepages_1g + 8)
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        location_filter: [],
+        location_preference: ["github-runners"]
+      )
+      expect { nx.start }.to hop("create_unix_user")
     end
 
     it "can force allocating a host" do
-      new_host(location: "hetzner-hel1")
-      vmh2 = new_host(location: "hetzner-hel1")
-      new_host(location: "hetzner-hel1")
-
-      st = described_class.assemble("some_ssh_key", prj.id, force_host_id: vmh2.id)
-      nx = described_class.new(st)
-
-      expect(nx.allocate).to eq vmh2.id
-    end
-
-    it "doesn't allocate draining hosts normally" do
-      new_host(allocation_state: "draining")
-      expect { nx.allocate }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible hosts for somewhere-normal"
-    end
-
-    it "can force allocating a draining host" do
-      vmh = new_host(allocation_state: "draining")
-
-      st = described_class.assemble("some_ssh_key", prj.id, force_host_id: vmh.id)
-      nx = described_class.new(st)
-
-      expect(nx.allocate).to eq vmh.id
-    end
-  end
-
-  describe "#allocate_storage_devices" do
-    let(:vmh) {
-      id = VmHost.generate_uuid
-      Sshable.create { _1.id = id }
-      host = VmHost.create(location: "xyz") { _1.id = id }
-      SpdkInstallation.create(vm_host_id: id, version: "v1", allocation_weight: 100) { _1.id = id }
-      StorageDevice.create(
-        vm_host_id: host.id, name: "nvme0",
-        available_storage_gib: 100, total_storage_gib: 150
-      ) { _1.id = StorageDevice.generate_uuid }
-      StorageDevice.create(
-        vm_host_id: host.id, name: "DEFAULT",
-        available_storage_gib: 100, total_storage_gib: 100
-      ) { _1.id = host.id }
-      host
-    }
-
-    it "can allocate storage on the same device" do
-      storage_volumes = [{"size_gib" => 5}, {"size_gib" => 10}]
       allow(nx).to receive(:frame).and_return({
-        "distinct_storage_devices" => false
+        "force_host_id" => :vm_host_id,
+        "storage_volumes" => :storage_volumes
       })
 
-      volumes = nx.allocate_storage_devices(vmh, storage_volumes)
-      expect(volumes[0]["storage_device_id"]).not_to be_nil
-      expect(volumes[0]["storage_device_id"]).to eq(volumes[1]["storage_device_id"])
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: [],
+        distinct_storage_devices: false,
+        host_filter: [:vm_host_id],
+        location_filter: [],
+        location_preference: []
+      )
+      expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "can allocate storage on distinct devices" do
-      storage_volumes = [{"size_gib" => 5}, {"size_gib" => 10}]
+    it "requests distinct storage devices" do
       allow(nx).to receive(:frame).and_return({
-        "distinct_storage_devices" => true
+        "distinct_storage_devices" => true,
+        "storage_volumes" => :storage_volumes
       })
 
-      volumes = nx.allocate_storage_devices(vmh, storage_volumes)
-      expect(volumes[0]["storage_device_id"]).not_to be_nil
-      expect(volumes[1]["storage_device_id"]).not_to be_nil
-      expect(volumes[0]["storage_device_id"]).not_to eq(volumes[1]["storage_device_id"])
-    end
-
-    it "fails if not enough space left" do
-      storage_volumes = [{"size_gib" => 65}, {"size_gib" => 160}]
-      allow(nx).to receive(:frame).and_return({
-        "distinct_storage_devices" => false
-      })
-
-      expect {
-        nx.allocate_storage_devices(vmh, storage_volumes)
-      }.to raise_error RuntimeError, "Storage device allocation failed"
-    end
-
-    it "skips the first device if it is too small" do
-      storage_volumes = [{"size_gib" => 51}, {"size_gib" => 30}]
-      allow(nx).to receive(:frame).and_return({
-        "distinct_storage_devices" => false
-      })
-
-      volumes = nx.allocate_storage_devices(vmh, storage_volumes)
-      expect(volumes[0]["storage_device_id"]).not_to be_nil
-      expect(volumes[0]["storage_device_id"]).to eq(volumes[1]["storage_device_id"])
-    end
-  end
-
-  describe "#create_storage_volume_records" do
-    let(:vmh) {
-      id = VmHost.generate_uuid
-      Sshable.create { _1.id = id }
-      host = VmHost.create(location: "xyz") { _1.id = id }
-      SpdkInstallation.create(vm_host_id: id, version: "v1", allocation_weight: 100) { _1.id = id }
-      host
-    }
-
-    let(:storage_device) {
-      StorageDevice.create(vm_host_id: vmh.id, name: "nvme0", available_storage_gib: 100, total_storage_gib: 100) { _1.id = vmh.id }
-    }
-
-    it "creates without encryption key if storage is not encrypted" do
-      st = described_class.assemble("some_ssh_key", prj.id)
-      nx = described_class.new(st)
-      volumes = [{
-        "size_gib" => 5,
-        "use_bdev_ubi" => false,
-        "skip_sync" => false,
-        "encrypted" => false,
-        "boot" => false,
-        "storage_device_id" => storage_device.id
-      }]
-      nx.create_storage_volume_records(vmh, volumes)
-      expect(StorageKeyEncryptionKey.count).to eq(0)
-      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
-      expect(nx.storage_secrets.count).to eq(0)
-    end
-
-    it "creates with encryption key if storage is encrypted" do
-      st = described_class.assemble("some_ssh_key", prj.id)
-      nx = described_class.new(st)
-      volumes = [{
-        "size_gib" => 5,
-        "use_bdev_ubi" => false,
-        "skip_sync" => false,
-        "encrypted" => true,
-        "boot" => false,
-        "storage_device_id" => storage_device.id
-      }]
-      nx.create_storage_volume_records(vmh, volumes)
-      expect(StorageKeyEncryptionKey.count).to eq(1)
-      expect(st.subject.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
-      expect(nx.storage_secrets.count).to eq(1)
-    end
-  end
-
-  describe "#allocate_spdk_installation" do
-    it "fails if total weight is zero" do
-      si_1 = SpdkInstallation.new(allocation_weight: 0)
-      si_2 = SpdkInstallation.new(allocation_weight: 0)
-
-      expect { nx.allocate_spdk_installation([si_1, si_2]) }.to raise_error "Total weight of all eligible spdk_installations shouldn't be zero."
-    end
-
-    it "chooses the only one if one provided" do
-      si_1 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1])).to eq(si_1.id)
-    end
-
-    it "doesn't return the one with zero weight" do
-      si_1 = SpdkInstallation.new(allocation_weight: 0) { _1.id = SpdkInstallation.generate_uuid }
-      si_2 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
-      expect(nx.allocate_spdk_installation([si_1, si_2])).to eq(si_2.id)
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: true,
+        host_filter: [],
+        location_filter: ["hetzner-hel1"],
+        location_preference: []
+      )
+      expect { nx.start }.to hop("create_unix_user")
     end
   end
 
