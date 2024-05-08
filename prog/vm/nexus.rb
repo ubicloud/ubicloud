@@ -99,7 +99,8 @@ class Prog::Vm::Nexus < Prog::Base
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
           "distinct_storage_devices" => distinct_storage_devices,
-          "force_host_id" => force_host_id
+          "force_host_id" => force_host_id,
+          "gpu_enabled" => vm_size.gpu
         }]
       ) { _1.id = vm.id }
     end
