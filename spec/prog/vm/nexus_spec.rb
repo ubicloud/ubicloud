@@ -956,6 +956,17 @@ RSpec.describe Prog::Vm::Nexus do
 
       expect { nx.destroy }.to exit({"msg" => "vm deleted"})
     end
+
+    it "detaches from pci devices" do
+      ds = instance_double(Sequel::Dataset)
+      expect(vm).to receive(:pci_devices_dataset).and_return(ds)
+      expect(ds).to receive(:update).with(vm_id: nil)
+      expect(vm).to receive(:update).with(display_state: "deleting")
+      expect(vm).to receive(:destroy)
+      allow(vm).to receive(:vm_storage_volumes).and_return([])
+
+      expect { nx.destroy }.to exit({"msg" => "vm deleted"})
+    end
   end
 
   describe "#start_after_host_reboot" do

@@ -606,6 +606,8 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
         used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib
       )
 
+      vm.pci_devices_dataset.update(vm_id: nil)
+
       vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy
     end
