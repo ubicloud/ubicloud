@@ -42,7 +42,6 @@ class CloverApi
       r.delete true do
         Authorization.authorize(@current_user.id, "Firewall:delete", @project.id)
 
-        @firewall.dissociate_with_project(@project)
         @firewall.destroy
 
         response.status = 204
