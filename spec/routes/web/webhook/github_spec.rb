@@ -3,7 +3,11 @@
 require_relative "../spec_helper"
 
 RSpec.describe Clover, "github" do
-  let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User") }
+  let(:installation) do
+    prj = Project.create_with_id(name: "test-project")
+    GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project_id: prj.id)
+  end
+
   let(:runner) { GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo", runner_id: 123, vm_id: "46683a25-acb1-4371-afe9-d39f303e44b4") }
 
   before do
@@ -126,6 +130,23 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unhandled workflow_job action"}}.to_json)
+    end
+
+    it "fails if GPU runners are not enabled" do
+      send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "ubicloud-standard-gpu-6")))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "GPU runners are not enabled for this project"}}.to_json)
+    end
+
+    it "succeeds if GPU runners are enabled" do
+      installation.project.set_ff_enable_gpu_runners(true)
+      st = instance_double(Strand, id: runner.id)
+      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud-standard-gpu-6-ubuntu-2204").and_return(st)
+      send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "ubicloud-standard-gpu-6-ubuntu-2204")))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] created"}.to_json)
     end
   end
 
