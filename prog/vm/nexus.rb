@@ -164,156 +164,6 @@ class Prog::Vm::Nexus < Prog::Base
     }.to_h
   end
 
-  def allocation_dataset
-    total_storage_gib = frame["storage_volumes"].sum { |v| v["size_gib"] }
-
-    device_allocation_query = if frame["distinct_storage_devices"]
-      <<-SQL
-WITH RankedGroupedAndFilteredStorageDevices AS(
-  SELECT sd.vm_host_id
-  FROM storage_device sd
-    INNER JOIN (VALUES #{frame["storage_volumes"].sort_by { _1["size_gib"] }.reverse.map.with_index(1) { |el, i| "(#{el["size_gib"]},#{i})" }.join(", ")}) AS va(size_gib, volume_rank)
-    ON sd.available_storage_gib >= va.size_gib AND sd.enabled
-  GROUP BY (sd.vm_host_id, va.volume_rank) HAVING count(*) >= va.volume_rank
-),
-EligibleVmHosts AS(
-   SELECT vm_host_id FROM RankedGroupedAndFilteredStorageDevices GROUP BY vm_host_id HAVING count(*) >= #{frame["storage_volumes"].length}
-)
-SELECT *
-FROM vm_host INNER JOIN EligibleVmHosts ON vm_host.id = EligibleVmHosts.vm_host_id
-WHERE
-      SQL
-    else
-      <<-SQL
-SELECT *
-FROM vm_host
-WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_device.enabled AND storage_device.vm_host_id = vm_host.id) >= #{total_storage_gib} AND
-      SQL
-    end
-
-    location_filter = if vm.location != "github-runners"
-      Sequel.lit("AND vm_host.location = ?", vm.location)
-    else
-      Sequel.lit("")
-    end
-
-    # YYY: We might not need special ordering for github-runners location after
-    # completing the fleet unification. This is a temporary solution to reduce
-    # capacity incidents for VM and PG allocations.
-    ordering_clause = if vm.location != "github-runners"
-      Sequel.lit("ORDER BY random()")
-    else
-      Sequel.lit("ORDER BY vm_host.location = 'github-runners' DESC, random()")
-    end
-
-    device_allocation_query += <<-SQL
-        vm_host.used_cores + :cores <= least(vm_host.total_cores, vm_host.total_mem_gib / :mem_gib_ratio)
-        AND vm_host.used_hugepages_1g + :mem_gib <= vm_host.total_hugepages_1g
-        AND vm_host.allocation_state = 'accepting'
-        AND vm_host.arch = :arch
-        :location_filter
-      :ordering_clause
-    SQL
-
-    DB[device_allocation_query, cores: vm.cores, mem_gib_ratio: vm.mem_gib_ratio,
-      mem_gib: vm.mem_gib, arch: vm.arch, location_filter: location_filter,
-      ordering_clause: ordering_clause]
-  end
-
-  def allocate
-    vm_host_id = frame["force_host_id"] || allocation_dataset.limit(1).get(:id)
-    fail "#{vm} no space left on any eligible hosts for #{vm.location}" unless vm_host_id
-
-    allocation_state_filter = if frame["force_host_id"]
-      {}
-    else
-      {allocation_state: "accepting"}
-    end
-
-    fail "concurrent allocation_state modification requires re-allocation" if VmHost.dataset
-      .where(id: vm_host_id, **allocation_state_filter)
-      .update(
-        used_cores: Sequel[:used_cores] + vm.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] + vm.mem_gib
-      ).zero?
-
-    vm_host_id
-  end
-
-  def allocate_storage_devices(vm_host, storage_volumes)
-    DB.transaction do
-      devices = vm_host.storage_devices_dataset.for_update.order_by(&:available_storage_gib).all
-      device_index = 0
-
-      storage_volumes.sort_by { _1["size_gib"] }.map do |volume|
-        while device_index < devices.length &&
-            (!devices[device_index].enabled ||
-            devices[device_index].available_storage_gib < volume["size_gib"])
-          device_index += 1
-        end
-
-        fail "Storage device allocation failed" unless device_index < devices.length
-
-        # Allocate!
-        allocated_device = devices[device_index]
-        allocated_device.update(available_storage_gib: allocated_device.available_storage_gib - volume["size_gib"])
-        volume.update({"storage_device_id" => allocated_device.id})
-
-        # If we require distinct storage devices, then the next volume can't use
-        # this device. Therefore, skip it.
-        device_index += 1 if frame["distinct_storage_devices"]
-
-        volume
-      end
-    end
-  end
-
-  def create_storage_volume_records(vm_host, storage_volumes)
-    storage_volumes.each_with_index do |volume, disk_index|
-      spdk_installation_id = allocate_spdk_installation(vm_host.spdk_installations)
-
-      key_encryption_key = if volume["encrypted"]
-        key_wrapping_algorithm = "aes-256-gcm"
-        cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
-        key_wrapping_key = cipher.random_key
-        key_wrapping_iv = cipher.random_iv
-
-        StorageKeyEncryptionKey.create_with_id(
-          algorithm: key_wrapping_algorithm,
-          key: Base64.encode64(key_wrapping_key),
-          init_vector: Base64.encode64(key_wrapping_iv),
-          auth_data: "#{vm.inhost_name}_#{disk_index}"
-        )
-      end
-
-      VmStorageVolume.create_with_id(
-        vm_id: vm.id,
-        boot: volume["boot"],
-        size_gib: volume["size_gib"],
-        use_bdev_ubi: SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"],
-        skip_sync: volume["skip_sync"],
-        disk_index: disk_index,
-        key_encryption_key_1_id: key_encryption_key&.id,
-        spdk_installation_id: spdk_installation_id,
-        storage_device_id: volume["storage_device_id"]
-      )
-    end
-  end
-
-  def allocate_spdk_installation(spdk_installations)
-    total_weight = spdk_installations.sum(&:allocation_weight)
-    fail "Total weight of all eligible spdk_installations shouldn't be zero." if total_weight == 0
-
-    rand_point = rand(0..total_weight - 1)
-    weight_sum = 0
-    rand_choice = spdk_installations.each { |si|
-      weight_sum += si.allocation_weight
-      break si if weight_sum > rand_point
-    }
-
-    rand_choice.id
-  end
-
   def clear_stack_storage_volumes
     current_frame = strand.stack.first
     current_frame.delete("storage_volumes")
@@ -334,8 +184,25 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
 
   label def start
     queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start")
-    vm_host_id = begin
-      allocate
+    begin
+      distinct_storage_devices = frame["distinct_storage_devices"] || false
+      allocation_state_filter, location_filter, location_preference, host_filter =
+        if frame["force_host_id"]
+          [[], [], [], [frame["force_host_id"]]]
+        elsif vm.location == "github-runners"
+          [["accepting"], [], ["github-runners"], []]
+        else
+          [["accepting"], [vm.location], [], []]
+        end
+
+      Scheduling::Allocator.allocate(
+        vm, frame["storage_volumes"],
+        distinct_storage_devices: distinct_storage_devices,
+        allocation_state_filter: allocation_state_filter,
+        location_filter: location_filter,
+        location_preference: location_preference,
+        host_filter: host_filter
+      )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible hosts")
 
@@ -350,29 +217,6 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       page.incr_resolve
     end
 
-    vm_host = VmHost[vm_host_id]
-    ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
-
-    DB.transaction do
-      storage_volumes = allocate_storage_devices(vm_host, frame["storage_volumes"])
-      create_storage_volume_records(vm_host, storage_volumes)
-    end
-
-    fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
-
-    DB.transaction do
-      vm.update(
-        vm_host_id: vm_host_id,
-        ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
-        local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s,
-        allocated_at: Time.now
-      )
-
-      Clog.emit("vm allocated") { {vm: vm.values, allocation: {vm_ubid: vm.ubid, vm_host_ubid: vm_host.ubid, duration: Time.now - vm.created_at}} }
-
-      AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
-    end
-    vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6.nth(2))
     register_deadline(:wait, 10 * 60)
 
     # We don't need storage_volume info anymore, so delete it before
