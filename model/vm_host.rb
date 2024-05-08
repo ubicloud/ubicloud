@@ -13,8 +13,9 @@ class VmHost < Sequel::Model
   one_to_many :spdk_installations, key: :vm_host_id
   one_to_many :storage_devices, key: :vm_host_id
   one_to_many :pci_devices, key: :vm_host_id
+  one_to_many :boot_images, key: :vm_host_id
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, boot_images: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -183,9 +184,8 @@ class VmHost < Sequel::Model
   end
 
   # Introduced for downloading a new boot image via REPL.
-  # Use with caution as the vm_host will not accept a new vm during the image download.
-  def download_boot_image(image_name, custom_url = nil)
-    Strand.create_with_id(schedule: Time.now, prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url}])
+  def download_boot_image(image_name, version:, custom_url: nil)
+    Strand.create_with_id(schedule: Time.now, prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
   end
 
   def hetznerify(server_id)

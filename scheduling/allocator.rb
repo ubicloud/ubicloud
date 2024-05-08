@@ -223,6 +223,15 @@ module Scheduling::Allocator
 
     private
 
+    def allocate_boot_image(vm_host, boot_image_name)
+      boot_image = BootImage.where(
+        vm_host_id: vm_host.id,
+        name: boot_image_name
+      ).exclude(activated_at: nil).order_by(Sequel.desc(:version)).first
+
+      boot_image&.id
+    end
+
     def map_volumes_to_devices
       return false if @candidate_host[:available_storage_gib] < @request.storage_gib
       @storage_device_allocations = @candidate_host[:storage_devices].map { StorageDeviceAllocation.new(_1["id"], _1["available_storage_gib"]) }
@@ -260,6 +269,7 @@ module Scheduling::Allocator
           boot: volume["boot"],
           size_gib: volume["size_gib"],
           use_bdev_ubi: SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"],
+          boot_image_id: volume["boot"] ? allocate_boot_image(vm_host, vm.boot_image) : nil,
           skip_sync: volume["skip_sync"],
           disk_index: disk_index,
           key_encryption_key_1_id: key_encryption_key&.id,
