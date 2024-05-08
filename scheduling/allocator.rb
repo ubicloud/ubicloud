@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, target_host_utilization: 0.65, distinct_storage_devices: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
+  def self.allocate(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
       vm.cores,
@@ -82,7 +82,7 @@ module Scheduling::Allocator
       vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6.nth(2))
     end
 
-    def initialize(candidate_host, request, score_randomization = rand(0..0.2))
+    def initialize(candidate_host, request, score_randomization = rand(0..0.4))
       @candidate_host = candidate_host
       @request = request
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
