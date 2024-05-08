@@ -68,6 +68,10 @@ class CloverWeb
       return error("Unmatched label")
     end
 
+    if Github.runner_labels[label]["gpu"] && !installation.project.get_ff_enable_gpu_runners
+      return error("GPU runners are not enabled for this project")
+    end
+
     if data["action"] == "queued"
       st = Prog::Vm::GithubRunner.assemble(
         installation,
