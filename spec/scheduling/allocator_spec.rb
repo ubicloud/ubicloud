@@ -211,7 +211,7 @@ RSpec.describe Al do
       expect(Al::VmHostAllocation).to receive(:new).with(:used_hugepages_1g, vmhds[:total_hugepages_1g], vmhds[:used_hugepages_1g], req.mem_gib).and_return(instance_double(Al::VmHostAllocation, utilization: req.target_host_utilization, is_valid: true))
       expect(Al::StorageAllocation).to receive(:new).with(vmhds, req).and_return(instance_double(Al::StorageAllocation, utilization: req.target_host_utilization, is_valid: true))
 
-      allocation = Al::Allocation.new(vmhds, req)
+      allocation = Al::Allocation.new(vmhds, req, 0)
       expect(allocation.score).to eq 0
       expect(allocation.is_valid).to be_truthy
     end
@@ -221,7 +221,7 @@ RSpec.describe Al do
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, false))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
 
-      allocation = Al::Allocation.new(vmhds, req)
+      allocation = Al::Allocation.new(vmhds, req, 0)
       expect(allocation.score).to eq 0
       expect(allocation.is_valid).to be_falsy
     end
@@ -230,7 +230,15 @@ RSpec.describe Al do
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
 
-      expect(Al::Allocation.new(vmhds, req).score).to eq 0
+      expect(Al::Allocation.new(vmhds, req, 0).score).to eq 0
+    end
+
+    it "randomizes the score by a constant" do
+      expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+
+      rnd = rand(0..2)
+      expect(Al::Allocation.new(vmhds, req, rnd).score).to eq rnd
     end
 
     it "is penalized if utilization is below target" do
@@ -268,12 +276,12 @@ RSpec.describe Al do
     it "respects location preferences" do
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(0, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
-      score_no_preference = Al::Allocation.new(vmhds, req).score
+      score_no_preference = Al::Allocation.new(vmhds, req, 0).score
 
       req.location_preference = ["loc1"]
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(0, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
-      score_preference_met = Al::Allocation.new(vmhds, req).score
+      score_preference_met = Al::Allocation.new(vmhds, req, 0).score
 
       req.location_preference = ["loc2"]
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization, true))
