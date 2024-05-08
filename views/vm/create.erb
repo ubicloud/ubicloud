@@ -92,7 +92,7 @@
                   <fieldset class="radio-small-cards" id="size-radios">
                     <legend class="sr-only">Server size</legend>
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      <% Option::VmSizes.each do |size| %>
+                      <% Option::VmSizes.select { _1.visible }.each do |size| %>
                         <label class="size-<%= size.name %>">
                           <input
                             type="radio"
