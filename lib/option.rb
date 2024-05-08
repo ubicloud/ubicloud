@@ -43,12 +43,14 @@ module Option
     ["almalinux-9.1", "AlmaLinux 9.1"]
   ].map { |args| BootImage.new(*args) }.freeze
 
-  VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_gib) do
+  VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_gib, :visible, :gpu) do
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16].map {
-    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 25)
-  }.freeze
+    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 25, true, false)
+  }.concat([6].map {
+    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, (_1 / 2) * 60, false, true)
+  }).freeze
 
   PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_gib) do
     alias_method :display_name, :name

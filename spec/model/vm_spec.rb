@@ -28,6 +28,12 @@ RSpec.describe Vm do
       vm.cores = 8
       expect(vm.mem_gib).to eq 64
     end
+
+    it "handles standard-6" do
+      vm.family = "standard-gpu"
+      vm.cores = 3
+      expect(vm.mem_gib).to eq 32
+    end
   end
 
   describe "#cloud_hypervisor_cpu_topology" do

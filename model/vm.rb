@@ -58,6 +58,8 @@ class Vm < Sequel::Model
 
   def mem_gib_ratio
     return 3.2 if arch == "arm64"
+    # Special case for GPUs
+    return 10.68 if family == "standard-gpu"
     8
   end
 
