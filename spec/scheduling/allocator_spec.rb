@@ -40,7 +40,7 @@ RSpec.describe Al do
           "2464de61-7501-8374-9ab0-416caebe31da", 1, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-          false, true, 0.65, "x64", ["accepting"], [], [], []
+          false, true, 0.55, "x64", ["accepting"], [], [], []
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -396,7 +396,7 @@ RSpec.describe Al do
       Vm.create_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "")
     end
 
-    def create_req(vm, storage_volumes, target_host_utilization: 0.65, distinct_storage_devices: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
       Al::Request.new(
         vm.id,
         vm.cores,
