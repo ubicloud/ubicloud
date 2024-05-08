@@ -434,7 +434,8 @@ WHERE (SELECT max(available_storage_gib) FROM storage_device WHERE storage_devic
       "mem_gib" => vm.mem_gib,
       "ndp_needed" => host.ndp_needed,
       "storage_volumes" => storage_volumes,
-      "swap_size_bytes" => frame["swap_size_bytes"]
+      "swap_size_bytes" => frame["swap_size_bytes"],
+      "pci_devices" => vm.pci_devices.map { [_1.slot, _1.iommu_group] }
     })
 
     host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: params_json)

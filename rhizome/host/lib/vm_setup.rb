@@ -44,13 +44,14 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes)
+  def prep(unix_user, public_key, nics, gua, ip4, local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     cloudinit(unix_user, public_key, nics, swap_size_bytes)
     download_boot_image(boot_image)
     storage(storage_params, storage_secrets, true)
     hugepages(mem_gib)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics)
+    prepare_pci_devices(pci_devices)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, multiqueue:)
@@ -489,7 +490,14 @@ EOS
     r("ip netns exec #{q_vm} sysctl -w net.ipv4.ip_forward=1")
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics)
+  def prepare_pci_devices(pci_devices)
+    pci_devices.select { _1[0].end_with? ".0" }.each do |pci_dev|
+      r("echo 1 > /sys/bus/pci/devices/0000:#{pci_dev[0]}/reset")
+      r("chown #{@vm_name}:#{@vm_name} /sys/kernel/iommu_groups/#{pci_dev[1]} /dev/vfio/#{pci_dev[1]}")
+    end
+  end
+
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -526,6 +534,8 @@ DNSMASQ_SERVICE
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
     net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
+    pci_device_params = pci_devices.map { " --device path=/sys/bus/pci/devices/0000:#{_1[0]}/" }.join
+    limit_memlock = pci_devices.empty? ? "" : "LimitMEMLOCK=#{mem_gib * 1073741824}"
 
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
@@ -552,6 +562,7 @@ ExecStart=#{CloudHypervisor::VERSION.bin} -v \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
 --memory size=#{mem_gib}G,hugepages=on,hugepage_size=1G \
+#{pci_device_params} \
 #{net_params.join(" \\\n")}
 
 ExecStop=#{CloudHypervisor::VERSION.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
@@ -560,6 +571,7 @@ User=#{@vm_name}
 Group=#{@vm_name}
 
 LimitNOFILE=500000
+#{limit_memlock}
 SERVICE
     r "systemctl daemon-reload"
   end

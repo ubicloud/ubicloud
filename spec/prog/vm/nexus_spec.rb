@@ -231,9 +231,11 @@ RSpec.describe Prog::Vm::Nexus do
       vm.public_key = "test_ssh_key"
       vm.local_vetho_ip = "169.254.0.0"
       nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
+      pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
       expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
       expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
       expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
+      expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
 
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
@@ -253,7 +255,8 @@ RSpec.describe Prog::Vm::Nexus do
           "mem_gib" => 8,
           "local_ipv4" => "169.254.0.0",
           "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]],
-          "swap_size_bytes" => nil
+          "swap_size_bytes" => nil,
+          "pci_devices" => [["01:00.0", 23]]
         })
       end
       expect(sshable).to receive(:cmd).with(/sudo host\/bin\/setup-vm prep #{nx.vm_name}/, {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
