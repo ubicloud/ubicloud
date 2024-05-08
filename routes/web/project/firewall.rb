@@ -134,7 +134,6 @@ class CloverWeb
       r.delete true do
         Authorization.authorize(@current_user.id, "Firewall:delete", fw.id)
         fw.private_subnets.map { Authorization.authorize(@current_user.id, "PrivateSubnet:edit", _1.id) }
-        fw.dissociate_with_project(@project)
         fw.destroy
 
         return {message: "Deleting #{fw.name}"}.to_json
