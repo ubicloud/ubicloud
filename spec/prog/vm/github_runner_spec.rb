@@ -108,6 +108,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
       expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
+      expect(vm).to receive(:update).with(name: github_runner.ubid, has_customer_data: true)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")
@@ -333,7 +334,6 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "picks vm and hops" do
       expect(nx).to receive(:pick_vm).and_return(vm)
       expect(github_runner).to receive(:update).with(vm_id: vm.id)
-      expect(vm).to receive(:update).with(name: github_runner.ubid)
       expect(github_runner).to receive(:reload).and_return(github_runner)
       expect(Clog).to receive(:emit).with("runner_allocated").and_call_original
       expect { nx.allocate_vm }.to hop("wait_vm")

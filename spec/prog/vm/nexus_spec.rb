@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_2.spdk_installation = si
     disk_2.storage_device = dev2
     disk_2.boot_image = bi
-    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1", created_at: Time.now).tap {
+    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1", created_at: Time.now, has_customer_data: true).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
@@ -219,6 +219,17 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:incr_setup_nic)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
+      expect(vm).to receive(:update).with(has_customer_data: true)
+      expect { nx.prep }.to hop("wait_sshable")
+    end
+
+    it "does not mark as has customer data if the vm in a pool" do
+      sshable = instance_spy(Sshable)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
+      expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
+      expect(vm).to receive(:pool_id).and_return("9013836c-339c-8f76-be7f-73933a588ba8")
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
+      expect(vm).not_to receive(:update).with(has_customer_data: false)
       expect { nx.prep }.to hop("wait_sshable")
     end
 
@@ -553,6 +564,7 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(vm).to receive(:update).with(has_customer_data: true)
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -569,6 +581,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
       expect(assigned_adr.active_billing_record).to receive(:finalize)
+      expect(vm).to receive(:update).with(has_customer_data: true)
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -576,6 +589,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(vm).to receive(:active_billing_records).and_return([])
       expect(vm).to receive(:assigned_vm_address).and_return(nil)
+      expect(vm).to receive(:update).with(has_customer_data: true)
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -585,6 +599,7 @@ RSpec.describe Prog::Vm::Nexus do
       assigned_adr = instance_double(AssignedVmAddress)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(nil)
+      expect(vm).to receive(:update).with(has_customer_data: true)
 
       expect { nx.before_run }.to hop("destroy")
     end
