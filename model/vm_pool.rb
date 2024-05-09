@@ -5,7 +5,7 @@ require_relative "../model"
 class VmPool < Sequel::Model
   one_to_one :strand, key: :id
   one_to_many :vms, key: :pool_id
-  one_to_many :idle_vms, key: :pool_id, class: Vm, conditions: {has_customer_data: false, display_state: "running"}
+  one_to_many :idle_vms, key: :pool_id, class: Vm, conditions: Sequel.&({has_customer_data: false}, Sequel.~(provisioned_at: nil))
 
   include ResourceMethods
 

@@ -21,17 +21,17 @@ RSpec.describe VmPool do
     end
 
     it "returns nil if there are no vms in running state" do
-      vm.update(display_state: "creating")
+      vm.update(provisioned_at: nil)
       expect(pool.pick_vm("new-name")).to be_nil
     end
 
     it "returns nil if there are no vms without user data" do
-      vm.update(display_state: "running", has_customer_data: true)
+      vm.update(provisioned_at: Time.now, has_customer_data: true)
       expect(pool.pick_vm("new-name")).to be_nil
     end
 
     it "returns the vm if there is a vm without user data in running state" do
-      vm.update(display_state: "running", has_customer_data: false)
+      vm.update(provisioned_at: Time.now, has_customer_data: false)
       expect(pool.pick_vm("new-name").id).to eq(vm.id)
     end
   end
