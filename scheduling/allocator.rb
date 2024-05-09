@@ -43,7 +43,8 @@ module Scheduling::Allocator
         .join(:total_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .join(:used_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
-        .select(Sequel[:vm_host][:id].as(:vm_host_id), :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :location, :num_storage_devices, :available_storage_gib, :total_storage_gib, :storage_devices, :total_ipv4, :used_ipv4, Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus), Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus), :available_iommu_groups)
+        .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
+        .select(Sequel[:vm_host][:id].as(:vm_host_id), :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :location, :num_storage_devices, :available_storage_gib, :total_storage_gib, :storage_devices, :total_ipv4, :used_ipv4, Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus), Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus), :available_iommu_groups, Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count))
         .where(arch: request.arch_filter)
         .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
         .where { (total_cores - used_cores >= request.cores) }
@@ -69,6 +70,10 @@ module Scheduling::Allocator
           .select_append { sum(Sequel.case({{vm_id: nil} => 1}, 0)).as(available_gpus) }
           .select_append { array_remove(array_agg(Sequel.case({{vm_id: nil} => :iommu_group}, nil)), nil).as(available_iommu_groups) }
           .where(device_class: ["0300", "0302"]))
+        .with(:vm_provisioning, DB[:vm]
+          .select_group(:vm_host_id)
+          .select_append { count.function.*.as(vm_provisioning_count) }
+          .where(display_state: "creating"))
 
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
       ds = ds.where { available_gpus > 0 } if request.gpu_enabled
@@ -132,13 +137,16 @@ module Scheduling::Allocator
       # imbalance score, in range [0, 1]
       imbalance_score = util.max - util.min
 
+      # penalty for ongoing vm provisionings on the host
+      vm_provisioning_penalty = @candidate_host[:vm_provisioning_count] * 0.2
+
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
       gpu_penalty = (@request.gpu_enabled || @candidate_host[:num_gpus] == 0) ? 0 : 5
 
       # penalty of 10 if location preference is not honored
       location_preference_penalty = (@request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location])) ? 0 : 10
 
-      utilization_score + imbalance_score + gpu_penalty + location_preference_penalty
+      utilization_score + imbalance_score + vm_provisioning_penalty + gpu_penalty + location_preference_penalty
     end
   end
 
