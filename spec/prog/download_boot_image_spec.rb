@@ -64,32 +64,22 @@ RSpec.describe Prog::DownloadBootImage do
     it "hops if it's succeeded" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean download_my-image")
-      expect { dbi.download }.to hop("learn_storage")
+      expect { dbi.download }.to hop("update_available_storage_space")
     end
   end
 
-  describe "#learn_storage" do
-    it "starts a number of sub-programs" do
-      expect(dbi).to receive(:bud).with(Prog::LearnStorage)
-      expect { dbi.learn_storage }.to hop("wait_learn_storage")
-    end
-  end
-
-  describe "#wait_learn_storage" do
-    it "exits if progs run properly" do
-      expect(dbi).to receive(:reap).and_return([
-        instance_double(Strand, prog: "LearnStorage", exitval: {"msg" => "created StorageDevice records"}),
-        instance_double(Strand, prog: "ArbitraryOtherProg")
-      ])
-
-      expect { dbi.wait_learn_storage }.to exit({"msg" => "my-image downloaded"})
-    end
-
-    it "donates to children if they are not exited yet" do
-      expect(dbi).to receive(:reap).and_return([])
-      expect(dbi).to receive(:leaf?).and_return(false)
-      expect(dbi).to receive(:donate).and_call_original
-      expect { dbi.wait_learn_storage }.to nap(1)
+  describe "#update_available_storage_space" do
+    it "updates available storage space" do
+      sd = StorageDevice.create_with_id(
+        vm_host_id: vm_host.id,
+        name: "DEFAULT",
+        total_storage_gib: 50,
+        available_storage_gib: 35,
+        enabled: true
+      )
+      expect(sshable).to receive(:cmd).with("stat -c %s /var/storage/images/my-image.raw").and_return("2361393152")
+      expect { dbi.update_available_storage_space }.to exit({"msg" => "my-image downloaded"})
+      expect(sd.reload.available_storage_gib).to eq(32)
     end
   end
 end
