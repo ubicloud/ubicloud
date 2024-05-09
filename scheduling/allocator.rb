@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
+  def self.allocate(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
       vm.cores,
@@ -9,6 +9,7 @@ module Scheduling::Allocator
       storage_volumes.map { _1["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       distinct_storage_devices,
+      gpu_enabled,
       vm.ip4_enabled,
       target_host_utilization,
       vm.arch,
@@ -24,8 +25,8 @@ module Scheduling::Allocator
     Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
   end
 
-  Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :distinct_storage_devices, :ip4_enabled, :target_host_utilization,
-    :arch_filter, :allocation_state_filter, :host_filter, :location_filter, :location_preference)
+  Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :distinct_storage_devices, :gpu_enabled, :ip4_enabled,
+    :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :location_filter, :location_preference)
 
   class Allocation
     attr_reader :score
@@ -41,7 +42,8 @@ module Scheduling::Allocator
         .join(:storage_devices, vm_host_id: Sequel[:vm_host][:id])
         .join(:total_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .join(:used_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
-        .select(:vm_host_id, :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :location, :num_storage_devices, :available_storage_gib, :total_storage_gib, :storage_devices, :total_ipv4, :used_ipv4)
+        .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
+        .select(Sequel[:vm_host][:id].as(:vm_host_id), :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :location, :num_storage_devices, :available_storage_gib, :total_storage_gib, :storage_devices, :total_ipv4, :used_ipv4, Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus), Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus), :available_iommu_groups)
         .where(allocation_state: request.allocation_state_filter)
         .where(arch: request.arch_filter)
         .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
@@ -62,9 +64,16 @@ module Scheduling::Allocator
           .where(enabled: true)
           .having { sum(available_storage_gib) >= request.storage_gib }
           .having { count.function.* >= (request.distinct_storage_devices ? request.storage_volumes.count : 1) })
+        .with(:gpus, DB[:pci_device]
+          .select_group(:vm_host_id)
+          .select_append { count.function.*.as(num_gpus) }
+          .select_append { sum(Sequel.case({{vm_id: nil} => 1}, 0)).as(available_gpus) }
+          .select_append { array_remove(array_agg(Sequel.case({{vm_id: nil} => :iommu_group}, nil)), nil).as(available_iommu_groups) }
+          .where(device_class: ["0300", "0302"]))
 
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
-      ds = ds.where(vm_host_id: request.host_filter) unless request.host_filter.empty?
+      ds = ds.where { available_gpus > 0 } if request.gpu_enabled
+      ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
       ds.all
     end
@@ -87,8 +96,9 @@ module Scheduling::Allocator
       @request = request
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
-      @storage_allocation = StorageAllocation.new(candidate_host, request)
-      @allocations = @vm_host_allocations + [@storage_allocation]
+      @device_allocations = [StorageAllocation.new(candidate_host, request)]
+      @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_enabled
+      @allocations = @vm_host_allocations + @device_allocations
       @score = calculate_score + score_randomization
     end
 
@@ -101,7 +111,7 @@ module Scheduling::Allocator
       DB.transaction do
         Allocation.update_vm(vm_host, vm)
         VmHost.dataset.where(id: @candidate_host[:vm_host_id]).update(@vm_host_allocations.map { _1.get_vm_host_update }.reduce(&:merge))
-        @storage_allocation.update(vm, vm_host)
+        @device_allocations.each { _1.update(vm, vm_host) }
       end
     end
 
@@ -122,10 +132,13 @@ module Scheduling::Allocator
       # imbalance score, in range [0, 1]
       imbalance_score = util.max - util.min
 
-      # location preference. 0 if preference is honored, 10 otherwise
-      location_preference_score = (@request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location])) ? 0 : 10
+      # penalty of 5 if host has a GPU but VM doesn't require a GPU
+      gpu_penalty = (@request.gpu_enabled || @candidate_host[:num_gpus] == 0) ? 0 : 5
 
-      utilization_score + imbalance_score + location_preference_score
+      # penalty of 10 if location preference is not honored
+      location_preference_penalty = (@request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location])) ? 0 : 10
+
+      utilization_score + imbalance_score + gpu_penalty + location_preference_penalty
     end
   end
 
@@ -149,6 +162,32 @@ module Scheduling::Allocator
 
     def get_vm_host_update
       {@column => Sequel[@column] + @requested}
+    end
+  end
+
+  class GpuAllocation
+    attr_reader
+    def initialize(candidate_host, request)
+      @used = candidate_host[:num_gpus] - candidate_host[:available_gpus]
+      @total = candidate_host[:num_gpus]
+      @iommu_group = candidate_host[:available_iommu_groups].sample
+    end
+
+    def is_valid
+      @used < @total
+    end
+
+    def utilization
+      (@used + 1).fdiv(@total)
+    end
+
+    def update(vm, vm_host)
+      fail "concurrent GPU allocation" if
+      PciDevice.dataset
+        .where(vm_host_id: vm_host.id)
+        .where(vm_id: nil)
+        .where(iommu_group: @iommu_group)
+        .update(vm_id: vm.id).zero?
     end
   end
 

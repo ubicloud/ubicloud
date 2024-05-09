@@ -187,6 +187,7 @@ class Prog::Vm::Nexus < Prog::Base
     queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
       distinct_storage_devices = frame["distinct_storage_devices"] || false
+      gpu_enabled = frame["gpu_enabled"] || false
       allocation_state_filter, location_filter, location_preference, host_filter =
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
@@ -202,7 +203,8 @@ class Prog::Vm::Nexus < Prog::Base
         allocation_state_filter: allocation_state_filter,
         location_filter: location_filter,
         location_preference: location_preference,
-        host_filter: host_filter
+        host_filter: host_filter,
+        gpu_enabled: gpu_enabled
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible hosts")

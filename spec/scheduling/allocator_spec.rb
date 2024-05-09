@@ -40,7 +40,7 @@ RSpec.describe Al do
           "2464de61-7501-8374-9ab0-416caebe31da", 1, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-          false, true, 0.55, "x64", ["accepting"], [], [], []
+          false, false, true, 0.55, "x64", ["accepting"], [], [], []
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -54,7 +54,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        false, true, 0.65, "x64", ["accepting"], [], [], []
+        false, false, true, 0.65, "x64", ["accepting"], [], [], []
       )
     }
 
@@ -108,6 +108,9 @@ RSpec.describe Al do
                  used_hugepages_1g: vmh.used_hugepages_1g,
                  vm_host_id: vmh.id,
                  total_ipv4: 4,
+                 num_gpus: 0,
+                 available_gpus: 0,
+                 available_iommu_groups: nil,
                  used_ipv4: 1}])
     end
 
@@ -181,6 +184,24 @@ RSpec.describe Al do
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(2)
     end
+
+    it "retrieves candidates with gpu if gpu_enabled" do
+      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "02:00.0", device_class: "0300", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 9)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "03:00.0", device_class: "1234", vendor: "vd", device: "dv3", numa_node: 0, iommu_group: 11)
+
+      req.gpu_enabled = true
+      cand = Al::Allocation.candidate_hosts(req)
+      expect(cand.size).to eq(1)
+      expect(cand.first[:vm_host_id]).to eq(vmh2.id)
+      expect(cand.first[:available_iommu_groups]).to eq([3, 9])
+    end
   end
 
   describe "Allocation" do
@@ -189,7 +210,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        false, true, 0.65, "x64", ["accepting"], [], [], []
+        false, false, true, 0.65, "x64", ["accepting"], [], [], []
       )
     }
     let(:vmhds) {
@@ -203,6 +224,8 @@ RSpec.describe Al do
        used_cores: 3,
        total_hugepages_1g: 22,
        used_hugepages_1g: 9,
+       num_gpus: 0,
+       available_gpus: 0,
        vm_host_id: "the_id"}
     }
 
@@ -390,13 +413,15 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
     end
 
     def create_vm
       Vm.create_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "")
     end
 
-    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
       Al::Request.new(
         vm.id,
         vm.cores,
@@ -404,6 +429,7 @@ RSpec.describe Al do
         storage_volumes.map { _1["size_gib"] }.sum,
         storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
         distinct_storage_devices,
+        gpu_enabled,
         true,
         target_host_utilization,
         vm.arch,
@@ -430,6 +456,26 @@ RSpec.describe Al do
       expect(used_cores + vm.cores).to eq(vmh.used_cores)
       expect(used_hugepages_1g + vm.mem_gib).to eq(vmh.used_hugepages_1g)
       expect(available_storage - 180).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
+      expect(vmh.pci_devices.map { _1.vm_id }).to eq([nil, nil])
+    end
+
+    it "updates pci devices" do
+      vm = create_vm
+      vmh = VmHost.first
+      used_cores = vmh.used_cores
+      used_hugepages_1g = vmh.used_hugepages_1g
+      available_storage = vmh.storage_devices.sum { _1.available_storage_gib }
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_enabled: true)
+      vmh.reload
+      expect(vm.vm_storage_volumes.detect { _1.disk_index == 0 }.size_gib).to eq(85)
+      expect(vm.vm_storage_volumes.detect { _1.disk_index == 1 }.size_gib).to eq(95)
+      expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 0 }.storage_device_id].name).to eq("stor2")
+      expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 1 }.storage_device_id].name).to eq("stor1")
+      expect(used_cores + vm.cores).to eq(vmh.used_cores)
+      expect(used_hugepages_1g + vm.mem_gib).to eq(vmh.used_hugepages_1g)
+      expect(available_storage - 180).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
+      expect(vmh.pci_devices.map { _1.vm_id }).to eq([vm.id, vm.id])
     end
 
     it "allows concurrent allocations" do
@@ -479,6 +525,15 @@ RSpec.describe Al do
       al2 = Al::Allocation.best_allocation(create_req(vm, vol))
       al1.update(vm1)
       expect { al2.update(vm2) }.to raise_error(Sequel::CheckConstraintViolation, /available_storage_gib_non_negative/)
+    end
+
+    it "fails concurrent allocations of gpus" do
+      vm1 = create_vm
+      vm2 = create_vm
+      al1 = Al::Allocation.best_allocation(create_req(vm, vol, gpu_enabled: true))
+      al2 = Al::Allocation.best_allocation(create_req(vm, vol, gpu_enabled: true))
+      al1.update(vm1)
+      expect { al2.update(vm2) }.to raise_error(RuntimeError, "concurrent GPU allocation")
     end
 
     it "creates volume without encryption key if storage is not encrypted" do
