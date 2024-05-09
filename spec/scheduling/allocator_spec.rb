@@ -267,17 +267,17 @@ RSpec.describe Al do
     it "is penalized if utilization is below target" do
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization * 0.9, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization * 0.9, true))
-      expect(Al::Allocation.new(vmhds, req).score).to be > 0
+      expect(Al::Allocation.new(vmhds, req, 0).score).to be > 0
     end
 
     it "penalizes over-utilization more than under-utilization" do
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(0, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
-      score_low_utilization = Al::Allocation.new(vmhds, req).score
+      score_low_utilization = Al::Allocation.new(vmhds, req, 0).score
 
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization * 1.01, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization * 1.01, true))
-      score_over_target = Al::Allocation.new(vmhds, req).score
+      score_over_target = Al::Allocation.new(vmhds, req, 0).score
 
       expect(score_over_target).to be > score_low_utilization
     end
@@ -286,12 +286,12 @@ RSpec.describe Al do
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
-      score_balance = Al::Allocation.new(vmhds, req).score
+      score_balance = Al::Allocation.new(vmhds, req, 0).score
 
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.4, true))
       expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.6, true))
-      score_imbalance = Al::Allocation.new(vmhds, req).score
+      score_imbalance = Al::Allocation.new(vmhds, req, 0).score
 
       expect(score_imbalance).to be > score_balance
     end
@@ -309,7 +309,7 @@ RSpec.describe Al do
       req.location_preference = ["loc2"]
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
-      score_preference_not_met = Al::Allocation.new(vmhds, req).score
+      score_preference_not_met = Al::Allocation.new(vmhds, req, 0).score
 
       expect(score_no_preference).to be_within(0.0001).of(score_preference_met)
       expect(score_preference_not_met).to be > score_preference_met
