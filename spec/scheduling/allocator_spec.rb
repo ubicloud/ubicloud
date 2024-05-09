@@ -547,6 +547,13 @@ RSpec.describe Al do
       expect(nx.storage_secrets.count).to eq(0)
     end
 
+    it "can have empty allocation state filter" do
+      vmh = VmHost.first
+      vmh.update(allocation_state: "draining")
+      al = Al::Allocation.best_allocation(create_req(vm, vol, allocation_state_filter: []))
+      expect(al).to be_truthy
+    end
+
     it "creates volume with encryption key if storage is encrypted" do
       vm = create_vm
       described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])

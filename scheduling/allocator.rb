@@ -44,7 +44,6 @@ module Scheduling::Allocator
         .join(:used_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
         .select(Sequel[:vm_host][:id].as(:vm_host_id), :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :location, :num_storage_devices, :available_storage_gib, :total_storage_gib, :storage_devices, :total_ipv4, :used_ipv4, Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus), Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus), :available_iommu_groups)
-        .where(allocation_state: request.allocation_state_filter)
         .where(arch: request.arch_filter)
         .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
         .where { (total_cores - used_cores >= request.cores) }
@@ -75,6 +74,7 @@ module Scheduling::Allocator
       ds = ds.where { available_gpus > 0 } if request.gpu_enabled
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
+      ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds.all
     end
 
