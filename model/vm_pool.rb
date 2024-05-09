@@ -5,21 +5,22 @@ require_relative "../model"
 class VmPool < Sequel::Model
   one_to_one :strand, key: :id
   one_to_many :vms, key: :pool_id
+  one_to_many :idle_vms, key: :pool_id, class: Vm, conditions: {has_customer_data: false, display_state: "running"}
 
   include ResourceMethods
 
   include SemaphoreMethods
   semaphore :destroy
 
-  def pick_vm
-    DB.transaction do
-      # first lock the whole pool in the join table so that no other thread can
-      # pick a vm from this pool
-      vms_dataset.for_update.all
-      pick_vm_id_q = vms_dataset.left_join(:github_runner, vm_id: :id)
-        .where(Sequel[:github_runner][:vm_id] => nil, Sequel[:vm][:display_state] => "running")
-        .select(Sequel[:vm][:id])
-      Vm.where(id: pick_vm_id_q).first
-    end
+  def pick_vm(new_name)
+    vm_hash = DB[:vm]
+      .returning
+      .with(:candidate, idle_vms_dataset.limit(1))
+      .from(:vm, :candidate)
+      .where(Sequel[:vm][:id] => Sequel[:candidate][:id])
+      .update(name: new_name, has_customer_data: true)
+      .first
+
+    Vm.call(vm_hash) unless vm_hash.nil?
   end
 end

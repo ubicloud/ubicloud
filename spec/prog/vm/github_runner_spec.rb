@@ -108,7 +108,6 @@ RSpec.describe Prog::Vm::GithubRunner do
       ).and_return([git_runner_pool])
       expect(git_runner_pool).to receive(:pick_vm).and_return(vm)
       expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
-      expect(vm).to receive(:update).with(name: github_runner.ubid, has_customer_data: true)
       vm = nx.pick_vm
       expect(vm).not_to be_nil
       expect(vm.name).to eq("dummy-vm")

@@ -37,8 +37,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"]
     ).first
 
-    if (picked_vm = pool&.pick_vm)
-      picked_vm.update(name: github_runner.ubid.to_s, has_customer_data: true)
+    if (picked_vm = pool&.pick_vm(github_runner.ubid))
       return picked_vm
     end
 
