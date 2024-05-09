@@ -69,9 +69,35 @@ class CloverWeb
         r.redirect @project.path + "/billing"
       end
 
+      # Pre-authorize card to check if it is valid, if so
+      # authorization won't be captured and will be refunded immediately
+      begin
+        customer_stripe_id = setup_intent["customer"]
+        payment_intent = Stripe::PaymentIntent.create({
+          amount: 100, # 100 cents to charge $1.00
+          currency: "usd",
+          confirm: true,
+          off_session: true,
+          capture_method: "manual",
+          customer: customer_stripe_id,
+          payment_method: stripe_id
+        })
+
+        if payment_intent.status != "requires_capture"
+          raise "Authorization failed"
+        end
+
+        Stripe::PaymentIntent.cancel(payment_intent.id)
+      rescue
+        # Log and redirect if Stripe card error or our manual raise
+        Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id: customer_stripe_id}} }
+        flash["error"] = "We couldn't pre-authorize $1 from your card for verification. Please try again or contact our support team at support@ubicloud.com."
+        r.redirect @project.path + "/billing"
+      end
+
       DB.transaction do
         unless (billing_info = @project.billing_info)
-          billing_info = BillingInfo.create_with_id(stripe_id: setup_intent["customer"])
+          billing_info = BillingInfo.create_with_id(stripe_id: customer_stripe_id)
           @project.update(billing_info_id: billing_info.id)
         end
 
