@@ -111,7 +111,34 @@ RSpec.describe Al do
                  num_gpus: 0,
                  available_gpus: 0,
                  available_iommu_groups: nil,
-                 used_ipv4: 1}])
+                 used_ipv4: 1,
+                 vm_provisioning_count: 0}])
+    end
+
+    it "retrieves provisioning count" do
+      vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
+      Vm.create_with_id(vm_host_id: vmh.id, family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "")
+      Vm.create_with_id(vm_host_id: vmh.id, family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "")
+
+      expect(Al::Allocation.candidate_hosts(req))
+        .to eq([{location: vmh.location,
+                 num_storage_devices: 1,
+                 storage_devices: [{"available_storage_gib" => sd1.available_storage_gib, "id" => sd1.id, "total_storage_gib" => sd1.total_storage_gib}],
+                 total_cores: vmh.total_cores,
+                 total_hugepages_1g: vmh.total_hugepages_1g,
+                 total_storage_gib: sd1.total_storage_gib,
+                 available_storage_gib: sd1.available_storage_gib,
+                 used_cores: vmh.used_cores,
+                 used_hugepages_1g: vmh.used_hugepages_1g,
+                 vm_host_id: vmh.id,
+                 total_ipv4: 4,
+                 num_gpus: 0,
+                 available_gpus: 0,
+                 available_iommu_groups: nil,
+                 used_ipv4: 1,
+                 vm_provisioning_count: 2}])
     end
 
     it "applies host filter" do
@@ -226,7 +253,8 @@ RSpec.describe Al do
        used_hugepages_1g: 9,
        num_gpus: 0,
        available_gpus: 0,
-       vm_host_id: "the_id"}
+       vm_host_id: "the_id",
+       vm_provisioning_count: 0}
     }
 
     it "initializes individual resource allocations" do
@@ -294,6 +322,13 @@ RSpec.describe Al do
       score_imbalance = Al::Allocation.new(vmhds, req, 0).score
 
       expect(score_imbalance).to be > score_balance
+    end
+
+    it "penalizes concurrent provisioning" do
+      expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      vmhds[:vm_provisioning_count] = 1
+      expect(Al::Allocation.new(vmhds, req, 0).score).to be > 0
     end
 
     it "respects location preferences" do
