@@ -351,7 +351,8 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         location_filter: ["hetzner-hel1"],
-        location_preference: []
+        location_preference: [],
+        gpu_enabled: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -364,7 +365,8 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         location_filter: [],
-        location_preference: ["github-runners"]
+        location_preference: ["github-runners"],
+        gpu_enabled: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -381,7 +383,8 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [:vm_host_id],
         location_filter: [],
-        location_preference: []
+        location_preference: [],
+        gpu_enabled: false
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -389,7 +392,8 @@ RSpec.describe Prog::Vm::Nexus do
     it "requests distinct storage devices" do
       allow(nx).to receive(:frame).and_return({
         "distinct_storage_devices" => true,
-        "storage_volumes" => :storage_volumes
+        "storage_volumes" => :storage_volumes,
+        "gpu_enabled" => false
       })
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -398,7 +402,26 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: true,
         host_filter: [],
         location_filter: ["hetzner-hel1"],
-        location_preference: []
+        location_preference: [],
+        gpu_enabled: false
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "requests a gpu" do
+      allow(nx).to receive(:frame).and_return({
+        "gpu_enabled" => true,
+        "storage_volumes" => :storage_volumes
+      })
+
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        location_filter: ["hetzner-hel1"],
+        location_preference: [],
+        gpu_enabled: true
       )
       expect { nx.start }.to hop("create_unix_user")
     end
