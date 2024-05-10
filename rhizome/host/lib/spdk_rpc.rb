@@ -21,8 +21,8 @@ class SpdkRpc
 
   def bdev_aio_delete(name, if_exists = true)
     call("bdev_aio_delete", {name: name})
-  rescue SpdkNotFound => e
-    raise e unless if_exists
+  rescue SpdkNotFound
+    raise unless if_exists
   end
 
   def bdev_crypto_create(name, base_bdev_name, key_name)
@@ -36,8 +36,8 @@ class SpdkRpc
 
   def bdev_crypto_delete(name, if_exists = true)
     call("bdev_crypto_delete", {name: name})
-  rescue SpdkNotFound => e
-    raise e unless if_exists
+  rescue SpdkNotFound
+    raise unless if_exists
   end
 
   def bdev_ubi_create(name, base_bdev_name, image_path,
@@ -59,8 +59,8 @@ class SpdkRpc
 
   def bdev_ubi_delete(name, if_exists = true)
     call("bdev_ubi_delete", {name: name})
-  rescue SpdkNotFound => e
-    raise e unless if_exists
+  rescue SpdkNotFound
+    raise unless if_exists
   end
 
   def vhost_create_blk_controller(name, bdev)
@@ -73,8 +73,8 @@ class SpdkRpc
 
   def vhost_delete_controller(name, if_exists = true)
     call("vhost_delete_controller", {ctrlr: name})
-  rescue SpdkNotFound => e
-    raise e unless if_exists
+  rescue SpdkNotFound
+    raise unless if_exists
   end
 
   def accel_crypto_key_create(name, cipher, key, key2)
@@ -89,8 +89,8 @@ class SpdkRpc
 
   def accel_crypto_key_destroy(name, if_exists = true)
     call("accel_crypto_key_destroy", {key_name: name})
-  rescue SpdkNotFound => e
-    raise e unless if_exists
+  rescue SpdkNotFound
+    raise unless if_exists
   end
 
   def call(method, params = {})

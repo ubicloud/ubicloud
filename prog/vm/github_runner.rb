@@ -311,7 +311,7 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     hop_wait
   rescue Octokit::Conflict => e
-    raise e unless e.message.include?("Already exists")
+    raise unless e.message.include?("Already exists")
 
     # If the runner already exists at GitHub side, this suggests that the
     # process terminated prematurely before hop wait. We can't be sure if the

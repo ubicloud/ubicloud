@@ -85,7 +85,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       minio_server.vm.sshable.cmd("sudo groupadd -f --system minio-user")
       minio_server.vm.sshable.cmd("sudo useradd --no-create-home --system -g minio-user minio-user")
     rescue => ex
-      raise ex unless ex.message.include?("already exists")
+      raise unless ex.message.include?("already exists")
     end
 
     hop_setup

@@ -69,7 +69,7 @@ class StorageVolume
     begin
       setup_spdk_bdev(encryption_key)
       setup_spdk_vhost
-    rescue SpdkExists => e
+    rescue SpdkExists
       # If some of SPDK artifacts exist, purge and retry. But retry only once
       # to prevent potential retry loops.
       if retries == 0
@@ -77,7 +77,7 @@ class StorageVolume
         purge_spdk_artifacts
         retry
       end
-      raise e
+      raise
     end
   end
 
