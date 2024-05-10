@@ -32,7 +32,6 @@ begin
   unix_user = params.fetch("unix_user")
   ssh_public_key = params.fetch("ssh_public_key")
   nics = params.fetch("nics").map { |args| VmSetup::Nic.new(*args) }.freeze
-  boot_image = params.fetch("boot_image")
   max_vcpus = params.fetch("max_vcpus")
   cpu_topology = params.fetch("cpu_topology")
   mem_gib = params.fetch("mem_gib")
@@ -54,7 +53,7 @@ when "prep"
   end
 
   vm_setup.prep(unix_user, ssh_public_key, nics, gua, ip4,
-    local_ip4, boot_image, max_vcpus, cpu_topology, mem_gib,
+    local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
