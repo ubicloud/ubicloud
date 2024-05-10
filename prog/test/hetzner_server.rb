@@ -68,7 +68,8 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vm_host = Prog::Vm::HostNexus.assemble(
       frame["hostname"],
       provider: "hetzner",
-      hetzner_server_identifier: frame["server_id"]
+      hetzner_server_identifier: frame["server_id"],
+      default_boot_images: [Config.default_boot_image_name]
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
 
