@@ -303,7 +303,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates a page if no capacity left and naps" do
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts")).twice
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
       expect(Page.from_tag_parts("NoCapacity", vm.location, vm.arch)).not_to be_nil
@@ -315,7 +315,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
-      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible hosts"))
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
 

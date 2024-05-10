@@ -208,7 +208,7 @@ class Prog::Vm::Nexus < Prog::Base
         gpu_enabled: gpu_enabled
       )
     rescue RuntimeError => ex
-      raise unless ex.message.include?("no space left on any eligible hosts")
+      raise unless ex.message.include?("no space left on any eligible host")
 
       queued_vms = queued_vms.all
       Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.arch}", queued_vms.first(25).map(&:ubid), "NoCapacity", vm.location, vm.arch)
