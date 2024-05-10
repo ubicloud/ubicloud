@@ -105,6 +105,9 @@ module Config
   # Spdk
   override :spdk_version, "v23.09-ubi-0.2"
 
+  # Boot Images
+  override :default_boot_image_name, "ubuntu-jammy", string
+
   # Pagerduty
   optional :pagerduty_key, string, clear: true
   optional :pagerduty_log_link, string
@@ -128,9 +131,11 @@ module Config
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
 
+  override :ubuntu_jammy_version, "20240319", string
   override :github_ubuntu_2204_version, "20240422.1.0", string
   override :github_ubuntu_2004_version, "20240422.1.0", string
   override :postgres_ubuntu_2204_version, "20240226.1.0", string
+  override :github_gpu_ubuntu_2204_version, "20240422.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float

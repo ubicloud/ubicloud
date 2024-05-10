@@ -4,7 +4,7 @@ class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
   semaphore :checkup, :reboot, :destroy
 
-  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version)
+  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
     DB.transaction do
       ubid = VmHost.generate_ubid
 
@@ -23,7 +23,7 @@ class Prog::Vm::HostNexus < Prog::Base
       Strand.create(
         prog: "Vm::HostNexus",
         label: "start",
-        stack: [{"spdk_version" => spdk_version}]
+        stack: [{"spdk_version" => spdk_version, "default_boot_images" => default_boot_images}]
       ) { _1.id = vmh.id }
     end
   end
@@ -95,7 +95,8 @@ class Prog::Vm::HostNexus < Prog::Base
       spdk_installation = vm_host.spdk_installations.first
       spdk_cores = (spdk_installation.cpu_count * vm_host.total_cores) / vm_host.total_cpus
       vm_host.update(used_cores: spdk_cores)
-      hop_prep_reboot
+
+      hop_download_boot_images
     end
 
     push Prog::Storage::SetupSpdk, {
@@ -103,6 +104,40 @@ class Prog::Vm::HostNexus < Prog::Base
       "start_service" => false,
       "allocation_weight" => 100
     }
+  end
+
+  def default_boot_image_version(image_name)
+    case image_name
+    when "ubuntu-jammy"
+      Config.ubuntu_jammy_version
+    when "github-ubuntu-2204"
+      Config.github_ubuntu_2204_version
+    when "github-ubuntu-2004"
+      Config.github_ubuntu_2004_version
+    when "github-gpu-ubuntu-2204"
+      Config.github_gpu_ubuntu_2204_version
+    when "postgres-ubuntu-2204"
+      Config.postgres_ubuntu_2204_version
+    else
+      fail "Unknown boot image: #{image_name}"
+    end
+  end
+
+  label def download_boot_images
+    frame["default_boot_images"].each { |image_name|
+      bud Prog::DownloadBootImage, {
+        "image_name" => image_name,
+        "version" => default_boot_image_version(image_name)
+      }
+    }
+
+    hop_wait_download_boot_images
+  end
+
+  label def wait_download_boot_images
+    reap
+    hop_prep_reboot if leaf?
+    donate
   end
 
   label def prep_reboot
