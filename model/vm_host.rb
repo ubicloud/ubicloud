@@ -15,7 +15,7 @@ class VmHost < Sequel::Model
   one_to_many :pci_devices, key: :vm_host_id
   one_to_many :boot_images, key: :vm_host_id
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, boot_images: :destroy
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
