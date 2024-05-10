@@ -181,7 +181,85 @@ RSpec.describe Prog::Vm::HostNexus do
       )
       allow(nx).to receive(:vm_host).and_return(vmh)
       expect(vmh).to receive(:update).with({used_cores: 2})
-      expect { nx.setup_spdk }.to hop("prep_reboot")
+      expect { nx.setup_spdk }.to hop("download_boot_image")
+    end
+  end
+
+  describe "#default_boot_images" do
+    it "returns the default image in development env" do
+      expect(Config).to receive(:development?).and_return(true)
+      expect(nx.default_boot_images).to eq([Config.default_boot_image_name])
+    end
+
+    it "returns the default image in non-development env without blob storage" do
+      expect(Config).to receive(:development?).and_return(false)
+      expect(Config).to receive(:ubicloud_images_blob_storage_endpoint).and_return(nil)
+      expect(nx.default_boot_images).to eq([Config.default_boot_image_name])
+    end
+
+    it "also includes github-runner images in non-development env with blob storage" do
+      expect(Config).to receive(:development?).and_return(false)
+      expect(Config).to receive(:ubicloud_images_blob_storage_endpoint).and_return("https://some.blob.storage")
+      expect(vm_host).to receive(:location).and_return("some-location")
+      expect(vm_host).to receive(:pci_devices_dataset).and_return([])
+      expect(nx.default_boot_images).to eq(["ubuntu-jammy", "github-ubuntu-2204", "github-ubuntu-2004"])
+    end
+
+    it "also includes postgres image for Germany hosts" do
+      expect(Config).to receive(:development?).and_return(false)
+      expect(Config).to receive(:ubicloud_images_blob_storage_endpoint).and_return("https://some.blob.storage")
+      expect(vm_host).to receive(:location).and_return("hetzner-fsn1")
+      expect(vm_host).to receive(:pci_devices_dataset).and_return([])
+      expect(nx.default_boot_images).to eq(["ubuntu-jammy", "github-ubuntu-2204", "github-ubuntu-2004", "postgres-ubuntu-2204"])
+    end
+
+    it "also includes github-gpu image for GPU hosts" do
+      expect(Config).to receive(:development?).and_return(false)
+      expect(Config).to receive(:ubicloud_images_blob_storage_endpoint).and_return("https://some.blob.storage")
+      expect(vm_host).to receive(:location).and_return("some-location")
+      expect(vm_host).to receive(:pci_devices_dataset).and_return([instance_double(PciDevice)])
+      expect(nx.default_boot_images).to eq(["ubuntu-jammy", "github-ubuntu-2204", "github-ubuntu-2004", "github-gpu-ubuntu-2204"])
+    end
+  end
+
+  describe "#default_boot_image_version" do
+    it "returns the version for the default image" do
+      expect(nx.default_boot_image_version("ubuntu-jammy")).to eq(Config.ubuntu_jammy_version)
+      expect(nx.default_boot_image_version("github-ubuntu-2204")).to eq(Config.github_ubuntu_2204_version)
+      expect(nx.default_boot_image_version("github-ubuntu-2004")).to eq(Config.github_ubuntu_2004_version)
+      expect(nx.default_boot_image_version("github-gpu-ubuntu-2204")).to eq(Config.github_gpu_ubuntu_2204_version)
+      expect(nx.default_boot_image_version("postgres-ubuntu-2204")).to eq(Config.postgres_ubuntu_2204_version)
+    end
+
+    it "fails for unknown images" do
+      expect { nx.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
+    end
+  end
+
+  describe "#download_boot_image" do
+    it "starts the download process and hops" do
+      default_images = ["ubuntu-jammy", "github-ubuntu-2204"]
+      expect(nx).to receive(:default_boot_images).and_return(default_images)
+      expect(nx).to receive(:bud).with(Prog::DownloadBootImage, {"image_name" => "ubuntu-jammy", "version" => Config.ubuntu_jammy_version})
+      expect(nx).to receive(:bud).with(Prog::DownloadBootImage, {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version})
+      expect { nx.download_boot_image }.to hop("wait_download_boot_images")
+    end
+  end
+
+  describe "#wait_download_boot_images" do
+    it "hops to prep_reboot if all tasks are done" do
+      expect(nx).to receive(:reap).and_return([])
+      expect(nx).to receive(:leaf?).and_return true
+
+      expect { nx.wait_download_boot_images }.to hop("prep_reboot")
+    end
+
+    it "donates its time if child strands are still running" do
+      expect(nx).to receive(:reap).and_return([])
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+
+      expect { nx.wait_download_boot_images }.to nap(1)
     end
   end
 

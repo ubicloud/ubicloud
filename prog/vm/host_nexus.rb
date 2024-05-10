@@ -95,7 +95,7 @@ class Prog::Vm::HostNexus < Prog::Base
       spdk_installation = vm_host.spdk_installations.first
       spdk_cores = (spdk_installation.cpu_count * vm_host.total_cores) / vm_host.total_cpus
       vm_host.update(used_cores: spdk_cores)
-      hop_prep_reboot
+      hop_download_boot_image
     end
 
     push Prog::Storage::SetupSpdk, {
@@ -103,6 +103,53 @@ class Prog::Vm::HostNexus < Prog::Base
       "start_service" => false,
       "allocation_weight" => 100
     }
+  end
+
+  def default_boot_images
+    return [Config.default_boot_image_name] if Config.development? || !Config.ubicloud_images_blob_storage_endpoint
+
+    images = ["ubuntu-jammy", "github-ubuntu-2204", "github-ubuntu-2004"]
+
+    # Germany hosts should have PG image too
+    images << "postgres-ubuntu-2204" if vm_host.location == "hetzner-fsn1"
+
+    # GPU hosts should have runner image too
+    images << "github-gpu-ubuntu-2204" if vm_host.pci_devices_dataset.count > 0
+
+    images
+  end
+
+  def default_boot_image_version(image_name)
+    case image_name
+    when "ubuntu-jammy"
+      Config.ubuntu_jammy_version
+    when "github-ubuntu-2204"
+      Config.github_ubuntu_2204_version
+    when "github-ubuntu-2004"
+      Config.github_ubuntu_2004_version
+    when "github-gpu-ubuntu-2204"
+      Config.github_gpu_ubuntu_2204_version
+    when "postgres-ubuntu-2204"
+      Config.postgres_ubuntu_2204_version
+    else
+      fail "Unknown boot image: #{image_name}"
+    end
+  end
+
+  label def download_boot_image
+    default_boot_images.each do |image_name|
+      bud Prog::DownloadBootImage, {
+        "image_name" => image_name,
+        "version" => default_boot_image_version(image_name)
+      }
+    end
+    hop_wait_download_boot_images
+  end
+
+  label def wait_download_boot_images
+    reap
+    hop_prep_reboot if leaf?
+    donate
   end
 
   label def prep_reboot
