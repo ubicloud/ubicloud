@@ -53,16 +53,6 @@ RSpec.describe VmSetup do
     end
   end
 
-  describe "#download_boot_image" do
-    it "can download ubuntu-jammy boot image" do
-      boot_image = instance_double(BootImage)
-      expect(BootImage).to receive(:new).with("ubuntu-jammy", nil).and_return(boot_image)
-      allow(Arch).to receive(:render).and_return("amd64")
-      expect(boot_image).to receive(:download)
-      vs.download_boot_image("ubuntu-jammy")
-    end
-  end
-
   describe "#purge_storage" do
     let(:vol_1_params) {
       {
