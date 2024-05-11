@@ -30,10 +30,11 @@ RSpec.describe Prog::DownloadBootImage do
         "image_name" => "my-image",
         "url" => "https://example.com/my-image.raw",
         "version" => "20230303",
-        "sha256sum" => nil
+        "sha256sum" => nil,
+        "certs" => nil
       }.to_json
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image #{params_json.shellescape}' download_my-image_20230303", stdin: nil)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
@@ -42,26 +43,29 @@ RSpec.describe Prog::DownloadBootImage do
         "image_name" => "github-runners-image",
         "url" => "https://minio.example.com/my-image.raw",
         "version" => "20230303",
-        "sha256sum" => nil
+        "sha256sum" => nil,
+        "certs" => "certs"
       }.to_json
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-runners-image", "version" => "20230303"}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-runners-image_20230303").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image #{params_json.shellescape}' download_github-runners-image_20230303", stdin: "certs")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-runners-image_20230303", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
-    it "doesn't send a url for non-github-runners images by default" do
+    it "doesn't send a url or a certificate for non-blob-storage images by default" do
       params_json = {
         "image_name" => "my-image",
         "url" => nil,
         "version" => "20230303",
-        "sha256sum" => nil
+        "sha256sum" => nil,
+        "certs" => nil
       }.to_json
+      expect(Config).not_to receive(:ubicloud_images_blob_storage_certs)
       expect(dbi).to receive(:frame).and_return({"image_name" => "my-image", "version" => "20230303"}).at_least(:once)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image #{params_json.shellescape}' download_my-image_20230303", stdin: nil)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 

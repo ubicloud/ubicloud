@@ -13,6 +13,10 @@ class Prog::DownloadBootImage < Prog::Base
     @version ||= frame.fetch("version")
   end
 
+  def download_from_blob_storage?
+    image_name.start_with?("github", "postgres")
+  end
+
   def url
     # YYY: Should we get ubuntu & almalinux urls here? Since we might start
     # putting all images into the blob storage in future, we're postponing the
@@ -21,7 +25,7 @@ class Prog::DownloadBootImage < Prog::Base
     @url ||=
       if frame["custom_url"]
         frame["custom_url"]
-      elsif image_name.start_with?("github", "postgres")
+      elsif download_from_blob_storage?
         blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}.raw", 60 * 60).to_s
       end
   end
@@ -70,9 +74,10 @@ class Prog::DownloadBootImage < Prog::Base
         image_name: image_name,
         url: url,
         version: version,
-        sha256sum: sha256_sum
+        sha256sum: sha256_sum,
+        certs: download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
       }.to_json
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image #{params_json.shellescape}' #{q_daemon_name}", stdin: Config.ubicloud_images_blob_storage_certs)
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' #{q_daemon_name}", stdin: params_json)
     when "Failed"
       BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
       fail "Failed to download '#{image_name}' image on #{vm_host}"
