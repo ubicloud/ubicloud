@@ -325,6 +325,14 @@ RSpec.describe Al do
       expect(Al::Allocation.new(vmhds, req).score).to eq(0.5)
     end
 
+    it "penalizes AX161 github runners" do
+      expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      vmhds[:location] = "github-runners"
+      vmhds[:total_cores] = 32
+      expect(Al::Allocation.new(vmhds, req).score).to eq(0.5)
+    end
+
     it "respects location preferences" do
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(0, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0, true))
