@@ -146,9 +146,11 @@ module Scheduling::Allocator
       score += util.max - util.min
 
       if @candidate_host[:location] == "github-runners"
-      # penalty for ongoing vm provisionings on the host
+        # penalty for ongoing vm provisionings on the host
         score += @candidate_host[:vm_provisioning_count] * 0.5
 
+        # penalty for AX161, TODO: remove after migration to AX162
+        score += 0.5 if @candidate_host[:total_cores] == 32
       end
 
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
