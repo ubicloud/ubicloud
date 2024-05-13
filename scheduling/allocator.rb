@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
+  def self.target_host_utilization
+    @@target_host_utilization ||= Config.allocator_target_host_utilization
+  end
+
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
       vm.cores,
@@ -31,10 +35,15 @@ module Scheduling::Allocator
   class Allocation
     attr_reader :score
 
+    def self.random_score
+      @@max_random_score ||= Config.allocator_max_random_score
+      rand(0..@@max_random_score)
+    end
+
     def self.best_allocation(request)
       candidate_hosts(request).map { Allocation.new(_1, request) }
         .select { _1.is_valid }
-        .min_by { _1.score }
+        .min_by { _1.score + random_score }
     end
 
     def self.candidate_hosts(request)
@@ -96,7 +105,7 @@ module Scheduling::Allocator
       vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6.nth(2))
     end
 
-    def initialize(candidate_host, request, score_randomization = rand(0..0.4))
+    def initialize(candidate_host, request)
       @candidate_host = candidate_host
       @request = request
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
@@ -104,7 +113,7 @@ module Scheduling::Allocator
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_enabled
       @allocations = @vm_host_allocations + @device_allocations
-      @score = calculate_score + score_randomization
+      @score = calculate_score
     end
 
     def is_valid

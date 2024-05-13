@@ -127,4 +127,8 @@ module Config
   optional :ubicloud_images_blob_storage_access_key, string, clear: true
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
+
+  # Allocator
+  override :allocator_target_host_utilization, 0.55, float
+  override :allocator_max_random_score, 0.1, float
 end
