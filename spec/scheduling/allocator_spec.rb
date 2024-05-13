@@ -317,11 +317,12 @@ RSpec.describe Al do
       expect(score_imbalance).to be > score_balance
     end
 
-    it "penalizes concurrent provisioning" do
+    it "penalizes concurrent provisioning for github runners" do
       expect(Al::VmHostAllocation).to receive(:new).twice.and_return(TestResourceAllocation.new(req.target_host_utilization, true))
       expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(req.target_host_utilization, true))
+      vmhds[:location] = "github-runners"
       vmhds[:vm_provisioning_count] = 1
-      expect(Al::Allocation.new(vmhds, req, 0).score).to be > 0
+      expect(Al::Allocation.new(vmhds, req).score).to eq(0.5)
     end
 
     it "respects location preferences" do

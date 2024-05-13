@@ -139,23 +139,25 @@ module Scheduling::Allocator
       util = @allocations.map { _1.utilization }
 
       # utilization score, in range [0, 2]
-      avg_util = util.sum.fdiv(util.size)
-      utilization_score = @request.target_host_utilization - avg_util
-      utilization_score = utilization_score.abs + 1 if utilization_score < 0
+      score = @request.target_host_utilization - util.sum.fdiv(util.size)
+      score = score.abs + 1 if score < 0
 
       # imbalance score, in range [0, 1]
-      imbalance_score = util.max - util.min
+      score += util.max - util.min
 
+      if @candidate_host[:location] == "github-runners"
       # penalty for ongoing vm provisionings on the host
-      vm_provisioning_penalty = @candidate_host[:vm_provisioning_count] * 0.2
+        score += @candidate_host[:vm_provisioning_count] * 0.5
+
+      end
 
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
-      gpu_penalty = (@request.gpu_enabled || @candidate_host[:num_gpus] == 0) ? 0 : 5
+      score += 5 unless @request.gpu_enabled || @candidate_host[:num_gpus] == 0
 
       # penalty of 10 if location preference is not honored
-      location_preference_penalty = (@request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location])) ? 0 : 10
+      score += 10 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location])
 
-      utilization_score + imbalance_score + vm_provisioning_penalty + gpu_penalty + location_preference_penalty
+      score
     end
   end
 
