@@ -171,7 +171,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
         expect(page).to have_content pg.name
 
-        click_link "Show", href: "#{project.path}#{pg.path}"
+        click_link pg.name, href: "#{project.path}#{pg.path}"
 
         expect(page.title).to eq("Ubicloud - #{pg.name}")
         expect(page).to have_content pg.name
