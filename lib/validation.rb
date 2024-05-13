@@ -34,6 +34,10 @@ module Validation
   # - Alphanumeric, hyphen, underscore, space, parantheses, exclamation, question mark, star
   ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?\*\(\) ]{1,63}\z}
 
+  # - Max length 63
+  # - Unicode letters, numbers, hyphen, space
+  ALLOWED_ACCOUNT_NAME = %r{\A\p{L}[\p{L}0-9\- ]{1,62}\z}
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
@@ -184,5 +188,9 @@ module Validation
 
   def self.validate_short_text(text, field_name)
     fail ValidationFailed.new({field_name: "The #{field_name} must have max length 63 and only contain alphanumeric characters, hyphen, underscore, space, parantheses, exclamation, question mark and star."}) unless text.match(ALLOWED_SHORT_TEXT_PATTERN)
+  end
+
+  def self.validate_account_name(name)
+    fail ValidationFailed.new({name: "Name must only contain letters, numbers, spaces, and hyphens and have max length 63."}) unless name&.match(ALLOWED_ACCOUNT_NAME)
   end
 end

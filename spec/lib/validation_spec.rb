@@ -266,4 +266,36 @@ RSpec.describe Validation do
       end
     end
   end
+
+  describe "#validate_account_name" do
+    it "valid account names" do
+      [
+        "John Doe",
+        "john doe",
+        "John Doe-Smith",
+        "Jøhn Döe",
+        "John2 Doe",
+        "J" * 63
+      ].each do |name|
+        expect(described_class.validate_account_name(name)).to be_nil
+      end
+    end
+
+    it "invalid account names" do
+      [
+        nil,
+        "",
+        " John Doe",
+        "1john Doe",
+        ".john Doe",
+        "https://example.com",
+        "Click this link: http://example.com",
+        "Click this link example.com",
+        "🚀 emojis not allowed",
+        "J" * 64
+      ].each do |name|
+        expect { described_class.validate_account_name(name) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
 end
