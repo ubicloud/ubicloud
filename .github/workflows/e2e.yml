@@ -2,6 +2,13 @@ name: E2E CI
 
 on:
   workflow_dispatch:
+    inputs:
+      test_cases:
+        description: 'Comma-separated list of test cases (vm)'
+        required: true
+        default: 'vm'
+        type: string
+
   schedule:
     - cron:  '0 */1 * * *'
 
@@ -53,7 +60,7 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
-        echo "e2e: bin/ci" >> Procfile
+        echo "e2e: bin/ci --test-cases=${{ inputs.test_cases }}" >> Procfile
 
     - name: Run services
       env:
