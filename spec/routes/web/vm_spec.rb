@@ -211,7 +211,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Virtual Machines")
         expect(page).to have_content vm.name
 
-        click_link "Show", href: "#{project.path}#{vm.path}"
+        click_link vm.name, href: "#{project.path}#{vm.path}"
 
         expect(page.title).to eq("Ubicloud - #{vm.name}")
         expect(page).to have_content vm.name
