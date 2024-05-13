@@ -152,6 +152,7 @@ class CloverWeb < Roda
     before_create_account do
       account[:id] = Account.generate_uuid
       account[:name] = param("name")
+      Validation.validate_account_name(account[:name])
     end
     after_create_account do
       Account[account_id].create_project_with_default_policy("Default")

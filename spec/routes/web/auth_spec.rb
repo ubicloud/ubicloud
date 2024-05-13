@@ -12,6 +12,7 @@ RSpec.describe Clover, "auth" do
   it "can not login new account without verification" do
     visit "/create-account"
     fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "John Doe"
     fill_in "Password", with: TEST_USER_PASSWORD
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
@@ -26,6 +27,19 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - Resend Verification")
+  end
+
+  it "can not create new account with invalid name" do
+    visit "/create-account"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Full Name", with: "Click here http://example.com"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(page.title).to eq("Ubicloud - Create Account")
+    expect(Mail::TestMailer.deliveries.length).to eq 0
+    expect(page).to have_content("Name must only contain letters, numbers, spaces, and hyphens and have max length 63.")
   end
 
   it "can create new account and verify it" do
