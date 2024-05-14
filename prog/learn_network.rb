@@ -34,7 +34,7 @@ class Prog::LearnNetwork < Prog::Base
     case JSON.parse(s)
     in [iface]
       case iface.fetch("addr_info").filter_map { |info|
-             if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 64
+             if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 68
                Ip6.new(local, prefixlen)
              end
            }

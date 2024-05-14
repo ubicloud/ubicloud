@@ -59,8 +59,8 @@ RSpec.describe VmHost do
   end
 
   it "tries to get another random network if the proposal matches the reserved nework" do
-    expect(SecureRandom).to receive(:bytes).and_return("\0\0")
-    expect(SecureRandom).to receive(:bytes).and_call_original
+    expect(SecureRandom).to receive(:random_number).and_return(0)
+    expect(SecureRandom).to receive(:random_number).and_call_original
     expect(vh.ip6_random_vm_network.to_s).not_to eq(vh.ip6_reserved_network)
   end
 
