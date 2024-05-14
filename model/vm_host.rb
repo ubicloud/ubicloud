@@ -73,16 +73,16 @@ class VmHost < Sequel::Model
   # Generate a random network that is a slice of the host's network
   # for delegation to a VM.
   def ip6_random_vm_network(prefix = 79)
-    subnet_bits = prefix - host_prefix
-
-    # Perform integer division, rounding up the number of random bytes
-    # needed.
-    bytes_needed = ((subnet_bits - 1) / 8) + 1
-
-    # Generate bits to sit between the host_prefix and the vm network.
-    #
-    # Shift them into the right place for a 128 bit IPv6 address
-    lower_bits = SecureRandom.bytes(bytes_needed).unpack1("n") << (128 - prefix - 1)
+    # Generates bits worth of a single byte of entropy and then shifts it to the
+    # correct position in the host's network. The bits sits in between the
+    # host's network and the network that is delegated to the VM. We use the
+    # range 2...256 to avoid the case where the lower_bits is 0 or 1, which
+    # would result in the host's network being returned. We also make sure the
+    # higest possible value is 255, so that the lower_bits is never greater than
+    # the host's network. This would be the case if the difference between the
+    # host's network and the network that is delegated to the VM is a single
+    # byte.
+    lower_bits = SecureRandom.random_number(2...256) << (128 - prefix - 1)
 
     # Combine it with the higher bits for the host.
     proposal = NetAddr::IPv6Net.new(
