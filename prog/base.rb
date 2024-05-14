@@ -153,10 +153,9 @@ end
     strand.retval
   end
 
-  def push(prog, new_frame = {}, label = "start")
-    old_prog = strand.prog
-    old_label = strand.label
-    new_frame = {"subject_id" => @subject_id, "link" => [strand.prog, old_label]}.merge(new_frame)
+  def push(prog, new_frame = {}, label = "start", next_prog: nil, next_label: nil)
+    old_prog, old_label = strand.prog, strand.label
+    new_frame = {"subject_id" => @subject_id, "link" => [next_prog || old_prog, next_label || old_label]}.merge(new_frame)
 
     fail Hop.new(old_prog, old_label,
       {prog: Strand.prog_verify(prog), label: label,

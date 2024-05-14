@@ -34,7 +34,7 @@ RSpec.describe Prog::BootstrapRhizome do
   describe "#setup" do
     before { br.strand.label = "setup" }
 
-    it "runs initializing shell wih public keys" do
+    it "runs initializing shell wih public keys and returns to finish label" do
       sshable = instance_double(Sshable, host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
       allow(br).to receive(:sshable).and_return(sshable)
       expect(Util).to receive(:rootish_ssh).with "hostname", "root", ["test private key"], <<FIXTURE
@@ -48,12 +48,16 @@ sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authoriz
 echo test\\ key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 FIXTURE
 
-      expect { br.setup }.to hop("start", "InstallRhizome")
+      expect { br.setup }.to hop("start", "InstallRhizome").with_hop { |hopped|
+        expect(br).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { br.pop("exit") }.to hop("finish")
     end
+  end
 
-    it "exits once InstallRhizome has returned" do
-      br.strand.retval = {"msg" => "installed rhizome"}
-      expect { br.setup }.to exit({"msg" => "rhizome user bootstrapped and source installed"})
+  describe "#finish" do
+    it "exits" do
+      expect { br.finish }.to exit({"msg" => "rhizome user bootstrapped and source installed"})
     end
   end
 end
