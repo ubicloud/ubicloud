@@ -12,6 +12,7 @@ module Scheduling::Allocator
       vm.mem_gib,
       storage_volumes.map { _1["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
+      vm.boot_image,
       distinct_storage_devices,
       gpu_enabled,
       vm.ip4_enabled,
@@ -29,7 +30,7 @@ module Scheduling::Allocator
     Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
   end
 
-  Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :distinct_storage_devices, :gpu_enabled, :ip4_enabled,
+  Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_enabled, :ip4_enabled,
     :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :location_filter, :location_preference)
 
   class Allocation
@@ -83,6 +84,10 @@ module Scheduling::Allocator
           .select_group(:vm_host_id)
           .select_append { count.function.*.as(vm_provisioning_count) }
           .where(display_state: "creating"))
+
+      ds = ds.join(:boot_image, Sequel[:vm_host][:id] => Sequel[:boot_image][:vm_host_id])
+        .where(Sequel[:boot_image][:name] => request.boot_image)
+        .exclude(Sequel[:boot_image][:activated_at] => nil)
 
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
       ds = ds.where { available_gpus > 0 } if request.gpu_enabled
@@ -250,7 +255,7 @@ module Scheduling::Allocator
         name: boot_image_name
       ).exclude(activated_at: nil).order_by(Sequel.desc(:version)).first
 
-      boot_image&.id
+      boot_image.id
     end
 
     def map_volumes_to_devices
