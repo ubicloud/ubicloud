@@ -123,7 +123,7 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dataset).to receive(:update) do |args|
         expect(args[:activated_at]).to be <= Time.now
       end
-      expect { dbi.activate_boot_image }.to exit({"msg" => "image=my-image version=20230303 downloaded"})
+      expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
     end
   end
 end
