@@ -95,7 +95,7 @@ RSpec.describe Al do
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
       sd2 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 12, total_storage_gib: 99)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
 
       expect(Al::Allocation.candidate_hosts(req))
         .to eq([{location: vmh.location,
@@ -123,7 +123,7 @@ RSpec.describe Al do
       sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
       Vm.create_with_id(vm_host_id: vmh.id, family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "")
       Vm.create_with_id(vm_host_id: vmh.id, family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy")
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
 
       expect(Al::Allocation.candidate_hosts(req))
         .to eq([{location: vmh.location,
@@ -151,8 +151,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       req.host_filter = [vmh2.id]
       cand = Al::Allocation.candidate_hosts(req)
@@ -168,8 +168,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       req.location_filter = ["loc1"]
       cand = Al::Allocation.candidate_hosts(req)
@@ -186,8 +186,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       req.distinct_storage_devices = true
       cand = Al::Allocation.candidate_hosts(req)
@@ -202,8 +202,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
       Address.create_with_id(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(1)
@@ -218,8 +218,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
       Address.create_with_id(cidr: "2.1.1.0/32", routed_to_host_id: vmh2.id)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(2)
@@ -235,8 +235,8 @@ RSpec.describe Al do
       PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "02:00.0", device_class: "0300", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 9)
       PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "03:00.0", device_class: "1234", vendor: "vd", device: "dv3", numa_node: 0, iommu_group: 11)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       req.gpu_enabled = true
       cand = Al::Allocation.candidate_hosts(req)
@@ -460,7 +460,7 @@ RSpec.describe Al do
 
     before do
       vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", net6: "fd10:9b0b:6b4b:8fbb::/64", total_cores: 7, used_cores: 5, total_hugepages_1g: 18, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
       SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
@@ -621,8 +621,8 @@ RSpec.describe Al do
     it "allocates the latest active boot image for boot volumes" do
       vmh = VmHost.first
       BootImage.where(vm_host_id: vmh.id).update(activated_at: nil)
-      bi = BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20230303", activated_at: Time.now)
-      BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20240404", activated_at: nil)
+      bi = BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20230303", activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20240404", activated_at: nil, size_gib: 3)
       vm = create_vm
       described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => true}])
       expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)

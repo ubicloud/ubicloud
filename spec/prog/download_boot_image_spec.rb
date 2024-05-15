@@ -19,7 +19,7 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "fails if image already exists" do
-      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303") { _1.id = vm_host.id }
+      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3) { _1.id = vm_host.id }
       expect { dbi.start }.to raise_error RuntimeError, "Image already exists on host"
     end
   end
@@ -88,6 +88,7 @@ RSpec.describe Prog::DownloadBootImage do
 
   describe "#update_available_storage_space" do
     it "updates available storage space" do
+      bi = BootImage.create_with_id(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
       sd = StorageDevice.create_with_id(
         vm_host_id: vm_host.id,
         name: "DEFAULT",
@@ -98,9 +99,11 @@ RSpec.describe Prog::DownloadBootImage do
       expect(sshable).to receive(:cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
       expect(sd.reload.available_storage_gib).to eq(32)
+      expect(bi.reload.size_gib).to eq(3)
     end
 
     it "checks the correct path if version is nil" do
+      BootImage.create_with_id(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
       dbi = described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => nil}]))
       allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
       sd = StorageDevice.create_with_id(
