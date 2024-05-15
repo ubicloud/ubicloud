@@ -11,4 +11,10 @@ class BootImage < Sequel::Model
   def self.ubid_type
     UBID::TYPE_ETC
   end
+
+  def path
+    version ?
+        "/var/storage/images/#{name}-#{version}.raw" :
+        "/var/storage/images/#{name}.raw"
+  end
 end

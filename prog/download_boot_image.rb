@@ -64,7 +64,8 @@ class Prog::DownloadBootImage < Prog::Base
       vm_host_id: vm_host.id,
       name: image_name,
       version: version,
-      activated_at: nil
+      activated_at: nil,
+      size_gib: 0
     )
     hop_download
   end
@@ -93,16 +94,13 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def update_available_storage_space
-    # YYY: version will be enforced in future.
-    image_path =
-      version ?
-        "/var/storage/images/#{image_name}-#{version}.raw" :
-        "/var/storage/images/#{image_name}.raw"
-    image_size_bytes = sshable.cmd("stat -c %s #{image_path}").to_i
+    image = BootImage[vm_host_id: vm_host.id, name: image_name, version: version]
+    image_size_bytes = sshable.cmd("stat -c %s #{image.path.shellescape}").to_i
     image_size_gib = (image_size_bytes / 1024.0**3).ceil
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
       available_storage_gib: Sequel[:available_storage_gib] - image_size_gib
     )
+    image.update(size_gib: image_size_gib)
     hop_activate_boot_image
   end
 
