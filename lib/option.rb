@@ -46,7 +46,7 @@ module Option
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16].map {
-    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 25, true, false)
+    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 40, true, false)
   }.concat([6].map {
     VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, (_1 / 2) * 60, false, true)
   }).freeze
