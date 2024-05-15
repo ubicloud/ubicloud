@@ -112,6 +112,6 @@ class Prog::DownloadBootImage < Prog::Base
       name: image_name,
       version: version
     ).update(activated_at: Time.now)
-    pop "image=#{image_name} version=#{version} downloaded"
+    pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
   end
 end
