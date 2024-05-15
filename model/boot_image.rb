@@ -12,6 +12,11 @@ class BootImage < Sequel::Model
     UBID::TYPE_ETC
   end
 
+  # Introduced for removing a boot image via REPL.
+  def remove_boot_image
+    Strand.create_with_id(schedule: Time.now, prog: "RemoveBootImage", label: "start", stack: [{subject_id: id}])
+  end
+
   def path
     version ?
         "/var/storage/images/#{name}-#{version}.raw" :
