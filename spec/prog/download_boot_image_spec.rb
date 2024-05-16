@@ -6,7 +6,7 @@ RSpec.describe Prog::DownloadBootImage do
   subject(:dbi) { described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => "20230303"}])) }
 
   let(:sshable) { Sshable.create_with_id }
-  let(:vm_host) { VmHost.create(location: "hetzner-hel1") { _1.id = sshable.id } }
+  let(:vm_host) { VmHost.create(location: "hetzner-hel1", arch: "x64") { _1.id = sshable.id } }
 
   before do
     allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
@@ -21,6 +21,50 @@ RSpec.describe Prog::DownloadBootImage do
     it "fails if image already exists" do
       BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303") { _1.id = vm_host.id }
       expect { dbi.start }.to raise_error RuntimeError, "Image already exists on host"
+    end
+
+    it "fails if version is nil" do
+      dbi = described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => nil}]))
+      expect { dbi.start }.to raise_error RuntimeError, "Version is required"
+    end
+  end
+
+  describe "#url" do
+    it "returns custom_url if it's provided" do
+      expect(dbi.url).to eq("https://example.com/my-image.raw")
+    end
+
+    it "returns presigned URL if custom_url is not provided" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
+      expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
+      expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
+    end
+
+    it "returns URL for x64 ubuntu-jammy image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "ubuntu-jammy", "version" => "20240319"}).at_least(:once)
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-amd64.img")
+    end
+
+    it "returns URL for arm64 ubuntu-jammy image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "ubuntu-jammy", "version" => "20240319"}).at_least(:once)
+      vm_host.update(arch: "arm64")
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-arm64.img")
+    end
+
+    it "returns URL for x64 almalinux-9.3 image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9.3", "version" => "20231113"}).at_least(:once)
+      expect(dbi.url).to eq("https://vault.almalinux.org/9.3/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.3-20231113.x86_64.qcow2")
+    end
+
+    it "returns URL for arm64 almalinux-9.3 image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9.3", "version" => "20231113"}).at_least(:once)
+      vm_host.update(arch: "arm64")
+      expect(dbi.url).to eq("https://vault.almalinux.org/9.3/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.3-20231113.aarch64.qcow2")
+    end
+
+    it "fails if image name is unknown" do
+      dbi = described_class.new(Strand.new(stack: [{"image_name" => "unknown", "custom_url" => nil, "version" => "20231113"}]))
+      expect { dbi.url }.to raise_error RuntimeError, "Unknown image name: unknown"
     end
   end
 
@@ -43,7 +87,7 @@ RSpec.describe Prog::DownloadBootImage do
         "image_name" => "github-ubuntu-2204",
         "url" => "https://minio.example.com/my-image.raw",
         "version" => "20240422.1.0",
-        "sha256sum" => nil,
+        "sha256sum" => "sha256_sum",
         "certs" => "certs"
       }.to_json
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
@@ -51,21 +95,7 @@ RSpec.describe Prog::DownloadBootImage do
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_20240422.1.0").and_return("NotStarted")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_20240422.1.0", stdin: params_json)
-      expect { dbi.download }.to nap(15)
-    end
-
-    it "doesn't send a url or a certificate for non-blob-storage images by default" do
-      params_json = {
-        "image_name" => "my-image",
-        "url" => nil,
-        "version" => "20230303",
-        "sha256sum" => nil,
-        "certs" => nil
-      }.to_json
-      expect(Config).not_to receive(:ubicloud_images_blob_storage_certs)
-      expect(dbi).to receive(:frame).and_return({"image_name" => "my-image", "version" => "20230303"}).at_least(:once)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
+      expect(dbi).to receive(:sha256_sum).and_return("sha256_sum")
       expect { dbi.download }.to nap(15)
     end
 
