@@ -253,7 +253,7 @@ module Scheduling::Allocator
       boot_image = BootImage.where(
         vm_host_id: vm_host.id,
         name: boot_image_name
-      ).exclude(activated_at: nil).order_by(Sequel.desc(:version)).first
+      ).exclude(activated_at: nil).order_by(Sequel.desc(:version, nulls: :last)).first
 
       boot_image.id
     end
