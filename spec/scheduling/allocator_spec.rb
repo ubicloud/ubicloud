@@ -168,8 +168,8 @@ RSpec.describe Al do
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
       Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
 
       req.host_exclusion_filter = [vmh1.id]
       cand = Al::Allocation.candidate_hosts(req)
