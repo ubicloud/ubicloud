@@ -7,7 +7,7 @@ require "base64"
 RSpec.describe BootImage do
   subject(:bi) { described_class.new("ubuntu-jammy", "20240110") }
 
-  describe "#download_boot_image" do
+  describe "#download" do
     it "can use an image that's already downloaded" do
       expect(File).to receive(:exist?).with("/var/storage/images/ubuntu-jammy-20240110.raw").and_return(true)
       expect(bi).not_to receive(:curl_image)
@@ -19,8 +19,8 @@ RSpec.describe BootImage do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/images")
       expect(bi).to receive(:image_ext).with("url").and_return(".img")
       tmp_path = "/var/storage/images/ubuntu-jammy-20240110.img.tmp"
-      expect(bi).to receive(:curl_image).with("url", tmp_path, "ca_path")
-      expect(bi).to receive(:verify_sha256sum).with(tmp_path, "sha256sum")
+      expect(bi).to receive(:curl_image).with("url", tmp_path, "ca_path").and_return("returned_sha256sum")
+      expect(bi).to receive(:verify_sha256sum).with("returned_sha256sum", "sha256sum")
       expect(bi).to receive(:convert_image).with(tmp_path, "qcow2")
       expect(FileUtils).to receive(:rm_r).with(tmp_path)
 
@@ -51,29 +51,40 @@ RSpec.describe BootImage do
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
       end.and_yield
-      expect(bi).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy-20240110.img.tmp url")
-      bi.curl_image("url", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", nil)
+
+      expect(bi).to receive(:r).with(
+        "bash -c 'curl -f -L10 url | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'"
+      ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
+
+      expect(
+        bi.curl_image("url", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", nil)
+      ).to eq("81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455")
     end
 
     it "can curl image with ca_path" do
       expect(File).to receive(:open) do |path, *_args|
         expect(path).to eq("/var/storage/images/ubuntu-jammy-20240110.img.tmp")
       end.and_yield
-      expect(bi).to receive(:r).with("curl -f -L10 -o /var/storage/images/ubuntu-jammy-20240110.img.tmp url --cacert ca_path")
+
+      expect(bi).to receive(:r).with(
+        "bash -c 'curl -f -L10 url --cacert ca_path | tee >(openssl dgst -sha256) > /var/storage/images/ubuntu-jammy-20240110.img.tmp'"
+      ).and_return("SHA2-256(stdin)= 81fae9cc21e2b1e3a9a4526c7dad3131b668e346c580702235ad4d02645d9455\n")
+
       bi.curl_image("url", "/var/storage/images/ubuntu-jammy-20240110.img.tmp", "ca_path")
     end
   end
 
   describe "#verify_sha256sum" do
-    it "can verify sha256sum" do
-      # Prefer using verifying doubles over normal doubles.
-      expect(Digest::SHA256).to receive(:file).with("/var/storage/images/ubuntu-jammy-20240110.img.tmp").and_return(instance_double(Digest::SHA256, hexdigest: "sha256sum"))
-      bi.verify_sha256sum("/var/storage/images/ubuntu-jammy-20240110.img.tmp", "sha256sum")
+    it "succeeds if sha256 sums match" do
+      expect { bi.verify_sha256sum("sha256sum", "sha256sum") }.not_to raise_error
     end
 
-    it "skips verification if sha256sum is empty" do
-      expect(Digest::SHA256).not_to receive(:file)
-      bi.verify_sha256sum("/var/storage/images/ubuntu-jammy-20240110.img.tmp", nil)
+    it "fails if sha256 sums do not match" do
+      expect { bi.verify_sha256sum("sha256sum", "invalid") }.to raise_error(RuntimeError, "Invalid SHA256 sum.")
+    end
+
+    it "succeeds if expected sha256 sum is nil" do
+      expect { bi.verify_sha256sum("sha256sum", nil) }.not_to raise_error
     end
   end
 

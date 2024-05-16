@@ -41,8 +41,8 @@ class BootImage
     # same time.
     temp_file_name = @version.nil? ? @name : "#{@name}-#{@version}"
     temp_path = File.join(image_root, "#{temp_file_name}#{ext}.tmp")
-    curl_image(url, temp_path, ca_path)
-    verify_sha256sum(temp_path, sha256sum)
+    file_sha256sum = curl_image(url, temp_path, ca_path)
+    verify_sha256sum(file_sha256sum, sha256sum)
     convert_image(temp_path, init_format)
 
     rm_if_exists(temp_path)
@@ -67,15 +67,16 @@ class BootImage
 
   def curl_image(url, temp_path, ca_path)
     ca_arg = ca_path ? " --cacert #{ca_path.shellescape}" : ""
+    sha256_sum = nil
     File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
-      r "curl -f -L10 -o #{temp_path.shellescape} #{url.shellescape}#{ca_arg}"
+      digest_out = r "bash -c 'curl -f -L10 #{url.shellescape}#{ca_arg} | tee >(openssl dgst -sha256) > #{temp_path.shellescape}'"
+      sha256_sum = digest_out.split(" ").last
     end
+    sha256_sum
   end
 
-  def verify_sha256sum(temp_path, sha256sum)
-    if !sha256sum.nil? && sha256sum != Digest::SHA256.file(temp_path).hexdigest
-      fail "Invalid SHA256 sum."
-    end
+  def verify_sha256sum(file_sha256sum, expected_sha256sum)
+    fail "Invalid SHA256 sum." if !expected_sha256sum.nil? && file_sha256sum != expected_sha256sum
   end
 
   def convert_image(temp_path, initial_format)
