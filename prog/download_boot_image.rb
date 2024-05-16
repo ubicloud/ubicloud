@@ -18,15 +18,19 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def url
-    # YYY: Should we get ubuntu & almalinux urls here? Since we might start
-    # putting all images into the blob storage in future, we're postponing the
-    # decision and keeping the current logic (i.e. formula based URL in the
-    # rhizome side).
     @url ||=
       if frame["custom_url"]
         frame["custom_url"]
       elsif download_from_blob_storage?
         blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}-#{version}.raw", 60 * 60).to_s
+      elsif image_name == "ubuntu-jammy"
+        arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
+        "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
+      elsif image_name == "almalinux-9.3"
+        arch = (vm_host.arch == "x64") ? "x86_64" : "aarch64"
+        "https://vault.almalinux.org/9.3/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-9.3-#{version}.#{arch}.qcow2"
+      else
+        fail "Unknown image name: #{image_name}"
       end
   end
 
@@ -59,7 +63,11 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def start
+    # YYY: we can remove this once we enforce it in the database layer.
+    fail "Version is required" if version.nil?
+
     fail "Image already exists on host" if vm_host.boot_images_dataset.where(name: image_name, version: version).count > 0
+
     BootImage.create_with_id(
       vm_host_id: vm_host.id,
       name: image_name,
