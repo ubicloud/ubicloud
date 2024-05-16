@@ -40,7 +40,7 @@ RSpec.describe Al do
           "2464de61-7501-8374-9ab0-416caebe31da", 1, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-          "ubuntu-jammy", false, false, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], []
+          "ubuntu-jammy", false, false, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], []
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -54,7 +54,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, false, true, 0.65, "x64", ["accepting"], [], [], []
+        "ubuntu-jammy", false, false, true, 0.65, "x64", ["accepting"], [], [], [], []
       )
     }
 
@@ -161,6 +161,23 @@ RSpec.describe Al do
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
     end
 
+    it "applies host exclusion filter" do
+      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create_with_id(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now)
+
+      req.host_exclusion_filter = [vmh1.id]
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand.size).to eq(1)
+      expect(cand.first[:vm_host_id]).to eq(vmh2.id)
+    end
+
     it "applies location filter" do
       vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
       vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc2", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
@@ -252,7 +269,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, false, true, 0.65, "x64", ["accepting"], [], [], []
+        "ubuntu-jammy", false, false, true, 0.65, "x64", ["accepting"], [], [], [], []
       )
     }
     let(:vmhds) {
@@ -392,7 +409,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], []
+        "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], []
       )
     }
     let(:vmhds) {
@@ -473,7 +490,7 @@ RSpec.describe Al do
       Vm.create_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy")
     end
 
-    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
       Al::Request.new(
         vm.id,
         vm.cores,
@@ -488,6 +505,7 @@ RSpec.describe Al do
         vm.arch,
         allocation_state_filter,
         host_filter,
+        host_exclusion_filter,
         location_filter,
         location_preference
       )
