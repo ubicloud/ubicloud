@@ -42,6 +42,12 @@ class CloverApi
           Validation.validate_boot_image(request_body_params["boot_image"])
         end
 
+        # Same as above, moved the size validation here to not allow users to
+        # pass gpu instance while creating a VM.
+        if request_body_params["size"]
+          Validation.validate_vm_size(request_body_params["size"], only_visible: true)
+        end
+
         if request_body_params["private_subnet_id"]
           ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
           unless ps && ps.location == @location

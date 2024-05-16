@@ -186,6 +186,29 @@ RSpec.describe Clover, "vm" do
         expect(JSON.parse(last_response.body)["error"]["details"]["boot_image"]).to eq("\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-jammy\"]")
       end
 
+      it "invalid vm size" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-gpu-6",
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["size"]).to eq("\"standard-gpu-6\" is not a valid virtual machine size. Available sizes: [\"standard-2\", \"standard-4\", \"standard-8\", \"standard-16\"]")
+      end
+
+      it "success without vm_size" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          boot_image: "ubuntu-jammy",
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
       it "invalid ps id" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
