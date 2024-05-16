@@ -60,9 +60,10 @@ module Validation
     fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
   end
 
-  def self.validate_vm_size(size)
-    unless (vm_size = Option::VmSizes.find { _1.name == size })
-      fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{Option::VmSizes.map(&:name)}"})
+  def self.validate_vm_size(size, only_visible: false)
+    available_vm_sizes = Option::VmSizes.select { !only_visible || _1.visible }
+    unless (vm_size = available_vm_sizes.find { _1.name == size })
+      fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{available_vm_sizes.map(&:name)}"})
     end
     vm_size
   end

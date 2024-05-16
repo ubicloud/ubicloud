@@ -14,13 +14,10 @@ class Prog::Vm::Nexus < Prog::Base
     unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
-    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [])
+    distinct_storage_devices: false, force_host_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
-    end
-    if exclude_host_ids.include?(force_host_id)
-      fail "Cannot force and exclude the same host"
     end
     Validation.validate_location(location)
     vm_size = Validation.validate_vm_size(size)
@@ -103,7 +100,6 @@ class Prog::Vm::Nexus < Prog::Base
           "swap_size_bytes" => swap_size_bytes,
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,
-          "exclude_host_ids" => exclude_host_ids,
           "gpu_enabled" => vm_size.gpu
         }]
       ) { _1.id = vm.id }
@@ -192,7 +188,6 @@ class Prog::Vm::Nexus < Prog::Base
     queued_vms = Vm.join(:strand, id: :id).where(:location => vm.location, :arch => vm.arch, Sequel[:strand][:label] => "start")
     begin
       distinct_storage_devices = frame["distinct_storage_devices"] || false
-      host_exclusion_filter = frame["exclude_host_ids"] || []
       gpu_enabled = frame["gpu_enabled"] || false
       allocation_state_filter, location_filter, location_preference, host_filter =
         if frame["force_host_id"]
@@ -210,7 +205,6 @@ class Prog::Vm::Nexus < Prog::Base
         location_filter: location_filter,
         location_preference: location_preference,
         host_filter: host_filter,
-        host_exclusion_filter: host_exclusion_filter,
         gpu_enabled: gpu_enabled
       )
     rescue RuntimeError => ex

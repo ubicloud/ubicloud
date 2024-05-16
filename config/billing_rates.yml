@@ -1,8 +1,8 @@
 - { id: 139d9a67-8182-8578-a303-235cabd5161c, resource_type: VmCores,                 resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.000622768 }
 - { id: 08c502f7-df5d-8978-9896-feafa0ec5c40, resource_type: VmCores,                 resource_family: standard,        location: hetzner-hel1,   unit_price: 0.000595982 }
 - { id: 2acc2bbf-d451-49c6-93de-db8d15311042, resource_type: VmCores,                 resource_family: standard,        location: github-runners, unit_price: 0.000595982 }
-- { id: 8cc76122-1463-8178-a89a-3b74434d1943, resource_type: VmCores,                 resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.000850000 }
-- { id: 0f189c1f-b182-8978-bc1c-d1e0412718c3, resource_type: VmCores,                 resource_family: standard,        location: leaseweb-dal13, unit_price: 0.000850000 }
+- { id: 8cc76122-1463-8178-a89a-3b74434d1943, resource_type: VmCores,                 resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.000622768 }
+- { id: 0f189c1f-b182-8978-bc1c-d1e0412718c3, resource_type: VmCores,                 resource_family: standard,        location: leaseweb-dal13, unit_price: 0.000622768 }
 - { id: 8c82e087-10aa-8d78-876f-88afcc162d4c, resource_type: VmCores,                 resource_family: standard-gpu,    location: hetzner-fsn1,   unit_price: 0.000622768 }
 - { id: 80c193bc-528a-8d78-9377-17523b162c58, resource_type: VmCores,                 resource_family: standard-gpu,    location: hetzner-hel1,   unit_price: 0.000595982 }
 - { id: c1eb36d9-6b46-8578-869a-92e64646b547, resource_type: VmCores,                 resource_family: standard-gpu,    location: github-runners, unit_price: 0.000595982 }

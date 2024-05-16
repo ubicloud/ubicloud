@@ -12,9 +12,6 @@ class BootImage
   end
 
   def image_path
-    # YYY: Support for unversioned images is still required in StorageVolume
-    # code when we want to recreate storage. We can remove this check once we
-    # have removed all unversioned images from production.
     @image_path ||= if @version.nil?
       "#{image_root}/#{@name}.raw"
     else
@@ -26,9 +23,12 @@ class BootImage
     "/var/storage/images"
   end
 
-  def download(url:, ca_path: nil, sha256sum: nil)
+  def download(url: nil, ca_path: nil, sha256sum: nil)
     return if File.exist?(image_path)
 
+    url ||= get_download_url
+
+    fail "Must provide url for #{@name} image" if url.nil?
     FileUtils.mkdir_p image_root
 
     # If image URL has query parameter such as SAS token, File.extname returns
@@ -86,5 +86,25 @@ class BootImage
       # i.e. no partial images will be passed to qemu-image.
       r "qemu-img convert -p -f #{initial_format.shellescape} -O raw #{temp_path.shellescape} #{image_path.shellescape}"
     end
+  end
+
+  # YYY: In future all images will have explicit versions and nil won't be
+  # allowed, so this method will be removed.
+  def version_to_fetch
+    @version || case @name
+                when "ubuntu-jammy"
+                  "20240319"
+                when "almalinux-9.3"
+                  "20231113"
+                end
+  end
+
+  def get_download_url
+    version = version_to_fetch
+    urls = {
+      "ubuntu-jammy" => "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{Arch.render(x64: "amd64")}.img",
+      "almalinux-9.3" => Arch.render(x64: "x86_64", arm64: "aarch64").yield_self { "https://repo.almalinux.org/almalinux/9/cloud/#{_1}/images/AlmaLinux-9-GenericCloud-9.3-#{version}.#{_1}.qcow2" }
+    }
+    urls.fetch(@name)
   end
 end

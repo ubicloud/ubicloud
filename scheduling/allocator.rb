@@ -5,7 +5,7 @@ module Scheduling::Allocator
     @@target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
       vm.cores,
@@ -20,7 +20,6 @@ module Scheduling::Allocator
       vm.arch,
       allocation_state_filter,
       host_filter,
-      host_exclusion_filter,
       location_filter,
       location_preference
     )
@@ -32,7 +31,7 @@ module Scheduling::Allocator
   end
 
   Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_enabled, :ip4_enabled,
-    :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference)
+    :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :location_filter, :location_preference)
 
   class Allocation
     attr_reader :score
@@ -93,7 +92,6 @@ module Scheduling::Allocator
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
       ds = ds.where { available_gpus > 0 } if request.gpu_enabled
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
-      ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds.all
@@ -255,7 +253,7 @@ module Scheduling::Allocator
       boot_image = BootImage.where(
         vm_host_id: vm_host.id,
         name: boot_image_name
-      ).exclude(activated_at: nil).order_by(Sequel.desc(:version, nulls: :last)).first
+      ).exclude(activated_at: nil).order_by(Sequel.desc(:version)).first
 
       boot_image.id
     end

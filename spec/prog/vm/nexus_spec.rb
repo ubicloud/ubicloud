@@ -352,7 +352,6 @@ RSpec.describe Prog::Vm::Nexus do
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
-        host_exclusion_filter: [],
         location_filter: ["hetzner-hel1"],
         location_preference: [],
         gpu_enabled: false
@@ -367,7 +366,6 @@ RSpec.describe Prog::Vm::Nexus do
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
-        host_exclusion_filter: [],
         location_filter: [],
         location_preference: ["github-runners"],
         gpu_enabled: false
@@ -386,38 +384,11 @@ RSpec.describe Prog::Vm::Nexus do
         allocation_state_filter: [],
         distinct_storage_devices: false,
         host_filter: [:vm_host_id],
-        host_exclusion_filter: [],
         location_filter: [],
         location_preference: [],
         gpu_enabled: false
       )
       expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "can exclude hosts" do
-      allow(nx).to receive(:frame).and_return({
-        "exclude_host_ids" => [:vm_host_id, "another-vm-host-id"],
-        "storage_volumes" => :storage_volumes
-      })
-
-      expect(Scheduling::Allocator).to receive(:allocate).with(
-        vm, :storage_volumes,
-        allocation_state_filter: ["accepting"],
-        distinct_storage_devices: false,
-        host_filter: [],
-        host_exclusion_filter: [:vm_host_id, "another-vm-host-id"],
-        location_filter: ["hetzner-hel1"],
-        location_preference: [],
-        gpu_enabled: false
-      )
-      expect { nx.start }.to hop("create_unix_user")
-    end
-
-    it "fails if same host is forced and excluded" do
-      expect {
-        described_class.assemble("some_ssh_key", prj.id,
-          force_host_id: "some-vm-host-id", exclude_host_ids: ["some-vm-host-id"])
-      }.to raise_error RuntimeError, "Cannot force and exclude the same host"
     end
 
     it "requests distinct storage devices" do
@@ -433,7 +404,6 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: true,
         host_filter: [],
         location_filter: ["hetzner-hel1"],
-        host_exclusion_filter: [],
         location_preference: [],
         gpu_enabled: false
       )
@@ -451,7 +421,6 @@ RSpec.describe Prog::Vm::Nexus do
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: false,
         host_filter: [],
-        host_exclusion_filter: [],
         location_filter: ["hetzner-hel1"],
         location_preference: [],
         gpu_enabled: true

@@ -9,15 +9,13 @@ def main(options)
   hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id])
   wait_until(hetzner_server_st, "wait")
 
-  if options[:test_cases].include?("vm")
-    encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
-    log(encrypted_vms_st, "storage_encrypted: true")
-    wait_until(encrypted_vms_st)
+  encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
+  log(encrypted_vms_st, "storage_encrypted: true")
+  wait_until(encrypted_vms_st)
 
-    unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
-    log(unencrypted_vms_st, "storage_encrypted: false")
-    wait_until(unencrypted_vms_st)
-  end
+  unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
+  log(unencrypted_vms_st, "storage_encrypted: false")
+  wait_until(unencrypted_vms_st)
 
   Semaphore.incr(hetzner_server_st.id, "destroy")
   wait_until(hetzner_server_st)
@@ -50,10 +48,9 @@ def log(st, msg)
   $stdout.write "#{Time.now.utc.iso8601} | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
 end
 
-options = {test_cases: ["vm"]}
+options = {}
 OptionParser.new do |opts|
   opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? VmHost.from_ubid(v).id : v }
-  opts.on("--test-cases TEST_CASES", Array, "List of test cases to run separated by comma") { |v| options[:test_cases] = v }
 end.parse!
 
 clover_freeze

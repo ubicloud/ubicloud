@@ -13,7 +13,7 @@
     provider_internal_name: leaseweb,
     locations: [
       {display_name: us-east-a2, internal_name: leaseweb-wdc02, visible: false},
-      {display_name: us-south-a13, internal_name: leaseweb-dal13, visible: true},
+      {display_name: us-south-a13, internal_name: leaseweb-dal13, visible: false},
     ]
   }
 ]

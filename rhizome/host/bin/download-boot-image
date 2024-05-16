@@ -13,16 +13,9 @@ unless (boot_image = params_json["image_name"])
   exit 1
 end
 
-unless (version = params_json["version"])
-  puts "need version in params"
-  exit 1
-end
-
-unless (url = params_json["url"])
-  puts "need url in params"
-  exit 1
-end
-
+# YYY: version will be mandatory in the future
+version = params_json["version"]
+url = params_json["url"]
 sha256sum = params_json["sha256sum"]
 certs = params_json["certs"]
 
