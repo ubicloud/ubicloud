@@ -55,6 +55,15 @@ jobs:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
       run: bundle exec rake test_up
 
+    - name: Install ngrok
+      run: curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list && sudo apt update && sudo apt install ngrok
+
+    - name: Set ngrok token
+      run: ngrok config add-authtoken ${{ secrets.NGROK_TOKEN }}
+
+    - name: Local to public
+      run: ngrok http --domain=${{ secrets.NGROK_ADDRESS }} http://127.0.0.1:5000 > /dev/null &
+
     - name: Install foreman
       run: gem install foreman
 
