@@ -10,11 +10,28 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def version
-    @version ||= frame.fetch("version")
+    @version ||= frame.fetch("version") { default_boot_image_version(image_name) }
   end
 
   def download_from_blob_storage?
     image_name.start_with?("github", "postgres")
+  end
+
+  def default_boot_image_version(image_name)
+    case image_name
+    when "ubuntu-jammy"
+      Config.ubuntu_jammy_version
+    when "github-ubuntu-2204"
+      Config.github_ubuntu_2204_version
+    when "github-ubuntu-2004"
+      Config.github_ubuntu_2004_version
+    when "github-gpu-ubuntu-2204"
+      Config.github_gpu_ubuntu_2204_version
+    when "postgres-ubuntu-2204"
+      Config.postgres_ubuntu_2204_version
+    else
+      fail "Unknown boot image: #{image_name}"
+    end
   end
 
   def url
@@ -64,7 +81,9 @@ class Prog::DownloadBootImage < Prog::Base
 
   label def start
     # YYY: we can remove this once we enforce it in the database layer.
-    fail "Version is required" if version.nil?
+    # Although the default version is used if version is not passed, adding
+    # a sanity check here to make sure version is not passed as nil.
+    fail "Version can not be passed as nil" if version.nil?
 
     fail "Image already exists on host" if vm_host.boot_images_dataset.where(name: image_name, version: version).count > 0
 
