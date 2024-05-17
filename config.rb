@@ -140,4 +140,7 @@ module Config
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
   override :allocator_max_random_score, 0.1, float
+
+  # e2e
+  optional :e2e_github_installation_id, string
 end
