@@ -132,6 +132,8 @@ module Config
   optional :ubicloud_images_blob_storage_certs, string
 
   override :ubuntu_jammy_version, "20240319", string
+  override :almalinux_9_version, "9.4-20240507", string
+  override :almalinux_8_version, "8.9-20231128", string
   override :github_ubuntu_2204_version, "20240422.1.0", string
   override :github_ubuntu_2004_version, "20240422.1.0", string
   override :postgres_ubuntu_2204_version, "20240226.1.0", string

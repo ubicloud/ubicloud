@@ -39,6 +39,8 @@ RSpec.describe Prog::DownloadBootImage do
   describe "#default_boot_image_version" do
     it "returns the version for the default image" do
       expect(dbi.default_boot_image_version("ubuntu-jammy")).to eq(Config.ubuntu_jammy_version)
+      expect(dbi.default_boot_image_version("almalinux-9")).to eq(Config.almalinux_9_version)
+      expect(dbi.default_boot_image_version("almalinux-8")).to eq(Config.almalinux_8_version)
       expect(dbi.default_boot_image_version("github-ubuntu-2204")).to eq(Config.github_ubuntu_2204_version)
       expect(dbi.default_boot_image_version("github-ubuntu-2004")).to eq(Config.github_ubuntu_2004_version)
       expect(dbi.default_boot_image_version("github-gpu-ubuntu-2204")).to eq(Config.github_gpu_ubuntu_2204_version)
@@ -72,15 +74,27 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-arm64.img")
     end
 
-    it "returns URL for x64 almalinux-9.3 image" do
-      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9.3", "version" => "20231113"}).at_least(:once)
-      expect(dbi.url).to eq("https://vault.almalinux.org/9.3/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.3-20231113.x86_64.qcow2")
+    it "returns URL for x64 almalinux-9 image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.4-20240507"}).at_least(:once)
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.4-20240507.x86_64.qcow2")
     end
 
-    it "returns URL for arm64 almalinux-9.3 image" do
-      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9.3", "version" => "20231113"}).at_least(:once)
+    it "returns URL for x64 almalinux-8 image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-8", "version" => "8.9-20231128"}).at_least(:once)
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-8.9-20231128.x86_64.qcow2")
+    end
+
+    it "crashes when asked for almalinux-8 on arm64" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-8", "version" => "8.9-20231128"}).at_least(:once)
       vm_host.update(arch: "arm64")
-      expect(dbi.url).to eq("https://vault.almalinux.org/9.3/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.3-20231113.aarch64.qcow2")
+      expect { dbi.url }.to raise_error RuntimeError, "Only x64 is supported for almalinux-8"
+    end
+
+    it "returns URL for arm64 almalinux-9 image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.4-20240507"}).at_least(:once)
+      vm_host.update(arch: "arm64")
+
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.4-20240507.aarch64.qcow2")
     end
 
     it "fails if image name is unknown" do
