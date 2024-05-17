@@ -21,6 +21,10 @@ class Prog::DownloadBootImage < Prog::Base
     case image_name
     when "ubuntu-jammy"
       Config.ubuntu_jammy_version
+    when "almalinux-9"
+      Config.almalinux_9_version
+    when "almalinux-8"
+      Config.almalinux_8_version
     when "github-ubuntu-2204"
       Config.github_ubuntu_2204_version
     when "github-ubuntu-2004"
@@ -43,9 +47,12 @@ class Prog::DownloadBootImage < Prog::Base
       elsif image_name == "ubuntu-jammy"
         arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
         "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "almalinux-9.3"
+      elsif image_name == "almalinux-8"
+        fail "Only x64 is supported for almalinux-8" unless vm_host.arch == "x64"
+        "https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-#{version}.x86_64.qcow2"
+      elsif image_name == "almalinux-9"
         arch = (vm_host.arch == "x64") ? "x86_64" : "aarch64"
-        "https://vault.almalinux.org/9.3/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-9.3-#{version}.#{arch}.qcow2"
+        "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
       else
         fail "Unknown image name: #{image_name}"
       end
@@ -55,8 +62,9 @@ class Prog::DownloadBootImage < Prog::Base
     hashes = {
       ["ubuntu-jammy", "x64", "20240319"] => "304983616fcba6ee1452e9f38993d7d3b8a90e1eb65fb0054d672ce23294d812",
       ["ubuntu-jammy", "arm64", "20240319"] => "40ea1181447b9395fa03f6f2c405482fe532a348cc46fbb876effcfbbb35336f",
-      ["almalinux-9.3", "x64", "20231113"] => "6bbd060c971fd827a544c7e5e991a7d9e44460a449d2d058a0bb1290dec5a114",
-      ["almalinux-9.3", "arm64", "20231113"] => "a064715bc755346d5a8e1a4c6b1b7abffe4de03f1b0584942d5483ed32aafd67",
+      ["almalinux-8", "x64", "8.9-20231128"] => "a1686bc537bce699b512e3233666f5b8f69ed797ff1ce0af52c17fdc52942621",
+      ["almalinux-9", "x64", "9.4-20240507"] => "bff0885c804c01fff8aac4b70c9ca4f04e8c119f9ee102043838f33e06f58390",
+      ["almalinux-9", "arm64", "9.4-20240507"] => "75b2e68f6aaa41c039274595ff15968201b7201a7f2f03b109af691f2d3687a1",
       ["github-ubuntu-2204", "x64", "20240422.1.0"] => "8b1b7af6941ce7b8b93d0c20af712e04e8ceedbd673b29fd4fba3406a3ba133c",
       ["github-ubuntu-2204", "arm64", "20240422.1.0"] => "e14a7176070af022ace0e057a93beaa420602fa331dc67353ea4ce2459344265",
       ["github-ubuntu-2004", "x64", "20240422.1.0"] => "cf4f3bd4fc43de5804eac32e810101fcfe078aafeb46cb5a34fff8f8f76b360d",
