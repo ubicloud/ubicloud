@@ -1,0 +1,13 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "shellwords"
+require_relative "../../common/lib/arch"
+
+fw_dir = "/opt/fw"
+FileUtils.mkdir_p(fw_dir)
+FileUtils.cd fw_dir do
+  arch = Arch.render
+  version = Arch.render(x64: "202402", arm64: "202211")
+  r "curl -L3 -o CLOUDHV-#{version}.fd " + "https://github.com/ubicloud/build-edk2-firmware/releases/download/edk2-stable#{version}-#{arch}/CLOUDHV-#{arch}.fd".shellescape
+end
