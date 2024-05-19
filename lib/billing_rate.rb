@@ -4,13 +4,13 @@ require "yaml"
 
 class BillingRate
   def self.rates
-    @@rates ||= YAML.load_file("config/billing_rates.yml")
+    @@rates ||= YAML.load_file("config/billing_rates.yml", permitted_classes: [Time])
   end
 
-  def self.from_resource_properties(resource_type, resource_family, location)
-    rates.find {
-      _1["resource_type"] == resource_type && _1["resource_family"] == resource_family && _1["location"] == location
-    }
+  def self.from_resource_properties(resource_type, resource_family, location, active_at = Time.now)
+    rates.select {
+      _1["resource_type"] == resource_type && _1["resource_family"] == resource_family && _1["location"] == location && _1["active_from"] < active_at
+    }.max_by { _1["active_from"] }
   end
 
   def self.from_id(billing_rate_id)

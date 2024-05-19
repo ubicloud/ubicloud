@@ -34,4 +34,8 @@ RSpec.describe BillingRate do
       expect(described_class.line_item_usage("GitHubRunnerMinutes", "standard-2", 5, 1)).to eq("5 minutes")
     end
   end
+
+  it "can unambiguously find active rate" do
+    expect(described_class.rates.group_by { [_1["resource_type"], _1["resource_family"], _1["location"], _1["active_from"]] }).not_to be_any { |k, v| v.count != 1 }
+  end
 end
