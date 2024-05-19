@@ -21,6 +21,8 @@ class BillingRate
     case resource_type
     when "VmCores"
       "#{resource_family}-#{(amount * 2).to_i} Virtual Machine"
+    when "VmStorage"
+      "#{amount.to_i} GiB Storage for Virtual Machine"
     when "IPAddress"
       "#{resource_family} Address"
     when "PostgresCores"
