@@ -156,9 +156,7 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response.status).to eq(200)
-        parsed_body = JSON.parse(last_response.body)
-        expect(parsed_body["name"]).to eq("test-vm")
-        expect(parsed_body["name"]).to eq("test-vm")
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
         expect(Vm.first.ip4_enabled).to be true
       end
 
