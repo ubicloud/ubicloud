@@ -92,7 +92,7 @@
                   <fieldset class="radio-small-cards" id="size-radios">
                     <legend class="sr-only">Server size</legend>
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      <% Option::VmSizes.select { _1.visible }.each do |size| %>
+                      <% Option::VmSizes.select { _1.visible }.each_with_index do |size, idx| %>
                         <label class="size-<%= size.name %>">
                           <input
                             type="radio"
@@ -103,7 +103,7 @@
                             data-resource-family="<%= size.family %>"
                             data-amount="<%= size.vcpu / 2 %>"
                             required
-                            <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
+                            <%= (flash.dig("old", "size") == size.name || flash.dig("old", "size").nil? && idx == 0) ? "checked" : "" %>
                           >
                           <span
                             class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
