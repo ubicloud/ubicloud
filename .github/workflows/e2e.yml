@@ -60,7 +60,7 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
-        echo "e2e: bin/ci --test-cases=${{ inputs.test_cases }}" >> Procfile
+        echo "e2e: bin/ci --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm' || inputs.test_cases }}" >> Procfile
 
     - name: Run services
       env:
