@@ -106,7 +106,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "creates with default storage size from vm size" do
       st = described_class.assemble("some_ssh_key", prj.id)
-      expect(requested_disk_size(st)).to eq(Option::VmSizes.first.storage_size_gib)
+      expect(requested_disk_size(st)).to eq(Option::VmSizes.first.min_storage_size_gib)
     end
 
     it "creates with custom storage size if provided" do
@@ -535,14 +535,14 @@ RSpec.describe Prog::Vm::Nexus do
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(vm).to receive(:ip4_enabled).and_return(true)
-      expect(BillingRecord).to receive(:create_with_id).twice
+      expect(BillingRecord).to receive(:create_with_id).exactly(4).times
       expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end
 
     it "creates billing records when ip4 is not enabled" do
       expect(vm).to receive(:ip4_enabled).and_return(false)
-      expect(BillingRecord).to receive(:create_with_id)
+      expect(BillingRecord).to receive(:create_with_id).exactly(3).times
       expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
       expect { nx.create_billing_record }.to hop("wait")
     end

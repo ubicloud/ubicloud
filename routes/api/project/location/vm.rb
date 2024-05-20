@@ -33,7 +33,7 @@ class CloverApi
         fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
         required_parameters = ["public_key"]
-        allowed_optional_parameters = ["size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
+        allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
 
         request_body_params = Validation.validate_request_body(r.body.read, required_parameters, allowed_optional_parameters)
 
@@ -58,6 +58,12 @@ class CloverApi
           end
           Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps.id)
           request_body_params["private_subnet_id"] = ps.id
+        end
+
+        if request_body_params["storage_size"]
+          storage_size = Validation.validate_vm_storage_size(request_body_params["size"], request_body_params["storage_size"])
+          request_body_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
+          request_body_params.delete("storage_size")
         end
 
         st = Prog::Vm::Nexus.assemble(

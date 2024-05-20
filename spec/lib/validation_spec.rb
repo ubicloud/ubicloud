@@ -41,6 +41,31 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_vm_storage_size" do
+      it "valid vm storage sizes" do
+        [
+          ["standard-2", "25"],
+          ["standard-2", "37.5"],
+          ["standard-4", "100"]
+        ].each do |vm_size, storage_size|
+          expect(described_class.validate_vm_storage_size(vm_size, storage_size)).to eq(storage_size.to_f)
+        end
+      end
+
+      it "invalid vm storage sizes" do
+        [
+          ["standard-2", "100"],
+          ["standard-2", "37.4"],
+          ["standard-2", ""],
+          ["standard-2", nil],
+          ["standard-5", "37.4"],
+          [nil, "25"]
+        ].each do |vm_size, storage_size|
+          expect { described_class.validate_vm_storage_size(vm_size, storage_size) }.to raise_error described_class::ValidationFailed
+        end
+      end
+    end
+
     describe "#validate_location" do
       it "valid locations" do
         [

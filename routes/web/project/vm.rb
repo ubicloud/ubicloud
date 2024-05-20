@@ -18,12 +18,14 @@ class CloverWeb
       Validation.validate_boot_image(r.params["boot-image"])
       Validation.validate_vm_size(r.params["size"], only_visible: true)
       location = LocationNameConverter.to_internal_name(r.params["location"])
+      storage_size = Validation.validate_vm_storage_size(r.params["size"], r.params["storage-size"])
       st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
         @project.id,
         name: r.params["name"],
         unix_user: r.params["user"],
         size: r.params["size"],
+        storage_volumes: [{size_gib: storage_size, encrypted: true}],
         location: location,
         boot_image: r.params["boot-image"],
         private_subnet_id: ps_id,

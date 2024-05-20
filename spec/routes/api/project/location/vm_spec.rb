@@ -162,6 +162,19 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be true
       end
 
+      it "success with storage size" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+          storage_size: "50"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
+      end
+
       it "boot image doesn't passed" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
@@ -288,7 +301,7 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: public_key, size, unix_user, boot_image, enable_ip4, private_subnet_id")
+        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: public_key, size, storage_size, unix_user, boot_image, enable_ip4, private_subnet_id")
       end
     end
 
