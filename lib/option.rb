@@ -42,13 +42,13 @@ module Option
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"]
   ].map { |args| BootImage.new(*args) }.freeze
 
-  VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_gib, :visible, :gpu) do
+  VmSize = Struct.new(:name, :family, :vcpu, :memory, :min_storage_size_gib, :max_storage_size_gib, :storage_size_step_gib, :visible, :gpu) do
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16, 30, 60].map {
-    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 25, true, false)
+    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 25, _1 * 25, (_1 / 2) * 12.5, true, false)
   }.concat([6].map {
-    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, (_1 / 2) * 60, false, true)
+    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, (_1 / 2) * 60, _1 * 60, (_1 / 2) * 60, false, true)
   }).freeze
 
   PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_gib) do

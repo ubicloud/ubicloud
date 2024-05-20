@@ -26,13 +26,13 @@ class Prog::Vm::Nexus < Prog::Base
     vm_size = Validation.validate_vm_size(size)
 
     storage_volumes ||= [{
-      size_gib: vm_size.storage_size_gib,
+      size_gib: vm_size.min_storage_size_gib,
       encrypted: true
     }]
 
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|
-      volume[:size_gib] ||= vm_size.storage_size_gib
+      volume[:size_gib] ||= vm_size.min_storage_size_gib
       volume[:skip_sync] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
@@ -335,6 +335,16 @@ class Prog::Vm::Nexus < Prog::Base
       billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
       amount: vm.cores
     )
+
+    storage_volumes.each do |vol|
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: vm.id,
+        resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
+        billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location)["id"],
+        amount: vol["size_gib"]
+      )
+    end
 
     if vm.ip4_enabled
       BillingRecord.create_with_id(
