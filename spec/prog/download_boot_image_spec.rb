@@ -5,11 +5,15 @@ require_relative "../model/spec_helper"
 RSpec.describe Prog::DownloadBootImage do
   subject(:dbi) { described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => "20230303"}])) }
 
+  let(:dbi_without_version) { described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw"}])) }
+  let(:dbi_with_version_nil) { described_class.new(Strand.new(stack: [{"image_name" => "my-image", "version" => nil, "custom_url" => "https://example.com/my-image.raw"}])) }
+
   let(:sshable) { Sshable.create_with_id }
   let(:vm_host) { VmHost.create(location: "hetzner-hel1", arch: "x64") { _1.id = sshable.id } }
 
   before do
     allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
+    allow(dbi_without_version).to receive_messages(sshable: sshable, vm_host: vm_host)
   end
 
   describe "#start" do
@@ -23,9 +27,26 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.start }.to raise_error RuntimeError, "Image already exists on host"
     end
 
+    it "fails if image unknown" do
+      expect { dbi_without_version.start }.to raise_error RuntimeError, "Unknown boot image: my-image"
+    end
+
     it "fails if version is nil" do
-      dbi = described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => nil}]))
-      expect { dbi.start }.to raise_error RuntimeError, "Version is required"
+      expect { dbi_with_version_nil.start }.to raise_error RuntimeError, "Version can not be passed as nil"
+    end
+  end
+
+  describe "#default_boot_image_version" do
+    it "returns the version for the default image" do
+      expect(dbi.default_boot_image_version("ubuntu-jammy")).to eq(Config.ubuntu_jammy_version)
+      expect(dbi.default_boot_image_version("github-ubuntu-2204")).to eq(Config.github_ubuntu_2204_version)
+      expect(dbi.default_boot_image_version("github-ubuntu-2004")).to eq(Config.github_ubuntu_2004_version)
+      expect(dbi.default_boot_image_version("github-gpu-ubuntu-2204")).to eq(Config.github_gpu_ubuntu_2204_version)
+      expect(dbi.default_boot_image_version("postgres-ubuntu-2204")).to eq(Config.postgres_ubuntu_2204_version)
+    end
+
+    it "fails for unknown images" do
+      expect { dbi.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
     end
   end
 
