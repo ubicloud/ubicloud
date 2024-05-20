@@ -166,7 +166,7 @@ RSpec.describe Clover, "vm" do
           unix_user: "ubi",
           size: "standard-2",
           boot_image: "ubuntu-jammy",
-          storage_size: "50"
+          storage_size: "40"
         }.to_json
 
         expect(last_response.status).to eq(200)
