@@ -5,6 +5,7 @@
 <% error = (defined?(error) && error) ? error : rodauth.field_error(name) || flash.dig("errors", name) %>
 <% description = (defined?(description) && description) ? description : nil %>
 <% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
+<% extra_class = (defined?(extra_class) && extra_class) ? extra_class : {} %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
@@ -18,12 +19,12 @@
       <% if value %>
       value="<%= value %>"
       <% end %>
-      class="w-full range-lg h-2 bg-gray-200 accent-orange-600 rounded-lg appearance-none cursor-pointer border-transparent <%= error ? "text-red-900 ring-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 focus:ring-orange-600"%>"
+      class="w-full range-lg h-2 bg-gray-200 accent-orange-600 rounded-lg appearance-none cursor-pointer border-transparent <%=extra_class %> <%= error ? "text-red-900 ring-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 focus:ring-orange-600"%>"
       <% attributes.each do |atr_key, atr_value| %>
       <%= atr_key %>="<%= atr_value %>"
       <% end%>
     >
-    <ul class="flex justify-between w-full px-[10px] pt-1 sm:pt-3">
+    <ul class="flex justify-between w-full px-[10px] pt-2 sm:pt-8">
       <% range_labels.each do |lbl| %>
         <li class="flex justify-right sm:justify-center relative items-center rotate-90 sm:rotate-0 mb-6 sm:mb-0"><span class="absolute"><%= lbl %></span></li>
       <% end %>

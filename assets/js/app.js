@@ -2,6 +2,7 @@ $(function() {
   setupPolicyEditor();
   setupLocationBasedPrices();
   setupLocationBasedOptions();
+  setupInstanceSizeBasedOptions();
   setupAutoRefresh();
   setupPrint();
   setupDatePicker();
@@ -186,10 +187,12 @@ $("input[name=location]").on("change", function (event) {
   setupLocationBasedPrices();
   setupLocationBasedPostgresHaPrices();
   setupLocationBasedOptions();
+  setupInstanceSizeBasedOptions();
 });
 
 $("input[name=size]").on("change", function (event) {
   setupLocationBasedPostgresHaPrices();
+  setupInstanceSizeBasedOptions();
 });
 
 function setupLocationBasedPrices() {
@@ -241,6 +244,27 @@ function setupLocationBasedOptions() {
   if (selectedLocation) {
     $(`.location-based-option.${selectedLocation}`).show().prop('disabled', false);
   }
+}
+
+function setupInstanceSizeBasedOptions() {
+  $(".instance-size-based-option").each(function() {
+    let type = $(this).attr("type")
+    if(type == "range" && $(this).attr("name") == "storage-size"){
+      min_storage_size_gib = $("input[name=size]:checked").data("min-storage-size-gib");
+      max_storage_size_gib = $("input[name=size]:checked").data("max-storage-size-gib");
+      storage_size_step_gib = $("input[name=size]:checked").data("storage-size-step-gib");
+
+      $(this).attr("min", min_storage_size_gib);
+      $(this).attr("max", max_storage_size_gib);
+      $(this).attr("step", storage_size_step_gib);
+
+      let monthlyPrice = $("input[name=location]:checked").data("details")["VmStorage"]["standard"]["monthly"]
+      $(this).next().find(".absolute").each(function(idx) {
+        storage_amount = min_storage_size_gib + idx * storage_size_step_gib;
+        $(this).text(storage_amount + "GB +$" + (storage_amount * monthlyPrice).toFixed(2));
+      });
+    }
+  });
 }
 
 function setupAutoRefresh() {

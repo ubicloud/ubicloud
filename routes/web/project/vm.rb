@@ -41,7 +41,7 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
         @subnets = Serializers::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
-        @prices = fetch_location_based_prices("VmCores", "IPAddress")
+        @prices = fetch_location_based_prices("VmCores", "VmStorage", "IPAddress")
         @has_valid_payment_method = @project.has_valid_payment_method?
 
         view "vm/create"
