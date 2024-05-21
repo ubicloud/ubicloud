@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch(:project_prefix, "private-subnet") do |r|
-    @serializer = Serializers::Api::PrivateSubnet
-
     r.get true do
       result = @project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").eager(nics: [:private_subnet]).paginated_result(
         start_after: r.params["start_after"],
@@ -12,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: serialize(result[:records]),
+        items: Serializers::Api::PrivateSubnet.serialize(result[:records]),
         count: result[:count]
       }
     end

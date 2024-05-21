@@ -2,8 +2,6 @@
 
 class CloverWeb
   hash_branch(:project_location_prefix, "private-subnet") do |r|
-    @serializer = Serializers::Web::PrivateSubnet
-
     r.on String do |ps_name|
       ps = @project.private_subnets_dataset.where(location: @location).where { {Sequel[:private_subnet][:name] => ps_name} }.first
 
@@ -11,7 +9,7 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @ps = serialize(ps, :detailed)
+      @ps = Serializers::Web::PrivateSubnet.new(:detailed).serialize(ps)
 
       r.get true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps.id)

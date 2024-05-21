@@ -2,8 +2,6 @@
 
 class CloverWeb
   hash_branch(:project_location_prefix, "postgres") do |r|
-    @serializer = Serializers::Web::Postgres
-
     r.on String do |pg_name|
       pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
 
@@ -11,7 +9,7 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @pg = serialize(pg, :detailed)
+      @pg = Serializers::Web::Postgres.new(:detailed).serialize(pg)
 
       r.get true do
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)

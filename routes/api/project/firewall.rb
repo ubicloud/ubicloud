@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch(:project_prefix, "firewall") do |r|
-    @serializer = Serializers::Api::Firewall
-
     r.get true do
       result = @project.firewalls_dataset.authorized(@current_user.id, "Firewall:view").eager(:firewall_rules).paginated_result(
         start_after: r.params["start_after"],
@@ -12,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: serialize(result[:records]),
+        items: Serializers::Api::Firewall.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -28,7 +26,7 @@ class CloverApi
       firewall = Firewall.create_with_id(name: request_body_params["name"], description: request_body_params["description"] || "")
       firewall.associate_with_project(@project)
 
-      serialize(firewall)
+      Serializers::Api::Firewall.serialize(firewall)
     end
 
     r.on String do |firewall_ubid|
@@ -51,7 +49,7 @@ class CloverApi
       r.get true do
         Authorization.authorize(@current_user.id, "Firewall:view", @project.id)
 
-        serialize(@firewall, :detailed)
+        Serializers::Api::Firewall.new(:detailed).serialize(@firewall)
       end
 
       r.post "attach-subnet" do
@@ -67,7 +65,7 @@ class CloverApi
 
         @firewall.associate_with_private_subnet(private_subnet)
 
-        serialize(@firewall, :detailed)
+        Serializers::Api::Firewall.new(:detailed).serialize(@firewall)
       end
 
       r.post "detach-subnet" do
@@ -83,7 +81,7 @@ class CloverApi
 
         @firewall.disassociate_from_private_subnet(private_subnet)
 
-        serialize(@firewall, :detailed)
+        Serializers::Api::Firewall.new(:detailed).serialize(@firewall)
       end
 
       r.hash_branches(:project_firewall_prefix)

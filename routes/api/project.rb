@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch("project") do |r|
-    @serializer = Serializers::Api::Project
-
     r.get true do
       result = Project.authorized(@current_user.id, "Project:view").where(visible: true).paginated_result(
         start_after: r.params["start_after"],
@@ -12,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: serialize(result[:records]),
+        items: Serializers::Api::Project.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -24,7 +22,7 @@ class CloverApi
 
       project = @current_user.create_project_with_default_policy(request_body_params["name"])
 
-      serialize(project)
+      Serializers::Api::Project.serialize(project)
     end
 
     r.on String do |project_ubid|
@@ -57,7 +55,7 @@ class CloverApi
       r.get true do
         Authorization.authorize(@current_user.id, "Project:view", @project.id)
 
-        serialize(@project)
+        Serializers::Api::Project.serialize(@project)
       end
 
       r.hash_branches(:project_prefix)

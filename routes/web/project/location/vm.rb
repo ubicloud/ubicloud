@@ -2,8 +2,6 @@
 
 class CloverWeb
   hash_branch(:project_location_prefix, "vm") do |r|
-    @serializer = Serializers::Web::Vm
-
     r.on String do |vm_name|
       vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first
 
@@ -15,7 +13,7 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:view", vm.id)
 
-        @vm = serialize(vm, :detailed)
+        @vm = Serializers::Web::Vm.new(:detailed).serialize(vm)
 
         view "vm/show"
       end

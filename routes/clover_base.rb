@@ -54,10 +54,6 @@ module CloverBase
     }
   end
 
-  def serialize(data, structure = :default)
-    @serializer.new(structure).serialize(data)
-  end
-
   def fetch_location_based_prices(*resource_types)
     # We use 1 month = 672 hours for conversion. Number of hours
     # in a month changes between 672 and 744, We are  also capping

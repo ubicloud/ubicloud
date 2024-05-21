@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch(:project_location_prefix, "postgres") do |r|
-    @serializer = Serializers::Api::Postgres
-
     r.get true do
       result = @project.postgres_resources_dataset.where(location: @location).authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand).paginated_result(
         start_after: r.params["start_after"],
@@ -12,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: serialize(result[:records]),
+        items: Serializers::Api::Postgres.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -44,7 +42,7 @@ class CloverApi
           ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
         )
 
-        serialize(st.subject, :detailed)
+        Serializers::Api::Postgres.new(:detailed).serialize(st.subject)
       end
 
       pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
@@ -60,7 +58,7 @@ class CloverApi
 
     request.get true do
       Authorization.authorize(user.id, "Postgres:view", pg.id)
-      serialize(pg, :detailed)
+      Serializers::Api::Postgres.new(:detailed).serialize(pg)
     end
 
     request.delete true do
@@ -89,7 +87,7 @@ class CloverApi
           pg.incr_update_firewall_rules
         end
 
-        serialize(pg, :detailed)
+        Serializers::Api::Postgres.new(:detailed).serialize(pg)
       end
 
       request.get true do
@@ -133,7 +131,7 @@ class CloverApi
         restore_target: request_body_params["restore_target"]
       )
 
-      serialize(st.subject, :detailed)
+      Serializers::Api::Postgres.new(:detailed).serialize(st.subject)
     end
 
     request.post "reset-superuser-password" do
@@ -155,7 +153,7 @@ class CloverApi
         pg.representative_server.incr_update_superuser_password
       end
 
-      serialize(pg, :detailed)
+      Serializers::Api::Postgres.new(:detailed).serialize(pg)
     end
   end
 end

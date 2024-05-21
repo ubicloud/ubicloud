@@ -148,8 +148,6 @@ class CloverWeb
 
     r.on "invoice" do
       r.is String do |invoice_ubid|
-        @serializer = Serializers::Web::Invoice
-
         invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice.from_ubid(invoice_ubid)
 
         unless invoice
@@ -159,7 +157,7 @@ class CloverWeb
 
         r.get true do
           @full_page = r.params["print"] == "1"
-          @invoice_data = serialize(invoice, :detailed)
+          @invoice_data = Serializers::Web::Invoice.new(:detailed).serialize(invoice)
           view "project/invoice"
         end
       end

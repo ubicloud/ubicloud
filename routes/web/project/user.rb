@@ -3,10 +3,9 @@
 class CloverWeb
   hash_branch(:project_prefix, "user") do |r|
     Authorization.authorize(@current_user.id, "Project:user", @project.id)
-    @serializer = Serializers::Web::Account
 
     r.get true do
-      @users = serialize(@project.accounts)
+      @users = Serializers::Web::Account.serialize(@project.accounts)
 
       view "project/user"
     end
