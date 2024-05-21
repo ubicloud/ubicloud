@@ -9,7 +9,7 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @ps = Serializers::Web::PrivateSubnet.new(:detailed).serialize(ps)
+      @ps = Serializers::Web::PrivateSubnet.serialize(ps, {detailed: true})
 
       r.get true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps.id)

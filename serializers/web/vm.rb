@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 class Serializers::Web::Vm < Serializers::Base
-  def self.base(vm)
-    {
+  def self.serialize_internal(vm, options = {})
+    base = {
       id: vm.id,
       ubid: vm.ubid,
       path: vm.path,
@@ -16,18 +16,16 @@ class Serializers::Web::Vm < Serializers::Base
       ip4: vm.ephemeral_net4,
       unix_user: vm.unix_user
     }
-  end
 
-  structure(:default) do |vm|
-    base(vm)
-  end
+    if options[:detailed]
+      base.merge!(
+        firewalls: vm.firewalls.map { |fw| Serializers::Web::Firewall.serialize(fw) },
+        private_ip4: vm.nics.first.private_ipv4.network,
+        private_ip6: vm.nics.first.private_ipv6.nth(2),
+        subnet: vm.nics.first.private_subnet.name
+      )
+    end
 
-  structure(:detailed) do |vm|
-    base(vm).merge(
-      firewalls: vm.firewalls.map { |fw| Serializers::Web::Firewall.serialize(fw) },
-      private_ip4: vm.nics.first.private_ipv4.network,
-      private_ip6: vm.nics.first.private_ipv6.nth(2),
-      subnet: vm.nics.first.private_subnet.name
-    )
+    base
   end
 end

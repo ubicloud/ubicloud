@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Serializers::Common::Nic < Serializers::Base
-  def self.base(nic)
+  def self.serialize_internal(nic, options = {})
     {
       id: nic.ubid,
       name: nic.name,
@@ -9,9 +9,5 @@ class Serializers::Common::Nic < Serializers::Base
       private_ipv6: nic.private_ipv6.nth(2).to_s,
       vm_name: nic.vm&.name
     }
-  end
-
-  structure(:default) do |nic|
-    base(nic)
   end
 end

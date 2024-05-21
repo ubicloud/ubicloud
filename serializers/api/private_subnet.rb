@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Serializers::Api::PrivateSubnet < Serializers::Base
-  def self.base(ps)
+  def self.serialize_internal(ps, options = {})
     {
       id: ps.ubid,
       name: ps.name,
@@ -12,9 +12,5 @@ class Serializers::Api::PrivateSubnet < Serializers::Base
       firewalls: Serializers::Api::Firewall.serialize(ps.firewalls),
       nics: Serializers::Common::Nic.serialize(ps.nics)
     }
-  end
-
-  structure(:default) do |ps|
-    base(ps)
   end
 end

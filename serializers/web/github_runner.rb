@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Serializers::Web::GithubRunner < Serializers::Base
-  def self.base(runner)
+  def self.serialize_internal(runner, options = {})
     {
       id: runner.id,
       ubid: runner.ubid,
@@ -20,9 +20,5 @@ class Serializers::Web::GithubRunner < Serializers::Base
       } : nil,
       state: runner.display_state
     }
-  end
-
-  structure(:default) do |runner|
-    base(runner)
   end
 end

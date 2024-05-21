@@ -161,7 +161,7 @@ class CloverWeb
 
         r.get true do
           @full_page = r.params["print"] == "1"
-          @invoice_data = Serializers::Web::Invoice.new(:detailed).serialize(invoice)
+          @invoice_data = Serializers::Web::Invoice.serialize(invoice, {detailed: true})
           view "project/invoice"
         end
       end

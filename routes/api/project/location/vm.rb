@@ -68,7 +68,7 @@ class CloverApi
           **request_body_params.except(*required_parameters).transform_keys(&:to_sym)
         )
 
-        Serializers::Api::Vm.new(:detailed).serialize(st.subject)
+        Serializers::Api::Vm.serialize(st.subject, {detailed: true})
       end
 
       vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first
@@ -84,7 +84,7 @@ class CloverApi
 
     request.get true do
       Authorization.authorize(user.id, "Vm:view", vm.id)
-      Serializers::Api::Vm.new(:detailed).serialize(vm)
+      Serializers::Api::Vm.serialize(vm, {detailed: true})
     end
 
     request.delete true do

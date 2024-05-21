@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Serializers::Web::PaymentMethod < Serializers::Base
-  def self.base(pm)
+  def self.serialize_internal(pm, options = {})
     {
       id: pm.id,
       ubid: pm.ubid,
@@ -11,9 +11,5 @@ class Serializers::Web::PaymentMethod < Serializers::Base
       exp_year: pm.stripe_data["card"]["exp_year"],
       order: pm.order
     }
-  end
-
-  structure(:default) do |pm|
-    base(pm)
   end
 end

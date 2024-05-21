@@ -3,8 +3,8 @@
 require_relative "../base"
 
 class Serializers::Api::Vm < Serializers::Base
-  def self.base(vm)
-    {
+  def self.serialize_internal(vm, options = {})
+    base = {
       id: vm.ubid,
       name: vm.name,
       state: vm.display_state,
@@ -15,18 +15,16 @@ class Serializers::Api::Vm < Serializers::Base
       ip6: vm.ephemeral_net6&.nth(2),
       ip4: vm.ephemeral_net4
     }
-  end
 
-  structure(:default) do |vm|
-    base(vm)
-  end
+    if options[:detailed]
+      base.merge!(
+        firewalls: vm.firewalls.map { |fw| Serializers::Api::Firewall.serialize(fw) },
+        private_ipv4: vm.nics.first.private_ipv4.network,
+        private_ipv6: vm.nics.first.private_ipv6.nth(2),
+        subnet: vm.nics.first.private_subnet.name
+      )
+    end
 
-  structure(:detailed) do |vm|
-    base(vm).merge(
-      firewalls: vm.firewalls.map { |fw| Serializers::Api::Firewall.serialize(fw) },
-      private_ipv4: vm.nics.first.private_ipv4.network,
-      private_ipv6: vm.nics.first.private_ipv6.nth(2),
-      subnet: vm.nics.first.private_subnet.name
-    )
+    base
   end
 end

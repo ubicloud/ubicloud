@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Serializers::Web::Project < Serializers::Base
-  def self.base(p)
+  def self.serialize_internal(p, options = {})
     {
       id: p.id,
       ubid: p.ubid,
@@ -10,9 +10,5 @@ class Serializers::Web::Project < Serializers::Base
       credit: p.credit.to_f,
       discount: p.discount
     }
-  end
-
-  structure(:default) do |p|
-    base(p)
   end
 end

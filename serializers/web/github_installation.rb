@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Serializers::Web::GithubInstallation < Serializers::Base
-  def self.base(ins)
+  def self.serialize_internal(ins, options = {})
     {
       id: ins.id,
       name: ins.name,
@@ -9,9 +9,5 @@ class Serializers::Web::GithubInstallation < Serializers::Base
       installation_id: ins.installation_id,
       installation_url: ins.installation_url
     }
-  end
-
-  structure(:default) do |ins|
-    base(ins)
   end
 end
