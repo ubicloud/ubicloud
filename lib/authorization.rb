@@ -37,7 +37,11 @@ module Authorization
 
   def self.matched_policies(subject_id, actions = nil, object_id = nil)
     object_filter = if object_id
-      Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
+      begin
+        Sequel.lit("AND object_applied_tags.tagged_id = ?", UBID.parse(object_id).to_uuid)
+      rescue UBIDParseError
+        Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
+      end
     else
       Sequel.lit("")
     end
