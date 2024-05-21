@@ -58,10 +58,16 @@ def sync_parent_dir(f)
 end
 
 def safe_write_to_file(filename, content)
+  safe_create_file_with_content(filename) do |f|
+    f.puts(content)
+  end
+end
+
+def safe_create_file_with_content(filename, &block)
   temp_filename = filename + ".tmp"
   File.open(temp_filename, File::RDWR | File::CREAT) do |f|
     f.flock(File::LOCK_EX)
-    f.puts(content)
+    yield f
     File.rename(temp_filename, filename)
   end
 end
