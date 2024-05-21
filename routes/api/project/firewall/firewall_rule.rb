@@ -21,7 +21,7 @@ class CloverApi
 
       firewall_rule = @firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
 
-      Serializers::Api::FirewallRule.serialize(firewall_rule)
+      Serializers::Common::FirewallRule.serialize(firewall_rule)
     end
 
     r.is String do |firewall_rule_ubid|

@@ -6,7 +6,7 @@ class Serializers::Api::Firewall < Serializers::Base
       id: firewall.ubid,
       name: firewall.name,
       description: firewall.description,
-      firewall_rules: firewall.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }.map { |fw| Serializers::Api::FirewallRule.serialize(fw) }
+      firewall_rules: firewall.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }.map { |fw| Serializers::Common::FirewallRule.serialize(fw) }
     }
   end
 
