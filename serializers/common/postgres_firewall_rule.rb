@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Api::PostgresFirewallRule < Serializers::Base
+class Serializers::Common::PostgresFirewallRule < Serializers::Base
   def self.base(postgres_firewall_rule)
     {
       id: postgres_firewall_rule.ubid,
