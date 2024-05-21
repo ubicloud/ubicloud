@@ -14,7 +14,7 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps.id)
 
-        @nics = Serializers::Web::Nic.serialize(ps.nics)
+        @nics = Serializers::Common::Nic.serialize(ps.nics)
 
         view "private_subnet/show"
       end
