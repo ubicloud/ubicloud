@@ -92,7 +92,7 @@ class CloverApi
 
       request.get true do
         Authorization.authorize(user.id, "Postgres:Firewall:view", pg.id)
-        Serializers::Api::PostgresFirewallRule.serialize(pg.firewall_rules)
+        Serializers::Common::PostgresFirewallRule.serialize(pg.firewall_rules)
       end
 
       request.is String do |firewall_rule_ubid|
