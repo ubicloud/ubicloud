@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch(:project_location_prefix, "private-subnet") do |r|
-    @serializer = Serializers::Api::PrivateSubnet
-
     r.get true do
       result = @project.private_subnets_dataset.where(location: @location).authorized(@current_user.id, "PrivateSubnet:view").eager(nics: [:private_subnet]).paginated_result(
         start_after: r.params["start_after"],
@@ -12,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: serialize(result[:records]),
+        items: Serializers::Api::PrivateSubnet.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -34,7 +32,7 @@ class CloverApi
           location: @location
         )
 
-        serialize(st.subject)
+        Serializers::Api::PrivateSubnet.serialize(st.subject)
       end
 
       ps = @project.private_subnets_dataset.where(location: @location).where { {Sequel[:private_subnet][:name] => ps_name} }.first
@@ -50,7 +48,7 @@ class CloverApi
 
     request.get true do
       Authorization.authorize(user.id, "PrivateSubnet:view", ps.id)
-      serialize(ps)
+      Serializers::Api::PrivateSubnet.serialize(ps)
     end
 
     request.delete true do

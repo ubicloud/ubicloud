@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch(:project_prefix, "vm") do |r|
-    @serializer = Serializers::Api::Vm
-
     r.get true do
       result = @project.vms_dataset.authorized(@current_user.id, "Vm:view").paginated_result(
         start_after: r.params["start_after"],
@@ -12,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: serialize(result[:records]),
+        items: Serializers::Api::Vm.serialize(result[:records]),
         count: result[:count]
       }
     end

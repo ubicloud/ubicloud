@@ -2,10 +2,8 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "vm") do |r|
-    @serializer = Serializers::Web::Vm
-
     r.get true do
-      @vms = serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all)
+      @vms = Serializers::Web::Vm.serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all)
 
       view "vm/index"
     end

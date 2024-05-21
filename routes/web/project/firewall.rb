@@ -2,11 +2,9 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "firewall") do |r|
-    @serializer = Serializers::Web::Firewall
-
     r.get true do
       authorized_firewalls = @project.firewalls_dataset.authorized(@current_user.id, "Firewall:view").all
-      @firewalls = serialize(authorized_firewalls)
+      @firewalls = Serializers::Web::Firewall.serialize(authorized_firewalls)
 
       view "firewall/index"
     end
@@ -91,7 +89,7 @@ class CloverWeb
         project_subnets = @project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all
         attached_subnets = fw.private_subnets_dataset.all
         @attachable_subnets = Serializers::Web::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.map(&:id).include?(ps.id) })
-        @firewall = serialize(fw, :detailed)
+        @firewall = Serializers::Web::Firewall.new(:detailed).serialize(fw)
 
         view "firewall/show"
       end

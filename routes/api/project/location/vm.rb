@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch(:project_location_prefix, "vm") do |r|
-    @serializer = Serializers::Api::Vm
-
     r.get true do
       result = @project.vms_dataset.where(location: @location).authorized(@current_user.id, "Vm:view").paginated_result(
         start_after: r.params["start_after"],
@@ -12,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: serialize(result[:records]),
+        items: Serializers::Api::Vm.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -65,7 +63,7 @@ class CloverApi
           **request_body_params.except(*required_parameters).transform_keys(&:to_sym)
         )
 
-        serialize(st.subject, :detailed)
+        Serializers::Api::Vm.new(:detailed).serialize(st.subject)
       end
 
       vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first
@@ -81,7 +79,7 @@ class CloverApi
 
     request.get true do
       Authorization.authorize(user.id, "Vm:view", vm.id)
-      serialize(vm, :detailed)
+      Serializers::Api::Vm.new(:detailed).serialize(vm)
     end
 
     request.delete true do

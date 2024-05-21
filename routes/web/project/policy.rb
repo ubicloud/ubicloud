@@ -3,11 +3,10 @@
 class CloverWeb
   hash_branch(:project_prefix, "policy") do |r|
     Authorization.authorize(@current_user.id, "Project:policy", @project.id)
-    @serializer = Serializers::Web::AccessPolicy
 
     r.get true do
       # For UI simplicity, we are showing only one policy at the moment
-      @policy = serialize(@project.access_policies.first)
+      @policy = Serializers::Web::AccessPolicy.serialize(@project.access_policies.first)
 
       view "project/policy"
     end

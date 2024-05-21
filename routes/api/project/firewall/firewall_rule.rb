@@ -2,8 +2,6 @@
 
 class CloverApi
   hash_branch(:project_firewall_prefix, "firewall-rule") do |r|
-    @serializer = Serializers::Api::FirewallRule
-
     r.post true do
       Authorization.authorize(@current_user.id, "Firewall:edit", @firewall.id)
 
@@ -23,7 +21,7 @@ class CloverApi
 
       firewall_rule = @firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
 
-      serialize(firewall_rule)
+      Serializers::Api::FirewallRule.serialize(firewall_rule)
     end
 
     r.is String do |firewall_rule_ubid|

@@ -2,10 +2,8 @@
 
 class CloverWeb
   hash_branch("project") do |r|
-    @serializer = Serializers::Web::Project
-
     r.get true do
-      @projects = serialize(@current_user.projects.filter(&:visible))
+      @projects = Serializers::Web::Project.serialize(@current_user.projects.filter(&:visible))
 
       view "project/index"
     end
@@ -35,7 +33,7 @@ class CloverWeb
         fail Authorization::Unauthorized
       end
 
-      @project_data = serialize(@project)
+      @project_data = Serializers::Web::Project.serialize(@project)
       @project_permissions = Authorization.all_permissions(@current_user.id, @project.id)
 
       r.get true do
