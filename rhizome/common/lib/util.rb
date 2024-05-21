@@ -57,11 +57,16 @@ def sync_parent_dir(f)
   }
 end
 
-def safe_write_to_file(filename, content)
+def safe_write_to_file(filename, content = nil)
+  raise ArgumentError, "must provide either content or block" if (content.nil? && !block_given?) || (!content.nil? && block_given?)
   temp_filename = filename + ".tmp"
   File.open(temp_filename, File::RDWR | File::CREAT) do |f|
     f.flock(File::LOCK_EX)
-    f.puts(content)
+    if block_given?
+      yield f
+    else
+      f.puts(content)
+    end
     File.rename(temp_filename, filename)
   end
 end
