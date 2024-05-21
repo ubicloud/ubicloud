@@ -188,6 +188,14 @@ class VmHost < Sequel::Model
     Strand.create_with_id(schedule: Time.now, prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
   end
 
+  # Introduced for downloading firmware via REPL.
+  def download_firmware(version_x64: nil, version_arm64: nil, sha256_x64: nil, sha256_arm64: nil)
+    version, sha256 = (arch == "x64") ? [version_x64, sha256_x64] : [version_arm64, sha256_arm64]
+    raise ArgumentError, "No version provided" if version.nil?
+    raise ArgumentError, "No SHA-256 digest provided" if sha256.nil?
+    Strand.create_with_id(schedule: Time.now, prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
+  end
+
   def hetznerify(server_id)
     DB.transaction do
       HetznerHost.create(server_identifier: server_id) { _1.id = id }
