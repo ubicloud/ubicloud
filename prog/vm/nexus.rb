@@ -8,7 +8,7 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :update_load_balancer, :waiting_for_capacity
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
@@ -318,6 +318,11 @@ class Prog::Vm::Nexus < Prog::Base
       hop_update_firewall_rules
     end
 
+    when_update_load_balancer_set? do
+      register_deadline(:wait, 5 * 60)
+      hop_update_load_balancer
+    end
+
     when_update_spdk_dependency_set? do
       register_deadline(:wait, 5 * 60)
       hop_update_spdk_dependency
@@ -333,6 +338,15 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     nap 30
+  end
+
+  label def update_load_balancer
+    if retval&.dig("msg") == "load balancer is updated"
+      hop_wait
+    end
+
+    decr_update_load_balancer
+    push Prog::Vnet::UpdateLoadBalancer, {}, :update_load_balancer
   end
 
   label def update_firewall_rules
