@@ -89,7 +89,7 @@ class CloverWeb
         project_subnets = @project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all
         attached_subnets = fw.private_subnets_dataset.all
         @attachable_subnets = Serializers::Web::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.map(&:id).include?(ps.id) })
-        @firewall = Serializers::Web::Firewall.new(:detailed).serialize(fw)
+        @firewall = Serializers::Web::Firewall.serialize(fw, {detailed: true})
 
         view "firewall/show"
       end

@@ -24,33 +24,17 @@
 
 module Serializers
   class Base
-    @@structures = {}
-
-    def self.structure(type, &blk)
-      @@structures["#{name}::#{type}"] = blk
-    end
-
-    def self.serialize(object)
-      new.serialize(object)
-    end
-
-    def initialize(type = :default)
-      @type = type
-    end
-
-    def serialize(object)
+    def self.serialize(object, options = {})
       return if object.nil?
       if object.respond_to?(:map) && !object.is_a?(Hash)
-        object.map { |item| serializer.call(item) }
+        object.map { |item| serialize_internal(item, options) }
       else
-        serializer.call(object)
+        serialize_internal(object, options)
       end
     end
 
-    private
-
-    def serializer
-      @@structures["#{self.class.name}::#{@type}"]
+    def self.serialize_internal(object, options = {})
+      raise NoMethodError
     end
   end
 end

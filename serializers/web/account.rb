@@ -1,15 +1,11 @@
 # frozen_string_literal: true
 
 class Serializers::Web::Account < Serializers::Base
-  def self.base(a)
+  def self.serialize_internal(a, options = {})
     {
       id: a.id,
       ubid: a.ubid,
       email: a.email
     }
-  end
-
-  structure(:default) do |a|
-    base(a)
   end
 end

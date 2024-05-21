@@ -3,7 +3,7 @@
 require "countries"
 
 class Serializers::Web::BillingInfo < Serializers::Base
-  def self.base(bi)
+  def self.serialize_internal(bi, options = {})
     {
       id: bi.id,
       ubid: bi.ubid
@@ -18,9 +18,5 @@ class Serializers::Web::BillingInfo < Serializers::Base
       tax_id: bi.stripe_data["metadata"]["tax_id"],
       company_name: bi.stripe_data["metadata"]["company_name"]
     } : {})
-  end
-
-  structure(:default) do |bi|
-    base(bi)
   end
 end

@@ -49,7 +49,7 @@ class CloverApi
       r.get true do
         Authorization.authorize(@current_user.id, "Firewall:view", @project.id)
 
-        Serializers::Api::Firewall.new(:detailed).serialize(@firewall)
+        Serializers::Api::Firewall.serialize(@firewall, {detailed: true})
       end
 
       r.post "attach-subnet" do
@@ -65,7 +65,7 @@ class CloverApi
 
         @firewall.associate_with_private_subnet(private_subnet)
 
-        Serializers::Api::Firewall.new(:detailed).serialize(@firewall)
+        Serializers::Api::Firewall.serialize(@firewall, {detailed: true})
       end
 
       r.post "detach-subnet" do
@@ -81,7 +81,7 @@ class CloverApi
 
         @firewall.disassociate_from_private_subnet(private_subnet)
 
-        Serializers::Api::Firewall.new(:detailed).serialize(@firewall)
+        Serializers::Api::Firewall.serialize(@firewall, {detailed: true})
       end
 
       r.hash_branches(:project_firewall_prefix)

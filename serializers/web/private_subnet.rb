@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 class Serializers::Web::PrivateSubnet < Serializers::Base
-  def self.base(ps)
-    {
+  def self.serialize_internal(ps, options = {})
+    base = {
       id: ps.id,
       ubid: ps.ubid,
       path: ps.path,
@@ -12,15 +12,11 @@ class Serializers::Web::PrivateSubnet < Serializers::Base
       net4: ps.net4.to_s,
       net6: ps.net6.to_s
     }
-  end
 
-  structure(:default) do |ps|
-    base(ps)
-  end
+    if options[:detailed]
+      base[:attached_firewalls] = ps.firewalls.map { |f| Serializers::Web::Firewall.serialize(f) }
+    end
 
-  structure(:detailed) do |ps|
-    base(ps).merge(
-      attached_firewalls: ps.firewalls.map { |f| Serializers::Web::Firewall.serialize(f) }
-    )
+    base
   end
 end

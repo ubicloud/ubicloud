@@ -3,8 +3,8 @@
 require "countries"
 
 class Serializers::Web::Invoice < Serializers::Base
-  def self.base(inv)
-    {
+  def self.serialize_internal(inv, options = {})
+    base = {
       ubid: inv.id ? inv.ubid : "current",
       path: inv.path,
       name: inv.name,
@@ -19,19 +19,9 @@ class Serializers::Web::Invoice < Serializers::Base
       status: inv.status,
       invoice_number: inv.invoice_number
     }
-  end
 
-  def self.humanized_cost(cost)
-    (cost < 0.001) ? "less than $0.001" : "$%0.03f" % cost
-  end
-
-  structure(:default) do |inv|
-    base(inv)
-  end
-
-  structure(:detailed) do |inv|
-    base(inv).merge(
-      {
+    if options[:detailed]
+      base.merge!(
         billing_name: inv.content.dig("billing_info", "name"),
         billing_email: inv.content.dig("billing_info", "email"),
         billing_address: inv.content.dig("billing_info", "address"),
@@ -48,36 +38,42 @@ class Serializers::Web::Invoice < Serializers::Base
         issuer_state: inv.content.dig("issuer_info", "state"),
         issuer_postal_code: inv.content.dig("issuer_info", "postal_code"),
         items: inv.content["resources"].flat_map do |resource|
-          resource["line_items"].map do |line_item|
-            {
-              name: resource["resource_name"],
-              description: line_item["description"],
-              duration: line_item["duration"].to_i,
-              amount: line_item["amount"],
-              cost: line_item["cost"],
-              cost_humanized: humanized_cost(line_item["cost"]),
-              usage: BillingRate.line_item_usage(line_item["resource_type"], line_item["resource_family"], line_item["amount"], line_item["duration"])
-            }
-          end
-        end.group_by { _1[:description] }.flat_map do |description, line_items|
-          if line_items.count <= 5 || description.end_with?("GitHub Runner")
-            line_items
-          else
-            duration_sum = line_items.sum { _1[:duration] }
-            amount_sum = line_items.sum { _1[:amount] }
-            cost_sum = line_items.sum { _1[:cost] }
-            {
-              name: "#{line_items.count} x #{description} (Aggregated)",
-              description: description,
-              duration: duration_sum,
-              amount: amount_sum,
-              cost: cost_sum,
-              cost_humanized: humanized_cost(cost_sum),
-              usage: BillingRate.line_item_usage(line_items.first["resource_type"], line_items.first["resource_family"], amount_sum, duration_sum)
-            }
-          end
-        end.sort_by { _1[:name] }
-      }
-    )
+                 resource["line_items"].map do |line_item|
+                   {
+                     name: resource["resource_name"],
+                     description: line_item["description"],
+                     duration: line_item["duration"].to_i,
+                     amount: line_item["amount"],
+                     cost: line_item["cost"],
+                     cost_humanized: humanized_cost(line_item["cost"]),
+                     usage: BillingRate.line_item_usage(line_item["resource_type"], line_item["resource_family"], line_item["amount"], line_item["duration"])
+                   }
+                 end
+               end.group_by { _1[:description] }.flat_map do |description, line_items|
+                 if line_items.count <= 5 || description.end_with?("GitHub Runner")
+                   line_items
+                 else
+                   duration_sum = line_items.sum { _1[:duration] }
+                   amount_sum = line_items.sum { _1[:amount] }
+                   cost_sum = line_items.sum { _1[:cost] }
+                   {
+                     name: "#{line_items.count} x #{description} (Aggregated)",
+                     description: description,
+                     duration: duration_sum,
+                     amount: amount_sum,
+                     cost: cost_sum,
+                     cost_humanized: humanized_cost(cost_sum),
+                     usage: BillingRate.line_item_usage(line_items.first["resource_type"], line_items.first["resource_family"], amount_sum, duration_sum)
+                   }
+                 end
+               end.sort_by { _1[:name] }
+      )
+    end
+
+    base
+  end
+
+  def self.humanized_cost(cost)
+    (cost < 0.001) ? "less than $0.001" : "$%0.03f" % cost
   end
 end

@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 class Serializers::Web::Firewall < Serializers::Base
-  def self.base(firewall)
-    {
+  def self.serialize_internal(firewall, options = {})
+    base = {
       ubid: firewall.ubid,
       id: firewall.id,
       name: firewall.name,
@@ -10,15 +10,11 @@ class Serializers::Web::Firewall < Serializers::Base
       path: firewall.path,
       firewall_rules: firewall.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }.map { |fw| Serializers::Common::FirewallRule.serialize(fw) }
     }
-  end
 
-  structure(:default) do |firewall|
-    base(firewall)
-  end
+    if options[:detailed]
+      base[:private_subnets] = firewall.private_subnets.map { |ps| Serializers::Web::PrivateSubnet.serialize(ps) }
+    end
 
-  structure(:detailed) do |firewall|
-    base(firewall).merge(
-      private_subnets: firewall.private_subnets.map { |ps| Serializers::Web::PrivateSubnet.serialize(ps) }
-    )
+    base
   end
 end
