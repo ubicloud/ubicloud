@@ -82,6 +82,35 @@ RSpec.describe VmHost do
     vh.download_boot_image("my-image", custom_url: "https://example.com/my-image.raw", version: "20230303")
   end
 
+  it "has a shortcut to download a new firmware for x64" do
+    vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
+    vh.arch = "x64"
+    expect(Strand).to receive(:create) do |args|
+      expect(args[:prog]).to eq("DownloadFirmware")
+      expect(args[:stack]).to eq([subject_id: vh.id, version: "202405", sha256: "sha-1"])
+    end
+    vh.download_firmware(version_x64: "202405", version_arm64: "202406", sha256_x64: "sha-1", sha256_arm64: "sha-2")
+  end
+
+  it "has a shortcut to download a new firmware for arm64" do
+    vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
+    vh.arch = "arm64"
+    expect(Strand).to receive(:create) do |args|
+      expect(args[:prog]).to eq("DownloadFirmware")
+      expect(args[:stack]).to eq([subject_id: vh.id, version: "202406", sha256: "sha-2"])
+    end
+    vh.download_firmware(version_x64: "202405", version_arm64: "202406", sha256_x64: "sha-1", sha256_arm64: "sha-2")
+  end
+
+  it "requires version and sha256 to download a new firmware" do
+    vh.arch = "x64"
+    expect { vh.download_firmware(sha256_x64: "thesha") }.to raise_error(RuntimeError, "No version provided")
+    expect { vh.download_firmware(version_x64: "202405") }.to raise_error(RuntimeError, "No SHA-256 digest provided")
+    vh.arch = "arm64"
+    expect { vh.download_firmware(sha256_arm64: "thesha") }.to raise_error(RuntimeError, "No version provided")
+    expect { vh.download_firmware(version_arm64: "202406") }.to raise_error(RuntimeError, "No SHA-256 digest provided")
+  end
+
   it "assigned_subnets returns the assigned subnets" do
     expect(vh).to receive(:assigned_subnets).and_return([address])
     expect(vh).to receive(:vm_addresses).and_return([])
