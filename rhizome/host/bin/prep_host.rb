@@ -63,12 +63,7 @@ FileUtils.cd ch_dir do
 end
 
 # Download firmware binaries.
-fw_dir = File.dirname(CloudHypervisor::FIRMWARE.path)
-FileUtils.mkdir_p(fw_dir)
-FileUtils.cd fw_dir do
-  r "curl -L3 -o #{CloudHypervisor::FIRMWARE.name.shellescape} #{CloudHypervisor::FIRMWARE.url.shellescape}"
-end
-CloudHypervisor::NEW_FIRMWARE.download
+CloudHypervisor::FIRMWARE.download
 
 # Err towards listing ('l') and not restarting services by default,
 # otherwise a stray keystroke when using "apt install" for unrelated
