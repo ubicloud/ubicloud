@@ -162,10 +162,6 @@ class Vm < Sequel::Model
     vm_storage_volumes.map { _1.size_gib }.sum
   end
 
-  def storage_encrypted?
-    vm_storage_volumes.all? { !_1.key_encryption_key_1_id.nil? }
-  end
-
   def init_health_monitor_session
     {
       ssh_session: vm_host.sshable.start_fresh_session

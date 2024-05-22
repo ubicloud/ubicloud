@@ -30,11 +30,11 @@
     "components/kv_data_card",
     locals: {
       data: [
-        ["ID", @vm[:ubid]],
+        ["ID", @vm[:id]],
         ["Name", @vm[:name]],
         ["Location", @vm[:location]],
-        ["Size", @vm[:display_size]],
-        ["Storage", "#{@vm[:storage_size_gib]}GB (#{@vm[:storage_encryption]})"],
+        ["Size", @vm[:size]],
+        ["Storage", "#{@vm[:storage_size_gib]}GB"],
         ["IPv4", @vm[:ip4], { copieble: true }],
         ["IPv6", @vm[:ip6], { copieble: true }],
         [
@@ -42,8 +42,8 @@
           "<span class='bg-slate-100 text-rose-500 font-mono px-2 py-1 rounded'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm[:unix_user]}@#{@vm[:ip4] || @vm[:ip6]}")}</span>",
           { escape: false }
         ],
-        ["Private IPv4", @vm[:private_ip4], { copieble: true }],
-        ["Private IPv6", @vm[:private_ip6], { copieble: true }],
+        ["Private IPv4", @vm[:private_ipv4], { copieble: true }],
+        ["Private IPv6", @vm[:private_ipv6], { copieble: true }],
         [
           "Private subnet",
           "<a href='#{@project_data[:path]}/location/#{@vm[:location]}/private-subnet/#{@vm[:subnet]}' class='text-rose-500 hover:underline'>#{@vm[:subnet]}</a>",
@@ -102,7 +102,7 @@
                 carefully.</p>
             </div>
           </div>
-          <div id="vm-delete-<%=@vm[:ubid]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+          <div id="vm-delete-<%=@vm[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
             <button
               type="button"
               data-url="<%= request.path %>"
