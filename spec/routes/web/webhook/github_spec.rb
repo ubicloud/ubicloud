@@ -131,23 +131,6 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({error: {message: "Unhandled workflow_job action"}}.to_json)
     end
-
-    it "fails if GPU runners are not enabled" do
-      send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "ubicloud-gpu-standard-1-latest")))
-
-      expect(page.status_code).to eq(200)
-      expect(page.body).to eq({error: {message: "GPU runners are not enabled for this project"}}.to_json)
-    end
-
-    it "succeeds if GPU runners are enabled" do
-      installation.project.set_ff_enable_gpu_runners(true)
-      st = instance_double(Strand, id: runner.id)
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud-gpu-standard-1-latest").and_return(st)
-      send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "ubicloud-gpu-standard-1-latest")))
-
-      expect(page.status_code).to eq(200)
-      expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] created"}.to_json)
-    end
   end
 
   def workflow_job_object(runner_id: 123, label: "ubicloud")

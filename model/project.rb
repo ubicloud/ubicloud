@@ -95,5 +95,4 @@ class Project < Sequel::Model
   end
 
   feature_flag :postgresql_base_image
-  feature_flag :enable_gpu_runners
 end
