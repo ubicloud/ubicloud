@@ -3,7 +3,7 @@
 class CloverWeb
   hash_branch(:project_prefix, "vm") do |r|
     r.get true do
-      @vms = Serializers::Web::Vm.serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all)
+      @vms = Serializers::Common::Vm.serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all, {include_path: true})
 
       view "vm/index"
     end

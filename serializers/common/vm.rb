@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../base"
-
-class Serializers::Api::Vm < Serializers::Base
+class Serializers::Common::Vm < Serializers::Base
   def self.serialize_internal(vm, options = {})
     base = {
       id: vm.ubid,
@@ -15,6 +13,10 @@ class Serializers::Api::Vm < Serializers::Base
       ip6: vm.ephemeral_net6&.nth(2),
       ip4: vm.ephemeral_net4
     }
+
+    if options[:include_path]
+      base[:path] = vm.path
+    end
 
     if options[:detailed]
       base.merge!(

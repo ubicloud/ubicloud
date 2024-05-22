@@ -10,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: Serializers::Api::Vm.serialize(result[:records]),
+        items: Serializers::Common::Vm.serialize(result[:records]),
         count: result[:count]
       }
     end
