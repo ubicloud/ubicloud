@@ -58,7 +58,7 @@
                   locals: {
                     name: "private-subnet-id",
                     label: "Private Subnet",
-                    options: @subnets.map { |s| [s[:ubid], s[:name]] },
+                    options: @subnets.map { |s| [s[:id], s[:name]] },
                     placeholder: "Select private subnet"
                   }
                 ) %>

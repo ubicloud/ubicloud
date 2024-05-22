@@ -14,7 +14,7 @@ class Serializers::Common::Firewall < Serializers::Base
     end
 
     if options[:detailed]
-      base[:private_subnets] = firewall.private_subnets.map { |ps| Serializers::Api::PrivateSubnet.serialize(ps) }
+      base[:private_subnets] = firewall.private_subnets.map { |ps| Serializers::Common::PrivateSubnet.serialize(ps) }
     end
 
     base

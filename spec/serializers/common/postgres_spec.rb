@@ -2,7 +2,7 @@
 
 require_relative "../../spec_helper"
 
-RSpec.describe Serializers::Web::Postgres do
+RSpec.describe Serializers::Common::Postgres do
   let(:pg) { PostgresResource.new(name: "pg-name").tap { _1.id = "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b" } }
 
   it "can serialize when no earliest/latest restore times" do
