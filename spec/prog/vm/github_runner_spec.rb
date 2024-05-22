@@ -388,36 +388,8 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
-        echo "started at: $(date)"
-        if [ "$ImageVersion" == "20240422.1.0" ]; then
-          sudo usermod -a -G sudo,adm runneradmin
-          jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
-        else
-          sudo [ ! -d /home/runner/actions-runner ] || sudo mv /home/runner/actions-runner ./
-          sudo userdel -rf runner || true
-          sudo groupdel -f runner || true
-          sudo addgroup --gid 1001 runner
-          sudo adduser --disabled-password --uid 1001 --gid 1001 --gecos '' runner
-          echo 'runner ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-runner
-          sudo usermod -a -G docker,adm,systemd-journal runner
-          sudo usermod -a -G sudo,adm runneradmin
-          sudo su -c "find /opt/post-generation -mindepth 1 -maxdepth 1 -type f -name '*.sh' -exec bash {} ';'"
-          source /etc/environment
-          sudo [ ! -d /usr/local/share/actions-runner ] || sudo mv /usr/local/share/actions-runner ./
-          sudo chown -R runneradmin:runneradmin actions-runner
-          ./actions-runner/env.sh
-          cat <<EOT > ./actions-runner/run-withenv.sh
-        #!/bin/bash
-        mapfile -t env </etc/environment
-        exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
-        EOT
-          chmod +x ./actions-runner/run-withenv.sh
-          echo "PATH=$PATH" >> ./actions-runner/.env
-          jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
-          sudo mv ./actions-runner /home/runner/
-          sudo chown -R runner:runner /home/runner/actions-runner
-        fi
-        echo "finished at: $(date)"
+        sudo usermod -a -G sudo,adm runneradmin
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
