@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Web::PaymentMethod < Serializers::Base
+class Serializers::PaymentMethod < Serializers::Base
   def self.serialize_internal(pm, options = {})
     {
       id: pm.id,

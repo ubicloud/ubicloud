@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Common::Nic < Serializers::Base
+class Serializers::Nic < Serializers::Base
   def self.serialize_internal(nic, options = {})
     {
       id: nic.ubid,

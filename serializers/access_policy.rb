@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Web::AccessPolicy < Serializers::Base
+class Serializers::AccessPolicy < Serializers::Base
   def self.serialize_internal(ap, options = {})
     {
       id: ap.id,

@@ -10,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: Serializers::Common::Postgres.serialize(result[:records]),
+        items: Serializers::Postgres.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -47,7 +47,7 @@ class CloverApi
           ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
         )
 
-        Serializers::Common::Postgres.serialize(st.subject, {detailed: true})
+        Serializers::Postgres.serialize(st.subject, {detailed: true})
       end
 
       pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
@@ -63,7 +63,7 @@ class CloverApi
 
     request.get true do
       Authorization.authorize(user.id, "Postgres:view", pg.id)
-      Serializers::Common::Postgres.serialize(pg, {detailed: true})
+      Serializers::Postgres.serialize(pg, {detailed: true})
     end
 
     request.delete true do
@@ -92,12 +92,12 @@ class CloverApi
           pg.incr_update_firewall_rules
         end
 
-        Serializers::Common::Postgres.serialize(pg, {detailed: true})
+        Serializers::Postgres.serialize(pg, {detailed: true})
       end
 
       request.get true do
         Authorization.authorize(user.id, "Postgres:Firewall:view", pg.id)
-        Serializers::Common::PostgresFirewallRule.serialize(pg.firewall_rules)
+        Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
       end
 
       request.is String do |firewall_rule_ubid|
@@ -136,7 +136,7 @@ class CloverApi
         restore_target: request_body_params["restore_target"]
       )
 
-      Serializers::Common::Postgres.serialize(st.subject, {detailed: true})
+      Serializers::Postgres.serialize(st.subject, {detailed: true})
     end
 
     request.post "reset-superuser-password" do
@@ -158,7 +158,7 @@ class CloverApi
         pg.representative_server.incr_update_superuser_password
       end
 
-      Serializers::Common::Postgres.serialize(pg, {detailed: true})
+      Serializers::Postgres.serialize(pg, {detailed: true})
     end
   end
 end

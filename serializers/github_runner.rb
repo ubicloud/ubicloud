@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Web::GithubRunner < Serializers::Base
+class Serializers::GithubRunner < Serializers::Base
   def self.serialize_internal(runner, options = {})
     {
       id: runner.id,

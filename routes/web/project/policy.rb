@@ -6,7 +6,7 @@ class CloverWeb
 
     r.get true do
       # For UI simplicity, we are showing only one policy at the moment
-      @policy = Serializers::Web::AccessPolicy.serialize(@project.access_policies.first)
+      @policy = Serializers::AccessPolicy.serialize(@project.access_policies.first)
 
       view "project/policy"
     end

@@ -3,7 +3,7 @@
 class CloverWeb
   hash_branch(:project_prefix, "vm") do |r|
     r.get true do
-      @vms = Serializers::Common::Vm.serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all, {include_path: true})
+      @vms = Serializers::Vm.serialize(@project.vms_dataset.authorized(@current_user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all, {include_path: true})
 
       view "vm/index"
     end
@@ -38,7 +38,7 @@ class CloverWeb
     r.on "create" do
       r.get true do
         Authorization.authorize(@current_user.id, "Vm:create", @project.id)
-        @subnets = Serializers::Common::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
+        @subnets = Serializers::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all)
         @prices = fetch_location_based_prices("VmCores", "IPAddress")
         @has_valid_payment_method = @project.has_valid_payment_method?
 

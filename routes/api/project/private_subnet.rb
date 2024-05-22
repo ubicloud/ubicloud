@@ -10,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: Serializers::Common::PrivateSubnet.serialize(result[:records]),
+        items: Serializers::PrivateSubnet.serialize(result[:records]),
         count: result[:count]
       }
     end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Common::Postgres < Serializers::Base
+class Serializers::Postgres < Serializers::Base
   def self.serialize_internal(pg, options = {})
     base = {
       id: pg.ubid,
@@ -20,7 +20,7 @@ class Serializers::Common::Postgres < Serializers::Base
       base.merge!(
         connection_string: pg.connection_string,
         primary: pg.representative_server&.primary?,
-        firewall_rules: Serializers::Common::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s })
+        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s })
       )
 
       if pg.timeline && pg.representative_server&.primary?

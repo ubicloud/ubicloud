@@ -20,7 +20,7 @@ class InvoiceGenerator
 
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
-        project_content[:billing_info] = Serializers::Web::BillingInfo.serialize(project.billing_info)
+        project_content[:billing_info] = Serializers::BillingInfo.serialize(project.billing_info)
         project_content[:issuer_info] = {
           name: "Ubicloud Inc.",
           address: "310 Santa Ana Avenue",

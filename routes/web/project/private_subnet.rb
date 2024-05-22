@@ -3,7 +3,7 @@
 class CloverWeb
   hash_branch(:project_prefix, "private-subnet") do |r|
     r.get true do
-      @pss = Serializers::Common::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all, {include_path: true})
+      @pss = Serializers::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all, {include_path: true})
 
       view "private_subnet/index"
     end
