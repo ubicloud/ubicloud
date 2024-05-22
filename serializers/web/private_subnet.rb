@@ -14,7 +14,7 @@ class Serializers::Web::PrivateSubnet < Serializers::Base
     }
 
     if options[:detailed]
-      base[:attached_firewalls] = ps.firewalls.map { |f| Serializers::Web::Firewall.serialize(f) }
+      base[:attached_firewalls] = ps.firewalls.map { |f| Serializers::Common::Firewall.serialize(f) }
     end
 
     base

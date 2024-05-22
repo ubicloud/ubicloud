@@ -18,7 +18,7 @@ class Serializers::Api::Vm < Serializers::Base
 
     if options[:detailed]
       base.merge!(
-        firewalls: vm.firewalls.map { |fw| Serializers::Api::Firewall.serialize(fw) },
+        firewalls: vm.firewalls.map { |fw| Serializers::Common::Firewall.serialize(fw) },
         private_ipv4: vm.nics.first.private_ipv4.network,
         private_ipv6: vm.nics.first.private_ipv6.nth(2),
         subnet: vm.nics.first.private_subnet.name
