@@ -100,7 +100,7 @@ RSpec.describe Clover, "billing" do
       click_button "Add new billing information"
 
       expect(page.status_code).to eq(200)
-      expect(page).to have_content("We couldn't pre-authorize $1 from your card for verification. Please try again or contact our support team at support@ubicloud.com.")
+      expect(page).to have_content("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
     end
 
     it "can update billing info" do
