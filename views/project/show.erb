@@ -20,7 +20,7 @@
       "components/kv_data_card",
       locals: {
         data: [
-          ["ID", @project_data[:ubid]],
+          ["ID", @project_data[:id]],
           (
             if Authorization.has_permission?(@current_user.id, "Project:edit", @project_data[:id])
               [
