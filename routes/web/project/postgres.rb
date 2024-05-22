@@ -3,7 +3,7 @@
 class CloverWeb
   hash_branch(:project_prefix, "postgres") do |r|
     r.get true do
-      @postgres_databases = Serializers::Common::Postgres.serialize(@project.postgres_resources_dataset.authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand, :representative_server, :timeline).all, {include_path: true})
+      @postgres_databases = Serializers::Postgres.serialize(@project.postgres_resources_dataset.authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand, :representative_server, :timeline).all, {include_path: true})
 
       view "postgres/index"
     end

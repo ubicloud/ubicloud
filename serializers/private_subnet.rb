@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Common::PrivateSubnet < Serializers::Base
+class Serializers::PrivateSubnet < Serializers::Base
   def self.serialize_internal(ps, options = {})
     base = {
       id: ps.ubid,
@@ -9,8 +9,8 @@ class Serializers::Common::PrivateSubnet < Serializers::Base
       location: ps.display_location,
       net4: ps.net4.to_s,
       net6: ps.net6.to_s,
-      firewalls: Serializers::Common::Firewall.serialize(ps.firewalls),
-      nics: Serializers::Common::Nic.serialize(ps.nics)
+      firewalls: Serializers::Firewall.serialize(ps.firewalls),
+      nics: Serializers::Nic.serialize(ps.nics)
     }
 
     if options[:include_path]

@@ -83,7 +83,7 @@ class Invoice < Sequel::Model
   end
 
   def send_success_email(below_threshold: false)
-    ser = Serializers::Web::Invoice.serialize(self, {detailed: true})
+    ser = Serializers::Invoice.serialize(self, {detailed: true})
     message = if below_threshold
       "Since the invoice total of #{ser[:total]} is below our minimum charge threshold, there will be no charges for this month."
     else
@@ -99,7 +99,7 @@ class Invoice < Sequel::Model
   end
 
   def send_failure_email(errors)
-    ser = Serializers::Web::Invoice.serialize(self, {detailed: true})
+    ser = Serializers::Invoice.serialize(self, {detailed: true})
     Util.send_email(ser[:billing_email], "Urgent: Action Required to Prevent Service Disruption",
       cc: Config.mail_from,
       greeting: "Dear #{ser[:billing_name]},",

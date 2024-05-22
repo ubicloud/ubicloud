@@ -10,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: Serializers::Common::PrivateSubnet.serialize(result[:records]),
+        items: Serializers::PrivateSubnet.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -37,7 +37,7 @@ class CloverApi
           location: @location
         )
 
-        Serializers::Common::PrivateSubnet.serialize(st.subject)
+        Serializers::PrivateSubnet.serialize(st.subject)
       end
 
       ps = @project.private_subnets_dataset.where(location: @location).where { {Sequel[:private_subnet][:name] => ps_name} }.first
@@ -53,7 +53,7 @@ class CloverApi
 
     request.get true do
       Authorization.authorize(user.id, "PrivateSubnet:view", ps.id)
-      Serializers::Common::PrivateSubnet.serialize(ps)
+      Serializers::PrivateSubnet.serialize(ps)
     end
 
     request.delete true do

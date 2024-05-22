@@ -9,7 +9,7 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @pg = Serializers::Common::Postgres.serialize(pg, {detailed: true, include_path: true})
+      @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
 
       r.get true do
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)

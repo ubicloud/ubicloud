@@ -2,7 +2,7 @@
 
 require "countries"
 
-class Serializers::Web::BillingInfo < Serializers::Base
+class Serializers::BillingInfo < Serializers::Base
   def self.serialize_internal(bi, options = {})
     {
       id: bi.id,

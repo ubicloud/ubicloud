@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Common::Vm < Serializers::Base
+class Serializers::Vm < Serializers::Base
   def self.serialize_internal(vm, options = {})
     base = {
       id: vm.ubid,
@@ -20,7 +20,7 @@ class Serializers::Common::Vm < Serializers::Base
 
     if options[:detailed]
       base.merge!(
-        firewalls: Serializers::Common::Firewall.serialize(vm.firewalls),
+        firewalls: Serializers::Firewall.serialize(vm.firewalls),
         private_ipv4: vm.nics.first.private_ipv4.network,
         private_ipv6: vm.nics.first.private_ipv6.nth(2),
         subnet: vm.nics.first.private_subnet.name

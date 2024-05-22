@@ -9,12 +9,12 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @ps = Serializers::Common::PrivateSubnet.serialize(ps)
+      @ps = Serializers::PrivateSubnet.serialize(ps)
 
       r.get true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps.id)
 
-        @nics = Serializers::Common::Nic.serialize(ps.nics)
+        @nics = Serializers::Nic.serialize(ps.nics)
 
         view "private_subnet/show"
       end

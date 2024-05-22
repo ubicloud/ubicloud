@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Common::Project < Serializers::Base
+class Serializers::Project < Serializers::Base
   def self.serialize_internal(p, options = {})
     base = {
       id: p.ubid,

@@ -2,7 +2,7 @@
 
 require "countries"
 
-class Serializers::Web::Invoice < Serializers::Base
+class Serializers::Invoice < Serializers::Base
   def self.serialize_internal(inv, options = {})
     base = {
       ubid: inv.id ? inv.ubid : "current",

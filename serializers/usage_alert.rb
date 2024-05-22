@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Web::UsageAlert < Serializers::Base
+class Serializers::UsageAlert < Serializers::Base
   def self.serialize_internal(ua, options = {})
     {
       ubid: ua.ubid,

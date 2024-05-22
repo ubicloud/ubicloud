@@ -10,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: Serializers::Common::Project.serialize(result[:records]),
+        items: Serializers::Project.serialize(result[:records]),
         count: result[:count]
       }
     end
@@ -22,7 +22,7 @@ class CloverApi
 
       project = @current_user.create_project_with_default_policy(request_body_params["name"])
 
-      Serializers::Common::Project.serialize(project)
+      Serializers::Project.serialize(project)
     end
 
     r.on String do |project_ubid|
@@ -55,7 +55,7 @@ class CloverApi
       r.get true do
         Authorization.authorize(@current_user.id, "Project:view", @project.id)
 
-        Serializers::Common::Project.serialize(@project)
+        Serializers::Project.serialize(@project)
       end
 
       r.hash_branches(:project_prefix)

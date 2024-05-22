@@ -14,12 +14,12 @@ class CloverWeb
 
     r.get true do
       if (billing_info = @project.billing_info)
-        @billing_info_data = Serializers::Web::BillingInfo.serialize(billing_info)
-        @payment_methods = Serializers::Web::PaymentMethod.serialize(billing_info.payment_methods)
-        @invoices = Serializers::Web::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
+        @billing_info_data = Serializers::BillingInfo.serialize(billing_info)
+        @payment_methods = Serializers::PaymentMethod.serialize(billing_info.payment_methods)
+        @invoices = Serializers::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
       end
 
-      @usage_alerts = Serializers::Web::UsageAlert.serialize(@project.usage_alerts_dataset.eager(:user))
+      @usage_alerts = Serializers::UsageAlert.serialize(@project.usage_alerts_dataset.eager(:user))
 
       view "project/billing"
     end
@@ -161,7 +161,7 @@ class CloverWeb
 
         r.get true do
           @full_page = r.params["print"] == "1"
-          @invoice_data = Serializers::Web::Invoice.serialize(invoice, {detailed: true})
+          @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
           view "project/invoice"
         end
       end

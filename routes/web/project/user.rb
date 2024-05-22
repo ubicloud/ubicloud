@@ -5,7 +5,7 @@ class CloverWeb
     Authorization.authorize(@current_user.id, "Project:user", @project.id)
 
     r.get true do
-      @users = Serializers::Web::Account.serialize(@project.accounts)
+      @users = Serializers::Account.serialize(@project.accounts)
 
       view "project/user"
     end
