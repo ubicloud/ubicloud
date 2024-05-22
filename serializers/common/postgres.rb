@@ -20,7 +20,7 @@ class Serializers::Common::Postgres < Serializers::Base
       base.merge!(
         connection_string: pg.connection_string,
         primary: pg.representative_server&.primary?,
-        firewall_rules: pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }.map { |fw| Serializers::Common::PostgresFirewallRule.serialize(fw) }
+        firewall_rules: Serializers::Common::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s })
       )
 
       if pg.timeline && pg.representative_server&.primary?

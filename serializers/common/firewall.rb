@@ -6,7 +6,7 @@ class Serializers::Common::Firewall < Serializers::Base
       id: firewall.ubid,
       name: firewall.name,
       description: firewall.description,
-      firewall_rules: firewall.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }.map { |fw| Serializers::Common::FirewallRule.serialize(fw) }
+      firewall_rules: Serializers::Common::FirewallRule.serialize(firewall.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s })
     }
 
     if options[:include_path]
@@ -14,7 +14,7 @@ class Serializers::Common::Firewall < Serializers::Base
     end
 
     if options[:detailed]
-      base[:private_subnets] = firewall.private_subnets.map { |ps| Serializers::Common::PrivateSubnet.serialize(ps) }
+      base[:private_subnets] = Serializers::Common::PrivateSubnet.serialize(firewall.private_subnets)
     end
 
     base
