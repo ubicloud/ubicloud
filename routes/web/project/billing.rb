@@ -73,8 +73,12 @@ class CloverWeb
       # authorization won't be captured and will be refunded immediately
       begin
         customer_stripe_id = setup_intent["customer"]
+
+        # Pre-authorizing random amount to verify card. As it is
+        # commonly done with other companies, apparently it is
+        # better to detect fraud then pre-authorizing fixed amount.
         payment_intent = Stripe::PaymentIntent.create({
-          amount: 100, # 100 cents to charge $1.00
+          amount: [100, 200, 300, 400, 500].sample, # 100 cents to charge $1.00
           currency: "usd",
           confirm: true,
           off_session: true,
@@ -91,7 +95,7 @@ class CloverWeb
       rescue
         # Log and redirect if Stripe card error or our manual raise
         Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id: customer_stripe_id}} }
-        flash["error"] = "We couldn't pre-authorize $1 from your card for verification. Please try again or contact our support team at support@ubicloud.com."
+        flash["error"] = "We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com."
         r.redirect @project.path + "/billing"
       end
 
