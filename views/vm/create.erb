@@ -67,7 +67,7 @@
                     name: "private-subnet-id",
                     label: "Private Subnet",
                     placeholder: "Create new subnet",
-                    options: @subnets.map { |s| [s[:ubid], s[:name], "location-based-option #{s[:location]}"] }
+                    options: @subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] }
                   }
                 ) %>
               </div>

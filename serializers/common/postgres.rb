@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Serializers::Api::Postgres < Serializers::Base
+class Serializers::Common::Postgres < Serializers::Base
   def self.serialize_internal(pg, options = {})
     base = {
       id: pg.ubid,
@@ -11,6 +11,10 @@ class Serializers::Api::Postgres < Serializers::Base
       storage_size_gib: pg.target_storage_size_gib,
       ha_type: pg.ha_type
     }
+
+    if options[:include_path]
+      base[:path] = pg.path
+    end
 
     if options[:detailed]
       base.merge!(

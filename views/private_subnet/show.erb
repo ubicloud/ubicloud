@@ -27,7 +27,7 @@
     "components/kv_data_card",
     locals: {
       data: [
-        ["ID", @ps[:ubid]],
+        ["ID", @ps[:id]],
         ["Name", @ps[:name]],
         ["Location", @ps[:location]],
         ["IPv6 block", @ps[:net6]],
@@ -92,7 +92,7 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
-        <% @ps[:attached_firewalls].each do |fw| %>
+        <% @ps[:firewalls].each do |fw| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <% if Authorization.has_permission?(@current_user.id, "Firewall:view", fw[:id]) %>

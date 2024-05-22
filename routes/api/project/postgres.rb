@@ -10,7 +10,7 @@ class CloverApi
       )
 
       {
-        items: Serializers::Api::Postgres.serialize(result[:records]),
+        items: Serializers::Common::Postgres.serialize(result[:records]),
         count: result[:count]
       }
     end
