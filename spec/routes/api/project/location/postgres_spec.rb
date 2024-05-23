@@ -372,6 +372,13 @@ RSpec.describe Clover, "postgres" do
         expect(SemSnap.new(pg.id).set?("destroy")).to be false
       end
 
+      it "not exist ubid in location" do
+        delete "/api/project/#{project.ubid}/location/foo_location/postgres/id/#{pg.ubid}"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(pg.id).set?("destroy")).to be false
+      end
+
       it "firewall-rule" do
         delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{pg.firewall_rules.first.ubid}"
 

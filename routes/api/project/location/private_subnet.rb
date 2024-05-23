@@ -18,6 +18,11 @@ class CloverApi
     r.on "id" do
       r.is String do |ps_id|
         ps = PrivateSubnet.from_ubid(ps_id)
+
+        if ps&.location != @location
+          ps = nil
+        end
+
         handle_ps_requests(@current_user, ps)
       end
     end
