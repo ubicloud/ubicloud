@@ -18,6 +18,11 @@ class CloverApi
     r.on "id" do
       r.on String do |vm_ubid|
         vm = Vm.from_ubid(vm_ubid)
+
+        if vm&.location != @location
+          vm = nil
+        end
+
         handle_vm_requests(@current_user, vm)
       end
     end

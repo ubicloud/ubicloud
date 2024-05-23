@@ -175,6 +175,20 @@ RSpec.describe Clover, "private_subnet" do
         expect(SemSnap.new(ps.id).set?("destroy")).to be true
       end
 
+      it "not exist ubid in location" do
+        delete "/api/project/#{project.ubid}/location/foo_location/private-subnet/id/#{ps.ubid}"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(ps.id).set?("destroy")).to be false
+      end
+
+      it "not exist ubid" do
+        delete "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/id/foo_ubid"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(ps.id).set?("destroy")).to be false
+      end
+
       it "dependent vm failure" do
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm-2")
 

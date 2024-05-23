@@ -343,6 +343,13 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
+
+      it "not exist ubid in location" do
+        delete "/api/project/#{project.ubid}/location/foo_location/vm/id/#{vm.ubid}"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(vm.id).set?("destroy")).to be false
+      end
     end
   end
 end

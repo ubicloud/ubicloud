@@ -18,6 +18,11 @@ class CloverApi
     r.on "id" do
       r.on String do |pg_ubid|
         pg = PostgresResource.from_ubid(pg_ubid)
+
+        if pg&.location != @location
+          pg = nil
+        end
+
         handle_pg_requests(@current_user, pg, @project)
       end
     end
