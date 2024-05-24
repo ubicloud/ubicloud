@@ -34,6 +34,12 @@ RSpec.describe Vm do
       expect(vm.mem_gib).to eq 64
     end
 
+    it "handles standard-30" do
+      vm.family = "standard"
+      vm.cores = 15
+      expect(vm.mem_gib).to eq 120
+    end
+
     it "handles standard-6" do
       vm.family = "standard-gpu"
       vm.cores = 3
