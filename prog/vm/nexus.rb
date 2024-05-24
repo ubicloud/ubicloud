@@ -8,7 +8,7 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
@@ -216,6 +216,7 @@ class Prog::Vm::Nexus < Prog::Base
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")
 
+      incr_waiting_for_capacity unless vm.waiting_for_capacity_set?
       queued_vms = queued_vms.all
       Prog::PageNexus.assemble("No capacity left at #{vm.location} for #{vm.arch}", queued_vms.first(25).map(&:ubid), "NoCapacity", vm.location, vm.arch)
       Clog.emit("No capacity left") { {lack_of_capacity: {location: vm.location, arch: vm.arch, queue_size: queued_vms.count}} }
@@ -223,6 +224,7 @@ class Prog::Vm::Nexus < Prog::Base
       nap 30
     end
 
+    decr_waiting_for_capacity
     if (page = Page.from_tag_parts("NoCapacity", vm.location, vm.arch)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
       page.incr_resolve
     end

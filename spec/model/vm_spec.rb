@@ -11,6 +11,11 @@ RSpec.describe Vm do
       expect(vm.display_state).to eq("deleting")
     end
 
+    it "returns waiting for capacity if semaphore increased" do
+      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm.display_state).to eq("waiting for capacity")
+    end
+
     it "return same if semaphores not increased" do
       expect(vm.display_state).to eq("creating")
     end

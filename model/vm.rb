@@ -21,7 +21,7 @@ class Vm < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity
 
   include Authorization::HyperTagMethods
 
@@ -52,7 +52,8 @@ class Vm < Sequel::Model
   end
 
   def display_state
-    return "deleting" if destroy_set?
+    return "deleting" if destroy_set? || strand&.label == "destroy"
+    return "waiting for capacity" if waiting_for_capacity_set?
     super
   end
 
