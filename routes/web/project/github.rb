@@ -12,14 +12,14 @@ class CloverWeb
     r.get true do
       @installations = Serializers::Web::GithubInstallation.serialize(@project.github_installations)
       @runners = Serializers::Web::GithubRunner.serialize(@project.github_installations_dataset.eager(runners: [:vm, :strand]).flat_map(&:runners).sort_by(&:created_at).reverse)
-      @has_valid_payment_method = @project.has_valid_payment_method?
+      @has_valid_payment_method = @project.has_valid_payment_method? || @project.get_ff_allow_github_installation_wo_billing
 
       view "project/github"
     end
 
     r.on "installation" do
       r.get "create" do
-        unless @project.has_valid_payment_method?
+        unless @project.has_valid_payment_method? || @project.get_ff_allow_github_installation_wo_billing
           fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"})
         end
         session[:github_installation_project_id] = @project.id

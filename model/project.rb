@@ -94,5 +94,5 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :postgresql_base_image
+  feature_flag :postgresql_base_image, :allow_github_installation_wo_billing
 end
