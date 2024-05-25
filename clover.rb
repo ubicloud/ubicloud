@@ -5,16 +5,6 @@ require_relative "model"
 require "roda"
 
 class Clover < Roda
-  def self.freeze
-    # :nocov:
-    unless Config.test?
-      Sequel::Model.freeze_descendents
-      DB.freeze
-    end
-    # :nocov:
-    super
-  end
-
   route do |r|
     subdomain = r.host.split(".").first
     if subdomain == "api"

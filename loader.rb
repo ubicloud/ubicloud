@@ -20,7 +20,7 @@ Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) {
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
 Unreloader.autoload("#{__dir__}/ubid.rb") { "UBID" }
 
-AUTOLOAD_CONSTANTS = ["DB", "UBID"]
+AUTOLOAD_CONSTANTS = ["DB", "UBID", "Clover"]
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
@@ -84,7 +84,7 @@ autoload_normal.call("model", flat: true)
 AUTOLOAD_CONSTANTS.freeze
 
 if Config.production?
-  AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
+  AUTOLOAD_CONSTANTS.map { Object.const_get(_1) }.each(&:freeze)
 end
 
 case Config.mail_driver

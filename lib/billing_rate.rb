@@ -3,6 +3,8 @@
 require "yaml"
 
 class BillingRate
+  @@rates = nil
+
   def self.rates
     @@rates ||= YAML.load_file("config/billing_rates.yml")
   end
