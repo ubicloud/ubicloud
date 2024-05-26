@@ -21,7 +21,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         PostgresServer,
         vm: instance_double(
           Vm,
-          cores: 1
+          cores: 1,
+          vm_host: instance_double(VmHost, id: "dd9ef3e7-6d55-8371-947f-a8478b42a17d")
         )
       )],
       representative_server: instance_double(
@@ -284,9 +285,16 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, required_standby_count: 0)
     end
 
-    it "creates missing standbys" do
+    it "exclude primary server's host while creating standbys" do
       expect(postgres_resource).to receive(:required_standby_count).and_return(1)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble)
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [postgres_resource.servers.first.vm.vm_host.id]))
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "does not exclude any hosts in development" do
+      expect(postgres_resource).to receive(:required_standby_count).and_return(1)
+      expect(Config).to receive(:development?).and_return(true)
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
       expect { nx.wait }.to nap(30)
     end
 
