@@ -50,4 +50,9 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:strand).and_return(instance_double(Strand, label: "wait_server"))
     expect(postgres_resource.display_state).to eq("creating")
   end
+
+  it "returns required_standby_count correctly" do
+    expect(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC)
+    (0..2).each { expect(postgres_resource.required_standby_count).to eq(_1) }
+  end
 end
