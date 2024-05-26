@@ -158,9 +158,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def wait
-    # Create missing standbys
-    (postgres_resource.required_standby_count + 1 - postgres_resource.servers.count).times do
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", private_subnet_id: representative_server.vm.private_subnets.first.id)
+    # Only create one standby at a time to ensure that they are allocated on different hosts
+    if postgres_resource.required_standby_count + 1 > servers.count && servers.none? { _1.vm.vm_host.nil? }
+      exclude_host_ids = Config.development? ? [] : servers.map { _1.vm.vm_host.id }
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", private_subnet_id: representative_server.vm.private_subnets.first.id, exclude_host_ids: exclude_host_ids)
     end
 
     when_refresh_dns_record_set? do
