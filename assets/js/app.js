@@ -186,14 +186,14 @@ function jsonHighlight(str) {
 
 $("input[name=location]").on("change", function (event) {
   setupLocationBasedPrices();
-  setupLocationBasedPostgresHaPrices();
   setupLocationBasedOptions();
   setupInstanceSizeBasedOptions();
+  setupLocationBasedPostgresHaPrices();
 });
 
 $("input[name=size]").on("change", function (event) {
-  setupLocationBasedPostgresHaPrices();
   setupInstanceSizeBasedOptions();
+  setupLocationBasedPostgresHaPrices();
 });
 
 $("input[name=storage-size]").on("change", function (event) {
