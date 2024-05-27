@@ -22,22 +22,12 @@ RSpec.describe Vm do
   end
 
   describe "#mem_gib" do
-    it "handles standard-2" do
+    it "handles standard family" do
       vm.family = "standard"
-      vm.cores = 1
-      expect(vm.mem_gib).to eq 8
-    end
-
-    it "handles standard-16" do
-      vm.family = "standard"
-      vm.cores = 8
-      expect(vm.mem_gib).to eq 64
-    end
-
-    it "handles standard-30" do
-      vm.family = "standard"
-      vm.cores = 15
-      expect(vm.mem_gib).to eq 120
+      [1, 2, 4, 8, 15, 30].each do |cores|
+        expect(vm).to receive(:cores).and_return(cores)
+        expect(vm.mem_gib).to eq cores * 8
+      end
     end
 
     it "handles standard-6" do
