@@ -3,6 +3,8 @@ $(function() {
   setupLocationBasedPrices();
   setupLocationBasedOptions();
   setupInstanceSizeBasedOptions();
+  setupLocationBasedPostgresHaPrices();
+  setupLocationBasedPostgresHaPrices();
   setupAutoRefresh();
   setupPrint();
   setupDatePicker();
