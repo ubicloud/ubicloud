@@ -32,13 +32,13 @@
 - { id: 80aa487a-0aa7-472f-a52c-d82a96067cba, resource_type: PostgresStorage,         resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
 - { id: c41422cd-9e28-46bd-acd4-02debfcd26a2, resource_type: PostgresStorage,         resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
 - { id: b8d48f79-8131-46aa-b898-dba1c21d0954, resource_type: PostgresStorage,         resource_family: standard,        location: github-runners, unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
-- { id: 0a45042a-6d20-8978-af02-dfaf3f40cd28, resource_type: PostgresStorage,         resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
-- { id: 5f19cb91-1cff-8d78-881a-1927e5fcdb98, resource_type: PostgresStorage,         resource_family: standard,        location: leaseweb-dal13, unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
+- { id: 0a45042a-6d20-8978-af02-dfaf3f40cd28, resource_type: PostgresStorage,         resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.0000031000, active_from: 2023-01-01T00:00:00Z }
+- { id: 5f19cb91-1cff-8d78-881a-1927e5fcdb98, resource_type: PostgresStorage,         resource_family: standard,        location: leaseweb-dal13, unit_price: 0.0000031000, active_from: 2023-01-01T00:00:00Z }
 - { id: eaf2d6df-c63c-4dd1-9aa4-00e08785fb59, resource_type: PostgresStandbyStorage,  resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
 - { id: 10e65151-b0e2-4a33-9834-c3b4549a0d98, resource_type: PostgresStandbyStorage,  resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
 - { id: f9f47985-f9fe-42b6-a8d8-c086d557f224, resource_type: PostgresStandbyStorage,  resource_family: standard,        location: github-runners, unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
-- { id: 4b8afe08-bc0e-8978-bc23-e38973e5b3d4, resource_type: PostgresStandbyStorage,  resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
-- { id: 1172b71c-4c1f-8978-aa10-b9e73822a8e4, resource_type: PostgresStandbyStorage,  resource_family: standard,        location: leaseweb-dal13, unit_price: 0.0000028100, active_from: 2023-01-01T00:00:00Z }
+- { id: 4b8afe08-bc0e-8978-bc23-e38973e5b3d4, resource_type: PostgresStandbyStorage,  resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.0000031000, active_from: 2023-01-01T00:00:00Z }
+- { id: 1172b71c-4c1f-8978-aa10-b9e73822a8e4, resource_type: PostgresStandbyStorage,  resource_family: standard,        location: leaseweb-dal13, unit_price: 0.0000031000, active_from: 2023-01-01T00:00:00Z }
 - { id: d772d0aa-0b40-4b7a-aceb-72f6211f7cad, resource_type: GitHubRunnerMinutes,     resource_family: standard-2,      location: global,         unit_price: 0.0008000000, active_from: 2023-01-01T00:00:00Z }
 - { id: d885c82d-b139-40d5-890f-de3720896b3b, resource_type: GitHubRunnerMinutes,     resource_family: standard-4,      location: global,         unit_price: 0.0016000000, active_from: 2023-01-01T00:00:00Z }
 - { id: e50e6bff-6ee9-493b-bc09-75f122863d08, resource_type: GitHubRunnerMinutes,     resource_family: standard-8,      location: global,         unit_price: 0.0032000000, active_from: 2023-01-01T00:00:00Z }
