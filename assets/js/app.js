@@ -261,10 +261,14 @@ function setupInstanceSizeBasedOptions() {
       max_storage_size_gib = $("input[name=size]:checked").data("max-storage-size-gib");
       storage_size_step_gib = $("input[name=size]:checked").data("storage-size-step-gib");
       storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
+      // We cache the value here and set it back after changing the min/max/step
+      // Because value might be invalid temporarily while changing min/max/step causing browser to change it automatically 
+      value = $(this).val();
 
       $(this).attr("min", min_storage_size_gib);
       $(this).attr("max", max_storage_size_gib);
       $(this).attr("step", storage_size_step_gib);
+      $(this).val(value);
 
       let monthlyPrice = $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"]
       $(this).data("monthly-price", monthlyPrice);
