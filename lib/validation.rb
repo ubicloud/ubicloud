@@ -113,6 +113,14 @@ module Validation
     postgres_size
   end
 
+  def self.validate_postgres_storage_size(size, storage_size)
+    storage_size = storage_size.to_i
+    pg_size = validate_postgres_size(size)
+    allowed_sizes = (pg_size.min_storage_size_gib..pg_size.max_storage_size_gib).step(pg_size.storage_size_step_gib)
+    fail ValidationFailed.new({storage_size: "Storage size must be one of the following: #{allowed_sizes.to_a.join(", ")}"}) unless allowed_sizes.include?(storage_size)
+    storage_size
+  end
+
   def self.validate_date(date, param = "date")
     # I use DateTime.parse instead of Time.parse because it uses UTC as default
     # timezone but Time.parse uses local timezone

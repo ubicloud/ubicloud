@@ -34,7 +34,7 @@ class CloverApi
         Validation.validate_postgres_location(@location)
 
         required_parameters = ["size"]
-        allowed_optional_parameters = ["ha_type"]
+        allowed_optional_parameters = ["storage_size", "ha_type"]
 
         request_body_params = Validation.validate_request_body(r.body.read, required_parameters, allowed_optional_parameters)
         parsed_size = Validation.validate_postgres_size(request_body_params["size"])
@@ -43,7 +43,7 @@ class CloverApi
           location: @location,
           name: pg_name,
           target_vm_size: parsed_size.vm_size,
-          target_storage_size_gib: parsed_size.storage_size_gib,
+          target_storage_size_gib: request_body_params["storage_size"] || parsed_size.min_storage_size_gib,
           ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
         )
 

@@ -20,6 +20,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     Validation.validate_location(location)
     Validation.validate_name(name)
     Validation.validate_vm_size(target_vm_size)
+    target_storage_size_gib = Validation.validate_postgres_storage_size(target_vm_size, target_storage_size_gib)
     Validation.validate_postgres_ha_type(ha_type)
 
     DB.transaction do

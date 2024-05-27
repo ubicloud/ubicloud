@@ -177,6 +177,31 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_postgres_storage_size" do
+      it "valid postgres storage sizes" do
+        [
+          ["standard-2", "128"],
+          ["standard-2", "256"],
+          ["standard-4", "1024"]
+        ].each do |pg_size, storage_size|
+          expect(described_class.validate_postgres_storage_size(pg_size, storage_size)).to eq(storage_size.to_f)
+        end
+      end
+
+      it "invalid postgres storage sizes" do
+        [
+          ["standard-2", "1024"],
+          ["standard-2", "37.4"],
+          ["standard-2", ""],
+          ["standard-2", nil],
+          ["standard-5", "128"],
+          [nil, "128"]
+        ].each do |pg_size, storage_size|
+          expect { described_class.validate_postgres_storage_size(pg_size, storage_size) }.to raise_error described_class::ValidationFailed
+        end
+      end
+    end
+
     describe "#validate_postgres_ha_type" do
       it "valid postgres ha_type" do
         [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.not_to raise_error }

@@ -20,7 +20,7 @@ class CloverWeb
         location: location,
         name: r.params["name"],
         target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: parsed_size.storage_size_gib,
+        target_storage_size_gib: r.params["storage-size"],
         ha_type: r.params["ha_type"]
       )
 

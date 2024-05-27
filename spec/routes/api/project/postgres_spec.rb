@@ -29,7 +29,7 @@ RSpec.describe Clover, "vm" do
         location: "hetzner-hel1",
         name: "pg-foo-1",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 100
+        target_storage_size_gib: 128
       )
 
       Prog::Postgres::PostgresResourceNexus.assemble(
@@ -37,7 +37,7 @@ RSpec.describe Clover, "vm" do
         location: "hetzner-fsn1",
         name: "pg-foo-2",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 100
+        target_storage_size_gib: 128
       )
 
       get "/api/project/#{project.ubid}/postgres"

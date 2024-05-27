@@ -13,7 +13,7 @@ RSpec.describe Clover, "postgres" do
       location: "hetzner-fsn1",
       name: "pg-with-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 100
+      target_storage_size_gib: 128
     ).subject
   end
 
@@ -23,7 +23,7 @@ RSpec.describe Clover, "postgres" do
       location: "hetzner-fsn1",
       name: "pg-without-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 100
+      target_storage_size_gib: 128
     ).subject
   end
 
