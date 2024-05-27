@@ -73,9 +73,13 @@
                             name="size"
                             value="<%= size.name %>"
                             class="peer sr-only location-based-price"
-                            data-resource-type="[&quot;PostgresCores&quot;, &quot;PostgresStorage&quot;]"
-                            data-resource-family="[&quot;<%= size.family %>&quot;, &quot;<%= size.family %>&quot;]"
-                            data-amount="[<%= size.vcpu / 2 %>, <%= size.min_storage_size_gib %>]"
+                            data-resource-type="PostgresCores"
+                            data-resource-family="<%= size.family %>"
+                            data-amount="<%= size.vcpu / 2 %>"
+                            data-min-storage-size-gib="<%= size.min_storage_size_gib %>"
+                            data-max-storage-size-gib="<%= size.max_storage_size_gib %>"
+                            data-storage-resource-type="PostgresStorage"
+                            data-storage-size-step-gib="<%= size.storage_size_step_gib %>"
                             required
                             <%= (flash.dig("old", "size") == size.name || flash.dig("old", "size").nil? && idx == 0) ? "checked" : "" %>
                           >
@@ -93,9 +97,6 @@
                                   <%= size.memory %>
                                   GB
                                 </span>
-                                <span class="hidden sm:mx-0.5 sm:inline" aria-hidden="true">&middot;</span>
-                                <span class="block sm:inline"><%= size.min_storage_size_gib %>
-                                  GB disk</span>
                               </span>
                             </span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
@@ -105,6 +106,33 @@
                           </span>
                         </label>
                       <% end %>
+                    </div>
+                  </fieldset>
+                </div>
+              </div>
+
+              <div class="col-span-full">
+                <div class="space-y-2">
+                  <label for="size" class="text-sm font-medium leading-6 text-gray-900">Storage size</label>
+                  <fieldset class="radio-small-cards" id="storage-size-radios">
+                    <div class="col-span-full">
+                      <% size = flash.dig("old", "size") ? Option::PostgresSizes.find { _1.name == flash.dig("old", "size") } : Option::PostgresSizes[0] %>
+                      <%== render(
+                        "components/form/range_slider",
+                        locals: {
+                          name: "storage-size",
+                          label: "Storage Size",
+                          range_labels: (size.min_storage_size_gib..size.max_storage_size_gib).step(size.storage_size_step_gib).map { "#{_1}GB" },
+                          value: flash.dig("old", "storage_size") || size.min_storage_size_gib,
+                          attributes: {
+                            min: size.min_storage_size_gib,
+                            max: size.max_storage_size_gib,
+                            step: size.storage_size_step_gib,
+                            required: true
+                          },
+                          extra_class: "instance-size-based-option storage-slider",
+                        }
+                      ) %>
                     </div>
                   </fieldset>
                 </div>

@@ -4,7 +4,6 @@ $(function() {
   setupLocationBasedOptions();
   setupInstanceSizeBasedOptions();
   setupLocationBasedPostgresHaPrices();
-  setupLocationBasedPostgresHaPrices();
   setupAutoRefresh();
   setupPrint();
   setupDatePicker();
@@ -197,6 +196,10 @@ $("input[name=size]").on("change", function (event) {
   setupInstanceSizeBasedOptions();
 });
 
+$("input[name=storage-size]").on("change", function (event) {
+  setupLocationBasedPostgresHaPrices();
+});
+
 function setupLocationBasedPrices() {
   let selectedLocation = $("input[name=location]:checked")
   let prices = selectedLocation.length ? selectedLocation.data("details") : {};
@@ -233,7 +236,9 @@ function setupLocationBasedPrices() {
 function setupLocationBasedPostgresHaPrices() {
   $("input.location-based-postgres-ha-price").each(function(i, obj) {
     let value = $(this).val();
-    let monthlyPrice = $("input[name=size]:checked").data("monthly-price");
+    let monthlyComputePrice = parseFloat($("input[name=size]:checked").data("monthly-price"))
+    let monthlyStoragePrice = parseFloat($("input[name=storage-size]").val()) * parseFloat($("input[name=storage-size]").data("monthly-price"))
+    let monthlyPrice = monthlyComputePrice + monthlyStoragePrice;
     let standbyCount = $(this).data("standby-count");
     $(`.ha-status-${value}`).show();
     $(`.ha-status-${value}-monthly-price`).text(`+$${(standbyCount * monthlyPrice).toFixed(2)}`);
@@ -255,12 +260,14 @@ function setupInstanceSizeBasedOptions() {
       min_storage_size_gib = $("input[name=size]:checked").data("min-storage-size-gib");
       max_storage_size_gib = $("input[name=size]:checked").data("max-storage-size-gib");
       storage_size_step_gib = $("input[name=size]:checked").data("storage-size-step-gib");
+      storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
 
       $(this).attr("min", min_storage_size_gib);
       $(this).attr("max", max_storage_size_gib);
       $(this).attr("step", storage_size_step_gib);
 
-      let monthlyPrice = $("input[name=location]:checked").data("details")["VmStorage"]["standard"]["monthly"]
+      let monthlyPrice = $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"]
+      $(this).data("monthly-price", monthlyPrice);
       $(this).next().find(".absolute").each(function(idx) {
         storage_amount = min_storage_size_gib + idx * storage_size_step_gib;
         $(this).text(storage_amount + "GB +$" + (storage_amount * monthlyPrice).toFixed(2));
