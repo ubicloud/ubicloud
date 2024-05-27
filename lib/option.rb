@@ -51,11 +51,11 @@ module Option
     VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, (_1 / 2) * 60, _1 * 60, (_1 / 2) * 60, false, true)
   }).freeze
 
-  PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_gib) do
+  PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :min_storage_size_gib, :max_storage_size_gib, :storage_size_step_gib) do
     alias_method :display_name, :name
   end
   PostgresSizes = [2, 4, 8, 16, 30, 60].map {
-    PostgresSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 128)
+    PostgresSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, _1 * 64, _1 * 256, _1 * 64)
   }.freeze
 
   PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)

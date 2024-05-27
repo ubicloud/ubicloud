@@ -15,7 +15,7 @@ RSpec.describe Clover, "postgres" do
       location: "hetzner-fsn1",
       name: "pg-with-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 100
+      target_storage_size_gib: 128
     ).subject
   end
 
@@ -25,7 +25,7 @@ RSpec.describe Clover, "postgres" do
       location: "hetzner-fsn1",
       name: "pg-without-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 100
+      target_storage_size_gib: 128
     ).subject
   end
 
@@ -148,7 +148,7 @@ RSpec.describe Clover, "postgres" do
           location: "hetzner-fsn1",
           name: "pg-test-2",
           target_vm_size: "standard-2",
-          target_storage_size_gib: 100
+          target_storage_size_gib: 128
         )
 
         get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres"
@@ -212,7 +212,7 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: size, ha_type")
+        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: size, storage_size, ha_type")
       end
 
       it "firewall-rule" do

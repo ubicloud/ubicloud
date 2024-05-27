@@ -75,7 +75,7 @@
                             class="peer sr-only location-based-price"
                             data-resource-type="[&quot;PostgresCores&quot;, &quot;PostgresStorage&quot;]"
                             data-resource-family="[&quot;<%= size.family %>&quot;, &quot;<%= size.family %>&quot;]"
-                            data-amount="[<%= size.vcpu / 2 %>, <%= size.storage_size_gib %>]"
+                            data-amount="[<%= size.vcpu / 2 %>, <%= size.min_storage_size_gib %>]"
                             required
                             <%= (flash.dig("old", "size") == size.name) ? "checked" : "" %>
                           >
@@ -94,7 +94,7 @@
                                   GB
                                 </span>
                                 <span class="hidden sm:mx-0.5 sm:inline" aria-hidden="true">&middot;</span>
-                                <span class="block sm:inline"><%= size.storage_size_gib %>
+                                <span class="block sm:inline"><%= size.min_storage_size_gib %>
                                   GB disk</span>
                               </span>
                             </span>

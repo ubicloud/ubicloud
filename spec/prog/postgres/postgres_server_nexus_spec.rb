@@ -52,7 +52,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         location: "hetzner-hel1",
         name: "pg-name",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 100,
+        target_storage_size_gib: 128,
         superuser_password: "dummy-password"
       )
 
