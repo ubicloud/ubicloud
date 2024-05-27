@@ -105,6 +105,7 @@
                             data-min-storage-size-gib="<%= size.min_storage_size_gib %>"
                             data-max-storage-size-gib="<%= size.max_storage_size_gib %>"
                             data-storage-size-step-gib="<%= size.storage_size_step_gib %>"
+                            data-storage-resource-type="VmStorage"
                             required
                             <%= (flash.dig("old", "size") == size.name || flash.dig("old", "size").nil? && idx == 0) ? "checked" : "" %>
                           >
