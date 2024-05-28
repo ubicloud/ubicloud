@@ -40,6 +40,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
         {encrypted: storage_encrypted, skip_sync: true},
         {encrypted: storage_encrypted, size_gib: 5}
       ],
+      boot_image: Option::BootImages.map { _1.name }.sample,
       enable_ip4: true
     )
 
@@ -47,6 +48,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
       storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
+      boot_image: Option::BootImages.map { _1.name }.sample,
       enable_ip4: true
     )
 
@@ -54,6 +56,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       "ubi", project.id,
       private_subnet_id: subnet2_s.id,
       storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
+      boot_image: Option::BootImages.map { _1.name }.sample,
       enable_ip4: true
     )
 

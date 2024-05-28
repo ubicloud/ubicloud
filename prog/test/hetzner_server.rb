@@ -69,7 +69,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       frame["hostname"],
       provider: "hetzner",
       hetzner_server_identifier: frame["server_id"],
-      default_boot_images: [Config.default_boot_image_name]
+      default_boot_images: Option::BootImages.map { _1.name }
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
 
