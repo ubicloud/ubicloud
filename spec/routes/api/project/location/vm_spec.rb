@@ -194,7 +194,7 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["boot_image"]).to eq("\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-jammy\", \"almalinux-9\", \"almalinux-8\"]")
+        expect(JSON.parse(last_response.body)["error"]["details"]["boot_image"]).to eq("\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-noble\", \"ubuntu-jammy\", \"almalinux-9\", \"almalinux-8\"]")
       end
 
       it "invalid vm size" do
