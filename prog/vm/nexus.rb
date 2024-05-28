@@ -180,6 +180,7 @@ class Prog::Vm::Nexus < Prog::Base
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
+        vm.this.where(tainted_at: nil).update(tainted_at: Time.now)
         vm.active_billing_record&.finalize
         vm.assigned_vm_address&.active_billing_record&.finalize
         register_deadline(nil, 5 * 60)
@@ -254,6 +255,7 @@ class Prog::Vm::Nexus < Prog::Base
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
       vm.nics.each { _1.incr_setup_nic }
+      vm.this.where(pool_id: nil).update(tainted_at: Time.now)
       hop_run
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({

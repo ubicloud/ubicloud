@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_2.spdk_installation = si
     disk_2.storage_device = dev2
     disk_2.boot_image = bi
-    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1", created_at: Time.now).tap {
+    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1", created_at: Time.now, tainted_at: Time.now).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
@@ -223,6 +223,9 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:incr_setup_nic)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
+      dataset = instance_double(Sequel::Dataset)
+      expect(vm).to receive(:this).and_return(instance_double(Sequel::Dataset, where: dataset))
+      expect(dataset).to receive(:update).with(tainted_at: instance_of(Time))
       expect { nx.prep }.to hop("run")
     end
 
@@ -558,6 +561,9 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      dataset = instance_double(Sequel::Dataset)
+      expect(vm).to receive(:this).and_return(instance_double(Sequel::Dataset, where: dataset))
+      expect(dataset).to receive(:update).with(tainted_at: instance_of(Time))
       expect { nx.before_run }.to hop("destroy")
     end
 
