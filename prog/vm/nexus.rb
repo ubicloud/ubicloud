@@ -349,7 +349,7 @@ class Prog::Vm::Nexus < Prog::Base
     if vm.ip4_enabled
       BillingRecord.create_with_id(
         project_id: project.id,
-        resource_id: vm.assigned_vm_address.id,
+        resource_id: vm.id,
         resource_name: vm.assigned_vm_address.ip,
         billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location)["id"],
         amount: 1
