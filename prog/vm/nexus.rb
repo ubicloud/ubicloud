@@ -180,7 +180,7 @@ class Prog::Vm::Nexus < Prog::Base
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
-        vm.active_billing_record&.finalize
+        vm.active_billing_records.each(&:finalize)
         vm.assigned_vm_address&.active_billing_record&.finalize
         register_deadline(nil, 5 * 60)
         hop_destroy
