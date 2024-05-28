@@ -187,6 +187,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     strand.children.each { _1.destroy }
     unless servers.empty?
+      servers.first.vm.private_subnets.each(&:incr_destroy)
       servers.each(&:incr_destroy)
       nap 5
     end
