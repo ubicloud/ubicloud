@@ -19,6 +19,8 @@ class Prog::DownloadBootImage < Prog::Base
 
   def default_boot_image_version(image_name)
     case image_name
+    when "ubuntu-noble"
+      Config.ubuntu_noble_version
     when "ubuntu-jammy"
       Config.ubuntu_jammy_version
     when "almalinux-9"
@@ -44,6 +46,9 @@ class Prog::DownloadBootImage < Prog::Base
         frame["custom_url"]
       elsif download_from_blob_storage?
         blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}-#{version}.raw", 60 * 60).to_s
+      elsif image_name == "ubuntu-noble"
+        arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
+        "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
       elsif image_name == "ubuntu-jammy"
         arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
         "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
@@ -60,6 +65,8 @@ class Prog::DownloadBootImage < Prog::Base
 
   def sha256_sum
     hashes = {
+      ["ubuntu-noble", "x64", "20240523.1"] => "b60205f4cc48a24b999ad0bd61ceb9fe28abfe4ac3701acb7bb5d6b0b5fdc624",
+      ["ubuntu-noble", "arm64", "20240523.1"] => "54f6b62cc8d393e5c82495a49b8980157dfa6a13b930d8d4170e34e30742d949",
       ["ubuntu-jammy", "x64", "20240319"] => "304983616fcba6ee1452e9f38993d7d3b8a90e1eb65fb0054d672ce23294d812",
       ["ubuntu-jammy", "arm64", "20240319"] => "40ea1181447b9395fa03f6f2c405482fe532a348cc46fbb876effcfbbb35336f",
       ["almalinux-8", "x64", "8.10-20240530"] => "41a6bcdefb35afbd2819f0e6c68005cd5e9a346adf2dc093b1116a2b7c647d86",

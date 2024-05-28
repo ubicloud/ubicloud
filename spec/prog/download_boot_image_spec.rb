@@ -38,6 +38,7 @@ RSpec.describe Prog::DownloadBootImage do
 
   describe "#default_boot_image_version" do
     it "returns the version for the default image" do
+      expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
       expect(dbi.default_boot_image_version("ubuntu-jammy")).to eq(Config.ubuntu_jammy_version)
       expect(dbi.default_boot_image_version("almalinux-9")).to eq(Config.almalinux_9_version)
       expect(dbi.default_boot_image_version("almalinux-8")).to eq(Config.almalinux_8_version)
@@ -61,6 +62,17 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
+    end
+
+    it "returns URL for x64 ubuntu-noble image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "ubuntu-noble", "version" => "20240523.1"}).at_least(:once)
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/noble/release-20240523.1/ubuntu-24.04-server-cloudimg-amd64.img")
+    end
+
+    it "returns URL for arm64 ubuntu-noble image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "ubuntu-noble", "version" => "20240523.1"}).at_least(:once)
+      vm_host.update(arch: "arm64")
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/noble/release-20240523.1/ubuntu-24.04-server-cloudimg-arm64.img")
     end
 
     it "returns URL for x64 ubuntu-jammy image" do

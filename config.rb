@@ -131,6 +131,7 @@ module Config
   optional :ubicloud_images_blob_storage_secret_key, string, clear: true
   optional :ubicloud_images_blob_storage_certs, string
 
+  override :ubuntu_noble_version, "20240523.1", string
   override :ubuntu_jammy_version, "20240319", string
   override :almalinux_9_version, "9.4-20240507", string
   override :almalinux_8_version, "8.10-20240530", string

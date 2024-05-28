@@ -39,6 +39,7 @@ module Option
 
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
+    ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
     ["almalinux-9", "AlmaLinux 9"],
     ["almalinux-8", "AlmaLinux 8"]
