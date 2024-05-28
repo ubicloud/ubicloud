@@ -550,7 +550,7 @@ ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
 ExecStart=#{CloudHypervisor::VERSION.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
---kernel #{CloudHypervisor::NEW_FIRMWARE.path} \
+--kernel #{CloudHypervisor::FIRMWARE.path} \
 #{disk_params.join("\n")}
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
