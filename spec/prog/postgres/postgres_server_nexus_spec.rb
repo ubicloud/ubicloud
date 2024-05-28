@@ -562,7 +562,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#destroy" do
     it "deletes resources and exits" do
-      expect(postgres_server.vm).to receive(:private_subnets).and_return([])
       expect(postgres_server.vm).to receive(:incr_destroy)
       expect(postgres_server).to receive(:destroy)
 

@@ -22,7 +22,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         vm: instance_double(
           Vm,
           cores: 1,
-          vm_host: instance_double(VmHost, id: "dd9ef3e7-6d55-8371-947f-a8478b42a17d")
+          vm_host: instance_double(VmHost, id: "dd9ef3e7-6d55-8371-947f-a8478b42a17d"),
+          private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")]
         )
       )],
       representative_server: instance_double(
@@ -320,6 +321,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = instance_double(DnsZone)
       expect(described_class).to receive(:dns_zone).and_return(dns_zone)
 
+      expect(postgres_resource.servers.first.vm.private_subnets).to all(receive(:incr_destroy))
       expect(postgres_resource.servers).to all(receive(:incr_destroy))
       expect { nx.destroy }.to nap(5)
 
