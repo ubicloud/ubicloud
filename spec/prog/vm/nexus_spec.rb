@@ -34,12 +34,12 @@ RSpec.describe Prog::Vm::Nexus do
       _1.vm_storage_volumes.append(disk_2)
       disk_1.vm = _1
       disk_2.vm = _1
-      allow(_1).to receive(:active_billing_record).and_return(BillingRecord.new(
+      allow(_1).to receive(:active_billing_records).and_return([BillingRecord.new(
         project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
         resource_name: _1.name,
         billing_rate_id: BillingRate.from_resource_properties("VmCores", _1.family, _1.location)["id"],
         amount: _1.cores
-      ))
+      )])
     }
     vm
   }
@@ -569,7 +569,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "stops billing before hops to destroy" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm.active_billing_record).to receive(:finalize)
+      expect(vm.active_billing_records.first).to receive(:finalize)
       assigned_adr = instance_double(AssignedVmAddress)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
@@ -579,14 +579,14 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "hops to destroy if billing record is not found" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm).to receive(:active_billing_record).and_return(nil)
+      expect(vm).to receive(:active_billing_records).and_return([])
       expect(vm).to receive(:assigned_vm_address).and_return(nil)
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "hops to destroy if billing record is not found for ipv4" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm.active_billing_record).to receive(:finalize)
+      expect(vm.active_billing_records.first).to receive(:finalize)
       assigned_adr = instance_double(AssignedVmAddress)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(nil)
