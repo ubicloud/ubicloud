@@ -612,10 +612,7 @@ RSpec.describe Al do
       described_class.allocate(vm, vol)
       expect(StorageKeyEncryptionKey.count).to eq(0)
       expect(vm.reload.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
-      nx = Prog::Vm::Nexus.new(Strand.new).tap {
-        _1.instance_variable_set(:@vm, vm)
-      }
-      expect(nx.storage_secrets.count).to eq(0)
+      expect(vm.storage_secrets.count).to eq(0)
     end
 
     it "can have empty allocation state filter" do
@@ -630,10 +627,7 @@ RSpec.describe Al do
       described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
       expect(StorageKeyEncryptionKey.count).to eq(1)
       expect(vm.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
-      nx = Prog::Vm::Nexus.new(Strand.new).tap {
-        _1.instance_variable_set(:@vm, vm)
-      }
-      expect(nx.storage_secrets.count).to eq(1)
+      expect(vm.storage_secrets.count).to eq(1)
     end
 
     it "allocates the latest active boot image for boot volumes" do

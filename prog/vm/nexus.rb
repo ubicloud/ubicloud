@@ -136,38 +136,8 @@ class Prog::Vm::Nexus < Prog::Base
     @host ||= vm.vm_host
   end
 
-  def local_ipv4
-    vm.local_vetho_ip&.to_s&.shellescape || ""
-  end
-
   def params_path
     @params_path ||= File.join(vm_home, "prep.json")
-  end
-
-  def storage_volumes
-    @storage_volumes ||= vm.vm_storage_volumes.map { |s|
-      {
-        "boot" => s.boot,
-        "image" => s.boot ? vm.boot_image : nil,
-        "image_version" => s.boot_image&.version,
-        "size_gib" => s.size_gib,
-        "device_id" => s.device_id,
-        "disk_index" => s.disk_index,
-        "encrypted" => !s.key_encryption_key_1.nil?,
-        "spdk_version" => s.spdk_version,
-        "use_bdev_ubi" => s.use_bdev_ubi,
-        "skip_sync" => s.skip_sync,
-        "storage_device" => s.storage_device.name
-      }
-    }
-  end
-
-  def storage_secrets
-    @storage_secrets ||= vm.vm_storage_volumes.filter_map { |s|
-      if !s.key_encryption_key_1.nil?
-        [s.device_id, s.key_encryption_key_1.secret_key_material_hash]
-      end
-    }.to_h
   end
 
   def clear_stack_storage_volumes
@@ -257,7 +227,7 @@ class Prog::Vm::Nexus < Prog::Base
       hop_run
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
-        storage: storage_secrets
+        storage: vm.storage_secrets
       })
 
       # Enable KVM access for VM user.
@@ -272,29 +242,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   def write_params_json
-    topo = vm.cloud_hypervisor_cpu_topology
-
-    # we don't write secrets to params_json, because it
-    # shouldn't be stored in the host for security reasons.
-    params_json = JSON.pretty_generate({
-      "vm_name" => vm_name,
-      "public_ipv6" => vm.ephemeral_net6.to_s,
-      "public_ipv4" => vm.ip4.to_s || "",
-      "local_ipv4" => local_ipv4,
-      "unix_user" => vm.unix_user,
-      "ssh_public_key" => vm.public_key,
-      "nics" => vm.nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
-      "boot_image" => vm.boot_image,
-      "max_vcpus" => topo.max_vcpus,
-      "cpu_topology" => topo.to_s,
-      "mem_gib" => vm.mem_gib,
-      "ndp_needed" => host.ndp_needed,
-      "storage_volumes" => storage_volumes,
-      "swap_size_bytes" => frame["swap_size_bytes"],
-      "pci_devices" => vm.pci_devices.map { [_1.slot, _1.iommu_group] }
-    })
-
-    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: params_json)
+    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: vm.params_json(frame["swap_size_bytes"]))
   end
 
   label def run
@@ -336,7 +284,7 @@ class Prog::Vm::Nexus < Prog::Base
       amount: vm.cores
     )
 
-    storage_volumes.each do |vol|
+    vm.storage_volumes.each do |vol|
       BillingRecord.create_with_id(
         project_id: project.id,
         resource_id: vm.id,
@@ -486,7 +434,7 @@ class Prog::Vm::Nexus < Prog::Base
     vm.update(display_state: "starting")
 
     secrets_json = JSON.generate({
-      storage: storage_secrets
+      storage: vm.storage_secrets
     })
 
     host.sshable.cmd("sudo host/bin/setup-vm recreate-unpersisted #{q_vm}", stdin: secrets_json)

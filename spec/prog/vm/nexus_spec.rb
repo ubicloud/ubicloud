@@ -189,17 +189,6 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
-  describe "#storage_volumes" do
-    it "includes all storage volumes" do
-      expect(nx.storage_volumes).to eq([
-        {"boot" => true, "disk_index" => 0, "image" => nil, "size_gib" => 20, "device_id" => "vm4hjdwr_0", "encrypted" => true,
-         "spdk_version" => "v1", "use_bdev_ubi" => false, "skip_sync" => false, "storage_device" => "nvme0", "image_version" => nil},
-        {"boot" => false, "disk_index" => 1, "image" => nil, "size_gib" => 15, "device_id" => "vm4hjdwr_1", "encrypted" => false,
-         "spdk_version" => "v1", "use_bdev_ubi" => true, "skip_sync" => true, "storage_device" => "DEFAULT", "image_version" => "20230303"}
-      ])
-    end
-  end
-
   describe "#create_unix_user" do
     it "runs adduser" do
       sshable = instance_double(Sshable)
@@ -243,7 +232,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
       vmh = instance_double(VmHost, sshable: sshable,
         total_cpus: 80, total_cores: 80, total_sockets: 1, ndp_needed: false)
-      expect(vm).to receive(:vm_host).and_return(vmh)
+      expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
 
       expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
         require "json"
@@ -272,16 +261,6 @@ RSpec.describe Prog::Vm::Nexus do
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
       expect { nx.prep }.to nap(1)
-    end
-
-    it "generates local_ipv4 if not set" do
-      expect(nx.local_ipv4).to eq("")
-    end
-
-    it "generates local_ipv4 if set" do
-      vm = nx.vm
-      vm.local_vetho_ip = "169.254.0.0"
-      expect(nx.local_ipv4).to eq("169.254.0.0")
     end
   end
 
