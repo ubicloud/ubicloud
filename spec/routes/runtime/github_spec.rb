@@ -105,5 +105,46 @@ RSpec.describe Clover, "github" do
         expect(entry.upload_id).to eq("upload-id")
       end
     end
+
+    describe "commits cache" do
+      it "fails if one of the parameters are missing" do
+        [
+          [["etag-1", "etag-2"], "upload-id", nil],
+          [nil, "upload-id", 100],
+          [["etag-1", "etag-2"], nil, 100]
+        ].each do |etags, upload_id, size|
+          params = {etags: etags, uploadId: upload_id, size: size}.compact
+          post "/runtime/github/caches/commit", params
+
+          expect(last_response.status).to eq(400)
+          expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Wrong parameters")
+        end
+      end
+
+      it "fails if there is no cache entry to commit" do
+        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "fails if there is no created multipart upload at blob storage" do
+        GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
+        expect(blob_storage_client).to receive(:complete_multipart_upload).and_raise(Aws::S3::Errors::NoSuchUpload.new("error", "error"))
+        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
+
+        expect(last_response.status).to eq(400)
+      end
+
+      it "completes multipart upload" do
+        entry = GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
+        expect(blob_storage_client).to receive(:complete_multipart_upload).with(
+          hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]})
+        )
+        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
+
+        expect(last_response.status).to eq(200)
+        expect(entry.reload.committed_at).not_to be_nil
+      end
+    end
   end
 end

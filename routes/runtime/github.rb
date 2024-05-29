@@ -42,6 +42,33 @@ class CloverRuntime
           chunkSize: max_chunk_size
         }
       end
+
+      # commitCache
+      r.post "commit" do
+        etags = r.params["etags"]
+        upload_id = r.params["uploadId"]
+        size = r.params["size"].to_i
+        fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if etags.nil? || etags.empty? || upload_id.nil? || size == 0
+
+        entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
+        fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || entry.size != size
+
+        begin
+          repository.blob_storage_client.complete_multipart_upload({
+            bucket: repository.bucket_name,
+            key: entry.blob_key,
+            upload_id: upload_id,
+            multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }}
+          })
+        rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload => ex
+          Clog.emit("could not complete multipart upload") { {failed_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+          fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
+        end
+
+        entry.update(committed_at: Time.now)
+
+        {}
+      end
     end
   end
 end
