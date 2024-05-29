@@ -8,6 +8,39 @@ class CloverRuntime
 
     repository.setup_blob_storage unless repository.access_key
 
+    # getCacheEntry
+    r.get "cache" do
+      keys, version = r.params["keys"]&.split(","), r.params["version"]
+      fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if keys.nil? || keys.empty? || version.nil?
+
+      # Clients can send multiple keys; we return the first matching cache in
+      # incoming key order. The function `.min_by { keys.index(_1.key) }` helps
+      # us achieve this by ordering entries based on the index of key in the
+      # given order. If the same cache exists for both the head_branch and the
+      # default branch, we prioritize and return the cache for the head_branch.
+      # The part `(scopes.index(_1.scope) * keys.size)` assists in sorting the
+      # caches by scope, pushing entries for later scopes to the end of the
+      # list.
+      scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
+      entry = repository.cache_entries_dataset
+        .exclude(committed_at: nil)
+        .where(key: keys, version: version, scope: scopes).all
+        .min_by { keys.index(_1.key) + (scopes.index(_1.scope) * keys.size) }
+
+      fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
+
+      entry.update(last_accessed_at: Time.now, last_accessed_by: runner.id)
+      signed_url = repository.url_presigner.presigned_url(:get_object, bucket: repository.bucket_name, key: entry.blob_key, expires_in: 900)
+
+      {
+        scope: entry.scope,
+        cacheKey: entry.key,
+        cacheVersion: entry.version,
+        creationTime: entry.created_at,
+        archiveLocation: signed_url
+      }
+    end
+
     r.on "caches" do
       # reserveCache
       r.post true do

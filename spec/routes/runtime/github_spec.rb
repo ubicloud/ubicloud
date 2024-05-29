@@ -2,6 +2,8 @@
 
 require_relative "spec_helper"
 
+require "aws-sdk-s3"
+
 RSpec.describe Clover, "github" do
   describe "authentication" do
     let(:vm) { create_vm }
@@ -144,6 +146,55 @@ RSpec.describe Clover, "github" do
 
         expect(last_response.status).to eq(200)
         expect(entry.reload.committed_at).not_to be_nil
+      end
+    end
+
+    describe "gets cache entry" do
+      it "fails if one of the parameters are missing" do
+        [
+          ["k1,k2", nil],
+          [nil, "v1"],
+          ["", "v1"]
+        ].each do |keys, version|
+          params = {keys: keys, version: version}.compact
+          get "/runtime/github/cache", params
+
+          expect(last_response.status).to eq(400)
+          expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Wrong parameters")
+        end
+      end
+
+      it "fails if no cache entry found" do
+        get "/runtime/github/cache", {keys: "k1", version: "v1"}
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "returns a cache from default branch when no branch info" do
+        runner.update(workflow_job: nil)
+        entry = GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "main", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
+        get "/runtime/github/cache", {keys: "k1", version: "v1"}
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "main"])
+      end
+
+      it "returns the first matched cache with key for runner's branch" do
+        [
+          ["k1", "v1", "dev"],
+          ["k1", "v2", "main"],
+          ["k2", "v1", "main"],
+          ["k2", "v1", "dev"]
+        ].each do |key, version, branch|
+          GithubCacheEntry.create_with_id(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        end
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url")
+        get "/runtime/github/cache", {keys: "k2", version: "v1"}
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k2", "v1", "dev"])
+        expect(GithubCacheEntry[key: "k2", version: "v1", scope: "dev"].last_accessed_by).to eq(runner.id)
       end
     end
   end
