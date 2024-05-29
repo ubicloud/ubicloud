@@ -51,8 +51,8 @@ module CloudHypervisor
     end
   }
 
-  NEW_FIRMWARE = FirmwareClass.new(Arch.render(x64: "202402", arm64: "202211"),
-    Arch.render(x64: "2cf0e7bd7164cbe1d353ccfe176f41e57b8036492eb7b0a94f9b04c0c973764d", arm64: "3e34934478870a2ce67eb76bef6f9f38eb6a8b16849115b64473f05c2ccb922a"))
+  NEW_FIRMWARE = FirmwareClass.new(Arch.render(x64: "202311", arm64: "202211"),
+    Arch.render(x64: "e31738aacd3d68d30f8f9a4d09711cca3dfb414e8910dc3af90c50f36885380a", arm64: "482f428f782591d7c2222e0bc8240d25fb200fb21fd984b3339c85979d94b4d8"))
 
   VersionClass = Struct.new(:version) {
     def ch_remote_url
