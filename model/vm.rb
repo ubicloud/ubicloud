@@ -193,4 +193,54 @@ class Vm < Sequel::Model
   def self.redacted_columns
     super + [:public_key]
   end
+
+  def params_json(swap_size_bytes)
+    topo = cloud_hypervisor_cpu_topology
+
+    # we don't write secrets to params_json, because it
+    # shouldn't be stored in the host for security reasons.
+    JSON.pretty_generate({
+      "vm_name" => name,
+      "public_ipv6" => ephemeral_net6.to_s,
+      "public_ipv4" => ip4.to_s || "",
+      "local_ipv4" => local_vetho_ip.to_s.shellescape || "",
+      "unix_user" => unix_user,
+      "ssh_public_key" => public_key,
+      "nics" => nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
+      "boot_image" => boot_image,
+      "max_vcpus" => topo.max_vcpus,
+      "cpu_topology" => topo.to_s,
+      "mem_gib" => mem_gib,
+      "ndp_needed" => vm_host.ndp_needed,
+      "storage_volumes" => storage_volumes,
+      "swap_size_bytes" => swap_size_bytes,
+      "pci_devices" => pci_devices.map { [_1.slot, _1.iommu_group] }
+    })
+  end
+
+  def storage_volumes
+    vm_storage_volumes.map { |s|
+      {
+        "boot" => s.boot,
+        "image" => s.boot ? boot_image : nil,
+        "image_version" => s.boot_image&.version,
+        "size_gib" => s.size_gib,
+        "device_id" => s.device_id,
+        "disk_index" => s.disk_index,
+        "encrypted" => !s.key_encryption_key_1.nil?,
+        "spdk_version" => s.spdk_version,
+        "use_bdev_ubi" => s.use_bdev_ubi,
+        "skip_sync" => s.skip_sync,
+        "storage_device" => s.storage_device.name
+      }
+    }
+  end
+
+  def storage_secrets
+    vm_storage_volumes.filter_map { |s|
+      if !s.key_encryption_key_1.nil?
+        [s.device_id, s.key_encryption_key_1.secret_key_material_hash]
+      end
+    }.to_h
+  end
 end
