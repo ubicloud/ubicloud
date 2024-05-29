@@ -54,7 +54,7 @@ module Option
   PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_gib) do
     alias_method :display_name, :name
   end
-  PostgresSizes = [2, 4, 8, 16].map {
+  PostgresSizes = [2, 4, 8, 16, 30, 60].map {
     PostgresSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, (_1 / 2) * 128)
   }.freeze
 
