@@ -17,7 +17,7 @@ class CloverRuntime < Roda
   plugin :error_handler do |e|
     error = parse_error(e)
 
-    {error: error}.to_json
+    {error: error}.to_json unless error[:code] == 204
   end
 
   def get_jwt_payload(request)
