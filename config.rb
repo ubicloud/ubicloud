@@ -102,6 +102,10 @@ module Config
   optional :github_runner_service_project_id, string
   override :enable_github_workflow_poller, true, bool
 
+  # GitHub Cache
+  optional :github_cache_blob_storage_endpoint, string
+  optional :github_cache_blob_storage_region, string
+
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
   optional :minio_service_project_id, string
