@@ -6,6 +6,7 @@ require_relative "../model"
 class GithubRunner < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :installation, key: :installation_id, class: :GithubInstallation
+  many_to_one :repository, key: :repository_id, class: :GithubRepository
   one_to_one :vm, key: :id, primary_key: :vm_id
 
   include ResourceMethods

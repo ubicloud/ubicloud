@@ -202,6 +202,12 @@ class Prog::Vm::GithubRunner < Prog::Base
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
       # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
       jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+
+
+      # We use a JWT token to authenticate the virtual machines with our runtime API. This token is valid as long as the vm is running.
+      # ubicloud/cache package which forked from the official actions/cache package, sends requests to UBICLOUD_CACHE_URL using this token.
+      echo "UBICLOUD_RUNTIME_TOKEN=#{vm.runtime_token}
+      UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee /etc/environment
     COMMAND
 
     # Remove comments and empty lines before sending them to the machine
