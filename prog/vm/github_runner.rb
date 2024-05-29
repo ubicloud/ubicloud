@@ -7,13 +7,13 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(installation, repository_name:, label:)
+  def self.assemble(installation, repository_name:, label:, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
     end
 
     DB.transaction do
-      repository = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name).subject
+      repository = Prog::Github::GithubRepositoryNexus.assemble(installation, repository_name, default_branch).subject
       github_runner = GithubRunner.create_with_id(
         installation_id: installation.id,
         repository_name: repository_name,

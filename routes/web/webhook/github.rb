@@ -72,7 +72,8 @@ class CloverWeb
       st = Prog::Vm::GithubRunner.assemble(
         installation,
         repository_name: data["repository"]["full_name"],
-        label: label
+        label: label,
+        default_branch: data["repository"]["default_branch"]
       )
       runner = GithubRunner[st.id]
 

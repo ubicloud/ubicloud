@@ -7,11 +7,13 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(installation, name)
+  def self.assemble(installation, name, default_branch)
     DB.transaction do
       repository = GithubRepository.new_with_id(installation_id: installation.id, name: name)
       repository.skip_auto_validations(:unique) do
-        repository.insert_conflict(target: [:installation_id, :name], update: {last_job_at: Time.now}).save_changes
+        updates = {last_job_at: Time.now}
+        updates[:default_branch] = default_branch if default_branch
+        repository.insert_conflict(target: [:installation_id, :name], update: updates).save_changes
       end
       Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { _1.id = repository.id }
         .insert_conflict(target: :id).save_changes
