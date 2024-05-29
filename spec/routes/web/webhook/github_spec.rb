@@ -81,7 +81,7 @@ RSpec.describe Clover, "github" do
 
     it "creates runner when receive queued action" do
       st = instance_double(Strand, id: runner.id)
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud").and_return(st)
+      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud", default_branch: "main").and_return(st)
 
       send_webhook("workflow_job", workflow_job_payload(action: "queued"))
 
@@ -152,7 +152,7 @@ RSpec.describe Clover, "github" do
     {
       action: action,
       installation: {id: installation_id},
-      repository: {full_name: repository_name},
+      repository: {full_name: repository_name, default_branch: "main"},
       workflow_job: workflow_job
     }
   end

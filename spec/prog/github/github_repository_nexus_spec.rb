@@ -22,14 +22,17 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
       expect {
-        described_class.assemble(installation, "ubicloud/ubicloud")
+        described_class.assemble(installation, "ubicloud/ubicloud", "master")
       }.to change(GithubRepository, :count).from(0).to(1)
       now = Time.now.round(6)
       expect(Time).to receive(:now).and_return(now).at_least(:once)
-      st = described_class.assemble(installation, "ubicloud/ubicloud")
+      st = described_class.assemble(installation, "ubicloud/ubicloud", "main")
       expect(GithubRepository.count).to eq(1)
       expect(Strand.count).to eq(1)
       expect(st.subject.last_job_at).to eq(now)
+      expect(st.subject.default_branch).to eq("main")
+      described_class.assemble(installation, "ubicloud/ubicloud", nil)
+      expect(st.subject.default_branch).to eq("main")
     end
   end
 
