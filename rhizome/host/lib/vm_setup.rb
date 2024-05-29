@@ -58,6 +58,14 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
   end
 
+  def reassign_ip6(unix_user, public_key, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
+    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
+    cloudinit(unix_user, public_key, nics, swap_size_bytes)
+    hugepages(mem_gib)
+    storage(storage_params, storage_secrets, false)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+  end
+
   def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, multiqueue:)
     ip4 = nil if ip4.empty?
     guest_ephemeral, clover_ephemeral = subdivide_network(NetAddr.parse_net(gua))

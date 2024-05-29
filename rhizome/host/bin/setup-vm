@@ -71,6 +71,15 @@ when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(
     max_vcpus, cpu_topology, mem_gib, storage_volumes, nics
   )
+when "reassign-ip6"
+  secrets = JSON.parse($stdin.read)
+  unless (storage_secrets = secrets["storage"])
+    puts "need storage secrets in secrets json"
+    exit 1
+  end
+  vm_setup.reassign_ip6(unix_user, ssh_public_key, nics, gua, ip4,
+    local_ip4, max_vcpus, cpu_topology, mem_gib,
+    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices)
 else
   puts "Invalid action #{action}"
   exit 1
