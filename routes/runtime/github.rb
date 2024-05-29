@@ -42,6 +42,29 @@ class CloverRuntime
     end
 
     r.on "caches" do
+      # listCache
+      r.get true do
+        key = r.params["key"]
+        fail CloverError.new(204, "NotFound", "No cache entry") if key.nil?
+
+        scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
+        entries = repository.cache_entries_dataset
+          .exclude(committed_at: nil)
+          .where(key: key, scope: scopes).all
+
+        {
+          totalCount: entries.count,
+          artifactCaches: entries.map do
+            {
+              scope: _1.scope,
+              cacheKey: _1.key,
+              cacheVersion: _1.version,
+              creationTime: _1.created_at
+            }
+          end
+        }
+      end
+
       # reserveCache
       r.post true do
         key = r.params["key"]

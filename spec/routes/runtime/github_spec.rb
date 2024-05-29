@@ -197,5 +197,47 @@ RSpec.describe Clover, "github" do
         expect(GithubCacheEntry[key: "k2", version: "v1", scope: "dev"].last_accessed_by).to eq(runner.id)
       end
     end
+
+    describe "lists cache entries" do
+      it "returns no content if the key is missing" do
+        get "/runtime/github/caches", {key: nil}
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "returns the list of cache entries for the key" do
+        [
+          ["k1", "v1", "dev"],
+          ["k1", "v2", "main"],
+          ["k1", "v1", "feature"],
+          ["k2", "v1", "dev"]
+        ].each do |key, version, branch|
+          GithubCacheEntry.create_with_id(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        end
+
+        get "/runtime/github/caches", {key: "k1"}
+
+        response = JSON.parse(last_response.body)
+        expect(response["totalCount"]).to eq(2)
+        expect(response["artifactCaches"].map { [_1["cacheKey"], _1["cacheVersion"]] }).to eq([["k1", "v1"], ["k1", "v2"]])
+      end
+
+      it "returns the list of cache entries for the default branch" do
+        runner.update(workflow_job: nil)
+        [
+          ["k1", "v1", "dev"],
+          ["k1", "v2", "main"],
+          ["k1", "v1", "feature"],
+          ["k2", "v1", "dev"]
+        ].each do |key, version, branch|
+          GithubCacheEntry.create_with_id(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        end
+        get "/runtime/github/caches", {key: "k1"}
+
+        response = JSON.parse(last_response.body)
+        expect(response["totalCount"]).to eq(1)
+        expect(response["artifactCaches"].map { [_1["cacheKey"], _1["cacheVersion"]] }).to eq([["k1", "v2"]])
+      end
+    end
   end
 end
