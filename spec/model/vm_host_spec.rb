@@ -64,6 +64,12 @@ RSpec.describe VmHost do
     expect(vh.ip6_random_vm_network.to_s).not_to eq(vh.ip6_reserved_network)
   end
 
+  it "can generate ipv6 for hosts with smaller than /64 prefix with single byte" do
+    vh.net6 = NetAddr.parse_net("2a01:4f9:2b:35a::/68")
+    expect(SecureRandom).to receive(:random_number).with(2...256).and_return(5)
+    expect(vh.ip6_random_vm_network.to_s).to eq("2a01:4f9:2b:35a:4::/79")
+  end
+
   it "has a shortcut to install Rhizome" do
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
