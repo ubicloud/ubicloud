@@ -82,7 +82,11 @@ class VmHost < Sequel::Model
     # the host's network. This would be the case if the difference between the
     # host's network and the network that is delegated to the VM is a single
     # byte.
-    lower_bits = SecureRandom.random_number(2...256) << (128 - prefix - 1)
+    # The upper range is updated later to increase the entropy if the host has
+    # a big enough prefix. This way we avoid collisions. Keeping the range to
+    # single byte caused elevated number of collisions.
+    upper_range = ((prefix - host_prefix) < 15) ? 2**8 : 2**16
+    lower_bits = SecureRandom.random_number(2...upper_range) << (128 - prefix - 1)
 
     # Combine it with the higher bits for the host.
     proposal = NetAddr::IPv6Net.new(
