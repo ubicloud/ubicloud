@@ -11,10 +11,19 @@ RSpec.describe Authorization do
   }
   let(:projects) { (0..1).map { users[_1].create_project_with_default_policy("project-#{_1}") } }
   let(:vms) { (0..3).map { Prog::Vm::Nexus.assemble("key", projects[_1 / 2].id, name: "vm#{_1}") }.map(&:subject) }
+  let(:pg) {
+    Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: projects[0].id, location: "hetzner-fsn1", name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128
+    ).subject
+  }
   let(:access_policy) { projects[0].access_policies.first }
 
   after do
     users.each(&:destroy)
+  end
+
+  before do
+    allow(Config).to receive(:postgres_service_project_id).and_return(projects[0].id)
   end
 
   describe "#matched_policies" do
@@ -25,19 +34,17 @@ RSpec.describe Authorization do
         [[], SecureRandom.uuid, ["Vm:view"], 0],
         [[], users[0].id, "Vm:view", 0],
         [[], users[0].id, ["Vm:view"], 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, "Vm:view", 8],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, ["Vm:view", "Vm:create"], 8],
-        [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name]}], users[0].id, "Vm:view", 8],
-        [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], 8],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, "Vm:view", 12],
+        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, ["Vm:view", "Vm:create"], 12],
+        [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name]}], users[0].id, "Vm:view", 12],
+        [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], 12],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms.map { _1.hyper_tag_name(access_policy.project) }}], users[0].id, "Vm:view", 2],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:Firewall:create", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:delete", 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:Firewall:create", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:create", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:Firewall:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:create", 1],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:Firewall:create", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1]
+        [[{subjects: users[0].hyper_tag_name, actions: "*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
+        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:Firewall:view", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:Firewall:delete", 0],
+        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:Firewall:edit", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:Firewall:view", 0]
       ].each do |policies, subject_id, actions, matched_count|
         access_policy.update(body: {acls: policies})
         expect(described_class.matched_policies(subject_id, actions).count).to eq(matched_count)
@@ -103,8 +110,7 @@ RSpec.describe Authorization do
         ["*", ["*"]],
         ["Vm:*", ["Vm:*", "*"]],
         ["Vm:view", ["Vm:view", "Vm:*", "*"]],
-        [["Vm:view", "PrivateSubnet:view"], ["Vm:view", "PrivateSubnet:view", "Vm:*", "PrivateSubnet:*", "*"]],
-        [["Vm:Firewall:view"], ["Vm:Firewall:view", "Vm:Firewall:*", "Vm:*", "*"]]
+        [["Vm:view", "PrivateSubnet:view"], ["Vm:view", "PrivateSubnet:view", "Vm:*", "PrivateSubnet:*", "*"]]
       ].each do |actions, expected|
         expect(described_class.expand_actions(actions)).to match_array(expected)
       end
@@ -159,13 +165,13 @@ RSpec.describe Authorization do
       users[0].associate_with_project(project)
 
       expect(project.applied_access_tags.count).to eq(1)
-      expect(users[0].applied_access_tags.count).to eq(2)
+      expect(users[0].applied_access_tags.count).to eq(4)
 
       users[0].dissociate_with_project(project)
       project.dissociate_with_project(project)
 
       expect(project.reload.applied_access_tags.count).to eq(0)
-      expect(users[0].reload.applied_access_tags.count).to eq(0)
+      expect(users[0].reload.applied_access_tags.count).to eq(2)
     end
 
     it "does not associate/dissociate with nil project" do
