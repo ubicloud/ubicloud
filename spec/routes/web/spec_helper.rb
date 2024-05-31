@@ -4,8 +4,6 @@ require_relative "../spec_helper"
 
 require "capybara"
 require "capybara/rspec"
-require "rack/test"
-require "argon2"
 
 Gem.suffix_pattern
 
