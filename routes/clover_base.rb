@@ -26,10 +26,6 @@ module CloverBase
       code = 400
       type = "InvalidRequest"
       message = e.to_s
-    when Roda::RodaPlugins::RouteCsrf::InvalidToken
-      code = 419
-      type = "InvalidSecurityToken"
-      message = "An invalid security token was submitted with this request, and this request could not be processed."
     when CloverError
       code = e.code
       type = e.type
