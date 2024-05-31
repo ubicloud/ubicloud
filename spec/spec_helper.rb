@@ -41,6 +41,7 @@ DatabaseCleaner.url_allowlist = [
 
 Warning.ignore([:not_reached, :unused_var], /.*lib\/mail\/parser.*/)
 Warning.ignore([:mismatched_indentations], /.*lib\/stripe\/api_operations.*/)
+Warning.ignore(/To use retry middleware with Faraday v2\.0\+, install `faraday-retry` gem/)
 
 RSpec.configure do |config|
   config.define_derived_metadata(file_path: %r{/spec/}) do |metadata|
