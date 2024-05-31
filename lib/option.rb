@@ -39,7 +39,9 @@ module Option
 
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
-    ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"]
+    ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
+    ["almalinux-9", "AlmaLinux 9"],
+    ["almalinux-8", "AlmaLinux 8"]
   ].map { |args| BootImage.new(*args) }.freeze
 
   VmSize = Struct.new(:name, :family, :vcpu, :memory, :min_storage_size_gib, :max_storage_size_gib, :storage_size_step_gib, :visible, :gpu) do
