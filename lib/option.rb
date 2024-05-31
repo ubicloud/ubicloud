@@ -63,10 +63,8 @@ module Option
     alias_method :display_name, :name
   end
   PostgresSizes = [2, 4, 8, 16, 30, 60].map {
-    min_storage_size_gib = _1 * 64
     max_storage_size_gib = _1 * 256
-    storage_size_step_gib = _1 * 64
-    storage_size_options = (min_storage_size_gib..max_storage_size_gib).step(storage_size_step_gib).to_a
+    storage_size_options = [128, 256, 512, 1024, 2048, 3072, 4096].select { |s| s <= max_storage_size_gib }
     PostgresSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, storage_size_options)
   }.freeze
 
