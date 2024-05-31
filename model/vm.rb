@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "jwt"
 require_relative "../model"
 
 class Vm < Sequel::Model
@@ -49,6 +50,10 @@ class Vm < Sequel::Model
 
   def ip4
     assigned_vm_address&.ip
+  end
+
+  def runtime_token
+    JWT.encode({sub: ubid, iat: Time.now.to_i}, Config.clover_runtime_token_secret, "HS256")
   end
 
   def display_state
