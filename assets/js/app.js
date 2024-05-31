@@ -272,10 +272,11 @@ function setupInstanceSizeBasedOptions() {
 
       let monthlyPrice = $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"]
       $(this).data("monthly-price", monthlyPrice);
-      $(this).next().find(".absolute").each(function(idx) {
-        storage_amount = min_storage_size_gib + idx * storage_size_step_gib;
-        $(this).text(storage_amount + "GB +$" + (storage_amount * monthlyPrice).toFixed(2));
-      });
+      $(this).next().html("");
+      for(var storage_amount = min_storage_size_gib; storage_amount <= max_storage_size_gib; storage_amount += storage_size_step_gib) {
+        let content = storage_amount + "GB<br/>+$" + (storage_amount * monthlyPrice).toFixed(2);
+        $(this).next().append("<li class='flex justify-right sm:justify-center relative items-center rotate-90 sm:rotate-0 mb-6 sm:mb-0'><span class='absolute text-center'>" + content + "</span></li>");
+      }
     }
   });
 }
