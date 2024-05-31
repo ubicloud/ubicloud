@@ -471,10 +471,10 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#wait_sshable" do
-    it "naps 15 second if it's the first time we execute wait_sshable" do
+    it "naps 12 second if it's the first time we execute wait_sshable" do
       expect(vm).to receive(:update_firewall_rules_set?).and_return(false)
       expect(vm).to receive(:incr_update_firewall_rules)
-      expect { nx.wait_sshable }.to nap(15)
+      expect { nx.wait_sshable }.to nap(12)
     end
 
     it "naps if not sshable" do
