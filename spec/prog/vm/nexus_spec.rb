@@ -106,7 +106,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "creates with default storage size from vm size" do
       st = described_class.assemble("some_ssh_key", prj.id)
-      expect(requested_disk_size(st)).to eq(Option::VmSizes.first.min_storage_size_gib)
+      expect(requested_disk_size(st)).to eq(Option::VmSizes.first.storage_size_options.first)
     end
 
     it "creates with custom storage size if provided" do

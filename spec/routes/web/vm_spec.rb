@@ -71,7 +71,6 @@ RSpec.describe Clover, "vm" do
         uncheck "Enable Public IPv4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
-        find(".storage-slider").set(40)
 
         click_button "Create"
 
@@ -95,7 +94,6 @@ RSpec.describe Clover, "vm" do
         check "Enable Public IPv4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
-        find(".storage-slider").set(40)
 
         click_button "Create"
 
@@ -121,7 +119,6 @@ RSpec.describe Clover, "vm" do
         select match: :prefer_exact, text: ps.name
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
-        find(".storage-slider").set("25")
 
         click_button "Create"
 
@@ -142,7 +139,6 @@ RSpec.describe Clover, "vm" do
         choose option: "eu-north-h1"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
-        find(".storage-slider").set(40)
 
         click_button "Create"
 
@@ -161,7 +157,6 @@ RSpec.describe Clover, "vm" do
         choose option: "eu-north-h1"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
-        find(".storage-slider").set(40)
 
         click_button "Create"
 
