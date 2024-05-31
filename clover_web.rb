@@ -30,7 +30,11 @@ class CloverWeb < Roda
     csp.frame_ancestors :none
   end
 
-  plugin :route_csrf
+  plugin :route_csrf do |token|
+    flash["error"] = "An invalid security token submitted with this request, please try again"
+    return redirect_back_with_inputs
+  end
+
   plugin :disallow_file_uploads
   plugin :flash
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
@@ -72,9 +76,6 @@ class CloverWeb < Roda
       return redirect_back_with_inputs
     when Validation::ValidationFailed
       flash["errors"] = (flash["errors"] || {}).merge(@error[:details])
-      return redirect_back_with_inputs
-    when Roda::RodaPlugins::RouteCsrf::InvalidToken
-      flash["error"] = "An invalid security token submitted with this request, please try again"
       return redirect_back_with_inputs
     end
 
