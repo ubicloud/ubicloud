@@ -26,13 +26,13 @@ class Prog::Vm::Nexus < Prog::Base
     vm_size = Validation.validate_vm_size(size)
 
     storage_volumes ||= [{
-      size_gib: vm_size.min_storage_size_gib,
+      size_gib: vm_size.storage_size_options.first,
       encrypted: true
     }]
 
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|
-      volume[:size_gib] ||= vm_size.min_storage_size_gib
+      volume[:size_gib] ||= vm_size.storage_size_options.first
       volume[:skip_sync] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index

@@ -43,7 +43,7 @@ class CloverApi
           location: @location,
           name: pg_name,
           target_vm_size: parsed_size.vm_size,
-          target_storage_size_gib: request_body_params["storage_size"] || parsed_size.min_storage_size_gib,
+          target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
           ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
         )
 
