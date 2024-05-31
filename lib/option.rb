@@ -46,17 +46,11 @@ module Option
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16, 30, 60].map {
-    min_storage_size_gib = _1 * 20
     max_storage_size_gib = _1 * 40
-    storage_size_step_gib = _1 * 10
-    storage_size_options = (min_storage_size_gib..max_storage_size_gib).step(storage_size_step_gib).to_a
+    storage_size_options = [40, 60, 80, 160, 320, 512, 1024, 2048, 3072, 4096].select { |s| s <= max_storage_size_gib }
     VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, storage_size_options, true, false)
   }.concat([6].map {
-    min_storage_size_gib = _1 * 30
-    max_storage_size_gib = _1 * 60
-    storage_size_step_gib = _1 * 15
-    storage_size_options = (min_storage_size_gib..max_storage_size_gib).step(storage_size_step_gib).to_a
-    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, storage_size_options, false, true)
+    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, [_1 * 30], false, true)
   }).freeze
 
   PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do
