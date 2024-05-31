@@ -30,6 +30,10 @@ class Clover < Roda
     end
     # :nocov:
 
+    r.on "runtime" do
+      r.run CloverRuntime
+    end
+
     r.run CloverWeb
   end
 end

@@ -47,6 +47,7 @@ module Config
   optional :versioning_default, string
   optional :versioning_app_name, string
   optional :clover_session_secret, base64, clear: true
+  optional :clover_runtime_token_secret, base64, clear: true
   optional :clover_column_encryption_key, base64, clear: true
   optional :stripe_public_key, string, clear: true
   optional :stripe_secret_key, string, clear: true
