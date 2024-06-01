@@ -9,7 +9,8 @@ class CloverWeb
     end
 
     r.post true do
-      route_helper.post
+      route_helper.instance_variable_set(:@location, LocationNameConverter.to_internal_name(r.params["location"]))
+      route_helper.post(name: r.params["name"])
     end
 
     r.on "create" do
