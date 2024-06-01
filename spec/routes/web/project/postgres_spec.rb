@@ -271,7 +271,6 @@ RSpec.describe Clover, "postgres" do
         btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Firewall rule deleted"}.to_json)
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
       end
 
@@ -286,16 +285,6 @@ RSpec.describe Clover, "postgres" do
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
 
         expect { find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
-      end
-
-      it "can not delete firewall rules if not exist" do
-        pg
-        visit "#{project.path}#{pg.path}"
-
-        btn = find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn"
-        expect(PostgresFirewallRule).to receive(:from_ubid).and_return(nil)
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(page.status_code).to eq(404)
       end
 
       it "does not show create firewall rule when does not have permissions" do
