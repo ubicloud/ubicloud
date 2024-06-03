@@ -200,6 +200,19 @@ class VmHost < Sequel::Model
     Strand.create_with_id(schedule: Time.now, prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
   end
 
+  # Introduced for downloading cloud hypervisor via REPL.
+  def download_cloud_hypervisor(version_x64: nil, version_arm64: nil, sha256_ch_bin_x64: nil, sha256_ch_bin_arm64: nil, sha256_ch_remote_x64: nil, sha256_ch_remote_arm64: nil)
+    version, sha256_ch_bin, sha256_ch_remote = if arch == "x64"
+      [version_x64, sha256_ch_bin_x64, sha256_ch_remote_x64]
+    elsif arch == "arm64"
+      [version_arm64, sha256_ch_bin_arm64, sha256_ch_remote_arm64]
+    else
+      fail "BUG: unexpected architecture"
+    end
+    fail ArgumentError, "No version provided" if version.nil?
+    Strand.create_with_id(schedule: Time.now, prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
+  end
+
   def hetznerify(server_id)
     DB.transaction do
       HetznerHost.create(server_identifier: server_id) { _1.id = id }
