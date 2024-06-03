@@ -62,7 +62,7 @@ class Prog::DownloadBootImage < Prog::Base
     hashes = {
       ["ubuntu-jammy", "x64", "20240319"] => "304983616fcba6ee1452e9f38993d7d3b8a90e1eb65fb0054d672ce23294d812",
       ["ubuntu-jammy", "arm64", "20240319"] => "40ea1181447b9395fa03f6f2c405482fe532a348cc46fbb876effcfbbb35336f",
-      ["almalinux-8", "x64", "8.9-20231128"] => "a1686bc537bce699b512e3233666f5b8f69ed797ff1ce0af52c17fdc52942621",
+      ["almalinux-8", "x64", "8.10-20240530"] => "41a6bcdefb35afbd2819f0e6c68005cd5e9a346adf2dc093b1116a2b7c647d86",
       ["almalinux-9", "x64", "9.4-20240507"] => "bff0885c804c01fff8aac4b70c9ca4f04e8c119f9ee102043838f33e06f58390",
       ["almalinux-9", "arm64", "9.4-20240507"] => "75b2e68f6aaa41c039274595ff15968201b7201a7f2f03b109af691f2d3687a1",
       ["github-ubuntu-2204", "x64", "20240422.1.0"] => "8b1b7af6941ce7b8b93d0c20af712e04e8ceedbd673b29fd4fba3406a3ba133c",
