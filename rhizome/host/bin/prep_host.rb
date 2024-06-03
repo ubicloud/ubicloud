@@ -61,6 +61,7 @@ FileUtils.cd ch_dir do
   r "curl -L3 -o cloud-hypervisor #{CloudHypervisor::VERSION_LEGACY.url.shellescape}"
   FileUtils.chmod "a+x", "cloud-hypervisor"
 end
+CloudHypervisor::VERSION.download
 
 # Download firmware binaries.
 fw_dir = File.dirname(CloudHypervisor::FIRMWARE.path)
