@@ -40,14 +40,10 @@ module CloudHypervisor
       FileUtils.mkdir_p(firmware_root)
       sha256_curl = nil
       safe_write_to_file(path) do |f|
-        sha256_curl = curl_firmware(f)
+        sha256_curl = curl_file(url, f.path)
         fail "Invalid SHA-256 digest" unless sha256 == sha256_curl
       end
       sha256_curl
-    end
-
-    def curl_firmware(file)
-      r("bash -c 'curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{file.path.shellescape}'").split(" ").last
     end
   }
 
