@@ -67,6 +67,10 @@ jobs:
     - name: Install foreman
       run: gem install foreman
 
+    - name: Modify Procfile to add retry logic
+      run: |
+        sed -i "s/^\([^:]*\): \(.*\)/\1: bash -c 'for i in {1..4}; do \2 \&\& break || echo \"Attempt \$i failed, retrying...\"; sleep 1; done'/" Procfile
+
     - name: Add e2e script to Procfile
       run: |
         echo "e2e: bin/ci --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm' || inputs.test_cases }}" >> Procfile
