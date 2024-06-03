@@ -74,3 +74,7 @@ def safe_write_to_file(filename, content = nil)
     File.rename(temp_filename, filename)
   end
 end
+
+def curl_file(url, path)
+  r("bash -c 'curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}'").split(" ").last
+end
