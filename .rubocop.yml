@@ -18,6 +18,7 @@ AllCops:
     - public/**/*
     - vendor/**/*
     - node_modules/**/*
+    - coverage/**/*
 
 RSpec:
   Enabled: true
