@@ -90,9 +90,11 @@ GEM
     faraday-net_http (3.1.0)
       net-http
     ffi (1.17.0-aarch64-linux-gnu)
+    ffi (1.17.0-aarch64-linux-musl)
     ffi (1.17.0-arm64-darwin)
     ffi (1.17.0-x86_64-darwin)
     ffi (1.17.0-x86_64-linux-gnu)
+    ffi (1.17.0-x86_64-linux-musl)
     ffi-compiler (1.3.2)
       ffi (>= 1.15.5)
       rake
@@ -313,10 +315,12 @@ GEM
 
 PLATFORMS
   aarch64-linux
+  aarch64-linux-musl
   arm64-darwin-22
   arm64-darwin-23
   x86_64-darwin-20
   x86_64-linux
+  x86_64-linux-musl
 
 DEPENDENCIES
   argon2
