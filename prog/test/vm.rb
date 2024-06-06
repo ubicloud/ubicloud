@@ -10,7 +10,7 @@ class Prog::Test::Vm < Prog::Test::Base
   label def verify_dd
     # Verifies basic block device health
     # See https://github.com/ubicloud/ubicloud/issues/276
-    sshable.cmd("dd if=/dev/random of=~/1.txt bs=512 count=1000000")
+    sshable.cmd("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
     sshable.cmd("sync ~/1.txt")
     size_info = sshable.cmd("ls -s ~/1.txt").split
 
@@ -42,7 +42,7 @@ class Prog::Test::Vm < Prog::Test::Base
       sshable.cmd("sudo mkfs.ext4 #{volume.device_path.shellescape}")
       sshable.cmd("sudo mount #{volume.device_path.shellescape} #{mount_path}")
       sshable.cmd("sudo chown ubi #{mount_path}")
-      sshable.cmd("dd if=/dev/random of=#{mount_path}/1.txt bs=512 count=10000")
+      sshable.cmd("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
       sshable.cmd("sync #{mount_path}/1.txt")
     }
 

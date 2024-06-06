@@ -61,14 +61,14 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#verify_dd" do
     it "verifies dd" do
-      expect(sshable).to receive(:cmd).with("dd if=/dev/random of=~/1.txt bs=512 count=1000000")
+      expect(sshable).to receive(:cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
       expect(sshable).to receive(:cmd).with("sync ~/1.txt")
       expect(sshable).to receive(:cmd).with("ls -s ~/1.txt").and_return "500004 /home/xyz/1.txt"
       expect { vm_test.verify_dd }.to hop("install_packages")
     end
 
     it "fails to verify if size is not in expected range" do
-      expect(sshable).to receive(:cmd).with("dd if=/dev/random of=~/1.txt bs=512 count=1000000")
+      expect(sshable).to receive(:cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
       expect(sshable).to receive(:cmd).with("sync ~/1.txt")
       expect(sshable).to receive(:cmd).with("ls -s ~/1.txt").and_return "300 /home/xyz/1.txt"
       expect(vm_test.strand).to receive(:update).with(exitval: {msg: "unexpected size after dd"})
@@ -106,7 +106,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:cmd).with("sudo mkfs.ext4 #{disk_path}")
       expect(sshable).to receive(:cmd).with("sudo mount #{disk_path} #{mount_path}")
       expect(sshable).to receive(:cmd).with("sudo chown ubi #{mount_path}")
-      expect(sshable).to receive(:cmd).with("dd if=/dev/random of=#{mount_path}/1.txt bs=512 count=10000")
+      expect(sshable).to receive(:cmd).with("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
       expect(sshable).to receive(:cmd).with("sync #{mount_path}/1.txt")
       expect { vm_test.verify_extra_disks }.to hop("ping_google")
     end
