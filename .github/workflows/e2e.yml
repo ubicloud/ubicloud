@@ -6,7 +6,7 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm'
+        default: 'vm,github_runner_ubuntu_2204,github_runner_ubuntu_2004'
         type: string
 
   schedule:
@@ -73,7 +73,7 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
-        echo "e2e: bin/ci --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm' || inputs.test_cases }}" >> Procfile
+        echo "e2e: bin/ci --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm,github_runner_ubuntu_2204,github_runner_ubuntu_2004' || inputs.test_cases }}" >> Procfile
 
     - name: Run services
       env:
