@@ -77,10 +77,24 @@ RSpec.describe Prog::Test::Vm do
   end
 
   describe "#install_packages" do
-    it "installs packages and hops to next step" do
+    it "installs packages for ubuntu images and hops to next step" do
+      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "ubuntu-jammy")).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo apt update")
       expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
+    end
+
+    it "installs packages for almalinux images and hops to next step" do
+      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "almalinux-9")).at_least(:once)
+      expect(sshable).to receive(:cmd).with("sudo dnf check-update || [ $? -eq 100 ]")
+      expect(sshable).to receive(:cmd).with("sudo dnf install -y gcc gcc-c++ make")
+      expect { vm_test.install_packages }.to hop("verify_extra_disks")
+    end
+
+    it "fails to install packages if the vm has unexpected boot image" do
+      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "windows")).at_least(:once)
+      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "unexpected boot image: windows"})
+      expect { vm_test.install_packages }.to hop("failed")
     end
   end
 

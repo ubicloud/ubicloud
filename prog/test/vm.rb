@@ -22,8 +22,15 @@ class Prog::Test::Vm < Prog::Test::Base
   end
 
   label def install_packages
-    sshable.cmd("sudo apt update")
-    sshable.cmd("sudo apt install -y build-essential")
+    if vm.boot_image.start_with?("ubuntu")
+      sshable.cmd("sudo apt update")
+      sshable.cmd("sudo apt install -y build-essential")
+    elsif vm.boot_image.start_with?("almalinux")
+      sshable.cmd("sudo dnf check-update || [ $? -eq 100 ]")
+      sshable.cmd("sudo dnf install -y gcc gcc-c++ make")
+    else
+      fail_test "unexpected boot image: #{vm.boot_image}"
+    end
 
     hop_verify_extra_disks
   end
