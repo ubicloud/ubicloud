@@ -116,7 +116,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   def before_run
     when_destroy_set? do
       unless ["destroy", "wait_vm_destroy"].include?(strand.label)
-        register_deadline(nil, 10 * 60)
+        register_deadline(nil, 15 * 60)
         update_billing_record
         hop_destroy
       end
@@ -288,7 +288,11 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     # Waiting 404 Not Found response for get runner request
     begin
-      github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
+      response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
+      if response[:busy]
+        Clog.emit("The runner is still running a job") { {github_runner: github_runner.values} }
+        nap 15
+      end
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       nap 5
     rescue Octokit::NotFound
@@ -327,7 +331,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def wait_vm_destroy
-    register_deadline(nil, 10 * 60, allow_extension: true) if vm&.prevent_destroy_set?
+    register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
     nap 10 unless vm.nil?
 
     github_runner.destroy

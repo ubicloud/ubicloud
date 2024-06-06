@@ -502,10 +502,16 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#destroy" do
     it "naps if runner not deregistered yet" do
-      expect(client).to receive(:get)
+      expect(client).to receive(:get).and_return(busy: false)
       expect(client).to receive(:delete)
 
       expect { nx.destroy }.to nap(5)
+    end
+
+    it "naps if runner still running a job" do
+      expect(client).to receive(:get).and_return(busy: true)
+
+      expect { nx.destroy }.to nap(15)
     end
 
     it "destroys resources and hops if runner deregistered" do
@@ -589,7 +595,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "extends deadline if vm prevents destroy" do
       expect(vm).to receive(:prevent_destroy_set?).and_return(true)
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, allow_extension: true)
+      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true)
       expect { nx.wait_vm_destroy }.to nap(10)
     end
 
