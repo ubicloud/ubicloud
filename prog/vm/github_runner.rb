@@ -141,8 +141,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       nap rand(5..15)
     end
 
-    Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { {github_runner: github_runner.values, utilization: utilization} }
-
     hop_allocate_vm
   end
 
