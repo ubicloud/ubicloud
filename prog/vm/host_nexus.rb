@@ -37,7 +37,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start
-    register_deadline(:wait, 15 * 60)
+    register_deadline(:download_boot_images, 10 * 60)
     hop_prep if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
 
     push Prog::BootstrapRhizome, {"target_folder" => "host"}
@@ -107,6 +107,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def download_boot_images
+    register_deadline(:prep_reboot, 4 * 60 * 60)
     frame["default_boot_images"].each { |image_name|
       bud Prog::DownloadBootImage, {
         "image_name" => image_name
