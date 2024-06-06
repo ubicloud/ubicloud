@@ -9,20 +9,28 @@ def main(options)
   hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id])
   wait_until(hetzner_server_st, "wait")
 
+  tests_to_wait = []
   if options[:test_cases].include?("vm")
     encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
     log(encrypted_vms_st, "storage_encrypted: true")
-    wait_until(encrypted_vms_st)
+    tests_to_wait << [encrypted_vms_st, nil]
 
     unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
     log(unencrypted_vms_st, "storage_encrypted: false")
-    wait_until(unencrypted_vms_st)
+    tests_to_wait << [unencrypted_vms_st, nil]
   end
 
   github_runner_test_cases = options[:test_cases].select { _1.include?("github_runner") }
   unless github_runner_test_cases.empty?
     runner_st = Prog::Test::GithubRunner.assemble(options[:vm_host_id], github_runner_test_cases)
-    wait_until(runner_st)
+    tests_to_wait << [runner_st, nil]
+  end
+
+  # Although wait_until will be blocked while checking the first one
+  # it won't affect the total time as other strands will continue in parallel.
+  # No need to make it parallel.
+  tests_to_wait.each do |strand, label|
+    wait_until(strand, label)
   end
 
   Semaphore.incr(hetzner_server_st.id, "destroy")
