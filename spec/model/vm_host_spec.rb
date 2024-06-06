@@ -158,7 +158,7 @@ RSpec.describe VmHost do
 
   it "returns nil if there is no available subnet" do
     expect(vh).to receive(:assigned_subnets).and_return([address])
-    expect(address.assigned_vm_address).to receive(:count).and_return(4)
+    expect(address.assigned_vm_addresses).to receive(:count).and_return(4)
     expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
     ip4, address = vh.ip4_random_vm_network
     expect(ip4).to be_nil
@@ -295,7 +295,7 @@ RSpec.describe VmHost do
     adr = Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
     expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
 
-    expect(adr).to receive(:assigned_vm_address).and_return([instance_double(Vm)]).at_least(:once)
+    expect(adr).to receive(:assigned_vm_addresses).and_return([instance_double(Vm)]).at_least(:once)
     expect {
       vh.create_addresses
     }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"

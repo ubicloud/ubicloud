@@ -113,7 +113,7 @@ class VmHost < Sequel::Model
     # we get the available subnets and if the subnet is /32, we eliminate it
     available_subnets = assigned_subnets.select { |a| a.cidr.version == 4 && a.cidr.network.to_s != sshable.host }
     # we eliminate the subnets that are full
-    used_subnet = available_subnets.select { |as| as.assigned_vm_address.count != 2**(32 - as.cidr.netmask.prefix_len) }.sample
+    used_subnet = available_subnets.select { |as| as.assigned_vm_addresses.count != 2**(32 - as.cidr.netmask.prefix_len) }.sample
 
     # not available subnet
     return [nil, nil] unless used_subnet
@@ -159,7 +159,7 @@ class VmHost < Sequel::Model
         # if it wasn't, we need to create it
         adr = Address.where(cidr: ip_addr).first
         if adr && is_failover_ip
-          if adr.assigned_vm_address.count > 0
+          if adr.assigned_vm_addresses.count > 0
             fail "BUG: failover ip #{ip_addr} is already assigned to a vm"
           end
 
