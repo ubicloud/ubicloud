@@ -14,7 +14,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def download_from_blob_storage?
-    image_name.start_with?("github", "postgres")
+    image_name.start_with?("github", "postgres") || Config.e2e_test?
   end
 
   def default_boot_image_version(image_name)
@@ -45,7 +45,15 @@ class Prog::DownloadBootImage < Prog::Base
       if frame["custom_url"]
         frame["custom_url"]
       elsif download_from_blob_storage?
-        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}-#{version}.raw", 60 * 60).to_s
+        suffixes = {
+          "github" => "raw",
+          "postgres" => "raw",
+          "ubuntu" => "img",
+          "almalinux" => "qcow2"
+        }
+        image_family = image_name.split("-").first
+        suffix = suffixes.fetch(image_family, nil)
+        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}-#{version}.#{suffix}", 60 * 60).to_s
       elsif image_name == "ubuntu-noble"
         arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
         "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
