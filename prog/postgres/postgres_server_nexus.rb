@@ -300,11 +300,7 @@ SQL
   label def unavailable
     register_deadline(:wait, 10 * 60)
 
-    if postgres_server.primary? && (standby = postgres_server.failover_target)
-      standby.incr_take_over
-      postgres_server.incr_destroy
-      nap 0
-    end
+    nap 0 if postgres_server.trigger_failover
 
     reap
     nap 5 unless strand.children.select { _1.prog == "Postgres::PostgresServerNexus" && _1.label == "restart" }.empty?

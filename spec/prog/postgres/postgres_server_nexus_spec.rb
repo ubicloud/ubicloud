@@ -481,35 +481,28 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#unavailable" do
     it "hops to wait if the server is available" do
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(postgres_server).to receive(:failover_target).and_return(nil)
+      expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
     end
 
     it "buds restart if the server is not available" do
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(postgres_server).to receive(:failover_target).and_return(nil)
+      expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
     end
 
     it "does not bud restart if there is already one restart going on" do
-      expect(postgres_server).to receive(:primary?).and_return(true).twice
-      expect(postgres_server).to receive(:failover_target).and_return(nil).twice
+      expect(postgres_server).to receive(:trigger_failover).and_return(false).twice
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(5)
       expect(nx).not_to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
     end
 
-    it "increments take_over if there is a failover target and increments destroy" do
-      standby = instance_double(PostgresServer)
-      expect(standby).to receive(:incr_take_over)
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(postgres_server).to receive(:failover_target).and_return(standby)
-      expect(postgres_server).to receive(:incr_destroy)
+    it "trigger_failover succeeds, naps 0" do
+      expect(postgres_server).to receive(:trigger_failover).and_return(true)
       expect { nx.unavailable }.to nap(0)
     end
   end
