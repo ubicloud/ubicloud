@@ -122,7 +122,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "returns first VM's host" do
       sshable = Sshable.create_with_id
       vm_host = VmHost.create(location: "A") { _1.id = sshable.id }
-      vm = Vm.create_with_id(unix_user: "root", public_key: "", name: "xyz", location: "a", boot_image: "b", family: "z", cores: 1, vm_host_id: vm_host.id)
+      vm = create_vm(vm_host_id: vm_host.id)
       expect(vg_test).to receive(:frame).and_return({"vms" => [vm.id]})
       expect(vg_test.vm_host).to eq(vm_host)
     end

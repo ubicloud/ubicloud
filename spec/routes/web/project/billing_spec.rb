@@ -223,15 +223,7 @@ RSpec.describe Clover, "billing" do
 
     describe "invoices" do
       def billing_record(begin_time, end_time)
-        vm = Vm.create_with_id(
-          unix_user: "x",
-          public_key: "x",
-          name: "vm-1",
-          family: "standard",
-          cores: 1,
-          location: "hetzner-hel1",
-          boot_image: "x"
-        )
+        vm = create_vm
         BillingRecord.create_with_id(
           project_id: billing_info.project.id,
           resource_id: vm.id,

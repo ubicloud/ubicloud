@@ -121,8 +121,8 @@ RSpec.describe Al do
       vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
-      Vm.create_with_id(vm_host_id: vmh.id, family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "")
-      Vm.create_with_id(vm_host_id: vmh.id, family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy")
+      create_vm(vm_host_id: vmh.id, location: vmh.location, boot_image: "", display_state: "creating")
+      create_vm(vm_host_id: vmh.id, location: vmh.location, boot_image: "ubuntu-jammy", display_state: "creating")
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
 
       expect(Al::Allocation.candidate_hosts(req))
@@ -484,10 +484,6 @@ RSpec.describe Al do
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
-    end
-
-    def create_vm
-      Vm.create_with_id(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: false, created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy")
     end
 
     def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])

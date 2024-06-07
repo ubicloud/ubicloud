@@ -20,7 +20,7 @@ RSpec.describe MinioServer do
       storage_size_gib: 100,
       vm_size: "standard-2"
     )
-    vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2, ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
+    vm = create_vm(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
 
     described_class.create_with_id(
       minio_pool_id: mp.id,
