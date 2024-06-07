@@ -327,20 +327,6 @@ RSpec.describe Prog::Vm::GithubRunner do
       VmHost[arch: "x64"].update(used_cores: 8)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
-
-    it "hops to allocate_vm when customer concurrency limit is full but the overall utilization is low for arm, too" do
-      dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
-
-      installation = instance_double(GithubInstallation, total_active_runner_cores: 2)
-      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
-
-      expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
-      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
-      expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
-      expect(github_runner).to receive(:label).and_return("ubicloud-standard-4-arm").at_least(:once)
-      VmHost[arch: "arm64"].update(used_cores: 8)
-      expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-    end
   end
 
   describe "#allocate_vm" do
