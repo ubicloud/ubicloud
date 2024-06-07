@@ -118,6 +118,13 @@ RSpec.describe Clover, "postgres" do
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
+
+    it "not failover" do
+      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
+
+      expect(last_response.status).to eq(401)
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+    end
   end
 
   describe "authenticated" do
@@ -298,6 +305,48 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+      end
+
+      it "failover" do
+        project.set_ff_postgresql_base_image(true)
+        expect(PostgresResource).to receive(:[]).and_return(pg)
+        expect(pg.representative_server).to receive(:trigger_failover).and_return(true)
+
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "failover invalid restore" do
+        expect(PostgresResource).to receive(:[]).and_return(pg)
+        expect(pg.representative_server).to receive(:primary?).and_return(false)
+
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Failover cannot be triggered during restore!")
+      end
+
+      it "failover no ff base image" do
+        expect(PostgresResource).to receive(:[]).and_return(pg)
+        expect(pg.representative_server).to receive(:primary?).and_return(true)
+
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Failover cannot be triggered for this resource!")
+      end
+
+      it "failover no standby" do
+        project.set_ff_postgresql_base_image(true)
+        expect(PostgresResource).to receive(:[]).and_return(pg)
+        expect(pg.representative_server).to receive(:primary?).and_return(true)
+        expect(pg.representative_server).to receive(:trigger_failover).and_return(false)
+
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("There is not a suitable standby server to failover!")
       end
 
       it "invalid payment" do
