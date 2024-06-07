@@ -92,6 +92,17 @@ class PostgresServer < Sequel::Model
     }
   end
 
+  def trigger_failover
+    if primary? && (standby = failover_target)
+      standby.incr_take_over
+      incr_destroy
+      true
+    else
+      Clog.emit("Failed to trigger failover")
+      false
+    end
+  end
+
   def primary?
     timeline_access == "push"
   end
