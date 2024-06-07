@@ -93,6 +93,28 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#trigger_failover" do
+    it "fails if server is not primary" do
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server.trigger_failover).to be_falsey
+    end
+
+    it "fails if there is no suitable standby" do
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:failover_target).and_return(nil)
+      expect(postgres_server.trigger_failover).to be_falsey
+    end
+
+    it "increments take over semaphore and destroy semaphore" do
+      standby = instance_double(described_class)
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:failover_target).and_return(standby)
+      expect(standby).to receive(:incr_take_over)
+      expect(postgres_server).to receive(:incr_destroy)
+      expect(postgres_server.trigger_failover).to be_truthy
+    end
+  end
+
   describe "#failover_target" do
     before do
       postgres_server.timeline_access = "push"
