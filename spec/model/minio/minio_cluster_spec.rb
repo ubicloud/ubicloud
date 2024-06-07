@@ -20,11 +20,10 @@ RSpec.describe MinioCluster do
       storage_size_gib: 100,
       vm_size: "standard-2"
     )
-    vm = Vm.create_with_id(unix_user: "u", public_key: "k", name: "n", location: "l", boot_image: "i", family: "f", cores: 2)
 
     MinioServer.create_with_id(
       minio_pool_id: mp.id,
-      vm_id: vm.id,
+      vm_id: create_vm.id,
       index: 0
     )
     mc

@@ -10,9 +10,7 @@ RSpec.describe GithubInstallation do
   }
 
   it "returns sum of used vm cores" do
-    vms = [2, 4, 8].map do |core_count|
-      Vm.create_with_id(display_state: "running", unix_user: "x", public_key: "x", name: "x", family: "standard", cores: core_count, location: "x", boot_image: "x")
-    end
+    vms = [2, 4, 8].map { create_vm(cores: _1) }
 
     # let's not create runner for the last vm
     vms[..1].each do |vm|

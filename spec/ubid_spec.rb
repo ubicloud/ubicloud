@@ -156,7 +156,7 @@ RSpec.describe UBID do
     host = VmHost.create(location: "x") { _1.id = sshable.id }
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
 
-    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x")
+    vm = create_vm
     expect(vm.ubid).to start_with UBID::TYPE_VM
 
     dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { _1.id = host.id }
@@ -222,7 +222,7 @@ RSpec.describe UBID do
     sshable = Sshable.create_with_id
     host = VmHost.create(location: "x") { _1.id = sshable.id }
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
-    vm = Vm.create_with_id(unix_user: "x", public_key: "x", name: "x", family: "x", cores: 2, location: "x", boot_image: "x")
+    vm = create_vm
     dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { _1.id = host.id }
     sv = VmStorageVolume.create_with_id(vm_id: vm.id, size_gib: 5, disk_index: 0, boot: false, spdk_installation_id: si.id, storage_device_id: dev.id)
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")

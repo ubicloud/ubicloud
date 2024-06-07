@@ -81,7 +81,7 @@ RSpec.describe InvoiceGenerator do
     Account.create_with_id(email: "auth1@example.com")
     Project.create_with_id(name: "cool-project")
   }
-  let(:vm1) { Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", family: "standard", cores: 2, location: "hetzner-hel1", boot_image: "x") }
+  let(:vm1) { create_vm }
 
   let(:day) { 24 * 60 * 60 }
   let(:begin_time) { Time.parse("2023-06-01") }
@@ -148,7 +148,7 @@ RSpec.describe InvoiceGenerator do
 
   it "generates invoice for a single project" do
     p2 = Project.create_with_id(name: "cool-project")
-    vm2 = Vm.create_with_id(unix_user: "x", public_key: "x", name: "vm-1", family: "standard", cores: 2, location: "hetzner-hel1", boot_image: "x")
+    vm2 = create_vm
 
     generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, end_time))
     generate_billing_record(p2, vm2, Sequel::Postgres::PGRange.new(begin_time, end_time))

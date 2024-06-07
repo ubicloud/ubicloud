@@ -19,10 +19,7 @@ RSpec.describe VmPool do
     end
 
     it "returns nil if there are no vms in running state" do
-      Vm.create_with_id(
-        pool_id: pool.id, display_state: "creating", unix_user: "x", public_key: "x",
-        name: "x", family: "x", cores: 2, location: "x", boot_image: "x"
-      )
+      create_vm(pool_id: pool.id, display_state: "creating")
       expect(pool.pick_vm).to be_nil
     end
   end
@@ -32,10 +29,7 @@ RSpec.describe VmPool do
       Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
     }
     let(:vm) {
-      vm = Vm.create_with_id(
-        pool_id: pool.id, display_state: "running", unix_user: "x", public_key: "x",
-        name: "x", family: "standard", cores: 2, location: "x", boot_image: "x"
-      )
+      vm = create_vm(pool_id: pool.id, display_state: "running")
       vm.associate_with_project(prj)
       vm
     }
