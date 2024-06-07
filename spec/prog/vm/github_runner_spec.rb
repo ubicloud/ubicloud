@@ -283,9 +283,9 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#wait_concurrency_limit" do
     before do
-      2.times do |i|
+      [["hetzner-hel1", "x64"], ["github-runners", "x64"], ["github-runners", "arm64"]].each_with_index do |(location, arch), i|
         ssh = Sshable.create_with_id(host: "0.0.0.#{i}")
-        VmHost.create(location: "github-runners", allocation_state: "accepting", arch: (i == 0) ? "x64" : "arm64", total_cores: 16, used_cores: 16) { _1.id = ssh.id }
+        VmHost.create(location: location, allocation_state: "accepting", arch: arch, total_cores: 16, used_cores: 16) { _1.id = ssh.id }
       end
     end
 
@@ -324,7 +324,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
-      VmHost[arch: "x64"].update(used_cores: 8)
+      VmHost[arch: "x64"].update(used_cores: 4)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
     end
   end
