@@ -146,8 +146,16 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
-    it "waits manual intervation if it's failed" do
+    it "waits manual intervation if it's failed in production" do
+      expect(Config).to receive(:production?).and_return(true)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
+      expect { dbi.download }.to raise_error RuntimeError, "Failed to download 'my-image' image on VmHost[#{vm_host.ubid}]"
+    end
+
+    it "retries downloading image if it is failed somewhere other than production" do
+      expect(Config).to receive(:production?).and_return(false)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
       expect { dbi.download }.to raise_error RuntimeError, "Failed to download 'my-image' image on VmHost[#{vm_host.ubid}]"
     end
 
