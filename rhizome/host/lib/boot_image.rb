@@ -41,11 +41,13 @@ class BootImage
     # same time.
     temp_file_name = @version.nil? ? @name : "#{@name}-#{@version}"
     temp_path = File.join(image_root, "#{temp_file_name}#{ext}.tmp")
-    file_sha256sum = curl_image(url, temp_path, ca_path)
-    verify_sha256sum(file_sha256sum, sha256sum)
-    convert_image(temp_path, init_format)
-
-    rm_if_exists(temp_path)
+    begin
+      file_sha256sum = curl_image(url, temp_path, ca_path)
+      verify_sha256sum(file_sha256sum, sha256sum)
+      convert_image(temp_path, init_format)
+    ensure
+      rm_if_exists(temp_path)
+    end
   end
 
   def image_ext(url)
