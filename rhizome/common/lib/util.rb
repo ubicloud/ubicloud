@@ -3,6 +3,7 @@
 require "bundler/setup"
 require "open3"
 require "shellwords"
+require "digest"
 
 class CommandFail < RuntimeError
   attr_reader :stdout, :stderr
@@ -60,12 +61,15 @@ end
 def safe_write_to_file(filename, content = nil)
   raise ArgumentError, "must provide either content or block" if (content.nil? && !block_given?) || (!content.nil? && block_given?)
   temp_filename = filename + ".tmp"
-  File.open(temp_filename, File::RDWR | File::CREAT) do |f|
-    f.flock(File::LOCK_EX)
+  lock_filename = "/tmp/#{Digest::SHA256.hexdigest(temp_filename)}.lock"
+  File.open(lock_filename, File::RDWR | File::CREAT) do |lock_file|
+    lock_file.flock(File::LOCK_EX)
     if block_given?
-      yield f
+      File.open(temp_filename, File::RDWR | File::CREAT) do |f|
+        yield f
+      end
     else
-      f.puts(content)
+      File.write(temp_filename, content)
     end
     File.rename(temp_filename, filename)
   end
