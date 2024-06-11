@@ -105,6 +105,10 @@ module Config
   # GitHub Cache
   optional :github_cache_blob_storage_endpoint, string
   optional :github_cache_blob_storage_region, string
+  optional :github_cache_blob_storage_access_key, string, clear: true
+  optional :github_cache_blob_storage_secret_key, string, clear: true
+  optional :github_cache_blob_storage_account_id, string
+  optional :github_cache_blob_storage_api_key, string, clear: true
 
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
