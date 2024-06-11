@@ -11,8 +11,7 @@ RSpec.describe Clover, "vm" do
     it "not list" do
       get "/api/project/#{project.ubid}/pg"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
   end
 

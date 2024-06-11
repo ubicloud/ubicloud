@@ -17,43 +17,37 @@ RSpec.describe Clover, "private_subnet" do
     it "not location list" do
       get "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not create" do
       post "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo_name"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete ubid" do
       delete "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/id/#{ps.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get ubid" do
       get "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/id/#{ps.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
   end
 
@@ -120,14 +114,13 @@ RSpec.describe Clover, "private_subnet" do
       it "invalid name" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/invalid_name"
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["name"]).to eq("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
       end
 
       it "not authorized" do
         post "/api/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.location}/private-subnet/foo_subnet"
 
-        expect(last_response.status).to eq(403)
+        expect(last_response).to have_api_error(403)
       end
 
       it "with valid firewall" do
@@ -143,8 +136,7 @@ RSpec.describe Clover, "private_subnet" do
       it "with invalid firewall id" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: "invalidid"}.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["firewall_id"]).to eq("Firewall with id \"invalidid\" not found")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"invalidid\" not found"})
       end
 
       it "with empty body" do
@@ -173,14 +165,13 @@ RSpec.describe Clover, "private_subnet" do
       it "not found" do
         get "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/not-exists-ps"
 
-        expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
 
       it "not authorized" do
         get "/api/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.display_location}/private-subnet/#{ps_wo_permission.name}"
 
-        expect(last_response.status).to eq(403)
+        expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
       end
     end
 
@@ -218,7 +209,7 @@ RSpec.describe Clover, "private_subnet" do
 
         delete "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
 
-        expect(last_response.status).to eq(409)
+        expect(last_response).to have_api_error(409, "Private subnet 'dummy-ps-1' has VMs attached, first, delete them.")
       end
 
       it "not exist" do
@@ -231,7 +222,7 @@ RSpec.describe Clover, "private_subnet" do
       it "not authorized" do
         delete "/api/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.display_location}/private-subnet/#{ps_wo_permission.name}"
 
-        expect(last_response.status).to eq(403)
+        expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
       end
     end
   end

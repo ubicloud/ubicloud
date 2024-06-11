@@ -17,43 +17,37 @@ RSpec.describe Clover, "vm" do
     it "not location list" do
       get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not create" do
       post "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete ubid" do
       delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get ubid" do
       get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
   end
 
@@ -111,7 +105,7 @@ RSpec.describe Clover, "vm" do
       it "ubid not exist" do
         get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/foo_ubid"
 
-        expect(last_response.status).to eq(404)
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
     end
 
@@ -193,8 +187,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["boot_image"]).to eq("\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-noble\", \"ubuntu-jammy\", \"almalinux-9\", \"almalinux-8\"]")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: boot_image", {"boot_image" => "\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-noble\", \"ubuntu-jammy\", \"almalinux-9\", \"almalinux-8\"]"})
       end
 
       it "invalid vm size" do
@@ -205,8 +198,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["size"]).to eq("\"standard-gpu-6\" is not a valid virtual machine size. Available sizes: [\"standard-2\", \"standard-4\", \"standard-8\", \"standard-16\", \"standard-30\", \"standard-60\"]")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "\"standard-gpu-6\" is not a valid virtual machine size. Available sizes: [\"standard-2\", \"standard-4\", \"standard-8\", \"standard-16\", \"standard-30\", \"standard-60\"]"})
       end
 
       it "success without vm_size" do
@@ -230,8 +222,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["private_subnet_id"]).to eq("Private subnet with the given id \"invalid-ubid\" is not found in the location \"eu-north-h1\"")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"invalid-ubid\" is not found in the location \"eu-north-h1\""})
       end
 
       it "invalid ps id in other location" do
@@ -245,8 +236,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["private_subnet_id"]).to eq("Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-north-h1\"")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-north-h1\""})
       end
 
       it "invalid name" do
@@ -257,8 +247,7 @@ RSpec.describe Clover, "vm" do
           boot_image: "ubuntu-jammy"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["name"]).to eq("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
       end
 
       it "invalid payment method" do
@@ -272,15 +261,13 @@ RSpec.describe Clover, "vm" do
           boot_image: "ubuntu-jammy"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["billing_info"]).to eq("Project doesn't have valid billing information")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: billing_info", {"billing_info" => "Project doesn't have valid billing information"})
       end
 
       it "invalid body" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", "invalid_body"
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Request body isn't a valid JSON object.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
       end
 
       it "missing required key" do
@@ -288,8 +275,7 @@ RSpec.describe Clover, "vm" do
           unix_user: "ubi"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Request body must include required parameters: public_key")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body must include required parameters: public_key"})
       end
 
       it "non allowed key" do
@@ -298,8 +284,7 @@ RSpec.describe Clover, "vm" do
           foo_key: "foo_val"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: public_key, size, storage_size, unix_user, boot_image, enable_ip4, private_subnet_id")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: public_key, size, storage_size, unix_user, boot_image, enable_ip4, private_subnet_id"})
       end
     end
 
@@ -321,8 +306,7 @@ RSpec.describe Clover, "vm" do
       it "not found" do
         get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/not-exists-vm"
 
-        expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
     end
 

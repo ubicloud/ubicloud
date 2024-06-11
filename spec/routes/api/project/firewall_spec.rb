@@ -13,43 +13,37 @@ RSpec.describe Clover, "firewall" do
     it "not list" do
       get "/api/project/#{project.ubid}/firewall"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not create" do
       post "/api/project/#{project.ubid}/firewall"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/firewall/#{firewall.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not associate" do
       get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/attach-subnet"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not dissociate" do
       get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/detach-subnet"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
   end
 
@@ -76,7 +70,7 @@ RSpec.describe Clover, "firewall" do
     it "get does not exist" do
       get "/api/project/#{project.ubid}/firewall/foo_ubid"
 
-      expect(last_response.status).to eq(404)
+      expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
     end
 
     it "success post" do
@@ -119,7 +113,7 @@ RSpec.describe Clover, "firewall" do
         private_subnet_id: "fooubid"
       }.to_json
 
-      expect(last_response.status).to eq(400)
+      expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
     end
 
     it "detach from subnet" do
@@ -139,7 +133,7 @@ RSpec.describe Clover, "firewall" do
         private_subnet_id: "fooubid"
       }.to_json
 
-      expect(last_response.status).to eq(400)
+      expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
     end
 
     it "attach and detach" do
