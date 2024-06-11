@@ -11,22 +11,19 @@ RSpec.describe Clover, "vm" do
     it "not list" do
       get "/api/project"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not create" do
       post "/api/project"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete" do
       delete "api/project/#{project.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
   end
 
@@ -59,14 +56,14 @@ RSpec.describe Clover, "vm" do
         project
         get "/api/project?order_column=name"
 
-        expect(last_response.status).to eq(400)
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: order_column")
       end
 
       it "invalid id" do
         project
         get "/api/project?start_after=invalid_id"
 
-        expect(last_response.status).to eq(400)
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: start_after")
       end
     end
 
@@ -83,7 +80,7 @@ RSpec.describe Clover, "vm" do
       it "missing parameter" do
         post "/api/project", {}.to_json
 
-        expect(last_response.status).to eq(400)
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
       end
     end
 
@@ -109,8 +106,7 @@ RSpec.describe Clover, "vm" do
 
         delete "api/project/#{project.ubid}"
 
-        expect(last_response.status).to eq(409)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("'#{project.name}' project has some resources. Delete all related resources first.")
+        expect(last_response).to have_api_error(409, "'#{project.name}' project has some resources. Delete all related resources first.")
       end
 
       it "not authorized" do
@@ -118,8 +114,7 @@ RSpec.describe Clover, "vm" do
         p = u.create_project_with_default_policy("project-1")
         delete "api/project/#{p.ubid}"
 
-        expect(last_response.status).to eq(403)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, you don't have permission to continue with this request.")
+        expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
       end
     end
 
@@ -134,8 +129,7 @@ RSpec.describe Clover, "vm" do
       it "not found" do
         get "/api/project/08s56d4kaj94xsmrnf5v5m3mav"
 
-        expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
 
       it "not authorized" do
@@ -143,8 +137,7 @@ RSpec.describe Clover, "vm" do
         p = u.create_project_with_default_policy("project-1")
         get "/api/project/#{p.ubid}"
 
-        expect(last_response.status).to eq(403)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, you don't have permission to continue with this request.")
+        expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
       end
     end
   end

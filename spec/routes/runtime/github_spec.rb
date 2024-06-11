@@ -13,16 +13,14 @@ RSpec.describe Clover, "github" do
     it "vm has no runner" do
       get "/runtime/github"
 
-      expect(last_response.status).to eq(400)
-      expect(JSON.parse(last_response.body)["error"]["type"]).to eq("InvalidRequest")
+      expect(last_response).to have_api_error(400, "invalid JWT format or claim in Authorization header")
     end
 
     it "vm has runner but no repository" do
       GithubRunner.create_with_id(vm_id: vm.id, repository_name: "test", label: "ubicloud")
       get "/runtime/github"
 
-      expect(last_response.status).to eq(400)
-      expect(JSON.parse(last_response.body)["error"]["type"]).to eq("InvalidRequest")
+      expect(last_response).to have_api_error(400, "invalid JWT format or claim in Authorization header")
     end
 
     it "vm has runner and repository" do
@@ -43,7 +41,7 @@ RSpec.describe Clover, "github" do
 
     post "/runtime/github/caches"
 
-    expect(last_response.status).to eq(400)
+    expect(last_response).to have_api_error(400, "Wrong parameters")
   end
 
   describe "cache endpoints" do
@@ -68,8 +66,7 @@ RSpec.describe Clover, "github" do
           params = {key: key, version: version, cacheSize: size}.compact
           post "/runtime/github/caches", params
 
-          expect(last_response.status).to eq(400)
-          expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Wrong parameters")
+          expect(last_response).to have_api_error(400, "Wrong parameters")
         end
       end
 
@@ -77,15 +74,13 @@ RSpec.describe Clover, "github" do
         runner.update(workflow_job: nil)
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("No workflow job data available")
+        expect(last_response).to have_api_error(400, "No workflow job data available")
       end
 
       it "fails if cache is bigger than 10GB" do
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 11 * 1024 * 1024 * 1024}
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("The cache size is over the 10GB limit")
+        expect(last_response).to have_api_error(400, "The cache size is over the 10GB limit")
       end
 
       it "returns presigned urls and upload id for the reserved cache" do
@@ -118,8 +113,7 @@ RSpec.describe Clover, "github" do
           params = {etags: etags, uploadId: upload_id, size: size}.compact
           post "/runtime/github/caches/commit", params
 
-          expect(last_response.status).to eq(400)
-          expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Wrong parameters")
+          expect(last_response).to have_api_error(400, "Wrong parameters")
         end
       end
 
@@ -134,7 +128,7 @@ RSpec.describe Clover, "github" do
         expect(blob_storage_client).to receive(:complete_multipart_upload).and_raise(Aws::S3::Errors::NoSuchUpload.new("error", "error"))
         post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
 
-        expect(last_response.status).to eq(400)
+        expect(last_response).to have_api_error(400, "Wrong parameters")
       end
 
       it "completes multipart upload" do
@@ -159,8 +153,7 @@ RSpec.describe Clover, "github" do
           params = {keys: keys, version: version}.compact
           get "/runtime/github/cache", params
 
-          expect(last_response.status).to eq(400)
-          expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Wrong parameters")
+          expect(last_response).to have_api_error(400, "Wrong parameters")
         end
       end
 

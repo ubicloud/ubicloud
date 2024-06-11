@@ -15,22 +15,19 @@ RSpec.describe Clover, "firewall" do
     it "not post" do
       post "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
   end
 
@@ -54,7 +51,7 @@ RSpec.describe Clover, "firewall" do
         port_range: "80..5432"
       }.to_json
 
-      expect(last_response.status).to eq(400)
+      expect(last_response).to have_api_error(400, "cidr and port_range and firewall_id is already taken")
     end
 
     it "firewall rule no port range" do
@@ -93,7 +90,7 @@ RSpec.describe Clover, "firewall" do
     it "get does not exist" do
       get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/fooubid"
 
-      expect(last_response.status).to eq(404)
+      expect(last_response).to have_api_error(404)
     end
   end
 end

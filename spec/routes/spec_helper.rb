@@ -16,6 +16,23 @@ RSpec.configure do |config|
   def app
     Clover.freeze.app
   end
+
+  RSpec::Matchers.define :have_api_error do |expected_state, expected_message, expected_details|
+    match do |response|
+      parsed_body = JSON.parse(response.body)
+      response.status == expected_state &&
+        (expected_message.nil? || parsed_body.dig("error", "message") == expected_message) &&
+        (expected_details.nil? || parsed_body.dig("error", "details") == expected_details)
+    end
+
+    failure_message do |response|
+      parsed_body = JSON.parse(response.body)
+      <<~MESSAGE
+        #{"expected: ".rjust(16)}#{expected_state}#{expected_message && " - #{expected_message}"}#{expected_details && " - #{expected_details}"}
+        #{"got: ".rjust(16)}#{response.status}#{expected_message && " - #{parsed_body.dig("error", "message")}"}#{expected_details && " - #{parsed_body.dig("error", "details")}"}
+      MESSAGE
+    end
+  end
 end
 
 def create_account(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD, with_project: true, enable_otp: false, enable_webauthn: false)

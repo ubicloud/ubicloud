@@ -38,92 +38,79 @@ RSpec.describe Clover, "postgres" do
     it "not location list" do
       get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not create" do
       post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/postgres_name"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete" do
       delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete ubid" do
       delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get" do
       get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not get ubid" do
       get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not create firewall rule" do
       post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not delete firewall rule" do
       delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not restore" do
       post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not restore ubid" do
       post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/restore"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not reset super user password" do
       post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not reset super user password ubid" do
       post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/reset-superuser-password"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not failover" do
       post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
 
-      expect(last_response.status).to eq(401)
-      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+      expect(last_response).to have_api_error(401, "Please login to continue")
     end
   end
 
@@ -182,8 +169,7 @@ RSpec.describe Clover, "postgres" do
           ha_type: "sync"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["location"]).to eq("Given location is not a valid postgres location. Available locations: [\"eu-central-h1\"]")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: location", {"location" => "Given location is not a valid postgres location. Available locations: [\"eu-central-h1\"]"})
       end
 
       it "invalid name" do
@@ -192,15 +178,13 @@ RSpec.describe Clover, "postgres" do
           ha_type: "sync"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["name"]).to eq("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
       end
 
       it "invalid body" do
         post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", "invalid_body"
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Request body isn't a valid JSON object.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
       end
 
       it "missing required key" do
@@ -208,8 +192,7 @@ RSpec.describe Clover, "postgres" do
           unix_user: "ha_type"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Request body must include required parameters: size")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body must include required parameters: size"})
       end
 
       it "non allowed key" do
@@ -218,8 +201,7 @@ RSpec.describe Clover, "postgres" do
           foo_key: "foo_val"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: size, storage_size, ha_type")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: size, storage_size, ha_type"})
       end
 
       it "firewall-rule" do
@@ -243,8 +225,7 @@ RSpec.describe Clover, "postgres" do
           cidr: "0.0.0"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["cidr"]).to eq("Invalid CIDR")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: cidr", {"cidr" => "Invalid CIDR"})
       end
 
       it "restore" do
@@ -269,7 +250,7 @@ RSpec.describe Clover, "postgres" do
           restore_target: Time.now.utc
         }.to_json
 
-        expect(last_response.status).to eq(400)
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: restore_target")
       end
 
       it "reset password" do
@@ -287,8 +268,7 @@ RSpec.describe Clover, "postgres" do
           password: "DummyPassword123"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Superuser password cannot be updated during restore!")
+        expect(last_response).to have_api_error(400, "Superuser password cannot be updated during restore!")
       end
 
       it "invalid password" do
@@ -296,7 +276,7 @@ RSpec.describe Clover, "postgres" do
           password: "dummy"
         }.to_json
 
-        expect(last_response.status).to eq(400)
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: password")
       end
 
       it "reset password ubid" do
@@ -323,8 +303,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Failover cannot be triggered during restore!")
+        expect(last_response).to have_api_error(400, "Failover cannot be triggered during restore!")
       end
 
       it "failover no ff base image" do
@@ -333,8 +312,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Failover cannot be triggered for this resource!")
+        expect(last_response).to have_api_error(400, "Failover cannot be triggered for this resource!")
       end
 
       it "failover no standby" do
@@ -345,8 +323,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("There is not a suitable standby server to failover!")
+        expect(last_response).to have_api_error(400, "There is not a suitable standby server to failover!")
       end
 
       it "invalid payment" do
@@ -357,8 +334,7 @@ RSpec.describe Clover, "postgres" do
           ha_type: "sync"
         }.to_json
 
-        expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Validation failed for following fields: billing_info")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: billing_info")
       end
     end
 
@@ -380,8 +356,7 @@ RSpec.describe Clover, "postgres" do
       it "not found" do
         get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/not-exists-pg"
 
-        expect(last_response.status).to eq(404)
-        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
 
       it "show firewall" do
