@@ -83,7 +83,7 @@ autoload_normal.call("model", flat: true)
 
 AUTOLOAD_CONSTANTS.freeze
 
-if Config.production?
+if Config.production? || Config.e2e_test?
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
 end
 
@@ -110,7 +110,7 @@ when :test
 end
 
 def clover_freeze
-  return unless Config.production?
+  return unless Config.production? || Config.e2e_test?
   require "refrigerator"
 
   # Take care of library dependencies that modify core classes.
