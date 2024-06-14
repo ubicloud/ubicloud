@@ -37,6 +37,21 @@ class Project < Sequel::Model
     !!billing_info&.payment_methods&.any?
   end
 
+  def default_location
+    location_max_capacity = DB[:vm_host]
+      .where(location: Option.locations.map { _1.name })
+      .where(allocation_state: "accepting")
+      .select_group(:location)
+      .order { sum(Sequel[:total_cores] - Sequel[:used_cores]).desc }
+      .first
+
+    if location_max_capacity.nil?
+      Option.locations.first.name
+    else
+      location_max_capacity[:location]
+    end
+  end
+
   def path
     "/project/#{ubid}"
   end
