@@ -48,6 +48,7 @@ class CloverWeb
       installation.runners.each(&:incr_destroy)
       installation.repositories.each(&:incr_destroy)
       installation.destroy
+      Clog.emit("GithubInstallation is deleted.") { {github_installation: {ubid: installation.ubid, type: installation.type}} }
       return success("GithubInstallation[#{installation.ubid}] deleted")
     end
 
