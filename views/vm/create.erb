@@ -46,6 +46,8 @@
                 <% locations = Option
                     .locations
                     .map { |l| [l.display_name, l.display_name, @prices[l.name].to_json] }
+
+                   default_location = Option.locations.detect { |l| l.name == @default_location }&.display_name
                 %>
                 <%== render(
                   "components/form/radio_small_cards",
@@ -53,7 +55,7 @@
                     name: "location",
                     label: "Location",
                     options: locations,
-                    selected: locations.first[0],
+                    selected: default_location,
                     attributes: {
                       required: true
                     }
