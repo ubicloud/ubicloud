@@ -28,5 +28,6 @@ clover_freeze
 loop do
   d.start_cohort
   next if d.wait_cohort > 0
-  sleep 5
+  duration_slept = sleep 5
+  Clog.emit("respirate finished sleep") { {sleep_duration_sec: duration_slept} }
 end
