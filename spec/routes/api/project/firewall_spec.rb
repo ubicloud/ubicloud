@@ -82,9 +82,25 @@ RSpec.describe Clover, "firewall" do
     it "success post" do
       post "/api/project/#{project.ubid}/firewall", {
         name: "foo-name",
-        description: "Firewall description"
+        description: "Firewall description",
+        firewall_rules: []
       }.to_json
 
+      expect(last_response.status).to eq(200)
+    end
+
+    it "can be created with rules" do
+      post "/api/project/#{project.ubid}/firewall", {
+        name: "foo-name",
+        description: "Firewall description",
+        firewall_rules: [
+          {cidr: "0.0.0.0/32", port_range: "11111"},
+          {cidr: "0.0.0.1/32", port_range: "22..80"},
+          {cidr: "0.0.0.3/32"}
+        ]
+      }.to_json
+
+      expect(Firewall.first.firewall_rules.count).to eq(3)
       expect(last_response.status).to eq(200)
     end
 

@@ -202,6 +202,26 @@ RSpec.describe Validation do
       end
     end
 
+    describe "#validate_firewall_rules" do
+      it "succeeds for valid input" do
+        expect(described_class.validate_firewall_rules([
+          {"cidr" => "0.0.0.0/32", "port_range" => "11111"},
+          {"cidr" => "0.0.0.1/32", "port_range" => "22..80"},
+          {"cidr" => "::/64"}
+        ])).to eq([
+          ["0.0.0.0/32", 11111..11111],
+          ["0.0.0.1/32", 22..80],
+          ["::/64", 0..65535]
+        ])
+      end
+
+      it "fails for invalid input" do
+        expect { described_class.validate_firewall_rules("not an array") }.to raise_error described_class::ValidationFailed, "Validation failed for following fields: firewall_rules"
+        expect { described_class.validate_firewall_rules(["not a hash"]) }.to raise_error described_class::ValidationFailed, "Validation failed for following fields: firewall_rules"
+        expect { described_class.validate_firewall_rules([{"no cidr" => ""}]) }.to raise_error described_class::ValidationFailed, "Validation failed for following fields: firewall_rules"
+      end
+    end
+
     describe "#validate_postgres_ha_type" do
       it "valid postgres ha_type" do
         [PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC].each { |ha_type| expect { described_class.validate_postgres_ha_type(ha_type) }.not_to raise_error }

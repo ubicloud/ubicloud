@@ -18,12 +18,12 @@ class CloverApi
     r.post true do
       Authorization.authorize(@current_user.id, "Firewall:create", @project.id)
 
-      required_parameters = ["name"]
+      required_parameters = ["name", "firewall_rules"]
       allowed_optional_parameters = ["description"]
       request_body_params = Validation.validate_request_body(r.body.read, required_parameters, allowed_optional_parameters)
       Validation.validate_name(request_body_params["name"])
-
-      firewall = Firewall.create_with_id(name: request_body_params["name"], description: request_body_params["description"] || "")
+      rules = Validation.validate_firewall_rules(request_body_params["firewall_rules"])
+      firewall = Firewall.create_with_rules(request_body_params["name"], request_body_params["description"] || "", rules)
       firewall.associate_with_project(@project)
 
       Serializers::Firewall.serialize(firewall)

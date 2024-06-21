@@ -18,6 +18,16 @@ class Firewall < Sequel::Model
   dataset_module Pagination
   dataset_module Authorization::Dataset
 
+  def self.create_with_rules(name, description, rules)
+    DB.transaction do
+      firewall = Firewall.create_with_id(name: name, description: description)
+      rules.each do |rule|
+        firewall.insert_firewall_rule(rule[0], Sequel.pg_range(rule[1]))
+      end
+      firewall
+    end
+  end
+
   def path
     "/firewall/#{ubid}"
   end
@@ -60,4 +70,10 @@ class Firewall < Sequel::Model
 
     private_subnet.incr_update_firewall_rules if apply_firewalls
   end
+end
+
+module Firewall::Rules
+  ALLOW_ALL = [["0.0.0.0/0", 0..65535], ["::/0", 0..65535]]
+  ALLOW_SSH = [["0.0.0.0/0", 22..22], ["::/0", 22..22]]
+  ALLOW_NONE = []
 end
