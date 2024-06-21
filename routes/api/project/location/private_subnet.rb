@@ -30,11 +30,14 @@ class CloverApi
     r.is String do |ps_name|
       r.post true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:create", @project.id)
+        request_body = r.body.read
+        firewall_rules = request_body.empty? ? Firewall::Rules::ALLOW_ALL : Validation.validate_firewall_rules(Validation.validate_request_body(request_body, ["firewall_rules"])["firewall_rules"])
 
         st = Prog::Vnet::SubnetNexus.assemble(
           @project.id,
           name: ps_name,
-          location: @location
+          location: @location,
+          firewall_rules: firewall_rules
         )
 
         Serializers::PrivateSubnet.serialize(st.subject)

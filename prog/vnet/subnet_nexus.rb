@@ -4,7 +4,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
   semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
 
-  def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false)
+  def self.assemble(project_id, name: nil, location: "hetzner-hel1", ipv6_range: nil, ipv4_range: nil, firewall_rules: Firewall::Rules::ALLOW_ALL)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -20,10 +20,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
       ps.associate_with_project(project)
-      port_range = allow_only_ssh ? 22..22 : 0..65535
       fw = Firewall.create_with_id(name: "#{name}-default")
       fw.associate_with_project(project)
-      ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
+      firewall_rules.each { |cidr, port_range| FirewallRule.create_with_id(firewall_id: fw.id, cidr: cidr.to_s, port_range: Sequel.pg_range(port_range)) }
       fw.associate_with_private_subnet(ps, apply_firewalls: false)
 
       Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }

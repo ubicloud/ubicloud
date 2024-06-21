@@ -110,8 +110,20 @@ RSpec.describe Clover, "private_subnet" do
     end
 
     describe "create" do
-      it "success" do
+      it "success with default firewall rules" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps"
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-ps")
+      end
+
+      it "success with provided firewall rules" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {
+          firewall_rules: [
+            {cidr: "0.0.0.0/32", port_range: "11111"},
+            {cidr: "0.0.0.1/32", port_range: "22..80"}
+          ]
+        }.to_json
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-ps")
