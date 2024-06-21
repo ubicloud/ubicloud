@@ -25,6 +25,13 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(401)
       expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
     end
+
+    it "not get" do
+      get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
+
+      expect(last_response.status).to eq(401)
+      expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Please login to continue")
+    end
   end
 
   describe "authenticated" do
@@ -75,6 +82,18 @@ RSpec.describe Clover, "firewall" do
     it "firewall rule delete does not exist" do
       delete "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/fooubid"
       expect(last_response.status).to eq(204)
+    end
+
+    it "success get firewall rule" do
+      get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/#{firewall_rule.ubid}"
+
+      expect(last_response.status).to eq(200)
+    end
+
+    it "get does not exist" do
+      get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/fooubid"
+
+      expect(last_response.status).to eq(404)
     end
   end
 end

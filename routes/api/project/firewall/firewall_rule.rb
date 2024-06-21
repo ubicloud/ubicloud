@@ -36,6 +36,13 @@ class CloverApi
         response.status = 204
         r.halt
       end
+
+      request.get true do
+        if firewall_rule
+          Authorization.authorize(@current_user.id, "Firewall:view", @firewall.id)
+          Serializers::FirewallRule.serialize(firewall_rule)
+        end
+      end
     end
   end
 end
