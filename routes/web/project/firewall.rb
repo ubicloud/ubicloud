@@ -99,15 +99,13 @@ class CloverWeb
           Authorization.authorize(@current_user.id, "Firewall:edit", fw.id)
 
           port_range = if r.params["port_range"].empty?
-            [0, 65535]
+            0..65535
           else
             Validation.validate_port_range(r.params["port_range"])
           end
-
           parsed_cidr = Validation.validate_cidr(r.params["cidr"])
-          pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
-          fw.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+          fw.insert_firewall_rule(parsed_cidr.to_s, Sequel.pg_range(port_range))
           flash["notice"] = "Firewall rule is created"
 
           r.redirect "#{@project.path}#{fw.path}"

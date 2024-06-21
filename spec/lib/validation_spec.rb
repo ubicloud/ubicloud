@@ -242,9 +242,9 @@ RSpec.describe Validation do
 
     describe "#validate_port_range" do
       it "valid port range" do
-        expect(described_class.validate_port_range("1234")).to eq([1234])
-        expect(described_class.validate_port_range("1234..1235")).to eq([1234, 1235])
-        expect(described_class.validate_port_range("1234..1234")).to eq([1234, 1234])
+        expect(described_class.validate_port_range("1234")).to eq(1234..1234)
+        expect(described_class.validate_port_range("1234..1235")).to eq(1234..1235)
+        expect(described_class.validate_port_range("1234..1234")).to eq(1234..1234)
       end
 
       it "invalid port range" do
