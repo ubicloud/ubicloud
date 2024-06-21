@@ -48,7 +48,7 @@ class Prog::Vm::VmPool < Prog::Base
       enable_ip4: true,
       pool_id: vm_pool.id,
       arch: vm_pool.arch,
-      allow_only_ssh: true,
+      firewall_rules: Firewall::Rules::ALLOW_SSH,
       swap_size_bytes: 4294963200
     )
 
