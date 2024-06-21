@@ -145,6 +145,14 @@ module Validation
     end
   end
 
+  def self.validate_firewall_rules(firewall_rules)
+    fail ValidationFailed.new({firewall_rules: "Missing array of firewall rules."}) unless firewall_rules.is_a?(Array)
+    firewall_rules.map do |rule|
+      fail ValidationFailed.new({firewall_rules: "Invalid firewall rule."}) unless rule.is_a?(Hash) && rule.key?("cidr")
+      [validate_cidr(rule["cidr"]).to_s, validate_port_range(rule["port_range"])]
+    end
+  end
+
   def self.validate_cidr(cidr)
     if cidr.include?(".")
       NetAddr::IPv4Net.parse(cidr)
