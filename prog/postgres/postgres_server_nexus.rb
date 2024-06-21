@@ -31,7 +31,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         boot_image: postgres_resource.project.get_ff_postgresql_base_image || "postgres-ubuntu-2204",
         private_subnet_id: private_subnet_id,
         enable_ip4: true,
-        allow_only_ssh: true,
+        firewall_rules: Firewall::Rules::ALLOW_SSH,
         exclude_host_ids: exclude_host_ids
       )
 

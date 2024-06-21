@@ -160,6 +160,25 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be true
       end
 
+      it "success with firewall rules" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+          firewall_rules: [
+            {cidr: "0.0.0.0/32", port_range: "11111"},
+            {cidr: "0.0.0.1/32", port_range: "22..80"},
+            {cidr: "0.0.0.3/32"}
+          ]
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
+        expect(Vm.first.private_subnets.count).to eq(1)
+        expect(Vm.first.private_subnets.first.firewalls.first.firewall_rules.count).to eq(3)
+      end
+
       it "success with storage size" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
@@ -249,6 +268,21 @@ RSpec.describe Clover, "vm" do
         expect(JSON.parse(last_response.body)["error"]["details"]["private_subnet_id"]).to eq("Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-north-h1\"")
       end
 
+      it "fails if ps and firewall rules as provided" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          boot_image: "ubuntu-jammy",
+          private_subnet_id: "some-id",
+          firewall_rules: [],
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["firewall_rules"]).to eq("Cannot provide both firewall_rules and private_subnet_id")
+      end
+
       it "invalid name" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/invalid_name", {
           public_key: "ssh key",
@@ -299,7 +333,7 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response.status).to eq(400)
-        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: public_key, size, storage_size, unix_user, boot_image, enable_ip4, private_subnet_id")
+        expect(JSON.parse(last_response.body)["error"]["details"]["body"]).to eq("Only following parameters are allowed: public_key, size, storage_size, unix_user, boot_image, enable_ip4, private_subnet_id, firewall_rules")
       end
     end
 

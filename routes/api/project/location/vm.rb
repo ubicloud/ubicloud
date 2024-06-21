@@ -33,7 +33,7 @@ class CloverApi
         fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
         required_parameters = ["public_key"]
-        allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
+        allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id", "firewall_rules"]
 
         request_body_params = Validation.validate_request_body(r.body.read, required_parameters, allowed_optional_parameters)
 
@@ -49,6 +49,15 @@ class CloverApi
         # pass gpu instance while creating a VM.
         if request_body_params["size"]
           Validation.validate_vm_size(request_body_params["size"], only_visible: true)
+        end
+
+        if request_body_params["firewall_rules"] && request_body_params["private_subnet_id"]
+          fail Validation::ValidationFailed.new({firewall_rules: "Cannot provide both firewall_rules and private_subnet_id"})
+        end
+
+        if request_body_params["firewall_rules"]
+          Authorization.authorize(@current_user.id, "PrivateSubnet:create", @project.id)
+          request_body_params["firewall_rules"] = Validation.validate_firewall_rules(request_body_params["firewall_rules"])
         end
 
         if request_body_params["private_subnet_id"]

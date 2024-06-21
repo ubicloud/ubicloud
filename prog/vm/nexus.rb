@@ -13,7 +13,7 @@ class Prog::Vm::Nexus < Prog::Base
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
+    enable_ip4: false, pool_id: nil, arch: "x64", firewall_rules: Firewall::Rules::ALLOW_ALL, swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [])
 
     unless (project = Project[project_id])
@@ -75,7 +75,7 @@ class Prog::Vm::Nexus < Prog::Base
           raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
           raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
         else
-          subnet_s = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location, firewall_rules: allow_only_ssh ? Firewall::Rules::ALLOW_SSH : Firewall::Rules::ALLOW_ALL)
+          subnet_s = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location, firewall_rules: firewall_rules)
           subnet = PrivateSubnet[subnet_s.id]
         end
         nic_s = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic")
