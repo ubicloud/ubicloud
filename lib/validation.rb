@@ -158,6 +158,7 @@ module Validation
   end
 
   def self.validate_port_range(port_range)
+    return 0..65535 if port_range.nil?
     fail ValidationFailed.new({port_range: "Invalid port range"}) unless (match = port_range.match(ALLOWED_PORT_RANGE_PATTERN))
     start_port = match[1].to_i
 
@@ -170,7 +171,8 @@ module Validation
       fail ValidationFailed.new({port_range: "Port must be between 0 to 65535"}) unless (0..65535).cover?(start_port)
     end
 
-    end_port ? [start_port, end_port] : [start_port]
+    port_range = end_port ? [start_port, end_port] : [start_port]
+    port_range.first..port_range.last
   end
 
   def self.validate_request_body(request_body, required_keys, allowed_optional_keys = [])
