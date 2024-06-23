@@ -43,8 +43,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         project_id: project_id, location: location, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
         superuser_password: superuser_password, ha_type: ha_type, parent_id: parent_id,
-        restore_target: restore_target,
-        hostname_version: "v2"
+        restore_target: restore_target, hostname_version: "v2",
+        prometheus_password: SecureRandom.urlsafe_base64(15)
       )
       postgres_resource.associate_with_project(project)
 

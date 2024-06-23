@@ -28,11 +28,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   let(:resource) {
     instance_double(
       PostgresResource,
+      ubid: "pgresourceubid",
       root_cert_1: "root_cert_1",
       root_cert_2: "root_cert_2",
       server_cert: "server_cert",
       server_cert_key: "server_cert_key",
       superuser_password: "dummy-password",
+      prometheus_password: "dummy-password",
       representative_server: postgres_server
     )
   }

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "forwardable"
+require "bcrypt"
 
 require_relative "../../lib/util"
 
@@ -161,6 +162,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 tls_server_config:
   cert_file: /dat/16/data/server.crt
   key_file: /dat/16/data/server.key
+basic_auth_users:
+    #{postgres_server.resource.ubid}: #{BCrypt::Password.create(postgres_server.resource.prometheus_password)}
 CONFIG
     vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
     hop_configure

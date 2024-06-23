@@ -25,6 +25,7 @@ class PostgresResource < Sequel::Model
 
   plugin :column_encryption do |enc|
     enc.column :superuser_password
+    enc.column :prometheus_password
     enc.column :root_cert_key_1
     enc.column :root_cert_key_2
     enc.column :server_cert_key
