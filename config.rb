@@ -142,7 +142,7 @@ module Config
   override :almalinux_8_version, "8.10-20240530", string
   override :github_ubuntu_2204_version, "20240422.1.0", string
   override :github_ubuntu_2004_version, "20240422.1.0", string
-  override :postgres_ubuntu_2204_version, "20240226.1.0", string
+  override :postgres_ubuntu_2204_version, "20240624.1.0", string
   override :github_gpu_ubuntu_2204_version, "20240422.1.0", string
 
   # Allocator
