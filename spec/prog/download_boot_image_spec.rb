@@ -133,15 +133,15 @@ RSpec.describe Prog::DownloadBootImage do
       params_json = {
         "image_name" => "github-ubuntu-2204",
         "url" => "https://minio.example.com/my-image.raw",
-        "version" => "20240422.1.0",
+        "version" => Config.github_ubuntu_2204_version,
         "sha256sum" => "sha256_sum",
         "certs" => "certs"
       }.to_json
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_20240422.1.0").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_20240422.1.0", stdin: params_json)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
       expect(dbi).to receive(:sha256_sum).and_return("sha256_sum")
       expect { dbi.download }.to nap(15)
     end

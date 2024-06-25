@@ -140,10 +140,10 @@ module Config
   override :ubuntu_jammy_version, "20240319", string
   override :almalinux_9_version, "9.4-20240507", string
   override :almalinux_8_version, "8.10-20240530", string
-  override :github_ubuntu_2204_version, "20240422.1.0", string
-  override :github_ubuntu_2004_version, "20240422.1.0", string
+  override :github_ubuntu_2204_version, "20240609.1.1", string
+  override :github_ubuntu_2004_version, "20240609.1.1", string
   override :postgres_ubuntu_2204_version, "20240226.1.0", string
-  override :github_gpu_ubuntu_2204_version, "20240422.1.0", string
+  override :github_gpu_ubuntu_2204_version, "20240609.1.1", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float

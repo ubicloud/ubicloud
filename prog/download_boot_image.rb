@@ -81,10 +81,15 @@ class Prog::DownloadBootImage < Prog::Base
       ["almalinux-9", "x64", "9.4-20240507"] => "bff0885c804c01fff8aac4b70c9ca4f04e8c119f9ee102043838f33e06f58390",
       ["almalinux-9", "arm64", "9.4-20240507"] => "75b2e68f6aaa41c039274595ff15968201b7201a7f2f03b109af691f2d3687a1",
       ["github-ubuntu-2204", "x64", "20240422.1.0"] => "8b1b7af6941ce7b8b93d0c20af712e04e8ceedbd673b29fd4fba3406a3ba133c",
+      ["github-ubuntu-2204", "x64", "20240609.1.1"] => "35e2a4f0e033af70f707e234a86096ffff094c7efafdd370f18cdf904a2b1476",
       ["github-ubuntu-2204", "arm64", "20240422.1.0"] => "e14a7176070af022ace0e057a93beaa420602fa331dc67353ea4ce2459344265",
+      ["github-ubuntu-2204", "arm64", "20240609.1.1"] => "64a619756838693ad7bf8f4f9cd7a10445b44d5ca815fb4632d74905c47e2333",
       ["github-ubuntu-2004", "x64", "20240422.1.0"] => "cf4f3bd4fc43de5804eac32e810101fcfe078aafeb46cb5a34fff8f8f76b360d",
+      ["github-ubuntu-2004", "x64", "20240609.1.1"] => "ab9d664b13ef2ca2bbfcba1f795f5ac4183f21c85d449b8982bce6828d773fc9",
       ["github-ubuntu-2004", "arm64", "20240422.1.0"] => "3e34cf2cb05ff9ab8c915b556bf31f153e90b20de25551587fadbec81557204b",
+      ["github-ubuntu-2004", "arm64", "20240609.1.1"] => "458c66af10efca50c25efd2adaa8f97c402d4e3cd8e638d0b0503766248a4d89",
       ["github-gpu-ubuntu-2204", "x64", "20240422.1.0"] => "5bb0577f9aaeae298f5a66403ae55b2092e790eb98ea7ef5812892211a55a548",
+      ["github-gpu-ubuntu-2204", "x64", "20240609.1.1"] => "bd1518b35ac5a848e67e2739ce6a9f715b2b97916621494348ad6af4de317c80",
       ["postgres-ubuntu-2204", "x64", "20240226.1.0"] => "f8a2b78189239717355b54ecf62a504a349c96b1ab6a21919984f58c2a367617"
     }
 
