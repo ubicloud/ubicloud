@@ -143,7 +143,7 @@ if (level = Config.database_logger_level)
 end
 
 module SequelExtensions
-  def delete(force: false, &block)
+  def delete(force: false, &)
     rodaauth_in_callstack = !caller.grep(/rodauth/).empty?
     destroy_in_callstack = !caller.grep(/sequel\/model\/base.*_destroy_delete/).empty?
     unless rodaauth_in_callstack || destroy_in_callstack || force
@@ -153,7 +153,7 @@ module SequelExtensions
     end
 
     if is_a?(Sequel::Dataset)
-      super(&block)
+      super(&)
     else
       super()
     end
