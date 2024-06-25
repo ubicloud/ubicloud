@@ -55,6 +55,11 @@ local   replication     all                                     peer
 host    replication     all             127.0.0.1/32            scram-sha-256
 host    replication     all             ::1/128                 scram-sha-256
 
+# Allow connections from localhost with ubi_monitoring OS user as
+# ubi_monitoring database user. This will be used by postgres_exporter
+# to scrape metrics and expose them to prometheus.
+local   all             ubi_monitoring                          peer
+
 # Allow connections from private subnet with SCRAM authentication
 #{private_subnets}
 

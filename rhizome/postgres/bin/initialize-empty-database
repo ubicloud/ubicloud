@@ -12,3 +12,4 @@ r "rm -rf /etc/postgresql/16"
 r "pg_createcluster 16 main --start --locale=C"
 
 r "sudo -u postgres psql -c 'CREATE ROLE ubi_replication WITH REPLICATION LOGIN'"
+r "sudo -u postgres psql -c 'CREATE ROLE ubi_monitoring WITH LOGIN IN ROLE pg_monitor'"

@@ -149,11 +149,21 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     refresh_walg_credentials
 
     when_initial_provisioning_set? do
-      hop_configure
+      hop_configure_prometheus
     end
 
     vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
     hop_wait
+  end
+
+  label def configure_prometheus
+    web_config = <<CONFIG
+tls_server_config:
+  cert_file: /dat/16/data/server.crt
+  key_file: /dat/16/data/server.key
+CONFIG
+    vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
+    hop_configure
   end
 
   label def configure
