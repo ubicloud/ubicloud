@@ -141,7 +141,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/ca.crt > /dev/null", stdin: ca_bundle)
     vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
     vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
-    vm.sshable.cmd("sudo -u postgres chmod 600 /etc/ssl/certs/server.key")
+    vm.sshable.cmd("sudo chown postgres:cert_readers /etc/ssl/certs/ca.crt && sudo chmod 040 /etc/ssl/certs/ca.crt")
+    vm.sshable.cmd("sudo chown postgres:cert_readers /etc/ssl/certs/server.crt && sudo chmod 040 /etc/ssl/certs/server.crt")
+    vm.sshable.cmd("sudo chown postgres:cert_readers /etc/ssl/certs/server.key && sudo chmod 040 /etc/ssl/certs/server.key")
 
     # MinIO cluster certificate rotation timelines are similar to postgres
     # servers' timelines. So we refresh the wal-g credentials which uses MinIO
