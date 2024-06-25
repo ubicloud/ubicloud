@@ -26,7 +26,6 @@ require "rspec"
 require "database_cleaner/sequel"
 require "logger"
 require "sequel/core"
-require "warning"
 require "webmock/rspec"
 
 # DatabaseCleaner assumes the usual DATABASE_URL, but the
@@ -41,7 +40,6 @@ DatabaseCleaner.url_allowlist = [
 
 Warning.ignore([:not_reached, :unused_var], /.*lib\/mail\/parser.*/)
 Warning.ignore([:mismatched_indentations], /.*lib\/stripe\/api_operations.*/)
-Warning.ignore(/To use retry middleware with Faraday v2\.0\+, install `faraday-retry` gem/)
 Warning.ignore([:unused_var], /.*lib\/aws-sdk-s3\/endpoint_provider.*/)
 
 RSpec.configure do |config|

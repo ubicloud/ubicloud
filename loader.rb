@@ -11,9 +11,11 @@ Bundler.setup
 
 require_relative "config"
 require "mail"
+require "warning"
 require "rack/unreloader"
 
 REPL = false unless defined? REPL
+Warning.ignore(/To use (retry|multipart) middleware with Faraday v2\.0\+, install `faraday-(retry|multipart)` gem/)
 
 Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) { Clover }
 
