@@ -74,9 +74,9 @@ class PostgresResource < Sequel::Model
 
   def replication_connection_string(application_name:)
     query_parameters = {
-      sslrootcert: "/dat/16/data/ca.crt",
-      sslcert: "/dat/16/data/server.crt",
-      sslkey: "/dat/16/data/server.key",
+      sslrootcert: "/etc/ssl/certs/ca.crt",
+      sslcert: "/etc/ssl/certs/server.crt",
+      sslkey: "/etc/ssl/certs/server.key",
       sslmode: "verify-full",
       application_name: application_name
     }.map { |k, v| "#{k}=#{v}" }.join("\\&")
