@@ -287,7 +287,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:incr_waiting_for_capacity)
       expect { nx.start }.to nap(30)
       expect(Page.active.count).to eq(1)
-      expect(Page.from_tag_parts("NoCapacity", vm.location, vm.arch)).not_to be_nil
+      expect(Page.from_tag_parts("NoCapacity", vm.location, vm.arch, vm.family)).not_to be_nil
 
       # Second run does not generate another page
       expect(vm).to receive(:waiting_for_capacity_set?).and_return(true)
