@@ -31,10 +31,25 @@ class CloverApi
       r.post true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:create", @project.id)
 
+        request_body = r.body.read
+        firewall_id = unless request_body.empty?
+          request_body_params = Validation.validate_request_body(request_body, [], ["firewall_id"])
+          if request_body_params["firewall_id"]
+            firewall_id = request_body_params["firewall_id"]
+            fw = Firewall.from_ubid(firewall_id)
+            unless fw
+              fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{firewall_id}\" not found")
+            end
+            Authorization.authorize(@current_user.id, "Firewall:view", fw.id)
+            fw.id
+          end
+        end
+
         st = Prog::Vnet::SubnetNexus.assemble(
           @project.id,
           name: ps_name,
-          location: @location
+          location: @location,
+          firewall_id: firewall_id
         )
 
         Serializers::PrivateSubnet.serialize(st.subject)
