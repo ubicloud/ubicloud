@@ -129,6 +129,30 @@ RSpec.describe Clover, "private_subnet" do
 
         expect(last_response.status).to eq(403)
       end
+
+      it "with valid firewall" do
+        fw = Firewall.create_with_id(name: "default-firewall").tap { _1.associate_with_project(project) }
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: fw.ubid}.to_json
+
+        expect(last_response.status).to eq(200)
+        resp_body = JSON.parse(last_response.body)
+        expect(resp_body["name"]).to eq("test-ps")
+        expect(resp_body["firewalls"].first["id"]).to eq(fw.ubid)
+      end
+
+      it "with invalid firewall id" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: "invalidid"}.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["firewall_id"]).to eq("Firewall with id \"invalidid\" not found")
+      end
+
+      it "with empty body" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-ps")
+      end
     end
 
     describe "show" do
