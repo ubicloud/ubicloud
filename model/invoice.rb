@@ -100,7 +100,9 @@ class Invoice < Sequel::Model
 
   def send_failure_email(errors)
     ser = Serializers::Invoice.serialize(self, {detailed: true})
-    Util.send_email(ser[:billing_email], "Urgent: Action Required to Prevent Service Disruption",
+    receivers = [ser[:billing_email]]
+    receivers += project.accounts.select { Authorization.has_permission?(_1.id, "Project:billing", project.id) }.map(&:email)
+    Util.send_email(receivers.uniq, "Urgent: Action Required to Prevent Service Disruption",
       cc: Config.mail_from,
       greeting: "Dear #{ser[:billing_name]},",
       body: ["We hope this message finds you well.",
