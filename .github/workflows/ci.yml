@@ -9,9 +9,9 @@ on:
 jobs:
   ruby-ci:
     strategy:
+      fail-fast: false
       matrix:
         runs-on: [ubicloud, ubicloud-arm]
-    continue-on-error: true
     name: Ruby CI - ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
 
