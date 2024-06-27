@@ -41,7 +41,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     perform_health_check if load_balancer.health_check_endpoint
 
-    nap 5
+    nap load_balancer.health_check_interval
   end
 
   label def update_vm_load_balancers
@@ -67,5 +67,29 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     load_balancer.destroy
 
     pop "load balancer deleted"
+  end
+
+  def perform_health_check
+    load_balancer.vms.each do |vm|
+      endpoint = "#{vm.nics.first.private_ipv4.network}:#{load_balancer.dst_port}#{load_balancer.health_check_endpoint}"
+      health_check = vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} curl --max-time #{load_balancer.health_check_timeout} #{endpoint}")
+      update_health_check_state(vm, health_check)
+    rescue
+      health_check = "unhealthy"
+      update_health_check_state(vm, health_check)
+    end
+  end
+
+  def update_health_check_state(vm, health_check)
+    if health_check == load_balancer.vm_lb_state(vm)
+      DB[:load_balancers_vms].where(vm_id: vm.id, load_balancer_id: load_balancer.id).update(state_counter: Sequel.expr(:state_counter) + 1)
+      threshold = (health_check == "healthy") ? load_balancer.health_check_healthy_threshold : load_balancer.health_check_unhealthy_threshold
+
+      if DB[:load_balancers_vms].where(vm_id: vm.id, load_balancer_id: load_balancer.id).get(:state_counter) == threshold
+        load_balancer.incr_update_load_balancer
+      end
+    else
+      DB[:load_balancers_vms].where(vm_id: vm.id, load_balancer_id: load_balancer.id).update(state_counter: 1, state: health_check)
+    end
   end
 end

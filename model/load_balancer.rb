@@ -23,4 +23,9 @@ class LoadBalancer < Sequel::Model
   def path
     "/load-balancer/#{name}"
   end
+
+  def vm_lb_state(vm)
+    DB[:load_balancers_vms].where(load_balancer_id: id, vm_id: vm.id).first[:state]
+  end
+
 end
