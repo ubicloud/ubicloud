@@ -35,7 +35,6 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def wait
     when_update_load_balancer_set? do
-      decr_update_load_balancer
       hop_update_vm_load_balancers
     end
 
@@ -45,6 +44,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def update_vm_load_balancers
+    rewrite_dns_records
+
     load_balancer.vms.each do |vm|
       bud Prog::Vnet::UpdateLoadBalancer, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
     end
@@ -55,6 +56,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def wait_update_vm_load_balancers
     reap
     if leaf?
+      decr_update_load_balancer
       hop_wait
     end
     donate
@@ -67,6 +69,14 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     load_balancer.destroy
 
     pop "load balancer deleted"
+  end
+
+  def rewrite_dns_records
+    Prog::Vnet::LoadBalancerNexus.dns_zone&.delete_record(record_name: load_balancer.hostname)
+    load_balancer.vms.each do |vm|
+      Prog::Vnet::LoadBalancerNexus.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s) if vm.ephemeral_net4
+      Prog::Vnet::LoadBalancerNexus.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "AAAA", ttl: 10, data: vm.ephemeral_net6.nth(2).to_s)
+    end
   end
 
   def perform_health_check
@@ -91,5 +101,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     else
       DB[:load_balancers_vms].where(vm_id: vm.id, load_balancer_id: load_balancer.id).update(state_counter: 1, state: health_check)
     end
+  end
+
+  def self.dns_zone
+    @@dns_zone ||= DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 end

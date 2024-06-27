@@ -126,6 +126,10 @@ module Config
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
 
+  # Load Balancer
+  optional :load_balancer_service_project_id, string
+  optional :load_balancer_service_hostname, string
+
   # Logging
   optional :database_logger_level, string
 

@@ -28,4 +28,7 @@ class LoadBalancer < Sequel::Model
     DB[:load_balancers_vms].where(load_balancer_id: id, vm_id: vm.id).first[:state]
   end
 
+  def hostname
+    "#{name}.#{ubid[-5...]}.#{Config.load_balancer_service_hostname}"
+  end
 end
