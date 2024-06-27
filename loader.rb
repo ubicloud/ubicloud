@@ -14,6 +14,7 @@ require "mail"
 require "rack/unreloader"
 
 REPL = false unless defined? REPL
+ENV["OCTOKIT_SILENT"] = "true" unless Config.development?
 
 Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) { Clover }
 
