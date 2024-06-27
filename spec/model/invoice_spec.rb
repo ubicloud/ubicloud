@@ -9,8 +9,37 @@ RSpec.describe Invoice do
 
   before do
     allow(invoice).to receive(:reload)
-    allow(invoice).to receive(:project).and_return(instance_double(Project, path: "/project/p1"))
+    allow(invoice).to receive(:project).and_return(instance_double(Project, path: "/project/p1", accounts: []))
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
+  end
+
+  describe ".send_failure_email" do
+    it "sends failure email to accounts with billing permissions in addition to the provided billing email" do
+      project = Project.create_with_id(name: "cool-project").tap { |p| p.associate_with_project(p) }
+      accounts = (0..2).map { Account.create_with_id(email: "account#{_1}@example.com").tap { |a| a.associate_with_project(project) } }
+      AccessPolicy.create_with_id(
+        project_id: project.id,
+        name: "default",
+        body: {acls: [
+          {subjects: accounts[0].hyper_tag_name, actions: "*", objects: project.hyper_tag_name},
+          {subjects: accounts[1].hyper_tag_name, actions: "Vm:view", objects: project.hyper_tag_name},
+          {subjects: accounts[2].hyper_tag_name, actions: "Project:billing", objects: project.hyper_tag_name}
+        ]}
+      )
+
+      invoice = described_class.create_with_id(project_id: project.id, invoice_number: "001", begin_time: Time.now, end_time: Time.now, content: {
+        "billing_info" => {"email" => "billing@example.com"},
+        "resources" => [],
+        "subtotal" => 0.0,
+        "credit" => 0.0,
+        "discount" => 0.0,
+        "cost" => 0.0
+      })
+
+      invoice.send_failure_email([])
+
+      expect(Mail::TestMailer.deliveries.first.to).to eq(["billing@example.com", accounts[0].email, accounts[2].email])
+    end
   end
 
   describe ".charge" do
