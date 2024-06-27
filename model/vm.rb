@@ -13,6 +13,7 @@ class Vm < Sequel::Model
   one_to_many :vm_storage_volumes, key: :vm_id, order: Sequel.desc(:boot)
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
   one_to_many :pci_devices, key: :vm_id, class: :PciDevice
+  many_to_many :load_balancers
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy
 
@@ -197,6 +198,23 @@ class Vm < Sequel::Model
 
   def self.redacted_columns
     super + [:public_key]
+  end
+
+  def attach_to_loadbalancer(load_balancer)
+    add_load_balancer(load_balancer)
+    load_balancer.incr_update_load_balancer
+  end
+
+  def detach_from_loadbalancer
+    DB[:load_balancers_vms].where(vm_id: id).delete(force: true)
+    load_balancer.incr_update_load_balancer
+  end
+
+  def update_load_balancer_state(state)
+    DB.transaction do
+      DB[:load_balancers_vms].where(vm_id: id).update(state: state)
+      load_balancer.incr_update_load_balancer
+    end
   end
 
   def params_json(swap_size_bytes)

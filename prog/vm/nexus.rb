@@ -360,9 +360,12 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     begin
+      vm.update_load_balancer_state("unhealthy")
+
       if available?
         Page.from_tag_parts("VmUnavailable", vm.ubid)&.incr_resolve
         decr_checkup
+        vm.update_load_balancer_state("healthy")
         hop_wait
       else
         Prog::PageNexus.assemble("#{vm} is unavailable", vm.ubid, "VmUnavailable", vm.ubid)
@@ -389,6 +392,8 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     vm.update(display_state: "deleting")
+
+    vm.update_load_balancer_state("unhealthy")
 
     unless host.nil?
       begin
