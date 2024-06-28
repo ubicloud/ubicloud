@@ -378,7 +378,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         sudo usermod -a -G sudo,adm runneradmin
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
-        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee /etc/environment
+        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
