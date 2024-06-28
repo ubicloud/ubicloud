@@ -43,7 +43,7 @@ jobs:
     - name: Cache ruby for ARM runners
       id: cache-ruby
       if: matrix.runs-on == 'ubicloud-arm'
-      uses: actions/cache@v4
+      uses: ubicloud/cache@v4
       with:
         path: ${{ runner.tool_cache }}/Ruby
         key: ${{ matrix.runs-on }}-ruby-${{ hashFiles('.tool-versions') }}
@@ -60,7 +60,7 @@ jobs:
         rm -rf ruby-build
 
     - name: Set up Ruby
-      uses: ruby/setup-ruby@v1
+      uses: ubicloud/setup-ruby@v1
       with:
         ruby-version: .tool-versions
         bundler-cache: true
