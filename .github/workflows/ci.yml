@@ -45,7 +45,7 @@ jobs:
       if: matrix.runs-on == 'ubicloud-arm'
       uses: actions/cache@v4
       with:
-        path: ${{ env.RUNNER_TOOL_CACHE }}/Ruby
+        path: ${{ runner.tool_cache }}/Ruby
         key: ${{ matrix.runs-on }}-ruby-${{ hashFiles('.tool-versions') }}
 
     - name: Install ruby for ARM runners if not cached
