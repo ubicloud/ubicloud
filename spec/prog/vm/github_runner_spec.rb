@@ -166,7 +166,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "uses separate billing rate for gpu runners" do
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
-      expect(github_runner).to receive(:label).and_return("ubicloud-gpu-standard-1-latest").at_least(:once)
+      expect(github_runner).to receive(:label).and_return("ubicloud-gpu").at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
