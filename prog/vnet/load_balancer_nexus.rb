@@ -4,9 +4,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   subject_is :load_balancer
   semaphore :destroy, :update_load_balancer, :dns_challenge
 
-  def self.assemble(private_subnet_id, name: nil, protocol: "tcp", src_port: nil,
-    dst_port: nil, health_check_endpoint: nil, health_check_interval: nil,
-    health_check_timeout: nil, health_check_unhealthy_threshold: nil, health_check_healthy_threshold: nil)
+  def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
+    health_check_endpoint: nil, health_check_interval: nil, health_check_timeout: nil,
+    health_check_unhealthy_threshold: nil, health_check_healthy_threshold: nil)
 
     unless PrivateSubnet[private_subnet_id]
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
@@ -16,7 +16,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     DB.transaction do
       LoadBalancer.create(
-        private_subnet_id: private_subnet_id, name: name, protocol: protocol,
+        private_subnet_id: private_subnet_id, name: name, algorithm: algorithm,
         src_port: src_port, dst_port: dst_port, health_check_endpoint: health_check_endpoint,
         health_check_interval: health_check_interval, health_check_timeout: health_check_timeout,
         health_check_unhealthy_threshold: health_check_unhealthy_threshold,

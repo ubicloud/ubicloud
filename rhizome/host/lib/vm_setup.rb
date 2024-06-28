@@ -119,14 +119,11 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   # Delete all traces of the VM.
   def purge
-    block_ip4
+    purge_network
+    purge_without_network
+  end
 
-    begin
-      r "ip netns del #{q_vm}"
-    rescue CommandFail => ex
-      raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
-    end
-
+  def purge_without_network
     FileUtils.rm_f(vp.systemd_service)
     FileUtils.rm_f(vp.dnsmasq_service)
     r "systemctl daemon-reload"
@@ -138,6 +135,16 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       r "deluser --remove-home #{q_vm}"
     rescue CommandFail => ex
       raise unless /The user `.*' does not exist./.match?(ex.stderr)
+    end
+  end
+
+  def purge_network
+    block_ip4
+
+    begin
+      r "ip netns del #{q_vm}"
+    rescue CommandFail => ex
+      raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
     end
   end
 

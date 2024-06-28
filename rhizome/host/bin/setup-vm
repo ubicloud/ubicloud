@@ -21,6 +21,16 @@ if action == "delete"
   exit 0
 end
 
+if action == "delete_wo_net"
+  vm_setup.purge_without_network
+  exit 0
+end
+
+if action == "delete_net"
+  vm_setup.purge_network
+  exit 0
+end
+
 params = JSON.parse(File.read(VmPath.new(vm_name).prep_json))
 
 begin

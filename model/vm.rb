@@ -23,7 +23,7 @@ class Vm < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
 
   include Authorization::HyperTagMethods
 
@@ -212,8 +212,8 @@ class Vm < Sequel::Model
 
   def update_load_balancer_state(state)
     DB.transaction do
-      DB[:load_balancers_vms].where(vm_id: id).update(state: state)
-      load_balancer.incr_update_load_balancer
+      DB[:load_balancers_vms].where(vm_id: id).update(state: state, state_counter: 0)
+      load_balancers.map(&:incr_update_load_balancer)
     end
   end
 

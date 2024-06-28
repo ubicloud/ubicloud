@@ -8,7 +8,7 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
@@ -393,8 +393,6 @@ class Prog::Vm::Nexus < Prog::Base
 
     vm.update(display_state: "deleting")
 
-    vm.update_load_balancer_state("unhealthy")
-
     unless host.nil?
       begin
         host.sshable.cmd("sudo systemctl stop #{q_vm}")
@@ -408,15 +406,13 @@ class Prog::Vm::Nexus < Prog::Base
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
-      host.sshable.cmd("sudo host/bin/setup-vm delete #{q_vm}")
+      # If there is a load balancer setup, we want to keep the network setup in
+      # tact for a while
+      action = vm.load_balancers.empty? ? "delete" : "delete_wo_net"
+      host.sshable.cmd("sudo host/bin/setup-vm #{action} #{q_vm}")
     end
 
     DB.transaction do
-      vm.nics.map do |nic|
-        nic.update(vm_id: nil)
-        nic.incr_destroy
-      end
-
       vm.vm_storage_volumes.each do |vol|
         vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
       end
@@ -427,7 +423,38 @@ class Prog::Vm::Nexus < Prog::Base
       )
 
       vm.pci_devices_dataset.update(vm_id: nil)
+    end
 
+    unless vm.load_balancers.empty?
+      vm.update_load_balancer_state("unhealthy")
+      hop_wait_lb_expiry
+    end
+
+    DB.transaction do
+      vm.nics.map do |nic|
+        nic.update(vm_id: nil)
+        nic.incr_destroy
+      end
+      vm.projects.map { vm.dissociate_with_project(_1) }
+      vm.destroy
+    end
+
+    pop "vm deleted"
+  end
+
+  label def wait_lb_expiry
+    unless vm.lb_expiry_started_set?
+      vm.incr_lb_expiry_started
+      nap 10 * 60
+    end
+
+    vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
+    DB.transaction do
+      vm.nics.map do |nic|
+        nic.update(vm_id: nil)
+        nic.incr_destroy
+      end
+      DB[:load_balancers_vms].where(vm_id: vm.id).delete(force: true)
       vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy
     end

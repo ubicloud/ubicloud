@@ -8,8 +8,6 @@ Sequel.migration do
     create_table(:load_balancer) do
       column :id, :uuid, primary_key: true
       column :name, :text, null: false
-      column :hostname, :text, null: false
-      column :protocol, :text, null: false
       column :algorithm, :lb_algorithm, null: false, default: "round_robin"
       column :src_port, :integer
       column :dst_port, :integer

@@ -15,10 +15,12 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
   label def update_load_balancer
     source_port = load_balancer.src_port
     destination_port = load_balancer.dst_port
-    #protocol = load_balancer.protocol
     algorithm = load_balancer.algorithm
 
     target_vms = vm.load_balancers.first.active_vms
+
+    # If there are no healthy VMs to load balance, simply don't work.
+    hop_remove_load_balancer if target_vms.empty?
 
     target_private_ips_v4 = target_vms.map { _1.nics.first.private_ipv4 }.flatten
     current_public_ipv4 = vm.ephemeral_net4.to_s
@@ -78,7 +80,7 @@ TEMPLATE
     pop "load balancer is updated"
   end
 
-  def remove_load_balancer
+  label def remove_load_balancer
     vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.nics.first.private_ipv4.network.to_s))
     pop "load balancer is updated"
   end
