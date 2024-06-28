@@ -3,12 +3,14 @@
 Sequel.migration do
   change do
     create_enum(:lb_node_state, %w[healthy unhealthy])
+    create_enum(:lb_algorithm, %w[round_robin source_hash])
 
     create_table(:load_balancer) do
       column :id, :uuid, primary_key: true
       column :name, :text, null: false
       column :hostname, :text, null: false
       column :protocol, :text, null: false
+      column :algorithm, :lb_algorithm, null: false, default: "round_robin"
       column :src_port, :integer
       column :dst_port, :integer
       column :health_check_endpoint, :text

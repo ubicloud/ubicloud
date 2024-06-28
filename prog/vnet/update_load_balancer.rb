@@ -13,14 +13,10 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
   end
 
   label def update_load_balancer
-    unless load_balancer.vms.map(&:id).include?(vm.id)
-      vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.nics.first.private_ipv4.network.to_s))
-      pop "load balancer is updated"
-    end
-
     source_port = load_balancer.src_port
     destination_port = load_balancer.dst_port
     #protocol = load_balancer.protocol
+    algorithm = load_balancer.algorithm
 
     target_vms = vm.load_balancers.first.active_vms
 
@@ -37,6 +33,12 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
     map_text_v6_pr = target_private_ips_v6.map.with_index { |ip, i| "#{i} : #{ip} . #{destination_port}" }.join(", ")
     neighbors_v6_pr = target_private_ips_v6.reject { _1 == current_private_ipv6 }
     neighbor_ips_v6_line_pr = neighbors_v6_pr.empty? ? "" : "elements = { #{neighbors_v6_pr.join(", ")} }"
+
+    balance_mode_ip4, balance_mode_ip6 = if algorithm == "round_robin"
+      ["numgen inc", "numgen inc"]
+    elsif algorithm == "source_hash"
+      ["jhash ip saddr . tcp sport . ip daddr . tcp dport", "jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport"]
+    end
 
     vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<TEMPLATE)
 table ip nat;
@@ -58,8 +60,8 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr #{current_public_ipv4} tcp dport #{source_port} ct state established,related,new counter dnat to numgen random mod #{target_private_ips_v4.count} map { #{map_text_v4} }
-    ip6 daddr #{current_public_ipv6} tcp dport #{source_port} ct state established,related,new counter dnat to numgen random mod #{target_private_ips_v6.count} map { #{map_text_v6_pr} }
+    ip daddr #{current_public_ipv4} tcp dport #{source_port} ct state established,related,new counter dnat to #{balance_mode_ip4} mod #{target_private_ips_v4.count} map { #{map_text_v4} }
+    ip6 daddr #{current_public_ipv6} tcp dport #{source_port} ct state established,related,new counter dnat to #{balance_mode_ip6} mod #{target_private_ips_v6.count} map { #{map_text_v6_pr} }
     ip daddr #{current_public_ipv4} dnat to #{current_private_ipv4}
   }
 
@@ -73,6 +75,11 @@ table inet nat {
 }
 TEMPLATE
 
+    pop "load balancer is updated"
+  end
+
+  def remove_load_balancer
+    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.nics.first.private_ipv4.network.to_s))
     pop "load balancer is updated"
   end
 

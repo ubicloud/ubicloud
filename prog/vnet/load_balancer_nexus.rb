@@ -64,7 +64,14 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    load_balancer.vms.map { _1.incr_update_load_balancer }
+    load_balancer.vms.each do |vm|
+      bud Prog::Vnet::UpdateLoadBalancer, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :remove_load_balancer
+    end
+
+    hop_wait_destroy
+  end
+
+  label def wait_destroy
     DB[:load_balancers_vms].where(load_balancer_id: load_balancer.id).delete(force: true)
     load_balancer.destroy
 
