@@ -261,7 +261,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
-      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(project).to receive(:this).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
 
       expect { nx.start }.to hop("wait_concurrency_limit")
@@ -274,7 +274,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       project = instance_double(Project, quota_available?: true, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
-      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(project).to receive(:this).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
 
       expect { nx.start }.to hop("allocate_vm")
@@ -296,7 +296,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
-      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(project).to receive(:this).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
 
       expect { nx.wait_concurrency_limit }.to nap
@@ -309,7 +309,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       project = instance_double(Project, quota_available?: true, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
-      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(project).to receive(:this).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
 
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
@@ -322,7 +322,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
-      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(project).to receive(:this).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
       VmHost[arch: "x64"].update(used_cores: 4)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")

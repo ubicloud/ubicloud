@@ -1,9 +1,14 @@
 # frozen_string_literal: true
 
+require "forwardable"
 require "net/ssh"
 
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
+
+  extend Forwardable
+  def_delegators :github_runner, :installation, :vm
+  def_delegators :installation, :project
 
   semaphore :destroy
 
@@ -62,7 +67,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.workflow_job
 
-    project = github_runner.installation.project
     rate_id = if label_data["arch"] == "arm64"
       BillingRate.from_resource_properties("GitHubRunnerMinutes", "#{label_data["vm_size"]}-arm", "global")["id"]
     else
@@ -102,12 +106,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
   end
 
-  def vm
-    @vm ||= github_runner.vm
-  end
-
   def github_client
-    @github_client ||= Github.installation_client(github_runner.installation.installation_id)
+    @github_client ||= Github.installation_client(installation.installation_id)
   end
 
   def label_data
@@ -166,7 +166,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def quota_available?
-    github_runner.installation.project_dataset.for_update.all
+    project.this.for_update.all
     # In existing Github quota calculations, we compare total allocated cores
     # with the core limit and allow passing the limit once. This is because we
     # check quota and allocate VMs in different labels hence transactions and it
@@ -174,7 +174,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # requests. There are some remedies, but it would require some refactoring
     # that I'm not keen to do at the moment. Although it looks weird, passing 0
     # as requested_additional_usage keeps the existing behavior.
-    github_runner.installation.project.quota_available?("GithubRunnerCores", 0)
+    project.quota_available?("GithubRunnerCores", 0)
   end
 
   def setup_info
@@ -189,8 +189,8 @@ class Prog::Vm::GithubRunner < Prog::Base
         "VM Pool" => vm.pool_id ? UBID.from_uuidish(vm.pool_id).to_s : nil,
         "Location" => vm.vm_host.location,
         "Datacenter" => vm.vm_host.data_center,
-        "Project" => github_runner.installation.project.ubid,
-        "Console URL" => "#{Config.base_url}#{github_runner.installation.project.path}/github"
+        "Project" => project.ubid,
+        "Console URL" => "#{Config.base_url}#{project.path}/github"
       }.map { "#{_1}: #{_2}" }.join("\n")
     }
   end
