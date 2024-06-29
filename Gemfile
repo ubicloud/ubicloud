@@ -59,4 +59,4 @@ end
 
 gem "webauthn", "~> 3.1"
 
-gem "aws-sdk-s3", "~> 1.151"
+gem "aws-sdk-s3", "~> 1.155"

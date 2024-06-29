@@ -35,17 +35,17 @@ GEM
     ast (2.4.2)
     awrence (1.2.1)
     aws-eventstream (1.3.0)
-    aws-partitions (1.947.0)
-    aws-sdk-core (3.198.0)
+    aws-partitions (1.949.0)
+    aws-sdk-core (3.200.0)
       aws-eventstream (~> 1, >= 1.3.0)
       aws-partitions (~> 1, >= 1.651.0)
       aws-sigv4 (~> 1.8)
       jmespath (~> 1, >= 1.6.1)
-    aws-sdk-kms (1.86.0)
-      aws-sdk-core (~> 3, >= 3.198.0)
+    aws-sdk-kms (1.87.0)
+      aws-sdk-core (~> 3, >= 3.199.0)
       aws-sigv4 (~> 1.1)
-    aws-sdk-s3 (1.153.0)
-      aws-sdk-core (~> 3, >= 3.198.0)
+    aws-sdk-s3 (1.155.0)
+      aws-sdk-core (~> 3, >= 3.199.0)
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.8)
     aws-sigv4 (1.8.0)
@@ -290,7 +290,7 @@ GEM
     strscan (3.1.0)
     syntax_tree (6.2.0)
       prettier_print (>= 1.2.0)
-    tilt (2.3.0)
+    tilt (2.4.0)
     timeout (0.4.1)
     tpm-key_attestation (0.12.0)
       bindata (~> 2.4)
@@ -334,7 +334,7 @@ PLATFORMS
 DEPENDENCIES
   argon2
   argon2-kdf
-  aws-sdk-s3 (~> 1.151)
+  aws-sdk-s3 (~> 1.155)
   bcrypt_pbkdf
   brakeman
   capybara
