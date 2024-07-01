@@ -247,6 +247,27 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["error"]["details"]["cidr"]).to eq("Invalid CIDR")
       end
 
+      it "metric-destination" do
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
+          url: "https://example.com",
+          username: "username",
+          password: "password"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "metric-destination invalid url" do
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
+          url: "-",
+          username: "username",
+          password: "password"
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["url"]).to eq("Invalid URL scheme. Only https URLs are supported.")
+      end
+
       it "restore" do
         stub_const("Backup", Struct.new(:last_modified))
         restore_target = Time.now.utc
@@ -442,6 +463,24 @@ RSpec.describe Clover, "postgres" do
 
       it "firewall-rule not exist" do
         delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "metric-destination" do
+        PostgresMetricDestination.create_with_id(
+          postgres_resource_id: pg.id,
+          url: "https://example.com",
+          username: "username",
+          password: "password"
+        )
+        delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/#{pg.metric_destinations.first.ubid}"
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "metric-destination not exist" do
+        delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/foo_ubid"
 
         expect(last_response.status).to eq(204)
       end

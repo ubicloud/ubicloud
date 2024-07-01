@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :update_firewall_rules, :take_over, :destroy
+  semaphore :restart, :configure, :update_firewall_rules, :take_over, :update_metric_destinations, :destroy
 
   def configure_hash
     configs = {
@@ -40,9 +40,9 @@ class PostgresServer < Sequel::Model
       tcp_keepalives_interval: "2",
       ssl: "on",
       ssl_min_protocol_version: "TLSv1.3",
-      ssl_ca_file: "'/dat/16/data/ca.crt'",
-      ssl_cert_file: "'/dat/16/data/server.crt'",
-      ssl_key_file: "'/dat/16/data/server.key'",
+      ssl_ca_file: "'/etc/ssl/certs/ca.crt'",
+      ssl_cert_file: "'/etc/ssl/certs/server.crt'",
+      ssl_key_file: "'/etc/ssl/certs/server.key'",
       log_timezone: "'UTC'",
       log_directory: "'pg_log'",
       log_filename: "'postgresql.log'",

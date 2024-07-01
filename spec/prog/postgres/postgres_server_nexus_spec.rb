@@ -28,12 +28,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   let(:resource) {
     instance_double(
       PostgresResource,
+      ubid: "pgresourcesubid",
       root_cert_1: "root_cert_1",
       root_cert_2: "root_cert_2",
       server_cert: "server_cert",
       server_cert_key: "server_cert_key",
       superuser_password: "dummy-password",
-      representative_server: postgres_server
+      representative_server: postgres_server,
+      metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")]
     )
   }
 
@@ -240,10 +242,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:cmd).with("sudo chown postgres:cert_readers /etc/ssl/certs/ca.crt && sudo chmod 040 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:cmd).with("sudo chown postgres:cert_readers /etc/ssl/certs/server.crt && sudo chmod 040 /etc/ssl/certs/server.crt")
+      expect(sshable).to receive(:cmd).with("sudo chown postgres:cert_readers /etc/ssl/certs/server.key && sudo chmod 040 /etc/ssl/certs/server.key")
+
       expect(nx).to receive(:refresh_walg_credentials)
 
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
@@ -251,10 +256,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait at times other than the initial provisioning" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /dat/16/data/server.key")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
+      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:cmd).with("sudo chown postgres:cert_readers /etc/ssl/certs/ca.crt && sudo chmod 040 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:cmd).with("sudo chown postgres:cert_readers /etc/ssl/certs/server.crt && sudo chmod 040 /etc/ssl/certs/server.crt")
+      expect(sshable).to receive(:cmd).with("sudo chown postgres:cert_readers /etc/ssl/certs/server.key && sudo chmod 040 /etc/ssl/certs/server.key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
       expect(nx).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
@@ -262,9 +269,23 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#configure_prometheus" do
-    it "configures prometheus" do
+    it "configures prometheus and hops configure during initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now prometheus")
+      expect(postgres_server).to receive(:primary?).and_return(true)
       expect { nx.configure_prometheus }.to hop("configure")
+    end
+
+    it "configures prometheus and hops wait at times other than the initial provisioning" do
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload prometheus")
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect { nx.configure_prometheus }.to hop("wait")
     end
   end
 
@@ -460,6 +481,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to update_firewall_rules if update_firewall_rules is set" do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
       expect { nx.wait }.to hop("update_firewall_rules")
+    end
+
+    it "hops to configure_prometheus if update_metric_destinations is set" do
+      expect(nx).to receive(:when_update_metric_destinations_set?).and_yield
+      expect { nx.wait }.to hop("configure_prometheus")
     end
 
     it "hops to configure if configure is set" do

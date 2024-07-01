@@ -208,4 +208,12 @@ module Validation
   def self.validate_account_name(name)
     fail ValidationFailed.new({name: "Name must only contain letters, numbers, spaces, and hyphens and have max length 63."}) unless name&.match(ALLOWED_ACCOUNT_NAME)
   end
+
+  def self.validate_url(url)
+    uri = URI.parse(url)
+    fail ValidationFailed.new({url: "Invalid URL scheme. Only https URLs are supported."}) if uri.scheme != "https"
+    fail ValidationFailed.new({url: "Invalid URL"}) if uri.host.nil? || uri.host.empty?
+  rescue URI::InvalidURIError
+    fail ValidationFailed.new({url: "Invalid URL"})
+  end
 end

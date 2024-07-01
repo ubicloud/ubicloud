@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def_delegators :postgres_server, :vm
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :update_firewall_rules, :take_over, :destroy
+  semaphore :restart, :configure, :update_firewall_rules, :take_over, :update_metric_destinations, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, private_subnet_id: nil, exclude_host_ids: [])
     DB.transaction do
@@ -138,10 +138,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     nap 5 if postgres_server.resource.server_cert.nil?
 
     ca_bundle = [postgres_server.resource.root_cert_1, postgres_server.resource.root_cert_2].join("\n")
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: ca_bundle)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
-    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
+    vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/ca.crt > /dev/null", stdin: ca_bundle)
+    vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
+    vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
+    vm.sshable.cmd("sudo chown postgres:cert_readers /etc/ssl/certs/ca.crt && sudo chmod 040 /etc/ssl/certs/ca.crt")
+    vm.sshable.cmd("sudo chown postgres:cert_readers /etc/ssl/certs/server.crt && sudo chmod 040 /etc/ssl/certs/server.crt")
+    vm.sshable.cmd("sudo chown postgres:cert_readers /etc/ssl/certs/server.key && sudo chmod 040 /etc/ssl/certs/server.key")
 
     # MinIO cluster certificate rotation timelines are similar to postgres
     # servers' timelines. So we refresh the wal-g credentials which uses MinIO
@@ -159,11 +161,49 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def configure_prometheus
     web_config = <<CONFIG
 tls_server_config:
-  cert_file: /dat/16/data/server.crt
-  key_file: /dat/16/data/server.key
+  cert_file: /etc/ssl/certs/server.crt
+  key_file: /etc/ssl/certs/server.key
 CONFIG
     vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
-    hop_configure
+
+    metric_destinations = postgres_server.resource.metric_destinations.map {
+      <<METRIC_DESTINATION
+- url: '#{_1.url}'
+  basic_auth:
+    username: '#{_1.username}'
+    password: '#{_1.password}'
+METRIC_DESTINATION
+    }.prepend("remote_write:").join("\n")
+
+    prometheus_config = <<CONFIG
+global:
+  scrape_interval: 15s
+  external_labels:
+    resource: #{postgres_server.resource.ubid}
+    role: #{postgres_server.primary? ? "primary" : "standby"}
+
+scrape_configs:
+- job_name: node
+  static_configs:
+  - targets: ['localhost:9100']
+- job_name: postgres
+  static_configs:
+  - targets: ['localhost:9187']
+#{metric_destinations}
+CONFIG
+    vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: prometheus_config)
+
+    when_initial_provisioning_set? do
+      vm.sshable.cmd("sudo systemctl enable --now postgres_exporter")
+      vm.sshable.cmd("sudo systemctl enable --now node_exporter")
+      vm.sshable.cmd("sudo systemctl enable --now prometheus")
+
+      hop_configure
+    end
+
+    vm.sshable.cmd("sudo systemctl reload prometheus")
+
+    hop_wait
   end
 
   label def configure
@@ -282,6 +322,11 @@ SQL
     when_update_firewall_rules_set? do
       decr_update_firewall_rules
       hop_update_firewall_rules
+    end
+
+    when_update_metric_destinations_set? do
+      decr_update_metric_destinations
+      hop_configure_prometheus
     end
 
     when_configure_set? do

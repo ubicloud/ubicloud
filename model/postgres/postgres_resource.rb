@@ -11,6 +11,7 @@ class PostgresResource < Sequel::Model
   one_to_one :representative_server, class: PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
   one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
   one_to_many :firewall_rules, class: PostgresFirewallRule, key: :postgres_resource_id
+  one_to_many :metric_destinations, class: PostgresMetricDestination, key: :postgres_resource_id
 
   plugin :association_dependencies, firewall_rules: :destroy
   dataset_module Authorization::Dataset
@@ -74,9 +75,9 @@ class PostgresResource < Sequel::Model
 
   def replication_connection_string(application_name:)
     query_parameters = {
-      sslrootcert: "/dat/16/data/ca.crt",
-      sslcert: "/dat/16/data/server.crt",
-      sslkey: "/dat/16/data/server.key",
+      sslrootcert: "/etc/ssl/certs/ca.crt",
+      sslcert: "/etc/ssl/certs/server.crt",
+      sslkey: "/etc/ssl/certs/server.key",
       sslmode: "verify-full",
       application_name: application_name
     }.map { |k, v| "#{k}=#{v}" }.join("\\&")
