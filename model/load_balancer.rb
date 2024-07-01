@@ -28,11 +28,15 @@ class LoadBalancer < Sequel::Model
 
   def detach_vm(vm)
     DB.transaction do
-      DB[:load_balancers_vms].where(load_balancer_id: id, vm_id: vm.id).delete(force: true)
-      Strand.where(prog: "Vnet::LoadBalancerHealthProbes", frame: {"subject_id" => vm.id, "load_balancer_id" => id}).delete
+      DB[:load_balancers_vms].where(load_balancer_id: id, vm_id: vm.id).update(state: "evacuating")
+      Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.select { |st| st.stack[0]["load_balancer_id"] == id && st.stack[0]["subject_id"] == vm.id }.map(&:destroy)
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
+  end
+
+  def remove_vm(vm)
+    DB[:load_balancers_vms].where(load_balancer_id: id, vm_id: vm.id).delete(force: true)
   end
 
   def hostname

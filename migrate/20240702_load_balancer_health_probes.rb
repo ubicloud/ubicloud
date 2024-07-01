@@ -2,7 +2,7 @@
 
 Sequel.migration do
   change do
-    create_enum(:lb_node_state, %w[up down])
+    create_enum(:lb_node_state, %w[up down evacuating])
 
     alter_table(:load_balancer) do
       add_column :health_check_endpoint, :text, collate: '"C"', null: false
