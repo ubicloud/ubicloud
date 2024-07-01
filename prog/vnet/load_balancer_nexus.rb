@@ -2,7 +2,7 @@
 
 class Prog::Vnet::LoadBalancerNexus < Prog::Base
   subject_is :load_balancer
-  semaphore :destroy, :update_load_balancer, :dns_challenge
+  semaphore :destroy, :update_load_balancer, :dns_challenge, :rewrite_dns_records
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
     health_check_endpoint: nil, health_check_interval: nil, health_check_timeout: nil,
@@ -38,14 +38,17 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       hop_update_vm_load_balancers
     end
 
+    when_rewrite_dns_records_set? do
+      rewrite_dns_records
+      decr_rewrite_dns_records
+    end
+
     perform_health_check if load_balancer.health_check_endpoint
 
     nap load_balancer.health_check_interval
   end
 
   label def update_vm_load_balancers
-    rewrite_dns_records
-
     load_balancer.vms.each do |vm|
       bud Prog::Vnet::UpdateLoadBalancer, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
     end

@@ -203,16 +203,18 @@ class Vm < Sequel::Model
   def attach_to_loadbalancer(load_balancer)
     add_load_balancer(load_balancer)
     load_balancer.incr_update_load_balancer
+    load_balancer.incr_rewrite_dns_records
   end
 
-  def detach_from_loadbalancer
+  def detach_from_loadbalancer(load_balancer)
     DB[:load_balancers_vms].where(vm_id: id).delete(force: true)
     load_balancer.incr_update_load_balancer
+    load_balancer.incr_rewrite_dns_records
   end
 
   def update_load_balancer_state(state)
     DB.transaction do
-      DB[:load_balancers_vms].where(vm_id: id).update(state: state, state_counter: 0)
+      DB[:load_balancers_vms].where(vm_id: id).update(state: state, state_counter: 1)
       load_balancers.map(&:incr_update_load_balancer)
     end
   end

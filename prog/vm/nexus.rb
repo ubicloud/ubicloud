@@ -445,6 +445,7 @@ class Prog::Vm::Nexus < Prog::Base
   label def wait_lb_expiry
     unless vm.lb_expiry_started_set?
       vm.incr_lb_expiry_started
+      vm.load_balancers.map { vm.detach_from_loadbalancer(_1) }
       nap 10 * 60
     end
 
@@ -454,7 +455,6 @@ class Prog::Vm::Nexus < Prog::Base
         nic.update(vm_id: nil)
         nic.incr_destroy
       end
-      DB[:load_balancers_vms].where(vm_id: vm.id).delete(force: true)
       vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy
     end
