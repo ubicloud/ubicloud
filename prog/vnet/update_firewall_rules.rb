@@ -74,7 +74,7 @@ table inet fw_table {
 
   flowtable ubi_flowtable {
     hook ingress priority filter
-    devices = { #{vm.nics.map(&:ubid_to_tap_name).join(",")}, vethi#{vm.inhost_name} }
+    devices = { #{vm.nics.map(&:ubid_to_tap_name).join(",")} }
   }
 
   chain forward_ingress {
