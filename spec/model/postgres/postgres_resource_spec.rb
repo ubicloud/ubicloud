@@ -33,7 +33,7 @@ RSpec.describe PostgresResource do
 
   it "returns replication_connection_string" do
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/dat/16/data/server.crt")
+    expect(s).to include("ubi_replication@pgc60xvcr00a5kbnggj1js4kkq.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
   end
 
   it "returns display state correctly" do
