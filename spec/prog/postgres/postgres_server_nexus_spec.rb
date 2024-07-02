@@ -269,6 +269,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure_prometheus" do
     it "configures prometheus" do
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now prometheus")
       expect { nx.configure_prometheus }.to hop("configure")
     end
   end
