@@ -8,6 +8,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   let(:postgres_server) {
     instance_double(
       PostgresServer,
+      id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8",
       ubid: "pgubid",
       timeline: instance_double(
         PostgresTimeline,
@@ -28,12 +29,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   let(:resource) {
     instance_double(
       PostgresResource,
+      ubid: "pgresourcesubid",
       root_cert_1: "root_cert_1",
       root_cert_2: "root_cert_2",
       server_cert: "server_cert",
       server_cert_key: "server_cert_key",
       superuser_password: "dummy-password",
-      representative_server: postgres_server
+      representative_server: postgres_server,
+      metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")]
     )
   }
 
@@ -267,12 +270,22 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#configure_prometheus" do
-    it "configures prometheus" do
+    it "configures prometheus and hops configure during initial provisioning" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres_exporter")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now node_exporter")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable --now prometheus")
       expect { nx.configure_prometheus }.to hop("configure")
+    end
+
+    it "configures prometheus and hops wait at times other than the initial provisioning" do
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
+      expect { nx.configure_prometheus }.to hop("wait")
     end
   end
 
@@ -468,6 +481,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to update_firewall_rules if update_firewall_rules is set" do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
       expect { nx.wait }.to hop("update_firewall_rules")
+    end
+
+    it "hops to configure_prometheus if configure_prometheus is set" do
+      expect(nx).to receive(:when_configure_prometheus_set?).and_yield
+      expect { nx.wait }.to hop("configure_prometheus")
     end
 
     it "hops to configure if configure is set" do

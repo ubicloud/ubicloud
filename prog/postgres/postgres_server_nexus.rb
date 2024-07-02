@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def_delegators :postgres_server, :vm
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :update_firewall_rules, :take_over, :destroy
+  semaphore :restart, :configure, :update_firewall_rules, :take_over, :configure_prometheus, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, private_subnet_id: nil, exclude_host_ids: [])
     DB.transaction do
@@ -166,10 +166,48 @@ tls_server_config:
 CONFIG
     vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
 
-    vm.sshable.cmd("sudo systemctl enable --now postgres_exporter")
-    vm.sshable.cmd("sudo systemctl enable --now node_exporter")
-    vm.sshable.cmd("sudo systemctl enable --now prometheus")
-    hop_configure
+    metric_destinations = postgres_server.resource.metric_destinations.map {
+      <<METRIC_DESTINATION
+- url: '#{_1.url}'
+  basic_auth:
+    username: '#{_1.username}'
+    password: '#{_1.password}'
+METRIC_DESTINATION
+    }.prepend("remote_write:").join("\n")
+
+    prometheus_config = <<CONFIG
+global:
+  scrape_interval: 10s
+  external_labels:
+    ubicloud_resource_id: #{postgres_server.resource.ubid}
+    ubicloud_resource_role: #{(postgres_server.id == postgres_server.resource.representative_server.id) ? "primary" : "standby"}
+
+scrape_configs:
+- job_name: node
+  static_configs:
+  - targets: ['localhost:9100']
+    labels:
+      instance: '#{postgres_server.ubid}'
+- job_name: postgres
+  static_configs:
+  - targets: ['localhost:9187']
+    labels:
+      instance: '#{postgres_server.ubid}'
+#{metric_destinations}
+CONFIG
+    vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: prometheus_config)
+
+    when_initial_provisioning_set? do
+      vm.sshable.cmd("sudo systemctl enable --now postgres_exporter")
+      vm.sshable.cmd("sudo systemctl enable --now node_exporter")
+      vm.sshable.cmd("sudo systemctl enable --now prometheus")
+
+      hop_configure
+    end
+
+    vm.sshable.cmd("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+
+    hop_wait
   end
 
   label def configure
@@ -288,6 +326,11 @@ SQL
     when_update_firewall_rules_set? do
       decr_update_firewall_rules
       hop_update_firewall_rules
+    end
+
+    when_configure_prometheus_set? do
+      decr_configure_prometheus
+      hop_configure_prometheus
     end
 
     when_configure_set? do
