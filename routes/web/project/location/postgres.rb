@@ -59,6 +59,43 @@ class CloverWeb
         end
       end
 
+      r.on "metric-destination" do
+        r.post true do
+          Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+          Validation.validate_url(r.params["url"])
+
+          DB.transaction do
+            PostgresMetricDestination.create_with_id(
+              postgres_resource_id: pg.id,
+              url: r.params["url"],
+              username: r.params["username"],
+              password: r.params["password"]
+            )
+            pg.servers.each(&:incr_configure_prometheus)
+          end
+
+          flash["notice"] = "Metric destination is created"
+
+          r.redirect "#{@project.path}#{pg.path}"
+        end
+
+        r.is String do |metric_destination_ubid|
+          r.delete true do
+            Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
+            md = PostgresMetricDestination.from_ubid(metric_destination_ubid)
+            if md
+              DB.transaction do
+                md.destroy
+                pg.servers.each(&:incr_configure_prometheus)
+              end
+            end
+
+            response.status = 204
+            r.halt
+          end
+        end
+      end
+
       r.post "restore" do
         Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
         Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
