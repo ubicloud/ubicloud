@@ -348,4 +348,28 @@ RSpec.describe Validation do
       end
     end
   end
+
+  describe "#validate_url" do
+    it "valid account names" do
+      [
+        "https://example.com",
+        "https://example.com:1234"
+      ].each do |url|
+        expect(described_class.validate_url(url)).to be_nil
+      end
+    end
+
+    it "invalid account names" do
+      [
+        nil,
+        "",
+        "1.2.3.4",
+        "http://example.com",
+        "https://",
+        "ftp://example.com"
+      ].each do |url|
+        expect { described_class.validate_url(url) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
 end

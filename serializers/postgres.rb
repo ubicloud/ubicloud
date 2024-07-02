@@ -20,7 +20,8 @@ class Serializers::Postgres < Serializers::Base
       base.merge!(
         connection_string: pg.connection_string,
         primary: pg.representative_server&.primary?,
-        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s })
+        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }),
+        metric_destinations: pg.metric_destinations.map { {id: _1.ubid, username: _1.username, url: _1.url} }
       )
 
       if pg.timeline && pg.representative_server&.primary?

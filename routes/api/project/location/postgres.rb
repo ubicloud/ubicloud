@@ -118,6 +118,46 @@ class CloverApi
       end
     end
 
+    request.on "metric-destination" do
+      request.post true do
+        Authorization.authorize(user.id, "Postgres:edit", pg.id)
+
+        required_parameters = ["url", "username", "password"]
+        request_body_params = Validation.validate_request_body(request.body.read, required_parameters)
+
+        Validation.validate_url(request_body_params["url"])
+
+        DB.transaction do
+          PostgresMetricDestination.create_with_id(
+            postgres_resource_id: pg.id,
+            url: request_body_params["url"],
+            username: request_body_params["username"],
+            password: request_body_params["password"]
+          )
+          pg.servers.each(&:incr_configure_prometheus)
+        end
+
+        Serializers::Postgres.serialize(pg, {detailed: true})
+      end
+
+      request.is String do |metric_destination_ubid|
+        request.delete true do
+          Authorization.authorize(user.id, "Postgres:edit", pg.id)
+
+          md = PostgresMetricDestination.from_ubid(metric_destination_ubid)
+          if md
+            DB.transaction do
+              md.destroy
+              pg.servers.each(&:incr_configure_prometheus)
+            end
+          end
+
+          response.status = 204
+          request.halt
+        end
+      end
+    end
+
     request.post "restore" do
       Authorization.authorize(user.id, "Postgres:create", project.id)
       Authorization.authorize(user.id, "Postgres:view", pg.id)
