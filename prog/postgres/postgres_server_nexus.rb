@@ -138,10 +138,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     nap 5 if postgres_server.resource.server_cert.nil?
 
     ca_bundle = [postgres_server.resource.root_cert_1, postgres_server.resource.root_cert_2].join("\n")
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: ca_bundle)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
-    vm.sshable.cmd("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
-    vm.sshable.cmd("sudo -u postgres chmod 600 /dat/16/data/server.key")
+    vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/ca.crt > /dev/null", stdin: ca_bundle)
+    vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
+    vm.sshable.cmd("sudo -u postgres tee /etc/ssl/certs/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
+    vm.sshable.cmd("sudo -u postgres chmod 600 /etc/ssl/certs/server.key")
 
     # MinIO cluster certificate rotation timelines are similar to postgres
     # servers' timelines. So we refresh the wal-g credentials which uses MinIO
@@ -159,8 +159,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def configure_prometheus
     web_config = <<CONFIG
 tls_server_config:
-  cert_file: /dat/16/data/server.crt
-  key_file: /dat/16/data/server.key
+  cert_file: /etc/ssl/certs/server.crt
+  key_file: /etc/ssl/certs/server.key
 CONFIG
     vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
     hop_configure
