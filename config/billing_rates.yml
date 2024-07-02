@@ -44,11 +44,13 @@
 - { id: e50e6bff-6ee9-493b-bc09-75f122863d08, resource_type: GitHubRunnerMinutes,     resource_family: standard-8,      location: global,         unit_price: 0.0032000000, active_from: 2023-01-01T00:00:00Z }
 - { id: 89cda6c2-2650-4ac1-bc28-deeae5e3b756, resource_type: GitHubRunnerMinutes,     resource_family: standard-16,     location: global,         unit_price: 0.0064000000, active_from: 2023-01-01T00:00:00Z }
 - { id: c5c0b29f-1ea9-437c-8ab8-c9395ec7e46d, resource_type: GitHubRunnerMinutes,     resource_family: standard-30,     location: global,         unit_price: 0.0120000000, active_from: 2023-01-01T00:00:00Z }
+- { id: 27ea6ba4-51d5-4643-90f3-4f3f962f5642, resource_type: GitHubRunnerMinutes,     resource_family: standard-60,     location: global,         unit_price: 0.0240000000, active_from: 2023-01-01T00:00:00Z }
 - { id: ab92083e-2be7-4038-b946-b060af3994fb, resource_type: GitHubRunnerMinutes,     resource_family: standard-2-arm,  location: global,         unit_price: 0.0008000000, active_from: 2023-01-01T00:00:00Z }
 - { id: 078d2f47-5827-49fa-9d13-bee6d1d8cadd, resource_type: GitHubRunnerMinutes,     resource_family: standard-4-arm,  location: global,         unit_price: 0.0016000000, active_from: 2023-01-01T00:00:00Z }
 - { id: 0fc7f264-87f0-446d-bee7-c0454149b1bc, resource_type: GitHubRunnerMinutes,     resource_family: standard-8-arm,  location: global,         unit_price: 0.0032000000, active_from: 2023-01-01T00:00:00Z }
 - { id: 995ab760-5d97-4a7b-981e-c9947233c78e, resource_type: GitHubRunnerMinutes,     resource_family: standard-16-arm, location: global,         unit_price: 0.0064000000, active_from: 2023-01-01T00:00:00Z }
 - { id: 5b49ad57-1bac-4c35-84d4-9545876ecb65, resource_type: GitHubRunnerMinutes,     resource_family: standard-30-arm, location: global,         unit_price: 0.0120000000, active_from: 2023-01-01T00:00:00Z }
+- { id: a3abe656-6ca2-4f17-a911-169c51a4a77a, resource_type: GitHubRunnerMinutes,     resource_family: standard-60-arm, location: global,         unit_price: 0.0240000000, active_from: 2023-01-01T00:00:00Z }
 - { id: 27d84309-e39d-8d78-b603-7632dafe374e, resource_type: GitHubRunnerMinutes,     resource_family: standard-gpu-6,  location: global,         unit_price: 0.0320000000, active_from: 2023-01-01T00:00:00Z }
 - { id: c31b3640-92fa-49c3-bae8-c1011cc5f917, resource_type: GitHubRunnerConcurrency, resource_family: standard,        location: global,         unit_price: 0.0000248016, active_from: 2023-01-01T00:00:00Z }
 
