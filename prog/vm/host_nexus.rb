@@ -228,7 +228,7 @@ class Prog::Vm::HostNexus < Prog::Base
     end
 
     unless vm_host.vms.empty?
-      Clog.emit("Cannot destroy the vm host with active virtual machines, first clean them up") { {vm_host: vm_host.values} }
+      Clog.emit("Cannot destroy the vm host with active virtual machines, first clean them up") { vm_host }
       nap 15
     end
 

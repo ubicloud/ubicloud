@@ -138,11 +138,11 @@ class Prog::Vm::GithubRunner < Prog::Base
     }.first.to_f
 
     unless utilization < 70
-      Clog.emit("Waiting for customer concurrency limit, utilization is high") { {github_runner: github_runner.values, utilization: utilization} }
+      Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
       nap rand(5..15)
     end
 
-    Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { {github_runner: github_runner.values, utilization: utilization} }
+    Clog.emit("Concurrency limit reached but allocation is allowed because of low utilization") { [github_runner, {utilization: utilization}] }
 
     hop_allocate_vm
   end
@@ -251,14 +251,14 @@ class Prog::Vm::GithubRunner < Prog::Base
     # If the runner script is not started yet, we can delete the runner and
     # register it again.
     if vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp == "dead"
-      Clog.emit("Deregistering runner because it already exists") { {github_runner: github_runner.values.merge({runner_id: runner_id})} }
+      Clog.emit("Deregistering runner because it already exists") { [github_runner, {existing_runner: {runner_id: runner_id}}] }
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{runner_id}")
       nap 5
     end
 
     # The runner script is already started. We persist the runner_id and allow
     # wait label to decide the next step.
-    Clog.emit("The runner already exists but the runner script is started too") { {github_runner: github_runner.values.merge({runner_id: runner_id})} }
+    Clog.emit("The runner already exists but the runner script is started too") { [github_runner, {existing_runner: {runner_id: runner_id}}] }
     github_runner.update(runner_id: runner_id, ready_at: Time.now)
     hop_wait
   end
@@ -269,7 +269,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       github_runner.incr_destroy
       nap 15
     when "failed"
-      Clog.emit("The runner script failed") { {github_runner: github_runner.values} }
+      Clog.emit("The runner script failed") { github_runner }
       github_runner.provision_spare_runner
       github_runner.incr_destroy
       nap 0
@@ -281,7 +281,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     if github_runner.workflow_job.nil? && Time.now > github_runner.ready_at + 5 * 60
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       unless response[:busy]
-        Clog.emit("The runner does not pick a job") { {github_runner: github_runner.values} }
+        Clog.emit("The runner does not pick a job") { github_runner }
         github_runner.incr_destroy
         nap 0
       end
@@ -297,7 +297,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     begin
       response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
       if response[:busy]
-        Clog.emit("The runner is still running a job") { {github_runner: github_runner.values} }
+        Clog.emit("The runner is still running a job") { github_runner }
         nap 15
       end
       github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
@@ -328,7 +328,7 @@ class Prog::Vm::GithubRunner < Prog::Base
           # Exclude the "Started" line because it contains sensitive information.
           vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
         rescue Sshable::SshError
-          Clog.emit("Failed to move serial.log or running journalctl") { {github_runner: github_runner.values} }
+          Clog.emit("Failed to move serial.log or running journalctl") { github_runner }
         end
       end
       vm.incr_destroy
