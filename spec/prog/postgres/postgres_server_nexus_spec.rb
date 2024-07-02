@@ -239,7 +239,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.refresh_certificates }.to nap(5)
     end
 
-    it "pushes certificates to vm and hops to configure during initial provisioning" do
+    it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:cmd).with("sudo -u postgres tee /dat/16/data/server.key > /dev/null", stdin: "server_cert_key")
@@ -247,7 +247,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:refresh_walg_credentials)
 
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect { nx.refresh_certificates }.to hop("configure")
+      expect { nx.refresh_certificates }.to hop("configure_prometheus")
     end
 
     it "hops to wait at times other than the initial provisioning" do
@@ -258,6 +258,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
       expect(nx).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
+    end
+  end
+
+  describe "#configure_prometheus" do
+    it "configures prometheus" do
+      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect { nx.configure_prometheus }.to hop("configure")
     end
   end
 
