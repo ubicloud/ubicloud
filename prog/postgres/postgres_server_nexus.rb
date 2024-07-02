@@ -165,6 +165,10 @@ tls_server_config:
   key_file: /etc/ssl/certs/server.key
 CONFIG
     vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
+
+    vm.sshable.cmd("sudo systemctl enable --now postgres_exporter")
+    vm.sshable.cmd("sudo systemctl enable --now node_exporter")
+    vm.sshable.cmd("sudo systemctl enable --now prometheus")
     hop_configure
   end
 
