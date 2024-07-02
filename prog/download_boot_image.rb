@@ -90,7 +90,8 @@ class Prog::DownloadBootImage < Prog::Base
       ["github-ubuntu-2004", "arm64", "20240609.1.1"] => "458c66af10efca50c25efd2adaa8f97c402d4e3cd8e638d0b0503766248a4d89",
       ["github-gpu-ubuntu-2204", "x64", "20240422.1.0"] => "5bb0577f9aaeae298f5a66403ae55b2092e790eb98ea7ef5812892211a55a548",
       ["github-gpu-ubuntu-2204", "x64", "20240609.1.1"] => "bd1518b35ac5a848e67e2739ce6a9f715b2b97916621494348ad6af4de317c80",
-      ["postgres-ubuntu-2204", "x64", "20240226.1.0"] => "f8a2b78189239717355b54ecf62a504a349c96b1ab6a21919984f58c2a367617"
+      ["postgres-ubuntu-2204", "x64", "20240226.1.0"] => "f8a2b78189239717355b54ecf62a504a349c96b1ab6a21919984f58c2a367617",
+      ["postgres-ubuntu-2204", "x64", "20240702.3.0"] => "02dfa6e844fa3e72224f2f0f1811e039221acee07d6b05b507d49ae17f84d0ce"
     }
 
     # YYY: In future all images should be checked for sha256 sum, so the nil
