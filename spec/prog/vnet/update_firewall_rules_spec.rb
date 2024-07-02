@@ -91,7 +91,7 @@ elements = {2a00:1450:400e:811::200e/128}
 
   flowtable ubi_flowtable {
     hook ingress priority filter
-    devices = { tap0, vethix }
+    devices = { tap0 }
   }
 
   chain forward_ingress {
@@ -188,7 +188,7 @@ table inet fw_table {
 
   flowtable ubi_flowtable {
     hook ingress priority filter
-    devices = { tap0, vethix }
+    devices = { tap0 }
   }
 
   chain forward_ingress {

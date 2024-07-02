@@ -78,7 +78,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    strand.children.each { _1.destroy }
+    strand.children.map { _1.destroy }
     Prog::Vnet::LoadBalancerNexus.dns_zone&.delete_record(record_name: load_balancer.hostname)
 
     load_balancer.vms.each do |vm|
@@ -102,7 +102,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   def rewrite_dns_records
     Prog::Vnet::LoadBalancerNexus.dns_zone&.delete_record(record_name: load_balancer.hostname)
-    load_balancer.vms_to_dns.each do |vm|
+
+    load_balancer.vms_to_dns.map do |vm|
       Prog::Vnet::LoadBalancerNexus.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s) if vm.ephemeral_net4
       Prog::Vnet::LoadBalancerNexus.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "AAAA", ttl: 10, data: vm.ephemeral_net6.nth(2).to_s)
     end
