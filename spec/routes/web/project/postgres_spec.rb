@@ -316,22 +316,68 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}"
 
         fill_in "cidr", with: "1.1.1.2"
-        click_button "Create"
+        find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
         expect(page).to have_content "1.1.1.2/32"
         expect(page).to have_content "5432"
 
         fill_in "cidr", with: "12.12.12.0/26"
-        click_button "Create"
+        find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
 
         fill_in "cidr", with: "fd00::/64"
-        click_button "Create"
+        find(".firewall-rule-create-button").click
         expect(page).to have_content "Firewall rule is created"
         expect(page.status_code).to eq(200)
         expect(page).to have_content "fd00::/64"
 
         expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
+      end
+    end
+
+    describe "metric-destination" do
+      it "can create metric destination" do
+        pg
+        visit "#{project.path}#{pg.path}"
+
+        fill_in "url", with: "https://example.com"
+        fill_in "username", with: "username"
+        fill_in "password", with: "password"
+        find(".metric-destination-create-button").click
+        expect(page).to have_content "https://example.com"
+        expect(pg.reload.metric_destinations.count).to eq(1)
+      end
+
+      it "can delete metric destinations" do
+        md = PostgresMetricDestination.create_with_id(
+          postgres_resource_id: pg.id,
+          url: "https://example.com",
+          username: "username",
+          password: "password"
+        )
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#md-delete-#{md.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(pg.reload.metric_destinations.count).to eq(0)
+      end
+
+      it "cannot delete metric destination if it is not exist" do
+        md = PostgresMetricDestination.create_with_id(
+          postgres_resource_id: pg.id,
+          url: "https://example.com",
+          username: "username",
+          password: "password"
+        )
+        expect(PostgresMetricDestination).to receive(:from_ubid).and_return(nil)
+
+        visit "#{project.path}#{pg.path}"
+
+        btn = find "#md-delete-#{md.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(pg.reload.metric_destinations.count).to eq(1)
       end
     end
 
