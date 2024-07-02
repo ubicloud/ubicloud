@@ -240,10 +240,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /etc/ssl/certs/server.key")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
+      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
 
       expect(nx).to receive(:refresh_walg_credentials)
 
@@ -252,10 +254,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait at times other than the initial provisioning" do
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres chmod 600 /etc/ssl/certs/server.key")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
+      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
       expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
       expect(nx).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
