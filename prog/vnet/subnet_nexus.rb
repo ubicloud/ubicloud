@@ -152,7 +152,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     strand.children.each { _1.destroy }
     private_subnet.firewalls.map { _1.disassociate_from_private_subnet(private_subnet, apply_firewalls: false) }
 
-    if private_subnet.nics.empty?
+    if private_subnet.nics.empty? && private_subnet.load_balancers.empty?
       DB.transaction do
         private_subnet.projects.each { |p| private_subnet.dissociate_with_project(p) }
         private_subnet.destroy
@@ -160,6 +160,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       pop "subnet destroyed"
     else
       private_subnet.nics.map { |n| n.incr_destroy }
+      private_subnet.load_balancers.map { |lb| lb.incr_destroy }
       nap 1
     end
   end

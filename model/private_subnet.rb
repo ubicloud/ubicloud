@@ -7,6 +7,7 @@ class PrivateSubnet < Sequel::Model
   one_to_many :nics, key: :private_subnet_id
   one_to_one :strand, key: :id
   many_to_many :firewalls
+  one_to_many :load_balancers
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
