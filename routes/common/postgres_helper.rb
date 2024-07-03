@@ -196,34 +196,29 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
   def reset_superuser_password
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
-    if @mode == AppMode::API
-      unless @resource.representative_server.primary?
+
+    unless @resource.representative_server.primary?
+      if @mode == AppMode::API
         fail CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated during restore!")
-      end
-
-      required_parameters = ["password"]
-      request_body_params = Validation.validate_request_body(@request.body.read, required_parameters)
-      Validation.validate_postgres_superuser_password(request_body_params["password"])
-
-      DB.transaction do
-        @resource.update(superuser_password: request_body_params["password"])
-        @resource.representative_server.incr_update_superuser_password
-      end
-
-      Serializers::Postgres.serialize(@resource, {detailed: true})
-    else
-      unless @resource.representative_server.primary?
+      else
         flash["error"] = "Superuser password cannot be updated during restore!"
         return @app.redirect_back_with_inputs
       end
+    end
 
-      Validation.validate_postgres_superuser_password(@request.params["original_password"], @request.params["repeat_password"])
+    required_parameters = (@mode == AppMode::API) ? ["password"] : ["password", "repeat_password"]
+    request_body_params = Validation.validate_request_body(params, required_parameters)
+    Validation.validate_postgres_superuser_password(request_body_params["password"], request_body_params["repeat_password"])
 
-      @resource.update(superuser_password: @request.params["original_password"])
+    DB.transaction do
+      @resource.update(superuser_password: request_body_params["password"])
       @resource.representative_server.incr_update_superuser_password
+    end
 
+    if @mode == AppMode::API
+      Serializers::Postgres.serialize(@resource, {detailed: true})
+    else
       flash["notice"] = "The superuser password will be updated in a few seconds"
-
       @request.redirect "#{project.path}#{@resource.path}"
     end
   end

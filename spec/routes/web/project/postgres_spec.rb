@@ -217,8 +217,8 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}"
         expect(page).to have_content "Reset superuser password"
 
-        fill_in "New password", with: "DummyPassword123"
-        fill_in "New password (repeat)", with: "DummyPassword123"
+        find(".reset-superuser-password-new-password").set("DummyPassword123")
+        find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
         click_button "Reset"
 
         expect(page.status_code).to eq(200)
@@ -237,8 +237,8 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Reset superuser password"
 
         pg.representative_server.update(timeline_access: "fetch")
-        fill_in "New password", with: "DummyPassword123"
-        fill_in "New password (repeat)", with: "DummyPassword123"
+        find(".reset-superuser-password-new-password").set("DummyPassword123")
+        find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
         click_button "Reset"
 
         expect(page.status_code).to eq(200)
@@ -331,7 +331,7 @@ RSpec.describe Clover, "postgres" do
 
         fill_in "url", with: "https://example.com"
         fill_in "username", with: "username"
-        fill_in "password", with: "password"
+        find(".metric-destination-password").set("password")
         find(".metric-destination-create-button").click
         expect(page).to have_content "https://example.com"
         expect(pg.reload.metric_destinations.count).to eq(1)
