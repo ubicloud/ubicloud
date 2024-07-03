@@ -40,7 +40,7 @@ begin
   ip4 = params.fetch("public_ipv4")
   local_ip4 = params.fetch("local_ipv4")
   unix_user = params.fetch("unix_user")
-  ssh_public_key = params.fetch("ssh_public_key")
+  ssh_public_keys = params.fetch("ssh_public_keys") { [params.fetch("ssh_public_key")] }
   nics = params.fetch("nics").map { |args| VmSetup::Nic.new(*args) }.freeze
   max_vcpus = params.fetch("max_vcpus")
   cpu_topology = params.fetch("cpu_topology")
@@ -62,7 +62,7 @@ when "prep"
     exit 1
   end
 
-  vm_setup.prep(unix_user, ssh_public_key, nics, gua, ip4,
+  vm_setup.prep(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices)
 when "recreate-unpersisted"
@@ -87,7 +87,7 @@ when "reassign-ip6"
     puts "need storage secrets in secrets json"
     exit 1
   end
-  vm_setup.reassign_ip6(unix_user, ssh_public_key, nics, gua, ip4,
+  vm_setup.reassign_ip6(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices)
 else
