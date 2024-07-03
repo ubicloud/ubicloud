@@ -196,9 +196,9 @@ $("input[name=size]").on("change", function (event) {
   setupLocationBasedPostgresHaPrices();
 });
 
-$("input[name=pseudo-storage-size]").on("change", function (event) {
+$(".storage-slider").on("change", function (event) {
   storage_size_options = $("input[name=size]:checked").data("storage-size-options");
-  storage_size_index = parseInt($("input[name=pseudo-storage-size]").val());
+  storage_size_index = parseInt($(".storage-slider").val());
   $("input[name=storage-size]").val(storage_size_options[storage_size_index])
   setupLocationBasedPostgresHaPrices();
 });
@@ -240,7 +240,7 @@ function setupLocationBasedPostgresHaPrices() {
   $("input.location-based-postgres-ha-price").each(function(i, obj) {
     let value = $(this).val();
     let monthlyComputePrice = parseFloat($("input[name=size]:checked").data("monthly-price"))
-    let monthlyStoragePrice = parseFloat($("input[name=storage-size]").val()) * parseFloat($("input[name=pseudo-storage-size]").data("monthly-price"))
+    let monthlyStoragePrice = parseFloat($("input[name=storage-size]").val()) * parseFloat($(".storage-slider").data("monthly-price"))
     let monthlyPrice = monthlyComputePrice + monthlyStoragePrice;
     let standbyCount = $(this).data("standby-count");
     $(`.ha-status-${value}`).show();
@@ -259,12 +259,12 @@ function setupLocationBasedOptions() {
 function setupInstanceSizeBasedOptions() {
   $(".instance-size-based-option").each(function() {
     let type = $(this).attr("type")
-    if(type == "range" && $(this).attr("id") == "pseudo-storage-size"){
+    if(type == "range" && $(this).hasClass("storage-slider")){
       storage_size_options = $("input[name=size]:checked").data("storage-size-options");
       storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
 
       $(this).attr("max", storage_size_options.length - 1);
-      storage_size_index = parseInt($("input[name=pseudo-storage-size]").val());
+      storage_size_index = parseInt($(".storage-slider").val());
       $("input[name=storage-size]").val(storage_size_options[storage_size_index])
 
       let monthlyPrice = $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"]
