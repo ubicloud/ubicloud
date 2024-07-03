@@ -100,11 +100,12 @@
                   "components/form/text",
                   locals: {
                     label: "New password",
-                    name: "original_password",
+                    name: "password",
                     type: "password",
                     attributes: {
                       required: true
-                    }
+                    },
+                    extra_class: "reset-superuser-password-new-password"
                   }
                 ) %>
               </div>
@@ -117,7 +118,8 @@
                     type: "password",
                     attributes: {
                       required: true
-                    }
+                    },
+                    extra_class: "reset-superuser-password-new-password-repeat"
                   }
                 ) %>
               </div>
@@ -267,7 +269,8 @@
                       attributes: {
                         required: true,
                         autocomplete: "new-password"
-                      }
+                      },
+                      extra_class: "metric-destination-password"
                     }
                   ) %>
                 </td>
