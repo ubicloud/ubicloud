@@ -7,8 +7,6 @@ RSpec.describe Clover, "postgres" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
-
   let(:pg) do
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id,
@@ -19,98 +17,30 @@ RSpec.describe Clover, "postgres" do
     ).subject
   end
 
-  let(:pg_wo_permission) do
-    Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: project_wo_permissions.id,
-      location: "hetzner-fsn1",
-      name: "pg-without-permission",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 128
-    ).subject
-  end
-
   describe "unauthenticated" do
-    before do
+    it "cannot perform authenticated operations" do
       postgres_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
-    end
 
-    it "not location list" do
-      get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres"
+      [
+        [:get, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres"],
+        [:post, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres"],
+        [:delete, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"],
+        [:delete, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}"],
+        [:get, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"],
+        [:get, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}"],
+        [:post, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule"],
+        [:delete, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"],
+        [:post, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore"],
+        [:post, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/restore"],
+        [:post, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"],
+        [:post, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/reset-superuser-password"],
+        [:post, "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"]
+      ].each do |method, path|
+        send method, path
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not create" do
-      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/postgres_name"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete" do
-      delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete ubid" do
-      delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not get" do
-      get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not get ubid" do
-      get "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not create firewall rule" do
-      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete firewall rule" do
-      delete "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not restore" do
-      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not restore ubid" do
-      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/restore"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not reset super user password" do
-      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not reset super user password ubid" do
-      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/reset-superuser-password"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not failover" do
-      post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/failover"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
+        expect(last_response).to have_api_error(401, "Please login to continue")
+      end
     end
   end
 
