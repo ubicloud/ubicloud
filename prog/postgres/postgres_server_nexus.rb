@@ -205,6 +205,8 @@ CONFIG
       hop_configure
     end
 
+    vm.sshable.cmd("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+    vm.sshable.cmd("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
     vm.sshable.cmd("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
     hop_wait
