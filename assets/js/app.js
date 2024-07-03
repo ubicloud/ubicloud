@@ -199,7 +199,7 @@ $("input[name=size]").on("change", function (event) {
 $(".storage-slider").on("change", function (event) {
   storage_size_options = $("input[name=size]:checked").data("storage-size-options");
   storage_size_index = parseInt($(".storage-slider").val());
-  $("input[name=storage-size]").val(storage_size_options[storage_size_index])
+  $("input[name=storage_size]").val(storage_size_options[storage_size_index])
   setupLocationBasedPostgresHaPrices();
 });
 
@@ -240,7 +240,7 @@ function setupLocationBasedPostgresHaPrices() {
   $("input.location-based-postgres-ha-price").each(function(i, obj) {
     let value = $(this).val();
     let monthlyComputePrice = parseFloat($("input[name=size]:checked").data("monthly-price"))
-    let monthlyStoragePrice = parseFloat($("input[name=storage-size]").val()) * parseFloat($(".storage-slider").data("monthly-price"))
+    let monthlyStoragePrice = parseFloat($("input[name=storage_size]").val()) * parseFloat($(".storage-slider").data("monthly-price"))
     let monthlyPrice = monthlyComputePrice + monthlyStoragePrice;
     let standbyCount = $(this).data("standby-count");
     $(`.ha-status-${value}`).show();
@@ -265,7 +265,7 @@ function setupInstanceSizeBasedOptions() {
 
       $(this).attr("max", storage_size_options.length - 1);
       storage_size_index = parseInt($(".storage-slider").val());
-      $("input[name=storage-size]").val(storage_size_options[storage_size_index])
+      $("input[name=storage_size]").val(storage_size_options[storage_size_index])
 
       let monthlyPrice = $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"]
       $(this).data("monthly-price", monthlyPrice);
