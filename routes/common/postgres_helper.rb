@@ -64,12 +64,8 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
   def delete
     Authorization.authorize(@user.id, "Postgres:delete", @resource.id)
     @resource.incr_destroy
-    if @mode == AppMode::API
-      response.status = 204
-      @request.halt
-    else
-      {message: "Deleting #{@resource.name}"}.to_json
-    end
+    response.status = 204
+    @request.halt
   end
 
   def post_firewall_rule
