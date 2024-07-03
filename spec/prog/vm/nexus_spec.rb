@@ -227,6 +227,8 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
       expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
       expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
+      prj.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
+      expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
 
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
@@ -240,7 +242,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(params).to include({
           "public_ipv6" => "fe80::/64",
           "unix_user" => "test_user",
-          "ssh_public_key" => "test_ssh_key",
+          "ssh_public_keys" => ["test_ssh_key", "operator_ssh_key"],
           "max_vcpus" => 1,
           "cpu_topology" => "1:1:1:1",
           "mem_gib" => 8,
