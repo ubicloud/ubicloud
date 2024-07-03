@@ -212,7 +212,7 @@ class Vm < Sequel::Model
       "public_ipv4" => ip4.to_s || "",
       "local_ipv4" => local_vetho_ip.to_s.shellescape || "",
       "unix_user" => unix_user,
-      "ssh_public_key" => public_key,
+      "ssh_public_keys" => [public_key],
       "nics" => nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
       "boot_image" => boot_image,
       "max_vcpus" => topo.max_vcpus,
