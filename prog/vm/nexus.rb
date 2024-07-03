@@ -8,7 +8,7 @@ require "base64"
 
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
-  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity
+  semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
@@ -403,15 +403,13 @@ class Prog::Vm::Nexus < Prog::Base
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
-      host.sshable.cmd("sudo host/bin/setup-vm delete #{q_vm}")
+      # If there is a load balancer setup, we want to keep the network setup in
+      # tact for a while
+      action = vm.load_balancers.empty? ? "delete" : "delete_keep_net"
+      host.sshable.cmd("sudo host/bin/setup-vm #{action} #{q_vm}")
     end
 
     DB.transaction do
-      vm.nics.map do |nic|
-        nic.update(vm_id: nil)
-        nic.incr_destroy
-      end
-
       vm.vm_storage_volumes.each do |vol|
         vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
       end
@@ -422,12 +420,42 @@ class Prog::Vm::Nexus < Prog::Base
       )
 
       vm.pci_devices_dataset.update(vm_id: nil)
+    end
 
+    hop_wait_lb_expiry unless vm.load_balancers.empty?
+
+    final_clean_up
+
+    pop "vm deleted"
+  end
+
+  label def wait_lb_expiry
+    unless vm.lb_expiry_started_set?
+      vm.incr_lb_expiry_started
+      vm.load_balancers.map { _1.evacuate_vm(vm) }
+      nap 10 * 60
+    end
+
+    vm.load_balancers.each do |lb|
+      lb.remove_vm(vm)
+    end
+
+    vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
+
+    final_clean_up
+
+    pop "vm deleted"
+  end
+
+  def final_clean_up
+    DB.transaction do
+      vm.nics.map do |nic|
+        nic.update(vm_id: nil)
+        nic.incr_destroy
+      end
       vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy
     end
-
-    pop "vm deleted"
   end
 
   label def start_after_host_reboot
