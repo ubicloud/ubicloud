@@ -111,59 +111,40 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
   def post_metric_destination
     Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
+
+    required_parameters = ["url", "username", "password"]
+    request_body_params = Validation.validate_request_body(params, required_parameters)
+
+    Validation.validate_url(request_body_params["url"])
+
+    DB.transaction do
+      PostgresMetricDestination.create_with_id(
+        postgres_resource_id: @resource.id,
+        url: request_body_params["url"],
+        username: request_body_params["username"],
+        password: request_body_params["password"]
+      )
+      @resource.servers.each(&:incr_configure_prometheus)
+    end
+
     if @mode == AppMode::API
-      required_parameters = ["url", "username", "password"]
-      request_body_params = Validation.validate_request_body(@request.body.read, required_parameters)
-
-      Validation.validate_url(request_body_params["url"])
-
-      DB.transaction do
-        PostgresMetricDestination.create_with_id(
-          postgres_resource_id: @resource.id,
-          url: request_body_params["url"],
-          username: request_body_params["username"],
-          password: request_body_params["password"]
-        )
-        @resource.servers.each(&:incr_configure_prometheus)
-      end
-
       Serializers::Postgres.serialize(@resource, {detailed: true})
     else
-      Validation.validate_url(@request.params["url"])
-
-      DB.transaction do
-        PostgresMetricDestination.create_with_id(
-          postgres_resource_id: @resource.id,
-          url: @request.params["url"],
-          username: @request.params["username"],
-          password: @request.params["password"]
-        )
-        @resource.servers.each(&:incr_configure_prometheus)
-      end
-
       flash["notice"] = "Metric destination is created"
-
       @request.redirect "#{project.path}#{@resource.path}"
     end
   end
 
   def delete_metric_destination(metric_destination_ubid)
     Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
-    md = PostgresMetricDestination.from_ubid(metric_destination_ubid)
-    if @mode == AppMode::API
-      if md
-        DB.transaction do
-          md.destroy
-          @resource.servers.each(&:incr_configure_prometheus)
-        end
-      end
-    elsif md
+
+    if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
       DB.transaction do
         md.destroy
         @resource.servers.each(&:incr_configure_prometheus)
       end
-
     end
+
     response.status = 204
     @request.halt
   end
