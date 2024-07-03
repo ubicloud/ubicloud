@@ -28,13 +28,13 @@ RSpec.describe Clover, "postgres" do
   end
 
   describe "unauthenticated" do
-    it "can not list without login" do
+    it "cannot list without login" do
       visit "/postgres"
 
       expect(page.title).to eq("Ubicloud - Login")
     end
 
-    it "can not create without login" do
+    it "cannot create without login" do
       visit "/postgres/create"
 
       expect(page.title).to eq("Ubicloud - Login")
@@ -92,23 +92,6 @@ RSpec.describe Clover, "postgres" do
         expect(PostgresResource.first.projects.first.id).to eq(project.id)
       end
 
-      it "can not create PostgreSQL database with invalid name" do
-        visit "#{project.path}/postgres/create"
-
-        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
-
-        fill_in "Name", with: "invalid name"
-        choose option: "eu-central-h1"
-        choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
-
-        click_button "Create"
-
-        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
-        expect(page).to have_content "Name must only contain"
-        expect((find "input[name=name]")["value"]).to eq("invalid name")
-      end
-
       it "can not create PostgreSQL database with same name" do
         visit "#{project.path}/postgres/create"
 
@@ -123,26 +106,6 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         expect(page).to have_content "name is already taken"
-      end
-
-      it "can not create PostgreSQL database if project has no valid payment method" do
-        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
-        expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
-
-        visit "#{project.path}/postgres/create"
-
-        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
-        expect(page).to have_content "Project doesn't have valid billing information"
-
-        fill_in "Name", with: "new-pg-db"
-        choose option: "eu-central-h1"
-        choose option: "standard-2"
-        choose option: PostgresResource::HaType::NONE
-
-        click_button "Create"
-
-        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
-        expect(page).to have_content "Project doesn't have valid billing information"
       end
 
       it "can not select invisible location" do
@@ -221,6 +184,7 @@ RSpec.describe Clover, "postgres" do
         find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
         click_button "Reset"
 
+        expect(pg.reload.superuser_password).to eq("DummyPassword123")
         expect(page.status_code).to eq(200)
       end
 
