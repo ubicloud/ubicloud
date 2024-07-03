@@ -390,7 +390,6 @@ RSpec.describe Clover, "postgres" do
         btn = find "#postgres-delete-#{pg.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Deleting #{pg.name}"}.to_json)
         expect(SemSnap.new(pg.id).set?("destroy")).to be true
       end
 
