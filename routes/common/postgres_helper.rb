@@ -52,7 +52,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
         location: location,
         name: @request.params["name"],
         target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: @request.params["storage-size"],
+        target_storage_size_gib: @request.params["storage_size"],
         ha_type: @request.params["ha_type"]
       )
 

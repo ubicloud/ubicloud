@@ -120,7 +120,7 @@
                         locals: {
                           label: "Storage Size",
                           range_labels: size.storage_size_options.map { "#{_1}GB" },
-                          value: flash.dig("old", "storage-size") ? size.storage_size_options.index(flash.dig("old", "storage-size").to_i) : 0,
+                          value: flash.dig("old", "storage_size") ? size.storage_size_options.index(flash.dig("old", "storage_size").to_i) : 0,
                           attributes: {
                             min: 0,
                             max: size.storage_size_options.size - 1,
@@ -129,7 +129,7 @@
                           extra_class: "instance-size-based-option storage-slider",
                         }
                       ) %>
-                      <input type="hidden" name="storage-size" id="storage-size" value="<%= flash.dig("old", "storage-size") || size.storage_size_options[0] %>">
+                      <input type="hidden" name="storage_size" id="storage_size" value="<%= flash.dig("old", "storage_size") || size.storage_size_options[0] %>">
                     </div>
                   </fieldset>
                 </div>
