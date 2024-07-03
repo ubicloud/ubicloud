@@ -171,34 +171,24 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
   def restore
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
+
+    required_parameters = ["name", "restore_target"]
+    request_body_params = Validation.validate_request_body(params, required_parameters)
+
+    st = Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: project.id,
+      location: @resource.location,
+      name: request_body_params["name"],
+      target_vm_size: @resource.target_vm_size,
+      target_storage_size_gib: @resource.target_storage_size_gib,
+      parent_id: @resource.id,
+      restore_target: request_body_params["restore_target"]
+    )
+
     if @mode == AppMode::API
-      required_parameters = ["name", "restore_target"]
-      request_body_params = Validation.validate_request_body(@request.body.read, required_parameters)
-
-      st = Prog::Postgres::PostgresResourceNexus.assemble(
-        project_id: project.id,
-        location: @resource.location,
-        name: request_body_params["name"],
-        target_vm_size: @resource.target_vm_size,
-        target_storage_size_gib: @resource.target_storage_size_gib,
-        parent_id: @resource.id,
-        restore_target: request_body_params["restore_target"]
-      )
-
       Serializers::Postgres.serialize(st.subject, {detailed: true})
     else
-      st = Prog::Postgres::PostgresResourceNexus.assemble(
-        project_id: project.id,
-        location: @resource.location,
-        name: @request.params["name"],
-        target_vm_size: @resource.target_vm_size,
-        target_storage_size_gib: @resource.target_storage_size_gib,
-        parent_id: @resource.id,
-        restore_target: @request.params["restore_target"]
-      )
-
-      flash["notice"] = "'#{@request.params["name"]}' will be ready in a few minutes"
-
+      flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
       @request.redirect "#{project.path}#{st.subject.path}"
     end
   end
