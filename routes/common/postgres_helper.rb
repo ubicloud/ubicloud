@@ -70,32 +70,22 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
   def post_firewall_rule
     Authorization.authorize(@user.id, "Postgres:Firewall:edit", @resource.id)
+
+    required_parameters = ["cidr"]
+    request_body_params = Validation.validate_request_body(params, required_parameters)
+    parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
+
+    DB.transaction do
+      PostgresFirewallRule.create_with_id(
+        postgres_resource_id: @resource.id,
+        cidr: parsed_cidr.to_s
+      )
+      @resource.incr_update_firewall_rules
+    end
+
     if @mode == AppMode::API
-      required_parameters = ["cidr"]
-
-      request_body_params = Validation.validate_request_body(@request.body.read, required_parameters)
-      Validation.validate_cidr(request_body_params["cidr"])
-
-      DB.transaction do
-        PostgresFirewallRule.create_with_id(
-          postgres_resource_id: @resource.id,
-          cidr: request_body_params["cidr"]
-        )
-        @resource.incr_update_firewall_rules
-      end
-
       Serializers::Postgres.serialize(@resource, {detailed: true})
     else
-      parsed_cidr = Validation.validate_cidr(@request.params["cidr"])
-
-      DB.transaction do
-        PostgresFirewallRule.create_with_id(
-          postgres_resource_id: @resource.id,
-          cidr: parsed_cidr.to_s
-        )
-        @resource.incr_update_firewall_rules
-      end
-
       flash["notice"] = "Firewall rule is created"
       @request.redirect "#{project.path}#{@resource.path}"
     end
@@ -108,28 +98,15 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
   def delete_firewall_rule(firewall_rule_ubid)
     Authorization.authorize(@user.id, "Postgres:Firewall:edit", @resource.id)
-    fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid)
-    if @mode == AppMode::API
-      if fwr
-        DB.transaction do
-          fwr.destroy
-          @resource.incr_update_firewall_rules
-        end
-      end
-      response.status = 204
-      @request.halt
-    else
-      unless fwr
-        response.status = 404
-        @request.halt
-      end
 
+    if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
       DB.transaction do
         fwr.destroy
         @resource.incr_update_firewall_rules
       end
-      {message: "Firewall rule deleted"}.to_json
     end
+    response.status = 204
+    @request.halt
   end
 
   def post_metric_destination
