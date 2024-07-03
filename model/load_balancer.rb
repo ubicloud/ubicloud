@@ -4,6 +4,7 @@ require_relative "../model"
 
 class LoadBalancer < Sequel::Model
   many_to_many :vms
+  many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: ["up"]}
   many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: "evacuating")
   one_to_one :strand, key: :id
   many_to_one :private_subnet
@@ -33,6 +34,7 @@ class LoadBalancer < Sequel::Model
   def evacuate_vm(vm)
     DB.transaction do
       load_balancers_vms_dataset.where(vm_id: vm.id).update(state: "evacuating")
+      strand.children_dataset.where(prog: "Vnet::LoadBalancerHealthProbes").all.select { |st| st.stack[0]["subject_id"] == id && st.stack[0]["vm_id"] == vm.id }.map(&:destroy)
       incr_update_load_balancer
       incr_rewrite_dns_records
     end

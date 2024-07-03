@@ -8,6 +8,10 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
   end
 
   label def update_load_balancer
+    # if there is literally no up resources to balance for, we simply not do
+    # load balancing. This is a bit of a hack, but it's a simple way to avoid
+    # the need to have a separate state for the load balancer.
+    hop_remove_load_balancer if load_balancer.active_vms.count == 0
     vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_lb_based_nat_rules)
 
     pop "load balancer is updated"
@@ -23,9 +27,9 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
     public_ipv6 = vm.ephemeral_net6.to_s
     private_ipv4 = vm.nics.first.private_ipv4.network
     private_ipv6 = vm.nics.first.private_ipv6.nth(2)
-    neighbor_vms = load_balancer.vms.reject { _1.id == vm.id }
+    neighbor_vms = load_balancer.active_vms.reject { _1.id == vm.id }
     neighbor_ips_v4_set, neighbor_ips_v6_set = generate_lb_ip_set_definition(neighbor_vms)
-    modulo = load_balancer.vms.count
+    modulo = load_balancer.active_vms.count
     ipv4_map_def, ipv6_map_def = generate_lb_map_defs
 
     balance_mode_ip4, balance_mode_ip6 = if load_balancer.algorithm == "round_robin"
@@ -78,8 +82,8 @@ TEMPLATE
   end
 
   def generate_lb_map_defs
-    [load_balancer.vms.map.with_index { |vm, i| "#{i} : #{vm.nics.first.private_ipv4.network} . #{load_balancer.dst_port}" }.join(", "),
-      load_balancer.vms.map.with_index { |vm, i| "#{i} : #{vm.nics.first.private_ipv6.nth(2)} . #{load_balancer.dst_port}" }.join(", ")]
+    [load_balancer.active_vms.map.with_index { |vm, i| "#{i} : #{vm.nics.first.private_ipv4.network} . #{load_balancer.dst_port}" }.join(", "),
+      load_balancer.active_vms.map.with_index { |vm, i| "#{i} : #{vm.nics.first.private_ipv6.nth(2)} . #{load_balancer.dst_port}" }.join(", ")]
   end
 
   def generate_nat_rules(current_public_ipv4, current_private_ipv4)

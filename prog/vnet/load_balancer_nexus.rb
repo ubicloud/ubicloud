@@ -4,7 +4,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   subject_is :load_balancer
   semaphore :destroy, :update_load_balancer, :rewrite_dns_records
 
-  def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil)
+  def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
+    health_check_endpoint: "/up", health_check_interval: 5, health_check_timeout: 3,
+    health_check_up_threshold: 3, health_check_down_threshold: 3)
 
     unless (ps = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
@@ -15,7 +17,10 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     DB.transaction do
       lb = LoadBalancer.create_with_id(
         private_subnet_id: private_subnet_id, name: name, algorithm: algorithm,
-        src_port: src_port, dst_port: dst_port)
+        src_port: src_port, dst_port: dst_port, health_check_endpoint: health_check_endpoint,
+        health_check_interval: health_check_interval, health_check_timeout: health_check_timeout,
+        health_check_up_threshold: health_check_up_threshold, health_check_down_threshold: health_check_down_threshold
+      )
       lb.associate_with_project(ps.projects.first)
 
       Strand.create(prog: "Vnet::LoadBalancerNexus", label: "wait") { _1.id = lb.id }
@@ -38,7 +43,19 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       decr_rewrite_dns_records
     end
 
+    hop_create_new_health_probe if strand.children_dataset.count < load_balancer.vms_dataset.count
+
     nap 5
+  end
+
+  label def create_new_health_probe
+    vms = load_balancer.vms
+    vms_getting_probed = strand.children_dataset.where(prog: "Vnet::LoadBalancerHealthProbes").map { |st| st.stack[0]["vm_id"] }
+    vms.reject { vms_getting_probed.include?(_1.id) }.each do |vm|
+      bud Prog::Vnet::LoadBalancerHealthProbes, {"vm_id" => vm.id, "subject_id" => load_balancer.id}, :health_probe
+    end
+
+    hop_wait
   end
 
   label def update_vm_load_balancers
