@@ -2,41 +2,19 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "postgres") do |r|
-    r.get true do
-      @postgres_databases = Serializers::Postgres.serialize(@project.postgres_resources_dataset.authorized(@current_user.id, "Postgres:view").eager(:semaphores, :strand, :representative_server, :timeline).all, {include_path: true})
+    pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: @current_user, location: nil, resource: nil)
 
-      view "postgres/index"
+    r.get true do
+      pg_endpoint_helper.list
     end
 
     r.post true do
-      Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
-      fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
-
-      parsed_size = Validation.validate_postgres_size(r.params["size"])
-      location = LocationNameConverter.to_internal_name(r.params["location"])
-      Validation.validate_postgres_location(location)
-      st = Prog::Postgres::PostgresResourceNexus.assemble(
-        project_id: @project.id,
-        location: location,
-        name: r.params["name"],
-        target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: r.params["storage-size"],
-        ha_type: r.params["ha_type"]
-      )
-
-      flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
-
-      r.redirect "#{@project.path}#{PostgresResource[st.id].path}"
+      pg_endpoint_helper.post
     end
 
     r.on "create" do
       r.get true do
-        Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
-
-        @prices = fetch_location_based_prices("PostgresCores", "PostgresStorage")
-        @has_valid_payment_method = @project.has_valid_payment_method?
-
-        view "postgres/create"
+        pg_endpoint_helper.view_create_page
       end
     end
   end
