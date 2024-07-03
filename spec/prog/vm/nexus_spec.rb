@@ -240,7 +240,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(params).to include({
           "public_ipv6" => "fe80::/64",
           "unix_user" => "test_user",
-          "ssh_public_key" => "test_ssh_key",
+          "ssh_public_keys" => ["test_ssh_key"],
           "max_vcpus" => 1,
           "cpu_topology" => "1:1:1:1",
           "mem_gib" => 8,
