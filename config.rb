@@ -159,4 +159,8 @@ module Config
 
   # e2e
   optional :e2e_github_installation_id, string
+
+  # Load Balancer
+  optional :load_balancer_service_project_id, string
+  optional :load_balancer_service_hostname, string
 end

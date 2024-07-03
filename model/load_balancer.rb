@@ -4,6 +4,7 @@ require_relative "../model"
 
 class LoadBalancer < Sequel::Model
   many_to_many :vms
+  many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: "evacuating")
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :projects, through: :private_subnet
@@ -15,7 +16,7 @@ class LoadBalancer < Sequel::Model
   include SemaphoreMethods
   include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
-  semaphore :destroy, :update_load_balancer
+  semaphore :destroy, :update_load_balancer, :rewrite_dns_records
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{private_subnet.display_location}/load-balancer/#{name}"
@@ -25,13 +26,23 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       super
       incr_update_load_balancer
+      incr_rewrite_dns_records
     end
   end
 
-  def detach_vm(vm)
+  def evacuate_vm(vm)
     DB.transaction do
-      DB[:load_balancers_vms].where(load_balancer_id: id, vm_id: vm.id).delete(force: true)
+      load_balancers_vms_dataset.where(vm_id: vm.id).update(state: "evacuating")
       incr_update_load_balancer
+      incr_rewrite_dns_records
     end
+  end
+
+  def remove_vm(vm)
+    load_balancers_vms_dataset.where(vm_id: vm.id).all.map(&:destroy)
+  end
+
+  def hostname
+    "#{name}.#{ubid[-5...]}.#{Config.load_balancer_service_hostname}"
   end
 end
