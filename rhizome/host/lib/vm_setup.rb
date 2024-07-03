@@ -119,6 +119,11 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   # Delete all traces of the VM.
   def purge
+    purge_network
+    purge_without_network
+  end
+
+  def purge_network
     block_ip4
 
     begin
@@ -126,7 +131,9 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     rescue CommandFail => ex
       raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
     end
+  end
 
+  def purge_without_network
     FileUtils.rm_f(vp.systemd_service)
     FileUtils.rm_f(vp.dnsmasq_service)
     r "systemctl daemon-reload"
