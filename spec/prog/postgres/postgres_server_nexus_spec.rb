@@ -283,6 +283,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "configures prometheus and hops wait at times other than the initial provisioning" do
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(sshable).to receive(:cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
       expect(sshable).to receive(:cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
       expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
       expect { nx.configure_prometheus }.to hop("wait")
