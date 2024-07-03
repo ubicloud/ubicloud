@@ -79,7 +79,7 @@ end
 
 autoload_normal.call("model", flat: true)
 %w[lib clover.rb clover_web.rb clover_api.rb clover_runtime.rb routes/clover_base.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
-%w[scheduling prog serializers].each { autoload_normal.call(_1, include_first: true) }
+%w[scheduling prog serializers routes/common].each { autoload_normal.call(_1, include_first: true) }
 
 AUTOLOAD_CONSTANTS.freeze
 
