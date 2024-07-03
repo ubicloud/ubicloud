@@ -9,138 +9,51 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-      @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
+
+      pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: @current_user, location: @location, resource: pg)
 
       r.get true do
-        Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
-        view "postgres/show"
+        pg_endpoint_helper.get
       end
 
       r.delete true do
-        Authorization.authorize(@current_user.id, "Postgres:delete", pg.id)
-        pg.incr_destroy
-        return {message: "Deleting #{pg.name}"}.to_json
+        pg_endpoint_helper.delete
       end
 
       r.on "firewall-rule" do
         r.post true do
-          Authorization.authorize(@current_user.id, "Postgres:Firewall:edit", pg.id)
-          parsed_cidr = Validation.validate_cidr(r.params["cidr"])
-
-          DB.transaction do
-            PostgresFirewallRule.create_with_id(
-              postgres_resource_id: pg.id,
-              cidr: parsed_cidr.to_s
-            )
-            pg.incr_update_firewall_rules
-          end
-
-          flash["notice"] = "Firewall rule is created"
-
-          r.redirect "#{@project.path}#{pg.path}"
+          pg_endpoint_helper.post_firewall_rule
         end
 
         r.is String do |firewall_rule_ubid|
           r.delete true do
-            Authorization.authorize(@current_user.id, "Postgres:Firewall:edit", pg.id)
-            fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid)
-            unless fwr
-              response.status = 404
-              r.halt
-            end
-
-            DB.transaction do
-              fwr.destroy
-              pg.incr_update_firewall_rules
-            end
-
-            return {message: "Firewall rule deleted"}.to_json
+            pg_endpoint_helper.delete_firewall_rule(firewall_rule_ubid)
           end
         end
       end
 
       r.on "metric-destination" do
         r.post true do
-          Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
-          Validation.validate_url(r.params["url"])
-
-          DB.transaction do
-            PostgresMetricDestination.create_with_id(
-              postgres_resource_id: pg.id,
-              url: r.params["url"],
-              username: r.params["username"],
-              password: r.params["password"]
-            )
-            pg.servers.each(&:incr_configure_prometheus)
-          end
-
-          flash["notice"] = "Metric destination is created"
-
-          r.redirect "#{@project.path}#{pg.path}"
+          pg_endpoint_helper.post_metric_destination
         end
 
         r.is String do |metric_destination_ubid|
           r.delete true do
-            Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
-            md = PostgresMetricDestination.from_ubid(metric_destination_ubid)
-            if md
-              DB.transaction do
-                md.destroy
-                pg.servers.each(&:incr_configure_prometheus)
-              end
-            end
-
-            response.status = 204
-            r.halt
+            pg_endpoint_helper.delete_metric_destination(metric_destination_ubid)
           end
         end
       end
 
       r.post "restore" do
-        Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
-        Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
-
-        st = Prog::Postgres::PostgresResourceNexus.assemble(
-          project_id: @project.id,
-          location: pg.location,
-          name: r.params["name"],
-          target_vm_size: pg.target_vm_size,
-          target_storage_size_gib: pg.target_storage_size_gib,
-          parent_id: pg.id,
-          restore_target: r.params["restore_target"]
-        )
-
-        flash["notice"] = "'#{r.params["name"]}' will be ready in a few minutes"
-
-        r.redirect "#{@project.path}#{st.subject.path}"
+        pg_endpoint_helper.restore
       end
 
       r.post "reset-superuser-password" do
-        Authorization.authorize(@current_user.id, "Postgres:create", @project.id)
-        Authorization.authorize(@current_user.id, "Postgres:view", pg.id)
-
-        unless pg.representative_server.primary?
-          flash["error"] = "Superuser password cannot be updated during restore!"
-          return redirect_back_with_inputs
-        end
-
-        Validation.validate_postgres_superuser_password(r.params["original_password"], r.params["repeat_password"])
-
-        pg.update(superuser_password: r.params["original_password"])
-        pg.representative_server.incr_update_superuser_password
-
-        flash["notice"] = "The superuser password will be updated in a few seconds"
-
-        r.redirect "#{@project.path}#{pg.path}"
+        pg_endpoint_helper.reset_superuser_password
       end
 
       r.post "restart" do
-        Authorization.authorize(@current_user.id, "Postgres:edit", pg.id)
-        pg.servers.each do |s|
-          s.incr_restart
-        rescue Sequel::ForeignKeyConstraintViolation
-        end
-        r.redirect "#{@project.path}#{pg.path}"
+        pg_endpoint_helper.restart
       end
     end
   end
