@@ -25,39 +25,28 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
   def post(name: nil)
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
+
+    Validation.validate_postgres_location(@location)
+
+    required_parameters = ["size"]
+    required_parameters << "name" << "location" if @mode == AppMode::WEB
+    allowed_optional_parameters = ["storage_size", "ha_type"]
+    request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
+    parsed_size = Validation.validate_postgres_size(request_body_params["size"])
+
+    st = Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: project.id,
+      location: @location,
+      name: name,
+      target_vm_size: parsed_size.vm_size,
+      target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
+      ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
+    )
+
     if @mode == AppMode::API
-      Validation.validate_postgres_location(@location)
-
-      required_parameters = ["size"]
-      allowed_optional_parameters = ["storage_size", "ha_type"]
-      request_body_params = Validation.validate_request_body(@request.body.read, required_parameters, allowed_optional_parameters)
-
-      parsed_size = Validation.validate_postgres_size(request_body_params["size"])
-      st = Prog::Postgres::PostgresResourceNexus.assemble(
-        project_id: project.id,
-        location: @location,
-        name: name,
-        target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
-        ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
-      )
-
       Serializers::Postgres.serialize(st.subject, {detailed: true})
     else
-      parsed_size = Validation.validate_postgres_size(@request.params["size"])
-      location = LocationNameConverter.to_internal_name(@request.params["location"])
-      Validation.validate_postgres_location(location)
-      st = Prog::Postgres::PostgresResourceNexus.assemble(
-        project_id: project.id,
-        location: location,
-        name: @request.params["name"],
-        target_vm_size: parsed_size.vm_size,
-        target_storage_size_gib: @request.params["storage_size"],
-        ha_type: @request.params["ha_type"]
-      )
-
-      flash["notice"] = "'#{@request.params["name"]}' will be ready in a few minutes"
-
+      flash["notice"] = "'#{name}' will be ready in a few minutes"
       @request.redirect "#{project.path}#{PostgresResource[st.id].path}"
     end
   end

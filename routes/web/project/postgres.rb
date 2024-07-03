@@ -9,7 +9,12 @@ class CloverWeb
     end
 
     r.post true do
-      pg_endpoint_helper.post
+      # API request for resource creation already has location in the URL.
+      # However for web endpoints the location is selected from the UI and
+      # cannot be dynamically put to the form's action. due to csrf checks.
+      # So we need to set the location here.
+      pg_endpoint_helper.instance_variable_set(:@location, LocationNameConverter.to_internal_name(r.params["location"]))
+      pg_endpoint_helper.post(name: r.params["name"])
     end
 
     r.on "create" do
