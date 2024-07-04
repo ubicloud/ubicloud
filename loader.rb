@@ -16,6 +16,7 @@ require "rack/unreloader"
 
 REPL = false unless defined? REPL
 Warning.ignore(/To use (retry|multipart) middleware with Faraday v2\.0\+, install `faraday-(retry|multipart)` gem/)
+Warning.ignore(%r{/ruby/[0-9.]+/lib/ruby/gems/[0-9.]+/gems})
 
 Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) { Clover }
 
