@@ -1,0 +1,23 @@
+<div>
+  <div class="hidden">
+    <label for="tabs" class="sr-only">Select a tab</label>
+    <!-- Use an "onChange" listener to redirect the user to the selected tab URL. -->
+    <select id="tabs" name="tabs" class="block w-full rounded-md border-gray-300 focus:border-orange-600 focus:ring-orange-600">
+      <option selected>private_subnets</option>
+      <option>firewalls</option>
+    </select>
+  </div>
+  <div class="sm:block rounded-lg ring-1 ring-black ring-opacity-5">
+    <nav class="isolate flex divide-x divide-gray-200 rounded-lg shadow" aria-label="Tabs">
+      <% [
+        ["Private Subnets", @project_data[:path] + "/private-subnet"],
+        ["Firewalls", @project_data[:path] + "/firewall"]
+      ].each do |label, url| %>
+        <a href="<%= url %>" class="group relative min-w-0 flex-1 overflow-hidden rounded-l-lg px-4 py-4 text-center text-sm bg-white font-medium focus:z-10 <%= request.path == url ? 'text-orange-700' : ' hover:text-orange-500 hover:bg-orange-50' =%>">
+          <span><%= label %></span>
+          <span aria-hidden="true" class="absolute inset-x-0 bottom-0 h-0.5 <%= request.path == url ? 'bg-orange-600' : 'bg-transparent' %>"></span>
+        </a>
+      <% end %>
+    </nav>
+  </div>
+</div>

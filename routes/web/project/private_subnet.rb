@@ -5,7 +5,7 @@ class CloverWeb
     r.get true do
       @pss = Serializers::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:view").all, {include_path: true})
 
-      view "private_subnet/index"
+      view "networking/private_subnet/index"
     end
 
     r.post true do
@@ -27,7 +27,7 @@ class CloverWeb
       r.get true do
         Authorization.authorize(@current_user.id, "PrivateSubnet:create", @project.id)
 
-        view "private_subnet/create"
+        view "networking/private_subnet/create"
       end
     end
   end
