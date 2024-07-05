@@ -18,6 +18,17 @@ RSpec.describe GithubInstallation do
       Strand.create(prog: "Github::RunnerNexus", label: "allocate_vm") { _1.id = gr.id }
     end
 
+    expect(installation.total_active_runner_cores).to eq(3)
+  end
+
+  it "returns sum of used vm cores for arm64" do
+    vms = [2, 4].map { create_vm(cores: _1, arch: "arm64") }
+
+    vms.each do |vm|
+      gr = GithubRunner.create_with_id(installation_id: installation.id, vm_id: vm.id, repository_name: "test-repo", label: "ubicloud-standard-#{vm.cores}-arm")
+      Strand.create(prog: "Github::RunnerNexus", label: "allocate_vm") { _1.id = gr.id }
+    end
+
     expect(installation.total_active_runner_cores).to eq(6)
   end
 end
