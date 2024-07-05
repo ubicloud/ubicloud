@@ -122,3 +122,6 @@ class Prog::Test < Prog::Base
     push Prog::Test, {"subject_id" => "70b633b7-1d24-4526-a47f-d2580597d53f"}
   end
 end
+
+class Prog::Test2 < Prog::Test
+end
