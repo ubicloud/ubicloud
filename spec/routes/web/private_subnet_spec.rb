@@ -46,7 +46,7 @@ RSpec.describe Clover, "private subnet" do
         visit "#{project.path}/private-subnet"
 
         expect(page.title).to eq("Ubicloud - Private Subnets")
-        expect(page).to have_content "No private subnets"
+        expect(page).to have_content "No Private Subnets"
 
         click_link "New Private Subnet"
         expect(page.title).to eq("Ubicloud - Create Private Subnet")

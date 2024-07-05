@@ -28,19 +28,12 @@
             <%== render(
               "layouts/sidebar/item",
               locals: {
-                name: "Private Subnet",
+                name: "Networking",
                 url: "#{@project_data[:path]}/private-subnet",
-                is_active: request.path.start_with?("#{@project_data[:path]}/private-subnet"),
+                is_active:
+                  request.path.start_with?("#{@project_data[:path]}/private-subnet") ||
+                  request.path.start_with?("#{@project_data[:path]}/firewall"),
                 icon: "hero-globe-alt"
-              }
-            ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
-                name: "Firewall",
-                url: "#{@project_data[:path]}/firewall",
-                is_active: request.path.start_with?("#{@project_data[:path]}/firewall"),
-                icon: "hero-firewall"
               }
             ) %>
             <%== render(

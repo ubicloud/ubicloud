@@ -16,7 +16,7 @@ class CloverWeb
 
         @nics = Serializers::Nic.serialize(ps.nics)
 
-        view "private_subnet/show"
+        view "networking/private_subnet/show"
       end
 
       r.delete true do

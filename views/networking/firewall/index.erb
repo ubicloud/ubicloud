@@ -1,26 +1,6 @@
 <% @page_title = "Firewalls" %>
-
+<%== render("networking/tabbar") %>
 <% if @firewalls.count > 0 %>
-  <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        back: @project_data[:path],
-        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Firewalls", "#"]]
-      }
-    ) %>
-
-    <%== render(
-      "components/page_header",
-      locals: {
-        title: "Firewalls",
-        right_items: has_project_permission("Firewall:create") ? [
-          render("components/button", locals: { text: "Create Firewall", link: "firewall/create" })
-        ] : []
-      }
-    ) %>
-  </div>
-
   <div class="grid gap-6">
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <table class="min-w-full divide-y divide-gray-300">
@@ -52,17 +32,26 @@
       </table>
     </div>
   </div>
+  <div class="flex justify-end space-y-1 mt-6">
+      <% if has_project_permission("Firewall:create")%>
+      <%== render(
+        "components/button", locals: { text: "Create Firewall", link: "firewall/create" })
+      %>
+      <% end %>
+  </div>
 <% else %>
-  <%== render(
-    "components/empty_state",
-    locals: {
-      icon: "hero-x-circle",
-      title: "No firewalls",
-      description: "You don't have permission to create firewalls."
-    }.merge(has_project_permission("Firewall:create") ? {
-      description: "Get started by creating a new firewall.",
-      button_link: "#{@project_data[:path]}/firewall/create",
-      button_title: "New Firewall"
-    } : {})
-  ) %>
+  <div class="mt-6">
+    <%== render(
+      "components/empty_state",
+      locals: {
+        icon: "hero-x-circle",
+        title: "No firewalls",
+        description: "You don't have permission to create firewalls."
+      }.merge(has_project_permission("Firewall:create") ? {
+        description: "Get started by creating a new firewall.",
+        button_link: "#{@project_data[:path]}/firewall/create",
+        button_title: "New Firewall"
+      } : {})
+    ) %>
+  </div>
 <% end %>

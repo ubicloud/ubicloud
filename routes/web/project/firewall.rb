@@ -6,7 +6,7 @@ class CloverWeb
       authorized_firewalls = @project.firewalls_dataset.authorized(@current_user.id, "Firewall:view").all
       @firewalls = Serializers::Firewall.serialize(authorized_firewalls, {include_path: true})
 
-      view "firewall/index"
+      view "networking/firewall/index"
     end
 
     r.on "create" do
@@ -14,7 +14,7 @@ class CloverWeb
         Authorization.authorize(@current_user.id, "Firewall:create", @project.id)
         authorized_subnets = @project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:edit").all
         @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
-        view "firewall/create"
+        view "networking/firewall/create"
       end
     end
 
@@ -91,7 +91,7 @@ class CloverWeb
         @attachable_subnets = Serializers::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.map(&:id).include?(ps.id) })
         @firewall = Serializers::Firewall.serialize(fw, {detailed: true})
 
-        view "firewall/show"
+        view "networking/firewall/show"
       end
 
       r.on "firewall-rule" do
