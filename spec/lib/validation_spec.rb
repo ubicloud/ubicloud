@@ -45,7 +45,7 @@ RSpec.describe Validation do
       it "valid vm storage sizes" do
         [
           ["standard-2", "40"],
-          ["standard-2", "60"],
+          ["standard-2", "80"],
           ["standard-4", "160"]
         ].each do |vm_size, storage_size|
           expect(described_class.validate_vm_storage_size(vm_size, storage_size)).to eq(storage_size.to_f)
