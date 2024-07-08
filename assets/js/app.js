@@ -196,10 +196,9 @@ $("input[name=size]").on("change", function (event) {
   setupLocationBasedPostgresHaPrices();
 });
 
-$(".storage-slider").on("change", function (event) {
+$("input[name=storage_size]").on("change", function (event) {
   storage_size_options = $("input[name=size]:checked").data("storage-size-options");
   storage_size_index = parseInt($(".storage-slider").val());
-  $("input[name=storage_size]").val(storage_size_options[storage_size_index])
   setupLocationBasedPostgresHaPrices();
 });
 
@@ -257,26 +256,20 @@ function setupLocationBasedOptions() {
 }
 
 function setupInstanceSizeBasedOptions() {
-  $(".instance-size-based-option").each(function() {
-    let type = $(this).attr("type")
-    if(type == "range" && $(this).hasClass("storage-slider")){
-      storage_size_options = $("input[name=size]:checked").data("storage-size-options");
-      storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
+  $(".instance-size-based-storage-sizes").each(function() {
+    storage_size_options = $("input[name=size]:checked").data("storage-size-options");
+    storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
+    storage_size_index = 0;
 
-      $(this).attr("max", storage_size_options.length - 1);
-      storage_size_index = parseInt($(".storage-slider").val());
-      $("input[name=storage_size]").val(storage_size_options[storage_size_index])
+    $(this).find(".storage-size").each(function() {
+      let storage_amount = storage_size_options[storage_size_index];
+      let monthlyPrice = storage_amount * $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"];
 
-      let monthlyPrice = $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"]
-      $(this).data("monthly-price", monthlyPrice);
-
-      $(this).next().html("");
-      for(var i = 0; i < storage_size_options.length; i++) {
-        let storage_amount = storage_size_options[i];
-        let content = storage_amount + "GB<br/>+$" + (storage_amount * monthlyPrice).toFixed(2);
-        $(this).next().append("<li class='flex justify-right sm:justify-center relative items-center rotate-90 sm:rotate-0 mb-6 sm:mb-0'><span class='absolute text-center'>" + content + "</span></li>");
-      }
-    }
+      $(this).find("input[type=radio]").val(storage_amount);
+      $(this).find(".storage-size-label").text(storage_amount + "GB (" + (storage_amount / storage_size_options[0]) + "x)");
+      $(this).find(".storage-size-price").text("+$" + (monthlyPrice).toFixed(2));
+      storage_size_index++;
+    });
   });
 }
 
