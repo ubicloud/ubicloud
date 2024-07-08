@@ -239,7 +239,7 @@ function setupLocationBasedPostgresHaPrices() {
   $("input.location-based-postgres-ha-price").each(function(i, obj) {
     let value = $(this).val();
     let monthlyComputePrice = parseFloat($("input[name=size]:checked").data("monthly-price"))
-    let monthlyStoragePrice = parseFloat($("input[name=storage_size]").val()) * parseFloat($(".storage-slider").data("monthly-price"))
+    let monthlyStoragePrice = parseFloat($("input[name=storage_size]:checked").data("monthly-price"))
     let monthlyPrice = monthlyComputePrice + monthlyStoragePrice;
     let standbyCount = $(this).data("standby-count");
     $(`.ha-status-${value}`).show();
@@ -266,6 +266,7 @@ function setupInstanceSizeBasedOptions() {
       let monthlyPrice = storage_amount * $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"];
 
       $(this).find("input[type=radio]").val(storage_amount);
+      $(this).find("input[type=radio]").data("monthly-price", monthlyPrice);
       $(this).find(".storage-size-label").text(storage_amount + "GB (" + (storage_amount / storage_size_options[0]) + "x)");
       $(this).find(".storage-size-price").text("+$" + (monthlyPrice).toFixed(2));
       storage_size_index++;
