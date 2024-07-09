@@ -12,14 +12,18 @@ class Firewall < Sequel::Model
   include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
   def hyper_tag_name(project)
-    "project/#{project.ubid}/firewall/#{ubid}"
+    "project/#{project.ubid}/location/#{display_location}/firewall/#{name}"
   end
 
   dataset_module Pagination
   dataset_module Authorization::Dataset
 
+  def display_location
+    LocationNameConverter.to_display_name(location)
+  end
+
   def path
-    "/firewall/#{ubid}"
+    "/location/#{display_location}/firewall/#{name}"
   end
 
   def remove_firewall_rule(firewall_rule)
