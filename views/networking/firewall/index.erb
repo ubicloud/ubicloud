@@ -9,6 +9,8 @@
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
             font-semibold text-gray-900 sm:pl-6">Name</th>
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
+            font-semibold text-gray-900 sm:pl-6">Location</th>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
             font-semibold text-gray-900 sm:pl-6">Description</th>
           </tr>
         </thead>
@@ -25,6 +27,7 @@
                   <%= fw[:name] %>
                 <% end %>
               </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fw[:location] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fw[:description] %></td>
             </tr>
           <% end %>
