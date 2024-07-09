@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch(:project_firewall_prefix, "firewall-rule") do |r|
+  hash_branch(:project_location_firewall_prefix, "firewall-rule") do |r|
     r.post true do
       Authorization.authorize(@current_user.id, "Firewall:edit", @firewall.id)
 
