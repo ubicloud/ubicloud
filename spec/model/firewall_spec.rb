@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe Firewall do
   describe "Firewall" do
     let(:fw) {
-      described_class.create_with_id(name: "test-fw", description: "test fw desc")
+      described_class.create_with_id(name: "test-fw", description: "test fw desc", location: "hetzner-hel1")
     }
 
     it "inserts firewall rules" do

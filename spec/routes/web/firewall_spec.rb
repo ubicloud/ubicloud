@@ -10,13 +10,13 @@ RSpec.describe Clover, "firewall" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
 
   let(:firewall) do
-    fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw")
+    fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-hel1")
     fw.associate_with_project(project)
     fw
   end
 
   let(:fw_wo_permission) {
-    fw = Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2")
+    fw = Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location: "hetzner-hel1")
     fw.associate_with_project(project_wo_permissions)
     fw
   }
@@ -153,7 +153,7 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "raises not found when firewall not exists" do
-        visit "#{project.path}/firewall/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/hetzner-hel1/firewall/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
