@@ -20,7 +20,12 @@
   <%== render(
     "components/kv_data_card",
     locals: {
-      data: [["ID", @firewall[:id]], ["Name", @firewall[:name]], ["Description", @firewall[:description]]]
+      data: [
+        ["ID", @firewall[:id]],
+        ["Name", @firewall[:name]],
+        ["Location", @firewall[:location]],
+        ["Description", @firewall[:description]]
+      ]
     }
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">

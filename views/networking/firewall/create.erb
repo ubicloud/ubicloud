@@ -52,13 +52,27 @@
                   }
                 ) %>
               </div>
+              <div class="col-span-full">
+                <%== render(
+                  "components/form/radio_small_cards",
+                  locals: {
+                    name: "location",
+                    label: "Location",
+                    options: Option.locations.to_h { |l| [l.display_name, l.display_name] },
+                    selected: Option.locations.detect { |l| l.name == @default_location }&.display_name,
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
               <div class="sm:col-span-2">
                 <%== render(
                   "components/form/select",
                   locals: {
                     name: "private-subnet-id",
                     label: "Private Subnet",
-                    options: @subnets.map { |s| [s[:id], s[:name]] },
+                    options: @subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] },
                     placeholder: "Select private subnet"
                   }
                 ) %>
