@@ -48,7 +48,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "uses firewall if provided" do
-      fw = Firewall.create_with_id(name: "default-firewall").tap { _1.associate_with_project(prj) }
+      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1").tap { _1.associate_with_project(prj) }
       ps = described_class.assemble(prj.id, firewall_id: fw.id)
       expect(ps.subject.firewalls.count).to eq(1)
       expect(ps.subject.firewalls.first).to eq(fw)
@@ -57,18 +57,18 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "fails if provided firewall does not exist" do
       expect {
         described_class.assemble(prj.id, firewall_id: "550e8400-e29b-41d4-a716-446655440000")
-      }.to raise_error RuntimeError, "Firewall with id 550e8400-e29b-41d4-a716-446655440000 does not exist"
+      }.to raise_error RuntimeError, "Firewall with id 550e8400-e29b-41d4-a716-446655440000 and location hetzner-hel1 does not exist"
     end
 
     it "fails if firewall is not in the project" do
-      fw = Firewall.create_with_id(name: "default-firewall")
+      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1")
       expect {
         described_class.assemble(prj.id, firewall_id: fw.id)
-      }.to raise_error RuntimeError, "Firewall with id #{fw.id} does not exist"
+      }.to raise_error RuntimeError, "Firewall with id #{fw.id} and location hetzner-hel1 does not exist"
     end
 
     it "fails if both allow_only_ssh and firewall_id are specified" do
-      fw = Firewall.create_with_id(name: "default-firewall").tap { _1.associate_with_project(prj) }
+      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1").tap { _1.associate_with_project(prj) }
       expect {
         described_class.assemble(prj.id, firewall_id: fw.id, allow_only_ssh: true)
       }.to raise_error RuntimeError, "Cannot specify both allow_only_ssh and firewall_id"

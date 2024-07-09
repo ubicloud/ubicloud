@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe FirewallRule do
   describe "FirewallRule" do
     let(:fw) {
-      Firewall.create_with_id
+      Firewall.create_with_id(location: "hetzner-hel1")
     }
 
     it "returns ip6? properly" do
