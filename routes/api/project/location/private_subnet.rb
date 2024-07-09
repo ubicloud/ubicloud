@@ -37,8 +37,8 @@ class CloverApi
           if request_body_params["firewall_id"]
             firewall_id = request_body_params["firewall_id"]
             fw = Firewall.from_ubid(firewall_id)
-            unless fw
-              fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{firewall_id}\" not found")
+            unless fw && fw.location == @location
+              fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{firewall_id}\" and location \"#{@location}\" is not found")
             end
             Authorization.authorize(@current_user.id, "Firewall:view", fw.id)
             fw.id

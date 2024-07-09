@@ -25,12 +25,12 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       ps.associate_with_project(project)
 
       firewall = if firewall_id
-        existing_fw = project.firewalls_dataset.first(Sequel[:firewall][:id] => firewall_id)
-        fail "Firewall with id #{firewall_id} does not exist" unless existing_fw
+        existing_fw = project.firewalls_dataset.where(location: location).first(Sequel[:firewall][:id] => firewall_id)
+        fail "Firewall with id #{firewall_id} and location #{location} does not exist" unless existing_fw
         existing_fw
       else
         port_range = allow_only_ssh ? 22..22 : 0..65535
-        new_fw = Firewall.create_with_id(name: "#{name}-default")
+        new_fw = Firewall.create_with_id(name: "#{name}-default", location: location)
         new_fw.associate_with_project(project)
         ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: new_fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
         new_fw
