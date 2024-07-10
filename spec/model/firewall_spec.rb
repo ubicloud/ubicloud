@@ -24,6 +24,14 @@ RSpec.describe Firewall do
       fw.insert_firewall_rule("0.0.0.0/0", nil)
     end
 
+    it "bulk sets firewall rules" do
+      fw.insert_firewall_rule("10.0.0.16/28", Sequel.pg_range(80..5432))
+      fw.insert_firewall_rule("0.0.0.0/32", Sequel.pg_range(5432..5432))
+      fw.replace_firewall_rules([{cidr: "0.0.0.0/32", port_range: Sequel.pg_range(5432..5432)}])
+      expect(fw.reload.firewall_rules.count).to eq(1)
+      expect(fw.reload.firewall_rules.first.cidr.to_s).to eq("0.0.0.0/32")
+    end
+
     it "associates with a private subnet" do
       ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
       expect(ps).to receive(:incr_update_firewall_rules)
