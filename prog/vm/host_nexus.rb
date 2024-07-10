@@ -124,6 +124,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def prep_reboot
+    register_deadline(:wait, 15 * 60)
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
