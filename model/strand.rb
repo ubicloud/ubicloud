@@ -29,7 +29,7 @@ SQL
     return false unless affected
     lease_time = affected.fetch(:lease)
 
-    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time}} }
+    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} }
     reload
 
     begin
@@ -79,7 +79,7 @@ SQL
   def unsynchronized_run
     start_time = Time.now
     prog_label = "#{prog}.#{label}"
-    Clog.emit("starting strand") { {strand: values, strand_started: {delay: start_time - schedule, prog_label: prog_label}} }
+    Clog.emit("starting strand") { {strand: values, strand_started: {prog_label: prog_label}} }
 
     if label == stack.first["deadline_target"].to_s
       if (pg = Page.from_tag_parts("Deadline", id, prog, stack.first["deadline_target"]))
