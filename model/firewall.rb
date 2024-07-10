@@ -38,6 +38,19 @@ class Firewall < Sequel::Model
     fwr
   end
 
+  def replace_firewall_rules(new_firewall_rules)
+    firewall_rules.each(&:destroy)
+    new_firewall_rules.each do |fwr|
+      FirewallRule.create_with_id(
+        firewall_id: id,
+        cidr: fwr[:cidr],
+        port_range: fwr[:port_range]
+      )
+    end
+
+    private_subnets.each(&:incr_update_firewall_rules)
+  end
+
   def destroy
     DB.transaction do
       private_subnets.each(&:incr_update_firewall_rules)
