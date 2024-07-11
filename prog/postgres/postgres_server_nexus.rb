@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   def_delegators :postgres_server, :vm
 
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :update_firewall_rules, :take_over, :configure_prometheus, :destroy
+  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [])
     DB.transaction do
@@ -44,8 +44,6 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         synchronization_status: synchronization_status,
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
-
-      postgres_server.create_resource_firewall_rules
 
       Strand.create(prog: "Postgres::PostgresServerNexus", label: "start") { _1.id = postgres_server.id }
     end
@@ -325,11 +323,6 @@ SQL
       decr_checkup
     end
 
-    when_update_firewall_rules_set? do
-      decr_update_firewall_rules
-      hop_update_firewall_rules
-    end
-
     when_configure_prometheus_set? do
       decr_configure_prometheus
       hop_configure_prometheus
@@ -344,18 +337,6 @@ SQL
     end
 
     nap 30
-  end
-
-  label def update_firewall_rules
-    register_deadline(:wait, 1 * 60)
-
-    # destroy the previous set of firewall rules
-    vm.firewalls.select { _1.name == postgres_server.ubid.to_s }.each(&:destroy)
-
-    # create a new set of firewall rules
-    postgres_server.create_resource_firewall_rules
-
-    hop_wait
   end
 
   label def unavailable

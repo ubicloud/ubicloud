@@ -34,7 +34,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
           private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")]
         )
       ),
-      private_subnet: instance_double(PrivateSubnet)
+      private_subnet: instance_double(PrivateSubnet, firewalls: [instance_double(Firewall)])
     ).as_null_object
   }
 
@@ -310,9 +310,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
-    it "increments update_firewall_rules semaphore of postgres server when update_firewall_rules is set" do
+    it "calls set_firewall_rules method of the postgres resource when update_firewall_rules is set" do
       expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
-      expect(postgres_resource.servers).to all(receive(:incr_update_firewall_rules))
+      expect(postgres_resource).to receive(:set_firewall_rules)
       expect { nx.wait }.to nap(30)
     end
   end
@@ -322,6 +322,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = instance_double(DnsZone)
       expect(described_class).to receive(:dns_zone).and_return(dns_zone)
 
+      expect(postgres_resource.private_subnet.firewalls).to all(receive(:destroy))
       expect(postgres_resource.private_subnet).to receive(:incr_destroy)
       expect(postgres_resource.servers).to all(receive(:incr_destroy))
 
@@ -335,6 +336,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "completes destroy even if dns zone is not configured" do
       expect(described_class).to receive(:dns_zone).and_return(nil)
+      expect(postgres_resource.private_subnet.firewalls).to all(receive(:destroy))
       expect(postgres_resource.private_subnet).to receive(:incr_destroy)
       expect(postgres_resource).to receive(:servers).and_return([])
 

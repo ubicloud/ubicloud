@@ -48,10 +48,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       )
       postgres_resource.associate_with_project(project)
 
-      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location).id
+      firewall = Firewall.create_with_id(name: "#{postgres_resource.ubid}-firewall", description: "Postgres default firewall")
+      firewall.associate_with_project(Project[Config.postgres_service_project_id])
+
+      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location, firewall_id: firewall.id).id
       postgres_resource.update(private_subnet_id: private_subnet_id)
 
       PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
+      postgres_resource.set_firewall_rules
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
 
@@ -177,8 +181,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     when_update_firewall_rules_set? do
-      postgres_resource.servers.each(&:incr_update_firewall_rules)
       decr_update_firewall_rules
+      postgres_resource.set_firewall_rules
     end
 
     nap 30
@@ -190,6 +194,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     decr_destroy
 
     strand.children.each { _1.destroy }
+    postgres_resource.private_subnet.firewalls.each(&:destroy)
     postgres_resource.private_subnet.incr_destroy
     servers.each(&:incr_destroy)
 
