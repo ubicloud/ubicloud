@@ -253,8 +253,7 @@ SQL
     postgres_server.run_query(commands)
 
     when_initial_provisioning_set? do
-      hop_wait if retval&.dig("msg") == "postgres server is restarted"
-      push self.class, frame, "restart"
+      push self.class, frame, "restart", next_label: "wait"
     end
 
     hop_wait

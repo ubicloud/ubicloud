@@ -67,14 +67,11 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#start" do
-    it "pushes a bootstrap rhizome process" do
-      expect(nx).to receive(:push).with(Prog::BootstrapRhizome, {"target_folder" => "host"}).and_call_original
-      expect { nx.start }.to hop("start", "BootstrapRhizome")
-    end
-
-    it "hops once BootstrapRhizome has returned" do
-      nx.strand.retval = {"msg" => "rhizome user bootstrapped and source installed"}
-      expect { nx.start }.to hop("prep")
+    it "pushes a bootstrap rhizome process and returns to prep label" do
+      expect { nx.start }.to hop("start", "BootstrapRhizome").with_hop { |hopped|
+        expect(nx).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { nx.pop("exit") }.to hop("prep")
     end
   end
 
@@ -149,29 +146,31 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#setup_hugepages" do
-    it "pushes the hugepage program" do
-      expect { nx.setup_hugepages }.to hop("start", "SetupHugepages")
-    end
-
-    it "hops once SetupHugepages has returned" do
-      nx.strand.retval = {"msg" => "hugepages installed"}
-      expect { nx.setup_hugepages }.to hop("setup_spdk")
+    it "pushes the hugepage program and returns to setup_spdk label" do
+      expect { nx.setup_hugepages }.to hop("start", "SetupHugepages").with_hop { |hopped|
+        expect(nx).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { nx.pop("exit") }.to hop("setup_spdk")
     end
   end
 
   describe "#setup_spdk" do
-    it "pushes the spdk program" do
+    it "pushes the spdk program and returns to calculate_spdk_cores label" do
       expect(nx).to receive(:push).with(Prog::Storage::SetupSpdk,
         {
           "version" => Config.spdk_version,
           "start_service" => false,
           "allocation_weight" => 100
-        }).and_call_original
-      expect { nx.setup_spdk }.to hop("start", "Storage::SetupSpdk")
+        }, next_label: "calculate_spdk_cores").and_call_original
+      expect { nx.setup_spdk }.to hop("start", "Storage::SetupSpdk").with_hop { |hopped|
+        expect(nx).to receive(:frame).and_return(hopped.strand_update_args[:stack].first)
+      }
+      expect { nx.pop("exit") }.to hop("calculate_spdk_cores")
     end
+  end
 
-    it "hops once SetupSpdk has returned" do
-      nx.strand.retval = {"msg" => "SPDK was setup"}
+  describe "#calculate_spdk_cores" do
+    it "hops afer updating used_cores of the host" do
       vmh = instance_double(VmHost)
       spdk_installation = SpdkInstallation.new(cpu_count: 4)
       allow(vmh).to receive_messages(
@@ -208,6 +207,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:donate).and_call_original
 
       expect { nx.wait_download_boot_images }.to nap(1)
+      expect { nx.calculate_spdk_cores }.to hop("prep_reboot")
     end
   end
 
