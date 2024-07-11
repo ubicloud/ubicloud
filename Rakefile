@@ -255,7 +255,7 @@ end
 
 begin
   namespace :linter do
-    # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
+    # "ubicloud/erb-formatter" can't be required without bundler setup because of custom repository.
     require "bundler/setup"
     Bundler.setup
 

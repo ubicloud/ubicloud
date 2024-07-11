@@ -1,9 +1,9 @@
 GIT
   remote: https://github.com/ubicloud/erb-formatter.git
-  revision: a9ff0001a1eb028e2186b222aeb02b07c04f9808
-  ref: a9ff0001a1eb028e2186b222aeb02b07c04f9808
+  revision: f9e10f2e1835eb910fc350e818f7fd4aa6946fec
+  ref: f9e10f2e1835eb910fc350e818f7fd4aa6946fec
   specs:
-    erb-formatter (0.4.3)
+    erb-formatter (0.7.3)
       syntax_tree (~> 6.0)
 
 GEM
