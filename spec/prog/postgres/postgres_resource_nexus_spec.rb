@@ -33,7 +33,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
           cores: 1,
           private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")]
         )
-      )
+      ),
+      private_subnet: instance_double(PrivateSubnet)
     ).as_null_object
   }
 
@@ -321,11 +322,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = instance_double(DnsZone)
       expect(described_class).to receive(:dns_zone).and_return(dns_zone)
 
-      expect(postgres_resource.servers.first.vm.private_subnets).to all(receive(:incr_destroy))
+      expect(postgres_resource.private_subnet).to receive(:incr_destroy)
       expect(postgres_resource.servers).to all(receive(:incr_destroy))
-      expect { nx.destroy }.to nap(5)
 
-      expect(postgres_resource).to receive(:servers).and_return([])
       expect(postgres_resource).to receive(:hostname)
       expect(dns_zone).to receive(:delete_record)
       expect(postgres_resource).to receive(:dissociate_with_project)
@@ -336,6 +335,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "completes destroy even if dns zone is not configured" do
       expect(described_class).to receive(:dns_zone).and_return(nil)
+      expect(postgres_resource.private_subnet).to receive(:incr_destroy)
       expect(postgres_resource).to receive(:servers).and_return([])
 
       expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})

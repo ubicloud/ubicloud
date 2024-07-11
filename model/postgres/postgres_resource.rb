@@ -12,6 +12,7 @@ class PostgresResource < Sequel::Model
   one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
   one_to_many :firewall_rules, class: PostgresFirewallRule, key: :postgres_resource_id
   one_to_many :metric_destinations, class: PostgresMetricDestination, key: :postgres_resource_id
+  many_to_one :private_subnet
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
   dataset_module Authorization::Dataset
