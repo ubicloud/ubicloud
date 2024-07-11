@@ -275,7 +275,7 @@ begin
       puts "Running ERB::Formatter..."
       require "erb/formatter/command_line"
       files = Dir.glob("views/**/*.erb").reject { _1.end_with?("icon.erb") }.entries
-      ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
+      ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "160"]).run
     end
 
     desc "Validate, lint, format OpenAPI YAML file"
