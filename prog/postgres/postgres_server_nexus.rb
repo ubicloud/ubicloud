@@ -13,7 +13,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
   semaphore :restart, :configure, :update_firewall_rules, :take_over, :configure_prometheus, :destroy
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, private_subnet_id: nil, exclude_host_ids: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -29,7 +29,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
           {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
         ],
         boot_image: postgres_resource.project.get_ff_postgresql_base_image || "postgres-ubuntu-2204",
-        private_subnet_id: private_subnet_id,
+        private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
         allow_only_ssh: true,
         exclude_host_ids: exclude_host_ids

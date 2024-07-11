@@ -48,6 +48,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       )
       postgres_resource.associate_with_project(project)
 
+      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location).id
+      postgres_resource.update(private_subnet_id: private_subnet_id)
+
       PostgresFirewallRule.create_with_id(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
@@ -162,7 +165,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     # Only create one standby at a time to ensure that they are allocated on different hosts
     if postgres_resource.required_standby_count + 1 > servers.count && servers.none? { _1.vm.vm_host.nil? }
       exclude_host_ids = Config.development? ? [] : servers.map { _1.vm.vm_host.id }
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", private_subnet_id: representative_server.vm.private_subnets.first.id, exclude_host_ids: exclude_host_ids)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id, timeline_access: "fetch", exclude_host_ids: exclude_host_ids)
     end
 
     when_refresh_dns_record_set? do
@@ -187,11 +190,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     decr_destroy
 
     strand.children.each { _1.destroy }
-    unless servers.empty?
-      servers.first.vm.private_subnets.each(&:incr_destroy)
-      servers.each(&:incr_destroy)
-      nap 5
-    end
+    postgres_resource.private_subnet.incr_destroy
+    servers.each(&:incr_destroy)
 
     Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
     postgres_resource.dissociate_with_project(postgres_resource.project)
