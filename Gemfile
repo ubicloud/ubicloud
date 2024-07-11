@@ -36,7 +36,7 @@ group :development do
   gem "awesome_print"
   gem "brakeman"
   gem "by", ">= 1.1.0"
-  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
+  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "f9e10f2e1835eb910fc350e818f7fd4aa6946fec"
   gem "foreman"
   gem "pry-byebug"
   gem "rackup"
