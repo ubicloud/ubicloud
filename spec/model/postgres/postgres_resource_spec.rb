@@ -55,4 +55,16 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:ha_type).and_return(PostgresResource::HaType::NONE, PostgresResource::HaType::ASYNC, PostgresResource::HaType::SYNC)
     (0..2).each { expect(postgres_resource.required_standby_count).to eq(_1) }
   end
+
+  it "sets firewall rules" do
+    firewall = instance_double(Firewall, name: "#{postgres_resource.ubid}-firewall")
+    expect(postgres_resource.private_subnet).to receive(:firewalls).and_return([firewall])
+    expect(postgres_resource).to receive(:firewall_rules).and_return([instance_double(PostgresFirewallRule, cidr: "0.0.0.0/0")])
+    expect(firewall).to receive(:replace_firewall_rules).with([
+      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
+      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
+      {cidr: "::/0", port_range: Sequel.pg_range(22..22)}
+    ])
+    postgres_resource.set_firewall_rules
+  end
 end

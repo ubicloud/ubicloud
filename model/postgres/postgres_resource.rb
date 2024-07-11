@@ -91,6 +91,13 @@ class PostgresResource < Sequel::Model
     required_standby_count_map[ha_type]
   end
 
+  def set_firewall_rules
+    vm_firewall_rules = firewall_rules.map { {cidr: _1.cidr.to_s, port_range: Sequel.pg_range(5432..5432)} }
+    vm_firewall_rules.push({cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)})
+    vm_firewall_rules.push({cidr: "::/0", port_range: Sequel.pg_range(22..22)})
+    private_subnet.firewalls.first.replace_firewall_rules(vm_firewall_rules)
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"
