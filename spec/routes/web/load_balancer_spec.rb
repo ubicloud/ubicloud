@@ -125,5 +125,172 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_content "Forbidden"
       end
     end
+
+    describe "show" do
+      it "can show load balancer details" do
+        lb
+        visit "#{project.path}/load-balancer"
+
+        expect(page.title).to eq("Ubicloud - Load Balancers")
+        expect(page).to have_content lb.name
+        expect(page).to have_content lb.hostname
+
+        click_link lb.name, href: "#{project.path}#{lb.path}"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content lb.name
+        expect(page).to have_content "Round Robin"
+      end
+
+      it "raises forbidden when does not have permissions" do
+        visit "#{project_wo_permissions.path}/location/eu-north-h1/load-balancer/#{lb_wo_permission.name}"
+
+        expect(page.title).to eq("Ubicloud - Forbidden")
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content "Forbidden"
+      end
+
+      it "raises not found when load balancer not exists" do
+        visit "#{project.path}/location/eu-north-h1/load-balancer/08s56d4kaj94xsmrnf5v5m3mav"
+
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content "ResourceNotFound"
+      end
+    end
+
+    describe "load-balancers" do
+      it "can show" do
+        visit "#{project.path}#{lb.path}"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content lb.name
+        expect(page).to have_content lb.private_subnet.name
+        expect(page).to have_content "Round Robin"
+        expect(page).to have_content "/up"
+        expect(page).to have_content "5"
+        expect(page).to have_content "3"
+      end
+
+      it "can attach vm" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
+        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+
+        visit "#{project.path}#{lb.path}"
+        select vm.name, from: "vm_id"
+        click_button "Attach"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content "VM is attached"
+        expect(lb.vms.count).to eq(1)
+
+        visit "#{project.path}#{lb.path}"
+        expect(page).to have_content lb.name
+        expect(page).to have_content vm.name
+        expect(page).to have_content 80
+        expect(page).to have_content 8000
+        expect(page).to have_content "down"
+        expect(page).to have_content "Hash Based"
+      end
+
+      it "can not attach vm when it is already attached to another load balancer" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        lb1 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+        lb2 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-4", src_port: 80, dst_port: 8000).subject
+        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+
+        visit "#{project.path}#{lb2.path}"
+        select vm.name, from: "vm_id"
+        lb1.add_vm(vm)
+        click_button "Attach"
+
+        expect(page.title).to eq("Ubicloud - #{lb2.name}")
+        expect(page).to have_content "VM is already attached to a load balancer"
+        expect(lb2.vms.count).to eq(0)
+      end
+
+      it "can not attach vm when it does not exist" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+
+        visit "#{project.path}#{lb.path}"
+        select vm.name, from: "vm_id"
+        vm.nics.first.destroy
+        vm.destroy
+        click_button "Attach"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content "VM not found"
+        expect(lb.vms.count).to eq(0)
+      end
+
+      it "can detach vm" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        expect(page).to have_no_content vm.name
+
+        lb.add_vm(vm)
+
+        visit "#{project.path}#{lb.path}"
+        click_button "Detach"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content "VM is detached"
+        expect(lb.vms.count).to eq(0)
+      end
+
+      it "can not detach vm when it does not exist" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+        vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+
+        visit "#{project.path}#{lb.path}"
+        select "dummy-vm-1", from: "vm_id"
+        click_button "Attach"
+        visit "#{project.path}#{lb.path}"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(lb.reload.vms.count).to eq(1)
+        vm.nics.first.destroy
+        vm.destroy
+        click_button "Detach"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content "VM not found"
+        expect(lb.reload.vms.count).to eq(0)
+      end
+    end
+
+    describe "delete" do
+      it "can delete load balancer" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+
+        visit "#{project.path}#{lb.path}"
+
+        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript enginer.
+        btn = find ".delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(lb.destroy_set?).to be true
+      end
+
+      it "can not delete load balancer when does not have permissions" do
+        # Give permission to view, so we can see the detail page
+        project_wo_permissions.access_policies.first.update(body: {
+          acls: [
+            {subjects: user.hyper_tag_name, actions: ["LoadBalancer:view"], objects: project_wo_permissions.hyper_tag_name}
+          ]
+        })
+
+        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}"
+
+        expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+    end
   end
 end
