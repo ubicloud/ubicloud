@@ -264,4 +264,8 @@ RSpec.describe UBID do
       described_class.decode("han2sefsk4f61k91z77vn0y978")
     }.to raise_error RuntimeError, "Couldn't decode ubid: han2sefsk4f61k91z77vn0y978"
   end
+
+  it "can be inspected" do
+    expect(described_class.parse("vmqsknkzw5164hkfnt6z6zgjps").inspect).to eq("#<UBID:Vm @ubid=\"vmqsknkzw5164hkfnt6z6zgjps\" @uuid=\"be6759ff-8509-8b74-8cdf-5d1be6fc256c\">")
+  end
 end
