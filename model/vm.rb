@@ -13,8 +13,8 @@ class Vm < Sequel::Model
   one_to_many :vm_storage_volumes, key: :vm_id, order: Sequel.desc(:boot)
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
   one_to_many :pci_devices, key: :vm_id, class: :PciDevice
-  many_to_many :load_balancers, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
-  one_to_many :load_balancers_vms, key: :vm_id, class: LoadBalancersVms
+  one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
+  one_to_one :load_balancers_vms, key: :vm_id, class: LoadBalancersVms
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 

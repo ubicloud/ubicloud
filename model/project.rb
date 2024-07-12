@@ -15,6 +15,7 @@ class Project < Sequel::Model
   many_to_many :private_subnets, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :postgres_resources, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :firewalls, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :load_balancers, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
 

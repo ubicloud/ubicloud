@@ -17,10 +17,16 @@ class LoadBalancer < Sequel::Model
   include SemaphoreMethods
   include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
+  dataset_module Authorization::Dataset
+  dataset_module Pagination
   semaphore :destroy, :update_load_balancer, :rewrite_dns_records
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{private_subnet.display_location}/load-balancer/#{name}"
+  end
+
+  def path
+    "/location/#{private_subnet.display_location}/load-balancer/#{name}"
   end
 
   def add_vm(vm)
