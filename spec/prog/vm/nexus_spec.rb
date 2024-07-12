@@ -706,7 +706,7 @@ RSpec.describe Prog::Vm::Nexus do
       end
 
       it "absorbs an already deleted errors as a success and hops to lb_expiry if vm is part of a load balancer" do
-        expect(vm).to receive(:load_balancers).and_return([instance_double(LoadBalancer)]).at_least(:once)
+        expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer)).at_least(:once)
         expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/).and_raise(
           Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
         )
@@ -744,7 +744,7 @@ RSpec.describe Prog::Vm::Nexus do
       it "naps for 10 minutes" do
         lb = instance_double(LoadBalancer)
         expect(lb).to receive(:evacuate_vm).with(vm)
-        expect(vm).to receive(:load_balancers).and_return([lb])
+        expect(vm).to receive(:load_balancer).and_return(lb)
         expect(vm).to receive(:incr_lb_expiry_started)
         expect { nx.wait_lb_expiry }.to nap(600)
       end
@@ -752,7 +752,7 @@ RSpec.describe Prog::Vm::Nexus do
       it "destroys properly after 10 minutes" do
         lb = instance_double(LoadBalancer)
         expect(lb).to receive(:remove_vm).with(vm)
-        expect(vm).to receive(:load_balancers).and_return([lb])
+        expect(vm).to receive(:load_balancer).and_return(lb)
         expect(vm).to receive(:lb_expiry_started_set?).and_return(true)
         expect(vm.vm_host.sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_net #{nx.vm_name}/)
         expect(vm).to receive(:destroy)

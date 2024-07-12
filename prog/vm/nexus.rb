@@ -406,7 +406,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       # If there is a load balancer setup, we want to keep the network setup in
       # tact for a while
-      action = vm.load_balancers.empty? ? "delete" : "delete_keep_net"
+      action = vm.load_balancer ? "delete_keep_net" : "delete"
       host.sshable.cmd("sudo host/bin/setup-vm #{action} #{q_vm}")
     end
 
@@ -423,7 +423,7 @@ class Prog::Vm::Nexus < Prog::Base
       vm.pci_devices_dataset.update(vm_id: nil)
     end
 
-    hop_wait_lb_expiry unless vm.load_balancers.empty?
+    hop_wait_lb_expiry if vm.load_balancer
 
     final_clean_up
 
@@ -433,13 +433,11 @@ class Prog::Vm::Nexus < Prog::Base
   label def wait_lb_expiry
     unless vm.lb_expiry_started_set?
       vm.incr_lb_expiry_started
-      vm.load_balancers.map { _1.evacuate_vm(vm) }
+      vm.load_balancer.evacuate_vm(vm)
       nap 10 * 60
     end
 
-    vm.load_balancers.each do |lb|
-      lb.remove_vm(vm)
-    end
+    vm.load_balancer.remove_vm(vm)
 
     vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
 
