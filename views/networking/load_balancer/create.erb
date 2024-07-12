@@ -1,0 +1,183 @@
+<% @page_title = "Create Load Balancer" %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: "#{@project_data[:path]}/load-balancer",
+      parts: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["Load Balancers", "#{@project_data[:path]}/load-balancer"],
+        %w[Create #]
+      ]
+    }
+  ) %>
+  <%== render("components/page_header", locals: { title: "Create Load Balancer" }) %>
+</div>
+
+<div class="grid gap-6">
+  <form action="<%= "#{@project_data[:path]}/load-balancer" %>" method="POST">
+    <%== csrf_tag("#{@project_data[:path]}/load-balancer") %>
+    <!-- Create Card -->
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your load balancer.</p>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-4 xl:col-span-2">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "name",
+                    label: "Name",
+                    attributes: {
+                      required: true,
+                      placeholder: "Enter name"
+                    }
+                  }
+                ) %>
+              </div>
+            </div>
+            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-4 xl:col-span-2">
+                <%== render(
+                  "components/form/select",
+                  locals: {
+                    name: "private_subnet_id",
+                    label: "Private Subnet",
+                    options: @subnets.map { |s| [s[:id], s[:name]] },
+                    placeholder: "Select private subnet"
+                  }
+                ) %>
+              </div>
+            </div>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/select",
+                  locals: {
+                    name: "algorithm",
+                    label: "Load Balancing Algorithm",
+                    options: ["round-robin", "hash-based"].map { |a| [a.tr("-", "_"), a] },
+                  }
+                ) %>
+              </div>
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "health_check_endpoint",
+                    label: "Health Check Endpoint",
+                    attributes: {
+                      required: true,
+                      placeholder: "/up"
+                    }
+                  }
+                ) %>
+              </div>
+            </div>
+            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "src_port",
+                    label: "Source Port",
+                    type: "number",
+                    attributes: {
+                      required: true,
+                      placeholder: "80"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "dst_port",
+                    label: "Destination Port",
+                    type: "number",
+                    attributes: {
+                      required: true,
+                      placeholder: "80"
+                    }
+                  }
+                ) %>
+              </div>
+            </div>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "health_check_interval",
+                    label: "Health Check Interval",
+                    type: "number",
+                    attributes: {
+                      required: true,
+                      placeholder: "30"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "health_check_timeout",
+                    label: "Health Check Timeout",
+                    type: "number",
+                    attributes: {
+                      required: true,
+                      placeholder: "10"
+                    }
+                  }
+                ) %>
+              </div>
+            </div>
+            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "health_check_up_threshold",
+                    label: "Health Check Healthy Threshold",
+                    type: "number",
+                    attributes: {
+                      required: true,
+                      placeholder: "3"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "health_check_down_threshold",
+                    label: "Health Check Unhealthy Threshold",
+                    type: "number",
+                    attributes: {
+                      required: true,
+                      placeholder: "3"
+                    }
+                  }
+                ) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="<%= @project_data[:path] %>/load-balancer" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
