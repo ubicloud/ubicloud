@@ -46,17 +46,24 @@ class GithubRepository < Sequel::Model
   end
 
   def destroy_blob_storage
-    admin_client.delete_bucket(bucket: bucket_name)
+    begin
+      admin_client.delete_bucket(bucket: bucket_name)
+    rescue Aws::S3::Errors::NoSuchBucket
+    end
+
     CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
     update(access_key: nil, secret_key: nil)
   end
 
   def setup_blob_storage
     DB.transaction do
-      admin_client.create_bucket({
-        bucket: bucket_name,
-        create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region}
-      })
+      begin
+        admin_client.create_bucket({
+          bucket: bucket_name,
+          create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region}
+        })
+      rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
+      end
 
       policies = [
         {
