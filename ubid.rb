@@ -190,6 +190,10 @@ class UBID
     @value
   end
 
+  def inspect
+    "#<UBID:#{TYPE2CLASS[to_s[..1]] || "Unknown"} @ubid=#{to_s.inspect} @uuid=#{to_uuid.inspect}>"
+  end
+
   #
   # Utility functions
   #
