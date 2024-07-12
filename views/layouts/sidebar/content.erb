@@ -32,7 +32,8 @@
                 url: "#{@project_data[:path]}/private-subnet",
                 is_active:
                   request.path.start_with?("#{@project_data[:path]}/private-subnet") ||
-                  request.path.start_with?("#{@project_data[:path]}/firewall"),
+                  request.path.start_with?("#{@project_data[:path]}/firewall") ||
+                  request.path.start_with?("#{@project_data[:path]}/load-balancer"),
                 icon: "hero-globe-alt"
               }
             ) %>
