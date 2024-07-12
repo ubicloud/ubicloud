@@ -1,0 +1,54 @@
+<% @page_title = "Load Balancers" %>
+<%== render("networking/tabbar") %>
+<% if @lbs.count > 0 %>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Hostname</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @lbs.each do |lb| %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <a href="<%= @project_data[:path] %><%= lb[:path] %>" class="text-orange-600 hover:text-orange-700">
+                <%= lb[:name] %>
+              </a>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+            <% if lb[:hostname] %>
+              <%== render("components/copieble_content", locals: { content: lb[:hostname], message: "Copied hostname" }) %>
+            <% else %>
+              Waiting for hostname to be ready
+            <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <div class="flex justify-end space-y-1 mt-6">
+    <% if has_project_permission("LoadBalancer:create")%>
+      <%== render(
+        "components/button", locals: { text: "Create Load Balancer", link: "load-balancer/create" })
+      %>
+    <% end %>
+  </div>
+<% else %>
+<div class="mt-6">
+  <%== render(
+    "components/empty_state",
+    locals: {
+      icon: "hero-arrows-pointing-out",
+      title: "No Load Balancers",
+      description: "You don't have permission to create Load Balancers."
+    }.merge(has_project_permission("LoadBalancer:create") ? {
+      description: "Get started by creating a new Load Balancer.",
+      button_link: "#{@project_data[:path]}/load-balancer/create",
+      button_title: "New Load Balancer"
+    } : {})
+  ) %>
+</div>
+<% end %>

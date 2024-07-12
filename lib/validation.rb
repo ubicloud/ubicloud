@@ -173,6 +173,17 @@ module Validation
     end_port ? [start_port, end_port] : [start_port]
   end
 
+  def self.validate_port(port_name, port)
+    fail ValidationFailed.new({port_name => "Port must be between 0 to 65535"}) unless port.to_i.to_s == port
+    fail ValidationFailed.new({port_name => "Port must be between 0 to 65535"}) unless (0..65535).cover?(port.to_i)
+    port.to_i
+  end
+
+  def self.validate_health_check_parameter(parameter_name, parameter_value)
+    fail ValidationFailed.new({parameter_name => "Value must be a positive integer."}) unless parameter_value.to_i.to_s == parameter_value && parameter_value.to_i > 0
+    parameter_value.to_i
+  end
+
   def self.validate_request_body(request_body, required_keys, allowed_optional_keys = [])
     begin
       request_body_params = JSON.parse(request_body)
