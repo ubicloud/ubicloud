@@ -149,14 +149,5 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
       expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
     end
-
-    it "deletes blob storage if it has one" do
-      expect(nx).to receive(:decr_destroy)
-      expect(github_repository).to receive(:destroy)
-      expect(github_repository).to receive(:access_key).and_return("access-key")
-      expect(github_repository).to receive(:destroy_blob_storage)
-
-      expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
-    end
   end
 end

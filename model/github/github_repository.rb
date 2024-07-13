@@ -10,6 +10,8 @@ class GithubRepository < Sequel::Model
   one_to_many :runners, key: :repository_id, class: :GithubRunner
   one_to_many :cache_entries, key: :repository_id, class: :GithubCacheEntry
 
+  plugin :association_dependencies, cache_entries: :destroy
+
   include ResourceMethods
   include SemaphoreMethods
 
@@ -45,6 +47,11 @@ class GithubRepository < Sequel::Model
     )
   end
 
+  def after_destroy
+    super
+    destroy_blob_storage if access_key
+  end
+
   def destroy_blob_storage
     begin
       admin_client.delete_bucket(bucket: bucket_name)
@@ -52,7 +59,7 @@ class GithubRepository < Sequel::Model
     end
 
     CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
-    update(access_key: nil, secret_key: nil)
+    this.update(access_key: nil, secret_key: nil)
   end
 
   def setup_blob_storage

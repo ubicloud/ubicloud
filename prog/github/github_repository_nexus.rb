@@ -115,8 +115,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       nap 5 * 60
     end
 
-    github_repository.destroy_blob_storage if github_repository.access_key
-
     github_repository.destroy
 
     pop "github repository destroyed"
