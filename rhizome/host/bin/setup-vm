@@ -40,7 +40,7 @@ begin
   ip4 = params.fetch("public_ipv4")
   local_ip4 = params.fetch("local_ipv4")
   unix_user = params.fetch("unix_user")
-  ssh_public_keys = params.fetch("ssh_public_keys") { [params.fetch("ssh_public_key")] }
+  ssh_public_keys = params.fetch("ssh_public_keys")
   nics = params.fetch("nics").map { |args| VmSetup::Nic.new(*args) }.freeze
   max_vcpus = params.fetch("max_vcpus")
   cpu_topology = params.fetch("cpu_topology")
