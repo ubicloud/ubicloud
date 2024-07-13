@@ -3,7 +3,7 @@
 require_relative "../spec_helper"
 
 RSpec.describe GithubRepository do
-  subject(:github_repository) { described_class.new(access_key: "my-token-id").tap { _1.id = "8823102a-2d5c-8e16-ac04-c60f1b6b9984" } }
+  subject(:github_repository) { described_class.new(name: "test", access_key: "my-token-id").tap { _1.id = "8823102a-2d5c-8e16-ac04-c60f1b6b9984" } }
 
   let(:blob_storage_client) { instance_double(Aws::S3::Client) }
   let(:cloudflare_client) { instance_double(CloudflareClient) }
@@ -17,6 +17,7 @@ RSpec.describe GithubRepository do
     it "deletes the bucket and token" do
       expect(blob_storage_client).to receive(:delete_bucket).with(bucket: "gph0hh0ahdbj6ng2cc3rvdecr8")
       expect(cloudflare_client).to receive(:delete_token).with(github_repository.access_key)
+      expect(github_repository).to receive(:this).and_return(github_repository)
       expect(github_repository).to receive(:update).with(access_key: nil, secret_key: nil)
       github_repository.destroy_blob_storage
     end
@@ -24,8 +25,28 @@ RSpec.describe GithubRepository do
     it "succeeds if the bucket is already deleted" do
       expect(blob_storage_client).to receive(:delete_bucket).and_raise(Aws::S3::Errors::NoSuchBucket.new(nil, nil))
       expect(cloudflare_client).to receive(:delete_token).with(github_repository.access_key)
+      expect(github_repository).to receive(:this).and_return(github_repository)
       expect(github_repository).to receive(:update).with(access_key: nil, secret_key: nil)
       github_repository.destroy_blob_storage
+    end
+  end
+
+  describe ".after_destroy" do
+    it "deletes the blob storage and cache entries" do
+      github_repository.save_changes
+      GithubCacheEntry.create_with_id(repository_id: github_repository.id, key: "k1", version: "v1", scope: "main", upload_id: "upload-123", committed_at: Time.now, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b")
+      expect(blob_storage_client).to receive(:delete_object)
+      expect(github_repository).to receive(:destroy_blob_storage)
+
+      github_repository.destroy
+    end
+
+    it "do not delete the blob storage if does not have one" do
+      github_repository.save_changes
+      expect(github_repository).to receive(:access_key)
+      expect(github_repository).not_to receive(:destroy_blob_storage)
+
+      github_repository.destroy
     end
   end
 
