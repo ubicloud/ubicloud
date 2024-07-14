@@ -149,7 +149,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def restore
+  def post_restore
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
 
@@ -174,7 +174,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
   end
 
-  def reset_superuser_password
+  def post_reset_superuser_password
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
 
@@ -204,7 +204,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
   end
 
-  def restart
+  def post_restart
     Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
     @resource.servers.each do |s|
       s.incr_restart
@@ -220,7 +220,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @app.view "postgres/create"
   end
 
-  def failover
+  def post_failover
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
 

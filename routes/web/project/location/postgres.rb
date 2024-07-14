@@ -12,49 +12,19 @@ class CloverWeb
 
       pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: @current_user, location: @location, resource: pg)
 
-      r.get true do
-        pg_endpoint_helper.get
-      end
+      routes = [
+        {method: :get, path: []},
+        {method: :delete, path: []},
+        {method: :post, path: ["firewall-rule"]},
+        {method: :delete, path: ["firewall-rule", String]},
+        {method: :post, path: ["metric-destination"]},
+        {method: :delete, path: ["metric-destination", String]},
+        {method: :post, path: ["restore"]},
+        {method: :post, path: ["reset-superuser-password"]},
+        {method: :post, path: ["restart"]}
+      ]
 
-      r.delete true do
-        pg_endpoint_helper.delete
-      end
-
-      r.on "firewall-rule" do
-        r.post true do
-          pg_endpoint_helper.post_firewall_rule
-        end
-
-        r.is String do |firewall_rule_ubid|
-          r.delete true do
-            pg_endpoint_helper.delete_firewall_rule(firewall_rule_ubid)
-          end
-        end
-      end
-
-      r.on "metric-destination" do
-        r.post true do
-          pg_endpoint_helper.post_metric_destination
-        end
-
-        r.is String do |metric_destination_ubid|
-          r.delete true do
-            pg_endpoint_helper.delete_metric_destination(metric_destination_ubid)
-          end
-        end
-      end
-
-      r.post "restore" do
-        pg_endpoint_helper.restore
-      end
-
-      r.post "reset-superuser-password" do
-        pg_endpoint_helper.reset_superuser_password
-      end
-
-      r.post "restart" do
-        pg_endpoint_helper.restart
-      end
+      add_routes(r, pg_endpoint_helper, routes)
     end
   end
 end
