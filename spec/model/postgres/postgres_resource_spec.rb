@@ -58,7 +58,7 @@ RSpec.describe PostgresResource do
 
   it "sets firewall rules" do
     firewall = instance_double(Firewall, name: "#{postgres_resource.ubid}-firewall")
-    expect(postgres_resource.private_subnet).to receive(:firewalls).and_return([firewall])
+    expect(postgres_resource).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, firewalls: [firewall]))
     expect(postgres_resource).to receive(:firewall_rules).and_return([instance_double(PostgresFirewallRule, cidr: "0.0.0.0/0")])
     expect(firewall).to receive(:replace_firewall_rules).with([
       {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
