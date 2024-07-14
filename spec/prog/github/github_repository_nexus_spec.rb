@@ -90,6 +90,45 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
   end
 
+  describe ".cleanup_cache" do
+    let(:blob_storage_client) { instance_double(Aws::S3::Client) }
+
+    before do
+      github_repository.save_changes
+      allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+    end
+
+    def create_cache_entry(**args)
+      defaults = {key: "k#{Random.rand}", version: "v1", scope: "main", repository_id: github_repository.id, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b", committed_at: Time.now}
+      GithubCacheEntry.create_with_id(**defaults.merge(args))
+    end
+
+    it "deletes cache entries that not accessed in the last 7 days" do
+      create_cache_entry(last_accessed_at: Time.now - 6 * 24 * 60 * 60)
+      ten_days_old = create_cache_entry(last_accessed_at: Time.now - 10 * 24 * 60 * 60)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: ten_days_old.blob_key)
+      nx.cleanup_cache
+    end
+
+    it "deletes cache entries that older than 7 days not accessed yet" do
+      six_days_old = create_cache_entry(last_accessed_at: nil, created_at: Time.now - 6 * 24 * 60 * 60)
+      ten_days_old = create_cache_entry(last_accessed_at: nil, created_at: Time.now - 10 * 24 * 60 * 60)
+      expect(blob_storage_client).not_to receive(:delete_object).with(bucket: github_repository.bucket_name, key: six_days_old.blob_key)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: ten_days_old.blob_key)
+      nx.cleanup_cache
+    end
+
+    it "deletes oldest cache entries if the total usage exceeds the limit" do
+      nine_gib_cache = create_cache_entry(created_at: Time.now - 10 * 60, size: 9 * 1024 * 1024 * 1024)
+      two_gib_cache = create_cache_entry(created_at: Time.now - 11 * 60, size: 2 * 1024 * 1024 * 1024)
+      three_gib_cache = create_cache_entry(created_at: Time.now - 12 * 60, size: 3 * 1024 * 1024 * 1024)
+      expect(blob_storage_client).not_to receive(:delete_object).with(bucket: github_repository.bucket_name, key: nine_gib_cache.blob_key)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: two_gib_cache.blob_key)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: three_gib_cache.blob_key)
+      nx.cleanup_cache
+    end
+  end
+
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
@@ -105,8 +144,10 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
   end
 
   describe "#wait" do
-    it "checks queued jobs and naps" do
+    it "checks queued jobs and cache usage then naps" do
+      expect(github_repository).to receive(:access_key).and_return("key")
       expect(nx).to receive(:check_queued_jobs)
+      expect(nx).to receive(:cleanup_cache)
       expect { nx.wait }.to nap(5 * 60)
     end
 

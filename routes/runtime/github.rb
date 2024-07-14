@@ -78,7 +78,7 @@ class CloverRuntime
           fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
         end
 
-        if size > 10 * 1024 * 1024 * 1024
+        if size > GithubRepository::CACHE_SIZE_LIMIT
           fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
         end
 
