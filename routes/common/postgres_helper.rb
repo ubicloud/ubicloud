@@ -213,7 +213,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.redirect "#{project.path}#{@resource.path}"
   end
 
-  def view_create_page
+  def get_create
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     @app.instance_variable_set(:@prices, @app.fetch_location_based_prices("PostgresCores", "PostgresStorage"))
     @app.instance_variable_set(:@has_valid_payment_method, project.has_valid_payment_method?)

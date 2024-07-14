@@ -73,8 +73,12 @@ module CloverBase
       request.is(*path) do |*args|
         path_routes.each do |route|
           request.public_send(route[:method], true) do
-            helper_method = path.select { _1.is_a?(String) }.map { _1.tr("-", "_") }.prepend(route[:method]).join("_").to_sym
-            helper.public_send(helper_method, *args)
+            if route[:proc].nil?
+              helper_method = path.select { _1.is_a?(String) }.map { _1.tr("-", "_") }.prepend(route[:method]).join("_").to_sym
+              helper.public_send(helper_method, *args)
+            else
+              route[:proc].call(helper, *args)
+            end
           end
         end
       end

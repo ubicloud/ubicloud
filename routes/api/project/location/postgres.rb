@@ -4,9 +4,7 @@ class CloverApi
   hash_branch(:project_location_prefix, "postgres") do |r|
     pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: @current_user, location: @location, resource: nil)
 
-    r.get true do
-      pg_endpoint_helper.list
-    end
+    add_routes(r, pg_endpoint_helper, [{method: :get, path: [], proc: proc { |pg_endpoint_helper, _| pg_endpoint_helper.list }}])
 
     routes = [
       {method: :get, path: []},
@@ -22,11 +20,16 @@ class CloverApi
       {method: :post, path: ["failover"]}
     ]
 
-    r.on "id" do
-      r.on String do |pg_ubid|
-        pg = PostgresResource.from_ubid(pg_ubid)
+    [{all: ["id", String]}, String].each_with_index do |path, index|
+      r.on path do |pg_identifier|
+        if index == 0
+          pg = PostgresResource.from_ubid(pg_identifier)
+        else
+          routes << {method: :post, path: [], proc: proc { |pg_endpoint_helper, _| pg_endpoint_helper.post(pg_identifier) }}
+          pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_identifier} }.first
+        end
 
-        if pg.nil? || pg.location != @location
+        if (pg.nil? || pg.location != @location) && !(index == 1 && request.post? && request.remaining_path == "")
           response.status = request.delete? ? 204 : 404
           request.halt
         end
@@ -34,21 +37,6 @@ class CloverApi
         pg_endpoint_helper.instance_variable_set(:@resource, pg)
         add_routes(request, pg_endpoint_helper, routes)
       end
-    end
-
-    r.on String do |pg_name|
-      r.post true do
-        pg_endpoint_helper.post(pg_name)
-      end
-
-      pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
-      if pg.nil?
-        response.status = request.delete? ? 204 : 404
-        request.halt
-      end
-
-      pg_endpoint_helper.instance_variable_set(:@resource, pg)
-      add_routes(request, pg_endpoint_helper, routes)
     end
   end
 end
