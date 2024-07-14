@@ -65,12 +65,6 @@ task :test_down do
   migrate.call("test", version)
 end
 
-desc "Migrate test database all the way down and then back up"
-task :test_bounce do
-  migrate.call("test", 0)
-  Sequel::Migrator.apply(DB, "migrate")
-end
-
 desc "Migrate development database to latest version"
 task :dev_up do
   migrate.call("development", nil)
@@ -80,12 +74,6 @@ desc "Migrate development database down. If VERSION isn't given, migrates to all
 task :dev_down do
   version = ENV["VERSION"].to_i || 0
   migrate.call("development", version)
-end
-
-desc "Migrate development database all the way down and then back up"
-task :dev_bounce do
-  migrate.call("development", 0)
-  Sequel::Migrator.apply(DB, "migrate")
 end
 
 desc "Migrate production database to latest version"
