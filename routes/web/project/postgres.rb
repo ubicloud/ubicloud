@@ -14,7 +14,7 @@ class CloverWeb
       # cannot be dynamically put to the form's action. due to csrf checks.
       # So we need to set the location here.
       pg_endpoint_helper.instance_variable_set(:@location, LocationNameConverter.to_internal_name(r.params["location"]))
-      pg_endpoint_helper.post(name: r.params["name"])
+      pg_endpoint_helper.post(r.params["name"])
     end
 
     r.on "create" do

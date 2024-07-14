@@ -22,7 +22,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
   end
 
-  def post(name: nil)
+  def post(name)
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 

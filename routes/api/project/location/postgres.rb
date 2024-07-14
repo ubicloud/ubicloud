@@ -38,7 +38,7 @@ class CloverApi
 
     r.on String do |pg_name|
       r.post true do
-        pg_endpoint_helper.post(name: pg_name)
+        pg_endpoint_helper.post(pg_name)
       end
 
       pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
