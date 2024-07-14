@@ -68,6 +68,19 @@ module CloverBase
     end
   end
 
+  def add_routes(request, helper, routes)
+    routes.group_by { _1[:path] }.each do |path, path_routes|
+      request.is(*path) do |*args|
+        path_routes.each do |route|
+          request.public_send(route[:method], true) do
+            helper_method = path.select { _1.is_a?(String) }.map { _1.tr("-", "_") }.prepend(route[:method]).join("_").to_sym
+            helper.public_send(helper_method, *args)
+          end
+        end
+      end
+    end
+  end
+
   module ClassMethods
     def autoload_routes(route)
       route_path = "routes/#{route}"
