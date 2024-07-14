@@ -80,6 +80,25 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     @polling_interval = (remaining_quota < 0.5) ? 15 * 60 : 5 * 60
   end
 
+  def cleanup_cache
+    # Destroy cache entries not accessed in last 7 days or
+    # created more than 7 days ago and not accessed yet.
+    seven_days_ago = Time.now - 7 * 24 * 60 * 60
+    github_repository.cache_entries_dataset
+      .where { (last_accessed_at < seven_days_ago) | ((last_accessed_at =~ nil) & (created_at < seven_days_ago)) }
+      .destroy
+
+    # Destroy oldest cache entries if the total usage exceeds the limit.
+    total_usage = github_repository.cache_entries_dataset.sum(:size).to_i
+    if total_usage > GithubRepository::CACHE_SIZE_LIMIT
+      github_repository.cache_entries_dataset.order(:created_at).each do |oldest_entry|
+        break if total_usage <= GithubRepository::CACHE_SIZE_LIMIT
+        oldest_entry.destroy
+        total_usage -= oldest_entry.size
+      end
+    end
+  end
+
   def before_run
     when_destroy_set? do
       if strand.label != "destroy"
@@ -101,6 +120,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         nap 0
       end
     end
+
+    cleanup_cache if github_repository.access_key
 
     # check_queued_jobs may have changed the default polling interval based on
     # the remaining rate limit.

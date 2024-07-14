@@ -21,6 +21,8 @@ class GithubRepository < Sequel::Model
     enc.column :secret_key
   end
 
+  CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
+
   def bucket_name
     ubid
   end
