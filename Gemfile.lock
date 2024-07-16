@@ -204,7 +204,7 @@ GEM
     rake (13.2.1)
     refrigerator (1.7.0)
     regexp_parser (2.9.2)
-    rexml (3.3.1)
+    rexml (3.3.2)
       strscan
     roda (3.82.0)
       rack
@@ -244,7 +244,7 @@ GEM
       parser (>= 3.3.1.0)
     rubocop-capybara (2.21.0)
       rubocop (~> 1.41)
-    rubocop-erb (0.4.0)
+    rubocop-erb (0.4.1)
       better_html
       rubocop (~> 1.45)
     rubocop-performance (1.21.1)
@@ -276,7 +276,7 @@ GEM
     simplecov-html (0.12.3)
     simplecov_json_formatter (0.1.4)
     smart_properties (1.17.0)
-    standard (1.39.1)
+    standard (1.39.2)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.0)
       rubocop (~> 1.64.0)
