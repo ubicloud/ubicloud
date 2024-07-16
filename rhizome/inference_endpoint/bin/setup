@@ -1,0 +1,16 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+r <<~CMD
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+  && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+CMD
+
+r "sudo apt-get update"
+r "sudo apt-get install -y nvidia-container-toolkit docker.io nvidia-driver-550-server"
+r "sudo nvidia-ctk runtime configure --runtime=docker"
+r "systemctl restart docker"
