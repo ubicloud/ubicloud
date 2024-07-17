@@ -9,19 +9,19 @@ Signal.trap("TERM") { d.shutdown }
 if Config.heartbeat_url
   puts "Starting heartbeat prog"
   # We always insert the heartbeat using the same UBID ("stheartbeatheartbheartheaz")
-  Strand.dataset.insert_conflict.insert(id: "8b958d2d-cad4-5f3a-5634-b8b958d45caf", schedule: Time.now, prog: "Heartbeat", label: "wait")
+  Strand.dataset.insert_conflict.insert(id: "8b958d2d-cad4-5f3a-5634-b8b958d45caf", prog: "Heartbeat", label: "wait")
 end
 
 if Config.github_app_id
   # We always insert this strand using the same UBID ("stredelivergith0bfail0reaz")
-  Strand.dataset.insert_conflict.insert(id: "c39ae087-6ec4-033a-d440-b7a821061caf", schedule: Time.now, prog: "RedeliverGithubFailures", label: "wait", stack: [{last_check_at: Time.now}].to_json)
+  Strand.dataset.insert_conflict.insert(id: "c39ae087-6ec4-033a-d440-b7a821061caf", prog: "RedeliverGithubFailures", label: "wait", stack: [{last_check_at: Time.now}].to_json)
 end
 
 # We always insert this strand using the same UBID ("stresolvee4block0dnsnamesz")
-Strand.dataset.insert_conflict.insert(id: "c3b200ed-ce22-c33a-0326-06d735551d9f", schedule: Time.now, prog: "ResolveGloballyBlockedDnsnames", label: "wait")
+Strand.dataset.insert_conflict.insert(id: "c3b200ed-ce22-c33a-0326-06d735551d9f", prog: "ResolveGloballyBlockedDnsnames", label: "wait")
 
 # We always insert this strand using the same UBID ("stcheckzvsagezalertszzzzza")
-Strand.dataset.insert_conflict.insert(id: "645cc9ff-7954-1f3a-fa82-ec6b3ffffff5", schedule: Time.now, prog: "CheckUsageAlerts", label: "wait")
+Strand.dataset.insert_conflict.insert(id: "645cc9ff-7954-1f3a-fa82-ec6b3ffffff5", prog: "CheckUsageAlerts", label: "wait")
 
 clover_freeze
 

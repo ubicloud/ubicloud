@@ -14,7 +14,7 @@ class BootImage < Sequel::Model
 
   # Introduced for removing a boot image via REPL.
   def remove_boot_image
-    Strand.create_with_id(schedule: Time.now, prog: "RemoveBootImage", label: "start", stack: [{subject_id: id}])
+    Strand.create_with_id(prog: "RemoveBootImage", label: "start", stack: [{subject_id: id}])
   end
 
   def path

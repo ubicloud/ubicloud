@@ -177,19 +177,19 @@ class VmHost < Sequel::Model
       end
     end
 
-    Strand.create_with_id(schedule: Time.now, prog: "SetupNftables", label: "start", stack: [{subject_id: id}])
+    Strand.create_with_id(prog: "SetupNftables", label: "start", stack: [{subject_id: id}])
   end
 
   # Operational Functions
 
   # Introduced for refreshing rhizome programs via REPL.
   def install_rhizome(install_specs: false)
-    Strand.create_with_id(schedule: Time.now, prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs: install_specs}])
+    Strand.create_with_id(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs: install_specs}])
   end
 
   # Introduced for downloading a new boot image via REPL.
   def download_boot_image(image_name, version:, custom_url: nil)
-    Strand.create_with_id(schedule: Time.now, prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
+    Strand.create_with_id(prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
   end
 
   # Introduced for downloading firmware via REPL.
@@ -197,7 +197,7 @@ class VmHost < Sequel::Model
     version, sha256 = (arch == "x64") ? [version_x64, sha256_x64] : [version_arm64, sha256_arm64]
     fail ArgumentError, "No version provided" if version.nil?
     fail ArgumentError, "No SHA-256 digest provided" if sha256.nil?
-    Strand.create_with_id(schedule: Time.now, prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
+    Strand.create_with_id(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
   end
 
   # Introduced for downloading cloud hypervisor via REPL.
@@ -210,7 +210,7 @@ class VmHost < Sequel::Model
       fail "BUG: unexpected architecture"
     end
     fail ArgumentError, "No version provided" if version.nil?
-    Strand.create_with_id(schedule: Time.now, prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
+    Strand.create_with_id(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
   end
 
   def hetznerify(server_id)
