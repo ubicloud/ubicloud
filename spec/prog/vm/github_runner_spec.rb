@@ -27,7 +27,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   before do
     allow(Github).to receive(:installation_client).and_return(client)
-    allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123))
+    allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123, name: "test", id: "98ab1743-6998-8601-8a3c-b71631dd18ea"))
     allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94"))
   end
 
@@ -118,7 +118,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
     before do
-      allow(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project)).at_least(:once)
+      allow(github_runner.installation).to receive(:project).and_return(project)
       allow(github_runner).to receive(:workflow_job).and_return({"id" => 123})
     end
 
@@ -144,7 +144,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: github_runner.installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(time, time)).to eq(1)
     end
@@ -157,7 +157,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: github_runner.installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(time, time)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-2-arm")
@@ -171,7 +171,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: github_runner.installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(time, time)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-gpu-6")
@@ -186,7 +186,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       nx.update_billing_record
 
       expect { nx.update_billing_record }
-        .to change { BillingRecord[resource_id: project.id].amount }.from(5).to(10)
+        .to change { BillingRecord[resource_id: github_runner.installation.id].amount }.from(5).to(10)
     end
 
     it "create a new record for a new day" do
@@ -203,9 +203,9 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(BillingRecord).to receive(:create_with_id).and_call_original
       # Create tomorrow record
       expect { nx.update_billing_record }
-        .to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
+        .to change { BillingRecord.where(resource_id: github_runner.installation.id).count }.from(1).to(2)
 
-      expect(BillingRecord.where(resource_id: project.id).map(&:amount)).to eq([5, 5])
+      expect(BillingRecord.where(resource_id: github_runner.installation.id).map(&:amount)).to eq([5, 5])
     end
 
     it "tries 3 times and creates single billing record" do
@@ -217,7 +217,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect {
         3.times { nx.update_billing_record }
-      }.to change { BillingRecord.where(resource_id: project.id).count }.from(0).to(1)
+      }.to change { BillingRecord.where(resource_id: github_runner.installation.id).count }.from(0).to(1)
     end
 
     it "tries 4 times and fails" do
