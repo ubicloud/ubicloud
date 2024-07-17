@@ -79,7 +79,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       end_time = begin_time + 24 * 60 * 60
       used_amount = ((Time.now - github_runner.ready_at) / 60).ceil
       today_record = BillingRecord
-        .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
+        .where(project_id: project.id, resource_id: installation.id, billing_rate_id: rate_id)
         .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
         .first
 
@@ -89,8 +89,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       else
         BillingRecord.create_with_id(
           project_id: project.id,
-          resource_id: project.id,
-          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
+          resource_id: installation.id,
+          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")} (#{installation.name})",
           billing_rate_id: rate_id,
           span: Sequel.pg_range(begin_time...end_time),
           amount: used_amount
