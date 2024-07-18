@@ -25,7 +25,7 @@ RSpec.describe LoadBalancer do
     end
 
     it "returns hostname" do
-      expect(lb.hostname).to eq("test-lb.#{lb.ubid[-5...]}.lb.ubicloud.com")
+      expect(lb.hostname).to eq("test-lb.#{lb.private_subnet.ubid[-5...]}.lb.ubicloud.com")
     end
   end
 

@@ -32,7 +32,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 80).subject
       expect(LoadBalancer.count).to eq 2
       expect(lb.projects.first).to eq ps.projects.first
-      expect(lb.hostname).to eq "test-lb2.#{lb.ubid[-5...]}.lb.ubicloud.com"
+      expect(lb.hostname).to eq "test-lb2.#{ps.ubid[-5...]}.lb.ubicloud.com"
     end
   end
 
