@@ -2,9 +2,23 @@
 
 class Routes::Common::LoadBalancerHelper < Routes::Common::Base
   def list
-    lbs = Serializers::LoadBalancer.serialize(project.load_balancers_dataset.authorized(@user.id, "LoadBalancer:view").all, {include_path: true})
-    @app.instance_variable_set(:@lbs, lbs)
-    @app.view "networking/load_balancer/index"
+    if @mode == AppMode::API
+      dataset = project.load_balancers_dataset
+      result = dataset.authorized(@user.id, "LoadBalancer:view").paginated_result(
+        start_after: @request.params["start_after"],
+        page_size: @request.params["page_size"],
+        order_column: @request.params["order_column"]
+      )
+
+      {
+        items: Serializers::LoadBalancer.serialize(result[:records]),
+        count: result[:count]
+      }
+    else
+      lbs = Serializers::LoadBalancer.serialize(project.load_balancers_dataset.authorized(@user.id, "LoadBalancer:view").all, {include_path: true})
+      @app.instance_variable_set(:@lbs, lbs)
+      @app.view "networking/load_balancer/index"
+    end
   end
 
   def post(name: nil)
@@ -15,6 +29,15 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     request_body_params = Validation.validate_request_body(params, required_parameters)
 
     ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
+    unless ps
+      response.status = 404
+      if @mode == AppMode::API
+        @request.halt
+      else
+        flash["error"] = "Private subnet not found"
+        @request.redirect "#{project.path}/load-balancer/create"
+      end
+    end
     Authorization.authorize(@user.id, "PrivateSubnet:view", ps.id)
 
     lb = Prog::Vnet::LoadBalancerNexus.assemble(
@@ -26,9 +49,12 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
       health_check_endpoint: request_body_params["health_check_endpoint"]
     ).subject
 
-    flash["notice"] = "'#{name}' is created"
-
-    @request.redirect "#{project.path}#{lb.path}"
+    if @mode == AppMode::API
+      Serializers::LoadBalancer.serialize(lb, {detailed: true})
+    else
+      flash["notice"] = "'#{name}' is created"
+      @request.redirect "#{project.path}#{lb.path}"
+    end
   end
 
   def get
