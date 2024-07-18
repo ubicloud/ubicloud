@@ -5,8 +5,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   semaphore :destroy, :update_load_balancer, :rewrite_dns_records
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
-    health_check_endpoint: "/up", health_check_interval: 5, health_check_timeout: 3,
-    health_check_up_threshold: 3, health_check_down_threshold: 3)
+    health_check_endpoint: "/up", health_check_interval: 30, health_check_timeout: 15,
+    health_check_up_threshold: 3, health_check_down_threshold: 2)
 
     unless (ps = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"

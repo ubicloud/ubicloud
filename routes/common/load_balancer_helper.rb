@@ -10,9 +10,9 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
   def post(name: nil)
     Authorization.authorize(@user.id, "LoadBalancer:create", project.id)
 
-    required_parameters = %w[name private_subnet_id algorithm src_port dst_port health_check_endpoint]
-    allowed_optional_parameters = %w[health_check_interval health_check_timeout health_check_up_threshold health_check_down_threshold]
-    request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
+    required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_endpoint]
+    required_parameters << "name" if @mode == AppMode::WEB
+    request_body_params = Validation.validate_request_body(params, required_parameters)
 
     ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
     Authorization.authorize(@user.id, "PrivateSubnet:view", ps.id)
@@ -23,11 +23,7 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
       algorithm: request_body_params["algorithm"],
       src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
       dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
-      health_check_endpoint: request_body_params["health_check_endpoint"],
-      health_check_interval: Validation.validate_health_check_parameter(:health_check_interval, request_body_params["health_check_interval"]),
-      health_check_timeout: Validation.validate_health_check_parameter(:health_check_timeout, request_body_params["health_check_timeout"]),
-      health_check_up_threshold: Validation.validate_health_check_parameter(:health_check_up_threshold, request_body_params["health_check_up_threshold"]),
-      health_check_down_threshold: Validation.validate_health_check_parameter(:health_check_down_threshold, request_body_params["health_check_down_threshold"])
+      health_check_endpoint: request_body_params["health_check_endpoint"]
     ).subject
 
     flash["notice"] = "'#{name}' is created"

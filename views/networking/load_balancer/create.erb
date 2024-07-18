@@ -109,66 +109,6 @@
                 ) %>
               </div>
             </div>
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "health_check_interval",
-                    label: "Health Check Interval",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "30"
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "health_check_timeout",
-                    label: "Health Check Timeout",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "10"
-                    }
-                  }
-                ) %>
-              </div>
-            </div>
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "health_check_up_threshold",
-                    label: "Health Check Healthy Threshold",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "3"
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "health_check_down_threshold",
-                    label: "Health Check Unhealthy Threshold",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "3"
-                    }
-                  }
-                ) %>
-              </div>
-            </div>
           </div>
         </div>
       </div>

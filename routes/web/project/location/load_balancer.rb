@@ -7,11 +7,11 @@ class CloverWeb
       lb = pss.flat_map { _1.load_balancers_dataset.where { {Sequel[:load_balancer][:name] => lb_name} }.all }.first
 
       unless lb
-        response.status = 404
+        response.status = r.delete? ? 204 : 404
         r.halt
       end
 
-      load_balancer_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: @current_user, location: @location, resource: lb)
+      load_balancer_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: @current_user, resource: lb, location: nil)
 
       r.get true do
         load_balancer_endpoint_helper.get

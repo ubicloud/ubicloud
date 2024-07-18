@@ -77,10 +77,6 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Destination Port", with: 8000
         select "round-robin", from: "algorithm"
         fill_in "Health Check Endpoint", with: "/up"
-        fill_in "Health Check Interval", with: 5
-        fill_in "Health Check Timeout", with: 3
-        fill_in "Health Check Healthy Threshold", with: 5
-        fill_in "Health Check Unhealthy Threshold", with: 3
         select ps.name, from: "private_subnet_id"
 
         click_button "Create"
@@ -103,10 +99,6 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Destination Port", with: 8000
         select "round-robin", from: "algorithm"
         fill_in "Health Check Endpoint", with: "/up"
-        fill_in "Health Check Interval", with: 5
-        fill_in "Health Check Timeout", with: 3
-        fill_in "Health Check Healthy Threshold", with: 5
-        fill_in "Health Check Unhealthy Threshold", with: 3
         select ps.name, from: "private_subnet_id"
 
         click_button "Create"
@@ -123,6 +115,28 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
+      end
+
+      it "can not create load balancer with invalid private subnet" do
+        project
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        visit "#{project.path}/load-balancer/create"
+
+        expect(page.title).to eq("Ubicloud - Create Load Balancer")
+
+        fill_in "Name", with: "dummy-lb-1"
+        fill_in "Source Port", with: 80
+        fill_in "Destination Port", with: 8000
+        select "round-robin", from: "algorithm"
+        fill_in "Health Check Endpoint", with: "/up"
+        select ps.name, from: "private_subnet_id"
+
+        ps.destroy
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - Create Load Balancer")
+        expect(page).to have_content "Private subnet not found"
       end
     end
 
@@ -168,8 +182,6 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_content lb.private_subnet.name
         expect(page).to have_content "Round Robin"
         expect(page).to have_content "/up"
-        expect(page).to have_content "5"
-        expect(page).to have_content "3"
       end
 
       it "can attach vm" do
@@ -290,6 +302,21 @@ RSpec.describe Clover, "load balancer" do
         visit "#{project_wo_permissions.path}#{lb_wo_permission.path}"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can not delete load balancer when it doesn't exist" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+
+        visit "#{project.path}#{lb.path}"
+
+        lb.update(name: "new-name")
+        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript enginer.
+        btn = find ".delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(page.status_code).to eq(204)
       end
     end
   end
