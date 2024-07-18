@@ -61,7 +61,7 @@
                   locals: {
                     name: "algorithm",
                     label: "Load Balancing Algorithm",
-                    options: ["round-robin", "hash-based"].map { |a| [a.tr("-", "_"), a] },
+                    options: ["Round Robin", "Hash Based"].map { |a| [a.downcase.tr(" ", "_"), a] },
                   }
                 ) %>
               </div>

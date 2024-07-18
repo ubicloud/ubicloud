@@ -58,6 +58,45 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     end
   end
 
+  def patch
+    Authorization.authorize(@user.id, "LoadBalancer:edit", @resource.id)
+    request_body_params = Validation.validate_request_body(params, %w[algorithm src_port dst_port health_check_endpoint vms])
+    @resource.update(
+      algorithm: request_body_params["algorithm"],
+      src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
+      dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
+      health_check_endpoint: request_body_params["health_check_endpoint"]
+    )
+
+    request_body_params["vms"].each do |vm_id|
+      vm_id = vm_id.delete("\"")
+      vm = Vm.from_ubid(vm_id)
+      unless vm
+        response.status = 404
+        @request.halt
+      end
+
+      Authorization.authorize(@user.id, "Vm:view", vm.id)
+      if vm.reload.load_balancer && vm.load_balancer.id != @resource.id
+        fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
+      elsif vm.load_balancer && vm.load_balancer.id == @resource.id
+        next
+      end
+
+      @resource.add_vm(vm)
+    end
+
+    @resource.vms.map { _1.ubid }.reject { request_body_params["vms"].map { |vm_id| vm_id.delete("\"") }.include?(_1) }.each do |vm_id|
+      vm = Vm.from_ubid(vm_id)
+      @resource.evacuate_vm(vm)
+      @resource.remove_vm(vm)
+    end
+
+    response.status = 200
+    @resource.incr_update_load_balancer
+    Serializers::LoadBalancer.serialize(@resource.reload, {detailed: true})
+  end
+
   def get
     Authorization.authorize(@user.id, "LoadBalancer:view", @resource.id)
     if @mode == AppMode::API
@@ -66,7 +105,7 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
       vms = @resource.private_subnet.vms_dataset.authorized(@user.id, "Vm:view").all
       attached_vm_ids = @resource.vms.map(&:id)
       @app.instance_variable_set(:@attachable_vms, Serializers::Vm.serialize(vms.reject { attached_vm_ids.include?(_1.id) }))
-      @app.instance_variable_set(:@lb, Serializers::LoadBalancer.serialize(@resource, {detailed: true}))
+      @app.instance_variable_set(:@lb, Serializers::LoadBalancer.serialize(@resource, {detailed: true, vms_serialized: true}))
 
       @app.view "networking/load_balancer/show"
     end
