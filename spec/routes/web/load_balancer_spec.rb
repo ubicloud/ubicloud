@@ -75,7 +75,7 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Name", with: name
         fill_in "Load Balancer Port", with: 80
         fill_in "Application Port", with: 8000
-        select "round-robin", from: "algorithm"
+        select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
 
@@ -97,7 +97,7 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Name", with: "invalid name"
         fill_in "Load Balancer Port", with: 80
         fill_in "Application Port", with: 8000
-        select "round-robin", from: "algorithm"
+        select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
 
@@ -127,7 +127,7 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Name", with: "dummy-lb-1"
         fill_in "Load Balancer Port", with: 80
         fill_in "Application Port", with: 8000
-        select "round-robin", from: "algorithm"
+        select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
 
@@ -247,6 +247,7 @@ RSpec.describe Clover, "load balancer" do
         lb.add_vm(vm)
 
         visit "#{project.path}#{lb.path}"
+        expect(page).to have_content vm.name
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")

@@ -41,6 +41,10 @@ class CloverApi
       load_balancer_endpoint_helper.delete
     end
 
+    request.patch true do
+      load_balancer_endpoint_helper.patch
+    end
+
     request.on "attach-vm" do
       request.post true do
         load_balancer_endpoint_helper.post_attach_vm

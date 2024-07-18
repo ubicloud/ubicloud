@@ -26,10 +26,10 @@
         ["Connection String", @lb[:hostname], { copieble: true }],
         [
           "Private Subnet",
-          "<a href='#{@project_data[:path]}#{@lb[:subnet][:path]}' class='text-rose-500 hover:underline'>#{@lb[:subnet][:name]}</a>",
+          "<a href='#{@project_data[:path]}/location/#{@lb[:location]}/private-subnet/#{@lb[:subnet]}' class='text-rose-500 hover:underline'>#{@lb[:subnet]}</a>",
           { escape: false }
         ],
-        ["Algorithm", @lb[:algorithm]],
+        ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
         ["Load Balancer Port", @lb[:src_port]],
         ["Application Port", @lb[:dst_port]],
         ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]

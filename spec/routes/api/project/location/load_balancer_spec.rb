@@ -139,6 +139,91 @@ RSpec.describe Clover, "load-balancer" do
       end
     end
 
+    describe "update" do
+      let(:vm) {
+        nic = Nic.create_with_id(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
+        vm = create_vm
+        nic.update(vm_id: vm.id)
+        vm.associate_with_project(project)
+        vm
+      }
+
+      it "success" do
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "80",
+          health_check_endpoint: "/up", algorithm: "round_robin", vms: []
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("lb-1")
+      end
+
+      it "not found" do
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid", {
+          src_port: "80", dst_port: "80",
+          health_check_endpoint: "/up", algorithm: "round_robin", vms: []
+        }.to_json
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
+      it "missing required parameters" do
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
+      end
+
+      it "updates vms" do
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["vms"].length).to eq(1)
+      end
+
+      it "detaches vms" do
+        lb.add_vm(vm)
+
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: []
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(lb.reload.vms.count).to eq(0)
+        expect(JSON.parse(last_response.body)["vms"]).to eq([])
+      end
+
+      it "invalid vm" do
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: ["invalid"]
+        }.to_json
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
+
+      it "vm already attached to a different load balancer" do
+        lb2 = Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 80).subject
+        lb2.add_vm(vm)
+
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+        }.to_json
+
+        expect(last_response).to have_api_error(400)
+      end
+
+      it "vm already attached to the same load balancer" do
+        lb.add_vm(vm)
+
+        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+          src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+    end
+
     describe "attach-vm" do
       let(:vm) {
         nic = Nic.create_with_id(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
