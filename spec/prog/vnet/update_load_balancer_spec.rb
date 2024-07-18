@@ -1,13 +1,9 @@
 # frozen_string_literal: true
 
 RSpec.describe Prog::Vnet::UpdateLoadBalancer do
-  subject(:nx) {
-    described_class.new(st)
-  }
+  subject(:nx) { described_class.new(st) }
 
-  let(:st) {
-    Strand.create_with_id(prog: "Vnet::UpdateLoadBalancer", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
-  }
+  let(:st) { described_class.assemble(vm.id, label: "update_load_balancer", load_balancer_id: lb.id) }
   let(:lb) {
     prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject

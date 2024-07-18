@@ -6,16 +6,14 @@ RSpec.describe Prog::Storage::SetupSpdk do
   subject(:setup_spdk) {
     described_class.new(described_class.assemble(
       "adec2977-74a9-8b71-8473-cf3940a45ac5",
-      spdk_version,
+      version: spdk_version,
       start_service: true,
       allocation_weight: 50
     ))
   }
 
   let(:spdk_version) { "v23.09-ubi-0.2" }
-  let(:sshable) {
-    instance_double(Sshable)
-  }
+  let(:sshable) { instance_double(Sshable) }
   let(:vm_host) {
     Sshable.create { _1.id = "adec2977-74a9-8b71-8473-cf3940a45ac5" }
     VmHost.create(
@@ -68,7 +66,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
     end
 
     it "skips installing service if not asked to" do
-      ss2 = described_class.new(described_class.assemble(vm_host.id, spdk_version, start_service: false))
+      ss2 = described_class.new(described_class.assemble(vm_host.id, version: spdk_version, start_service: false))
       expect { ss2.start_service }.to hop("update_database")
     end
   end

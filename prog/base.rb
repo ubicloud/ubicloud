@@ -3,6 +3,14 @@
 class Prog::Base
   attr_reader :strand, :subject_id
 
+  def self.assemble(subject_id, label: "start", **frame)
+    Strand.create(
+      prog: Strand.prog_verify(self),
+      label: label,
+      stack: [{"subject_id" => subject_id}.merge(frame).transform_keys(&:to_s)]
+    ) { _1.id = Strand.generate_uuid }
+  end
+
   def initialize(strand, snap = nil)
     @snap = snap || SemSnap.new(strand.id)
     @strand = strand

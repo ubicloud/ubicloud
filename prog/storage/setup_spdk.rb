@@ -8,19 +8,6 @@ class Prog::Storage::SetupSpdk < Prog::Base
     ["v23.09-ubi-0.2", "arm64"]
   ]
 
-  def self.assemble(vm_host_id, version, start_service: false, allocation_weight: 0)
-    Strand.create_with_id(
-      prog: "Storage::SetupSpdk",
-      label: "start",
-      stack: [{
-        "subject_id" => vm_host_id,
-        "version" => version,
-        "start_service" => start_service,
-        "allocation_weight" => allocation_weight
-      }]
-    )
-  end
-
   label def start
     version = frame["version"]
     arch = vm_host.arch

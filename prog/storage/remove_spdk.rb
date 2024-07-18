@@ -3,16 +3,6 @@
 class Prog::Storage::RemoveSpdk < Prog::Base
   subject_is :spdk_installation
 
-  def self.assemble(spdk_installation_id)
-    Strand.create_with_id(
-      prog: "Storage::RemoveSpdk",
-      label: "start",
-      stack: [{
-        "subject_id" => spdk_installation_id
-      }]
-    )
-  end
-
   label def start
     vm_host = spdk_installation.vm_host
 

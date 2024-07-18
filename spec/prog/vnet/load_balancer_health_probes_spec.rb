@@ -1,13 +1,9 @@
 # frozen_string_literal: true
 
 RSpec.describe Prog::Vnet::LoadBalancerHealthProbes do
-  subject(:nx) {
-    described_class.new(st)
-  }
+  subject(:nx) { described_class.new(st) }
 
-  let(:st) {
-    Strand.create_with_id(prog: "Vnet::LoadBalancerHealthProbes", stack: [{"subject_id" => lb.id, "vm_id" => vm.id}], label: "health_probe")
-  }
+  let(:st) { described_class.assemble(lb.id, label: "health_probe", vm_id: vm.id) }
   let(:lb) {
     prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject

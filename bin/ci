@@ -11,14 +11,14 @@ def main(options)
 
   tests_to_wait = []
   if options[:test_cases].include?("vm")
-    encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
+    encrypted_vms_st = Prog::Test::VmGroup.assemble(nil, storage_encrypted: true, test_reboot: true, vms: [])
     log(encrypted_vms_st, "storage_encrypted: true")
     # Not running in parallel but waiting, since host is rebooted during test.
     # Rebooting makes the next test to test reboot practically as well depending
     # on when the host is rebooted and can cause flaky issues for github runner tests.
     wait_until(encrypted_vms_st)
 
-    unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
+    unencrypted_vms_st = Prog::Test::VmGroup.assemble(nil, storage_encrypted: false, test_reboot: false, vms: [])
     log(unencrypted_vms_st, "storage_encrypted: false")
     tests_to_wait << [unencrypted_vms_st, nil]
   end

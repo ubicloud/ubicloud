@@ -74,7 +74,7 @@ RSpec.describe VmHost do
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("InstallRhizome")
-      expect(args[:stack]).to eq([subject_id: vh.id, target_folder: "host", install_specs: false])
+      expect(args[:stack]).to eq(["subject_id" => vh.id, "target_folder" => "host", "install_specs" => false])
     end
     vh.install_rhizome
   end
@@ -83,7 +83,7 @@ RSpec.describe VmHost do
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("DownloadBootImage")
-      expect(args[:stack]).to eq([subject_id: vh.id, image_name: "my-image", custom_url: "https://example.com/my-image.raw", version: "20230303"])
+      expect(args[:stack]).to eq(["subject_id" => vh.id, "image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => "20230303"])
     end
     vh.download_boot_image("my-image", custom_url: "https://example.com/my-image.raw", version: "20230303")
   end
@@ -93,7 +93,7 @@ RSpec.describe VmHost do
     vh.arch = "x64"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("DownloadFirmware")
-      expect(args[:stack]).to eq([subject_id: vh.id, version: "202405", sha256: "sha-1"])
+      expect(args[:stack]).to eq(["subject_id" => vh.id, "version" => "202405", "sha256" => "sha-1"])
     end
     vh.download_firmware(version_x64: "202405", sha256_x64: "sha-1")
   end
@@ -103,7 +103,7 @@ RSpec.describe VmHost do
     vh.arch = "arm64"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("DownloadFirmware")
-      expect(args[:stack]).to eq([subject_id: vh.id, version: "202406", sha256: "sha-2"])
+      expect(args[:stack]).to eq(["subject_id" => vh.id, "version" => "202406", "sha256" => "sha-2"])
     end
     vh.download_firmware(version_arm64: "202406", sha256_arm64: "sha-2")
   end
@@ -122,7 +122,7 @@ RSpec.describe VmHost do
     vh.arch = "x64"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("DownloadCloudHypervisor")
-      expect(args[:stack]).to eq([subject_id: vh.id, version: "35.1", sha256_ch_bin: "sha-1", sha256_ch_remote: "sha-2"])
+      expect(args[:stack]).to eq(["subject_id" => vh.id, "version" => "35.1", "sha256_ch_bin" => "sha-1", "sha256_ch_remote" => "sha-2"])
     end
     vh.download_cloud_hypervisor(version_x64: "35.1", sha256_ch_bin_x64: "sha-1", sha256_ch_remote_x64: "sha-2")
   end
@@ -132,7 +132,7 @@ RSpec.describe VmHost do
     vh.arch = "arm64"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("DownloadCloudHypervisor")
-      expect(args[:stack]).to eq([subject_id: vh.id, version: "35.1", sha256_ch_bin: "sha-3", sha256_ch_remote: "sha-4"])
+      expect(args[:stack]).to eq(["subject_id" => vh.id, "version" => "35.1", "sha256_ch_bin" => "sha-3", "sha256_ch_remote" => "sha-4"])
     end
     vh.download_cloud_hypervisor(version_arm64: "35.1", sha256_ch_bin_arm64: "sha-3", sha256_ch_remote_arm64: "sha-4")
   end

@@ -3,18 +3,6 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
-  def self.assemble(storage_encrypted: true, test_reboot: true)
-    Strand.create_with_id(
-      prog: "Test::VmGroup",
-      label: "start",
-      stack: [{
-        "storage_encrypted" => storage_encrypted,
-        "test_reboot" => test_reboot,
-        "vms" => []
-      }]
-    )
-  end
-
   label def start
     hop_setup_vms
   end
