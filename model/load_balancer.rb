@@ -51,6 +51,6 @@ class LoadBalancer < Sequel::Model
   end
 
   def hostname
-    "#{name}.#{ubid[-5...]}.#{Config.load_balancer_service_hostname}"
+    "#{name}.#{private_subnet.ubid[-5...]}.#{Config.load_balancer_service_hostname}"
   end
 end
