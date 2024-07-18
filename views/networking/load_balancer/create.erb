@@ -54,8 +54,8 @@
                 ) %>
               </div>
             </div>
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-4 xl:col-span-2">
                 <%== render(
                   "components/form/select",
                   locals: {
@@ -65,27 +65,22 @@
                   }
                 ) %>
               </div>
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "health_check_endpoint",
-                    label: "Health Check Endpoint",
-                    attributes: {
-                      required: true,
-                      placeholder: "/up"
-                    }
-                  }
-                ) %>
-              </div>
             </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 mt-6 sm:p-6">
+        <div class="space-y-12">
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Forwarding Rule</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">Configures the routing of traffic from the load balancer to your virtual machines.</p>
             <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="col-span-6 md:col-span-2 xl:col-span-1">
                 <%== render(
                   "components/form/text",
                   locals: {
                     name: "src_port",
-                    label: "Source Port",
+                    label: "Load Balancer Port",
                     type: "number",
                     attributes: {
                       required: true,
@@ -99,7 +94,7 @@
                   "components/form/text",
                   locals: {
                     name: "dst_port",
-                    label: "Destination Port",
+                    label: "Application Port",
                     type: "number",
                     attributes: {
                       required: true,
@@ -111,6 +106,24 @@
             </div>
           </div>
         </div>
+      </div>
+      <div class="px-4 py-5 mt-6 sm:p-6">
+        <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+          <div class="col-span-6 md:col-span-2 xl:col-span-1">
+            <%== render(
+              "components/form/text",
+              locals: {
+                name: "health_check_endpoint",
+                label: "HTTP Health Check Endpoint",
+                attributes: {
+                  required: true,
+                  placeholder: "/up"
+                }
+              }
+            ) %>
+          </div>
+        </div>
+        <p class="mt-1 text-sm leading-6 text-gray-600">The health check endpoint is used in combination with the Application Port. Make sure it returns 200.</p>
       </div>
       <div class="px-4 py-5 sm:p-6">
         <div class="flex items-center justify-end gap-x-6">

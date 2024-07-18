@@ -73,8 +73,8 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
         name = "dummy-lb-1"
         fill_in "Name", with: name
-        fill_in "Source Port", with: 80
-        fill_in "Destination Port", with: 8000
+        fill_in "Load Balancer Port", with: 80
+        fill_in "Application Port", with: 8000
         select "round-robin", from: "algorithm"
         fill_in "Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
@@ -95,8 +95,8 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
 
         fill_in "Name", with: "invalid name"
-        fill_in "Source Port", with: 80
-        fill_in "Destination Port", with: 8000
+        fill_in "Load Balancer Port", with: 80
+        fill_in "Application Port", with: 8000
         select "round-robin", from: "algorithm"
         fill_in "Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
@@ -125,8 +125,8 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
 
         fill_in "Name", with: "dummy-lb-1"
-        fill_in "Source Port", with: 80
-        fill_in "Destination Port", with: 8000
+        fill_in "Load Balancer Port", with: 80
+        fill_in "Application Port", with: 8000
         select "round-robin", from: "algorithm"
         fill_in "Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
