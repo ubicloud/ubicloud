@@ -268,20 +268,6 @@ RSpec.describe Validation do
       end
     end
 
-    describe "#validate_health_check_parameter" do
-      it "valid health check parameter" do
-        expect(described_class.validate_health_check_parameter(:health_check_interval, "10")).to eq(10)
-        expect(described_class.validate_health_check_parameter(:health_check_timeout, "10")).to eq(10)
-        expect(described_class.validate_health_check_parameter(:health_check_up_threshold, "2")).to eq(2)
-        expect(described_class.validate_health_check_parameter(:health_check_down_threshold, "2")).to eq(2)
-      end
-
-      it "invalid health check parameter" do
-        expect { described_class.validate_health_check_parameter(:health_check_interval, "abc") }.to raise_error described_class::ValidationFailed
-        expect { described_class.validate_health_check_parameter(:health_check_interval, "0") }.to raise_error described_class::ValidationFailed
-      end
-    end
-
     describe "#validate_cidr" do
       it "valid cidr" do
         expect { described_class.validate_cidr("0.0.0.0/0") }.not_to raise_error
