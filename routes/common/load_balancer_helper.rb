@@ -2,8 +2,9 @@
 
 class Routes::Common::LoadBalancerHelper < Routes::Common::Base
   def list
+    dataset = project.load_balancers_dataset
+    dataset = dataset.join(:private_subnet, id: Sequel[:load_balancer][:private_subnet_id]).where(location: @location).select_all(:load_balancer) if @location
     if @mode == AppMode::API
-      dataset = project.load_balancers_dataset
       result = dataset.authorized(@user.id, "LoadBalancer:view").paginated_result(
         start_after: @request.params["start_after"],
         page_size: @request.params["page_size"],
@@ -15,7 +16,7 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
         count: result[:count]
       }
     else
-      lbs = Serializers::LoadBalancer.serialize(project.load_balancers_dataset.authorized(@user.id, "LoadBalancer:view").all, {include_path: true})
+      lbs = Serializers::LoadBalancer.serialize(dataset.authorized(@user.id, "LoadBalancer:view").all, {include_path: true})
       @app.instance_variable_set(:@lbs, lbs)
       @app.view "networking/load_balancer/index"
     end
@@ -59,12 +60,16 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
 
   def get
     Authorization.authorize(@user.id, "LoadBalancer:view", @resource.id)
-    vms = @resource.private_subnet.vms_dataset.authorized(@user.id, "Vm:view").all
-    attached_vm_ids = @resource.vms.map(&:id)
-    @app.instance_variable_set(:@attachable_vms, Serializers::Vm.serialize(vms.reject { attached_vm_ids.include?(_1.id) }))
-    @app.instance_variable_set(:@lb, Serializers::LoadBalancer.serialize(@resource, {detailed: true}))
+    if @mode == AppMode::API
+      Serializers::LoadBalancer.serialize(@resource, {detailed: true})
+    else
+      vms = @resource.private_subnet.vms_dataset.authorized(@user.id, "Vm:view").all
+      attached_vm_ids = @resource.vms.map(&:id)
+      @app.instance_variable_set(:@attachable_vms, Serializers::Vm.serialize(vms.reject { attached_vm_ids.include?(_1.id) }))
+      @app.instance_variable_set(:@lb, Serializers::LoadBalancer.serialize(@resource, {detailed: true}))
 
-    @app.view "networking/load_balancer/show"
+      @app.view "networking/load_balancer/show"
+    end
   end
 
   def delete
@@ -80,10 +85,16 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     required_parameters = %w[vm_id]
     request_body_params = Validation.validate_request_body(params, required_parameters)
     vm = Vm.from_ubid(request_body_params["vm_id"])
+
     unless vm
-      flash["error"] = "VM not found"
       response.status = 404
-      @request.redirect "#{project.path}#{@resource.path}"
+
+      if @mode == AppMode::API
+        @request.halt
+      else
+        flash["error"] = "VM not found"
+        @request.redirect "#{project.path}#{@resource.path}"
+      end
     end
 
     Authorization.authorize(@user.id, "Vm:view", vm.id)
@@ -95,27 +106,43 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     end
 
     @resource.add_vm(vm)
-    flash["notice"] = "VM is attached"
-    @request.redirect "#{project.path}#{@resource.path}"
+
+    if @mode == AppMode::API
+      Serializers::LoadBalancer.serialize(@resource, {detailed: true})
+    else
+      flash["notice"] = "VM is attached"
+      @request.redirect "#{project.path}#{@resource.path}"
+    end
   end
 
   def post_detach_vm
     Authorization.authorize(@user.id, "LoadBalancer:edit", @resource.id)
     required_parameters = %w[vm_id]
     request_body_params = Validation.validate_request_body(params, required_parameters)
+
     vm = Vm.from_ubid(request_body_params["vm_id"])
     unless vm
-      flash["error"] = "VM not found"
       response.status = 404
-      @request.redirect "#{project.path}#{@resource.path}"
+
+      if @mode == AppMode::API
+        @request.halt
+      else
+        flash["error"] = "VM not found"
+        @request.redirect "#{project.path}#{@resource.path}"
+      end
     end
 
     Authorization.authorize(@user.id, "Vm:view", vm.id)
 
     @resource.evacuate_vm(vm)
     @resource.remove_vm(vm)
-    flash["notice"] = "VM is detached"
-    @request.redirect "#{project.path}#{@resource.path}"
+
+    if @mode == AppMode::API
+      Serializers::LoadBalancer.serialize(@resource, {detailed: true})
+    else
+      flash["notice"] = "VM is detached"
+      @request.redirect "#{project.path}#{@resource.path}"
+    end
   end
 
   def view_create_page
