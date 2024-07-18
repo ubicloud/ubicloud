@@ -37,7 +37,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
       minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { _1.id = ubid.to_uuid }
 
-      Strand.create(prog: "Minio::MinioServerNexus", label: "start") { _1.id = minio_server.id }
+      super(minio_server.id, nexus: true)
     end
   end
 

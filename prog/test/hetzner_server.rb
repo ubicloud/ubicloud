@@ -22,11 +22,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       fail "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
     end
 
-    Strand.create_with_id(
-      prog: "Test::HetznerServer",
-      label: "start",
-      stack: [frame]
-    )
+    super(nil, **frame)
   end
 
   label def start

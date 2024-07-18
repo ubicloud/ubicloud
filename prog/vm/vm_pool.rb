@@ -20,7 +20,8 @@ class Prog::Vm::VmPool < Prog::Base
         storage_skip_sync: storage_skip_sync,
         arch: arch
       )
-      Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { _1.id = vm_pool.id }
+
+      super(vm_pool.id, nexus: true, label: "create_new_vm")
     end
   end
 

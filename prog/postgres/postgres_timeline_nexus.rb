@@ -22,7 +22,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         secret_key: SecureRandom.hex(32),
         blob_storage_id: Config.postgres_service_blob_storage_id
       )
-      Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { _1.id = postgres_timeline.id }
+
+      super(postgres_timeline.id, nexus: true)
     end
   end
 

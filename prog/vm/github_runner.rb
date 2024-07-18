@@ -21,7 +21,7 @@ class Prog::Vm::GithubRunner < Prog::Base
         label: label
       )
 
-      Strand.create(prog: "Vm::GithubRunner", label: "start") { _1.id = github_runner.id }
+      super(github_runner.id, nexus: true)
     end
   end
 

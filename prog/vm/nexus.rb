@@ -95,18 +95,16 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm.associate_with_project(project)
 
-      Strand.create(
-        prog: "Vm::Nexus",
-        label: "start",
-        stack: [{
-          "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
-          "swap_size_bytes" => swap_size_bytes,
-          "distinct_storage_devices" => distinct_storage_devices,
-          "force_host_id" => force_host_id,
-          "exclude_host_ids" => exclude_host_ids,
-          "gpu_enabled" => vm_size.gpu
-        }]
-      ) { _1.id = vm.id }
+      super(
+        vm.id,
+        nexus: true,
+        storage_volumes: storage_volumes.map { |v| v.transform_keys(&:to_s) },
+        swap_size_bytes: swap_size_bytes,
+        distinct_storage_devices: distinct_storage_devices,
+        force_host_id: force_host_id,
+        exclude_host_ids: exclude_host_ids,
+        gpu_enabled: vm_size.gpu
+      )
     end
   end
 

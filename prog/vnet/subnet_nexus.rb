@@ -37,7 +37,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      Strand.create(prog: "Vnet::SubnetNexus", label: "wait") { _1.id = ubid.to_uuid }
+      super(ubid.to_uuid, nexus: true, label: "wait")
     end
   end
 

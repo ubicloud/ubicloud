@@ -17,7 +17,8 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
-      Strand.create(prog: "Vnet::NicNexus", label: "wait_vm") { _1.id = ubid.to_uuid }
+
+      super(ubid.to_uuid, nexus: true, label: "wait_vm")
     end
   end
 

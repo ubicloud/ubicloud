@@ -23,7 +23,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       )
       lb.associate_with_project(ps.projects.first)
 
-      Strand.create(prog: "Vnet::LoadBalancerNexus", label: "wait") { _1.id = lb.id }
+      super(lb.id, nexus: true, label: "wait")
     end
   end
 

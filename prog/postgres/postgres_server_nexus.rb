@@ -45,7 +45,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
 
-      Strand.create(prog: "Postgres::PostgresServerNexus", label: "start") { _1.id = postgres_server.id }
+      super(postgres_server.id, nexus: true)
     end
   end
 

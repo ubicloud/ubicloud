@@ -20,16 +20,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       project_id: github_test_project.id
     )
 
-    Strand.create_with_id(
-      prog: "Test::GithubRunner",
-      label: "start",
-      stack: [{
-        "created_at" => Time.now.utc,
-        "vm_host_id" => vm_host_id,
-        "test_cases" => test_cases,
-        "github_service_project_id" => github_service_project.id,
-        "github_test_project_id" => github_test_project.id
-      }]
+    super(nil,
+      created_at: Time.now.utc,
+      vm_host_id: vm_host_id,
+      test_cases: test_cases,
+      github_service_project_id: github_service_project.id,
+      github_test_project_id: github_test_project.id
     )
   end
 

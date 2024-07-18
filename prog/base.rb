@@ -3,12 +3,18 @@
 class Prog::Base
   attr_reader :strand, :subject_id
 
-  def self.assemble(subject_id, label: "start", **frame)
+  def self.assemble(subject_id, label: "start", nexus: false, **frame)
+    new_frame, strand_id = if nexus
+      [frame, subject_id]
+    else
+      [{"subject_id" => subject_id}.merge(frame), Strand.generate_uuid]
+    end
+
     Strand.create(
       prog: Strand.prog_verify(self),
       label: label,
-      stack: [{"subject_id" => subject_id}.merge(frame).transform_keys(&:to_s)]
-    ) { _1.id = Strand.generate_uuid }
+      stack: [new_frame.transform_keys(&:to_s)]
+    ) { _1.id = strand_id }
   end
 
   def initialize(strand, snap = nil)

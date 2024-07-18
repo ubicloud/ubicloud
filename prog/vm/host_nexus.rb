@@ -20,11 +20,7 @@ class Prog::Vm::HostNexus < Prog::Base
         AssignedHostAddress.create_with_id(ip: sshable_hostname, address_id: vmh.id, host_id: vmh.id)
       end
 
-      Strand.create(
-        prog: "Vm::HostNexus",
-        label: "start",
-        stack: [{"spdk_version" => spdk_version, "default_boot_images" => default_boot_images}]
-      ) { _1.id = vmh.id }
+      super(vmh.id, nexus: true, spdk_version: spdk_version, default_boot_images: default_boot_images)
     end
   end
 
