@@ -76,7 +76,7 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Load Balancer Port", with: 80
         fill_in "Application Port", with: 8000
         select "round-robin", from: "algorithm"
-        fill_in "Health Check Endpoint", with: "/up"
+        fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
 
         click_button "Create"
@@ -98,7 +98,7 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Load Balancer Port", with: 80
         fill_in "Application Port", with: 8000
         select "round-robin", from: "algorithm"
-        fill_in "Health Check Endpoint", with: "/up"
+        fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
 
         click_button "Create"
@@ -128,7 +128,7 @@ RSpec.describe Clover, "load balancer" do
         fill_in "Load Balancer Port", with: 80
         fill_in "Application Port", with: 8000
         select "round-robin", from: "algorithm"
-        fill_in "Health Check Endpoint", with: "/up"
+        fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
 
         ps.destroy

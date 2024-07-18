@@ -30,9 +30,9 @@
           { escape: false }
         ],
         ["Algorithm", @lb[:algorithm]],
-        ["Health Check Endpoint", @lb[:health_check_endpoint]],
-        ["Source Port", @lb[:src_port]],
-        ["Destination Port", @lb[:dst_port]]
+        ["Load Balancer Port", @lb[:src_port]],
+        ["Application Port", @lb[:dst_port]],
+        ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
       ]
     }
   ) %>
@@ -48,7 +48,7 @@
       <thead class="bg-gray-50">
         <tr>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State</th>
           <% if Authorization.has_permission?(@current_user.id, "LoadBalancer:edit", @lb[:id]) %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
