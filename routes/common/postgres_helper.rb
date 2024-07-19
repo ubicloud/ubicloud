@@ -227,6 +227,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     @app.instance_variable_set(:@prices, @app.fetch_location_based_prices("PostgresCores", "PostgresStorage"))
     @app.instance_variable_set(:@has_valid_payment_method, project.has_valid_payment_method?)
+    @app.instance_variable_set(:@enabled_postgres_sizes, Option::VmSizes.select { project.quota_available?("PostgresCores", _1.vcpu / 2) }.map(&:name))
     @app.view "postgres/create"
   end
 
