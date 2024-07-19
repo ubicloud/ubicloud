@@ -18,6 +18,7 @@ class Project < Sequel::Model
   many_to_many :load_balancers, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
+  one_to_many :quotas, class: ProjectQuota, key: :project_id
 
   dataset_module Authorization::Dataset
   dataset_module Pagination
@@ -96,6 +97,26 @@ class Project < Sequel::Model
     }
 
     Invoice.new(project_id: id, content: content, begin_time: begin_time, end_time: end_time, created_at: Time.now, status: "current")
+  end
+
+  def current_resource_usage(resource_type)
+    case resource_type
+    when "VmCores" then vms.sum(&:cores)
+    when "GithubRunnerCores" then github_installations.sum(&:total_active_runner_cores)
+    when "PostgresCores" then postgres_resources.flat_map { _1.servers.map { |s| s.vm.cores } }.sum
+    else
+      raise "Unknown resource type: #{resource_type}"
+    end
+  end
+
+  def effective_quota_value(resource_type)
+    default_quota = ProjectQuota.default_quotas[resource_type]
+    override_quota_value = quotas_dataset.first(quota_id: default_quota["id"])&.value
+    override_quota_value || default_quota["value"]
+  end
+
+  def quota_available?(resource_type, requested_additional_usage)
+    effective_quota_value(resource_type) >= current_resource_usage(resource_type) + requested_additional_usage
   end
 
   def self.feature_flag(*flags)
