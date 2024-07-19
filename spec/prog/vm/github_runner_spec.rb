@@ -257,8 +257,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to wait_concurrency_limit if there is no capacity" do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
-      installation = instance_double(GithubInstallation, total_active_runner_cores: 2)
-      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
+      installation = instance_double(GithubInstallation)
+      project = instance_double(Project, quota_available?: false, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -270,8 +270,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to allocate_vm if there is capacity" do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
-      installation = instance_double(GithubInstallation, total_active_runner_cores: 1)
-      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
+      installation = instance_double(GithubInstallation)
+      project = instance_double(Project, quota_available?: true, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -292,8 +292,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "waits until customer concurrency limit frees up" do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
-      installation = instance_double(GithubInstallation, total_active_runner_cores: 2)
-      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
+      installation = instance_double(GithubInstallation)
+      project = instance_double(Project, quota_available?: false, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -305,8 +305,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to allocate_vm when customer concurrency limit frees up" do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
-      installation = instance_double(GithubInstallation, total_active_runner_cores: 1)
-      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
+      installation = instance_double(GithubInstallation)
+      project = instance_double(Project, quota_available?: true, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -318,8 +318,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to allocate_vm when customer concurrency limit is full but the overall utilization is low" do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
-      installation = instance_double(GithubInstallation, total_active_runner_cores: 2)
-      project = instance_double(Project, runner_core_limit: 2, github_installations: [installation])
+      installation = instance_double(GithubInstallation)
+      project = instance_double(Project, quota_available?: false, github_installations: [installation])
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)

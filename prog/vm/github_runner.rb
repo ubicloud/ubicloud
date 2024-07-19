@@ -125,12 +125,12 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def start
-    hop_wait_concurrency_limit unless concurrency_available?
+    hop_wait_concurrency_limit unless quota_available?
     hop_allocate_vm
   end
 
   label def wait_concurrency_limit
-    hop_allocate_vm if concurrency_available?
+    hop_allocate_vm if quota_available?
 
     # check utilization, if it's high, wait for it to go down
     utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
@@ -165,9 +165,16 @@ class Prog::Vm::GithubRunner < Prog::Base
     hop_setup_environment
   end
 
-  def concurrency_available?
+  def quota_available?
     github_runner.installation.project_dataset.for_update.all
-    github_runner.installation.project.runner_core_limit > github_runner.installation.project.github_installations.sum(&:total_active_runner_cores)
+    # In existing Github quota calculations, we compare total allocated cores
+    # with the core limit and allow passing the limit once. This is because we
+    # check quota and allocate VMs in different labels hence transactions and it
+    # is difficult to enforce quotas in the environment with lots of concurrent
+    # requests. There are some remedies, but it would require some refactoring
+    # that I'm not keen to do at the moment. Although it looks weird, passing 0
+    # as requested_additional_usage keeps the existing behavior.
+    github_runner.installation.project.quota_available?("GithubRunnerCores", 0)
   end
 
   def setup_info
