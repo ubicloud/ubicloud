@@ -10,6 +10,8 @@ class Prog::Base
       [{"subject_id" => subject_id}.merge(frame), Strand.generate_uuid]
     end
 
+    fail "unexpected label: #{label}" unless labels.include?(label.intern)
+
     Strand.create(
       prog: Strand.prog_verify(self),
       label: label,
