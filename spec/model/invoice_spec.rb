@@ -120,11 +120,27 @@ RSpec.describe Invoice do
       expect(invoice).to receive(:save).with(columns: [:status, :content])
       expect(Clog).to receive(:emit).with("Invoice couldn't charged.").and_call_original
       expect(Clog).to receive(:emit).with("Invoice charged.").and_call_original
+      project = instance_double(Project)
+      expect(project).to receive(:update).with(reputation: "verified")
+      expect(invoice).to receive(:project).and_return(project)
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("paid")
       expect(invoice.content["payment_method"]["id"]).to eq(payment_method2.id)
       expect(invoice.content["payment_intent"]).to eq("pi_1234567890")
       expect(Mail::TestMailer.deliveries.length).to eq 1
+    end
+
+    it "does not update project reputation if cost is less than 5" do
+      invoice.content["cost"] = 4
+      invoice.content["billing_info"] = {"id" => billing_info.id}
+      PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
+      # rubocop:enable RSpec/VerifiedDoubles
+      expect(invoice).to receive(:save).with(columns: [:status, :content])
+      expect(invoice).to receive(:send_success_email)
+      expect(invoice).not_to receive(:project)
+      expect(invoice.charge).to be true
     end
   end
 end
