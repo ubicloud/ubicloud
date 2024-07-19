@@ -84,13 +84,29 @@ RSpec.describe Clover, "postgres" do
 
     describe "create" do
       it "success" do
-        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres", {
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
+          size: "standard-2",
+          ha_type: "none"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-no-ha")
+
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-async", {
+          size: "standard-2",
+          ha_type: "async"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-async")
+
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-sync", {
           size: "standard-2",
           ha_type: "sync"
         }.to_json
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres")
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-sync")
       end
 
       it "invalid location" do

@@ -34,6 +34,16 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
     parsed_size = Validation.validate_postgres_size(request_body_params["size"])
 
+    ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
+    requested_standby_count = case ha_type
+    when PostgresResource::HaType::ASYNC then 1
+    when PostgresResource::HaType::SYNC then 2
+    else 0
+    end
+
+    requested_postgres_core_count = (requested_standby_count + 1) * parsed_size.vcpu / 2
+    Validation.validate_core_quota(project, "PostgresCores", requested_postgres_core_count)
+
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: project.id,
       location: @location,
