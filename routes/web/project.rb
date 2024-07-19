@@ -35,6 +35,13 @@ class CloverWeb
 
       @project_data = Serializers::Project.serialize(@project, {include_path: true})
       @project_permissions = Authorization.all_permissions(@current_user.id, @project.id)
+      @quotas = ["VmCores", "PostgresCores"].map {
+        {
+          resource_type: _1,
+          current_resource_usage: @project.current_resource_usage(_1),
+          quota: @project.effective_quota_value(_1) * 2
+        }
+      }
 
       r.get true do
         Authorization.authorize(@current_user.id, "Project:view", @project.id)
