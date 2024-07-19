@@ -112,7 +112,7 @@ class Project < Sequel::Model
   def effective_quota_value(resource_type)
     default_quota = ProjectQuota.default_quotas[resource_type]
     override_quota_value = quotas_dataset.first(quota_id: default_quota["id"])&.value
-    override_quota_value || default_quota["value"]
+    override_quota_value || default_quota["#{reputation}_value"]
   end
 
   def quota_available?(resource_type, requested_additional_usage)
