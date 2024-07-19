@@ -1,0 +1,3 @@
+- { id: c088f732-0a30-454b-aa6b-542ce1d67bfb, resource_type: VmCores,           value: 16  }
+- { id: 14fa6820-bf63-41d2-b35e-4a4dcefd1b15, resource_type: GithubRunnerCores, value: 150 }
+- { id: 91d616ea-a15b-4d54-90b7-aaa1e1bd2f19, resource_type: PostgresCores,     value: 64  }
