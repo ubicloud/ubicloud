@@ -73,6 +73,8 @@ class Invoice < Sequel::Model
         "payment_intent" => payment_intent.id
       })
       save(columns: [:status, :content])
+      project.update(reputation: "verified") if amount > 5
+
       send_success_email
       return true
     end
