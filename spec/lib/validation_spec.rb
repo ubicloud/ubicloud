@@ -398,4 +398,16 @@ RSpec.describe Validation do
       end
     end
   end
+
+  describe "#validate_core_quota" do
+    it "sufficient core quota" do
+      p = instance_double(Project, current_resource_usage: 5, effective_quota_value: 10, quota_available?: true)
+      expect { described_class.validate_core_quota(p, "VmCores", 1) }.not_to raise_error
+    end
+
+    it "insufficient core quota" do
+      p = instance_double(Project, current_resource_usage: 10, effective_quota_value: 10, quota_available?: false)
+      expect { described_class.validate_core_quota(p, "VmCores", 1) }.to raise_error described_class::ValidationFailed
+    end
+  end
 end

@@ -48,7 +48,7 @@ class CloverApi
         # Same as above, moved the size validation here to not allow users to
         # pass gpu instance while creating a VM.
         if request_body_params["size"]
-          Validation.validate_vm_size(request_body_params["size"], only_visible: true)
+          parsed_size = Validation.validate_vm_size(request_body_params["size"], only_visible: true)
         end
 
         if request_body_params["private_subnet_id"]
@@ -65,6 +65,9 @@ class CloverApi
           request_body_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
           request_body_params.delete("storage_size")
         end
+
+        requested_vm_core_count = parsed_size.nil? ? 1 : parsed_size.vcpu / 2
+        Validation.validate_core_quota(@project, "VmCores", requested_vm_core_count)
 
         st = Prog::Vm::Nexus.assemble(
           request_body_params["public_key"],

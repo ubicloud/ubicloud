@@ -16,9 +16,13 @@ class CloverWeb
       Authorization.authorize(@current_user.id, "PrivateSubnet:view", ps_id)
 
       Validation.validate_boot_image(r.params["boot-image"])
-      Validation.validate_vm_size(r.params["size"], only_visible: true)
+      parsed_size = Validation.validate_vm_size(r.params["size"], only_visible: true)
       location = LocationNameConverter.to_internal_name(r.params["location"])
       storage_size = Validation.validate_vm_storage_size(r.params["size"], r.params["storage_size"])
+
+      requested_vm_core_count = parsed_size.vcpu / 2
+      Validation.validate_core_quota(@project, "VmCores", requested_vm_core_count)
+
       st = Prog::Vm::Nexus.assemble(
         r.params["public-key"],
         @project.id,

@@ -227,4 +227,13 @@ module Validation
   rescue URI::InvalidURIError
     fail ValidationFailed.new({url: "Invalid URL"})
   end
+
+  def self.validate_core_quota(project, resource_type, requested_core_count)
+    if !project.quota_available?(resource_type, requested_core_count)
+      current_used_core_count = project.current_resource_usage(resource_type)
+      effective_quota_value = project.effective_quota_value(resource_type)
+
+      fail ValidationFailed.new({size: "Insufficient quota for requested size. Requested core count: #{requested_core_count}, currently used core count: #{current_used_core_count}, maximum allowed core count: #{effective_quota_value}, remaining core count: #{effective_quota_value - current_used_core_count}"})
+    end
+  end
 end
