@@ -95,7 +95,8 @@
                     <legend class="sr-only">Server size</legend>
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                       <% Option::VmSizes.select { _1.visible }.each_with_index do |size, idx| %>
-                        <label class="size-<%= size.name %>">
+                        <% disabled = !@enabled_vm_sizes.include?(size.name) %>
+                        <label class="size-<%= size.name %>" title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>">
                           <input
                             type="radio"
                             name="size"
@@ -108,11 +109,13 @@
                             data-storage-size-options="<%= size.storage_size_options %>"
                             required
                             <%= (flash.dig("old", "size") == size.name || flash.dig("old", "size").nil? && idx == 0) ? "checked" : "" %>
+                            <%= disabled ? "disabled" : "" %>
                           >
                           <span
                             class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
                                 ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
+                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
+                                <%= disabled ? "opacity-50" : "" %>"
                           >
                             <span class="flex flex-col">
                               <span class="text-md font-semibold"><%= size.display_name %></span>
