@@ -94,6 +94,11 @@ RSpec.describe Project do
     expect(project.effective_quota_value("VmCores")).to eq 16
     expect(project.effective_quota_value("GithubRunnerCores")).to eq 1000
     expect(project.effective_quota_value("PostgresCores")).to eq 64
+
+    expect(project).to receive(:reputation).and_return("verified").at_least(:once)
+    expect(project.effective_quota_value("VmCores")).to eq 128
+    expect(project.effective_quota_value("GithubRunnerCores")).to eq 1000
+    expect(project.effective_quota_value("PostgresCores")).to eq 128
   end
 
   it "checks if quota is available" do
