@@ -743,12 +743,12 @@ RSpec.describe Prog::Vm::Nexus do
         expect { nx.destroy }.to exit({"msg" => "vm deleted"})
       end
 
-      it "naps for 10 minutes" do
+      it "naps for 30 seconds" do
         lb = instance_double(LoadBalancer)
         expect(lb).to receive(:evacuate_vm).with(vm)
         expect(vm).to receive(:load_balancer).and_return(lb)
         expect(vm).to receive(:incr_lb_expiry_started)
-        expect { nx.wait_lb_expiry }.to nap(600)
+        expect { nx.wait_lb_expiry }.to nap(30)
       end
 
       it "destroys properly after 10 minutes" do

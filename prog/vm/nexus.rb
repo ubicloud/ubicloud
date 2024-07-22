@@ -434,7 +434,7 @@ class Prog::Vm::Nexus < Prog::Base
     unless vm.lb_expiry_started_set?
       vm.incr_lb_expiry_started
       vm.load_balancer.evacuate_vm(vm)
-      nap 10 * 60
+      nap 30
     end
 
     vm.load_balancer.remove_vm(vm)
