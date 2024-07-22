@@ -32,36 +32,6 @@ module CloudHypervisor
   FIRMWARE = FirmwareClass.new(Arch.render(x64: "202311", arm64: "202211"),
     Arch.render(x64: "e31738aacd3d68d30f8f9a4d09711cca3dfb414e8910dc3af90c50f36885380a", arm64: "482f428f782591d7c2222e0bc8240d25fb200fb21fd984b3339c85979d94b4d8"))
 
-  VersionClassLegacy = Struct.new(:version) {
-    def ch_remote_url
-      "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{version}/ch-remote" + Arch.render(x64: "", arm64: "-static-aarch64")
-    end
-
-    def url
-      "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{version}/cloud-hypervisor" + Arch.render(x64: "", arm64: "-static-aarch64")
-    end
-
-    def dir
-      "/opt/cloud-hypervisor/v#{version}"
-    end
-
-    def bin
-      File.join(dir, "cloud-hypervisor")
-    end
-
-    def ch_remote_bin
-      File.join(dir, "ch-remote")
-    end
-  }
-
-  VERSION_LEGACY = if Arch.arm64?
-    VersionClassLegacy.new("35.0")
-  elsif Arch.x64?
-    VersionClassLegacy.new("31.0")
-  else
-    fail "BUG: unexpected architecture"
-  end
-
   VersionClass = Struct.new(:version, :sha256_ch_bin, :sha256_ch_remote) {
     def ch_remote_url
       "https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/v#{version}/ch-remote" + Arch.render(x64: "-static", arm64: "-static-aarch64")
