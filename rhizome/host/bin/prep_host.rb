@@ -53,14 +53,6 @@ r "chmod +x /etc/update-motd.d/99-clover-motd"
 r "timedatectl set-timezone UTC"
 
 # Download cloud hypervisor binaries.
-ch_dir = CloudHypervisor::VERSION_LEGACY.dir
-FileUtils.mkdir_p(ch_dir)
-FileUtils.cd ch_dir do
-  r "curl -L3 -o ch-remote #{CloudHypervisor::VERSION_LEGACY.ch_remote_url.shellescape}"
-  FileUtils.chmod "a+x", "ch-remote"
-  r "curl -L3 -o cloud-hypervisor #{CloudHypervisor::VERSION_LEGACY.url.shellescape}"
-  FileUtils.chmod "a+x", "cloud-hypervisor"
-end
 CloudHypervisor::VERSION.download
 
 # Download firmware binaries.
