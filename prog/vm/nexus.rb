@@ -211,12 +211,19 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def create_unix_user
-    host.sshable.cmd("sudo userdel --remove --force #{q_vm} || true")
-    host.sshable.cmd("sudo groupdel -f #{q_vm} || true")
-
-    # create vm's user and home directory
     uid = rand(1100..59999)
-    host.sshable.cmd("sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} --uid #{uid} #{q_vm}")
+    command = <<~COMMAND
+      set -ueo pipefail
+      # Make this script idempotent
+      sudo userdel --remove --force #{q_vm} || true
+      sudo groupdel -f #{q_vm} || true
+      # Create vm's user and home directory
+      sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} --uid #{uid} #{q_vm}
+      # Enable KVM access for VM user
+      sudo usermod -a -G kvm #{q_vm}
+    COMMAND
+
+    host.sshable.cmd(command)
 
     hop_prep
   end
