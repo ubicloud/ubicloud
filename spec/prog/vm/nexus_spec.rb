@@ -219,7 +219,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:incr_setup_nic)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
-      expect { nx.prep }.to hop("run")
+      expect { nx.prep }.to hop("wait_sshable")
     end
 
     it "generates and passes a params json if prep command is not started yet" do

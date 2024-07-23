@@ -233,7 +233,7 @@ class Prog::Vm::Nexus < Prog::Base
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
       vm.nics.each { _1.incr_setup_nic }
-      hop_run
+      hop_wait_sshable
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
         storage: vm.storage_secrets
