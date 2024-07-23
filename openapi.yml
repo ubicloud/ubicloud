@@ -3,15 +3,11 @@ info:
   title: Clover API
   version: "0.1.0"
   description: API for managing resources on Ubicloud
-
 servers:
   - url: 'https://api.ubicloud.com'
-  
 security:
   - BearerAuth: []
-
 paths:
-
   # LOGIN
   /login:
     post:
@@ -46,12 +42,10 @@ paths:
                 type: string
         '401':
           description: Unauthorized
-          
-
   # PROJECT
   /project:
     get:
-      tags: 
+      tags:
         - Project
       summary: List all projects visible to the logged in user.
       operationId: listProjects
@@ -71,14 +65,14 @@ paths:
                 properties:
                   items:
                     type: array
-                    items: 
+                    items:
                       $ref: '#/components/schemas/Project'
                   count:
                     type: integer
         '401':
           description: Unauthorized
     post:
-      tags: 
+      tags:
         - Project
       summary: Create a new project
       operationId: createProject
@@ -111,7 +105,7 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
-      tags: 
+      tags:
         - Project
       summary: Retrieve a project
       operationId: getProject
@@ -127,7 +121,7 @@ paths:
         '404':
           description: Resource not found
     delete:
-      tags: 
+      tags:
         - Project
       summary: Delete a project
       operationId: deleteProject
@@ -140,11 +134,10 @@ paths:
           description: Unauthorized
         '404':
           description: Resource not found
-  
   # VM
   /project/{project_id}/vm:
     get:
-      tags: 
+      tags:
         - Virtual Machine
       summary: List all VMs created under the given project ID and visible to logged in user
       operationId: listProjectVMs
@@ -171,7 +164,7 @@ paths:
           description: Unauthorized
   /project/{project_id}/location/{location}/vm:
     get:
-      tags: 
+      tags:
         - Virtual Machine
       summary: List VMs in a specific location of a project
       operationId: listLocationVMs
@@ -208,7 +201,7 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/vm_name'
     post:
-      tags: 
+      tags:
         - Virtual Machine
       summary: Create a new VM in a specific location of a project
       operationId: createVM
@@ -254,7 +247,7 @@ paths:
         '401':
           description: Unauthorized
     get:
-      tags: 
+      tags:
         - Virtual Machine
       summary: Get details of a specific VM in a location
       operationId: getVMDetails
@@ -268,7 +261,7 @@ paths:
         '401':
           description: Unauthorized
     delete:
-      tags: 
+      tags:
         - Virtual Machine
       summary: Delete a specific VM
       operationId: deleteVM
@@ -283,7 +276,7 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/vm_id'
     get:
-      tags: 
+      tags:
         - Virtual Machine
       summary: Get details of a specific VM in a location with ID
       operationId: getVMDetailsWithId
@@ -297,7 +290,7 @@ paths:
         '401':
           description: Unauthorized
     delete:
-      tags: 
+      tags:
         - Virtual Machine
       summary: Delete a specific VM with ID
       operationId: deleteVMWithId
@@ -306,11 +299,10 @@ paths:
           description: VM deleted successfully
         '401':
           description: Unauthorized
-
   # PRIVATE SUBNET
   /project/{project_id}/private-subnet:
     get:
-      tags: 
+      tags:
         - Private Subnet
       summary: List visible Private Subnets
       operationId: listPSs
@@ -339,7 +331,7 @@ paths:
           description: Resource is not found
   /project/{project_id}/location/{location}/private-subnet:
     get:
-      tags: 
+      tags:
         - Private Subnet
       summary: List Private Subnets in a specific location of a project
       operationId: listLocationPrivateSubnets
@@ -373,7 +365,7 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/private_subnet_name'
     post:
-      tags: 
+      tags:
         - Private Subnet
       summary: Create a new Private Subnet in a specific location of a project
       operationId: createPrivateSubnet
@@ -396,7 +388,7 @@ paths:
         '401':
           description: Unauthorized
     get:
-      tags: 
+      tags:
         - Private Subnet
       summary: Get details of a specific Private Subnet in a location
       operationId: getPrivateSubnetDetails
@@ -412,7 +404,7 @@ paths:
         '404':
           description: Resource not found
     delete:
-      tags: 
+      tags:
         - Private Subnet
       summary: Delete a specific Private Subnet
       operationId: deletePrivateSubnet
@@ -427,7 +419,7 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/private_subnet_id'
     get:
-      tags: 
+      tags:
         - Private Subnet
       summary: Get details of a specific Private Subnet in a location with ID
       operationId: getPSDetailsWithId
@@ -441,7 +433,7 @@ paths:
         '401':
           description: Unauthorized
     delete:
-      tags: 
+      tags:
         - Private Subnet
       summary: Delete a specific Private Subnet with ID
       operationId: deletePSWithId
@@ -450,11 +442,10 @@ paths:
           description: Private Subnet is deleted successfully
         '401':
           description: Unauthorized
-
   # POSTGRES
   /project/{project_id}/postgres:
     get:
-      tags: 
+      tags:
         - Postgres
       summary: List visible Postgres databases
       operationId: listPostgresDatabases
@@ -481,7 +472,7 @@ paths:
           description: Unauthorized
   /project/{project_id}/location/{location}/postgres:
     get:
-      tags: 
+      tags:
         - Postgres
       summary: List Postgres databases in a specific location of a project
       operationId: listLocationPostgresDatabases
@@ -513,7 +504,7 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_name'
     post:
-      tags: 
+      tags:
         - Postgres
       summary: Create a new Postgres database in a specific location of a project
       operationId: createPostgresDatabase
@@ -545,7 +536,7 @@ paths:
         '401':
           description: Unauthorized
     get:
-      tags: 
+      tags:
         - Postgres
       summary: Get details of a specific Postgres database in a location
       operationId: getPostgresDatabaseDetails
@@ -559,7 +550,7 @@ paths:
         '401':
           description: Unauthorized
     delete:
-      tags: 
+      tags:
         - Postgres
       summary: Delete a specific Postgres database
       operationId: deletePostgresDatabase
@@ -568,15 +559,14 @@ paths:
           description: Postgres database is deleted successfully
         '401':
           description: Unauthorized
-  
   /project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore:
     post:
-      tags: 
+      tags:
         - Postgres
       parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_name'
       summary: Restore a new Postgres database in a specific location of a project
       operationId: restorePostgresDatabase
       requestBody:
@@ -603,12 +593,12 @@ paths:
           description: Unauthorized
   /project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password:
     post:
-      tags: 
+      tags:
         - Postgres
       parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_name'
       summary: Reset superuser password of the Postgres database
       operationId: resetSuperuserPassword
       requestBody:
@@ -637,7 +627,7 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_id'
     get:
-      tags: 
+      tags:
         - Postgres
       summary: Get details of a specific Postgres database in a location with ID
       operationId: getPostgresDetailsWithId
@@ -649,7 +639,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
     delete:
-      tags: 
+      tags:
         - Postgres
       summary: Delete a specific Postgres database with ID
       operationId: deletePostgresDatabaseWithID
@@ -660,12 +650,12 @@ paths:
           description: Unauthorized
   /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/restore:
     post:
-      tags: 
+      tags:
         - Postgres
       parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_id'
       summary: Restore a new Postgres database in a specific location of a project with ID
       operationId: restorePostgresDatabaseWithID
       requestBody:
@@ -692,12 +682,12 @@ paths:
           description: Unauthorized
   /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password:
     post:
-      tags: 
+      tags:
         - Postgres
       parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_id'
       summary: Reset super-user password of the Postgres database
       operationId: resetSuperuserPasswordWithID
       requestBody:
@@ -720,14 +710,13 @@ paths:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
           description: Unauthorized
-
-# FIREWALL RULES
+          # FIREWALL RULES
   /project/{project_id}/firewall/{firewall_id}/firewall-rule:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/firewall_id'
     post:
-      tags: 
+      tags:
         - Firewall Rule
       summary: Create a new firewall rule
       operationId: createFirewallRule
@@ -765,9 +754,9 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/firewall_id'
-      - $ref: '#/components/parameters/firewall_rule_id'    
+      - $ref: '#/components/parameters/firewall_rule_id'
     get:
-      tags: 
+      tags:
         - Firewall Rule
       summary: Get details of a firewall rule
       operationId: getFirewallRuleDetails
@@ -781,7 +770,7 @@ paths:
         '401':
           description: Unauthorized
     delete:
-      tags: 
+      tags:
         - Firewall Rule
       summary: Delete a specific firewall rule
       operationId: deleteFirewallRule
@@ -790,13 +779,12 @@ paths:
           description: Firewall rule deleted successfully
         '401':
           description: Unauthorized
-
-# FIREWALL
+          # FIREWALL
   /project/{project_id}/firewall:
     parameters:
       - $ref: '#/components/parameters/project_id'
     post:
-      tags: 
+      tags:
         - Firewall
       summary: Create a new firewall
       operationId: createFirewall
@@ -829,9 +817,9 @@ paths:
   /project/{project_id}/firewall/{firewall_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'  
+      - $ref: '#/components/parameters/firewall_id'
     get:
-      tags: 
+      tags:
         - Firewall
       summary: Get details of a specific firewall
       operationId: getFirewallDetails
@@ -845,7 +833,7 @@ paths:
         '401':
           description: Unauthorized
     delete:
-      tags: 
+      tags:
         - Firewall
       summary: Delete a specific firewall
       operationId: deleteFirewall
@@ -856,10 +844,10 @@ paths:
           description: Unauthorized
 components:
   securitySchemes:
-    BearerAuth:    # Arbitrary name for the security scheme
+    BearerAuth: # Arbitrary name for the security scheme
       type: http
       scheme: bearer
-      bearerFormat: JWT   # Optional, just for documentation purposes
+      bearerFormat: JWT # Optional, just for documentation purposes
   schemas:
     Project:
       type: object
@@ -964,7 +952,7 @@ components:
         firewalls:
           type: array
           description: List of firewalls
-          items: 
+          items:
             $ref: '#/components/schemas/Firewall'
     Firewall:
       type: object
@@ -981,7 +969,7 @@ components:
         firewall_rules:
           type: array
           description: List of firewall rules
-          items: 
+          items:
             $ref: '#/components/schemas/FirewallRule'
     FirewallRule:
       type: object
@@ -1036,11 +1024,11 @@ components:
         nics:
           type: array
           description: List of NICs
-          items: 
+          items:
             $ref: '#/components/schemas/Nic'
         firewalls:
           type: array
-          items: 
+          items:
             $ref: '#/components/schemas/Firewall'
     PostgresFirewallRule:
       type: object
@@ -1108,7 +1096,7 @@ components:
         firewall_rules:
           type: array
           description: List of Postgres firewall rules
-          items: 
+          items:
             $ref: '#/components/schemas/PostgresFirewallRule'
         earliest_restore_time:
           type: string
@@ -1116,7 +1104,6 @@ components:
         latest_restore_time:
           type: string
           description: Latest restore time (if primary)"
-
   parameters:
     start_after:
       name: start_after
