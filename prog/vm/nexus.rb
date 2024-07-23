@@ -251,11 +251,6 @@ class Prog::Vm::Nexus < Prog::Base
     host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape}", stdin: vm.params_json(frame["swap_size_bytes"]))
   end
 
-  label def run
-    host.sshable.cmd("sudo systemctl start #{q_vm}")
-    hop_wait_sshable
-  end
-
   label def wait_sshable
     unless vm.update_firewall_rules_set?
       vm.incr_update_firewall_rules
@@ -470,7 +465,6 @@ class Prog::Vm::Nexus < Prog::Base
     })
 
     host.sshable.cmd("sudo host/bin/setup-vm recreate-unpersisted #{q_vm}", stdin: secrets_json)
-    host.sshable.cmd("sudo systemctl start #{q_vm}")
     vm.nics.each { _1.incr_repopulate }
 
     vm.update(display_state: "running")

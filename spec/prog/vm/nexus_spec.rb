@@ -486,15 +486,6 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
-  describe "#run" do
-    it "runs the vm" do
-      sshable = instance_double(Sshable)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
-      expect(sshable).to receive(:cmd).with(/sudo systemctl start vm/)
-      expect { nx.run }.to hop("wait_sshable")
-    end
-  end
-
   describe "#wait_sshable" do
     it "naps 10 second if it's the first time we execute wait_sshable" do
       expect(vm).to receive(:update_firewall_rules_set?).and_return(false)
@@ -828,7 +819,6 @@ RSpec.describe Prog::Vm::Nexus do
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
       )
-      expect(sshable).to receive(:cmd).with(/sudo systemctl start vm[0-9a-z]+/)
       expect(vm).to receive(:update).with(display_state: "starting")
       expect(vm).to receive(:update).with(display_state: "running")
       expect(vm).to receive(:incr_update_firewall_rules)
