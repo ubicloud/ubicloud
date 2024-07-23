@@ -139,6 +139,7 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false, multiqueue: true)
       expect(vs).to receive(:hugepages).with(4)
       expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
+      expect(vs).to receive(:start_systemd_unit)
 
       vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets", multiqueue: true)
     end
@@ -296,6 +297,13 @@ NFTABLES_CONF
       expect(FileUtils).to receive(:chown).with("test", "test", "/vm/test/hugepages")
       expect(vs).to receive(:r).with("mount -t hugetlbfs -o uid=test,size=2G nodev /vm/test/hugepages")
       vs.hugepages(2)
+    end
+  end
+
+  describe "#start_systemd_unit" do
+    it "can start systemd unit" do
+      expect(vs).to receive(:r).with("systemctl start test")
+      vs.start_systemd_unit
     end
   end
 

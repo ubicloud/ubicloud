@@ -50,12 +50,14 @@ class VmSetup
     hugepages(mem_gib)
     prepare_pci_devices(pci_devices)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    start_systemd_unit
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, multiqueue:)
     setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: multiqueue)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
+    start_systemd_unit
   end
 
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
@@ -583,6 +585,10 @@ LimitNOFILE=500000
 #{limit_memlock}
 SERVICE
     r "systemctl daemon-reload"
+  end
+
+  def start_systemd_unit
+    r "systemctl start #{q_vm}"
   end
 
   # Generate a MAC with the "local" (generated, non-manufacturer) bit
