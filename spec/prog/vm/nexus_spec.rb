@@ -192,11 +192,18 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#create_unix_user" do
     it "runs adduser" do
       sshable = instance_double(Sshable)
-      vm_host = instance_double(VmHost, sshable: sshable)
-      expect(vm).to receive(:vm_host).and_return(vm_host)
-      expect(sshable).to receive(:cmd).with(/sudo.*userdel.*#{nx.vm_name}/)
-      expect(sshable).to receive(:cmd).with(/sudo.*groupdel.*#{nx.vm_name}/)
-      expect(sshable).to receive(:cmd).with(/sudo.*adduser.*#{nx.vm_name}/)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
+      expect(nx).to receive(:rand).and_return(1111)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        set -ueo pipefail
+        # Make this script idempotent
+        sudo userdel --remove --force #{nx.vm_name} || true
+        sudo groupdel -f #{nx.vm_name} || true
+        # Create vm's user and home directory
+        sudo adduser --disabled-password --gecos '' --home #{nx.vm_home} --uid 1111 #{nx.vm_name}
+        # Enable KVM access for VM user
+        sudo usermod -a -G kvm #{nx.vm_name}
+      COMMAND
 
       expect { nx.create_unix_user }.to hop("prep")
     end
