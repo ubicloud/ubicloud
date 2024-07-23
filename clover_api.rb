@@ -80,6 +80,7 @@ class CloverApi < Roda
     require_bcrypt? false
   end
 
+  use Committee::Middleware::RequestValidation, schema_path: "openapi.yml", strict_reference_validation: true, strict: true
   use Committee::Middleware::ResponseValidation, schema_path: "openapi.yml", strict_reference_validation: true, strict: true
 
   route do |r|
