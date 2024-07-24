@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "committee"
+require "roda"
+require_relative "db"
 
 class CloverApi < Roda
   include CloverBase
