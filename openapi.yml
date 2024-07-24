@@ -38,8 +38,15 @@ paths:
           headers:
             Authorization:
               description: JWT Token
+              type: string
+          content:
+            application/json:
               schema:
-                type: string
+                type: object
+                properties:
+                  success:
+                    type: string
+                    example: "You have been logged in"
         '401':
           description: Unauthorized
   # PROJECT
