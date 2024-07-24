@@ -82,8 +82,11 @@ class CloverApi < Roda
     require_bcrypt? false
   end
 
-  use Committee::Middleware::RequestValidation, schema_path: "openapi.yml", strict_reference_validation: true, strict: true
-  use Committee::Middleware::ResponseValidation, schema_path: "openapi.yml", strict_reference_validation: true, strict: true
+  OPENAPI = OpenAPIParser.load("openapi.yml", strict_reference_validation: true)
+  SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
+
+  use Committee::Middleware::RequestValidation, schema: SCHEMA, strict: true, prefix: "/api"
+  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api"
 
   route do |r|
     r.rodauth
