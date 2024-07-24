@@ -776,6 +776,21 @@ paths:
   /project/{project_id}/firewall:
     parameters:
       - $ref: '#/components/parameters/project_id'
+    get:
+      responses:
+        '200':
+          description: Return the list of firewalls in the project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Firewall'
+                  count:
+                    type: integer
     post:
       tags:
         - Firewall
