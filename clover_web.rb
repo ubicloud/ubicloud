@@ -216,6 +216,17 @@ class CloverWeb < Roda
     close_account_redirect "/login"
     close_account_route "account/close-account"
     close_account_view { view "account/close_account", "My Account" }
+
+    before_close_account do
+      account = Account[account_id]
+      # Do not allow to close account if the project has resources and
+      # the account is the only user
+      if (project = account.projects.find { _1.accounts.count == 1 && _1.has_resources })
+        flash["error"] = "'#{project.name}' project has some resources. Delete all related resources first."
+        redirect "/project"
+      end
+    end
+
     delete_account_on_close? true
     delete_account do
       account = Account[account_id]
