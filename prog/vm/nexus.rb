@@ -239,9 +239,6 @@ class Prog::Vm::Nexus < Prog::Base
         storage: vm.storage_secrets
       })
 
-      # Enable KVM access for VM user.
-      host.sshable.cmd("sudo usermod -a -G kvm #{q_vm}")
-
       write_params_json
 
       host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/setup-vm prep #{q_vm}' prep_#{q_vm}", stdin: secrets_json)
