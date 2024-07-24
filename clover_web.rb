@@ -216,6 +216,12 @@ class CloverWeb < Roda
     close_account_redirect "/login"
     close_account_route "account/close-account"
     close_account_view { view "account/close_account", "My Account" }
+    delete_account_on_close? true
+    delete_account do
+      account = Account[account_id]
+      account.projects.each { account.dissociate_with_project(_1) }
+      account.destroy
+    end
 
     argon2_secret { Config.clover_session_secret }
     require_bcrypt? false
