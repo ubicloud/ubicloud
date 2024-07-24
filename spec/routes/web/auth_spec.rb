@@ -249,5 +249,17 @@ RSpec.describe Clover, "auth" do
 
       click_button "Sign in"
     end
+
+    it "can close account" do
+      visit "/account/close-account"
+
+      click_button "Close Account"
+
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_content("Your account has been closed")
+
+      expect(Account[email: TEST_USER_EMAIL]).to be_nil
+      expect(AccessTag.where(name: "user/#{TEST_USER_EMAIL}").count).to eq 0
+    end
   end
 end
