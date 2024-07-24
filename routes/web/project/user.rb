@@ -12,7 +12,8 @@ class CloverWeb
 
     r.post true do
       email = r.params["email"]
-      user = Account[email: email]
+      # Don't invite deleted accounts
+      user = Account.exclude(status_id: 3)[email: email]
 
       user&.associate_with_project(@project)
 
