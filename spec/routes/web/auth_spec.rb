@@ -261,5 +261,17 @@ RSpec.describe Clover, "auth" do
       expect(Account[email: TEST_USER_EMAIL]).to be_nil
       expect(AccessTag.where(name: "user/#{TEST_USER_EMAIL}").count).to eq 0
     end
+
+    it "can not close account if the project has some resources" do
+      vm = create_vm
+      vm.associate_with_project(Account[email: TEST_USER_EMAIL].projects.first)
+
+      visit "/account/close-account"
+
+      click_button "Close Account"
+
+      expect(page.title).to eq("Ubicloud - Projects")
+      expect(page).to have_content("project has some resources. Delete all related resources first")
+    end
   end
 end
