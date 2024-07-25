@@ -90,6 +90,7 @@ RSpec.describe Clover, "firewall" do
     it "get does not exist" do
       get "/api/project/#{project.ubid}/firewall/#{firewall.ubid}/firewall-rule/fooubid"
 
+      expect(last_response.content_type).to eq("application/json")
       expect(last_response).to have_api_error(404)
     end
   end

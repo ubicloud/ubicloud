@@ -13,6 +13,7 @@ class CloverApi < Roda
   autoload_routes("api")
 
   plugin :not_found do
+    response["Content-Type"] = "application/json"
     {
       error: {
         code: 404,
