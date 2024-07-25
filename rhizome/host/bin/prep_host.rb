@@ -61,6 +61,7 @@ CloudHypervisor::FIRMWARE.download
 # Err towards listing ('l') and not restarting services by default,
 # otherwise a stray keystroke when using "apt install" for unrelated
 # packages can restart systemd services that interrupt customers.
+FileUtils.mkdir_p("/etc/needrestart/conf.d")
 File.write("/etc/needrestart/conf.d/82-clover-default-list.conf", <<CONF)
 $nrconf{restart} = 'l';
 CONF
