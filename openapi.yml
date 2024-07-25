@@ -877,6 +877,7 @@ paths:
         '401':
           description: Unauthorized
           $ref: '#/components/responses/Error'
+    delete:
       tags:
         - Firewall
       summary: Delete a specific firewall
