@@ -85,8 +85,17 @@ class CloverApi < Roda
   OPENAPI = OpenAPIParser.load("openapi.yml", strict_reference_validation: true)
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
 
-  use Committee::Middleware::RequestValidation, schema: SCHEMA, strict: true, prefix: "/api"
-  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api"
+  class CustomErrorHandler
+    def call(error, request)
+      puts "Schema validation failed: #{error.inspect}"
+      puts "Request: #{request.inspect}"
+      puts "Error details: #{error.inspect}"
+      # raise error
+    end
+  end
+
+  use Committee::Middleware::RequestValidation, schema: SCHEMA, strict: true, prefix: "/api",  error_handler: CustomErrorHandler.new
+  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api",  error_handler: CustomErrorHandler.new
 
   route do |r|
     r.rodauth
