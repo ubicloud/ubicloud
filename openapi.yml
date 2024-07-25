@@ -60,7 +60,9 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
       responses:
         '200':
           description: Return the list of all projects visible to the logged in user
@@ -153,7 +155,9 @@ paths:
       operationId: listProjectVMs
       parameters:
         - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
       responses:
         '200':
           description: Return the list of all VMs visible created under the given project and visible to the logged in user
@@ -184,7 +188,9 @@ paths:
           schema:
             type: string
           description: Return the list VMs created in a specific location of a project and visible to the logged in user
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
       responses:
         '200':
           description: A list of VMs
@@ -314,7 +320,9 @@ paths:
       operationId: listPSs
       parameters:
         - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
       responses:
         '200':
           description: A list of private subnets
@@ -343,7 +351,9 @@ paths:
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
       responses:
         '200':
           description: A list of Private Subnets in a location
@@ -460,7 +470,9 @@ paths:
       operationId: listPostgresDatabases
       parameters:
         - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
       responses:
         '200':
           description: A list of Postgres databases
@@ -487,7 +499,9 @@ paths:
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/pagination'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
       responses:
         '200':
           description: A list of Postgres databases in a specific location of a project
@@ -1162,34 +1176,29 @@ components:
           type: string
           description: Latest restore time (if primary)"
   parameters:
-    pagination:
-      name: pagination
+    start_after:
+      name: start_after
       in: query
-      style: form
-      explode: true
+      required: false
       schema:
-        start_after:
-          name: start_after
-          required: false
-          schema:
-            type: string
-          description: Pagination - Start after
-        page_size:
-          name: page_size
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 10
-          description: Pagination - Page size
-        order_column:
-          name: order_column
-          in: query
-          required: false
-          schema:
-            type: string
-            default: id
-          description: Pagination - Order column
+        type: string
+      description: Pagination - Start after
+    page_size:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 10
+      description: Pagination - Page size
+    order_column:
+      name: order_column
+      in: query
+      required: false
+      schema:
+        type: string
+        default: id
+      description: Pagination - Order column
     project_id:
       name: project_id
       in: path
