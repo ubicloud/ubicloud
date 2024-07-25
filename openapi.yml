@@ -49,6 +49,7 @@ paths:
                     example: "You have been logged in"
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   # PROJECT
   /project:
     get:
@@ -76,6 +77,10 @@ paths:
                     type: integer
         '401':
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     post:
       tags:
         - Project
@@ -326,6 +331,7 @@ paths:
                     type: integer
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
         '404':
           description: Resource is not found
   /project/{project_id}/location/{location}/private-subnet:
@@ -354,6 +360,7 @@ paths:
                     type: integer
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
         '404':
           description: Resource not found
   /project/{project_id}/location/{location}/private-subnet/{private_subnet_name}:
@@ -384,6 +391,7 @@ paths:
                 $ref: '#/components/schemas/PrivateSubnet'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
     get:
       tags:
         - Private Subnet
@@ -398,6 +406,7 @@ paths:
                 $ref: '#/components/schemas/PrivateSubnet'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
         '404':
           description: Resource not found
     delete:
@@ -410,6 +419,7 @@ paths:
           description: Private Subnet is deleted successfully
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -429,6 +439,7 @@ paths:
                 $ref: '#/components/schemas/PrivateSubnet'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
     delete:
       tags:
         - Private Subnet
@@ -439,6 +450,7 @@ paths:
           description: Private Subnet is deleted successfully
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   # POSTGRES
   /project/{project_id}/postgres:
     get:
@@ -465,6 +477,7 @@ paths:
                     type: integer
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/postgres:
     get:
       tags:
@@ -491,6 +504,7 @@ paths:
                     type: integer
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/postgres/{postgres_database_name}:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -528,6 +542,7 @@ paths:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
     get:
       tags:
         - Postgres
@@ -542,6 +557,7 @@ paths:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
     delete:
       tags:
         - Postgres
@@ -552,6 +568,7 @@ paths:
           description: Postgres database is deleted successfully
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore:
     post:
       tags:
@@ -584,6 +601,7 @@ paths:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password:
     post:
       tags:
@@ -614,6 +632,7 @@ paths:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -641,6 +660,7 @@ paths:
           description: Postgres database is deleted successfully
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/restore:
     post:
       tags:
@@ -673,6 +693,7 @@ paths:
                 $ref: '#/components/schemas/Postgres'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password:
     post:
       tags:
@@ -703,6 +724,7 @@ paths:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
           # FIREWALL RULES
   /project/{project_id}/firewall/{firewall_id}/firewall-rule:
     parameters:
@@ -743,6 +765,7 @@ paths:
           description: Invalid request
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/firewall/{firewall_id}/firewall-rule/{firewall_rule_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -762,6 +785,7 @@ paths:
                 $ref: '#/components/schemas/FirewallRule'
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
     delete:
       tags:
         - Firewall Rule
@@ -772,6 +796,7 @@ paths:
           description: Firewall rule deleted successfully
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
           # FIREWALL
   /project/{project_id}/firewall:
     parameters:
@@ -822,6 +847,7 @@ paths:
           description: Invalid request
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
   /project/{project_id}/firewall/{firewall_id}:
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -840,7 +866,7 @@ paths:
                 $ref: '#/components/schemas/Firewall'
         '401':
           description: Unauthorized
-    delete:
+          $ref: '#/components/responses/Error'
       tags:
         - Firewall
       summary: Delete a specific firewall
@@ -850,13 +876,36 @@ paths:
           description: Firewall deleted successfully
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     BearerAuth: # Arbitrary name for the security scheme
       type: http
       scheme: bearer
       bearerFormat: JWT # Optional, just for documentation purposes
+  responses:
+    Error:
+      description: an error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: integer
+              example: 401
+            type:
+              type: string
+              example: "InvalidCredentials"
+            message:
+              type: string
+              example: "There was an error logging in"
     Project:
       type: object
       properties:
