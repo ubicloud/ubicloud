@@ -35,10 +35,6 @@ paths:
       responses:
         '200':
           description: Logged in successfully.
-          headers:
-            Authorization:
-              description: JWT Token
-              type: string
           content:
             application/json:
               schema:
