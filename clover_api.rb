@@ -30,18 +30,18 @@ class CloverApi < Roda
   plugin :error_handler do |e|
     response["Content-Type"] = "application/json"
     error = parse_error(e)
-
     {error: error}.to_json
   end
 
-  plugin :rodauth do
+  plugin :rodauth, json: :only do
     enable :argon2, :json, :jwt, :active_sessions, :login
-
+    use_json? true
     only_json? true
     use_jwt? true
 
     # Converting rodauth error response to the common error format of the API
     json_response_body do |hash|
+      p [5, hash]
       # In case of an error, rodauth returns the error in the following format
       # {
       #   (required) "error": "There was an error logging in"
@@ -87,7 +87,8 @@ class CloverApi < Roda
 
   class CustomErrorHandler
     def call(error, request)
-      puts "Schema validation failed: #{error.inspect}"
+      printed_error = error.respond_to?(:original_error) ? error.original_error : error
+      puts "Schema validation failed: #{printed_error.inspect}"
       puts "Request: #{request.inspect}"
       puts "Error details: #{error.inspect}"
       # raise error
