@@ -6,7 +6,8 @@ ruby "3.2.5"
 gem "argon2"
 gem "nokogiri"
 gem "bcrypt_pbkdf"
-gem "committee"
+gem "committee", path: '/home/fdr/code/committee'
+gem "openapi_parser", path: '/home/fdr/code/openapi_parser'
 gem "ed25519"
 gem "net-ssh"
 gem "netaddr"

@@ -6,6 +6,19 @@ GIT
     erb-formatter (0.4.3)
       syntax_tree (~> 6.0)
 
+PATH
+  remote: /home/fdr/code/committee
+  specs:
+    committee (5.4.0)
+      json_schema (~> 0.14, >= 0.14.3)
+      openapi_parser (~> 2.0)
+      rack (>= 1.5, < 3.1)
+
+PATH
+  remote: /home/fdr/code/openapi_parser
+  specs:
+    openapi_parser (2.1.0)
+
 GEM
   remote: https://rubygems.org/
   specs:
@@ -79,10 +92,6 @@ GEM
     cbor (0.5.9.8)
     chunky_png (1.4.0)
     coderay (1.1.3)
-    committee (5.3.0)
-      json_schema (~> 0.14, >= 0.14.3)
-      openapi_parser (~> 2.0)
-      rack (>= 1.5)
     concurrent-ruby (1.3.3)
     connection_pool (2.4.1)
     cose (1.3.0)
@@ -169,7 +178,6 @@ GEM
     octokit (9.1.0)
       faraday (>= 1, < 3)
       sawyer (~> 0.9)
-    openapi_parser (2.1.0)
     openssl (3.2.0)
     openssl-signature_algorithm (1.3.0)
       openssl (> 2.0)
@@ -192,7 +200,7 @@ GEM
     puma (6.4.2)
       nio4r (~> 2.0)
     racc (1.8.0)
-    rack (3.1.7)
+    rack (3.0.11)
     rack-test (2.1.0)
       rack (>= 1.3)
     rack-unreloader (2.1.0)
@@ -346,7 +354,7 @@ DEPENDENCIES
   bcrypt_pbkdf
   brakeman
   capybara
-  committee
+  committee!
   countries
   database_cleaner-sequel
   ed25519
@@ -360,6 +368,7 @@ DEPENDENCIES
   netaddr
   nokogiri
   octokit
+  openapi_parser!
   pagerduty (>= 4.0)
   pry
   pry-byebug
