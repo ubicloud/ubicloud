@@ -24,6 +24,7 @@ class CloverApi < Roda
   end
 
   plugin :error_handler do |e|
+    response["Content-Type"] = "application/json"
     error = parse_error(e)
 
     {error: error}.to_json
