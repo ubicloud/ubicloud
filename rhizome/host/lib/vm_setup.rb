@@ -43,13 +43,24 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
+  def measure(name)
+    start = Time.now
+    response = yield
+    puts "#{name.ljust(48)} #{"#{(Time.now - start).round(2)}s".ljust(8)} #{start} #{Time.now}"
+    response
+  end
+
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
-    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
-    cloudinit(unix_user, public_keys, nics, swap_size_bytes)
-    storage(storage_params, storage_secrets, true)
-    hugepages(mem_gib)
-    prepare_pci_devices(pci_devices)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    measure("TOTAL") do
+      puts "prep start #{Time.now}"
+      measure("1.setup_networking") { setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1) }
+      measure("2.cloudinit") { cloudinit(unix_user, public_keys, nics, swap_size_bytes) }
+      measure("3.storage") { storage(storage_params, storage_secrets, true) }
+      measure("4.hugepages") { hugepages(mem_gib) }
+      measure("5.prepare_pci_devices") { prepare_pci_devices(pci_devices) }
+      measure("6.install_systemd_unit") { install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices) }
+      puts "prep end #{Time.now}"
+    end
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, multiqueue:)
@@ -84,12 +95,12 @@ class VmSetup
       end
     end
 
-    interfaces(nics, multiqueue)
-    setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
-    setup_taps_6(gua, nics)
-    routes4(ip4, local_ip4, nics)
-    write_nftables_conf(ip4, gua, nics)
-    forwarding
+    measure("1.1.interfaces") { interfaces(nics, multiqueue) }
+    measure("1.2.setup_veths_6") { setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed) }
+    measure("1.3.setup_taps_6") { setup_taps_6(gua, nics) }
+    measure("1.4.routes4") { routes4(ip4, local_ip4, nics) }
+    measure("1.5.write_nftables_conf") { write_nftables_conf(ip4, gua, nics) }
+    measure("1.6.forwarding") { forwarding }
   end
 
   def unblock_ip4(ip4)
@@ -305,9 +316,9 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def write_nftables_conf(ip4, gua, nics)
-    config = build_nftables_config(gua, nics, ip4)
-    vp.write_nftables_conf(config)
-    apply_nftables
+    config = measure("1.5.1.build_nftables_config") { build_nftables_config(gua, nics, ip4) }
+    measure("1.5.2.vp.write_nftables_conf") { vp.write_nftables_conf(config) }
+    measure("1.5.3.apply_nftables") { apply_nftables }
   end
 
   def generate_nat4_rules(ip4, private_ip)
@@ -486,8 +497,8 @@ EOS
       device_id = params["device_id"]
       key_wrapping_secrets = storage_secrets[device_id]
       storage_volume = StorageVolume.new(@vm_name, params)
-      storage_volume.prep(key_wrapping_secrets) if prep
-      storage_volume.start(key_wrapping_secrets)
+      measure("3.1.storage_volume.prep") { storage_volume.prep(key_wrapping_secrets) if prep }
+      measure("3.2.storage_volume.start") { storage_volume.start(key_wrapping_secrets) }
     }
   end
 
@@ -582,7 +593,7 @@ Group=#{@vm_name}
 LimitNOFILE=500000
 #{limit_memlock}
 SERVICE
-    r "systemctl daemon-reload"
+    measure("6.1.daemon-reload") { r "systemctl daemon-reload" }
   end
 
   # Generate a MAC with the "local" (generated, non-manufacturer) bit

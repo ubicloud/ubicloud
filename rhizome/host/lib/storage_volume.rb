@@ -36,45 +36,52 @@ class StorageVolume
     @rpc_client ||= SpdkRpc.new(SpdkPath.rpc_sock(@spdk_version))
   end
 
+  def measure(name)
+    start = Time.now
+    response = yield
+    puts "#{name.ljust(48)} #{"#{(Time.now - start).round(2)}s".ljust(8)} #{start} #{Time.now}"
+    response
+  end
+
   def prep(key_wrapping_secrets)
     # Device path is intended to be created by system admin, so fail loudly if
     # it doesn't exist
     fail "Storage device directory doesn't exist: #{sp.device_path}" if !File.exist?(sp.device_path)
 
-    FileUtils.mkdir_p storage_dir
-    encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
+    measure("3.1.1.mkdir_p_storage_dir") { FileUtils.mkdir_p storage_dir }
+    encryption_key = measure("3.1.2.setup_data_encryption_key") { setup_data_encryption_key(key_wrapping_secrets) } if @encrypted
 
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
-      create_empty_disk_file
+      measure("3.1.3.create_empty_disk_file") { create_empty_disk_file }
       return
     end
 
     verify_imaged_disk_size
 
     if @use_bdev_ubi
-      create_ubi_writespace(encryption_key)
+      measure("3.1.4.create_ubi_writespace") { create_ubi_writespace(encryption_key) }
     elsif @encrypted
-      create_empty_disk_file
-      encrypted_image_copy(encryption_key, @image_path)
+      measure("3.1.3.create_empty_disk_file") { create_empty_disk_file }
+      measure("3.1.4.encrypted_image_copy") { encrypted_image_copy(encryption_key, @image_path) }
     else
-      unencrypted_image_copy
+      measure("3.1.4.unencrypted_image_copy") { unencrypted_image_copy }
     end
   end
 
   def start(key_wrapping_secrets)
-    encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
+    encryption_key = measure("3.2.1.read_data_encryption_key") { read_data_encryption_key(key_wrapping_secrets) } if @encrypted
 
     retries = 0
     begin
-      setup_spdk_bdev(encryption_key)
-      setup_spdk_vhost
+      measure("3.2.2.setup_spdk_bdev") { setup_spdk_bdev(encryption_key) }
+      measure("3.2.3.setup_spdk_vhost") { setup_spdk_vhost }
     rescue SpdkExists
       # If some of SPDK artifacts exist, purge and retry. But retry only once
       # to prevent potential retry loops.
       if retries == 0
         retries += 1
-        purge_spdk_artifacts
+        measure("3.2.4.purge_spdk_artifacts") { purge_spdk_artifacts }
         retry
       end
       raise
@@ -213,10 +220,11 @@ class StorageVolume
   end
 
   def create_ubi_writespace(encryption_key)
-    create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024 + 16)
+    measure("3.1.4.1.create_empty_disk_file") { create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024 + 16) }
+
     if @encrypted
       # just clear the metadata section, i.e. first 8MB
-      encrypted_image_copy(encryption_key, "/dev/zero", block_size: 2097152, count: 4)
+      measure("3.1.4.2.encrypted_image_copy") { encrypted_image_copy(encryption_key, "/dev/zero", block_size: 2097152, count: 4) }
     end
   end
 
@@ -243,20 +251,22 @@ class StorageVolume
     if encryption_key
       key_name = "#{@device_id}_key"
       aio_bdev = "#{@device_id}_aio"
-      rpc_client.accel_crypto_key_create(
-        key_name,
-        encryption_key[:cipher],
-        encryption_key[:key],
-        encryption_key[:key2]
-      )
-      rpc_client.bdev_aio_create(aio_bdev, disk_file, 512)
-      rpc_client.bdev_crypto_create(non_ubi_bdev, aio_bdev, key_name)
+      measure("3.2.2.1.accel_crypto_key_create") {
+        rpc_client.accel_crypto_key_create(
+          key_name,
+          encryption_key[:cipher],
+          encryption_key[:key],
+          encryption_key[:key2]
+        )
+      }
+      measure("3.2.2.2.bdev_aio_create") { rpc_client.bdev_aio_create(aio_bdev, disk_file, 512) }
+      measure("3.2.2.3.bdev_crypto_create") { rpc_client.bdev_crypto_create(non_ubi_bdev, aio_bdev, key_name) }
     else
       rpc_client.bdev_aio_create(non_ubi_bdev, disk_file, 512)
     end
 
     if @use_bdev_ubi
-      rpc_client.bdev_ubi_create(@device_id, non_ubi_bdev, @image_path, @skip_sync)
+      measure("3.2.2.4.bdev_ubi_create") { rpc_client.bdev_ubi_create(@device_id, non_ubi_bdev, @image_path, @skip_sync) }
     end
   end
 
