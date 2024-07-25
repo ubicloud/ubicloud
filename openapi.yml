@@ -1071,6 +1071,7 @@ components:
         vm_name:
           type: string
           description: Name of the VM
+          nullable: true
     PrivateSubnet:
       type: object
       properties:
