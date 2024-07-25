@@ -398,6 +398,8 @@ paths:
         '401':
           description: Unauthorized
           $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
     get:
       tags:
         - Private Subnet
@@ -415,6 +417,7 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           description: Resource not found
+          $ref: '#/components/responses/Error'
     delete:
       tags:
         - Private Subnet
