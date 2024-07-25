@@ -120,6 +120,7 @@ RSpec.describe Clover, "private_subnet" do
       it "not authorized" do
         post "/api/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.location}/private-subnet/foo_subnet"
 
+        expect(last_response.content_type).to eq("application/json")
         expect(last_response).to have_api_error(403)
       end
 
