@@ -350,8 +350,24 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "considers all locations for github-runners" do
+    it "considers EU locations for github-runners" do
       vm.location = "github-runners"
+      expect(Scheduling::Allocator).to receive(:allocate).with(
+        vm, :storage_volumes,
+        allocation_state_filter: ["accepting"],
+        distinct_storage_devices: false,
+        host_filter: [],
+        host_exclusion_filter: [],
+        location_filter: ["github-runners", "hetzner-fsn1", "hetzner-hel1"],
+        location_preference: ["github-runners"],
+        gpu_enabled: false
+      )
+      expect { nx.start }.to hop("create_unix_user")
+    end
+
+    it "considers all locations for standard-60 runners" do
+      vm.location = "github-runners"
+      vm.cores = 30
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
         allocation_state_filter: ["accepting"],

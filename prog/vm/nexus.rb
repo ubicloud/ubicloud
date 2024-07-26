@@ -168,7 +168,8 @@ class Prog::Vm::Nexus < Prog::Base
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
         elsif vm.location == "github-runners"
-          [["accepting"], [], ["github-runners"], []]
+          runner_locations = (vm.cores == 30) ? [] : ["github-runners", "hetzner-fsn1", "hetzner-hel1"]
+          [["accepting"], runner_locations, ["github-runners"], []]
         else
           [["accepting"], [vm.location], [], []]
         end
