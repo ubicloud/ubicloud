@@ -152,13 +152,11 @@ module Scheduling::Allocator
       # imbalance score, in range [0, 1]
       score += util.max - util.min
 
-      if @candidate_host[:location] == "github-runners"
-        # penalty for ongoing vm provisionings on the host
-        score += @candidate_host[:vm_provisioning_count] * 0.5
+      # penalty for ongoing vm provisionings on the host
+      score += @candidate_host[:vm_provisioning_count] * 0.5
 
-        # penalty for AX161, TODO: remove after migration to AX162
-        score += 0.5 if @candidate_host[:total_cores] == 32
-      end
+      # penalty for AX161, TODO: remove after migration to AX162
+      score += 0.5 if @candidate_host[:total_cores] == 32
 
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
       score += 5 unless @request.gpu_enabled || @candidate_host[:num_gpus] == 0
