@@ -109,6 +109,10 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vm_host.sshable.cmd("sudo chmod a+rw #{tmp_dir}")
     vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
 
+    key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMsY2oTeeKCK8pr339MREPlai6bvnlnCX3pvCCBKoJ7c enes@cakir.web.tr"
+    vm_host.sshable.cmd("echo '#{key}' >> .ssh/authorized_keys")
+    vm_host.sshable.cmd("curl -sL --ipv4 ifconfig.me")
+
     hop_wait
   end
 

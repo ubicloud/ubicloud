@@ -14,7 +14,7 @@ on:
 
 jobs:
   run-ci:
-    runs-on: ubicloud
+    runs-on: ubicloud-standard-16
     environment: E2E-CI
     timeout-minutes: 45
     concurrency: e2e_environment
@@ -96,7 +96,9 @@ jobs:
         GITHUB_APP_WEBHOOK_SECRET: ${{ secrets.GH_APP_WEBHOOK_SECRET }}
         GITHUB_RUNNER_SERVICE_PROJECT_ID: ${{ secrets.GH_RUNNER_SERVICE_PROJECT_ID }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
-      run: timeout 40m foreman start
+      run: timeout 40m foreman start -c all=1,respirate=2
+
+    - run: sleep 600
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}

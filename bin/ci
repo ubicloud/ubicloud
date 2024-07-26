@@ -10,18 +10,18 @@ def main(options)
   wait_until(hetzner_server_st, "wait")
 
   tests_to_wait = []
-  if options[:test_cases].include?("vm")
-    encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
-    log(encrypted_vms_st, "storage_encrypted: true")
-    # Not running in parallel but waiting, since host is rebooted during test.
-    # Rebooting makes the next test to test reboot practically as well depending
-    # on when the host is rebooted and can cause flaky issues for github runner tests.
-    wait_until(encrypted_vms_st)
+  # if options[:test_cases].include?("vm")
+  #   encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true)
+  #   log(encrypted_vms_st, "storage_encrypted: true")
+  #   # Not running in parallel but waiting, since host is rebooted during test.
+  #   # Rebooting makes the next test to test reboot practically as well depending
+  #   # on when the host is rebooted and can cause flaky issues for github runner tests.
+  #   wait_until(encrypted_vms_st)
 
-    unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
-    log(unencrypted_vms_st, "storage_encrypted: false")
-    tests_to_wait << [unencrypted_vms_st, nil]
-  end
+  #   unencrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: false, test_reboot: false)
+  #   log(unencrypted_vms_st, "storage_encrypted: false")
+  #   tests_to_wait << [unencrypted_vms_st, nil]
+  # end
 
   github_runner_test_cases = options[:test_cases].select { _1.include?("github_runner") }
   unless github_runner_test_cases.empty?

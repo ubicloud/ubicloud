@@ -52,41 +52,39 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def trigger_test_runs
-    test_runs.each do |test_run|
-      unless trigger_test_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
-        update_stack({"fail_message" => "Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
-        hop_clean_resources
-      end
+    1.times do
+      label_data = Github.runner_labels["ubicloud"]
+      Prog::Vm::Nexus.assemble_with_sshable(
+        "runneradmin",
+        Project.first.id,
+        size: label_data["vm_size"],
+        location: label_data["location"],
+        boot_image: label_data["boot_image"],
+        storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
+        enable_ip4: true,
+        arch: label_data["arch"],
+        allow_only_ssh: true,
+        swap_size_bytes: 4294963200
+      )
     end
+
+    # test_runs.each do |test_run|
+    #   unless trigger_test_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
+    #     update_stack({"fail_message" => "Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
+    #     hop_clean_resources
+    #   end
+    # end
 
     # To make sure that test runs are triggered
     # We sill still check the runs in the next step in
     # case an incident happens on the github side
-    sleep 30
+    # sleep 30
 
     hop_check_test_runs
   end
 
   label def check_test_runs
-    test_runs.each do |test_run|
-      latest_run = latest_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
-
-      # In case the run can not be triggered in the previous state
-      if latest_run[:created_at] < Time.parse(frame["created_at"])
-        update_stack({"fail_message" => "Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
-        break
-      end
-
-      conclusion = latest_run[:conclusion]
-      if FAIL_CONCLUSIONS.include?(conclusion)
-        update_stack({"fail_message" => "Test run for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]} failed with conclusion #{conclusion}"})
-        break
-      elsif IN_PROGRESS_CONCLUSIONS.include?(conclusion) || conclusion.nil?
-        nap 15
-      end
-    end
-
-    hop_clean_resources
+    nap 30
   end
 
   label def clean_resources

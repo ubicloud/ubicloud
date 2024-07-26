@@ -70,7 +70,7 @@ module Config
   # Override -- value is returned or the set default.
   override :base_url, "http://localhost:9292", string
   override :database_timeout, 10, int
-  override :db_pool, 5, int
+  override :db_pool, 30, int
   override :deployment, "production", string
   override :force_ssl, true, bool
   override :port, 3000, int
