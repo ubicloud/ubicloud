@@ -192,6 +192,12 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:bud).with(Prog::DownloadBootImage, {"image_name" => "github-ubuntu-2204"})
       expect { nx.download_boot_images }.to hop("wait_download_boot_images")
     end
+
+    it "pushes the download boot image program for arm64 architecture" do
+      expect(nx).to receive(:frame).and_return({"default_boot_images" => ["ubuntu-jammy"]})
+      expect(nx).to receive(:bud).with(Prog::DownloadBootImage, {"image_name" => "ubuntu-jammy"})
+      expect { nx.download_boot_images }.to hop("wait_download_boot_images")
+    end
   end
 
   describe "#wait_download_boot_images" do

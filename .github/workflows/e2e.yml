@@ -8,6 +8,14 @@ on:
         required: true
         default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,github_runner_ubuntu_2004'
         type: string
+      arch:
+        description: 'The architecture to run the tests on'
+        required: false
+        default: x64
+        type: choice
+        options:
+          - x64
+          - arm64
 
   schedule:
     - cron:  '0 */1 * * *'
@@ -17,7 +25,7 @@ jobs:
     runs-on: ubicloud
     environment: E2E-CI
     timeout-minutes: 45
-    concurrency: e2e_environment
+    concurrency: e2e_environment_${{ inputs.arch }}
 
     env:
       DB_USER: clover
@@ -103,7 +111,7 @@ jobs:
         GITHUB_APP_WEBHOOK_SECRET: ${{ secrets.GH_APP_WEBHOOK_SECRET }}
         GITHUB_RUNNER_SERVICE_PROJECT_ID: ${{ secrets.GH_RUNNER_SERVICE_PROJECT_ID }}
         VM_POOL_PROJECT_ID: ${{ secrets.VM_POOL_PROJECT_ID }}
-        E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
+        E2E_HETZNER_SERVER_ID: ${{ inputs.arch == 'x64' && secrets.E2E_HETZNER_SERVER_ID_X64 || secrets.E2E_HETZNER_SERVER_ID_ARM64 }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
       run: timeout 40m foreman start
 
