@@ -62,7 +62,7 @@ jobs:
           test_cases="${{ inputs.test_cases }}"
         fi
         echo "Running e2e test cases: $test_cases"
-        echo "e2e: bin/ci --test-cases=$test_cases" >> Procfile
+        echo "e2e: bin/e2e --test-cases=$test_cases" >> Procfile
 
     - name: Run tests
       env:
@@ -70,7 +70,10 @@ jobs:
         CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
         RACK_ENV: production
         IS_E2E: "true"
-        CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
+        E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
+        E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
+        HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
+        HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
         HETZNER_PASSWORD: ${{ secrets.HETZNER_PASSWORD }}
         UBICLOUD_IMAGES_BLOB_STORAGE_ENDPOINT: ${{ secrets.UBICLOUD_IMAGES_BLOB_STORAGE_ENDPOINT }}
@@ -93,9 +96,6 @@ jobs:
         POSTGRES_SERVICE_PROJECT_ID: "546a1ed8-53e5-86d2-966c-fb782d2ae5ab"
         MINIO_SERVICE_PROJECT_ID: "37ad2a8d-0220-4e8b-a67f-38db95d6c657"
         VM_POOL_PROJECT_ID: ${{ secrets.VM_POOL_PROJECT_ID }}
-        E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
-        HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
-        HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
       run: |
         set -o pipefail
         timeout 55m foreman start | tee foreman.log | grep "e2e.1"
