@@ -18,28 +18,20 @@ require_relative "../loader"
 d = Scheduling::Dispatcher.new(partition_number:)
 Signal.trap("TERM") { d.shutdown }
 
-if Config.heartbeat_url
-  puts "Starting heartbeat prog"
-  # We always insert the heartbeat using the same UBID ("stheartbeatheartbheartheaz")
-  Strand.dataset.insert_conflict.insert(id: "8b958d2d-cad4-5f3a-5634-b8b958d45caf", prog: "Heartbeat", label: "wait")
-end
+workers = [
+  {ubid: "stresolvee4block0dnsnamesz", prog: "ResolveGloballyBlockedDnsnames"},
+  {ubid: "stcheckzvsagezalertszzzzza", prog: "CheckUsageAlerts"},
+  {ubid: "stexp1repr0ject1nv1tat10na", prog: "ExpireProjectInvitations"},
+  {ubid: "st10g0vmh0st0vt111zat10nzz", prog: "LogVmHostUtilizations"},
+  Config.heartbeat_url ? {ubid: "stheartbeatheartbheartheaz", prog: "Heartbeat"} : nil,
+  Config.github_app_id ? {ubid: "stredelivergith0bfail0reaz", prog: "RedeliverGithubFailures", stack: [{last_check_at: Time.now}]} : nil
+]
+workers.compact!
 
-if Config.github_app_id
-  # We always insert this strand using the same UBID ("stredelivergith0bfail0reaz")
-  Strand.dataset.insert_conflict.insert(id: "c39ae087-6ec4-033a-d440-b7a821061caf", prog: "RedeliverGithubFailures", label: "wait", stack: [{last_check_at: Time.now}].to_json)
-end
-
-# We always insert this strand using the same UBID ("stresolvee4block0dnsnamesz")
-Strand.dataset.insert_conflict.insert(id: "c3b200ed-ce22-c33a-0326-06d735551d9f", prog: "ResolveGloballyBlockedDnsnames", label: "wait")
-
-# We always insert this strand using the same UBID ("stcheckzvsagezalertszzzzza")
-Strand.dataset.insert_conflict.insert(id: "645cc9ff-7954-1f3a-fa82-ec6b3ffffff5", prog: "CheckUsageAlerts", label: "wait")
-
-# We always insert this strand using the same UBID ("stexp1repr0ject1nv1tat10na")
-Strand.dataset.insert_conflict.insert(id: "776c1c3a-d804-9f3a-6683-5d874ad04155", prog: "ExpireProjectInvitations", label: "wait")
-
-# We always insert this strand using the same UBID ("st10g0vmh0st0vt111zat10nzz")
-Strand.dataset.insert_conflict.insert(id: "08200dd2-20ce-833a-de82-10fd5a082bff", prog: "LogVmHostUtilizations", label: "wait")
+Strand.dataset.insert_conflict.import(
+  [:id, :prog, :label, :stack],
+  workers.map { [UBID.parse(it[:ubid]).to_uuid, it[:prog], "wait", (it[:stack] || [{}]).to_json] }
+)
 
 clover_freeze
 
