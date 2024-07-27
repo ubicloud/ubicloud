@@ -14,12 +14,12 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       }
     else
       {
-        server_id: Config.ci_hetzner_sacrificial_server_id, destroy: true
+        server_id: Config.e2e_hetzner_server_id, destroy: true
       }
     end
 
     if frame[:server_id].nil? || frame[:server_id].empty?
-      fail "CI_HETZNER_SACRIFICIAL_SERVER_ID must be a nonempty string"
+      fail "E2E_HETZNER_SERVER_ID must be a nonempty string"
     end
 
     Strand.create_with_id(
