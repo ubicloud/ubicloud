@@ -16,6 +16,12 @@ RSpec.describe Prog::Test::VmGroup do
       expect(vg_test).to receive(:update_stack).and_call_original
       expect { vg_test.setup_vms }.to hop("wait_vms")
     end
+
+    it "hops to wait_children_ready for arm64 host" do
+      expect(vg_test).to receive(:frame).and_return({"arch" => "arm64"}).at_least(:once)
+      expect(vg_test).to receive(:update_stack).and_call_original
+      expect { vg_test.setup_vms }.to hop("wait_vms")
+    end
   end
 
   describe "#wait_vms" do

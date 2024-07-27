@@ -3,13 +3,14 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
-  def self.assemble(storage_encrypted: true, test_reboot: true)
+  def self.assemble(storage_encrypted: true, test_reboot: true, arch: "x64")
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
         "storage_encrypted" => storage_encrypted,
         "test_reboot" => test_reboot,
+        "arch" => arch,
         "vms" => []
       }]
     )
@@ -32,6 +33,9 @@ class Prog::Test::VmGroup < Prog::Test::Base
     )
 
     storage_encrypted = frame.fetch("storage_encrypted", true)
+    boot_images = Option::BootImages.map { _1.name }
+    # We don't support almalinux-8 on arm64
+    boot_images.delete("almalinux-8") if frame["arch"] == "arm64"
 
     vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
@@ -40,24 +44,24 @@ class Prog::Test::VmGroup < Prog::Test::Base
         {encrypted: storage_encrypted, skip_sync: true},
         {encrypted: storage_encrypted, size_gib: 5}
       ],
-      boot_image: Option::BootImages.map { _1.name }.sample,
-      enable_ip4: true
+      boot_image: boot_images.sample,
+      enable_ip4: true, arch: frame["arch"]
     )
 
     vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
       storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
-      boot_image: Option::BootImages.map { _1.name }.sample,
-      enable_ip4: true
+      boot_image: boot_images.sample,
+      enable_ip4: true, arch: frame["arch"]
     )
 
     vm3_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet2_s.id,
       storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
-      boot_image: Option::BootImages.map { _1.name }.sample,
-      enable_ip4: true
+      boot_image: boot_images.sample,
+      enable_ip4: true, arch: frame["arch"]
     )
 
     update_stack({

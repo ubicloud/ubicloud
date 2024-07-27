@@ -19,6 +19,7 @@ RSpec.describe Prog::Test::GithubRunner do
 
   describe "#download_boot_images" do
     it "hops to hop_wait_download_boot_images" do
+      expect(VmHost).to receive(:[]).and_return(instance_double(VmHost, id: 12345))
       expect(gr_test).to receive(:bud).with(Prog::DownloadBootImage, {"subject_id" => 12345, "image_name" => "github-ubuntu-2204"})
       expect { gr_test.download_boot_images }.to hop("wait_download_boot_images")
     end
@@ -70,7 +71,8 @@ RSpec.describe Prog::Test::GithubRunner do
     it "triggers test runs" do
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client)
-      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main").and_return(true)
+      expect(gr_test).to receive(:vm_host).and_return(instance_double(VmHost, arch: "x64"))
+      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main", {inputs: {arch: "x64"}}).and_return(true)
       expect(gr_test).to receive(:sleep).with(30)
       expect { gr_test.trigger_test_runs }.to hop("check_test_runs")
     end
@@ -78,7 +80,8 @@ RSpec.describe Prog::Test::GithubRunner do
     it "can not triggers test runs" do
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client)
-      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main").and_return(false)
+      expect(gr_test).to receive(:vm_host).and_return(instance_double(VmHost, arch: "arm64"))
+      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main", {inputs: {arch: "arm64"}}).and_return(false)
       expect { gr_test.trigger_test_runs }.to hop("clean_resources")
     end
   end
