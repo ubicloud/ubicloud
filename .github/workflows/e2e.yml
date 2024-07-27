@@ -81,7 +81,7 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
-        echo "e2e: bin/ci --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm,github_runner_ubuntu_2204,github_runner_ubuntu_2004' || inputs.test_cases }}" >> Procfile
+        echo "e2e: bin/e2e --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm,github_runner_ubuntu_2204,github_runner_ubuntu_2004' || inputs.test_cases }}" >> Procfile
 
     - name: Run services
       env:
@@ -89,7 +89,6 @@ jobs:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
         CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
         CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
-        CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
         HETZNER_PASSWORD: ${{ secrets.HETZNER_PASSWORD }}
         UBICLOUD_IMAGES_BLOB_STORAGE_ENDPOINT: ${{ secrets.UBICLOUD_IMAGES_BLOB_STORAGE_ENDPOINT }}
@@ -104,6 +103,7 @@ jobs:
         GITHUB_APP_WEBHOOK_SECRET: ${{ secrets.GH_APP_WEBHOOK_SECRET }}
         GITHUB_RUNNER_SERVICE_PROJECT_ID: ${{ secrets.GH_RUNNER_SERVICE_PROJECT_ID }}
         VM_POOL_PROJECT_ID: ${{ secrets.VM_POOL_PROJECT_ID }}
+        E2E_HETZNER_SERVER_ID: ${{ secrets.E2E_HETZNER_SERVER_ID }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
       run: timeout 40m foreman start
 
