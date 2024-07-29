@@ -53,9 +53,14 @@ class VmSetup
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
     measure("TOTAL") do
       puts "prep start #{Time.now}"
-      measure("1.setup_networking") { setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1) }
-      measure("2.cloudinit") { cloudinit(unix_user, public_keys, nics, swap_size_bytes) }
-      measure("3.storage") { storage(storage_params, storage_secrets, true) }
+      measure("1.cloudinit") { cloudinit(unix_user, public_keys, nics, swap_size_bytes, gua) }
+      networking_thread = Thread.new do
+        measure("2.setup_networking") { setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1) }
+      end
+      storage_thread = Thread.new do
+        measure("3.storage") { storage(storage_params, storage_secrets, true) }
+      end
+      [networking_thread, storage_thread].each(&:join)
       measure("4.hugepages") { hugepages(mem_gib) }
       measure("5.prepare_pci_devices") { prepare_pci_devices(pci_devices) }
       measure("6.install_systemd_unit") { install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices) }
@@ -71,7 +76,7 @@ class VmSetup
 
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
-    cloudinit(unix_user, public_keys, nics, swap_size_bytes)
+    cloudinit(unix_user, public_keys, nics, swap_size_bytes, gua)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
@@ -405,13 +410,13 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_keys, nics, swap_size_bytes)
+  def cloudinit(unix_user, public_keys, nics, swap_size_bytes, gua)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
 EOS
 
-    guest_network = NetAddr.parse_net(vp.read_guest_ephemeral)
+    guest_network = subdivide_network(NetAddr.parse_net(gua)).first
     private_ip_dhcp = nics.map do |nic|
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
       vm_sub_4 = NetAddr::IPv4Net.parse(nic.net4)
