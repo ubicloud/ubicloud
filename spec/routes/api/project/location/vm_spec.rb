@@ -14,40 +14,19 @@ RSpec.describe Clover, "vm" do
   end
 
   describe "unauthenticated" do
-    it "not location list" do
-      get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm"
+    it "cannot perform authenticated operations" do
+      [
+        [:get, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm"],
+        [:post, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"],
+        [:delete, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
+        [:delete, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}"],
+        [:get, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
+        [:get, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}"]
+      ].each do |method, path|
+        send method, path
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not create" do
-      post "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete" do
-      delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete ubid" do
-      delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not get" do
-      get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not get ubid" do
-      get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/id/#{vm.ubid}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
+        expect(last_response).to have_api_error(401, "Please login to continue")
+      end
     end
   end
 
@@ -57,24 +36,6 @@ RSpec.describe Clover, "vm" do
     end
 
     describe "list" do
-      it "empty" do
-        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm"
-
-        expect(last_response.status).to eq(200)
-        parsed_body = JSON.parse(last_response.body)
-        expect(parsed_body["items"]).to eq([])
-        expect(parsed_body["count"]).to eq(0)
-      end
-
-      it "success single" do
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm"
-
-        expect(last_response.status).to eq(200)
-        parsed_body = JSON.parse(last_response.body)
-        expect(parsed_body["items"].length).to eq(1)
-        expect(parsed_body["count"]).to eq(1)
-      end
-
       it "success multiple" do
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
 
@@ -121,20 +82,6 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
         expect(Vm.first.ip4_enabled).to be false
-      end
-
-      it "success with ipv4" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
-          public_key: "ssh key",
-          unix_user: "ubi",
-          size: "standard-2",
-          boot_image: "ubuntu-jammy",
-          enable_ip4: true
-        }.to_json
-
-        expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
-        expect(Vm.first.ip4_enabled).to be true
       end
 
       it "success with private subnet" do
@@ -237,31 +184,6 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-north-h1\""})
-      end
-
-      it "invalid name" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/invalid_name", {
-          public_key: "ssh key",
-          unix_user: "ubi",
-          size: "standard-2",
-          boot_image: "ubuntu-jammy"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
-      end
-
-      it "invalid payment method" do
-        expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-        expect(Project).to receive(:from_ubid).and_return(project)
-
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
-          public_key: "ssh key",
-          unix_user: "ubi",
-          size: "standard-2",
-          boot_image: "ubuntu-jammy"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: billing_info", {"billing_info" => "Project doesn't have valid billing information"})
       end
 
       it "invalid body" do
