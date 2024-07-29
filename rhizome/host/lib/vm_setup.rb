@@ -44,9 +44,14 @@ class VmSetup
   end
 
   def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
-    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
-    storage(storage_params, storage_secrets, true)
+    network_thread = Thread.new do
+      setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
+    end
+    storage_thread = Thread.new do
+      storage(storage_params, storage_secrets, true)
+    end
+    [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
     prepare_pci_devices(pci_devices)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
@@ -61,8 +66,8 @@ class VmSetup
   end
 
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
-    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
+    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
