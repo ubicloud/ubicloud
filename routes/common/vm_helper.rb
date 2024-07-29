@@ -26,80 +26,56 @@ class Routes::Common::VmHelper < Routes::Common::Base
   def post(name)
     Authorization.authorize(@user.id, "Vm:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
+
+    required_parameters = ["public_key"]
+    required_parameters << "name" << "location" if @mode == AppMode::WEB
+    allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
+    request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
+
+    # Generally parameter validation is handled in progs while creating resources.
+    # Since Vm::Nexus both handles VM creation requests from user and also Postgres
+    # service, moved the boot_image validation here to not allow users to pass
+    # postgres image as boot image while creating a VM.
+    if request_body_params["boot_image"]
+      Validation.validate_boot_image(request_body_params["boot_image"])
+    end
+
+    # Same as above, moved the size validation here to not allow users to
+    # pass gpu instance while creating a VM.
+    if request_body_params["size"]
+      parsed_size = Validation.validate_vm_size(request_body_params["size"], only_visible: true)
+    end
+
+    if request_body_params["storage_size"]
+      storage_size = Validation.validate_vm_storage_size(request_body_params["size"], request_body_params["storage_size"])
+      request_body_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
+      request_body_params.delete("storage_size")
+    end
+
+    if request_body_params["private_subnet_id"] && request_body_params["private_subnet_id"] != ""
+      ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
+      if !ps || ps.location != @location
+        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{request_body_params["private_subnet_id"]}\" is not found in the location \"#{LocationNameConverter.to_display_name(@location)}\""})
+      end
+      Authorization.authorize(@user.id, "PrivateSubnet:view", ps.id)
+    end
+    request_body_params["private_subnet_id"] = ps&.id
+
+    requested_vm_core_count = parsed_size.nil? ? 1 : parsed_size.vcpu / 2
+    Validation.validate_core_quota(project, "VmCores", requested_vm_core_count)
+
+    st = Prog::Vm::Nexus.assemble(
+      request_body_params["public_key"],
+      project.id,
+      name: name,
+      location: @location,
+      **request_body_params.except(*required_parameters).transform_keys(&:to_sym)
+    )
+
     if @mode == AppMode::API
-      required_parameters = ["public_key"]
-      allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
-
-      request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
-
-      # Generally parameter validation is handled in progs while creating resources.
-      # Since Vm::Nexus both handles VM creation requests from user and also Postgres
-      # service, moved the boot_image validation here to not allow users to pass
-      # postgres image as boot image while creating a VM.
-      if request_body_params["boot_image"]
-        Validation.validate_boot_image(request_body_params["boot_image"])
-      end
-
-      # Same as above, moved the size validation here to not allow users to
-      # pass gpu instance while creating a VM.
-      if request_body_params["size"]
-        parsed_size = Validation.validate_vm_size(request_body_params["size"], only_visible: true)
-      end
-
-      if request_body_params["private_subnet_id"]
-        ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
-        unless ps && ps.location == @location
-          fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{request_body_params["private_subnet_id"]}\" is not found in the location \"#{LocationNameConverter.to_display_name(@location)}\""})
-        end
-        Authorization.authorize(@user.id, "PrivateSubnet:view", ps.id)
-        request_body_params["private_subnet_id"] = ps.id
-      end
-
-      if request_body_params["storage_size"]
-        storage_size = Validation.validate_vm_storage_size(request_body_params["size"], request_body_params["storage_size"])
-        request_body_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
-        request_body_params.delete("storage_size")
-      end
-
-      requested_vm_core_count = parsed_size.nil? ? 1 : parsed_size.vcpu / 2
-      Validation.validate_core_quota(project, "VmCores", requested_vm_core_count)
-
-      st = Prog::Vm::Nexus.assemble(
-        request_body_params["public_key"],
-        project.id,
-        name: name,
-        location: @location,
-        **request_body_params.except(*required_parameters).transform_keys(&:to_sym)
-      )
-
       Serializers::Vm.serialize(st.subject, {detailed: true})
     else
-      ps_id = @request.params["private-subnet-id"].empty? ? nil : UBID.parse(@request.params["private-subnet-id"]).to_uuid
-      Authorization.authorize(@user.id, "PrivateSubnet:view", ps_id)
-
-      Validation.validate_boot_image(@request.params["boot-image"])
-      parsed_size = Validation.validate_vm_size(@request.params["size"], only_visible: true)
-      location = LocationNameConverter.to_internal_name(@request.params["location"])
-      storage_size = Validation.validate_vm_storage_size(@request.params["size"], @request.params["storage_size"])
-
-      requested_vm_core_count = parsed_size.vcpu / 2
-      Validation.validate_core_quota(project, "VmCores", requested_vm_core_count)
-
-      st = Prog::Vm::Nexus.assemble(
-        @request.params["public-key"],
-        project.id,
-        name: name,
-        unix_user: @request.params["user"],
-        size: @request.params["size"],
-        storage_volumes: [{size_gib: storage_size, encrypted: true}],
-        location: location,
-        boot_image: @request.params["boot-image"],
-        private_subnet_id: ps_id,
-        enable_ip4: @request.params.key?("enable-ip4")
-      )
-
       flash["notice"] = "'#{name}' will be ready in a few minutes"
-
       @request.redirect "#{project.path}#{st.subject.path}"
     end
   end
