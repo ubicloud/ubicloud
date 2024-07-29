@@ -82,10 +82,12 @@ class CloverRuntime
           fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
         end
 
-        entry = GithubCacheEntry.create_with_id(repository_id: runner.repository.id, key: key, version: version, size: size, scope: scope, created_by: runner.id)
-
-        upload_id = repository.blob_storage_client.create_multipart_upload(bucket: repository.bucket_name, key: entry.blob_key).upload_id
-        entry.update(upload_id: upload_id)
+        entry, upload_id = nil, nil
+        DB.transaction do
+          entry = GithubCacheEntry.create_with_id(repository_id: runner.repository.id, key: key, version: version, size: size, scope: scope, created_by: runner.id)
+          upload_id = repository.blob_storage_client.create_multipart_upload(bucket: repository.bucket_name, key: entry.blob_key).upload_id
+          entry.update(upload_id: upload_id)
+        end
 
         max_chunk_size = 32 * 1024 * 1024 # 32MB
         presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do

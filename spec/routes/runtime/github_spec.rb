@@ -83,6 +83,14 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_api_error(400, "The cache size is over the 10GB limit")
       end
 
+      it "Rollbacks inconsistent cache entry if a failure occurs in the middle" do
+        expect(blob_storage_client).to receive(:create_multipart_upload).and_raise("error")
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 75 * 1024 * 1024}
+
+        expect(last_response).to have_api_error(500, "Sorry, we couldn’t process your request because of an unexpected error.")
+        expect(repository.cache_entries).to be_empty
+      end
+
       it "returns presigned urls and upload id for the reserved cache" do
         expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
         expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")) do |_, params|
