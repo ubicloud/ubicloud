@@ -2,35 +2,19 @@ name: Build
 
 on:
   workflow_dispatch:
-    inputs:
-      push_image:
-        description: 'Push the image to Docker Hub'
-        default: false
-        type: boolean
-  push:
-    branches:
-      - 'main'
-    tags:
-      - 'v*'
 
-env:
-  IMAGE_NAME: ubicloud/ubicloud
+
+
+
 jobs:
-  docker:
-    name: Docker ${{ matrix.platform }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubicloud-standard-8
-            platform: linux/amd64
-          - runner: ubicloud-standard-8-arm
-            platform: linux/arm64
-
+  build:
+    name: build and release
+    runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+
+
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
