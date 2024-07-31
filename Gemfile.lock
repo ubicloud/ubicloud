@@ -9,6 +9,9 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
+    acme-client (2.0.18)
+      faraday (>= 1.0, < 3.0.0)
+      faraday-retry (>= 1.0, < 3.0.0)
     actionview (7.2.0)
       activesupport (= 7.2.0)
       builder (~> 3.1)
@@ -107,6 +110,8 @@ GEM
       logger
     faraday-net_http (3.1.1)
       net-http
+    faraday-retry (2.2.1)
+      faraday (~> 2.0)
     ffi (1.17.0-aarch64-linux-gnu)
     ffi (1.17.0-aarch64-linux-musl)
     ffi (1.17.0-arm64-darwin)
@@ -336,6 +341,7 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
+  acme-client (~> 2.0)
   argon2
   argon2-kdf
   aws-sdk-s3 (~> 1.158)
