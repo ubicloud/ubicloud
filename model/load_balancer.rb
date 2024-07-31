@@ -31,6 +31,10 @@ class LoadBalancer < Sequel::Model
     "/location/#{private_subnet.display_location}/load-balancer/#{name}"
   end
 
+  def certificate_bundle_path
+    "/location/#{private_subnet.display_location}/load-balancer/#{name}/certificate-bundle"
+  end
+
   def add_vm(vm)
     DB.transaction do
       super

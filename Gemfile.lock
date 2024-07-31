@@ -262,6 +262,7 @@ GEM
     rubocop-sequel (0.3.4)
       rubocop (~> 1.0)
     ruby-progressbar (1.13.0)
+    rubyzip (2.3.2)
     safety_net_attestation (0.4.0)
       jwt (~> 2.0)
     sawyer (0.9.2)
@@ -378,6 +379,7 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
+  rubyzip (~> 2.3)
   sequel (>= 5.62)
   sequel-annotate
   sequel_pg (>= 1.8)

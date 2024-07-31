@@ -21,6 +21,12 @@ class CloverWeb
         load_balancer_endpoint_helper.delete
       end
 
+      r.on "certificate-bundle" do
+        r.get true do
+          load_balancer_endpoint_helper.download_certificate_bundle
+        end
+      end
+
       r.on "attach-vm" do
         r.post true do
           load_balancer_endpoint_helper.post_attach_vm
