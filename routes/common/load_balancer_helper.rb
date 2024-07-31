@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "zip"
 class Routes::Common::LoadBalancerHelper < Routes::Common::Base
   def list
     dataset = project.load_balancers_dataset
@@ -117,6 +118,31 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     @resource.incr_destroy
     response.status = 204
     @request.halt
+  end
+
+  def download_certificate_bundle
+    Authorization.authorize(@user.id, "LoadBalancer:view", @resource.id)
+    if @resource.need_certificates?
+      response.status = 404
+      flash["error"] = "No certificates are available to download"
+      @request.redirect "#{project.path}#{@resource.path}"
+    else
+      response.headers["Content-Type"] = "application/zip"
+      response.headers["Content-Disposition"] = "attachment; filename=#{File.basename(@resource.hostname)}.zip"
+      zip_stream = Zip::OutputStream.write_buffer do |zip|
+        cert = @resource.active_cert
+        zip.put_next_entry("#{@resource.hostname}.crt")
+        zip.write(cert.cert)
+        zip.put_next_entry("#{@resource.hostname}.key")
+        zip.write(OpenSSL::PKey::EC.new(cert.private_key).to_pem)
+      end
+
+      zip_stream.rewind
+      zip_data = zip_stream.read
+
+      response.write(zip_data)
+      response.finish
+    end
   end
 
   def post_attach_vm

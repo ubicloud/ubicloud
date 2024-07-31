@@ -32,7 +32,13 @@
         ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
         ["Load Balancer Port", @lb[:src_port]],
         ["Application Port", @lb[:dst_port]],
-        ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
+        ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]],
+        ["Health Check Protocol", @lb[:health_check_protocol].upcase],
+        [
+          "Certificate Bundle",
+          "<a href='#{@project_data[:path]}#{@lb[:certificate_bundle_path]}' class='text-rose-500 hover:underline'>Download</a>",
+          { escape: false }
+        ]
       ]
     }
   ) %>

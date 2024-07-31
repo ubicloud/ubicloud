@@ -24,6 +24,7 @@ class Serializers::LoadBalancer < Serializers::Base
 
     if options[:vms_serialized]
       base[:vms] = Serializers::Vm.serialize(lb.vms, {load_balancer: true})
+      base[:certificate_bundle_path] = lb.certificate_bundle_path
     end
 
     base
