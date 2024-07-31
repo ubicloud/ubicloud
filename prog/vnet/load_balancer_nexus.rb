@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
+require "acme-client"
+require "openssl"
+
 class Prog::Vnet::LoadBalancerNexus < Prog::Base
   subject_is :load_balancer
-  semaphore :destroy, :update_load_balancer, :rewrite_dns_records
+  semaphore :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
     health_check_endpoint: "/up", health_check_interval: 30, health_check_timeout: 15,
@@ -44,8 +47,20 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
 
     hop_create_new_health_probe if strand.children_dataset.count < load_balancer.vms_dataset.count
+    hop_create_new_cert if load_balancer.need_certificates?
 
     nap 5
+  end
+
+  label def create_new_cert
+    cert = Prog::Vnet::CertNexus.assemble(load_balancer.hostname, Prog::Vnet::LoadBalancerNexus.dns_zone.id).subject
+    load_balancer.add_cert(cert)
+    hop_wait_cert_provisioning
+  end
+
+  label def wait_cert_provisioning
+    nap 60 if load_balancer.need_certificates?
+    hop_wait
   end
 
   label def create_new_health_probe

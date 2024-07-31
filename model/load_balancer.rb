@@ -10,8 +10,10 @@ class LoadBalancer < Sequel::Model
   many_to_one :private_subnet
   one_to_many :projects, through: :private_subnet
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: LoadBalancersVms
+  many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
+  one_to_many :certs_load_balancers, key: :load_balancer_id, class: CertsLoadBalancers
 
-  plugin :association_dependencies, load_balancers_vms: :destroy
+  plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -19,7 +21,7 @@ class LoadBalancer < Sequel::Model
   include Authorization::HyperTagMethods
   dataset_module Authorization::Dataset
   dataset_module Pagination
-  semaphore :destroy, :update_load_balancer, :rewrite_dns_records
+  semaphore :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{private_subnet.display_location}/load-balancer/#{name}"
@@ -52,5 +54,15 @@ class LoadBalancer < Sequel::Model
 
   def hostname
     "#{name}.#{private_subnet.ubid[-5...]}.#{Config.load_balancer_service_hostname}"
+  end
+
+  def need_certificates?
+    return true if certs_dataset.empty?
+
+    certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 2 }.empty?
+  end
+
+  def active_cert
+    certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 3 }.order(Sequel.desc(:created_at)).first
   end
 end
