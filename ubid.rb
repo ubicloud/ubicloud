@@ -70,6 +70,7 @@ class UBID
   TYPE_POSTGRES_FIREWALL_RULE = "pf"
   TYPE_GITHUB_REPOSITORY = "gp"
   TYPE_LOAD_BALANCER = "1b"
+  TYPE_CERT = "ce"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
