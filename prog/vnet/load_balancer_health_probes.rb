@@ -8,12 +8,16 @@ class Prog::Vnet::LoadBalancerHealthProbes < Prog::Base
   end
 
   label def health_probe
-    response_code = nil
-    begin
-      endpoint = "#{vm.nics.first.private_ipv4.network}:#{load_balancer.dst_port}#{load_balancer.health_check_endpoint}"
-      response_code = vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} curl --max-time #{load_balancer.health_check_timeout} --silent --output /dev/null --write-out '%{http_code}' #{endpoint}")
+    response_code = begin
+      cmd = if load_balancer.health_check_protocol == "tcp"
+        "sudo ip netns exec #{vm.inhost_name} nc -z -w #{load_balancer.health_check_timeout} #{vm.nics.first.private_ipv4.network} #{load_balancer.dst_port} && echo 200 || echo 400"
+      else
+        "sudo ip netns exec #{vm.inhost_name} curl --insecure --max-time #{load_balancer.health_check_timeout} --silent --output /dev/null --write-out '%{http_code}' #{load_balancer.health_check_protocol}://#{vm.nics.first.private_ipv4.network}:#{load_balancer.dst_port}#{load_balancer.health_check_endpoint}"
+      end
+
+      vm.vm_host.sshable.cmd(cmd)
     rescue
-      response_code = "500"
+      "500"
     end
 
     vm_state, vm_state_counter = load_balancer.load_balancers_vms_dataset.where(vm_id: vm.id).get([:state, :state_counter])
