@@ -108,22 +108,40 @@
         </div>
       </div>
       <div class="px-4 py-5 mt-6 sm:p-6">
-        <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-          <div class="col-span-6 md:col-span-2 xl:col-span-1">
-            <%== render(
-              "components/form/text",
-              locals: {
-                name: "health_check_endpoint",
-                label: "HTTP Health Check Endpoint",
-                attributes: {
-                  required: true,
-                  placeholder: "/up"
-                }
-              }
-            ) %>
+        <div class="space-y-12">
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Monitoring</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">The health check endpoint is used in combination with the Application Port. Make sure it returns 200.</p>
+            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "health_check_endpoint",
+                    label: "HTTP Health Check Endpoint",
+                    attributes: {
+                      placeholder: "/up"
+                    }
+                  }
+                ) %>
+              </div>
+              <div class="col-span-6 md:col-span-2 xl:col-span-1">
+                <%== render(
+                  "components/form/select",
+                  locals: {
+                    name: "health_check_protocol",
+                    label: "Health Check Protocol",
+                    options: ["http", "https", "tcp"].map { |p| [p, p.upcase] },
+                    placeholder: "Select health check protocol",
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+            </div>
           </div>
         </div>
-        <p class="mt-1 text-sm leading-6 text-gray-600">The health check endpoint is used in combination with the Application Port. Make sure it returns 200.</p>
       </div>
       <div class="px-4 py-5 sm:p-6">
         <div class="flex items-center justify-end gap-x-6">

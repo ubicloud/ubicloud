@@ -9,7 +9,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
     health_check_endpoint: "/up", health_check_interval: 30, health_check_timeout: 15,
-    health_check_up_threshold: 3, health_check_down_threshold: 2)
+    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http")
 
     unless (ps = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
@@ -19,10 +19,10 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     DB.transaction do
       lb = LoadBalancer.create_with_id(
-        private_subnet_id: private_subnet_id, name: name, algorithm: algorithm,
-        src_port: src_port, dst_port: dst_port, health_check_endpoint: health_check_endpoint,
-        health_check_interval: health_check_interval, health_check_timeout: health_check_timeout,
-        health_check_up_threshold: health_check_up_threshold, health_check_down_threshold: health_check_down_threshold
+        private_subnet_id: private_subnet_id, name: name, algorithm: algorithm, src_port: src_port, dst_port: dst_port,
+        health_check_endpoint: health_check_endpoint, health_check_interval: health_check_interval,
+        health_check_timeout: health_check_timeout, health_check_up_threshold: health_check_up_threshold,
+        health_check_down_threshold: health_check_down_threshold, health_check_protocol: health_check_protocol
       )
       lb.associate_with_project(ps.projects.first)
 
