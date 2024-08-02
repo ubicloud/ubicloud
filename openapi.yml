@@ -673,6 +673,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
+        '401':
+          description: Unauthorized
+          $ref: '#/components/responses/Error'
     delete:
       tags:
         - Postgres
