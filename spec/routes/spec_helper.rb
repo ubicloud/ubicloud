@@ -17,6 +17,16 @@ RSpec.configure do |config|
     Clover.freeze.app
   end
 
+  config.define_derived_metadata(file_path: %r{\A\./spec/routes/api/}) do |metadata|
+    metadata[:clover_api] = true
+  end
+
+  config.before do |example|
+    next unless example.metadata[:clover_api]
+    header "Content-Type", "application/json"
+    header "Accept", "application/json"
+  end
+
   RSpec::Matchers.define :have_api_error do |expected_state, expected_message, expected_details|
     match do |response|
       parsed_body = JSON.parse(response.body)
