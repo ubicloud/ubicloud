@@ -563,6 +563,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized
           $ref: '#/components/responses/Error'
@@ -622,6 +624,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized
           $ref: '#/components/responses/Error'
@@ -653,6 +657,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
           description: Unauthorized
           $ref: '#/components/responses/Error'
@@ -1175,6 +1181,7 @@ components:
         connection_string:
           type: string
           description: Connection string to the Postgres database
+          nullable: true
         primary:
           type: boolean
           description: Is the database primary
@@ -1186,6 +1193,7 @@ components:
         earliest_restore_time:
           type: string
           description: Earliest restore time (if primary)
+          nullable: true
         latest_restore_time:
           type: string
           description: Latest restore time (if primary)"
