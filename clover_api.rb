@@ -95,8 +95,7 @@ class CloverApi < Roda
     end
   end
 
-  use Committee::Middleware::RequestValidation, schema: SCHEMA, strict: true, prefix: "/api",  error_handler: CustomErrorHandler.new
-  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api",  error_handler: CustomErrorHandler.new
+  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api", error_handler: CustomErrorHandler.new
 
   route do |r|
     r.rodauth
@@ -104,6 +103,8 @@ class CloverApi < Roda
     rodauth.require_authentication
 
     @current_user = Account[rodauth.session_value]
+
+    Committee::Middleware::RequestValidation.new(app, schema: SCHEMA, strict: true, prefix: "/api", error_handler: CustomErrorHandler.new).call(r.env)
 
     r.hash_branches("")
   end
