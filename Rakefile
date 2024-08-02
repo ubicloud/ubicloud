@@ -153,6 +153,18 @@ task "assets:precompile" do
   fail unless $?.success?
 end
 
+desc "Validate, lint, format OpenAPI YAML file"
+task :oapivlf do
+  # Validate
+  sh "npx swagger-cli validate openapi.yml"
+
+  # Lint
+  sh "npx @stoplight/spectral-cli lint openapi.yml"
+
+  # Format
+  sh "yq 'sort_keys(..)' openapi.yml | npx openapi-format -o openapi.yml"
+end
+
 begin
   namespace :linter do
     # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
