@@ -402,6 +402,8 @@ paths:
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
+        '400':
+          $ref: '#/components/responses/Error'
     get:
       tags:
         - Private Subnet
@@ -432,6 +434,10 @@ paths:
           description: Private Subnet is deleted successfully
         '401':
           description: Unauthorized
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '403':
           $ref: '#/components/responses/Error'
   /project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}:
     parameters:
