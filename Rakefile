@@ -154,14 +154,9 @@ task "assets:precompile" do
 end
 
 desc "Validate, lint, format OpenAPI YAML file"
-task :oapivlf do
-  # Validate
-  sh "npx swagger-cli validate openapi.yml"
-
-  # Lint
+task :openapifmt do
+  sh "npx redocly lint openapi.yml"
   sh "npx @stoplight/spectral-cli lint openapi.yml"
-
-  # Format
   sh "yq 'sort_keys(..)' openapi.yml | npx openapi-format -o openapi.yml"
 end
 
