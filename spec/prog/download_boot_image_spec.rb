@@ -42,6 +42,7 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.default_boot_image_version("ubuntu-jammy")).to eq(Config.ubuntu_jammy_version)
       expect(dbi.default_boot_image_version("almalinux-9")).to eq(Config.almalinux_9_version)
       expect(dbi.default_boot_image_version("almalinux-8")).to eq(Config.almalinux_8_version)
+      expect(dbi.default_boot_image_version("github-ubuntu-2404")).to eq(Config.github_ubuntu_2404_version)
       expect(dbi.default_boot_image_version("github-ubuntu-2204")).to eq(Config.github_ubuntu_2204_version)
       expect(dbi.default_boot_image_version("github-ubuntu-2004")).to eq(Config.github_ubuntu_2004_version)
       expect(dbi.default_boot_image_version("github-gpu-ubuntu-2204")).to eq(Config.github_gpu_ubuntu_2204_version)
