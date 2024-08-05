@@ -46,8 +46,6 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       decr_rewrite_dns_records
     end
 
-    hop_create_new_health_probe if strand.children_dataset.count < load_balancer.vms_dataset.count
-
     if load_balancer.need_certificates?
       hop_create_new_cert
     end
@@ -67,16 +65,6 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     else
       hop_wait
     end
-  end
-
-  label def create_new_health_probe
-    vms = load_balancer.vms
-    vms_getting_probed = strand.children_dataset.where(prog: "Vnet::LoadBalancerHealthProbes").map { |st| st.stack[0]["vm_id"] }
-    vms.reject { vms_getting_probed.include?(_1.id) }.each do |vm|
-      bud Prog::Vnet::LoadBalancerHealthProbes, {"vm_id" => vm.id, "subject_id" => load_balancer.id}, :health_probe
-    end
-
-    hop_wait
   end
 
   label def update_vm_load_balancers
