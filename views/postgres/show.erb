@@ -35,9 +35,9 @@
   when PostgresResource::HaType::NONE
     data.push(["High Availability", "Inactive"])
   when PostgresResource::HaType::ASYNC
-    data.push(["High Availability", "Active (1 standby with asyncronous replication)"])
+    data.push(["High Availability", "Active (1 standby with asynchronous replication)"])
   when PostgresResource::HaType::SYNC
-    data.push(["High Availability", "Active (2 standbys with syncronous replication)"])
+    data.push(["High Availability", "Active (2 standbys with synchronous replication)"])
   end
   
   if @pg[:connection_string] == ""

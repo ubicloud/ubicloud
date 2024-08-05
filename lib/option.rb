@@ -66,8 +66,8 @@ module Option
 
   PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)
   PostgresHaOptions = [[PostgresResource::HaType::NONE, 0, "No Standbys", "No replication"],
-    [PostgresResource::HaType::ASYNC, 1, "1 Standby", "Asyncronous replication"],
-    [PostgresResource::HaType::SYNC, 2, "2 Standbys", "Syncronous replication with quorum"]].map {
+    [PostgresResource::HaType::ASYNC, 1, "1 Standby", "Asynchronous replication"],
+    [PostgresResource::HaType::SYNC, 2, "2 Standbys", "Synchronous replication with quorum"]].map {
     PostgresHaOption.new(*_1)
   }.freeze
 end
