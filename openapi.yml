@@ -38,7 +38,6 @@ paths:
                     type: string
                     example: You have been logged in
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       security: []
       tags:
@@ -326,7 +325,6 @@ paths:
                   count:
                     type: integer
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
         '404':
           description: Resource is not found
@@ -358,7 +356,6 @@ paths:
                     type: integer
         '401':
           description: Unauthorized
-          $ref: '#/components/responses/Error'
         '404':
           description: Resource not found
       tags:
@@ -390,7 +387,6 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
@@ -409,12 +405,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/PrivateSubnet'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
         '404':
-          description: Resource not found
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -425,7 +419,6 @@ paths:
         '204':
           description: Private Subnet is deleted successfully
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
@@ -449,7 +442,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PrivateSubnet'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -460,7 +452,6 @@ paths:
         '204':
           description: Private Subnet is deleted successfully
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -488,7 +479,6 @@ paths:
                   count:
                     type: integer
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -517,7 +507,6 @@ paths:
                   count:
                     type: integer
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -557,7 +546,6 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -572,7 +560,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -583,7 +570,6 @@ paths:
         '204':
           description: Postgres database is deleted successfully
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -618,7 +604,6 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -651,7 +636,6 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -671,7 +655,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -682,7 +665,6 @@ paths:
         '204':
           description: Postgres database is deleted successfully
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -715,7 +697,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Postgres'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -746,7 +727,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -784,9 +764,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/FirewallRule'
         '400':
-          description: Invalid request
+          $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
@@ -806,7 +785,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/FirewallRule'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
@@ -817,7 +795,6 @@ paths:
         '204':
           description: Firewall rule deleted successfully
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
@@ -825,9 +802,10 @@ paths:
     parameters:
       - $ref: '#/components/parameters/project_id'
     get:
+      summary: Return the list of firewalls in the project
       responses:
         '200':
-          description: Return the list of firewalls in the project
+          description: "Firewall list retrieved successfully"
           content:
             application/json:
               schema:
@@ -865,9 +843,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Firewall'
         '400':
-          description: Invalid request
+          $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
@@ -886,7 +863,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Firewall'
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
@@ -897,7 +873,6 @@ paths:
         '204':
           description: Firewall deleted successfully
         '401':
-          description: Unauthorized
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
