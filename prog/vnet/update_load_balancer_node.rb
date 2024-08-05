@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Prog::Vnet::UpdateLoadBalancer < Prog::Base
+class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   subject_is :vm
 
   def load_balancer

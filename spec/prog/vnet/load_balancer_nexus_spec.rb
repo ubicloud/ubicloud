@@ -158,7 +158,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(st.children).to all(receive(:destroy))
       expect { nx.destroy }.to hop("wait_destroy")
 
-      expect(Strand.where(prog: "Vnet::UpdateLoadBalancer").count).to eq 3
+      expect(Strand.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
     end
 
     it "deletes the dns record" do
