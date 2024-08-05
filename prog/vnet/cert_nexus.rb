@@ -7,7 +7,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   subject_is :cert
   semaphore :destroy
 
-  REVOKE_REASON = "cessationOfOperation" # unspecified
+  REVOKE_REASON = "cessationOfOperation"
 
   def self.assemble(hostname, dns_zone_id)
     unless DnsZone[dns_zone_id]
@@ -98,7 +98,11 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   label def destroy
     # the reason is chosen as "cessationOfOperation"
-    acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
+    begin
+      acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
+    rescue Acme::Client::Error::AlreadyRevoked => ex
+      Clog.emit("Certificate is already revoked") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
+    end
 
     dns_zone.delete_record(record_name: dns_record_name) if dns_challenge
     cert.destroy
