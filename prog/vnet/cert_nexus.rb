@@ -92,6 +92,8 @@ class Prog::Vnet::CertNexus < Prog::Base
   label def destroy
     begin
       acme_client.revoke(certificate: cert.cert) if cert.cert
+    rescue Acme::Client::Error::AlreadyRevoked
+      Clog.emit("Certificate is already revoked")
     rescue Sequel::Error
       fail "Failed to revoke certificate"
     end
