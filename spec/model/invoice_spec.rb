@@ -38,7 +38,7 @@ RSpec.describe Invoice do
 
       invoice.send_failure_email([])
 
-      expect(Mail::TestMailer.deliveries.first.to).to eq(["billing@example.com", accounts[0].email, accounts[2].email])
+      expect(Mail::TestMailer.deliveries.first.to).to contain_exactly("billing@example.com", accounts[0].email, accounts[2].email)
     end
   end
 
