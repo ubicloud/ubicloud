@@ -1084,47 +1084,28 @@ components:
           type: string
     PostgresDetailed:
       type: object
-      properties:
-        connection_string:
-          description: Connection string to the Postgres database
-          type: string
-          nullable: true
-        earliest_restore_time:
-          description: Earliest restore time (if primary)
-          type: string
-          nullable: true
-        firewall_rules:
-          description: List of Postgres firewall rules
-          type: array
-          items:
-            $ref: '#/components/schemas/PostgresFirewallRule'
-        ha_type:
-          description: High availability type
-          type: string
-        id:
-          description: ID of the Postgres database
-          type: string
-        latest_restore_time:
-          description: Latest restore time (if primary)"
-          type: string
-        location:
-          description: Location of the Postgres database
-          type: string
-        name:
-          description: Name of the Postgres database
-          type: string
-        primary:
-          description: Is the database primary
-          type: boolean
-        state:
-          description: State of the Postgres database
-          type: string
-        storage_size_gib:
-          description: Storage size in GiB
-          type: integer
-        vm_size:
-          description: Size of the underlying VM
-          type: string
+      allOf:
+        - $ref: '#/components/schemas/Postgres'
+        - properties:
+            connection_string:
+              description: Connection string to the Postgres database
+              type: string
+              nullable: true
+            earliest_restore_time:
+              description: Earliest restore time (if primary)
+              type: string
+              nullable: true
+            firewall_rules:
+              description: List of Postgres firewall rules
+              type: array
+              items:
+                $ref: '#/components/schemas/PostgresFirewallRule'
+            latest_restore_time:
+              description: Latest restore time (if primary)"
+              type: string
+            primary:
+              description: Is the database primary
+              type: boolean
     PostgresFirewallRule:
       type: object
       properties:
