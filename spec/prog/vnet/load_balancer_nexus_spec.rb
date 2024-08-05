@@ -61,12 +61,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait }.to nap(5)
     end
 
-    it "creates new health probe if needed" do
-      vm = Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm1", private_subnet_id: ps.id).subject
-      st.subject.add_vm(vm)
-      expect { nx.wait }.to hop("create_new_health_probe")
-    end
-
     it "hops to update vm load balancers" do
       expect(nx).to receive(:when_update_load_balancer_set?).and_yield
       expect { nx.wait }.to hop("update_vm_load_balancers")
@@ -107,22 +101,13 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
   end
 
-  describe "#create_new_health_probe" do
-    it "creates health probes for all vms" do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
-      vms.each { st.subject.add_vm(_1) }
-      expect { nx.create_new_health_probe }.to hop("wait")
-      expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").count).to eq 3
-      expect(st.children_dataset.count).to eq 3
-    end
-  end
-
   describe "#update_vm_load_balancers" do
     it "updates load balancers for all vms" do
       vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(_1) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
-      expect(st.children_dataset.count).to eq 3
+      # Update progs are budded in update_vm_load_balancers
+      expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
     end
   end
 
