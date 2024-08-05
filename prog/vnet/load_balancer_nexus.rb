@@ -75,7 +75,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def update_vm_load_balancers
     load_balancer.vms.each do |vm|
-      bud Prog::Vnet::UpdateLoadBalancer, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
+      bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
     end
 
     hop_wait_update_vm_load_balancers
@@ -83,7 +83,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def wait_update_vm_load_balancers
     reap
-    if strand.children_dataset.where(prog: "Vnet::UpdateLoadBalancer").all? { _1.exitval == "load balancer is updated" } || strand.children.empty?
+    if strand.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").all? { _1.exitval == "load balancer is updated" } || strand.children.empty?
       decr_update_load_balancer
       hop_wait
     end
@@ -101,7 +101,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
 
     load_balancer.vms.each do |vm|
-      bud Prog::Vnet::UpdateLoadBalancer, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :remove_load_balancer
+      bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :remove_load_balancer
     end
 
     hop_wait_destroy
