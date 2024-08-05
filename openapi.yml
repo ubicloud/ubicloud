@@ -112,11 +112,11 @@ paths:
         '204':
           description: Project deleted successfully
         '400':
-          description: Invalid request
+          $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
         '404':
-          description: Resource not found
+          $ref: '#/components/responses/Error'
       tags:
         - Project
     get:
