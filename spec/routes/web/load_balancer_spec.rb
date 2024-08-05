@@ -255,7 +255,9 @@ RSpec.describe Clover, "load balancer" do
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
         expect(page).to have_content "VM is detached"
-        expect(lb.vms.count).to eq(0)
+        expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.count { |st| st.stack[0]["subject_id"] == lb.id && st.stack[0]["vm_id"] == vm.id }).to eq(0)
+        expect(lb.update_load_balancer_set?).to be(true)
+        expect(lb.load_balancers_vms_dataset.where(vm_id: vm.id).first.state).to eq("detaching")
       end
 
       it "can not detach vm when it does not exist" do

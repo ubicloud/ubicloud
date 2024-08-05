@@ -7,13 +7,25 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
     @load_balancer ||= LoadBalancer[frame.fetch("load_balancer_id")]
   end
 
-  label def update_load_balancer
-    # if there is literally no up resources to balance for, we simply not do
-    # load balancing. This is a bit of a hack, but it's a simple way to avoid
-    # the need to have a separate state for the load balancer.
-    hop_remove_load_balancer if load_balancer.active_vms.count == 0
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_lb_based_nat_rules)
+  def vm_load_balancer_state
+    load_balancer.load_balancers_vms_dataset[vm_id: vm.id].state
+  end
 
+  def before_run
+    pop "VM is destroyed" unless vm
+  end
+
+  label def update_load_balancer
+    if vm_load_balancer_state == "detaching"
+      load_balancer.remove_vm(vm)
+      hop_remove_load_balancer
+    end
+
+    # if there is literally no up resources to balance for, we simply not do
+    # load balancing.
+    hop_remove_load_balancer if load_balancer.active_vms.count == 0
+
+    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_lb_based_nat_rules)
     pop "load balancer is updated"
   end
 

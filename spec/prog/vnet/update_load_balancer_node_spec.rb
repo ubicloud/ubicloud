@@ -26,10 +26,30 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     allow(vm).to receive_messages(ephemeral_net4: NetAddr::IPv4Net.parse("100.100.100.100/32"), ephemeral_net6: NetAddr::IPv6Net.parse("2a02:a464:deb2:a000::/64"))
   end
 
+  describe ".before_run" do
+    it "simply pops if VM is destroyed" do
+      expect(nx).to receive(:vm).and_return(nil)
+
+      expect { nx.before_run }.to exit({"msg" => "VM is destroyed"})
+    end
+
+    it "doesn't do anything if the VM is not destroyed" do
+      expect(nx).to receive(:vm).and_return(vm)
+
+      expect { nx.before_run }.not_to exit
+    end
+  end
+
   describe "#update_load_balancer" do
     context "when no healthy vm exists" do
       it "hops to remove load balancer" do
         expect(lb).to receive(:active_vms).and_return([])
+        expect { nx.update_load_balancer }.to hop("remove_load_balancer")
+      end
+
+      it "removes the VM from load balancer and hops to remove_load_balancer if the VM is detaching" do
+        lb.load_balancers_vms_dataset.update(state: "detaching")
+        expect(lb).to receive(:remove_vm).with(vm)
         expect { nx.update_load_balancer }.to hop("remove_load_balancer")
       end
     end
