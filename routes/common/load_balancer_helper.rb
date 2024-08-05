@@ -175,8 +175,7 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
 
     Authorization.authorize(@user.id, "Vm:view", vm.id)
 
-    @resource.evacuate_vm(vm)
-    @resource.remove_vm(vm)
+    @resource.detach_vm(vm)
 
     if @mode == AppMode::API
       Serializers::LoadBalancer.serialize(@resource, {detailed: true})
