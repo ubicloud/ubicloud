@@ -31,7 +31,6 @@ RSpec.describe LoadBalancer do
 
   describe "add_vm" do
     it "increments update_load_balancer and rewrite_dns_records" do
-      expect(lb).to receive(:incr_update_load_balancer)
       expect(lb).to receive(:incr_rewrite_dns_records)
       lb.add_vm(vm1)
       expect(lb.load_balancers_vms.count).to eq(1)
