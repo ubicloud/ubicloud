@@ -64,12 +64,10 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Project'
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/Error'
       security:
         - BearerAuth: []
       tags:
@@ -425,6 +423,8 @@ paths:
                 $ref: '#/components/schemas/PostgresDetailed'
         '401':
           $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
       tags:
         - Postgres
     parameters:
@@ -556,9 +556,9 @@ paths:
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
         '404':
-          description: Resource not found
+          $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
   '/project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}':
@@ -686,7 +686,7 @@ paths:
                     items:
                       $ref: '#/components/schemas/Vm'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
   '/project/{project_id}/location/{location}/vm/id/{vm_id}':
@@ -725,8 +725,12 @@ paths:
       responses:
         '204':
           description: VM deleted successfully
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
     get:
@@ -740,7 +744,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/VmDetailed'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
     parameters:
@@ -787,10 +793,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmDetailed'
-        '400':
-          description: Invalid request
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
   '/project/{project_id}/postgres':
@@ -846,7 +852,7 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
         '404':
-          description: Resource is not found
+          $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
   '/project/{project_id}/vm':
@@ -873,7 +879,7 @@ paths:
                     items:
                       $ref: '#/components/schemas/Vm'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
 components:
@@ -1171,10 +1177,12 @@ components:
           description: IPv4 address
           type: string
           format: ipv4
+          nullable: true
         ip6:
           description: IPv6 address
           type: string
           format: ipv6
+          nullable: true
         location:
           description: Location of the VM
           type: string
@@ -1197,55 +1205,28 @@ components:
           type: string
     VmDetailed:
       type: object
-      properties:
-        firewalls:
-          description: List of firewalls
-          type: array
-          items:
-            $ref: '#/components/schemas/Firewall'
-        id:
-          description: ID of the VM
-          type: string
-          example: vmw12ouhqjdy4g72xng1ubkda6
-        ip4:
-          description: IPv4 address
-          type: string
-          format: ipv4
-        ip6:
-          description: IPv6 address
-          type: string
-          format: ipv6
-        location:
-          description: Location of the VM
-          type: string
-          example: eu-north-h1
-        name:
-          description: Name of the VM
-          type: string
-          example: my-vm-name
-        private_ipv4:
-          description: Private IPv4 address
-          type: string
-          format: ipv4
-        private_ipv6:
-          description: Private IPv6 address
-          type: string
-          format: ipv6
-        size:
-          description: Size of the underlying VM
-          type: string
-        state:
-          description: State of the VM
-          type: string
-        storage_size_gib:
-          description: Storage size in GiB
-          type: integer
-        subnet:
-          description: Subnet of the VM
-          type: string
-        unix_user:
-          description: Unix user of the VM
-          type: string
+      allOf:
+        - $ref: '#/components/schemas/Vm'
+        - properties:
+            firewalls:
+              description: List of firewalls
+              type: array
+              items:
+                $ref: '#/components/schemas/Firewall'
+            private_ipv4:
+              description: Private IPv4 address
+              type: string
+              format: ipv4
+            private_ipv6:
+              description: Private IPv6 address
+              type: string
+              format: ipv6
+            subnet:
+              description: Subnet of the VM
+              type: string
+            unix_user:
+              description: Unix user of the VM
+              type: string
   responses:
     Error:
       description: an error response
