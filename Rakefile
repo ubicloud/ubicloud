@@ -153,16 +153,43 @@ task "assets:precompile" do
   fail unless $?.success?
 end
 
-desc "Validate, lint, format OpenAPI YAML file"
-task :oapivlf do
-  # Validate
-  sh "npx swagger-cli validate openapi.yml"
+desc "Lint and format (lf) the OpenAPI YAML file"
+task :oapilf do
+  require "yaml"
+  require_relative "lib/openapi_chores"
 
-  # Lint
-  sh "npx @stoplight/spectral-cli lint openapi.yml"
+  error_ref = { '$ref' => '#/components/responses/Error' }.freeze
+  error_codes = %w[400 401 403 409].freeze
 
-  # Format
-  sh "yq 'sort_keys(..)' openapi.yml | npx openapi-format -o openapi.yml"
+require 'psych'
+
+# Create an emitter that writes to stdout
+emitter = OpenapiChores.new($stdout)
+
+# Create a parser that uses the emitter as its handler
+parser = Psych::Parser.new(emitter)
+
+# Read the YAML content from the file and parse it
+File.open('openapi.yml') { |file| parser.parse(file.read) }
+  
+  # parser = Psych::Parser.new(Psych::Visitors::Emitter.new($stdout))
+  # File.open('openapi.yml') { parser.parse(_1) }
+
+  # openapi['paths'].each_value do |methods|
+  #   methods.each_value do |details|
+  #     next unless details['responses']
+  #     error_codes.each { |code| details['responses'][code] = error_ref }
+  #   end
+  # end
+
+  # res = IO.popen(['sh', '-c', %s(yq sort_keys(..) | npx openapi-format -o openapi.yml)], 'w') do |pipe|
+  #   pipe.puts YAML.dump(openapi)
+  # end
+
+  # # Same as `sh` helper's exit checking in lib/rake/file_utils.rb.
+  # status = $?
+  # status = Rake::PseudoStatus.new(1) if !res && status.nil?
+  # shell_runner.call(res, status)
 end
 
 begin
