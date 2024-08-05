@@ -104,7 +104,13 @@ class CloverApi < Roda
 
     @current_user = Account[rodauth.session_value]
 
-    Committee::Middleware::RequestValidation.new(app, schema: SCHEMA, strict: true, prefix: "/api", error_handler: CustomErrorHandler.new).call(r.env)
+    # Brutal hack to avoid recursion if the app
+    # re-self-execs. Probably should stop using middleware and write
+    # my own validation code.
+    validated_count = r.env['clover.request_validated'] = r.env.fetch('clover.request_validated', 0) + 1
+    if validated_count <= 1
+      Committee::Middleware::RequestValidation.new(app, schema: SCHEMA, strict: true, prefix: "/api", error_handler: CustomErrorHandler.new).call(r.env)
+    end
 
     r.hash_branches("")
   end

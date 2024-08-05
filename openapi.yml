@@ -95,9 +95,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
         '400':
-          description: InvalidRequest
+          $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
       security:
         - BearerAuth: []
       tags:
@@ -113,7 +113,11 @@ paths:
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '404':
+          $ref: '#/components/responses/Error'
+        '409':
           $ref: '#/components/responses/Error'
       tags:
         - Project
@@ -128,9 +132,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '404':
-          description: Resource not found
+          $ref: '#/components/responses/Error'
       tags:
         - Project
     parameters:
@@ -152,6 +158,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Firewall'
+        '401':
+          $ref: '#/components/responses/Error'
     parameters:
       - $ref: '#/components/parameters/project_id'
     post:
@@ -696,8 +704,10 @@ paths:
       responses:
         '204':
           description: VM deleted successfully
+        '404':
+          $ref: '#/components/responses/Error'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
     get:
@@ -711,7 +721,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/VmDetailed'
         '401':
-          description: Unauthorized
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
     parameters:
@@ -793,6 +805,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmDetailed'
+        '400':
+          $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
         '404':
