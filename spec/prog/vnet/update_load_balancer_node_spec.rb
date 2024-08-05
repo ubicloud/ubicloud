@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-RSpec.describe Prog::Vnet::UpdateLoadBalancer do
+RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
   subject(:nx) {
     described_class.new(st)
   }
 
   let(:st) {
-    Strand.create_with_id(prog: "Vnet::UpdateLoadBalancer", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
+    Strand.create_with_id(prog: "Vnet::UpdateLoadBalancerNode", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
   }
   let(:lb) {
     prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
