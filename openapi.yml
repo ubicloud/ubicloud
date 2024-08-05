@@ -704,9 +704,9 @@ paths:
       responses:
         '204':
           description: VM deleted successfully
-        '404':
-          $ref: '#/components/responses/Error'
         '401':
+          $ref: '#/components/responses/Error'
+        '404':
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
