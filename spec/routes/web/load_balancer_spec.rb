@@ -78,6 +78,7 @@ RSpec.describe Clover, "load balancer" do
         select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
+        select "HTTP", from: "health_check_protocol"
 
         click_button "Create"
 
@@ -100,6 +101,7 @@ RSpec.describe Clover, "load balancer" do
         select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
+        select "HTTP", from: "health_check_protocol"
 
         click_button "Create"
 
@@ -130,6 +132,7 @@ RSpec.describe Clover, "load balancer" do
         select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
+        select "HTTP", from: "health_check_protocol"
 
         ps.destroy
 
