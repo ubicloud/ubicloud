@@ -255,9 +255,9 @@ class Prog::Vm::Nexus < Prog::Base
     unless vm.update_firewall_rules_set?
       vm.incr_update_firewall_rules
       # This is the first time we get into this state and we know that
-      # wait_sshable will take definitely more than 10 seconds. So, we nap here
+      # wait_sshable will take definitely more than 8 seconds. So, we nap here
       # to reduce the amount of load on the control plane unnecessarily.
-      nap 10
+      nap 8
     end
     addr = vm.ephemeral_net4
     hop_create_billing_record unless addr
