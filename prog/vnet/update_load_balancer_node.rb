@@ -36,7 +36,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
 
   def generate_lb_based_nat_rules
     public_ipv4 = vm.ephemeral_net4.to_s
-    public_ipv6 = vm.ephemeral_net6.to_s
+    public_ipv6 = vm.ephemeral_net6.nth(2).to_s
     private_ipv4 = vm.nics.first.private_ipv4.network
     private_ipv6 = vm.nics.first.private_ipv6.nth(2)
     neighbor_vms = load_balancer.active_vms.reject { _1.id == vm.id }
