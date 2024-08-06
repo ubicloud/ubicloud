@@ -286,6 +286,12 @@ table ip nat {
 REMOVE_LOAD_BALANCER
       expect { nx.remove_load_balancer }.to exit({"msg" => "load balancer is updated"})
     end
+
+    it "skips if vm doesn't exist" do
+      expect(nx).to receive(:vm).and_return(nil)
+
+      expect { nx.remove_load_balancer }.to exit({"msg" => "load balancer is updated"})
+    end
   end
 
   it "returns load_balancer" do

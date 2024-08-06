@@ -86,7 +86,8 @@ RSpec.describe Clover, "load-balancer" do
         post "/api/project/#{project.ubid}/load-balancer/lb1", {
           private_subnet_id: ps.ubid,
           src_port: "80", dst_port: "80",
-          health_check_endpoint: "/up", algorithm: "round_robin"
+          health_check_endpoint: "/up", algorithm: "round_robin",
+          health_check_protocol: "http"
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -103,7 +104,8 @@ RSpec.describe Clover, "load-balancer" do
         post "/api/project/#{project.ubid}/load-balancer/lb1", {
           private_subnet_id: "invalid",
           src_port: "80", dst_port: "80",
-          health_check_endpoint: "/up", algorithm: "round_robin"
+          health_check_endpoint: "/up", algorithm: "round_robin",
+          health_check_protocol: "http"
         }.to_json
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
