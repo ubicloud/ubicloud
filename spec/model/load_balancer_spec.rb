@@ -30,11 +30,11 @@ RSpec.describe LoadBalancer do
   end
 
   describe "add_vm" do
-    it "increments update_load_balancer and rewrite_dns_records" do
-      expect(lb).to receive(:incr_update_load_balancer)
+    it "increments rewrite_dns_records and creates health probs" do
       expect(lb).to receive(:incr_rewrite_dns_records)
       lb.add_vm(vm1)
       expect(lb.load_balancers_vms.count).to eq(1)
+      expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.count { |st| st.stack[0]["subject_id"] == lb.id && st.stack[0]["vm_id"] == vm1.id }).to eq(1)
     end
   end
 
@@ -44,12 +44,12 @@ RSpec.describe LoadBalancer do
     end
 
     it "increments update_load_balancer and rewrite_dns_records" do
+      expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.count { |st| st.stack[0]["subject_id"] == lb.id && st.stack[0]["vm_id"] == vm1.id }).to eq(1)
       expect(lb).to receive(:incr_update_load_balancer)
       expect(lb).to receive(:incr_rewrite_dns_records)
-      health_probe = instance_double(Strand, stack: [{"subject_id" => lb.id, "vm_id" => vm1.id}])
-      expect(lb.strand).to receive(:children_dataset).and_return(instance_double(Sequel::Dataset, where: instance_double(Sequel::Dataset, all: [health_probe])))
-      expect(health_probe).to receive(:destroy)
+
       lb.evacuate_vm(vm1)
+      expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.count { |st| st.stack[0]["subject_id"] == lb.id && st.stack[0]["vm_id"] == vm1.id }).to eq(0)
       expect(lb.load_balancers_vms.first[:state]).to eq("evacuating")
     end
   end
