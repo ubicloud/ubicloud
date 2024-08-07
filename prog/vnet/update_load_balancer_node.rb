@@ -1,10 +1,18 @@
 # frozen_string_literal: true
 
-class Prog::Vnet::UpdateLoadBalancer < Prog::Base
+class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   subject_is :vm
 
   def load_balancer
     @load_balancer ||= LoadBalancer[frame.fetch("load_balancer_id")]
+  end
+
+  def vm_load_balancer_state
+    load_balancer.load_balancers_vms_dataset.where(vm_id: vm.id).first.state
+  end
+
+  def before_run
+    pop "VM is destroyed" unless vm
   end
 
   label def update_load_balancer
@@ -12,8 +20,12 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
     # load balancing. This is a bit of a hack, but it's a simple way to avoid
     # the need to have a separate state for the load balancer.
     hop_remove_load_balancer if load_balancer.active_vms.count == 0
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_lb_based_nat_rules)
+    if vm_load_balancer_state == "detaching"
+      load_balancer.remove_vm(vm)
+      hop_remove_load_balancer
+    end
 
+    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_lb_based_nat_rules)
     pop "load balancer is updated"
   end
 
@@ -24,7 +36,7 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
 
   def generate_lb_based_nat_rules
     public_ipv4 = vm.ephemeral_net4.to_s
-    public_ipv6 = vm.ephemeral_net6.to_s
+    public_ipv6 = vm.ephemeral_net6.nth(2).to_s
     private_ipv4 = vm.nics.first.private_ipv4.network
     private_ipv6 = vm.nics.first.private_ipv6.nth(2)
     neighbor_vms = load_balancer.active_vms.reject { _1.id == vm.id }

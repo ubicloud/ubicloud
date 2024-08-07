@@ -5,7 +5,7 @@ require_relative "../model"
 class LoadBalancer < Sequel::Model
   many_to_many :vms
   many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: ["up"]}
-  many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: "evacuating")
+  many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: ["evacuating", "detaching"])
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :projects, through: :private_subnet
@@ -38,22 +38,33 @@ class LoadBalancer < Sequel::Model
   def add_vm(vm)
     DB.transaction do
       super
-      incr_update_load_balancer
+      Strand.create_with_id(schedule: Time.now, prog: "Vnet::LoadBalancerHealthProbes", label: "health_probe", stack: [{subject_id: id, vm_id: vm.id}])
       incr_rewrite_dns_records
     end
+  end
+
+  def detach_vm(vm)
+    load_balancers_vms_dataset.where(vm_id: vm.id).update(state: "detaching")
+    remove_health_probe(vm.id)
+    incr_update_load_balancer
   end
 
   def evacuate_vm(vm)
     DB.transaction do
       load_balancers_vms_dataset.where(vm_id: vm.id).update(state: "evacuating")
-      strand.children_dataset.where(prog: "Vnet::LoadBalancerHealthProbes").all.select { |st| st.stack[0]["subject_id"] == id && st.stack[0]["vm_id"] == vm.id }.map(&:destroy)
+      remove_health_probe(vm.id)
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
   end
 
   def remove_vm(vm)
-    load_balancers_vms_dataset.where(vm_id: vm.id).all.map(&:destroy)
+    load_balancers_vms_dataset[vm_id: vm.id].destroy
+    incr_rewrite_dns_records
+  end
+
+  def remove_health_probe(vm_id)
+    Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.select { |st| st.stack[0]["subject_id"] == id && st.stack[0]["vm_id"] == vm_id }.map(&:destroy)
   end
 
   def hostname

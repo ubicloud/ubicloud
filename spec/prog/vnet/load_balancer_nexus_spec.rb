@@ -61,12 +61,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait }.to nap(5)
     end
 
-    it "creates new health probe if needed" do
-      vm = Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm1", private_subnet_id: ps.id).subject
-      st.subject.add_vm(vm)
-      expect { nx.wait }.to hop("create_new_health_probe")
-    end
-
     it "hops to update vm load balancers" do
       expect(nx).to receive(:when_update_load_balancer_set?).and_yield
       expect { nx.wait }.to hop("update_vm_load_balancers")
@@ -104,16 +98,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     it "hops to wait if need_certificates? is false" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait")
-    end
-  end
-
-  describe "#create_new_health_probe" do
-    it "creates health probes for all vms" do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
-      vms.each { st.subject.add_vm(_1) }
-      expect { nx.create_new_health_probe }.to hop("wait")
-      expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").count).to eq 3
-      expect(st.children_dataset.count).to eq 3
     end
   end
 
@@ -158,7 +142,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(st.children).to all(receive(:destroy))
       expect { nx.destroy }.to hop("wait_destroy")
 
-      expect(Strand.where(prog: "Vnet::UpdateLoadBalancer").count).to eq 3
+      expect(Strand.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
     end
 
     it "deletes the dns record" do

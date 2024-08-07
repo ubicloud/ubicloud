@@ -46,8 +46,6 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       decr_rewrite_dns_records
     end
 
-    hop_create_new_health_probe if strand.children_dataset.count < load_balancer.vms_dataset.count
-
     if load_balancer.need_certificates?
       hop_create_new_cert
     end
@@ -69,19 +67,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
   end
 
-  label def create_new_health_probe
-    vms = load_balancer.vms
-    vms_getting_probed = strand.children_dataset.where(prog: "Vnet::LoadBalancerHealthProbes").map { |st| st.stack[0]["vm_id"] }
-    vms.reject { vms_getting_probed.include?(_1.id) }.each do |vm|
-      bud Prog::Vnet::LoadBalancerHealthProbes, {"vm_id" => vm.id, "subject_id" => load_balancer.id}, :health_probe
-    end
-
-    hop_wait
-  end
-
   label def update_vm_load_balancers
     load_balancer.vms.each do |vm|
-      bud Prog::Vnet::UpdateLoadBalancer, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
+      bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
     end
 
     hop_wait_update_vm_load_balancers
@@ -89,7 +77,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def wait_update_vm_load_balancers
     reap
-    if strand.children_dataset.where(prog: "Vnet::UpdateLoadBalancer").all? { _1.exitval == "load balancer is updated" } || strand.children.empty?
+    if strand.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").all? { _1.exitval == "load balancer is updated" } || strand.children.empty?
       decr_update_load_balancer
       hop_wait
     end
@@ -107,7 +95,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
 
     load_balancer.vms.each do |vm|
-      bud Prog::Vnet::UpdateLoadBalancer, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :remove_load_balancer
+      bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :remove_load_balancer
     end
 
     hop_wait_destroy

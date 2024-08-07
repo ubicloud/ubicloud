@@ -105,9 +105,9 @@ elements = {2a00:1450:400e:811::200e/128}
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
-    ip6 daddr @private_ipv6_cidrs ct state established,related counter accept
+    ip6 daddr @private_ipv6_cidrs ct state established,related,new counter accept
     ip6 saddr fd00::/80 ct state established,related,new counter accept
-    ip6 daddr fd00::/80 ct state established,related counter accept
+    ip6 daddr fd00::/80 ct state established,related,new counter accept
     ip saddr @allowed_ipv4_cidrs ip daddr @private_ipv4_cidrs counter accept
     ip6 saddr @allowed_ipv6_cidrs ip6 daddr fd00::/80 counter accept
     ip saddr . tcp dport @allowed_ipv4_port_tuple ip daddr @private_ipv4_cidrs counter accept
@@ -202,9 +202,9 @@ table inet fw_table {
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
-    ip6 daddr @private_ipv6_cidrs ct state established,related counter accept
+    ip6 daddr @private_ipv6_cidrs ct state established,related,new counter accept
     ip6 saddr fd00::/80 ct state established,related,new counter accept
-    ip6 daddr fd00::/80 ct state established,related counter accept
+    ip6 daddr fd00::/80 ct state established,related,new counter accept
     ip saddr @allowed_ipv4_cidrs ip daddr @private_ipv4_cidrs counter accept
     ip6 saddr @allowed_ipv6_cidrs ip6 daddr fd00::/80 counter accept
     ip saddr . tcp dport @allowed_ipv4_port_tuple ip daddr @private_ipv4_cidrs counter accept
