@@ -86,6 +86,8 @@ class Prog::DownloadBootImage < Prog::Base
       ["almalinux-8", "x64", "8.10-20240530"] => "41a6bcdefb35afbd2819f0e6c68005cd5e9a346adf2dc093b1116a2b7c647d86",
       ["almalinux-9", "x64", "9.4-20240507"] => "bff0885c804c01fff8aac4b70c9ca4f04e8c119f9ee102043838f33e06f58390",
       ["almalinux-9", "arm64", "9.4-20240507"] => "75b2e68f6aaa41c039274595ff15968201b7201a7f2f03b109af691f2d3687a1",
+      ["almalinux-9", "x64", "9.4-20240805"] => "4f2984589020c0d82b9a410cf9e29715a607c948dfdca652025cdc79ddb5e816",
+      ["almalinux-9", "arm64", "9.4-20240805"] => "433e7a79b7c49007723851b7721c69a8f0a08be48969c04c1c9252cc16adc893",
       ["github-ubuntu-2404", "x64", "20240721.1.0"] => "6efeba655fc023e22ac9d540c704b49792ee4ebd90d1ec73f80d87e3345f9352",
       ["github-ubuntu-2204", "x64", "20240630.1.1"] => "7c4cf6d984aacdc80d1932c95d2b89ceff9d2b0d9090b99be3f2b61d9d5feaeb",
       ["github-ubuntu-2204", "x64", "20240721.1.0"] => "d865fe797f7deaf2b6800392b31d5a8cd9861f5f105a0c3d8bd023f96577ce6d",
