@@ -6,20 +6,22 @@ Sequel.migration do
       column :id, :uuid, primary_key: true
       column :created_at, :timestamptz, null: false, default: Sequel.lit("now()")
       column :updated_at, :timestamptz, null: false, default: Sequel.lit("now()")
-      column :project_id, :project, type: :uuid, null: false
+      column :public, :boolean, null: false, default: false
+      column :visible, :boolean, null: false, default: true
       column :location, :text, collate: '"C"', null: false
+      column :boot_image, :text, collate: '"C"', null: false
       column :name, :text, null: false
       column :vm_size, :text, collate: '"C"', null: false
       column :model_name, :text, collate: '"C"', null: false
+      column :storage_volumes, :jsonb, null: false
+      column :engine, :text, collate: '"C"', null: false
+      column :engine_params, :text, collate: '"C"', null: false
       column :min_replicas, :integer, null: false
       column :max_replicas, :integer, null: false
-      column :api_key, :text, collate: '"C"', null: false
-      column :root_cert, :text, collate: '"C"'
-      column :root_cert_key, :text, collate: '"C"'
-      column :server_cert, :text, collate: '"C"'
-      column :server_cert_key, :text, collate: '"C"'
+      foreign_key :project_id, :project, type: :uuid, null: false
       foreign_key :load_balancer_id, :load_balancer, type: :uuid, null: false
       foreign_key :private_subnet_id, :private_subnet, type: :uuid, null: false
+      index :public
     end
 
     create_table(:inference_endpoint_replica) do

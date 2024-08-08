@@ -16,14 +16,17 @@ class Project < Sequel::Model
   many_to_many :postgres_resources, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :firewalls, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :load_balancers, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :inference_endpoints, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: ProjectQuota, key: :project_id
 
+  one_to_one :api_key_pair, key: :owner_id, class: :ApiKeyPair, conditions: {owner_table: "project"}
+
   dataset_module Authorization::Dataset
   dataset_module Pagination
 
-  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy
+  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy, api_key_pair: :destroy
 
   include ResourceMethods
   include Authorization::HyperTagMethods
@@ -119,6 +122,10 @@ class Project < Sequel::Model
     effective_quota_value(resource_type) >= current_resource_usage(resource_type) + requested_additional_usage
   end
 
+  def create_api_key_pair
+    ApiKeyPair.create_with_id(owner_table: Project.table_name, owner_id: id)
+  end
+
   def self.feature_flag(*flags)
     flags.map(&:to_s).each do |flag|
       define_method :"set_ff_#{flag}" do |value|
@@ -131,5 +138,5 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :postgresql_base_image, :vm_public_ssh_keys
+  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :inference_endpoint
 end

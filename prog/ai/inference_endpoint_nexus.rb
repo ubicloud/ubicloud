@@ -12,7 +12,8 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(project_id:, location:, name:, vm_size:, model_name:, min_replicas: 1, max_replicas: 1)
+  def self.assemble(project_id:, location:, boot_image:, name:, vm_size:, model_name:,
+    engine: "vllm", engine_params: "", min_replicas: 1, max_replicas: 1, public: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -24,15 +25,15 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     DB.transaction do
       ubid = InferenceEndpoint.generate_ubid
       subnet_s = Prog::Vnet::SubnetNexus.assemble(Config.inference_endpoint_service_project_id, name: ubid.to_s, location: location, firewall_id: Config.inference_endpoint_service_firewall_id)
-
       lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: name, src_port: 8000, dst_port: 8000, health_check_endpoint: "/health")
 
       inference_endpoint = InferenceEndpoint.create(
-        project_id: project_id, location: location, name: name, vm_size: vm_size, model_name: model_name,
-        min_replicas: min_replicas, max_replicas: max_replicas, api_key: SecureRandom.urlsafe_base64,
+        project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, model_name: model_name,
+        engine: engine, engine_params: engine_params, min_replicas: min_replicas, max_replicas: max_replicas, public: public,
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
       ) { _1.id = ubid.to_uuid }
       inference_endpoint.associate_with_project(project)
+      ApiKeyPair.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint") unless public
 
       min_replicas.times do
         Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
@@ -51,14 +52,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   end
 
   label def start
-    hop_initialize_certificates
-  end
-
-  label def initialize_certificates
-    inference_endpoint.root_cert, inference_endpoint.root_cert_key = Util.create_root_certificate(common_name: "#{inference_endpoint.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-    inference_endpoint.server_cert, inference_endpoint.server_cert_key = create_certificate
-    inference_endpoint.save_changes
-
     hop_wait_replicas
   end
 
@@ -88,18 +81,5 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     inference_endpoint.destroy
 
     pop "inference endpoint is deleted"
-  end
-
-  def create_certificate
-    root_cert = OpenSSL::X509::Certificate.new(inference_endpoint.root_cert)
-    root_cert_key = OpenSSL::PKey::EC.new(inference_endpoint.root_cert_key)
-
-    Util.create_certificate(
-      subject: "/C=US/O=Ubicloud/CN=#{load_balancer.hostname}",
-      extensions: ["subjectAltName=DNS:#{load_balancer.hostname},DNS:#{replicas.first.vm.ephemeral_net4}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth,clientAuth"],
-      duration: 60 * 60 * 24 * 30 * 6, # ~6 months
-      issuer_cert: root_cert,
-      issuer_key: root_cert_key
-    ).map(&:to_pem)
   end
 end

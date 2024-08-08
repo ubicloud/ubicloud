@@ -23,10 +23,8 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         location: inference_endpoint.location,
         name: ubid.to_s,
         size: inference_endpoint.vm_size,
-        storage_volumes: [
-          {encrypted: true, size_gib: 200}
-        ],
-        boot_image: "ubuntu-noble",
+        storage_volumes: inference_endpoint.storage_volumes,
+        boot_image: inference_endpoint.boot_image,
         private_subnet_id: inference_endpoint.load_balancer.private_subnet.id,
         enable_ip4: true
       )

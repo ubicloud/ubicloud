@@ -46,6 +46,15 @@
                 icon: "hero-circle-stack"
               }
             ) %>
+            <%== render(
+              "layouts/sidebar/item",
+              locals: {
+                name: "AI Inference",
+                url: "#{@project_data[:path]}/inference-endpoint/public",
+                is_active: request.path.start_with?("#{@project_data[:path]}/inference-endpoint"),
+                icon: "ai-robot"
+              }
+            ) %>
           <% else %>
             <%== render(
               "layouts/sidebar/item",

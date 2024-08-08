@@ -4,6 +4,7 @@ require "yaml"
 
 module Option
   providers = YAML.load_file("config/providers.yml")
+  models = YAML.load_file("config/models.yml")
 
   Provider = Struct.new(:name, :display_name)
   Location = Struct.new(:provider, :name, :display_name, :visible)
@@ -29,11 +30,22 @@ module Option
   PROVIDERS.freeze
   LOCATIONS.freeze
 
+  MODELS = models.select { _1["enabled"] }
+  MODELS.freeze
+
   def self.locations(only_visible: true)
     Option::LOCATIONS.select { !only_visible || _1.visible }
   end
 
   def self.postgres_locations
+    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" }
+  end
+
+  def self.inference_endpoint_locations
+    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" }
+  end
+
+  def self.inference_endpoint_models
     Option::LOCATIONS.select { _1.name == "hetzner-fsn1" }
   end
 
