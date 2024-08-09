@@ -38,6 +38,7 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:boot] = disk_index == boot_disk_index
     end
 
+    puts storage_volumes
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
 
     ubid = Vm.generate_ubid

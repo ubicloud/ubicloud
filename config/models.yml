@@ -1,0 +1,1 @@
+- { id: 04ba0d97-859b-46ba-a90b-36a7c7900d4b, model_name: llama-3.1-8B-instruct, enabled: true, locations: ["hetzner-fsn1"],  vm_size: "standard-gpu-6" , storage_volumes: [{encrypted: true, size_gib: 180}], boot_image: "llama_3_1_8B_instruct", engine: "vllm", engine_params: "--max-model-len 4096" }

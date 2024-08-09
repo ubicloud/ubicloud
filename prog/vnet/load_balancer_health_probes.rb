@@ -11,7 +11,7 @@ class Prog::Vnet::LoadBalancerHealthProbes < Prog::Base
     response_code = nil
     begin
       endpoint = "#{vm.nics.first.private_ipv4.network}:#{load_balancer.dst_port}#{load_balancer.health_check_endpoint}"
-      response_code = vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} curl --max-time #{load_balancer.health_check_timeout} --silent --output /dev/null --write-out '%{http_code}' #{endpoint}")
+      response_code = vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} curl --max-time #{load_balancer.health_check_timeout} -k --silent --output /dev/null --write-out '%{http_code}' https://#{endpoint}")
     rescue
       response_code = "500"
     end

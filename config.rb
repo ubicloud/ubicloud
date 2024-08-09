@@ -163,4 +163,9 @@ module Config
   # Load Balancer
   optional :load_balancer_service_project_id, string
   optional :load_balancer_service_hostname, string
+
+  # AI
+  optional :inference_endpoint_service_project_id, string
+  optional :inference_endpoint_service_firewall_id, string
+  optional :inference_endpoint_hf_token, string, clear: true
 end

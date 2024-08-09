@@ -54,6 +54,34 @@ module Validation
     fail ValidationFailed.new({provider: msg}) unless available_locs.include?(location)
   end
 
+  def self.validate_inference_endpoint_location(location)
+    available_ie_locs = Option.inference_endpoint_locations.map(&:name)
+    msg = "Given location is not a valid inference endpoint location. Available locations: #{available_ie_locs.map { LocationNameConverter.to_display_name(_1) }}"
+    fail ValidationFailed.new({location: msg}) unless available_ie_locs.include?(location)
+  end
+
+  def self.validate_inference_endpoint_model(model_name, location)
+    model = Option::MODELS.detect { _1["model_name"] == model_name }
+    fail ValidationFailed.new({model: "Provided model name is not valid."}) unless model
+    validate_location(location)
+    location_internal_name = LocationNameConverter.to_internal_name(location)
+    fail ValidationFailed.new({model: "Model name is not available in location #{location}."}) unless model["locations"].include?(location_internal_name)
+    model
+  end
+
+  def self.validate_inference_endpoint_replica_size(min_replicas, max_replicas)
+    min_replicas ||= 1
+    max_replicas ||= min_replicas
+
+    min_replicas = min_replicas.to_i
+    max_replicas = max_replicas.to_i
+    fail ValidationFailed.new({min_replicas: "Minimum replicas must be greater than 0."}) if min_replicas <= 0
+    fail ValidationFailed.new({min_replicas: "Minimum replicas must be greater than 0."}) if min_replicas <= 0
+    fail ValidationFailed.new({max_replicas: "Maximum replicas must be greater or equal than minimum replicas"}) if max_replicas < min_replicas
+    fail ValidationFailed.new({max_replicas: "Maximum replicas must be less than 10"}) if max_replicas >= 10
+    [min_replicas, max_replicas]
+  end
+
   def self.validate_postgres_location(location)
     available_pg_locs = Option.postgres_locations.map(&:name)
     msg = "Given location is not a valid postgres location. Available locations: #{available_pg_locs.map { LocationNameConverter.to_display_name(_1) }}"
@@ -100,7 +128,7 @@ module Validation
     end
     storage_volumes.each { |volume|
       volume.each_key { |key|
-        fail ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key)
+        ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key)
       }
     }
   end
