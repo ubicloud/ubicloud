@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+require "committee"
 
 class CloverApi < Roda
   include CloverBase
@@ -77,6 +78,8 @@ class CloverApi < Roda
     argon2_secret { Config.clover_session_secret }
     require_bcrypt? false
   end
+
+  use Committee::Middleware::ResponseValidation, schema_path: 'openapi.yaml', strict_reference_validation: true
 
   route do |r|
     r.rodauth

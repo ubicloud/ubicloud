@@ -1,0 +1,948 @@
+openapi: 3.0.0
+info:
+  title: Clover API
+  version: "1.0.0"
+  description: API for managing resources on Ubicloud
+
+servers:
+  - url: 'http://127.0.0.1:9292/api'
+  
+security:
+  - BearerAuth: []
+
+paths:
+  
+  # LOGIN
+  /login:
+    post:
+      tags:
+        - Login
+      summary: Login with user information
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                  example: "user@mail.com"
+                password:
+                  type: string
+                  example: "password"
+              required:
+                - login
+                - password
+      responses:
+        '200':
+          description: Logged in succesfully.
+          headers:
+            Authorization:
+              description: JWT Token
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+          
+
+  # PROJECT
+  /project:
+    get:
+      tags: 
+        - Project
+      summary: List all projects visible to the logged in user.
+      operationId: listProjects
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: Return the list of all projects visible to the logged in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: 
+                      $ref: '#/components/schemas/Project'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+    post:
+      tags: 
+        - Project
+      summary: Create a new project
+      operationId: createProject
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "my-project-name"
+                provider:
+                  type: string
+                  example: "hetzner"
+              required:
+                - name
+                - provider
+      responses:
+        '200':
+          description: Project is created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: InvalidRequest
+        '401':
+          description: Unauthorized
+  /project/{project_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      tags: 
+        - Project
+      summary: Retrieve a project
+      operationId: getProject
+      responses:
+        '200':
+          description: Retrieved project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Resource not found
+    delete:
+      tags: 
+        - Project
+      summary: Delete a project
+      operationId: deleteProject
+      responses:
+        '204':
+          description: Project deleted successfully
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+        '404':
+          description: Resource not found
+  
+  # VM
+  /project/{project_id}/vm:
+    get:
+      tags: 
+        - Virtual Machine
+      summary: List all VMs created under the given project ID and visible to logged in user
+      operationId: listProjectVMs
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: Return the list of all VMs visible created under the given project and visible to the logged in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/vm:
+    get:
+      tags: 
+        - Virtual Machine
+      summary: List VMs in a specific location of a project
+      operationId: listLocationVMs
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - in: path
+          name: location
+          required: true
+          schema:
+            type: string
+          description: Return the list VMs created in a specific location of a project and visible to the logged in user
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of VMs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/vm/{vm_name}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_name'
+    post:
+      tags: 
+        - Virtual Machine
+      summary: Create a new VM in a specific location of a project
+      operationId: createVM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                public_key:
+                  type: string
+                size:
+                  type: string
+                unix_user:
+                  type: string
+                boot_image:
+                  type: string
+                enable_ip4:
+                  type: boolean
+                private_subnet_id:
+                  type: string
+                  format: ipv4
+              required:
+                - public_key
+      responses:
+        '200':
+          description: Virtual machine created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        '400':
+          description: Invalid request
+        '401':
+          description: Unauthorized
+    get:
+      tags: 
+        - Virtual Machine
+      summary: Get details of a specific VM in a location
+      operationId: getVMDetails
+      responses:
+        '200':
+          description: Details of the VM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        '401':
+          description: Unauthorized
+    delete:
+      tags: 
+        - Virtual Machine
+      summary: Delete a specific VM
+      operationId: deleteVM
+      responses:
+        '204':
+          description: VM deleted successfully
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/vm/id/{vm_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_id'
+    get:
+      tags: 
+        - Virtual Machine
+      summary: Get details of a specific VM in a location with ID
+      operationId: getVMDetailsWithId
+      responses:
+        '200':
+          description: Details of the VM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        '401':
+          description: Unauthorized
+    delete:
+      tags: 
+        - Virtual Machine
+      summary: Delete a specific VM with ID
+      operationId: deleteVMWithId
+      responses:
+        '204':
+          description: VM deleted successfully
+        '401':
+          description: Unauthorized
+
+  # PRIVATE SUBNET
+  /project/{project_id}/private-subnet:
+    get:
+      tags: 
+        - Private Subnet
+      summary: List visible Private Subnets
+      operationId: listPSs
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of private subnets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateSubnet'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '404':
+          description: Resource is not found
+  /project/{project_id}/location/{location}/private-subnet:
+    get:
+      tags: 
+        - Private Subnet
+      summary: List Private Subnets in a specific location of a project
+      operationId: listLocationPrivateSubnets
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Private Subnets in a location
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateSubnet'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+        '404':
+          description: Resource not found
+  /project/{project_id}/location/{location}/private-subnet/{private_subnet_name}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_name'
+    post:
+      tags: 
+        - Private Subnet
+      summary: Create a new Private Subnet in a specific location of a project
+      operationId: createPrivateSubnet
+      responses:
+        '200':
+          description: Private subnet is created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        '401':
+          description: Unauthorized
+    get:
+      tags: 
+        - Private Subnet
+      summary: Get details of a specific Private Subnet in a location
+      operationId: getPrivateSubnetDetails
+      responses:
+        '200':
+          description: Details of the Private Subnet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Resource not found
+    delete:
+      tags: 
+        - Private Subnet
+      summary: Delete a specific Private Subnet
+      operationId: deletePrivateSubnet
+      responses:
+        '204':
+          description: Private Subnet is deleted successfully
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_id'
+    get:
+      tags: 
+        - Private Subnet
+      summary: Get details of a specific Private Subnet in a location with ID
+      operationId: getPSDetailsWithId
+      responses:
+        '200':
+          description: Details of the Private Subnet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        '401':
+          description: Unauthorized
+    delete:
+      tags: 
+        - Private Subnet
+      summary: Delete a specific Private Subnet with ID
+      operationId: deletePSWithId
+      responses:
+        '204':
+          description: Private Subnet is deleted successfully
+        '401':
+          description: Unauthorized
+
+  # POSTGRES
+  /project/{project_id}/postgres:
+    get:
+      tags: 
+        - Postgres
+      summary: List visible Postgres databases
+      operationId: listPostgresDatabases
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Postgres databases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Postgres'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/postgres:
+    get:
+      tags: 
+        - Postgres
+      summary: List Postgres databases in a specific location of a project
+      operationId: listLocationPostgresDatabases
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Postgres databases in a specific location of a project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Postgres'
+                  count:
+                    type: integer
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/postgres/{postgres_database_name}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+    post:
+      tags: 
+        - Postgres
+      summary: Create a new Postgres database in a specific location of a project
+      operationId: createPostgresDatabase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                size:
+                  type: string
+                ha_type:
+                  type: string
+              required:
+                - size
+      responses:
+        '200':
+          description: Postgres database is created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        '401':
+          description: Unauthorized
+    get:
+      tags: 
+        - Postgres
+      summary: Get details of a specific Postgres database in a location
+      operationId: getPostgresDatabaseDetails
+      responses:
+        '200':
+          description: Details of the Postgres database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        '401':
+          description: Unauthorized
+    delete:
+      tags: 
+        - Postgres
+      summary: Delete a specific Postgres database
+      operationId: deletePostgresDatabase
+      responses:
+        '204':
+          description: Postgres database is deleted successfully
+        '401':
+          description: Unauthorized
+  
+  /project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore:
+
+    post:
+      tags: 
+        - Postgres
+      parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+      summary: Restore a new Postgres database in a specific location of a project
+      operationId: restorePostgresDatabase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              required:
+                - size, restore_target
+      responses:
+        '200':
+          description: Postgres database is restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password:
+    post:
+      tags: 
+        - Postgres
+      parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+      summary: Reset superuser password of the Postgres database
+      operationId: resetSuperuserPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+      responses:
+        '200':
+          description: Superuser passwrod is updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}:
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+    get:
+      tags: 
+        - Postgres
+      summary: Get details of a specific Postgres database in a location with ID
+      operationId: getPostgresDetailsWithId
+      responses:
+        '200':
+          description: Details of the Postgres databases in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+    delete:
+      tags: 
+        - Postgres
+      summary: Delete a specific Postgres database with ID
+      operationId: deletePostgresDatabaseWithID
+      responses:
+        '204':
+          description: Postgres database is deleted successfully
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/restore:
+    post:
+      tags: 
+        - Postgres
+      parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+      summary: Restore a new Postgres database in a specific location of a project with ID
+      operationId: restorePostgresDatabaseWithID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              required:
+                - size, restore_target
+      responses:
+        '200':
+          description: Postgres database is restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Postgres'
+        '401':
+          description: Unauthorized
+  /project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password:
+    post:
+      tags: 
+        - Postgres
+      parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+      summary: Reset super-user password of the Postgres database
+      operationId: resetSuperuserPasswordWithID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+      responses:
+        '200':
+          description: Superuser passwrod is updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    BearerAuth:    # Arbitrary name for the security scheme
+      type: http
+      scheme: bearer
+      bearerFormat: JWT   # Optional, just for documentation purposes
+  schemas:
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          example: pjw92xhhqjdy4g72xng1ubkda6
+        name:
+          type: string
+          example: my-project
+        credit:
+          type: number
+          format: float
+          example: 25.4
+        discount:
+          type: integer
+          example: 10
+        provider:
+          type: string
+          example: hetzner
+    Vm:
+      type: object
+      properties:
+        id:
+          type: string
+          example: vmw12ouhqjdy4g72xng1ubkda6
+        name:
+          type: string
+          example: "my-vm-name"
+        state:
+          type: string
+        location:
+          type: string
+          example: "eu-north-h1"
+        display_size:
+          type: string
+        unix_user:
+          type: string
+        storage_size_gib:
+          type: string
+        ip6:
+          type: string
+          format: ipv6
+        ip4:
+          type: string
+          format: ipv4
+    VmDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Vm'
+        - type: object
+          properties:
+            nics:
+              type: array
+              items: 
+                $ref: '#/components/schemas/Nic'
+            firewalls:
+              type: array
+              items: 
+                $ref: '#/components/schemas/Firewall'
+    Firewall:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        firewall_rules:
+          type: array
+          items: 
+            $ref: '#/components/schemas/FirewallRule'
+    FirewallRule:
+      type: object
+      properties:
+        id:
+          type: string
+        cidr:
+          type: string
+        port_range:
+          type: string
+    Nic:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        private_ipv4:
+          type: string
+          format: ipv4
+        private_ipv6:
+          type: string
+          format: ipv6
+        subnet_name:
+          type: string
+    PrivateSubnet:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        location:
+          type: string
+        net4:
+          type: string
+        net6:
+          type: string
+        nics:
+          type: array
+          items: 
+            $ref: '#/components/schemas/Nic'
+    PostgresFirewallRule:
+      type: object
+      properties:
+        id:
+          type: string
+        cidr:
+          type: string
+    Postgres:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        state:
+          type: string
+        location:
+          type: string
+        vm_size:
+          type: string
+        storage_size_gib:
+          type: string
+        ha_type:
+          type: string
+    PostgresDetailed:
+      allOf:
+        - $ref: '#/components/schemas/Postgres'
+        - type: object
+          properties:
+            conection_string:
+              type: string
+            primary:
+              type: boolean
+            firewall_rules:
+              type: array
+              items: 
+                $ref: '#/components/schemas/PostgresFirewallRule'
+            earliest_restore_time:
+              type: string
+            latest_restore_time:
+              type: string
+
+  parameters:
+    start_after:
+      name: start_after
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Start after explanation
+    page_size:
+      name: page_size
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 10
+      description: Page size explanation
+    order_column:
+      name: order_column
+      in: query
+      required: false
+      schema:
+        type: string
+        default: id
+      description: Order column explanation
+    project_id:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Id of the Project
+    location:
+      name: location
+      in: path
+      required: true
+      schema:
+        type: string
+        example: eu-north-h1
+      description: The location within the project
+    vm_name:
+      name: vm_name
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Virtual machine name
+    vm_id:
+      name: vm_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Virtual machine ID
+    private_subnet_name:
+      name: private_subnet_name
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Private Subnet name
+    private_subnet_id:
+      name: private_subnet_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Virtual machine ID
+    postgres_database_name:
+      name: postgres_database_name
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Private Subnet name
+    postgres_database_id:
+      name: postgres_database_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Virtual machine ID
