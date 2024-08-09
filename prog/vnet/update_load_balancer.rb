@@ -18,7 +18,7 @@ class Prog::Vnet::UpdateLoadBalancer < Prog::Base
   end
 
   label def remove_load_balancer
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.nics.first.private_ipv4.network.to_s))
+    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.nics.first.private_ipv4.network.to_s)) if vm
     pop "load balancer is updated"
   end
 

@@ -164,4 +164,12 @@ module Config
   # Load Balancer
   optional :load_balancer_service_project_id, string
   optional :load_balancer_service_hostname, string
+
+  # ACME
+  # The following are optional because they are only needed in production.
+  # They are not needed in development or test.
+  optional :acme_email, string
+  override :acme_directory, "https://acme.zerossl.com/v2/DV90", string
+  optional :acme_eab_kid, string, clear: true
+  optional :acme_eab_hmac_key, string, clear: true
 end

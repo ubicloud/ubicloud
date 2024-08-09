@@ -60,3 +60,7 @@ end
 gem "webauthn", "~> 3.1"
 
 gem "aws-sdk-s3", "~> 1.157"
+
+gem "acme-client", "~> 2.0"
+
+gem "rubyzip", "~> 2.3"

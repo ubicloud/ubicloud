@@ -78,6 +78,7 @@ RSpec.describe Clover, "load balancer" do
         select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
+        select "HTTP", from: "health_check_protocol"
 
         click_button "Create"
 
@@ -100,6 +101,7 @@ RSpec.describe Clover, "load balancer" do
         select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
+        select "HTTP", from: "health_check_protocol"
 
         click_button "Create"
 
@@ -130,6 +132,7 @@ RSpec.describe Clover, "load balancer" do
         select "Round Robin", from: "algorithm"
         fill_in "HTTP Health Check Endpoint", with: "/up"
         select ps.name, from: "private_subnet_id"
+        select "HTTP", from: "health_check_protocol"
 
         ps.destroy
 
@@ -318,6 +321,29 @@ RSpec.describe Clover, "load balancer" do
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         expect(page.status_code).to eq(204)
+      end
+    end
+
+    describe "download certificate bundle" do
+      it "can download certificate bundle if it exists" do
+        dns_zone = DnsZone.create_with_id(project_id: project.id, name: "lb.ubicloud.com")
+        ce = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
+        key = OpenSSL::PKey::EC.generate("prime256v1")
+        ce.update(cert: "cert", csr_key: key.to_der)
+        lb.add_cert(ce)
+        visit "#{project.path}#{lb.path}/certificate-bundle"
+
+        expect(page.status_code).to eq(200)
+        expect(page.response_headers["Content-Type"]).to eq("application/zip")
+        expect(page.response_headers["Content-Disposition"]).to eq("attachment; filename=#{lb.hostname}.zip")
+      end
+
+      it "can not download certificate bundle when there is not one" do
+        lb.certs.map(&:destroy)
+        visit "#{project.path}#{lb.path}/certificate-bundle"
+
+        expect(page).to have_content "No certificates are available to download"
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
       end
     end
   end

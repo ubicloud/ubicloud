@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "zip"
 class Routes::Common::LoadBalancerHelper < Routes::Common::Base
   def list
     dataset = project.load_balancers_dataset
@@ -25,9 +26,10 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
   def post(name: nil)
     Authorization.authorize(@user.id, "LoadBalancer:create", project.id)
 
-    required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_endpoint]
+    required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol]
     required_parameters << "name" if @mode == AppMode::WEB
-    request_body_params = Validation.validate_request_body(params, required_parameters)
+    optional_parameters = %w[health_check_endpoint]
+    request_body_params = Validation.validate_request_body(params, required_parameters, optional_parameters)
 
     ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
     unless ps
@@ -47,7 +49,8 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
       algorithm: request_body_params["algorithm"],
       src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
       dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
-      health_check_endpoint: request_body_params["health_check_endpoint"]
+      health_check_endpoint: request_body_params["health_check_endpoint"],
+      health_check_protocol: request_body_params["health_check_protocol"]
     ).subject
 
     if @mode == AppMode::API
@@ -117,6 +120,31 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     @resource.incr_destroy
     response.status = 204
     @request.halt
+  end
+
+  def download_certificate_bundle
+    Authorization.authorize(@user.id, "LoadBalancer:view", @resource.id)
+    if @resource.need_certificates?
+      response.status = 404
+      flash["error"] = "No certificates are available to download"
+      @request.redirect "#{project.path}#{@resource.path}"
+    else
+      response.headers["Content-Type"] = "application/zip"
+      response.headers["Content-Disposition"] = "attachment; filename=#{File.basename(@resource.hostname)}.zip"
+      zip_stream = Zip::OutputStream.write_buffer do |zip|
+        cert = @resource.active_cert
+        zip.put_next_entry("#{@resource.hostname}.crt")
+        zip.write(cert.cert)
+        zip.put_next_entry("#{@resource.hostname}.key")
+        zip.write(OpenSSL::PKey::EC.new(cert.csr_key).to_pem)
+      end
+
+      zip_stream.rewind
+      zip_data = zip_stream.read
+
+      response.write(zip_data)
+      response.finish
+    end
   end
 
   def post_attach_vm

@@ -8,6 +8,7 @@ class Serializers::LoadBalancer < Serializers::Base
       hostname: lb.hostname,
       algorithm: lb.algorithm,
       health_check_endpoint: lb.health_check_endpoint,
+      health_check_protocol: lb.health_check_protocol,
       src_port: lb.src_port,
       dst_port: lb.dst_port
     }
@@ -24,6 +25,7 @@ class Serializers::LoadBalancer < Serializers::Base
 
     if options[:vms_serialized]
       base[:vms] = Serializers::Vm.serialize(lb.vms, {load_balancer: true})
+      base[:certificate_bundle_path] = lb.certificate_bundle_path
     end
 
     base
