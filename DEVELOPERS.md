@@ -95,8 +95,8 @@ I find use of `asdf` with
 obligatory, for the reasons discussed in its README.  Let's set it up
 as a user-global tool, and not a project-local one:
 
-    echo "direnv 2.32.2" >> ~/.tool-versions
     asdf direnv setup --version latest
+    echo "direnv $(direnv --version)" >> ~/.tool-versions
 
 After `direnv setup` you need to source your shell's startup files or
 start a new shell.
