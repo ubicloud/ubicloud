@@ -11,6 +11,9 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     github_service_project = Project.create(name: "Github Runner Service Project") { _1.id = Config.github_runner_service_project_id }
     github_service_project.associate_with_project(github_service_project)
 
+    vm_pool_service_project = Project.create(name: "Vm Pool Service Project") { _1.id = Config.vm_pool_project_id }
+    vm_pool_service_project.associate_with_project(vm_pool_service_project)
+
     github_test_project = Project.create_with_id(name: "Github Runner Test Project")
     github_test_project.associate_with_project(github_test_project)
     GithubInstallation.create_with_id(
@@ -28,6 +31,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
         "vm_host_id" => vm_host_id,
         "test_cases" => test_cases,
         "github_service_project_id" => github_service_project.id,
+        "vm_pool_service_project" => vm_pool_service_project.id,
         "github_test_project_id" => github_test_project.id
       }]
     )
@@ -47,8 +51,36 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   label def wait_download_boot_images
     reap
-    hop_trigger_test_runs if leaf?
+    hop_create_vm_pool if leaf?
     donate
+  end
+
+  label def create_vm_pool
+    label_data = Github.runner_labels["ubicloud"]
+    pool = Prog::Vm::VmPool.assemble(
+      size: 1,
+      vm_size: label_data["vm_size"],
+      boot_image: label_data["boot_image"],
+      location: label_data["location"],
+      storage_size_gib: label_data["storage_size_gib"],
+      arch: label_data["arch"],
+      storage_encrypted: true,
+      storage_skip_sync: true
+    ).subject
+    update_stack({"vm_pool_id" => pool.id})
+
+    hop_wait_vm_pool_to_be_ready
+  end
+
+  label def wait_vm_pool_to_be_ready
+    pool = VmPool[frame["vm_pool_id"]]
+    nap 10 unless pool.size == pool.vms_dataset.exclude(provisioned_at: nil).count
+
+    # No need to provision a new VM to the pool when the first one is picked.
+    # This simplifies the process of verifying at the end of the test that VMs
+    # were correctly picked from the pool.
+    pool.update(size: 0)
+    hop_trigger_test_runs
   end
 
   label def trigger_test_runs
@@ -94,8 +126,15 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
     nap 15 if GithubRunner.any?
 
+    pool = VmPool[frame["vm_pool_id"]]
+    unless pool.vms.count.zero?
+      update_stack({"fail_message" => "The runner did not picked from the pool"})
+    end
+
     GithubRepository.each { _1.destroy }
+    pool.incr_destroy
     Project[frame["github_service_project_id"]]&.destroy
+    Project[frame["vm_pool_service_project"]]&.destroy
     Project[frame["github_test_project_id"]]&.destroy
 
     frame["fail_message"] ? fail_test(frame["fail_message"]) : hop_finish
