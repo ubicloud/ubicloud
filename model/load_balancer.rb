@@ -35,12 +35,14 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       super
       Strand.create_with_id(prog: "Vnet::LoadBalancerHealthProbes", label: "health_probe", stack: [{subject_id: id, vm_id: vm.id}], parent_id: strand.id)
+      Strand.create_with_id(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_rewrite_dns_records
     end
   end
 
   def detach_vm(vm)
     load_balancers_vms_dataset.where(vm_id: vm.id, state: ["up", "down", "evacuating"]).update(state: "detaching")
+    Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
     remove_health_probe(vm.id)
     incr_update_load_balancer
   end
@@ -49,6 +51,7 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       load_balancers_vms_dataset.where(vm_id: vm.id, state: ["up", "down"]).update(state: "evacuating")
       remove_health_probe(vm.id)
+      Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
