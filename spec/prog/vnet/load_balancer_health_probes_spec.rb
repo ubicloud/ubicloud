@@ -11,7 +11,11 @@ RSpec.describe Prog::Vnet::LoadBalancerHealthProbes do
   let(:lb) {
     prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 80).subject
+    dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
+    cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+    lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 80).subject
+    lb.add_cert(cert)
+    lb
   }
   let(:vm) {
     Prog::Vm::Nexus.assemble("pub-key", lb.projects.first.id, name: "test-vm", private_subnet_id: lb.private_subnet.id).subject

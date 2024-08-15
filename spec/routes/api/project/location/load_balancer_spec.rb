@@ -9,7 +9,11 @@ RSpec.describe Clover, "load-balancer" do
 
   let(:lb) do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-hel1")
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80).subject
+    dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+    cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+    lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80).subject
+    lb.add_cert(cert)
+    lb
   end
 
   describe "unauthenticated" do
@@ -206,6 +210,9 @@ RSpec.describe Clover, "load-balancer" do
 
       it "vm already attached to a different load balancer" do
         lb2 = Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 80).subject
+        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb2.private_subnet.projects.first.id)
+        cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+        lb2.add_cert(cert)
         lb2.add_vm(vm)
 
         patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {

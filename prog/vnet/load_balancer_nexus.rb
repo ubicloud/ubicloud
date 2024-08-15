@@ -45,7 +45,11 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       rewrite_dns_records
       decr_rewrite_dns_records
     end
-    hop_create_new_cert if load_balancer.need_certificates?
+
+    if load_balancer.need_certificates?
+      load_balancer.incr_refresh_cert
+      hop_create_new_cert
+    end
 
     nap 5
   end
@@ -59,9 +63,25 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def wait_cert_provisioning
     if load_balancer.need_certificates?
       nap 60
-    else
+    elsif load_balancer.refresh_cert_set?
+      load_balancer.vms.each do |vm|
+        bud Prog::Vnet::CertServer, {"subject_id" => load_balancer.id, "vm_id" => vm.id}, :reshare_certificate
+      end
+
+      hop_wait_cert_broadcast
+    end
+
+    hop_wait
+  end
+
+  label def wait_cert_broadcast
+    reap
+    if strand.children.select { _1.prog == "Vnet::CertServer" }.all? { _1.exitval == "certificate is reshared" } || strand.children.empty?
+      decr_refresh_cert
       hop_wait
     end
+
+    nap 1
   end
 
   label def update_vm_load_balancers
@@ -92,7 +112,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
 
     load_balancer.vms.each do |vm|
-      bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :remove_load_balancer
+      bud Prog::Vnet::UpdateLoadBalancerNode, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :update_load_balancer
+      bud Prog::Vnet::CertServer, {"subject_id" => load_balancer.id, "vm_id" => vm.id}, :remove_cert_server
     end
 
     hop_wait_destroy
