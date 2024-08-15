@@ -18,7 +18,6 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   label def update_load_balancer
     if vm_load_balancer_state == "detaching"
       load_balancer.remove_vm(vm)
-      hop_remove_load_balancer
     end
 
     # if there is literally no up resources to balance for, we simply not do
@@ -31,7 +30,8 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
 
   label def remove_load_balancer
     vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.nics.first.private_ipv4.network.to_s))
-    pop "load balancer is updated"
+
+    pop "load balancer is removed"
   end
 
   def generate_lb_based_nat_rules

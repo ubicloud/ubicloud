@@ -1,0 +1,28 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require_relative "../lib/cert_server_setup"
+require "fileutils"
+
+unless (verb = ARGV.shift)
+  puts "expected verb as argument"
+  exit 1
+end
+
+unless (vm_name = ARGV.shift)
+  puts "expected vm_name as argument"
+  exit 1
+end
+
+cert_server_setup = CertServerSetup.new(vm_name)
+
+case verb
+when "setup"
+  cert_server_setup.copy_server
+  cert_server_setup.create_service
+  cert_server_setup.enable_and_start_service
+when "stop_and_remove"
+  cert_server_setup.stop_and_remove_service
+  cert_server_setup.remove_paths
+end
