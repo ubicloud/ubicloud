@@ -37,6 +37,8 @@ class Prog::DownloadBootImage < Prog::Base
       Config.github_gpu_ubuntu_2204_version
     when "postgres-ubuntu-2204"
       Config.postgres_ubuntu_2204_version
+    when "ubuntu-noble-ai"
+      Config.ubuntu_noble_ai_version
     else
       fail "Unknown boot image: #{image_name}"
     end

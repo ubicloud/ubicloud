@@ -1,0 +1,54 @@
+<% @page_title = "Inference Endpoints" %>
+<%== render("inference-endpoint/tabbar") %>
+<% if @private_inference_endpoints.count > 0 %>
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @private_inference_endpoints.each do |ie| %>
+            <tr>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <a href="<%= @project_data[:path] %><%= ie[:path] %>" class="text-orange-600 hover:text-orange-700">
+                  <%= ie[:name] %>
+                </a>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= ie[:location] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%== render("components/inference_endpoint_state_label", locals: { state: ie[:state] }) %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="flex justify-end space-y-1 mt-6">
+    <% if has_project_permission("InferenceEndpoint:create")%>
+    <%== render(
+      "components/button", locals: { text: "Create Private Inference Endpoint", link: "inference-endpoint/create" })
+    %>
+    <% end %>
+  </div>
+<% else %>
+  <div class="mt-6">
+    <%== render(
+    "components/empty_state",
+    locals: {
+      icon: "ai-robot",
+      title: "No Private Inference Endpoints",
+      description: "You don't have permission to create Inference Endpoints."
+    }.merge(has_project_permission("InferenceEndpoint:create") ? {
+      description: "Get started by creating a new Private Inference Endpoint.",
+      button_link: "#{@project_data[:path]}/inference-endpoint/create",
+      button_title: "New Inference Endpoint"
+    } : {})
+  ) %>
+  </div>
+<% end %>
