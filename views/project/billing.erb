@@ -207,6 +207,10 @@
                     Expires
                     <%= pm[:exp_month] %>/<%= pm[:exp_year] %>
                   </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    Added on
+                    <%= pm[:created_at] %>
+                  </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex justify-end">
                     <%== render(
                       "components/delete_button",
