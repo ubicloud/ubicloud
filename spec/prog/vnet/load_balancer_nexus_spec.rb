@@ -107,7 +107,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       vms.each { st.subject.add_vm(_1) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
       # Update progs are budded in update_vm_load_balancers
-      expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
+      expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode", label: "update_load_balancer").count).to eq 3
     end
   end
 
