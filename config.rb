@@ -153,6 +153,7 @@ module Config
   override :github_ubuntu_2004_version, "20240721.1.0", string
   override :postgres_ubuntu_2204_version, "20240702.3.0", string
   override :github_gpu_ubuntu_2204_version, "20240721.1.0", string
+  override :ubuntu_noble_ai_version, "20240815", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
@@ -164,4 +165,8 @@ module Config
   # Load Balancer
   optional :load_balancer_service_project_id, string
   optional :load_balancer_service_hostname, string
+
+  # AI
+  optional :inference_endpoint_service_project_id, string
+  optional :inference_endpoint_service_firewall_id, string
 end

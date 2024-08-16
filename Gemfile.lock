@@ -52,6 +52,7 @@ GEM
     aws-sigv4 (1.9.1)
       aws-eventstream (~> 1, >= 1.0.2)
     base64 (0.2.0)
+    bcrypt (3.1.20)
     bcrypt_pbkdf (1.1.1)
     bcrypt_pbkdf (1.1.1-arm64-darwin)
     bcrypt_pbkdf (1.1.1-x86_64-darwin)
@@ -338,6 +339,7 @@ DEPENDENCIES
   argon2
   argon2-kdf
   aws-sdk-s3 (~> 1.157)
+  bcrypt
   bcrypt_pbkdf
   brakeman
   capybara

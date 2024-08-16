@@ -43,7 +43,7 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
+  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, readonly_image)
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
@@ -54,7 +54,7 @@ class VmSetup
     [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
     prepare_pci_devices(pci_devices)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, readonly_image)
     start_systemd_unit
   end
 
@@ -513,7 +513,7 @@ EOS
     end
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, readonly_image)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -552,6 +552,7 @@ DNSMASQ_SERVICE
     net_params = nics.map { "--net mac=#{_1.mac},tap=#{_1.tap},ip=,mask=,num_queues=#{max_vcpus * 2 + 1}" }
     pci_device_params = pci_devices.map { " --device path=/sys/bus/pci/devices/0000:#{_1[0]}/" }.join
     limit_memlock = pci_devices.empty? ? "" : "LimitMEMLOCK=#{mem_gib * 1073741824}"
+    readonly_disk = readonly_image.empty? ? "" : "--disk path=/var/storage/images/#{readonly_image}.raw,readonly=on \\"
 
     # YYY: Do something about systemd escaping, i.e. research the
     # rules and write a routine for it.  Banning suspicious strings
@@ -574,6 +575,7 @@ ExecStart=#{CloudHypervisor::VERSION.bin} -v \
 --api-socket path=#{vp.ch_api_sock} \
 --kernel #{CloudHypervisor::FIRMWARE.path} \
 #{disk_params.join("\n")}
+#{readonly_disk}
 --disk path=#{vp.cloudinit_img} \
 --console off --serial file=#{vp.serial_log} \
 --cpus #{cpu_setting} \
