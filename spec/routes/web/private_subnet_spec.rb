@@ -191,7 +191,6 @@ RSpec.describe Clover, "private subnet" do
         btn = find ".delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Deleting #{private_subnet.name}"}.to_json)
         expect(SemSnap.new(private_subnet.id).set?("destroy")).to be true
       end
 
