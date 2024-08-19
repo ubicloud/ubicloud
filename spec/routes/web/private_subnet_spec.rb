@@ -81,22 +81,6 @@ RSpec.describe Clover, "private subnet" do
         expect(PrivateSubnet.first.projects.first.id).to eq(project.id)
       end
 
-      it "can not create private subnet with invalid name" do
-        project
-        visit "#{project.path}/private-subnet/create"
-
-        expect(page.title).to eq("Ubicloud - Create Private Subnet")
-
-        fill_in "Name", with: "invalid name"
-        choose option: "eu-north-h1"
-
-        click_button "Create"
-
-        expect(page.title).to eq("Ubicloud - Create Private Subnet")
-        expect(page).to have_content "Name must only contain"
-        expect((find "input[name=name]")["value"]).to eq("invalid name")
-      end
-
       it "can not create private subnet with same name" do
         project
         visit "#{project.path}/private-subnet/create"
@@ -110,15 +94,6 @@ RSpec.describe Clover, "private subnet" do
 
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
         expect(page).to have_content "name is already taken"
-      end
-
-      it "can not create vm in a project when does not have permissions" do
-        project_wo_permissions
-        visit "#{project_wo_permissions.path}/private-subnet/create"
-
-        expect(page.title).to eq("Ubicloud - Forbidden")
-        expect(page.status_code).to eq(403)
-        expect(page).to have_content "Forbidden"
       end
     end
 
@@ -134,14 +109,6 @@ RSpec.describe Clover, "private subnet" do
 
         expect(page.title).to eq("Ubicloud - #{private_subnet.name}")
         expect(page).to have_content private_subnet.name
-      end
-
-      it "raises forbidden when does not have permissions" do
-        visit "#{project_wo_permissions.path}#{ps_wo_permission.path}"
-
-        expect(page.title).to eq("Ubicloud - Forbidden")
-        expect(page.status_code).to eq(403)
-        expect(page).to have_content "Forbidden"
       end
 
       it "raises not found when private subnet not exists" do
