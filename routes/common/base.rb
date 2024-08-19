@@ -34,6 +34,6 @@ class Routes::Common::Base
   end
 
   def params
-    (@mode == AppMode::API) ? @request.body.read : @request.params.reject { _1 == "_csrf" }.to_json
+    @params ||= (@mode == AppMode::API) ? @request.body.read : @request.params.reject { _1 == "_csrf" }.to_json
   end
 end
