@@ -6,7 +6,7 @@ module Option
   providers = YAML.load_file("config/providers.yml")
 
   Provider = Struct.new(:name, :display_name)
-  Location = Struct.new(:provider, :name, :display_name, :visible)
+  Location = Struct.new(:provider, :name, :display_name, :ui_name, :visible)
 
   PROVIDERS = {}
   LOCATIONS = []
@@ -21,6 +21,7 @@ module Option
         PROVIDERS[provider_internal_name],
         location["internal_name"],
         location["display_name"],
+        location["ui_name"],
         location["visible"]
       ))
     end

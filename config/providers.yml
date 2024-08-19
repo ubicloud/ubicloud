@@ -3,17 +3,17 @@
     provider_display_name: Hetzner,
     provider_internal_name: hetzner,
     locations: [
-      {display_name: eu-central-h1, internal_name: hetzner-fsn1, visible: true },
-      {display_name: eu-north-h1, internal_name: hetzner-hel1, visible: true },
-      {display_name: github-runners, internal_name: github-runners, visible: false }
+      {display_name: eu-central-h1, internal_name: hetzner-fsn1, ui_name: "Germany", visible: true },
+      {display_name: eu-north-h1, internal_name: hetzner-hel1, ui_name: "Finland", visible: true },
+      {display_name: github-runners, internal_name: github-runners, ui_name: "GithubRunner", visible: false }
     ]
   },
   {
     provider_display_name: Leaseweb,
     provider_internal_name: leaseweb,
     locations: [
-      {display_name: us-east-a2, internal_name: leaseweb-wdc02, visible: false},
-      {display_name: us-south-a13, internal_name: leaseweb-dal13, visible: false},
+      {display_name: us-east-a2, internal_name: leaseweb-wdc02, ui_name: "Washington D.C., US", visible: false},
+      {display_name: us-south-a13, internal_name: leaseweb-dal13,  ui_name: "Dallas, US", visible: false},
     ]
   }
 ]

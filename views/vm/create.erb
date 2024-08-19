@@ -45,7 +45,7 @@
               <div class="col-span-full">
                 <% locations = Option
                     .locations
-                    .map { |l| [l.display_name, l.display_name, @prices[l.name].to_json] }
+                    .map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] }
 
                    default_location = Option.locations.detect { |l| l.name == @default_location }&.display_name
                 %>
