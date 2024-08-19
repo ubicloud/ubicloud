@@ -25,39 +25,32 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
 
   def post(name)
     Authorization.authorize(@user.id, "PrivateSubnet:create", project.id)
-    if @mode == AppMode::API
-      firewall_id = unless params.empty?
-        request_body_params = Validation.validate_request_body(params, [], ["firewall_id"])
-        if request_body_params["firewall_id"]
-          firewall_id = request_body_params["firewall_id"]
-          fw = Firewall.from_ubid(firewall_id)
-          unless fw && fw.location == @location
-            fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{firewall_id}\" and location \"#{@location}\" is not found")
-          end
-          Authorization.authorize(@user.id, "Firewall:view", fw.id)
-          fw.id
+
+    unless params.empty?
+      required_parameters = []
+      required_parameters << "name" << "location" if @mode == AppMode::WEB
+      request_body_params = Validation.validate_request_body(params, required_parameters, ["firewall_id"])
+      firewall_id = if request_body_params["firewall_id"]
+        fw = Firewall.from_ubid(request_body_params["firewall_id"])
+        unless fw && fw.location == @location
+          fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{request_body_params["firewall_id"]}\" and location \"#{@location}\" is not found")
         end
+        Authorization.authorize(@user.id, "Firewall:view", fw.id)
+        fw.id
       end
+    end
 
-      st = Prog::Vnet::SubnetNexus.assemble(
-        project.id,
-        name: name,
-        location: @location,
-        firewall_id: firewall_id
-      )
+    st = Prog::Vnet::SubnetNexus.assemble(
+      project.id,
+      name: name,
+      location: @location,
+      firewall_id: firewall_id
+    )
 
+    if @mode == AppMode::API
       Serializers::PrivateSubnet.serialize(st.subject)
     else
-      location = LocationNameConverter.to_internal_name(@request.params["location"])
-
-      st = Prog::Vnet::SubnetNexus.assemble(
-        project.id,
-        name: @request.params["name"],
-        location: location
-      )
-
       flash["notice"] = "'#{@request.params["name"]}' will be ready in a few seconds"
-
       @request.redirect "#{project.path}#{PrivateSubnet[st.id].path}"
     end
   end
