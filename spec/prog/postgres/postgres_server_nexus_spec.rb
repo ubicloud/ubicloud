@@ -555,6 +555,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
       expect(postgres_server).to receive(:primary?).and_return(true)
       expect(postgres_server).to receive(:incr_configure)
+      expect(postgres_server).to receive(:incr_restart)
 
       standby = instance_double(PostgresServer, primary?: false)
       expect(standby).to receive(:update).with(synchronization_status: "catching_up")
