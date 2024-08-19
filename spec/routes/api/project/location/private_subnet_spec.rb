@@ -14,40 +14,19 @@ RSpec.describe Clover, "private_subnet" do
   let(:ps_wo_permission) { Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2").subject }
 
   describe "unauthenticated" do
-    it "not location list" do
-      get "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet"
+    it "cannot perform authenticated operations" do
+      [
+        [:get, "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet"],
+        [:post, "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo_name"],
+        [:delete, "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"],
+        [:delete, "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/id/#{ps.ubid}"],
+        [:get, "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"],
+        [:get, "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/id/#{ps.ubid}"]
+      ].each do |method, path|
+        send method, path
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not create" do
-      post "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo_name"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete" do
-      delete "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete ubid" do
-      delete "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/id/#{ps.ubid}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not get" do
-      get "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not get ubid" do
-      get "/api/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/id/#{ps.ubid}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
+        expect(last_response).to have_api_error(401, "Please login to continue")
+      end
     end
   end
 
