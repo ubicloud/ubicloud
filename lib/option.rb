@@ -4,6 +4,7 @@ require "yaml"
 
 module Option
   providers = YAML.load_file("config/providers.yml")
+  models = YAML.load_file("config/models.yml")
 
   Provider = Struct.new(:name, :display_name)
   Location = Struct.new(:provider, :name, :display_name, :ui_name, :visible)
@@ -27,8 +28,11 @@ module Option
     end
   end
 
+  MODELS = models.select { _1["enabled"] }
+
   PROVIDERS.freeze
   LOCATIONS.freeze
+  MODELS.freeze
 
   def self.locations(only_visible: true)
     Option::LOCATIONS.select { !only_visible || _1.visible }

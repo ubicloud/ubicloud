@@ -153,6 +153,8 @@ module Config
   override :github_ubuntu_2004_version, "20240818.1.0", string
   override :postgres_ubuntu_2204_version, "20240702.3.0", string
   override :github_gpu_ubuntu_2204_version, "20240818.1.0", string
+  override :github_gpu_ubuntu_2204_version, "20240721.1.0", string
+  override :ai_ubuntu_2404_version, "20240820.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
@@ -172,4 +174,7 @@ module Config
   override :acme_directory, "https://acme.zerossl.com/v2/DV90", string
   optional :acme_eab_kid, string, clear: true
   optional :acme_eab_hmac_key, string, clear: true
+
+  # AI
+  optional :inference_endpoint_service_project_id, string
 end

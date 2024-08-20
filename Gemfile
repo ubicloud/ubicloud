@@ -5,6 +5,7 @@ ruby "3.2.5"
 
 gem "argon2"
 gem "nokogiri"
+gem "bcrypt"
 gem "bcrypt_pbkdf"
 gem "ed25519"
 gem "net-ssh"

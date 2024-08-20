@@ -100,7 +100,7 @@ module Validation
     end
     storage_volumes.each { |volume|
       volume.each_key { |key|
-        fail ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key)
+        fail ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key.to_sym)
       }
     }
   end

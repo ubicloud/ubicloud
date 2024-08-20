@@ -15,6 +15,7 @@ class Vm < Sequel::Model
   one_to_many :pci_devices, key: :vm_id, class: :PciDevice
   one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
   one_to_one :load_balancers_vms, key: :vm_id, class: LoadBalancersVms
+  one_to_one :inference_endpoint_replica, key: :vm_id
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 
@@ -205,6 +206,14 @@ class Vm < Sequel::Model
     topo = cloud_hypervisor_cpu_topology
 
     project_public_keys = projects.first.get_ff_vm_public_ssh_keys || []
+    readonly_image = if inference_endpoint_replica
+      model_image_name = "ai-model-#{inference_endpoint_replica.inference_endpoint.model_name}"
+      model_image = vm_host.boot_images_dataset.where(name: model_image_name).exclude(activated_at: nil).order(Sequel.desc(:name)).first
+      fail "Model image #{model_image_name} not found on #{vm_host.ubid}" unless model_image
+      "#{model_image.name}-#{model_image.version}"
+    else
+      ""
+    end
 
     # we don't write secrets to params_json, because it
     # shouldn't be stored in the host for security reasons.
@@ -223,7 +232,8 @@ class Vm < Sequel::Model
       "ndp_needed" => vm_host.ndp_needed,
       "storage_volumes" => storage_volumes,
       "swap_size_bytes" => swap_size_bytes,
-      "pci_devices" => pci_devices.map { [_1.slot, _1.iommu_group] }
+      "pci_devices" => pci_devices.map { [_1.slot, _1.iommu_group] },
+      "readonly_image" => readonly_image
     })
   end
 

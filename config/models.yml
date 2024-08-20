@@ -1,0 +1,1 @@
+- { id: 04ba0d97-859b-46ba-a90b-36a7c7900d4b, model_name: google-gemma-2-2b-it, enabled: true, locations: [hetzner-fsn1],  vm_size: standard-gpu-6 , storage_volumes: [{encrypted: true, size_gib: 80}], boot_image: ai-ubuntu-2404, engine: vllm, engine_params: "" }
