@@ -25,7 +25,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access = if parent_id.nil?
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble.id, "push"]
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location: location).id, "push"]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
