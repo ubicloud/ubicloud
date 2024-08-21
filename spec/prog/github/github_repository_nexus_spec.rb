@@ -151,9 +151,11 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect { nx.wait }.to nap(5 * 60)
     end
 
-    it "does not check queued jobs if 6 hours passed from the last job" do
+    it "does not check queued jobs but check cache usage if 6 hours passed from the last job" do
+      expect(github_repository).to receive(:access_key).and_return("key")
       expect(github_repository).to receive(:last_job_at).and_return(Time.now - 7 * 60 * 60)
       expect(nx).not_to receive(:check_queued_jobs)
+      expect(nx).to receive(:cleanup_cache)
       expect { nx.wait }.to nap(15 * 60)
     end
 
