@@ -19,16 +19,18 @@ class GithubRepository < Sequel::Model
 
   plugin :column_encryption do |enc|
     enc.column :secret_key
+    enc.column :session_token
   end
 
   CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
+  BLOB_STORAGE_TOKEN_TTL = 5 * 24 * 60 * 60 # 5 days
 
   def bucket_name
     ubid
   end
 
   def blob_storage_client
-    @blob_storage_client ||= s3_client(access_key, secret_key)
+    @blob_storage_client ||= s3_client(access_key, secret_key, session_token)
   end
 
   def url_presigner
@@ -44,20 +46,24 @@ class GithubRepository < Sequel::Model
     destroy_blob_storage if access_key
   end
 
+  def refresh_blob_storage_token
+    client = CloudflareClient.new(Config.github_cache_blob_storage_api_key)
+    access_key, secret_key, session_token = client.create_temporary_token(bucket_name, "object-read-write", BLOB_STORAGE_TOKEN_TTL)
+    update(access_key: access_key, secret_key: secret_key, session_token: session_token, last_token_refreshed_at: Time.now)
+  end
+
   def destroy_blob_storage
     begin
       admin_client.delete_bucket(bucket: bucket_name)
     rescue Aws::S3::Errors::NoSuchBucket
     end
-
-    CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
-    this.update(access_key: nil, secret_key: nil)
+    this.update(access_key: nil, secret_key: nil, session_token: nil, last_token_refreshed_at: nil)
   end
 
   def setup_blob_storage
     DB.transaction do
       lock!
-      return if access_key && secret_key
+      return if access_key && secret_key && session_token
 
       begin
         admin_client.create_bucket({
@@ -67,24 +73,16 @@ class GithubRepository < Sequel::Model
       rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
       end
 
-      policies = [
-        {
-          "effect" => "allow",
-          "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"}
-        }
-      ]
-
-      token_id, token = CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
-      update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+      refresh_blob_storage_token
     end
   end
 
-  private def s3_client(access_key_id, secret_access_key)
+  private def s3_client(access_key_id, secret_access_key, session_token = nil)
     Aws::S3::Client.new(
       endpoint: Config.github_cache_blob_storage_endpoint,
       access_key_id:,
       secret_access_key:,
+      session_token:,
       region: Config.github_cache_blob_storage_region,
       request_checksum_calculation: "when_required",
       response_checksum_validation: "when_required"
