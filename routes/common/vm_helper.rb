@@ -31,35 +31,36 @@ class Routes::Common::VmHelper < Routes::Common::Base
     required_parameters << "name" << "location" if @mode == AppMode::WEB
     allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
     request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
+    assemble_params = request_body_params.slice(*allowed_optional_parameters).compact
 
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
     # service, moved the boot_image validation here to not allow users to pass
     # postgres image as boot image while creating a VM.
-    if request_body_params["boot_image"]
-      Validation.validate_boot_image(request_body_params["boot_image"])
+    if assemble_params["boot_image"]
+      Validation.validate_boot_image(assemble_params["boot_image"])
     end
 
     # Same as above, moved the size validation here to not allow users to
     # pass gpu instance while creating a VM.
-    if request_body_params["size"]
-      parsed_size = Validation.validate_vm_size(request_body_params["size"], only_visible: true)
+    if assemble_params["size"]
+      parsed_size = Validation.validate_vm_size(assemble_params["size"], only_visible: true)
     end
 
-    if request_body_params["storage_size"]
-      storage_size = Validation.validate_vm_storage_size(request_body_params["size"], request_body_params["storage_size"])
-      request_body_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
-      request_body_params.delete("storage_size")
+    if assemble_params["storage_size"]
+      storage_size = Validation.validate_vm_storage_size(assemble_params["size"], assemble_params["storage_size"])
+      assemble_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
+      assemble_params.delete("storage_size")
     end
 
-    if request_body_params["private_subnet_id"] && request_body_params["private_subnet_id"] != ""
-      ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
+    if assemble_params["private_subnet_id"] && assemble_params["private_subnet_id"] != ""
+      ps = PrivateSubnet.from_ubid(assemble_params["private_subnet_id"])
       if !ps || ps.location != @location
-        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{request_body_params["private_subnet_id"]}\" is not found in the location \"#{LocationNameConverter.to_display_name(@location)}\""})
+        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params["private_subnet_id"]}\" is not found in the location \"#{LocationNameConverter.to_display_name(@location)}\""})
       end
       Authorization.authorize(@user.id, "PrivateSubnet:view", ps.id)
     end
-    request_body_params["private_subnet_id"] = ps&.id
+    assemble_params["private_subnet_id"] = ps&.id
 
     requested_vm_core_count = parsed_size.nil? ? 1 : parsed_size.vcpu / 2
     Validation.validate_core_quota(project, "VmCores", requested_vm_core_count)
@@ -69,7 +70,7 @@ class Routes::Common::VmHelper < Routes::Common::Base
       project.id,
       name: name,
       location: @location,
-      **request_body_params.except(*required_parameters).transform_keys(&:to_sym)
+      **assemble_params.transform_keys(&:to_sym)
     )
 
     if @mode == AppMode::API
