@@ -197,8 +197,6 @@ $("input[name=size]").on("change", function (event) {
 });
 
 $("input[name=storage_size]").on("change", function (event) {
-  storage_size_options = $("input[name=size]:checked").data("storage-size-options");
-  storage_size_index = parseInt($(".storage-slider").val());
   setupLocationBasedPostgresHaPrices();
 });
 
