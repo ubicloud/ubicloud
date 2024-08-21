@@ -109,6 +109,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   end
 
   label def wait
+    cleanup_cache if github_repository.access_key
     nap 15 * 60 if Time.now - github_repository.last_job_at > 6 * 60 * 60
 
     begin
@@ -120,8 +121,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
         nap 0
       end
     end
-
-    cleanup_cache if github_repository.access_key
 
     # check_queued_jobs may have changed the default polling interval based on
     # the remaining rate limit.
