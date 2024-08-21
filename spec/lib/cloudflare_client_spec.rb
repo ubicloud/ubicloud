@@ -3,14 +3,10 @@
 RSpec.describe CloudflareClient do
   let(:client) { described_class.new("api_key") }
 
-  it "create_token" do
-    Excon.stub({path: "/client/v4/user/tokens", method: :post}, {status: 200, body: {result: {id: "123", value: "secret"}}.to_json})
-    expect(client.create_token("test-token", [{id: "test-policy"}])).to eq(["123", "secret"])
-  end
-
-  it "delete_token" do
-    token_id = "123"
-    Excon.stub({path: "/client/v4/user/tokens/#{token_id}", method: :delete}, {status: 200})
-    expect(client.delete_token(token_id)).to eq(200)
+  it "create_temporary_token" do
+    expect(Config).to receive(:github_cache_blob_storage_account_id).and_return("account-123")
+    Excon.stub({path: "/client/v4/accounts/account-123/r2/temp-access-credentials", method: :post},
+      {status: 200, body: {result: {accessKeyId: "123", secretAccessKey: "secret", sessionToken: "token"}}.to_json})
+    expect(client.create_temporary_token("bucket", "object-read-write", 123)).to eq(["123", "secret", "token"])
   end
 end
