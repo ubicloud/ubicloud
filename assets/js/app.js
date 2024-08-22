@@ -245,6 +245,7 @@ function setupLocationBasedPostgresHaPrices() {
     let standbyCount = $(this).data("standby-count");
     $(`.ha-status-${value}`).show();
     $(`.ha-status-${value}-monthly-price`).text(`+$${(standbyCount * monthlyPrice).toFixed(2)}`);
+    $(`.ha-status-${value}-hourly-price`).text(`+$${(standbyCount * monthlyPrice / 672).toFixed(3)}`);
   });
 }
 
