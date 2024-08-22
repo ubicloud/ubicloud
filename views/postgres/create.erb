@@ -101,8 +101,8 @@
                               </span>
                             </span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium size-<%= size.name %>-monthly-price">-</span>
-                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                              <span class="font-medium"><span class="size-<%= size.name %>-monthly-price">-</span>/mo</span>
+                              <span class="ml-1 opacity-50 sm:ml-0"><span class="size-<%= size.name %>-hourly-price">-</span>/hour</span>
                             </span>
                           </span>
                         </label>
@@ -136,8 +136,8 @@
                           >
                             <span class="text-md font-semibold storage-size-label"><%= storage_size %>GB</span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium storage-size-price">-</span>
-                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                              <span class="font-medium"><span class="storage-size-monthly-price">-</span>/mo</span>
+                              <span class="ml-1 opacity-50 sm:ml-0"><span class="storage-size-hourly-price">-</span>/hour</span>
                             </span>
                           </span>
                         </label>
@@ -178,8 +178,8 @@
                               </span>
                             </span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium ha-status-<%= ha_type.name %>-monthly-price">-</span>
-                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                              <span class="font-medium"><span class="ha-status-<%= ha_type.name %>-monthly-price">-</span>/mo</span>
+                              <span class="ml-1 opacity-50 sm:ml-0"><span class="ha-status-<%= ha_type.name %>-hourly-price">-</span>/hour</span>
                             </span>
                           </span>
                         </label>
