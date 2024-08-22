@@ -62,13 +62,13 @@ class InvoiceGenerator
         project_content[:cost] = project_content[:subtotal]
         project_content[:discount] = 0
         if project.discount > 0
-          project_content[:discount] = project_content[:cost] * (project.discount / 100.0)
+          project_content[:discount] = (project_content[:cost] * (project.discount / 100.0)).round(3)
           project_content[:cost] -= project_content[:discount]
         end
 
         project_content[:credit] = 0
         if project.credit > 0
-          project_content[:credit] = [project_content[:cost], project.credit.to_f].min
+          project_content[:credit] = [project_content[:cost], project.credit.to_f].min.round(3)
           project_content[:cost] -= project_content[:credit]
         end
 
@@ -81,6 +81,7 @@ class InvoiceGenerator
           project_content[:credit] += project_content[:github_credit]
           project_content[:cost] -= project_content[:github_credit]
         end
+        project_content[:cost] = project_content[:cost].round(3)
 
         if @save_result
           invoice_month = @begin_time.strftime("%y%m")
@@ -135,7 +136,7 @@ class InvoiceGenerator
         resource_type: br.billing_rate["resource_type"],
         resource_family: br.billing_rate["resource_family"],
         amount: br.amount,
-        cost: (br.amount * duration * br.billing_rate["unit_price"]),
+        cost: (br.amount * duration * br.billing_rate["unit_price"]).round(3),
         duration: duration
       }
     end
