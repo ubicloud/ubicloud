@@ -143,6 +143,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
   '/project/{project_id}/firewall':
     get:
+      operationId: getFirewall
       summary: Return the list of firewalls in the project
       responses:
         '200':
@@ -160,6 +161,8 @@ paths:
                       $ref: '#/components/schemas/Firewall'
         '401':
           $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
     parameters:
       - $ref: '#/components/parameters/project_id'
     post:
@@ -1236,3 +1239,18 @@ components:
       type: http
 security:
   - BearerAuth: []
+tags:
+  - description: Firewall Operations
+    name: Firewall
+  - description: Firewall Rule Operations
+    name: Firewall Rule
+  - description: Login Operations
+    name: Login
+  - description: Postgres Operations
+    name: Postgres
+  - description: Private Subnet Operations
+    name: Private Subnet
+  - description: Project Operations
+    name: Project
+  - description: Virtual Machine Operations
+    name: Virtual Machine
