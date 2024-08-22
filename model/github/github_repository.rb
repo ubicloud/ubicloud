@@ -94,15 +94,17 @@ end
 
 # Table: github_repository
 # Columns:
-#  id              | uuid                     | PRIMARY KEY
-#  installation_id | uuid                     |
-#  name            | text                     | NOT NULL
-#  created_at      | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  last_job_at     | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  last_check_at   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  default_branch  | text                     |
-#  access_key      | text                     |
-#  secret_key      | text                     |
+#  id                      | uuid                     | PRIMARY KEY
+#  installation_id         | uuid                     |
+#  name                    | text                     | NOT NULL
+#  created_at              | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_job_at             | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_check_at           | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  default_branch          | text                     |
+#  access_key              | text                     |
+#  secret_key              | text                     |
+#  session_token           | text                     |
+#  last_token_refreshed_at | timestamp with time zone |
 # Indexes:
 #  github_repository_pkey                       | PRIMARY KEY btree (id)
 #  github_repository_installation_id_name_index | UNIQUE btree (installation_id, name)
