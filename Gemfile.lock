@@ -209,7 +209,7 @@ GEM
     rake (13.2.1)
     refrigerator (1.7.0)
     regexp_parser (2.9.2)
-    rexml (3.3.5)
+    rexml (3.3.6)
       strscan
     roda (3.83.0)
       rack
