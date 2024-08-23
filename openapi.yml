@@ -37,7 +37,7 @@ paths:
                   success:
                     type: string
                     example: You have been logged in
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       security: []
       tags:
@@ -64,9 +64,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Project'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       security:
         - BearerAuth: []
@@ -94,9 +92,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       security:
         - BearerAuth: []
@@ -109,15 +105,7 @@ paths:
       responses:
         '204':
           description: Project deleted successfully
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
-          $ref: '#/components/responses/Error'
-        '409':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Project
@@ -131,11 +119,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Project
@@ -159,7 +143,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Firewall'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
@@ -190,9 +174,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Firewall'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
@@ -203,7 +185,7 @@ paths:
       responses:
         '204':
           description: Firewall deleted successfully
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
@@ -217,7 +199,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Firewall'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
@@ -257,9 +239,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FirewallRule'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
@@ -270,7 +250,7 @@ paths:
       responses:
         '204':
           description: Firewall rule deleted successfully
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
@@ -284,7 +264,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FirewallRule'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
@@ -316,7 +296,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Postgres'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -327,7 +307,7 @@ paths:
       responses:
         '204':
           description: Postgres database is deleted successfully
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -341,7 +321,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -375,7 +355,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -407,7 +387,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Postgres'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -418,7 +398,7 @@ paths:
       responses:
         '204':
           description: Postgres database is deleted successfully
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -432,9 +412,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -470,9 +448,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -502,9 +478,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -536,9 +510,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PostgresDetailed'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -566,9 +538,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -579,7 +549,7 @@ paths:
       responses:
         '204':
           description: Private Subnet is deleted successfully
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -593,7 +563,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivateSubnet'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -608,11 +578,7 @@ paths:
       responses:
         '204':
           description: Private Subnet is deleted successfully
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '409':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -626,11 +592,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivateSubnet'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -657,13 +619,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivateSubnet'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -696,7 +652,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Vm'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
@@ -707,9 +663,7 @@ paths:
       responses:
         '204':
           description: VM deleted successfully
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
@@ -723,9 +677,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmDetailed'
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
@@ -740,11 +692,7 @@ paths:
       responses:
         '204':
           description: VM deleted successfully
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
@@ -758,9 +706,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmDetailed'
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
@@ -808,11 +754,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VmDetailed'
-        '400':
-          $ref: '#/components/responses/Error'
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
@@ -839,7 +781,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Postgres'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
@@ -866,9 +808,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
-        '401':
-          $ref: '#/components/responses/Error'
-        '404':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
@@ -895,7 +835,7 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Vm'
-        '401':
+        default:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine

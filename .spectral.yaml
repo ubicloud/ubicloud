@@ -1,1 +1,12 @@
 extends: ["spectral:oas"]
+rules:
+  responses-default:
+    description: "Responses have default value `$ref: '#/components/responses/Error'`"
+    given: $.paths[*][*][responses]
+    severity: error
+    then:
+      field: default
+      function: schema
+      functionOptions:
+        schema:
+          $ref: '#/components/responses/Error'
