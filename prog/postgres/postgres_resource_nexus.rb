@@ -20,16 +20,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     Validation.validate_location(location)
     Validation.validate_name(name)
     Validation.validate_vm_size(target_vm_size)
-    target_storage_size_gib = Validation.validate_postgres_storage_size(target_vm_size, target_storage_size_gib)
     Validation.validate_postgres_ha_type(ha_type)
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access = if parent_id.nil?
+        target_storage_size_gib = Validation.validate_postgres_storage_size(target_vm_size, target_storage_size_gib)
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location: location).id, "push"]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
         end
+
+        if target_storage_size_gib != parent.target_storage_size_gib
+          target_storage_size_gib = Validation.validate_postgres_storage_size(target_vm_size, target_storage_size_gib)
+        end
+
         restore_target = Validation.validate_date(restore_target, "restore_target")
         parent.timeline.refresh_earliest_backup_completion_time
         unless (earliest_restore_time = parent.timeline.earliest_restore_time) && earliest_restore_time <= restore_target &&
