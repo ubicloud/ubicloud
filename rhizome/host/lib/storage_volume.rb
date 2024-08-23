@@ -22,6 +22,7 @@ class StorageVolume
     @encrypted = params["encrypted"]
     @disk_size_gib = params["size_gib"]
     @use_bdev_ubi = params["use_bdev_ubi"] || false
+    @use_lvol = params["use_lvol"] || false
     @skip_sync = params["skip_sync"] || false
     @image_path = BootImage.new(params["image"], params["image_version"]).image_path if params["image"]
     @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
@@ -52,7 +53,9 @@ class StorageVolume
 
     verify_imaged_disk_size
 
-    if @use_bdev_ubi
+    if @use_lvol
+      create_lvol_writespace(encryption_key)
+    elsif @use_bdev_ubi
       create_ubi_writespace(encryption_key)
     elsif @encrypted
       create_empty_disk_file
@@ -88,11 +91,18 @@ class StorageVolume
 
     non_ubi_bdev = @use_bdev_ubi ? "#{@device_id}_base" : @device_id
 
-    if @use_bdev_ubi
+    if @use_lvol
+      rpc_client.bdev_lvol_delete("#{@device_id}/vol")
+      rpc_client.bdev_lvol_delete_lvstore(@device_id)
+      rpc_client.bdev_aio_delete("#{@device_id}_base")
+      rpc_client.bdev_aio_delete("#{@device_id}_image")
+    end
+
+    if @use_bdev_ubi && !@use_lvol
       rpc_client.bdev_ubi_delete(@device_id)
     end
 
-    if @encrypted
+    if @encrypted && !@use_lvol
       rpc_client.bdev_crypto_delete(non_ubi_bdev)
       rpc_client.bdev_aio_delete("#{@device_id}_aio")
       rpc_client.accel_crypto_key_destroy("#{@device_id}_key")
@@ -220,6 +230,13 @@ class StorageVolume
     end
   end
 
+  def create_lvol_writespace(encryption_key)
+    # XXX:
+    #  1. how to handle encryption?
+    #  2. how much padding to add?
+    create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024 + 128)
+  end
+
   def create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024)
     FileUtils.touch(disk_file)
     File.truncate(disk_file, disk_size_mib * 1024 * 1024)
@@ -238,6 +255,17 @@ class StorageVolume
   end
 
   def setup_spdk_bdev(encryption_key)
+    if @use_lvol
+      base_bdev = "#{@device_id}_base"
+      image_bdev = "#{@device_id}_image"
+      rpc_client.bdev_aio_create(image_bdev, @image_path, 512, true)
+      rpc_client.bdev_aio_create(base_bdev, disk_file, 512)
+      rpc_client.bdev_lvol_create_lvstore(@device_id, base_bdev)
+      rpc_client.bdev_lvol_create("vol", @disk_size_gib * 1024, @device_id)
+      rpc_client.bdev_lvol_set_parent_bdev("#{@device_id}/vol", image_bdev)
+      return
+    end
+
     non_ubi_bdev = @use_bdev_ubi ? "#{@device_id}_base" : @device_id
 
     if encryption_key
@@ -264,7 +292,9 @@ class StorageVolume
     vhost_controller = SpdkPath.vhost_controller(@vm_name, @disk_index)
     spdk_vhost_sock = SpdkPath.vhost_sock(vhost_controller)
 
-    rpc_client.vhost_create_blk_controller(vhost_controller, @device_id)
+    bdev_name = @use_lvol ? "#{@device_id}/vol" : @device_id
+
+    rpc_client.vhost_create_blk_controller(vhost_controller, bdev_name)
 
     # don't allow others to access the vhost socket
     FileUtils.chmod "u=rw,g=r,o=", spdk_vhost_sock

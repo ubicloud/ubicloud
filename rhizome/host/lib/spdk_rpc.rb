@@ -9,12 +9,12 @@ class SpdkRpc
     @response_size_limit = response_size_limit
   end
 
-  def bdev_aio_create(name, filename, block_size)
+  def bdev_aio_create(name, filename, block_size, readonly = false)
     params = {
       name: name,
       filename: filename,
       block_size: block_size,
-      readonly: false
+      readonly: readonly
     }
     call("bdev_aio_create", params)
   end
@@ -89,6 +89,63 @@ class SpdkRpc
 
   def accel_crypto_key_destroy(name, if_exists = true)
     call("accel_crypto_key_destroy", {key_name: name})
+  rescue SpdkNotFound
+    raise unless if_exists
+  end
+
+  def bdev_lvol_create_lvstore(name, base_bdev_name, clear_method = "none")
+    params = {
+      lvs_name: name,
+      bdev_name: base_bdev_name,
+      clear_method: clear_method
+    }
+    call("bdev_lvol_create_lvstore", params)
+  end
+
+  def bdev_lvol_delete_lvstore(name, if_exists = true)
+    params = {lvs_name: name}
+    call("bdev_lvol_delete_lvstore", params)
+  rescue SpdkNotFound
+    raise unless if_exists
+  end
+
+  def bdev_lvol_create(name, size_mib, lvs_name, thin_provision = true, clear_method = "unmap")
+    params = {
+      lvol_name: name,
+      size_in_mib: size_mib,
+      thin_provision: thin_provision,
+      lvs_name: lvs_name,
+      clear_method: clear_method
+    }
+    call("bdev_lvol_create", params)
+  end
+
+  def bdev_lvol_delete(name, if_exists = true)
+    params = {name: name}
+    call("bdev_lvol_delete", params)
+  rescue SpdkNotFound
+    raise unless if_exists
+  end
+
+  def bdev_lvol_set_parent_bdev(name, base_bdev_name)
+    params = {
+      lvol_name: name,
+      parent_name: base_bdev_name
+    }
+    call("bdev_lvol_set_parent_bdev", params)
+  end
+
+  def bdev_passthru_create(name, base_bdev_name)
+    params = {
+      name: name,
+      base_bdev_name: base_bdev_name
+    }
+    call("bdev_passthru_create", params)
+  end
+
+  def bdev_passthru_delete(name, if_exists = true)
+    params = {name: name}
+    call("bdev_passthru_delete", params)
   rescue SpdkNotFound
     raise unless if_exists
   end

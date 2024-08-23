@@ -240,7 +240,8 @@ class Vm < Sequel::Model
         "spdk_version" => s.spdk_version,
         "use_bdev_ubi" => s.use_bdev_ubi,
         "skip_sync" => s.skip_sync,
-        "storage_device" => s.storage_device.name
+        "storage_device" => s.storage_device.name,
+        "use_lvol" => true
       }
     }
   end
