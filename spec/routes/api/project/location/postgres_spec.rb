@@ -196,12 +196,11 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "restore" do
-        stub_const("Backup", Struct.new(:last_modified))
+        stub_const("Backup", Struct.new(:key, :last_modified))
         restore_target = Time.now.utc
-        pg.timeline.update(earliest_backup_completed_at: restore_target - 10 * 60)
-        expect(pg.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(restore_target - 10 * 60)
-        expect(PostgresResource).to receive(:[]).with(pg.id).and_return(pg)
-        expect(PostgresResource).to receive(:[]).and_call_original.at_least(:once)
+        expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [Backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
           restore_target: restore_target

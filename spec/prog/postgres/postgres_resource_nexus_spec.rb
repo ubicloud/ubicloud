@@ -75,8 +75,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       expect {
         parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
-        parent.timeline.update(earliest_backup_completed_at: Time.now)
-        expect(parent.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(Time.now)
         expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
         described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
@@ -86,8 +84,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       parent.update(target_storage_size_gib: 1024)
-      parent.timeline.update(earliest_backup_completed_at: Time.now - 10 * 60)
-      expect(parent.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(Time.now - 10 * 60)
+      expect(parent.timeline).to receive(:earliest_restore_time).and_return(Time.now - 10 * 60)
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent).at_least(:once)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
 
@@ -105,8 +102,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       restore_target = Time.now
-      parent.timeline.update(earliest_backup_completed_at: restore_target - 10 * 60)
-      expect(parent.timeline).to receive(:refresh_earliest_backup_completion_time).and_return(restore_target - 10 * 60)
+      expect(parent.timeline).to receive(:earliest_restore_time).and_return(restore_target - 10 * 60)
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
 

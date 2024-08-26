@@ -63,21 +63,11 @@ PGHOST=/var/run/postgresql
     backup.key.delete_prefix("basebackups_005/").delete_suffix("_backup_stop_sentinel.json")
   end
 
-  def refresh_earliest_backup_completion_time
-    update(earliest_backup_completed_at: backups.map(&:last_modified).min)
-    earliest_backup_completed_at
-  end
-
-  # The "earliest_backup_completed_at" column is used to cache the value,
-  # eliminating the need to query the blob storage every time. The
-  # "earliest_backup_completed_at" value can be changed when a new backup is
-  # created or an existing backup is deleted. It's nil when the server is
-  # created, so we get it from the blob storage until the first backup
-  # completed. Currently, we lack a backup cleanup feature. Once it is
-  # implemented, we can invoke the "refresh_earliest_backup_completion_time"
-  # method at the appropriate points.
+  # This method is called from serializer and needs to access our blob storage
+  # to calculate the answer, so it is inherently slow. It would be good if we
+  # can cache this somehow.
   def earliest_restore_time
-    if (earliest_backup = earliest_backup_completed_at || refresh_earliest_backup_completion_time)
+    if (earliest_backup = backups.map(&:last_modified).min)
       earliest_backup + 5 * 60
     end
   end
