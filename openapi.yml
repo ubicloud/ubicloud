@@ -3,6 +3,9 @@ info:
   description: API for managing resources on Ubicloud
   title: Clover API
   version: 0.1.0
+  license:
+    name: GNU Affero General Public License v3.0 (AGPL-3.0)
+    url: 'https://www.gnu.org/licenses/agpl-3.0.en.html'
 servers:
   - url: 'https://api.ubicloud.com'
 paths:
@@ -1177,8 +1180,6 @@ components:
       bearerFormat: JWT
       scheme: bearer
       type: http
-security:
-  - BearerAuth: []
 tags:
   - description: Firewall Operations
     name: Firewall
@@ -1194,3 +1195,5 @@ tags:
     name: Project
   - description: Virtual Machine Operations
     name: Virtual Machine
+security:
+  - BearerAuth: []

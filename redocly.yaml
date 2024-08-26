@@ -1,0 +1,5 @@
+extends:
+  - recommended-strict
+rules:
+  operation-4xx-response: off
+  no-ambiguous-paths: off
