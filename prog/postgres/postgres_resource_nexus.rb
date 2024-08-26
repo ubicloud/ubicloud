@@ -36,7 +36,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         end
 
         restore_target = Validation.validate_date(restore_target, "restore_target")
-        parent.timeline.refresh_earliest_backup_completion_time
         unless (earliest_restore_time = parent.timeline.earliest_restore_time) && earliest_restore_time <= restore_target &&
             parent.timeline.latest_restore_time && restore_target <= parent.timeline.latest_restore_time
           fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{parent.timeline.latest_restore_time}"})
