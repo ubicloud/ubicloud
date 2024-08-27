@@ -181,7 +181,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content "Forbidden"
       end
 
-      it "can invite new user to project" do
+      it "can invite existing user to project" do
         visit "#{project.path}/user"
 
         expect(page).to have_content user.email
@@ -195,17 +195,24 @@ RSpec.describe Clover, "project" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
-      it "can invite new existing email to project and nothing happens" do
+      it "can invite non-existent user to project" do
         visit "#{project.path}/user"
-
+        new_email = "new@example.com"
         expect(page).to have_content user.email
 
-        fill_in "Email", with: "new@example.com"
+        fill_in "Email", with: new_email
         click_button "Invite"
 
         expect(page).to have_content user.email
-        expect(page).to have_content "Invitation sent successfully to 'new@example.com'."
+        expect(page).to have_content new_email
+        expect(page).to have_content "Invitation sent successfully to '#{new_email}'."
         expect(Mail::TestMailer.deliveries.length).to eq 1
+        expect(ProjectInvitation.where(email: new_email).count).to eq 1
+
+        fill_in "Email", with: new_email
+        click_button "Invite"
+
+        expect(page).to have_content "'#{new_email}' already invited to join the project."
       end
 
       it "can remove user from project" do
