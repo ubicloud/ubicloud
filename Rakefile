@@ -156,7 +156,7 @@ end
 desc "Validate, lint, format OpenAPI YAML file"
 task :openapifmt do
   sh "npx redocly lint openapi.yml"
-  sh "npx @stoplight/spectral-cli lint openapi.yml"
+  sh "npx @stoplight/spectral-cli --fail-severity=warn lint openapi.yml"
   sh "echo 'sortPathsBy: path' | npx -- openapi-format -o openapi.yml --sortFile /dev/stdin openapi.yml"
 end
 

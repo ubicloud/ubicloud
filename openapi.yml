@@ -3,6 +3,9 @@ info:
   description: API for managing resources on Ubicloud
   title: Clover API
   version: 0.1.0
+  contact:
+    url: 'https://www.ubicloud.com/'
+    email: support@ubicloud.com
   license:
     name: GNU Affero General Public License v3.0 (AGPL-3.0)
     url: 'https://www.gnu.org/licenses/agpl-3.0.en.html'

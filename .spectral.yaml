@@ -1,5 +1,6 @@
 extends: ["spectral:oas"]
 rules:
+  operation-description: off
   responses-default:
     description: "Responses have default value `$ref: '#/components/responses/Error'`"
     given: $.paths[*][*][responses]
