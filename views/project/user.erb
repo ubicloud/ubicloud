@@ -82,6 +82,21 @@
             </td>
           </tr>
         <% end %>
+        <% @invitations.each do |invitation| %>
+          <tr id="invitation-<%= invitation[:email] %>" class="whitespace-nowrap text-sm font-medium">
+            <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row">
+              <%= invitation[:email] %>
+              <span
+                class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
+              >
+                Invitation expires on
+                <%= invitation[:expires_at] %>
+              </span>
+            </td>
+            <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+            </td>
+          </tr>
+        <% end %>
       </tbody>
     </table>
   </div>

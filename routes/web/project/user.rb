@@ -6,6 +6,7 @@ class CloverWeb
 
     r.get true do
       @users = Serializers::Account.serialize(@project.accounts)
+      @invitations = Serializers::ProjectInvitation.serialize(@project.invitations)
 
       view "project/user"
     end
