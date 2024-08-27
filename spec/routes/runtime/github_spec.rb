@@ -83,6 +83,13 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_api_error(400, "The cache size is over the 10GB limit")
       end
 
+      it "fails if the cache entry already exists" do
+        GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100}
+
+        expect(last_response).to have_api_error(409, "A cache entry for dev scope already exists with k1 key and v1 version.")
+      end
+
       it "Rollbacks inconsistent cache entry if a failure occurs in the middle" do
         expect(blob_storage_client).to receive(:create_multipart_upload).and_raise(CloverError.new(500, "UnexceptedError", "Sorry, we couldn’t process your request because of an unexpected error."))
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 75 * 1024 * 1024}

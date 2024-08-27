@@ -78,6 +78,10 @@ class CloverRuntime
           fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
         end
 
+        if repository.cache_entries_dataset[key: key, version: version, scope: scope]
+          fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
+        end
+
         if size > GithubRepository::CACHE_SIZE_LIMIT
           fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
         end
