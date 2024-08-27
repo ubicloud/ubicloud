@@ -156,7 +156,12 @@ class CloverWeb < Roda
       Validation.validate_account_name(account[:name])
     end
     after_create_account do
-      Account[account_id].create_project_with_default_policy("Default")
+      account = Account[account_id]
+      account.create_project_with_default_policy("Default")
+      ProjectInvitation.where(email: account.email).each do |inv|
+        account.associate_with_project(inv.project)
+        inv.destroy
+      end
     end
 
     reset_password_view { view "auth/reset_password", "Request Password" }

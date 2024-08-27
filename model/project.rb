@@ -19,6 +19,7 @@ class Project < Sequel::Model
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: ProjectQuota, key: :project_id
+  one_to_many :invitations, class: ProjectInvitation, key: :project_id
 
   dataset_module Authorization::Dataset
   dataset_module Pagination
