@@ -23,6 +23,8 @@ Strand.dataset.insert_conflict.insert(id: "c3b200ed-ce22-c33a-0326-06d735551d9f"
 # We always insert this strand using the same UBID ("stcheckzvsagezalertszzzzza")
 Strand.dataset.insert_conflict.insert(id: "645cc9ff-7954-1f3a-fa82-ec6b3ffffff5", prog: "CheckUsageAlerts", label: "wait")
 
+# We always insert this strand using the same UBID ("stexp1repr0ject1nv1tat10na")
+Strand.dataset.insert_conflict.insert(id: "776c1c3a-d804-9f3a-6683-5d874ad04155", prog: "ExpireProjectInvitations", label: "wait")
 clover_freeze
 
 loop do
