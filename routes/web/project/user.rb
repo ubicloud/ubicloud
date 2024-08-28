@@ -36,6 +36,16 @@ class CloverWeb
       r.redirect "#{@project.path}/user"
     end
 
+    r.on "invitation" do
+      r.is String do |email|
+        r.delete true do
+          @project.invitations_dataset.where(email: email).destroy
+          flash["notice"] = "Invitation for '#{email}' is removed successfully."
+          r.halt
+        end
+      end
+    end
+
     r.is String do |user_ubid|
       user = Account.from_ubid(user_ubid)
 

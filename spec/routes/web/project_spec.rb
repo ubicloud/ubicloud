@@ -235,6 +235,22 @@ RSpec.describe Clover, "project" do
         expect(page).to have_no_content user2.email
       end
 
+      it "can remove invited user from project" do
+        invited_email = "invited@example.com"
+        project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+
+        visit "#{project.path}/user"
+        expect(page).to have_content invited_email
+
+        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript enginer.
+        btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        visit "#{project.path}/user"
+        expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
       it "raises bad request when it's the last user" do
         user
         visit "#{project.path}/user"
