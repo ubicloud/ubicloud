@@ -31,7 +31,7 @@ RSpec.describe InvoiceGenerator do
 
     br = BillingRate.from_resource_properties("VmCores", vm.family, vm.location)
     duration_mins = [672 * 60, (duration / 60).ceil].min
-    cost = vm.cores * duration_mins * br["unit_price"]
+    cost = (vm.cores * duration_mins * br["unit_price"]).round(3)
     expect(invoices.first.content).to eq({
       "project_id" => project.id,
       "project_name" => project.name,
@@ -175,9 +175,9 @@ RSpec.describe InvoiceGenerator do
     p1.update(discount: 10)
     cost_after, discount_after = described_class.new(begin_time, end_time).run.first.content.values_at("cost", "discount")
 
-    expect(cost_after).to eq(cost_before * 0.9)
+    expect(cost_after).to eq((cost_before * 0.9).round(3))
     expect(discount_before).to eq(0)
-    expect(discount_after).to eq(cost_before * 0.1)
+    expect(discount_after).to eq((cost_before * 0.1).round(3))
   end
 
   it "handles credits" do
@@ -187,7 +187,7 @@ RSpec.describe InvoiceGenerator do
     p1.update(credit: 10)
     cost_after, credit_after = described_class.new(begin_time, end_time, save_result: true).run.first.content.values_at("cost", "credit")
 
-    expect(cost_after).to eq(cost_before - 10)
+    expect(cost_after).to eq((cost_before - 10).round(3))
     expect(credit_before).to eq(0)
     expect(credit_after).to eq(10)
     expect(p1.reload.credit).to eq(0)
@@ -200,8 +200,8 @@ RSpec.describe InvoiceGenerator do
     p1.update(credit: 10, discount: 10)
     after = described_class.new(begin_time, end_time, save_result: true).run.first.content
 
-    expect(after["cost"]).to eq(before["cost"] * 0.9 - 10)
-    expect(after["discount"]).to eq(before["cost"] * 0.1)
+    expect(after["cost"]).to eq((before["cost"] * 0.9 - 10).round(3))
+    expect(after["discount"]).to eq((before["cost"] * 0.1).round(3))
     expect(after["credit"]).to eq(10)
     expect(p1.reload.credit).to eq(0)
   end
@@ -227,8 +227,8 @@ RSpec.describe InvoiceGenerator do
     after = described_class.new(begin_time, end_time, save_result: true).run.first.content
 
     expect(before["cost"]).to eq(before["subtotal"] - 1)
-    expect(after["cost"]).to eq(before["subtotal"] * 0.9 - 11)
-    expect(after["discount"]).to eq(before["subtotal"] * 0.1)
+    expect(after["cost"]).to eq((before["subtotal"] * 0.9 - 11).round(3))
+    expect(after["discount"]).to eq((before["subtotal"] * 0.1).round(3))
     expect(after["credit"]).to eq(11)
     expect(p1.reload.credit).to eq(0)
   end

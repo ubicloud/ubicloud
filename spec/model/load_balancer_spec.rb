@@ -31,7 +31,6 @@ RSpec.describe LoadBalancer do
 
   describe "add_vm" do
     it "increments update_load_balancer and rewrite_dns_records" do
-      expect(lb).to receive(:incr_update_load_balancer)
       expect(lb).to receive(:incr_rewrite_dns_records)
       lb.add_vm(vm1)
       expect(lb.load_balancers_vms.count).to eq(1)
@@ -62,6 +61,62 @@ RSpec.describe LoadBalancer do
     it "deletes the vm" do
       lb.remove_vm(vm1)
       expect(lb.load_balancers_vms.count).to eq(0)
+    end
+  end
+
+  describe "need_certificates?" do
+    let(:dns_zone) {
+      DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.projects.first.id)
+    }
+
+    before do
+      allow(Prog::Vnet::LoadBalancerNexus).to receive(:dns_zone).and_return(dns_zone)
+    end
+
+    it "returns true if there are no certs" do
+      expect(lb.need_certificates?).to be(true)
+    end
+
+    it "returns false if there are certs but either expired or close to expiry" do
+      cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
+      lb.add_cert(cert)
+
+      cert.update(created_at: Time.now - 1 * 365 * 24 * 60 * 60)
+      expect(lb.need_certificates?).to be(true)
+    end
+
+    it "returns false if there are certs and they are not expired" do
+      cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
+      lb.add_cert(cert)
+      expect(lb.need_certificates?).to be(false)
+    end
+  end
+
+  describe "active_cert" do
+    let(:dns_zone) {
+      DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.projects.first.id)
+    }
+
+    before do
+      allow(Prog::Vnet::LoadBalancerNexus).to receive(:dns_zone).and_return(dns_zone)
+    end
+
+    it "returns the cert that is not expired" do
+      cert1 = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
+      cert2 = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
+      lb.add_cert(cert1)
+      lb.add_cert(cert2)
+
+      cert1.update(created_at: Time.now - 1 * 365 * 24 * 60 * 60)
+      expect(lb.active_cert.id).to eq(cert2.id)
+    end
+
+    it "returns nil if all certs are expired" do
+      cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
+      lb.add_cert(cert)
+
+      cert.update(created_at: Time.now - 1 * 365 * 24 * 60 * 60)
+      expect(lb.active_cert).to be_nil
     end
   end
 end

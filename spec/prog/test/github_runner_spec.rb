@@ -7,6 +7,7 @@ RSpec.describe Prog::Test::GithubRunner do
 
   before do
     expect(Config).to receive(:github_runner_service_project_id).and_return("fabd95f8-d002-8ed2-9f4c-00625eb7f574")
+    expect(Config).to receive(:vm_pool_project_id).and_return("c3fd495f-9888-82d2-8100-7fae94e87e27")
     expect(Config).to receive(:e2e_github_installation_id).and_return(123456).at_least(:once)
   end
 
@@ -27,7 +28,7 @@ RSpec.describe Prog::Test::GithubRunner do
     it "hops to hop_wait_download_boot_images" do
       expect(gr_test).to receive(:reap)
       expect(gr_test).to receive(:leaf?).and_return(true)
-      expect { gr_test.wait_download_boot_images }.to hop("trigger_test_runs")
+      expect { gr_test.wait_download_boot_images }.to hop("create_vm_pool")
     end
 
     it "stays in wait_download_boot_images" do
@@ -35,6 +36,33 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(gr_test).to receive(:leaf?).and_return(false)
       expect(gr_test).to receive(:donate).and_call_original
       expect { gr_test.wait_download_boot_images }.to nap(1)
+    end
+  end
+
+  describe "#create_vm_pool" do
+    it "creates pool and hops to wait_vm_pool_to_be_ready" do
+      label_data = Github.runner_labels["ubicloud"]
+      expect(Prog::Vm::VmPool).to receive(:assemble)
+        .with(hash_including(size: 1, vm_size: label_data["vm_size"]))
+        .and_return(instance_double(Strand, subject: instance_double(VmPool, id: 12345)))
+      expect { gr_test.create_vm_pool }.to hop("wait_vm_pool_to_be_ready")
+    end
+  end
+
+  describe "#wait_vm_pool_to_be_ready" do
+    it "hops to trigger_test_runs when the pool is ready" do
+      pool = instance_double(VmPool, size: 1)
+      expect(VmPool).to receive(:[]).and_return(pool)
+      expect(pool).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, exclude: [instance_double(Vm)]))
+      expect(pool).to receive(:update).with(size: 0)
+      expect { gr_test.wait_vm_pool_to_be_ready }.to hop("trigger_test_runs")
+    end
+
+    it "naps if the vm in the pool not provisioned yet" do
+      pool = instance_double(VmPool, size: 1)
+      expect(VmPool).to receive(:[]).and_return(pool)
+      expect(pool).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, exclude: []))
+      expect { gr_test.wait_vm_pool_to_be_ready }.to nap(10)
     end
   end
 
@@ -113,7 +141,8 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
       expect(client).to receive(:cancel_workflow_run).with("ubicloud/github-e2e-test-workflows", 10)
       expect(GithubRunner).to receive(:any?).and_return(false)
-      expect(Project).to receive(:[]).with(anything).and_return(instance_double(Project, destroy: nil)).twice
+      expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [], incr_destroy: nil))
+      expect(Project).to receive(:[]).with(anything).and_return(instance_double(Project, destroy: nil)).at_least(:once)
       expect { gr_test.clean_resources }.to hop("finish")
     end
 
@@ -123,7 +152,8 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
       expect(client).to receive(:cancel_workflow_run).with("ubicloud/github-e2e-test-workflows", 10)
       expect(GithubRunner).to receive(:any?).and_return(false)
-      expect(Project).to receive(:[]).with(anything).and_return(nil).twice
+      expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [instance_double(Vm)], incr_destroy: nil))
+      expect(Project).to receive(:[]).with(anything).and_return(nil).at_least(:once)
       expect(gr_test).to receive(:frame).and_return({"fail_message" => "Failed test", "test_cases" => ["github_runner_ubuntu_2204"]}).at_least(:once)
       expect { gr_test.clean_resources }.to hop("failed")
     end

@@ -1,6 +1,6 @@
 # Active billing rates
-- { id: 8a890156-96cb-4087-878c-51dc4ed2ad8a, resource_type: VmCores,                 resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0005525180, active_from: 2024-05-27T00:00:00Z }
-- { id: 0a2eb7b7-dfc7-4232-9b75-7e162020dc4c, resource_type: VmCores,                 resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0005257320, active_from: 2024-05-27T00:00:00Z }
+- { id: ebf592fd-8586-4457-8c86-aa1ed774b90d, resource_type: VmCores,                 resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0006040000, active_from: 2024-08-22T00:00:00Z }
+- { id: d31188b8-ced8-4bab-bb73-ee6b0c6a4806, resource_type: VmCores,                 resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0005740000, active_from: 2024-08-22T00:00:00Z }
 - { id: a63fc107-176f-41e6-baf6-a1399446f616, resource_type: VmCores,                 resource_family: standard,        location: github-runners, unit_price: 0.0005257320, active_from: 2024-05-27T00:00:00Z }
 - { id: 724069e2-fa28-46d9-918c-666d1fbe80ba, resource_type: VmCores,                 resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.0007725000, active_from: 2024-05-27T00:00:00Z }
 - { id: 534e85b6-2ba2-44c7-b799-8a1b99f8cd50, resource_type: VmCores,                 resource_family: standard,        location: leaseweb-dal13, unit_price: 0.0007725000, active_from: 2024-05-27T00:00:00Z }
@@ -9,8 +9,8 @@
 - { id: 9c7ae621-9175-4187-a635-62948cfacb1d, resource_type: VmCores,                 resource_family: standard-gpu,    location: github-runners, unit_price: 0.0005257320, active_from: 2024-05-27T00:00:00Z }
 - { id: 8bff7562-7f1b-4c68-9e3a-682385fa2d7a, resource_type: VmCores,                 resource_family: standard-gpu,    location: leaseweb-wdc02, unit_price: 0.0007725000, active_from: 2024-05-27T00:00:00Z }
 - { id: 4ddb3928-5efa-44b4-b380-39bf64c4a7f1, resource_type: VmCores,                 resource_family: standard-gpu,    location: leaseweb-dal13, unit_price: 0.0007725000, active_from: 2024-05-27T00:00:00Z }
-- { id: 717caef1-e7b1-43fd-8526-fa02d5caa87c, resource_type: VmStorage,               resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0000028100, active_from: 2024-05-27T00:00:00Z }
-- { id: 39796c71-9d4d-4d6d-ab2a-17c225d59c8f, resource_type: VmStorage,               resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0000028100, active_from: 2024-05-27T00:00:00Z }
+- { id: 7cc6f715-cf25-47fd-acf9-a530203865a9, resource_type: VmStorage,               resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0000014000, active_from: 2024-08-22T00:00:00Z }
+- { id: 1a3974fb-dbcc-47cc-b33e-2410b2782702, resource_type: VmStorage,               resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0000014000, active_from: 2024-08-22T00:00:00Z }
 - { id: af340cfe-70ea-4122-b23e-66e9de8502e3, resource_type: VmStorage,               resource_family: standard,        location: github-runners, unit_price: 0.0000028100, active_from: 2024-05-27T00:00:00Z }
 - { id: ed244151-1199-4734-9b6d-4ec7d3da7227, resource_type: VmStorage,               resource_family: standard,        location: leaseweb-wdc02, unit_price: 0.0000031000, active_from: 2024-05-27T00:00:00Z }
 - { id: ea875583-660e-4a27-b95c-ccf6d321230c, resource_type: VmStorage,               resource_family: standard,        location: leaseweb-dal13, unit_price: 0.0000031000, active_from: 2024-05-27T00:00:00Z }
@@ -65,3 +65,7 @@
 - { id: c1eb36d9-6b46-8578-869a-92e64646b547, resource_type: VmCores,                 resource_family: standard-gpu,    location: github-runners, unit_price: 0.0005959820, active_from: 2023-01-01T00:00:00Z }
 - { id: b44a8854-f7fb-8578-b1b8-f38b218b52e3, resource_type: VmCores,                 resource_family: standard-gpu,    location: leaseweb-wdc02, unit_price: 0.0006227680, active_from: 2023-01-01T00:00:00Z }
 - { id: 88dcb876-0a21-8978-bc58-558b1755ad29, resource_type: VmCores,                 resource_family: standard-gpu,    location: leaseweb-dal13, unit_price: 0.0006227680, active_from: 2023-01-01T00:00:00Z }
+- { id: 8a890156-96cb-4087-878c-51dc4ed2ad8a, resource_type: VmCores,                 resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0005525180, active_from: 2024-05-27T00:00:00Z }
+- { id: 0a2eb7b7-dfc7-4232-9b75-7e162020dc4c, resource_type: VmCores,                 resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0005257320, active_from: 2024-05-27T00:00:00Z }
+- { id: 717caef1-e7b1-43fd-8526-fa02d5caa87c, resource_type: VmStorage,               resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0000028100, active_from: 2024-05-27T00:00:00Z }
+- { id: 39796c71-9d4d-4d6d-ab2a-17c225d59c8f, resource_type: VmStorage,               resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0000028100, active_from: 2024-05-27T00:00:00Z }

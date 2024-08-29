@@ -45,7 +45,7 @@
               <div class="col-span-full">
                 <% locations = Option
                     .locations
-                    .map { |l| [l.display_name, l.display_name, @prices[l.name].to_json] }
+                    .map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] }
 
                    default_location = Option.locations.detect { |l| l.name == @default_location }&.display_name
                 %>
@@ -66,7 +66,7 @@
                 <%== render(
                   "components/form/select",
                   locals: {
-                    name: "private-subnet-id",
+                    name: "private_subnet_id",
                     label: "Private Subnet",
                     placeholder: "Create new subnet",
                     options: @subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] }
@@ -77,8 +77,8 @@
                 <%== render(
                   "components/form/checkbox",
                   locals: {
-                    name: "enable-ip4",
-                    label: "Public IPv4 Support (+<span class='enable-ip4-1-monthly-price'>-</span><span class='text-xs text-gray-500'>/mo</span>)",
+                    name: "enable_ip4",
+                    label: "Public IPv4 Support (+<span class='enable_ip4-1-monthly-price'>-</span><span class='text-xs text-gray-500'>/mo</span>)",
                     options: [
                      ["1", "Enable Public IPv4", "location-based-price", {"data-amount" => "1", "data-resource-type" => "IPAddress", "data-resource-family" => "IPv4", "data-default" => "true"}]
                     ],
@@ -129,8 +129,8 @@
                               </span>
                             </span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium size-<%= size.name %>-monthly-price">-</span>
-                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                              <span class="font-medium"><span class="size-<%= size.name %>-monthly-price">-</span>/mo</span>
+                              <span class="ml-1 opacity-50 sm:ml-0"><span class="size-<%= size.name %>-hourly-price">-</span>/hour</span>
                             </span>
                           </span>
                         </label>
@@ -164,8 +164,8 @@
                           >
                             <span class="text-md font-semibold storage-size-label"><%= storage_size %>GB</span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium storage-size-price">-</span>
-                              <span class="ml-1 opacity-50 sm:ml-0">/mo</span>
+                              <span class="font-medium"><span class="storage-size-monthly-price">-</span>/mo</span>
+                              <span class="ml-1 opacity-50 sm:ml-0"><span class="storage-size-hourly-price">-</span>/hour</span>
                             </span>
                           </span>
                         </label>
@@ -179,7 +179,7 @@
                 <%== render(
                   "components/form/radio_small_cards",
                   locals: {
-                    name: "boot-image",
+                    name: "boot_image",
                     label: "Boot Image",
                     options: Option::BootImages.to_h { |bi| [bi.name, bi.display_name] },
                     attributes: {
@@ -199,7 +199,7 @@
                 <%== render(
                   "components/form/text",
                   locals: {
-                    name: "user",
+                    name: "unix_user",
                     label: "User",
                     value: "ubi",
                     attributes: {
@@ -214,7 +214,7 @@
                 <%== render(
                   "components/form/textarea",
                   locals: {
-                    name: "public-key",
+                    name: "public_key",
                     label: "SSH Public Key",
                     description: "SSH keys are a more secure method of logging into a server.",
                     attributes: {

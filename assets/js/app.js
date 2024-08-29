@@ -197,8 +197,6 @@ $("input[name=size]").on("change", function (event) {
 });
 
 $("input[name=storage_size]").on("change", function (event) {
-  storage_size_options = $("input[name=size]:checked").data("storage-size-options");
-  storage_size_index = parseInt($(".storage-slider").val());
   setupLocationBasedPostgresHaPrices();
 });
 
@@ -231,6 +229,7 @@ function setupLocationBasedPrices() {
     $(this).data("monthly-price", monthly.toFixed(2));
     $(`.${name}-${value}`).show();
     $(`.${name}-${value}-monthly-price`).text(`$${monthly.toFixed(2)}`);
+    $(`.${name}-${value}-hourly-price`).text(`$${(monthly / 672).toFixed(3)}`);
     count[name] = (count[name] || 0) + 1;
   });
 }
@@ -244,6 +243,7 @@ function setupLocationBasedPostgresHaPrices() {
     let standbyCount = $(this).data("standby-count");
     $(`.ha-status-${value}`).show();
     $(`.ha-status-${value}-monthly-price`).text(`+$${(standbyCount * monthlyPrice).toFixed(2)}`);
+    $(`.ha-status-${value}-hourly-price`).text(`+$${(standbyCount * monthlyPrice / 672).toFixed(3)}`);
   });
 }
 
@@ -268,7 +268,8 @@ function setupInstanceSizeBasedOptions() {
       $(this).find("input[type=radio]").val(storage_amount);
       $(this).find("input[type=radio]").data("monthly-price", monthlyPrice);
       $(this).find(".storage-size-label").text(storage_amount + "GB (" + (storage_amount / storage_size_options[0]) + "x)");
-      $(this).find(".storage-size-price").text("+$" + (monthlyPrice).toFixed(2));
+      $(this).find(".storage-size-monthly-price").text("+$" + (monthlyPrice).toFixed(2));
+      $(this).find(".storage-size-hourly-price").text("+$" + (monthlyPrice / 672).toFixed(3));
       storage_size_index++;
     });
   });

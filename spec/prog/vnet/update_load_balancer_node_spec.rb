@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-RSpec.describe Prog::Vnet::UpdateLoadBalancer do
+RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
   subject(:nx) {
     described_class.new(st)
   }
 
   let(:st) {
-    Strand.create_with_id(prog: "Vnet::UpdateLoadBalancer", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
+    Strand.create_with_id(prog: "Vnet::UpdateLoadBalancerNode", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
   }
   let(:lb) {
     prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
@@ -26,10 +26,30 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancer do
     allow(vm).to receive_messages(ephemeral_net4: NetAddr::IPv4Net.parse("100.100.100.100/32"), ephemeral_net6: NetAddr::IPv6Net.parse("2a02:a464:deb2:a000::/64"))
   end
 
+  describe ".before_run" do
+    it "simply pops if VM is destroyed" do
+      expect(nx).to receive(:vm).and_return(nil)
+
+      expect { nx.before_run }.to exit({"msg" => "VM is destroyed"})
+    end
+
+    it "doesn't do anything if the VM is not destroyed" do
+      expect(nx).to receive(:vm).and_return(vm)
+
+      expect { nx.before_run }.not_to exit
+    end
+  end
+
   describe "#update_load_balancer" do
     context "when no healthy vm exists" do
       it "hops to remove load balancer" do
         expect(lb).to receive(:active_vms).and_return([])
+        expect { nx.update_load_balancer }.to hop("remove_load_balancer")
+      end
+
+      it "removes the VM from load balancer and hops to remove_load_balancer if the VM is detaching" do
+        lb.load_balancers_vms_dataset.update(state: "detaching")
+        expect(lb).to receive(:remove_vm).with(vm)
         expect { nx.update_load_balancer }.to hop("remove_load_balancer")
       end
     end
@@ -67,7 +87,7 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
     ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::/64 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -107,7 +127,7 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
     ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to jhash ip saddr . tcp sport . ip daddr . tcp dport mod 1 map { 0 : 192.168.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::/64 tcp dport 80 ct state established,related,new counter dnat to jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -156,7 +176,7 @@ elements = {fd10:9b0b:6b4b:aaa::2}
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
     ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 172.10.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::/64 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 8080 }
+    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 8080 }
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -194,7 +214,7 @@ elements = {fd10:9b0b:6b4b:aaa::2}
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
     ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 172.10.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::/64 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:aaa::2 . 8080 }
+    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:aaa::2 . 8080 }
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -232,7 +252,7 @@ table inet nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
     ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::/64 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 

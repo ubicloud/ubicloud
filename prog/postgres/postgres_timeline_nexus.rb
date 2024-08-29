@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   semaphore :destroy
 
-  def self.assemble(parent_id: nil)
+  def self.assemble(parent_id: nil, location: nil)
     if parent_id && (PostgresTimeline[parent_id]).nil?
       fail "No existing parent"
     end
@@ -20,7 +20,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         parent_id: parent_id,
         access_key: SecureRandom.hex(16),
         secret_key: SecureRandom.hex(32),
-        blob_storage_id: Config.postgres_service_blob_storage_id
+        blob_storage_id: MinioCluster.where(location: location).all.find { _1.projects.map(&:id).include?(Config.postgres_service_project_id) }&.id
       )
       Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { _1.id = postgres_timeline.id }
     end
@@ -89,8 +89,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   def destroy_blob_storage
     admin_client = Minio::Client.new(
       endpoint: postgres_timeline.blob_storage_endpoint,
-      access_key: Config.postgres_service_blob_storage_access_key,
-      secret_key: Config.postgres_service_blob_storage_secret_key,
+      access_key: postgres_timeline.blob_storage.admin_user,
+      secret_key: postgres_timeline.blob_storage.admin_password,
       ssl_ca_file_data: postgres_timeline.blob_storage.root_certs
     )
 
@@ -102,8 +102,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     DB.transaction do
       admin_client = Minio::Client.new(
         endpoint: postgres_timeline.blob_storage_endpoint,
-        access_key: Config.postgres_service_blob_storage_access_key,
-        secret_key: Config.postgres_service_blob_storage_secret_key,
+        access_key: postgres_timeline.blob_storage.admin_user,
+        secret_key: postgres_timeline.blob_storage.admin_password,
         ssl_ca_file_data: postgres_timeline.blob_storage.root_certs
       )
 

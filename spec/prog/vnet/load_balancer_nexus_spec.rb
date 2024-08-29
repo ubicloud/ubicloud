@@ -57,13 +57,8 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#wait" do
     it "naps for 5 seconds if nothing to do" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait }.to nap(5)
-    end
-
-    it "creates new health probe if needed" do
-      vm = Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm1", private_subnet_id: ps.id).subject
-      st.subject.add_vm(vm)
-      expect { nx.wait }.to hop("create_new_health_probe")
     end
 
     it "hops to update vm load balancers" do
@@ -75,17 +70,34 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx).to receive(:when_rewrite_dns_records_set?).and_yield
       expect(nx).to receive(:rewrite_dns_records)
       expect(nx).to receive(:decr_rewrite_dns_records)
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait }.to nap(5)
+    end
+
+    it "creates new cert if needed" do
+      expect { nx.wait }.to hop("create_new_cert")
     end
   end
 
-  describe "#create_new_health_probe" do
-    it "creates health probes for all vms" do
-      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
-      vms.each { st.subject.add_vm(_1) }
-      expect { nx.create_new_health_probe }.to hop("wait")
-      expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").count).to eq 3
-      expect(st.children_dataset.count).to eq 3
+  describe "#create_new_cert" do
+    it "creates a new cert" do
+      dns_zone = DnsZone.create_with_id(name: "test-dns-zone", project_id: nx.load_balancer.private_subnet.projects.first.id)
+      allow(described_class).to receive(:dns_zone).and_return(dns_zone)
+      expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
+      expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 1
+      expect(nx.load_balancer.certs.count).to eq 1
+    end
+  end
+
+  describe "#wait_cert_provisioning" do
+    it "naps for 60 seconds if need_certificates? is true" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(true)
+      expect { nx.wait_cert_provisioning }.to nap(60)
+    end
+
+    it "hops to wait if need_certificates? is false" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
+      expect { nx.wait_cert_provisioning }.to hop("wait")
     end
   end
 
@@ -94,7 +106,8 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "test-vm#{_1}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(_1) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
-      expect(st.children_dataset.count).to eq 3
+      # Update progs are budded in update_vm_load_balancers
+      expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
     end
   end
 
@@ -130,7 +143,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(st.children).to all(receive(:destroy))
       expect { nx.destroy }.to hop("wait_destroy")
 
-      expect(Strand.where(prog: "Vnet::UpdateLoadBalancer").count).to eq 3
+      expect(Strand.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
     end
 
     it "deletes the dns record" do
@@ -193,6 +206,18 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx.load_balancer).to receive(:destroy)
       expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
       expect(LoadBalancersVms.count).to eq 0
+    end
+
+    it "destroys the certificate if it exists" do
+      cert = Prog::Vnet::CertNexus.assemble(st.subject.hostname, dns_zone.id).subject
+      lb = st.subject
+      lb.add_cert(cert)
+      expect(lb.certs.count).to eq 1
+      expect(nx).to receive(:reap)
+      expect(nx).to receive(:leaf?).and_return(true)
+      expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
+      expect(CertsLoadBalancers.count).to eq 0
+      expect(cert.destroy_set?).to be true
     end
   end
 end

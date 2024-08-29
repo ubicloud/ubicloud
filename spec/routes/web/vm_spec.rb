@@ -243,7 +243,6 @@ RSpec.describe Clover, "vm" do
         btn = find "#vm-delete-#{vm.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Deleting #{vm.name}"}.to_json)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end
 

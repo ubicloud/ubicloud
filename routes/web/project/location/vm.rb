@@ -10,20 +10,14 @@ class CloverWeb
         r.halt
       end
 
+      vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: @current_user, location: @location, resource: vm)
+
       r.get true do
-        Authorization.authorize(@current_user.id, "Vm:view", vm.id)
-
-        @vm = Serializers::Vm.serialize(vm, {detailed: true})
-
-        view "vm/show"
+        vm_endpoint_helper.get
       end
 
       r.delete true do
-        Authorization.authorize(@current_user.id, "Vm:delete", vm.id)
-
-        vm.incr_destroy
-
-        return {message: "Deleting #{vm.name}"}.to_json
+        vm_endpoint_helper.delete
       end
     end
   end

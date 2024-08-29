@@ -128,8 +128,6 @@ module Config
   # Postgres
   optional :postgres_service_project_id, string
   override :postgres_service_hostname, "postgres.ubicloud.com", string
-  optional :postgres_service_blob_storage_access_key, string
-  optional :postgres_service_blob_storage_secret_key, string, clear: true
   optional :postgres_service_blob_storage_id, string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
@@ -146,10 +144,10 @@ module Config
 
   override :ubuntu_noble_version, "20240702", string
   override :ubuntu_jammy_version, "20240701", string
-  override :almalinux_9_version, "9.4-20240507", string
+  override :almalinux_9_version, "9.4-20240805", string
   override :almalinux_8_version, "8.10-20240530", string
   override :github_ubuntu_2404_version, "20240721.1.0", string
-  override :github_ubuntu_2204_version, "20240721.1.0", string
+  override :github_ubuntu_2204_version, "20240721.1.1", string
   override :github_ubuntu_2004_version, "20240721.1.0", string
   override :postgres_ubuntu_2204_version, "20240702.3.0", string
   override :github_gpu_ubuntu_2204_version, "20240721.1.0", string
@@ -164,4 +162,12 @@ module Config
   # Load Balancer
   optional :load_balancer_service_project_id, string
   optional :load_balancer_service_hostname, string
+
+  # ACME
+  # The following are optional because they are only needed in production.
+  # They are not needed in development or test.
+  optional :acme_email, string
+  override :acme_directory, "https://acme.zerossl.com/v2/DV90", string
+  optional :acme_eab_kid, string, clear: true
+  optional :acme_eab_hmac_key, string, clear: true
 end

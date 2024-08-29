@@ -57,7 +57,7 @@ class GithubRunner < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      available_memory = session[:ssh_session].exec!("free | awk 'NR==2 {print $4}'").chomp
+      available_memory = session[:ssh_session].exec!("awk '/MemAvailable/ {print $2}' /proc/meminfo").chomp
       "up"
     rescue
       "down"
