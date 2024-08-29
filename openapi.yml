@@ -1,0 +1,1202 @@
+openapi: 3.0.3
+info:
+  description: API for managing resources on Ubicloud
+  title: Clover API
+  version: 0.1.0
+  contact:
+    url: 'https://www.ubicloud.com/'
+    email: support@ubicloud.com
+  license:
+    name: GNU Affero General Public License v3.0 (AGPL-3.0)
+    url: 'https://www.gnu.org/licenses/agpl-3.0.en.html'
+servers:
+  - url: 'https://api.ubicloud.com'
+paths:
+  /login:
+    post:
+      operationId: login
+      summary: Login with user information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                  example: user@mail.com
+                password:
+                  type: string
+                  example: password
+              required:
+                - login
+                - password
+      responses:
+        '200':
+          description: Logged in successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: string
+                    example: You have been logged in
+        default:
+          $ref: '#/components/responses/Error'
+      security: []
+      tags:
+        - Login
+  /project:
+    get:
+      operationId: listProjects
+      summary: List all projects visible to the logged in user.
+      parameters:
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: Return the list of all projects visible to the logged in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+      security:
+        - BearerAuth: []
+      tags:
+        - Project
+    post:
+      operationId: createProject
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: my-project-name
+              required:
+                - name
+      responses:
+        '200':
+          description: Project is created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+      security:
+        - BearerAuth: []
+      tags:
+        - Project
+  '/project/{project_id}':
+    delete:
+      operationId: deleteProject
+      summary: Delete a project
+      responses:
+        '204':
+          description: Project deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Project
+    get:
+      operationId: getProject
+      summary: Retrieve a project
+      responses:
+        '200':
+          description: Retrieved project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Project
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+  '/project/{project_id}/firewall':
+    get:
+      operationId: getFirewall
+      summary: Return the list of firewalls in the project
+      responses:
+        '200':
+          description: Firewall list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createFirewall
+      summary: Create a new firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  description: Description of the firewall
+                  type: string
+                name:
+                  description: Name of the firewall
+                  type: string
+              required:
+                - name
+      responses:
+        '200':
+          description: Firewall created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/firewall/{firewall_id}':
+    delete:
+      operationId: deleteFirewall
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          description: Firewall deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getFirewallDetails
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          description: Details of the firewall
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+  '/project/{project_id}/firewall/{firewall_id}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    post:
+      operationId: createFirewallRule
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/firewall/{firewall_id}/firewall-rule/{firewall_rule_id}':
+    delete:
+      operationId: deleteFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getFirewallRuleDetails
+      summary: Get details of a firewall rule
+      responses:
+        '200':
+          description: Details of the firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+      - $ref: '#/components/parameters/firewall_rule_id'
+  '/project/{project_id}/location/{location}/postgres':
+    get:
+      operationId: listLocationPostgresDatabases
+      summary: List Postgres databases in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Postgres databases in a specific location of a project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Postgres'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}':
+    delete:
+      operationId: deletePostgresDatabaseWithID
+      summary: Delete a specific Postgres database with ID
+      responses:
+        '204':
+          description: Postgres database is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    get:
+      operationId: getPostgresDetailsWithId
+      summary: Get details of a specific Postgres database in a location with ID
+      responses:
+        '200':
+          description: Details of the Postgres databases in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password':
+    post:
+      operationId: resetSuperuserPasswordWithID
+      summary: Reset super-user password of the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+      responses:
+        '200':
+          description: Superuser password is updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/restore':
+    post:
+      operationId: restorePostgresDatabaseWithID
+      summary: Restore a new Postgres database in a specific location of a project with ID
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              required:
+                - 'name, restore_target'
+      responses:
+        '200':
+          description: Postgres database is restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Postgres'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
+    delete:
+      operationId: deletePostgresDatabase
+      summary: Delete a specific Postgres database
+      responses:
+        '204':
+          description: Postgres database is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    get:
+      operationId: getPostgresDatabaseDetails
+      summary: Get details of a specific Postgres database in a location
+      responses:
+        '200':
+          description: Details of the Postgres database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+    post:
+      operationId: createPostgresDatabase
+      summary: Create a new Postgres database in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ha_type:
+                  description: High availability type
+                  type: string
+                size:
+                  description: Requested size for the underlying VM
+                  type: string
+                storage_size:
+                  description: Requested storage size in GiB
+                  type: integer
+              required:
+                - size
+      responses:
+        '200':
+          description: Postgres database is created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password':
+    post:
+      operationId: resetSuperuserPassword
+      summary: Reset superuser password of the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              required:
+                - password
+      responses:
+        '200':
+          description: Superuser password is updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore':
+    post:
+      operationId: restorePostgresDatabase
+      summary: Restore a new Postgres database in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              required:
+                - 'name, restore_target'
+      responses:
+        '200':
+          description: Postgres database is restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/private-subnet':
+    get:
+      operationId: listLocationPrivateSubnets
+      summary: List Private Subnets in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Private Subnets in a location
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}':
+    delete:
+      operationId: deletePSWithId
+      summary: Delete a specific Private Subnet with ID
+      responses:
+        '204':
+          description: Private Subnet is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    get:
+      operationId: getPSDetailsWithId
+      summary: Get details of a specific Private Subnet in a location with ID
+      responses:
+        '200':
+          description: Details of the private subnet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_id'
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}':
+    delete:
+      operationId: deletePrivateSubnet
+      summary: Delete a specific Private Subnet
+      responses:
+        '204':
+          description: Private Subnet is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    get:
+      operationId: getPrivateSubnetDetails
+      summary: Get details of a specific Private Subnet in a location
+      responses:
+        '200':
+          description: Details of the private subnet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_name'
+    post:
+      operationId: createPrivateSubnet
+      summary: Create a new Private Subnet in a specific location of a project
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firewall_id:
+                  type: string
+      responses:
+        '200':
+          description: Private subnet is created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/location/{location}/vm':
+    get:
+      operationId: listLocationVMs
+      summary: List VMs in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - name: location
+          in: path
+          description: Return the list VMs created in a specific location of a project and visible to the logged in user
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of VMs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/id/{vm_id}':
+    delete:
+      operationId: deleteVMWithId
+      summary: Delete a specific VM with ID
+      responses:
+        '204':
+          description: VM deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    get:
+      operationId: getVMDetailsWithId
+      summary: Get details of a specific VM in a location with ID
+      responses:
+        '200':
+          description: Details of the VM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_id'
+  '/project/{project_id}/location/{location}/vm/{vm_name}':
+    delete:
+      operationId: deleteVM
+      summary: Delete a specific VM
+      responses:
+        '204':
+          description: VM deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    get:
+      operationId: getVMDetails
+      summary: Get details of a specific VM in a location
+      responses:
+        '200':
+          description: Details of the VM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_name'
+    post:
+      operationId: createVM
+      summary: Create a new VM in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                boot_image:
+                  description: Boot image of the VM
+                  type: string
+                enable_ip4:
+                  description: Enable IPv4
+                  type: boolean
+                private_subnet_id:
+                  description: ID of the private subnet
+                  type: string
+                public_key:
+                  description: Public SSH key for the VM
+                  type: string
+                size:
+                  description: Size of the VM
+                  type: string
+                storage_size:
+                  description: Requested storage size in GiB
+                  type: integer
+                unix_user:
+                  description: Unix user of the VM
+                  type: string
+              required:
+                - public_key
+      responses:
+        '200':
+          description: Virtual machine created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/postgres':
+    get:
+      operationId: listPostgresDatabases
+      summary: List visible Postgres databases
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Postgres databases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Postgres'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/private-subnet':
+    get:
+      operationId: listPSs
+      summary: List visible Private Subnets
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of private subnets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/vm':
+    get:
+      operationId: listProjectVMs
+      summary: List all VMs created under the given project ID and visible to logged in user
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: Return the list of all VMs visible created under the given project and visible to the logged in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+components:
+  parameters:
+    firewall_id:
+      description: ID of the firewall
+      in: path
+      name: firewall_id
+      required: true
+      schema:
+        type: string
+    firewall_rule_id:
+      description: ID of the firewall rule
+      in: path
+      name: firewall_rule_id
+      required: true
+      schema:
+        type: string
+    location:
+      description: The Ubicloud location/region
+      in: path
+      name: location
+      required: true
+      schema:
+        type: string
+        example: eu-north-h1
+    order_column:
+      description: Pagination - Order column
+      in: query
+      name: order_column
+      required: false
+      schema:
+        type: string
+        default: id
+    page_size:
+      description: Pagination - Page size
+      in: query
+      name: page_size
+      required: false
+      schema:
+        type: integer
+        default: 10
+    postgres_database_id:
+      description: Postgres database ID
+      in: path
+      name: postgres_database_id
+      required: true
+      schema:
+        type: string
+    postgres_database_name:
+      description: Postgres database name
+      in: path
+      name: postgres_database_name
+      required: true
+      schema:
+        type: string
+    private_subnet_id:
+      description: Private subnet ID
+      in: path
+      name: private_subnet_id
+      required: true
+      schema:
+        type: string
+    private_subnet_name:
+      description: Private subnet name
+      in: path
+      name: private_subnet_name
+      required: true
+      schema:
+        type: string
+    project_id:
+      description: ID of the project
+      in: path
+      name: project_id
+      required: true
+      schema:
+        type: string
+    start_after:
+      description: Pagination - Start after
+      in: query
+      name: start_after
+      required: false
+      schema:
+        type: string
+    vm_id:
+      description: Virtual machine ID
+      in: path
+      name: vm_id
+      required: true
+      schema:
+        type: string
+    vm_name:
+      description: Virtual machine name
+      in: path
+      name: vm_name
+      required: true
+      schema:
+        type: string
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: integer
+              example: 401
+            message:
+              type: string
+              example: There was an error logging in
+            type:
+              type: string
+              example: InvalidCredentials
+    Firewall:
+      type: object
+      properties:
+        description:
+          description: Description of the firewall
+          type: string
+        firewall_rules:
+          description: List of firewall rules
+          type: array
+          items:
+            $ref: '#/components/schemas/FirewallRule'
+        id:
+          description: ID of the firewall
+          type: string
+        name:
+          description: Name of the firewall
+          type: string
+    FirewallRule:
+      type: object
+      properties:
+        cidr:
+          description: CIDR of the firewall rule
+          type: string
+        id:
+          description: ID of the firewall rule
+          type: string
+        port_range:
+          description: Port range of the firewall rule
+          type: string
+    Nic:
+      type: object
+      properties:
+        id:
+          description: ID of the NIC
+          type: string
+        name:
+          description: Name of the NIC
+          type: string
+        private_ipv4:
+          description: Private IPv4 address
+          type: string
+          format: ipv4
+        private_ipv6:
+          description: Private IPv6 address
+          type: string
+          format: ipv6
+        vm_name:
+          description: Name of the VM
+          type: string
+          nullable: true
+    Postgres:
+      type: object
+      properties:
+        ha_type:
+          description: High availability type
+          type: string
+        id:
+          description: ID of the Postgres database
+          type: string
+        location:
+          description: Location of the Postgres database
+          type: string
+        name:
+          description: Name of the Postgres database
+          type: string
+        state:
+          description: State of the Postgres database
+          type: string
+        storage_size_gib:
+          description: Storage size in GiB
+          type: integer
+        vm_size:
+          description: Size of the underlying VM
+          type: string
+    PostgresDetailed:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Postgres'
+        - properties:
+            connection_string:
+              description: Connection string to the Postgres database
+              type: string
+              nullable: true
+            earliest_restore_time:
+              description: Earliest restore time (if primary)
+              type: string
+              nullable: true
+            firewall_rules:
+              description: List of Postgres firewall rules
+              type: array
+              items:
+                $ref: '#/components/schemas/PostgresFirewallRule'
+            latest_restore_time:
+              description: Latest restore time (if primary)"
+              type: string
+            primary:
+              description: Is the database primary
+              type: boolean
+    PostgresFirewallRule:
+      type: object
+      properties:
+        cidr:
+          description: CIDR of the Postgres firewall rule
+          type: string
+        id:
+          description: ID of the Postgres firewall rule
+          type: string
+    PrivateSubnet:
+      type: object
+      properties:
+        firewalls:
+          type: array
+          items:
+            $ref: '#/components/schemas/Firewall'
+        id:
+          description: ID of the subnet
+          type: string
+        location:
+          description: Location of the subnet
+          type: string
+        name:
+          description: Name of the subnet
+          type: string
+        net4:
+          description: IPv4 CIDR of the subnet
+          type: string
+        net6:
+          description: IPv6 CIDR of the subnet
+          type: string
+        nics:
+          description: List of NICs
+          type: array
+          items:
+            $ref: '#/components/schemas/Nic'
+    Project:
+      type: object
+      properties:
+        credit:
+          description: Remaining credit of the project in $
+          type: number
+          format: float
+          example: 25.4
+        discount:
+          description: Discount of the project as percentage
+          type: integer
+          example: 10
+        id:
+          type: string
+          example: pjw92xhhqjdy4g72xng1ubkda6
+        name:
+          description: Name of the project
+          type: string
+          example: my-project
+    Vm:
+      type: object
+      properties:
+        id:
+          description: ID of the VM
+          type: string
+          example: vmw12ouhqjdy4g72xng1ubkda6
+        ip4:
+          description: IPv4 address
+          type: string
+          format: ipv4
+          nullable: true
+        ip6:
+          description: IPv6 address
+          type: string
+          format: ipv6
+          nullable: true
+        location:
+          description: Location of the VM
+          type: string
+          example: eu-north-h1
+        name:
+          description: Name of the VM
+          type: string
+          example: my-vm-name
+        size:
+          description: Size of the underlying VM
+          type: string
+        state:
+          description: State of the VM
+          type: string
+        storage_size_gib:
+          description: Storage size in GiB
+          type: integer
+        unix_user:
+          description: Unix user of the VM
+          type: string
+    VmDetailed:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/Vm'
+        - properties:
+            firewalls:
+              description: List of firewalls
+              type: array
+              items:
+                $ref: '#/components/schemas/Firewall'
+            private_ipv4:
+              description: Private IPv4 address
+              type: string
+              format: ipv4
+            private_ipv6:
+              description: Private IPv6 address
+              type: string
+              format: ipv6
+            subnet:
+              description: Subnet of the VM
+              type: string
+            unix_user:
+              description: Unix user of the VM
+              type: string
+  responses:
+    Error:
+      description: an error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    BearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
+tags:
+  - description: Firewall Operations
+    name: Firewall
+  - description: Firewall Rule Operations
+    name: Firewall Rule
+  - description: Login Operations
+    name: Login
+  - description: Postgres Operations
+    name: Postgres
+  - description: Private Subnet Operations
+    name: Private Subnet
+  - description: Project Operations
+    name: Project
+  - description: Virtual Machine Operations
+    name: Virtual Machine
+security:
+  - BearerAuth: []
