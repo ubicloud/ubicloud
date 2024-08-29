@@ -177,10 +177,17 @@ begin
       files = Dir.glob("views/**/[!icon]*.erb").entries
       ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
     end
+
+    desc "Validate, lint, format OpenAPI YAML file"
+    task :openapi do
+      sh "npx redocly lint openapi.yml"
+      sh "npx @stoplight/spectral-cli --fail-severity=warn lint openapi.yml"
+      sh "echo 'sortPathsBy: path' | npx -- openapi-format -o openapi.yml --sortFile /dev/stdin openapi.yml"
+    end
   end
 
   desc "Run all linters"
-  task linter: ["rubocop", "brakeman", "erb_formatter"].map { "linter:#{_1}" }
+  task linter: ["rubocop", "brakeman", "erb_formatter", "openapi"].map { "linter:#{_1}" }
 rescue LoadError
   puts "Could not load dev dependencies"
 end
