@@ -251,6 +251,19 @@ RSpec.describe Clover, "project" do
         expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
+      it "can not have more than 50 pending invitations" do
+        visit "#{project.path}/user"
+
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(project).to receive(:invitations_dataset).and_return(instance_double(Sequel::Dataset, count: 50))
+
+        fill_in "Email", with: "new@example.com"
+        click_button "Invite"
+
+        expect(page).to have_no_content "new@example.com"
+        expect(page).to have_content "You can't have more than 50 pending invitations"
+      end
+
       it "raises bad request when it's the last user" do
         user
         visit "#{project.path}/user"

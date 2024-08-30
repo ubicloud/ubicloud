@@ -19,6 +19,9 @@ class CloverWeb
       elsif ProjectInvitation[project_id: @project.id, email: email]
         flash["error"] = "'#{email}' already invited to join the project."
         r.redirect "#{@project.path}/user"
+      elsif @project.invitations_dataset.count >= 50
+        flash["error"] = "You can't have more than 50 pending invitations."
+        r.redirect "#{@project.path}/user"
       else
         @project.add_invitation(email: email, inviter_id: @current_user.id, expires_at: Time.now + 7 * 24 * 60 * 60)
       end
