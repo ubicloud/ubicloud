@@ -5,10 +5,10 @@
 
 # Ubicloud [![CI](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/ci.yml) [![Build](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml/badge.svg)](https://github.com/ubicloud/ubicloud/actions/workflows/build.yml) <a href="https://app.greptile.com/repo/ubicloud"><img src="https://img.shields.io/badge/learn_with-greptile-%091B12?color=%091B12" alt="Learn this repo using Greptile"></a>
 
-Ubicloud is an open, free, and portable cloud. Think of it as an open alternative to
-cloud providers, like what Linux is to proprietary operating systems.
+Ubicloud is an open source cloud that can run anywhere. Think of it as an open alternative
+to cloud providers, like what Linux is to proprietary operating systems.
 
-Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, OVH, 
+Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, Leaseweb, 
 and AWS Bare Metal. You can set it up yourself on these providers or you can use our 
 managed service. We're currently in public beta.
 
@@ -61,9 +61,9 @@ IPv4 addresses from your provider and add them to your control plane.
 
 Public cloud providers like AWS, Azure, and Google Cloud have made life easier for 
 start-ups and enterprises. But they are closed source, have you rent computers 
-at a huge premium, and lock you in. Ubicloud offers an open alternative, reduces 
-your costs, and returns control of your infrastructure back to you. All without
-sacrificing the cloud's convenience.
+at a huge premium, and lock you in. Ubicloud offers an open source alternative, 
+reduces your costs, and returns control of your infrastructure back to you. All 
+without sacrificing the cloud's convenience.
 
 Today, AWS offers about two hundred cloud services. Ultimately, we will implement 
 10% of the cloud services that make up 80% of that consumption.
@@ -84,7 +84,7 @@ cloud for portability, security, or compliance reasons.
 
 ## Status
 
-Ubicloud is in public alpha. You can provide us your feedback, get help, or ask
+Ubicloud is in public beta. You can provide us your feedback, get help, or ask
 us to support your network environment in the
 [Community Forum](https://github.com/ubicloud/ubicloud/discussions).
 
@@ -98,11 +98,13 @@ Hypervisor](https://github.com/cloud-hypervisor/cloud-hypervisor) as our virtual
 machine monitor (VMM); and each instance of the VMM is contained within Linux
 namespaces for further isolation / security.
 
-* **Virtual Networking**: We use [IPsec](https://en.wikipedia.org/wiki/IPsec)
-tunneling to establish an encrypted and private network environment. We support IPv4
-and IPv6 in a dual-stack setup and provide both public and private networking. For
-security, each customer’s VMs operate in their own networking namespace. Everything
-in virtual networking is layer 3 and up.
+* **Networking**: We use [IPsec](https://en.wikipedia.org/wiki/IPsec) tunneling to
+establish an encrypted and private network environment. We support IPv4 and IPv6 in
+a dual-stack setup and provide both public and private networking. For security,
+each customer’s VMs operate in their own networking namespace. For
+[firewalls](https://www.ubicloud.com/blog/ubicloud-firewalls-how-linux-nftables-enables-flexible-rules)
+and [load balancers](https://www.ubicloud.com/blog/ubicloud-load-balancer-simple-and-cost-free),
+we use Linux nftables.
 
 * **Block Storage, non replicated**: We use Storage Performance Development Toolkit
 ([SPDK](https://spdk.io)) to provide virtualized block storage to VMs. SPDK enables
@@ -113,8 +115,8 @@ follow security best practices and encrypt the data encryption key itself.
 roles, and permissions for users and give them fine-grained access to resources. You
 can read more about our [ABAC design here](doc/authorization.md).
 
-* **What's Next?**: We're planning to work on the elastic load balancer or simple
-storage service next. If you have a workload that would benefit from a specific cloud
+* **What's Next?**: We're planning to work on a managed K8s or metrics/monitoring
+service next. If you have a workload that would benefit from a specific cloud
 service, please get in touch with us through our [Community
 Forum](https://github.com/ubicloud/ubicloud/discussions).
 
