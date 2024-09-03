@@ -138,6 +138,12 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     rescue CommandFail => ex
       raise unless /Cannot remove namespace file ".*": No such file or directory/.match?(ex.stderr)
     end
+
+    begin
+      r "deluser --remove-home #{q_vm}"
+    rescue CommandFail => ex
+      raise unless /The user `.*' does not exist./.match?(ex.stderr)
+    end
   end
 
   def purge_without_network
@@ -147,12 +153,6 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     purge_storage
     unmount_hugepages
-
-    begin
-      r "deluser --remove-home #{q_vm}"
-    rescue CommandFail => ex
-      raise unless /The user `.*' does not exist./.match?(ex.stderr)
-    end
   end
 
   def purge_storage
