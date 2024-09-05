@@ -4,6 +4,7 @@ source "https://rubygems.org"
 ruby "3.2.5"
 
 gem "argon2"
+gem "committee"
 gem "nokogiri"
 gem "bcrypt_pbkdf"
 gem "ed25519"
