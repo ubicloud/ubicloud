@@ -82,8 +82,7 @@ class CloverApi < Roda
 
   class CustomErrorHandler
     def call(error, request)
-      printed_error = error.respond_to?(:original_error) ? error.original_error : error
-      puts "Schema validation failed: #{printed_error.inspect}"
+      puts "Schema validation failed: #{error.inspect}"
       puts "Request: #{request.inspect}"
       puts "Error details: #{error.inspect}"
       # raise error
@@ -101,8 +100,15 @@ class CloverApi < Roda
     rodauth.check_active_session
     rodauth.require_authentication
 
-    schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
-    schema_validator.request_validate(Rack::Request.new(r.env))
+    begin
+      error_handler = CustomErrorHandler.new
+      schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
+      schema_validator.request_validate(Rack::Request.new(r.env))
+      # TODO: rescue and return/raise as per request_validator middleware from committee
+    rescue => err
+      error_handler.call(err, r.env)
+    end
+
 
     @current_user = Account[rodauth.session_value]
 
