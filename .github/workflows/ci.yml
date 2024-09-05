@@ -59,16 +59,28 @@ jobs:
         ruby-version: .tool-versions
         bundler-cache: true
 
+    - name: Set up Node.js
+      uses: ubicloud/setup-node@v4
+      with:
+         node-version: "22"
+
+    - name: Install node packages
+      run: npm ci
+
     - name: Run erb-formatter
-      run: |
-        bundle exec rake linter:erb_formatter
-        git diff --exit-code
+      run: bundle exec rake linter:erb_formatter
 
     - name: Run rubocop
       run: bundle exec rake linter:rubocop
 
     - name: Run brakeman
       run: bundle exec rake linter:brakeman
+
+    - name: Run linter:openapi
+      run: bundle exec rake linter:openapi
+
+    - name: Check that source code formatters make no changes
+      run: git diff --stat --exit-code
 
     - name: Apply migrations
       env:
