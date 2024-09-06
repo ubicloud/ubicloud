@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/ubicloud/ubicloud/assets/2545443/caa2d2be-26f3-4635-be78-1861886e2ebe">
+  <img src="https://github.com/user-attachments/assets/779e73bd-c260-4729-8430-c630628f1b6b">
 </p>
 
 
