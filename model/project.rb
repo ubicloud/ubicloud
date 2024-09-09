@@ -131,5 +131,5 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :postgresql_base_image, :vm_public_ssh_keys
+  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :runner_preferred_location
 end

@@ -31,11 +31,12 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   def pick_vm
+    location = project.get_ff_runner_preferred_location || label_data["location"]
     skip_sync = true
     pool = VmPool.where(
       vm_size: label_data["vm_size"],
       boot_image: label_data["boot_image"],
-      location: label_data["location"],
+      location: location,
       storage_size_gib: label_data["storage_size_gib"],
       storage_encrypted: true,
       storage_skip_sync: skip_sync,
@@ -51,7 +52,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       Config.github_runner_service_project_id,
       name: github_runner.ubid.to_s,
       size: label_data["vm_size"],
-      location: label_data["location"],
+      location: location,
       boot_image: label_data["boot_image"],
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: skip_sync}],
       enable_ip4: true,

@@ -66,6 +66,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
     before do
+      expect(github_runner.installation).to receive(:project).and_return(project)
       runner_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
     end
@@ -80,6 +81,14 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.family).to eq("standard")
       expect(vm.cores).to eq(2)
       expect(vm.projects.map(&:id)).to include(Config.github_runner_service_project_id)
+    end
+
+    it "provisions a VM in the project's runner location preference" do
+      project.set_ff_runner_preferred_location("hetzner-fsn1")
+      expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
+      vm = nx.pick_vm
+      expect(vm).not_to be_nil
+      expect(vm.location).to eq("hetzner-fsn1")
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
