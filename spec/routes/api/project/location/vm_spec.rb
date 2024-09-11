@@ -72,8 +72,9 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
-          public_key: "ssh key",
+          # public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
           boot_image: "ubuntu-jammy"

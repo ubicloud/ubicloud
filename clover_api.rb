@@ -101,12 +101,16 @@ class CloverApi < Roda
     rodauth.require_authentication
 
     begin
-      error_handler = CustomErrorHandler.new
       schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
       schema_validator.request_validate(Rack::Request.new(r.env))
+
+      raise Commitee::NotFound if !schema_validator.link_exist? # strict setting, raise if method + path isn't in schema
       # TODO: rescue and return/raise as per request_validator middleware from committee
-    rescue => err
-      error_handler.call(err, r.env)
+    rescue Committee::BadRequest
+      # json parsing doesn't result in a hash
+    rescue Committee::InvalidRequest => e
+      puts "ORIGINAL #{e.original_error.inspect}" # underlying OpenAPIParser error (if there is one)
+      puts "ERROR #{e.inspect}"
     end
 
 
