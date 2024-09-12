@@ -25,6 +25,11 @@ class CloverWeb
         r.redirect "/dashboard"
       end
 
+      if (project.accounts.any?{_1.suspended_at != nil})
+        flash["error"] = "GitHub runner integration is not allowed for suspended accounts."
+        r.redirect "/dashboard"
+      end
+
       Authorization.authorize(@current_user.id, "Project:github", project.id)
 
       GithubInstallation.create_with_id(
