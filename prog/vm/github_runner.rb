@@ -137,6 +137,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       sum(:used_cores) * 100.0 / sum(:total_cores)
     }.first.to_f
 
+    if github_runner.installation.project.effective_quota_value("GithubRunnerCores") == 0
+      Clog.emit("No quota available for this project") { [github_runner] }
+      nap 2592000
+    end
+
     unless utilization < 70
       Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
       nap rand(5..15)
