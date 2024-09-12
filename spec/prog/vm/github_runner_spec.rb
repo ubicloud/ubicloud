@@ -294,6 +294,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -320,12 +321,25 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
       VmHost[arch: "x64"].update(used_cores: 4)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    end
+
+    it "naps for a long time if the quota is set to 0" do
+      dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
+
+      installation = instance_double(GithubInstallation)
+      project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(0)
+      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
+
+      expect { nx.wait_concurrency_limit }.to nap(2592000)
     end
   end
 
