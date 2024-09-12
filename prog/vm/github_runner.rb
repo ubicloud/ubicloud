@@ -140,7 +140,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # :nocov:
     if github_runner.installation.project.effective_quota_value("GithubRunnerCores") == 0
       Clog.emit("No quota available for this project") { [github_runner] }
-      hop_destroy
+      nap 2592000
     end
     # :nocov:
 
