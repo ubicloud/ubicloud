@@ -294,6 +294,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -320,6 +321,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
