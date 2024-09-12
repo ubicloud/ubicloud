@@ -30,7 +30,7 @@ class Prog::Vnet::CertServer < Prog::Base
   end
 
   label def put_certificate
-    nap 5 unless load_balancer.active_cert
+    nap 5 unless load_balancer.active_cert&.cert
 
     put_cert_to_vm
     hop_start_certificate_server
