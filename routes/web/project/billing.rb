@@ -77,8 +77,11 @@ class CloverWeb
         # Pre-authorizing random amount to verify card. As it is
         # commonly done with other companies, apparently it is
         # better to detect fraud then pre-authorizing fixed amount.
+        # That money will be kept until next billing period and if
+        # it's not a fraud, it will be applied to the invoice.
+        preauth_amount = [100, 200, 300, 400, 500].sample
         payment_intent = Stripe::PaymentIntent.create({
-          amount: [100, 200, 300, 400, 500].sample, # 100 cents to charge $1.00
+          amount: preauth_amount,
           currency: "usd",
           confirm: true,
           off_session: true,
@@ -90,8 +93,6 @@ class CloverWeb
         if payment_intent.status != "requires_capture"
           raise "Authorization failed"
         end
-
-        Stripe::PaymentIntent.cancel(payment_intent.id)
       rescue
         # Log and redirect if Stripe card error or our manual raise
         Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id: customer_stripe_id}} }
@@ -105,7 +106,7 @@ class CloverWeb
           @project.update(billing_info_id: billing_info.id)
         end
 
-        PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint)
+        PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_amount: preauth_amount)
       end
 
       r.redirect @project.path + "/billing"
