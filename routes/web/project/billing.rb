@@ -74,14 +74,11 @@ class CloverWeb
       begin
         customer_stripe_id = setup_intent["customer"]
 
-        # Pre-authorizing random amount to verify card. As it is
-        # commonly done with other companies, apparently it is
-        # better to detect fraud then pre-authorizing fixed amount.
+        # Pre-authorizing $5 to verify card.
         # That money will be kept until next billing period and if
         # it's not a fraud, it will be applied to the invoice.
-        preauth_amount = [100, 200, 300, 400, 500].sample
         payment_intent = Stripe::PaymentIntent.create({
-          amount: preauth_amount,
+          amount: 500,
           currency: "usd",
           confirm: true,
           off_session: true,
@@ -106,7 +103,7 @@ class CloverWeb
           @project.update(billing_info_id: billing_info.id)
         end
 
-        PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_amount: preauth_amount)
+        PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_amount: 500)
       end
 
       r.redirect @project.path + "/billing"
