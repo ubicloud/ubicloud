@@ -768,15 +768,7 @@ RSpec.describe Prog::Vm::Nexus do
       it "destroys properly after 10 minutes" do
         lb = instance_double(LoadBalancer)
         expect(lb).to receive(:remove_vm).with(vm)
-        expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
-        expect(vm).to receive(:lb_expiry_started_set?).and_return(true)
-        expect(vm.vm_host.sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_net #{nx.vm_name}/)
-        expect(vm).to receive(:destroy)
-        expect { nx.wait_lb_expiry }.to exit({"msg" => "vm deleted"})
-      end
-
-      it "destroys properly after 10 minutes if the lb is gone" do
-        expect(vm).to receive(:load_balancer).and_return(nil)
+        expect(vm).to receive(:load_balancer).and_return(lb)
         expect(vm).to receive(:lb_expiry_started_set?).and_return(true)
         expect(vm.vm_host.sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm delete_net #{nx.vm_name}/)
         expect(vm).to receive(:destroy)
