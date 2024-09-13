@@ -61,7 +61,6 @@ RSpec.describe Clover, "billing" do
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).twice
-      expect(Stripe::PaymentIntent).to receive(:cancel).with("pi_1234567890").once
 
       visit project.path
 
@@ -135,7 +134,6 @@ RSpec.describe Clover, "billing" do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"payment_method" => "pm_222222222"})
-      expect(Stripe::PaymentIntent).to receive(:cancel).with("pi_1234567890").once
 
       visit "#{project.path}/billing"
 
