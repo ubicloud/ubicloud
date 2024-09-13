@@ -128,6 +128,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   def purge
     purge_network
     purge_without_network
+    purge_user
   end
 
   def purge_network
@@ -147,12 +148,12 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     purge_storage
     unmount_hugepages
+  end
 
-    begin
-      r "deluser --remove-home #{q_vm}"
-    rescue CommandFail => ex
-      raise unless /The user `.*' does not exist./.match?(ex.stderr)
-    end
+  def purge_user
+    r "deluser --remove-home #{q_vm}"
+  rescue CommandFail => ex
+    raise unless /The user `.*' does not exist./.match?(ex.stderr)
   end
 
   def purge_storage

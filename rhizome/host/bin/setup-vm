@@ -28,6 +28,7 @@ end
 
 if action == "delete_net"
   vm_setup.purge_network
+  vm_setup.purge_user
   exit 0
 end
 
