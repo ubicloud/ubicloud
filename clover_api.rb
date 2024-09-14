@@ -80,20 +80,11 @@ class CloverApi < Roda
     require_bcrypt? false
   end
 
-  class CustomErrorHandler
-    def call(error, request)
-      puts "Schema validation failed: #{error.inspect}"
-      puts "Request: #{request.inspect}"
-      puts "Error details: #{error.inspect}"
-      # raise error
-    end
-  end
-
   OPENAPI = OpenAPIParser.load("openapi.yml", strict_reference_validation: true) unless const_defined?(:OPENAPI)
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI) unless const_defined?(:SCHEMA)
-  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true, prefix: "/api", error_handler: CustomErrorHandler.new) unless const_defined?(:SCHEMA_ROUTER)
+  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true, prefix: "/api") unless const_defined?(:SCHEMA_ROUTER)
 
-  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api", error_handler: CustomErrorHandler.new
+  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api"
 
   route do |r|
     r.rodauth
@@ -104,15 +95,10 @@ class CloverApi < Roda
       schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
       schema_validator.request_validate(Rack::Request.new(r.env))
 
-      raise Commitee::NotFound if !schema_validator.link_exist? # strict setting, raise if method + path isn't in schema
-      # TODO: rescue and return/raise as per request_validator middleware from committee
-    rescue Committee::BadRequest
-      # json parsing doesn't result in a hash
-    rescue Committee::InvalidRequest => e
-      puts "ORIGINAL #{e.original_error.inspect}" # underlying OpenAPIParser error (if there is one)
-      puts "ERROR #{e.inspect}"
+      raise Commitee::NotFound if !schema_validator.link_exist? # no method + path
+    rescue JSON::ParserError
+      raise Committee::InvalidRequest.new("Request body wasn't valid JSON.")
     end
-
 
     @current_user = Account[rodauth.session_value]
 
