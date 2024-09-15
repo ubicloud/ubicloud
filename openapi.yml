@@ -385,7 +385,8 @@ paths:
                 restore_target:
                   type: string
               required:
-                - 'name, restore_target'
+                - name
+                - restore_target
       responses:
         '200':
           description: Postgres database is restored successfully
@@ -508,7 +509,8 @@ paths:
                 restore_target:
                   type: string
               required:
-                - 'name, restore_target'
+                - name
+                - restore_target
       responses:
         '200':
           description: Postgres database is restored successfully
