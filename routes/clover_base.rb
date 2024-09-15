@@ -27,14 +27,17 @@ module CloverBase
       type = "InvalidRequest"
       message = e.to_s
     when Committee::BadRequest, Committee::InvalidRequest
+      raise e if Config.test?
       code = 400
       type = "BadRequest"
       message = e.message
     when Committee::InvalidResponse
+      raise e if Config.test?
       code = 500
       type = "InternalServerError"
       message = e.message
     when Committee::NotFound
+      raise e if Config.test?
       code = 404
       type = "NotFound"
       message = e.message
