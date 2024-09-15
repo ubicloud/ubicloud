@@ -27,14 +27,14 @@ class Prog::Vm::Nexus < Prog::Base
 
     storage_volumes ||= [{
       size_gib: vm_size.storage_size_options.first,
-      encrypted: true
+      encrypted: false
     }]
 
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_options.first
       volume[:skip_sync] ||= false
-      volume[:encrypted] = true if !volume.has_key? :encrypted
+      volume[:encrypted] = false
       volume[:boot] = disk_index == boot_disk_index
     end
 

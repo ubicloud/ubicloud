@@ -60,7 +60,9 @@ class SpdkSetup
 
     {
       ["v23.09-ubi-0.2", :arm64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2-arm64/ubicloud-spdk-ubuntu-22.04-arm64.tar.gz",
-      ["v23.09-ubi-0.2", :x64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2/ubicloud-spdk-ubuntu-22.04-x64.tar.gz"
+      ["v23.09-ubi-0.2", :x64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2/ubicloud-spdk-ubuntu-22.04-x64.tar.gz",
+      ["v23.09-ubi-0.3", :arm64] => "https://github.com/pykello/bdev_ubi_2/releases/download/main-arm64/ubicloud-spdk-ubuntu-22.04-arm64.tar.gz",
+      ["v23.09-ubi-0.3", :x64] => "https://github.com/pykello/bdev_ubi_2/releases/download/main-x64/ubicloud-spdk-ubuntu-22.04-x64.tar.gz"
     }.fetch([@spdk_version, arch])
   end
 
