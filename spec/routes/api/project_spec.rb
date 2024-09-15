@@ -69,6 +69,7 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
+        header "Content-Type", "application/json"
         post "/api/project", {
           name: "test-project"
         }.to_json
@@ -78,6 +79,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "missing parameter" do
+        header "Content-Type", "application/json"
         post "/api/project", {}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body")

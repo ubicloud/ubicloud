@@ -88,6 +88,7 @@ RSpec.describe Clover, "vm" do
       it "success with private subnet" do
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").ubid
 
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -103,6 +104,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success with storage size" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -116,6 +118,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "boot image doesn't passed" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -127,6 +130,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid boot image" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -139,6 +143,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid vm size" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -150,6 +155,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success without vm_size" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -161,6 +167,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid ps id" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -175,6 +182,7 @@ RSpec.describe Clover, "vm" do
 
       it "invalid ps id in other location" do
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").ubid
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -188,12 +196,14 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid body" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", "invalid_body"
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
       end
 
       it "missing required key" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           unix_user: "ubi"
         }.to_json
@@ -202,6 +212,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "non allowed key" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           foo_key: "foo_val"

@@ -84,6 +84,7 @@ RSpec.describe Clover, "postgres" do
 
     describe "create" do
       it "success" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
           ha_type: "none"
@@ -110,6 +111,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid location" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
           ha_type: "sync"
@@ -119,6 +121,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid name" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/INVALIDNAME", {
           size: "standard-2",
           ha_type: "sync"
@@ -128,12 +131,14 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid body" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", "invalid_body"
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
       end
 
       it "missing required key" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
           unix_user: "ha_type"
         }.to_json
@@ -142,6 +147,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "non allowed key" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
           size: "standard-2",
           foo_key: "foo_val"
@@ -201,6 +207,7 @@ RSpec.describe Clover, "postgres" do
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [Backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
           restore_target: restore_target
@@ -211,6 +218,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "restore invalid target" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
           restore_target: Time.now.utc
@@ -220,6 +228,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "reset password" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
           password: "DummyPassword123"
         }.to_json
@@ -230,6 +239,7 @@ RSpec.describe Clover, "postgres" do
       it "reset password invalid restore" do
         pg.representative_server.update(timeline_access: "fetch")
 
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
           password: "DummyPassword123"
         }.to_json
@@ -238,6 +248,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid password" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
           password: "dummy"
         }.to_json
@@ -246,6 +257,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "reset password ubid" do
+        header "Content-Type", "application/json"
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/id/#{pg.ubid}/reset-superuser-password", {
           password: "DummyPassword123"
         }.to_json
@@ -293,6 +305,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid payment" do
+        header "Content-Type", "application/json"
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
 
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
