@@ -122,7 +122,12 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid location" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           size: "standard-2",
           ha_type: "sync"
         }.to_json
@@ -131,7 +136,12 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid name" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/INVALIDNAME", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/INVALIDNAME", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           size: "standard-2",
           ha_type: "sync"
         }.to_json
@@ -140,13 +150,23 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid body" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", "invalid_body"
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", "invalid_body"
+>>>>>>> e2a96e28 (fix content-type validation errors)
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
       end
 
       it "missing required key" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           unix_user: "ha_type"
         }.to_json
 
@@ -154,7 +174,12 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "non allowed key" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           size: "standard-2",
           foo_key: "foo_val"
         }.to_json
@@ -213,7 +238,12 @@ RSpec.describe Clover, "postgres" do
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           name: "restored-pg",
           restore_target: restore_target
 
@@ -223,7 +253,12 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "restore invalid target" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           name: "restored-pg",
           restore_target: Time.now.utc
         }.to_json
@@ -232,7 +267,12 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "reset password" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           password: "DummyPassword123"
         }.to_json
 
@@ -242,7 +282,12 @@ RSpec.describe Clover, "postgres" do
       it "reset password invalid restore" do
         pg.representative_server.update(timeline_access: "fetch")
 
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           password: "DummyPassword123"
         }.to_json
 
@@ -250,7 +295,12 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid password" do
+<<<<<<< HEAD
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+=======
+        header "Content-Type", "application/json"
+        post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
+>>>>>>> e2a96e28 (fix content-type validation errors)
           password: "dummy"
         }.to_json
 
@@ -306,6 +356,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid payment" do
+        header "Content-Type", "application/json"
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
 
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
