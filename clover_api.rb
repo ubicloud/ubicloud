@@ -97,7 +97,7 @@ class CloverApi < Roda
 
       raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
     rescue JSON::ParserError
-      raise Committee::InvalidRequest.new("Request body wasn't valid JSON.")
+      # handled by validations
     end
 
     @current_user = Account[rodauth.session_value]
