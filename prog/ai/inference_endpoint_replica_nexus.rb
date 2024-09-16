@@ -34,8 +34,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
       replica = InferenceEndpointReplica.create(
         inference_endpoint_id: inference_endpoint_id,
-        vm_id: vm_st.id,
-        replica_secret: SecureRandom.alphanumeric(32)
+        vm_id: vm_st.id
       ) { _1.id = ubid.to_uuid }
 
       Strand.create(prog: "Ai::InferenceEndpointReplicaNexus", label: "start") { _1.id = replica.id }
@@ -83,9 +82,9 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         model: inference_endpoint.model_name,
         replica_ubid: inference_endpoint_replica.ubid,
         public_endpoint: inference_endpoint.public,
-        clover_secret: BCrypt::Password.create(inference_endpoint_replica.replica_secret).shellescape,
-        ssl_crt_path: https ? "TODO path to ssl crt file" : "",
-        ssl_key_path: https ? "TODO path to ssl key file" : ""
+        ssl_crt_path: https ? "/ie/workdir/ubi_cert.pem " : "",
+        ssl_key_path: https ? "/ie/workdir/ubi_key.pem " : "",
+        is_development: Config.development?
       }
       params_json = JSON.generate(params)
       vm.sshable.cmd("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", stdin: params_json)
@@ -147,21 +146,11 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       projects: projects
     }
 
-    uri = URI.parse("#{inference_endpoint.load_balancer.health_check_protocol}://#{vm.ephemeral_net4}:9191")  # TODO: switch to https when inference gateway is started with https, see write_config_files in rhizome/inference_endpoint/lib/replica_setup.rb
-    header = {"Content-Type": "text/json", Authorization: "Bearer " + inference_endpoint_replica.replica_secret}
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.read_timeout = 5
-    req = Net::HTTP::Post.new(uri.request_uri, header)
-    req.body = body.to_json
-    resp = http.request(req)
-    if resp.code == "200"
-      project_usage = JSON.parse(resp.body)["projects"]
-      # project_usage is a list of the following format:
-      # [{"ubid":"aprojectubid","request_count":0,"prompt_token_count":0,"completion_token_count":0}, ...]
-      # TODO: produce billing records for public endpoints based on project_usage
-      Clog.emit("Successfully pinged inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage: project_usage} }
-    else
-      Clog.emit("Failed to ping inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, http_code: resp.code} }
-    end
+    resp = vm.sshable.cmd("sudo curl -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
+    project_usage = JSON.parse(resp)["projects"]
+    # project_usage is a list of the following format:
+    # [{"ubid":"aprojectubid","request_count":0,"prompt_token_count":0,"completion_token_count":0}, ...]
+    # TODO: produce billing records for public endpoints based on project_usage
+    Clog.emit("Successfully pinged inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage: project_usage} }
   end
 end

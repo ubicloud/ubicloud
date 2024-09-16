@@ -344,7 +344,6 @@ DEPENDENCIES
   argon2
   argon2-kdf
   aws-sdk-s3 (~> 1.160)
-  aws-sdk-s3 (~> 1.158)
   bcrypt
   bcrypt_pbkdf
   brakeman

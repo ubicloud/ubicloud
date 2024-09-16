@@ -1,0 +1,15 @@
+#!/bin/bash
+set -ueo pipefail
+
+if [ "$1" = "dev" ]; then
+    openssl req -x509 -out /ie/workdir/ubi_cert.pem -keyout /ie/workdir/ubi_key.pem -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost'
+else
+    curl -f -L3 [FD00:0B1C:100D:5afe:CE::]:8080/load-balancer/cert.pem > /ie/workdir/ubi_cert.pem
+    curl -f -L3 [FD00:0B1C:100D:5afe:CE::]:8080/load-balancer/key.pem > /ie/workdir/ubi_key.pem
+fi
+
+chown ie:ie /ie/workdir/ubi_key.pem
+chmod 640 /ie/workdir/ubi_key.pem
+
+chown ie:ie /ie/workdir/ubi_cert.pem
+chmod 644 /ie/workdir/ubi_cert.pem

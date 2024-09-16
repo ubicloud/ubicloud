@@ -10,10 +10,10 @@ require "base64"
 require "uri"
 
 class ReplicaSetup
-  def prep(inference_engine:, inference_engine_params:, model:, replica_ubid:, public_endpoint:, clover_secret:, ssl_crt_path:, ssl_key_path:)
+  def prep(inference_engine:, inference_engine_params:, model:, replica_ubid:, public_endpoint:, ssl_crt_path:, ssl_key_path:, is_development:)
     engine_start_cmd = engine_start_command(inference_engine: inference_engine, inference_engine_params: inference_engine_params, model: model)
-    write_config_files(replica_ubid, public_endpoint, clover_secret, ssl_crt_path, ssl_key_path)
-    install_systemd_units(engine_start_cmd)
+    write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path)
+    install_systemd_units(engine_start_cmd, is_development)
     start_systemd_units
   end
 
@@ -51,23 +51,23 @@ class ReplicaSetup
     end
   end
 
-  def write_config_files(replica_ubid, public_endpoint, clover_secret, ssl_crt_path, ssl_key_path)
+  def write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path)
     safe_write_to_file("/ie/workdir/inference-gateway.conf", <<CONFIG)
 RUST_BACKTRACE=1
 RUST_LOG=info
 IG_DAEMON=true
 IG_LOG="/ie/workdir/inference-gateway.log"
 IG_PID_FILE="/ie/workdir/inference-gateway.pid"
-IG_UPGRADE_SOCK="/ie/workdir/inference-gateway.upgrade.sock"
+IG_UPGRADE_UDS="/ie/workdir/inference-gateway.upgrade.sock"
 IG_REPLICA_UBID=#{replica_ubid}
 IG_PUBLIC_ENDPOINT=#{public_endpoint}
-IG_CLOVER_SECRET="#{clover_secret}"
+IG_CLOVER_UDS="/ie/workdir/inference-gateway.clover.sock"
 IG_SSL_CRT_PATH=#{ssl_crt_path}
 IG_SSL_KEY_PATH=#{ssl_key_path}
 CONFIG
   end
 
-  def install_systemd_units(engine_start_command)
+  def install_systemd_units(engine_start_command, is_development)
     write_inference_gateway_service <<GATEWAY
 [Unit]
 Description=Inference Gateway
@@ -77,7 +77,9 @@ After=network.target
 EnvironmentFile=/ie/workdir/inference-gateway.conf
 Type=forking
 PIDFile=/ie/workdir/inference-gateway.pid
+ExecStartPre=/home/ubi/inference_endpoint/bin/get-lb-cert #{is_development ? "dev" : "prod"}
 ExecStart=/opt/inference-gateway/inference-gateway
+LimitNOFILE=65536
 GATEWAY
 
     write_inference_engine_service <<ENGINE
@@ -97,6 +99,7 @@ WorkingDirectory=/ie/workdir
 User=ie
 Group=ie
 Restart=always
+LimitNOFILE=65536
 ENGINE
     r "systemctl daemon-reload"
   end

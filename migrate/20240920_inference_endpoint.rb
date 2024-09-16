@@ -25,7 +25,6 @@ Sequel.migration do
 
     create_table(:inference_endpoint_replica) do
       column :id, :uuid, primary_key: true
-      column :replica_secret, :text, collate: '"C"', null: false
       foreign_key :inference_endpoint_id, :inference_endpoint, type: :uuid, null: false
       foreign_key :vm_id, :vm, type: :uuid, null: false, unique: true
     end

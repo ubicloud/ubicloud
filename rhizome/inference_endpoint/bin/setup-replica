@@ -13,9 +13,9 @@ begin
   model = params.fetch("model")
   replica_ubid = params.fetch("replica_ubid")
   public_endpoint = params.fetch("public_endpoint")
-  clover_secret = params.fetch("clover_secret")
   ssl_crt_path = params.fetch("ssl_crt_path")
   ssl_key_path = params.fetch("ssl_key_path")
+  is_development = params.fetch("is_development")
 rescue KeyError => e
   puts "Needed #{e.key} in parameters"
   exit 1
@@ -27,7 +27,7 @@ replica_setup.prep(
   model: model,
   replica_ubid: replica_ubid,
   public_endpoint: public_endpoint,
-  clover_secret: clover_secret,
   ssl_crt_path: ssl_crt_path,
-  ssl_key_path: ssl_key_path
+  ssl_key_path: ssl_key_path,
+  is_development: is_development
 )

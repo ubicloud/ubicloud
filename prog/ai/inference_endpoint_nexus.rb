@@ -51,7 +51,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       firewall = internal_project.firewalls_dataset.where(location: location).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
       fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{location}" unless firewall
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location: location, firewall_id: firewall.id)
-      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 8080, dst_port: 8080, health_check_endpoint: "/up", health_check_protocol: Config.production? ? "https" : "http")
+      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 8080, dst_port: 8080, health_check_endpoint: "/up", health_check_protocol: "https") #Config.production? ? "https" : "http"
 
       inference_endpoint = InferenceEndpoint.create(
         project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, storage_volumes: storage_volumes,

@@ -11,12 +11,4 @@ class InferenceEndpointReplica < Sequel::Model
   include SemaphoreMethods
 
   semaphore :destroy
-
-  plugin :column_encryption do |enc|
-    enc.column :replica_secret
-  end
-
-  def self.redacted_columns
-    super + [:replica_secret]
-  end
 end
