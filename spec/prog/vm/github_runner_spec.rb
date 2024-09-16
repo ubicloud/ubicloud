@@ -610,6 +610,15 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.destroy }.to hop("wait_vm_destroy")
     end
 
+    it "skip deregistration and destroy vm immediately" do
+      expect(nx).to receive(:decr_destroy)
+      expect(github_runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
     it "destroys resources and hops if runner deregistered, also, copies serial log if workflow_job is nil" do
       expect(nx).to receive(:decr_destroy)
       expect(client).to receive(:get).and_raise(Octokit::NotFound)

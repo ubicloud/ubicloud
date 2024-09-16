@@ -5,7 +5,7 @@ require "net/ssh"
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
 
-  semaphore :destroy
+  semaphore :destroy, :skip_deregistration
 
   def self.assemble(installation, repository_name:, label:, default_branch: nil)
     unless Github.runner_labels[label]
@@ -368,16 +368,23 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def destroy
     decr_destroy
 
-    # Waiting 404 Not Found response for get runner request
-    begin
-      response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      if response[:busy]
-        Clog.emit("The runner is still running a job") { github_runner }
-        nap 15
+    # When we attempt to destroy the runner, we also deregister it from GitHub.
+    # We wait to receive a 'not found' response for the runner. If the runner is
+    # still running a job and, due to stale data, it gets mistakenly hopped to
+    # destroy, this prevents the underlying VM from being destroyed and the job
+    # from failing. However, in certain situations like fraudulent activity, we
+    # might need to bypass this verification and immediately remove the runner.
+    unless github_runner.skip_deregistration_set?
+      begin
+        response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
+        if response[:busy]
+          Clog.emit("The runner is still running a job") { github_runner }
+          nap 15
+        end
+        github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
+        nap 5
+      rescue Octokit::NotFound
       end
-      github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      nap 5
-    rescue Octokit::NotFound
     end
 
     if vm
