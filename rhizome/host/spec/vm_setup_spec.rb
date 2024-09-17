@@ -30,7 +30,7 @@ RSpec.describe VmSetup do
     before { expect(vs).to receive(:vp).and_return(vps).at_least(:once) }
 
     it "templates user YAML with no swap" do
-      vs.write_user_data("some_user", ["some_ssh_key"], nil)
+      vs.write_user_data("some_user", ["some_ssh_key"], nil, "")
       expect(vps).to have_received(:write_user_data) {
         expect(_1).to match(/some_user/)
         expect(_1).to match(/some_ssh_key/)
@@ -38,7 +38,7 @@ RSpec.describe VmSetup do
     end
 
     it "templates user YAML with swap" do
-      vs.write_user_data("some_user", ["some_ssh_key"], 123)
+      vs.write_user_data("some_user", ["some_ssh_key"], 123, "")
       expect(vps).to have_received(:write_user_data) {
         expect(_1).to match(/some_user/)
         expect(_1).to match(/some_ssh_key/)
@@ -48,7 +48,7 @@ RSpec.describe VmSetup do
 
     it "fails if the swap is not an integer" do
       expect {
-        vs.write_user_data("some_user", ["some_ssh_key"], "123")
+        vs.write_user_data("some_user", ["some_ssh_key"], "123", "")
       }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
     end
   end
