@@ -36,6 +36,10 @@ module CloverBase
         when JSON::ParserError
           message = "Validation failed for following fields: body"
           details = {"body" => "Request body isn't a valid JSON object."}
+        when OpenAPIParser::NotExistRequiredKey
+          keys = e.original_error.instance_variable_get(:@keys)
+          message = "Validation failed for following fields: body"
+          details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
         else
           raise e
         end
