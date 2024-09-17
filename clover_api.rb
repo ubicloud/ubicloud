@@ -95,9 +95,10 @@ class CloverApi < Roda
       schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
       schema_validator.request_validate(Rack::Request.new(r.env))
 
-      raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
-    rescue JSON::ParserError
-      # handled by validations
+      # FIXME: strict validation
+      # raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
+    rescue JSON::ParserError => e
+      raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
     end
 
     @current_user = Account[rodauth.session_value]

@@ -27,10 +27,19 @@ module CloverBase
       type = "InvalidRequest"
       message = e.to_s
     when Committee::BadRequest, Committee::InvalidRequest
-      raise e if Config.test?
       code = 400
       type = "BadRequest"
       message = e.message
+
+      if Config.test?
+        case e.original_error
+        when JSON::ParserError
+          message = "Validation failed for following fields: body"
+          details = {"body" => "Request body isn't a valid JSON object."}
+        else
+          raise e
+        end
+      end
     when Committee::InvalidResponse
       raise e if Config.test?
       code = 500
