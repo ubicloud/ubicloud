@@ -43,8 +43,8 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
+  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     end
@@ -65,8 +65,8 @@ class VmSetup
     start_systemd_unit
   end
 
-  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
+  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
@@ -404,7 +404,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -451,7 +451,7 @@ ethernets:
 #{ethernets}
 EOS
 
-    write_user_data(unix_user, public_keys, swap_size_bytes)
+    write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
 
     FileUtils.rm_rf(vp.cloudinit_img)
     r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
@@ -472,7 +472,20 @@ EOS
     SWAP_CONFIG
   end
 
-  def write_user_data(unix_user, public_keys, swap_size_bytes)
+  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
+    install_cmd = if boot_image.include?("almalinux")
+      "  - [dnf, install, '-y', nftables]\n"
+    else
+      ""
+    end
+    nft_safe_sudo_allow = <<NFT_ADD_COMMS
+  - [nft, add, table, ip6, filter]
+  - [nft, add, chain, ip6, filter, output, "{", type, filter, hook, output, priority, 0, ";", "}"]
+  - [nft, add, rule, ip6, filter, output, ip6, daddr, 'fd00:0b1c:100d:5AFE::/56', meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
+NFT_ADD_COMMS
+
+    nft_safe_sudo_allow_inst = install_cmd + nft_safe_sudo_allow
+
     vp.write_user_data(<<EOS)
 #cloud-config
 users:
@@ -485,12 +498,11 @@ users:
 ssh_pwauth: False
 
 runcmd:
-  - [ systemctl, daemon-reload]
+  - [systemctl, daemon-reload]
+#{nft_safe_sudo_allow_inst}
 
 bootcmd:
-  - [nft, add, table, ip6, filter]
-  - [nft, add, chain, ip6, filter, output, "{", type, filter, hook, output, priority, 0, ";", "}"]
-  - [nft, add, rule, ip6, filter, output, ip6, daddr, fd00:0b1c:100d:5AFE::/56, meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
+#{nft_safe_sudo_allow}
 
 #{generate_swap_config(swap_size_bytes)}
 EOS
