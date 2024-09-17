@@ -11,22 +11,26 @@ class CloverWeb
       unless (access_token = code_response[:access_token]) &&
           (installation_response = Octokit::Client.new(access_token: access_token).get("/user/installations")[:installations].find { _1[:id].to_s == installation_id })
         flash["error"] = "GitHub App installation failed."
+        Clog.emit("GitHub callback failed due to lack of access") { {installation_failed: {id: installation_id}} }
         r.redirect "/dashboard"
       end
 
       if (installation = GithubInstallation[installation_id: installation_id])
         Authorization.authorize(@current_user.id, "Project:github", installation.project.id)
         flash["notice"] = "GitHub runner integration is already enabled for #{installation.project.name} project."
+        Clog.emit("GitHub installation already exists") { {installation_failed: {id: installation_id}} }
         r.redirect "#{installation.project.path}/github"
       end
 
       unless (project = Project[session.delete("github_installation_project_id")])
         flash["error"] = "Install GitHub App from project's 'GitHub Runners' page."
+        Clog.emit("GitHub callback failed due to lack of project in the session") { {installation_failed: {id: installation_id}} }
         r.redirect "/dashboard"
       end
 
       if project.accounts.any? { !_1.suspended_at.nil? }
         flash["error"] = "GitHub runner integration is not allowed for suspended accounts."
+        Clog.emit("GitHub callback failed due to suspended accounts") { {installation_failed: {id: installation_id}} }
         r.redirect "/dashboard"
       end
 
