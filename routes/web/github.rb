@@ -11,11 +11,13 @@ class CloverWeb
       if (installation = GithubInstallation[installation_id: installation_id])
         Authorization.authorize(@current_user.id, "Project:github", installation.project.id)
         flash["notice"] = "GitHub runner integration is already enabled for #{installation.project.name} project."
+        Clog.emit("GitHub installation already exists") { {installation_failed: {id: installation_id, account_ubid: @current_user.ubid}} }
         r.redirect "#{installation.project.path}/github"
       end
 
       unless (project = Project[session.delete("github_installation_project_id")])
         flash["error"] = "You should initiate the GitHub App installation request from the project's GitHub runner integration page."
+        Clog.emit("GitHub callback failed due to lack of project in the session") { {installation_failed: {id: installation_id, account_ubid: @current_user.ubid}} }
         r.redirect "/dashboard"
       end
 
@@ -23,21 +25,25 @@ class CloverWeb
 
       if setup_action == "request"
         flash["notice"] = "The GitHub App installation request is awaiting approval from the GitHub organization's administrator. As GitHub will redirect your admin back to the Ubicloud console, the admin needs to have an Ubicloud account with the necessary permissions to finalize the installation. Please invite the admin to your project if they don't have an account yet."
+        Clog.emit("GitHub installation initiated by non-admin user") { {installation_failed: {id: installation_id, account_ubid: @current_user.ubid}} }
         r.redirect "#{project.path}/user"
       end
 
       unless (access_token = code_response[:access_token])
         flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@ubicloud.com"
+        Clog.emit("GitHub callback failed due to lack of permission") { {installation_failed: {id: installation_id, account_ubid: @current_user.ubid}} }
         r.redirect "#{project.path}/github"
       end
 
       unless (installation_response = Octokit::Client.new(access_token: access_token).get("/user/installations")[:installations].find { _1[:id].to_s == installation_id })
         flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@ubicloud.com"
+        Clog.emit("GitHub callback failed due to lack of installation") { {installation_failed: {id: installation_id, account_ubid: @current_user.ubid}} }
         r.redirect "#{project.path}/github"
       end
 
       if @current_user.suspended_at
         flash["error"] = "GitHub runner integration is not allowed for suspended accounts."
+        Clog.emit("GitHub callback failed due to suspended account") { {installation_failed: {id: installation_id, account_ubid: @current_user.ubid}} }
         r.redirect "#{project.path}/dashboard"
       end
 
