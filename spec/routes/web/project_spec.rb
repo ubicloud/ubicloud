@@ -197,7 +197,7 @@ RSpec.describe Clover, "project" do
 
       it "can invite non-existent user to project" do
         visit "#{project.path}/user"
-        new_email = "new@example.com"
+        new_email = "newUpper@example.com"
         expect(page).to have_content user.email
 
         fill_in "Email", with: new_email
@@ -209,10 +209,10 @@ RSpec.describe Clover, "project" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
         expect(ProjectInvitation.where(email: new_email).count).to eq 1
 
-        fill_in "Email", with: new_email
+        fill_in "Email", with: new_email.downcase
         click_button "Invite"
 
-        expect(page).to have_content "'#{new_email}' already invited to join the project."
+        expect(page).to have_content "'#{new_email.downcase}' already invited to join the project."
       end
 
       it "can remove user from project" do
