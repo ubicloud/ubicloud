@@ -127,7 +127,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         .map do
         {
           ubid: _1.ubid,
-          api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" }.map(&:key_hash),
+          api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" }.map(&:key),
           quota_rps: 1.0,
           quota_tps: 100.0
         }
@@ -135,7 +135,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     else
       [{
         ubid: inference_endpoint.project.ubid,
-        api_keys: inference_endpoint.api_keys.map(&:key_hash),
+        api_keys: inference_endpoint.api_keys.map(&:key),
         quota_rps: 1000000.0,
         quota_tps: 1000000.0
       }]
@@ -146,7 +146,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       projects: projects
     }
 
-    resp = vm.sshable.cmd("sudo curl -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
+    resp = vm.sshable.cmd("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
     project_usage = JSON.parse(resp)["projects"]
     # project_usage is a list of the following format:
     # [{"ubid":"aprojectubid","request_count":0,"prompt_token_count":0,"completion_token_count":0}, ...]
