@@ -1,29 +1,12 @@
 GEM
-  remote: https://rubygems.org/
   specs:
-    diff-lcs (1.5.0)
-    netaddr (2.0.6)
-    rspec (3.12.0)
-      rspec-core (~> 3.12.0)
-      rspec-expectations (~> 3.12.0)
-      rspec-mocks (~> 3.12.0)
-    rspec-core (3.12.2)
-      rspec-support (~> 3.12.0)
-    rspec-expectations (3.12.3)
-      diff-lcs (>= 1.2.0, < 2.0)
-      rspec-support (~> 3.12.0)
-    rspec-mocks (3.12.6)
-      diff-lcs (>= 1.2.0, < 2.0)
-      rspec-support (~> 3.12.0)
-    rspec-support (3.12.1)
 
 PLATFORMS
   aarch64-linux
+  arm64-darwin-23
   x86_64-linux
 
 DEPENDENCIES
-  netaddr
-  rspec
 
 BUNDLED WITH
-   2.4.10
+   2.5.17

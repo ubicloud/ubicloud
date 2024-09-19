@@ -10,6 +10,7 @@ Sequel.migration do
       column :owner_id, :uuid, null: false
       column :used_for, :text, null: false
       column :key, :text, collate: '"C"', null: false
+      column :is_valid, :boolean, null: false, default: true
       index [:owner_table, :owner_id]
     end
   end

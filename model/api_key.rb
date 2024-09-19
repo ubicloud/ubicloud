@@ -16,7 +16,7 @@ class ApiKey < Sequel::Model
   end
 
   def self.create_with_id(owner_table:, owner_id:, used_for:)
-    unless ["project", "inference_endpoint"].include?(owner_table)
+    unless ["project", "inference_endpoint"].include?(owner_table.to_s)
       fail "Invalid owner_table: #{owner_table}"
     end
 
@@ -27,5 +27,9 @@ class ApiKey < Sequel::Model
   def rotate
     new_key = SecureRandom.alphanumeric(32)
     update(key: new_key, updated_at: Time.now)
+  end
+
+  def valid?
+    is_valid
   end
 end

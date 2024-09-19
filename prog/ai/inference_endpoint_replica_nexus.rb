@@ -81,10 +81,11 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         inference_engine_params: inference_endpoint.engine_params,
         model: inference_endpoint.model_name,
         replica_ubid: inference_endpoint_replica.ubid,
-        public_endpoint: inference_endpoint.public,
+        public_endpoint: inference_endpoint.is_public,
         ssl_crt_path: https ? "/ie/workdir/ubi_cert.pem " : "",
         ssl_key_path: https ? "/ie/workdir/ubi_key.pem " : "",
-        is_development: Config.development?
+        use_self_signed_cert: Config.development?,
+        gateway_port: inference_endpoint.load_balancer.dst_port
       }
       params_json = JSON.generate(params)
       vm.sshable.cmd("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", stdin: params_json)
@@ -121,13 +122,13 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
   # pushes latest config to inference gateway and collects billing information
   def ping_gateway
-    projects = if inference_endpoint.public
+    projects = if inference_endpoint.is_public
       Project.all
-        .select { _1.get_ff_inference_endpoint && _1.api_keys.any? { |k| k.used_for == "inference_endpoint" } }
+        .select { _1.get_ff_inference_endpoint && _1.api_keys.any? { |k| k.used_for == "inference_endpoint" && k.is_valid } }
         .map do
         {
           ubid: _1.ubid,
-          api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" }.map(&:key),
+          api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map(&:key),
           quota_rps: 1.0,
           quota_tps: 100.0
         }
@@ -135,14 +136,14 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     else
       [{
         ubid: inference_endpoint.project.ubid,
-        api_keys: inference_endpoint.api_keys.map(&:key),
-        quota_rps: 1000000.0,
+        api_keys: inference_endpoint.api_keys.select(&:is_valid).map(&:key),
+        quota_rps: 100.0,
         quota_tps: 1000000.0
       }]
     end
     body = {
       replica_ubid: inference_endpoint_replica.ubid,
-      public_endpoint: inference_endpoint.public,
+      public_endpoint: inference_endpoint.is_public,
       projects: projects
     }
 

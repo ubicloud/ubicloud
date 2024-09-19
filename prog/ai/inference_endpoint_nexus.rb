@@ -13,8 +13,8 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   semaphore :destroy
 
   def self.assemble_with_model(project_id:, location:, name:, model_id:,
-    replica_count: 1, public: false)
-    model = Option::MODELS.detect { _1["id"] == model_id }
+    replica_count: 1, is_public: false)
+    model = Option::AI_MODELS.detect { _1["id"] == model_id }
 
     fail "Model with id #{model_id} not found" unless model
 
@@ -29,12 +29,12 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       engine: model["engine"],
       engine_params: model["engine_params"],
       replica_count: replica_count,
-      public: public
+      is_public: is_public
     )
   end
 
   def self.assemble(project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:, model_name:,
-    engine:, engine_params:, replica_count:, public:)
+    engine:, engine_params:, replica_count:, is_public:)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -51,15 +51,15 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       firewall = internal_project.firewalls_dataset.where(location: location).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
       fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{location}" unless firewall
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location: location, firewall_id: firewall.id)
-      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 8080, dst_port: 8080, health_check_endpoint: "/up", health_check_protocol: "https") #Config.production? ? "https" : "http"
+      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 443, health_check_endpoint: "/up", health_check_protocol: "https") # Config.production? ? "https" : "http"
 
       inference_endpoint = InferenceEndpoint.create(
         project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, storage_volumes: storage_volumes,
-        model_name: model_name, engine: engine, engine_params: engine_params, replica_count: replica_count, public: public,
+        model_name: model_name, engine: engine, engine_params: engine_params, replica_count: replica_count, is_public: is_public,
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
       ) { _1.id = ubid.to_uuid }
       inference_endpoint.associate_with_project(project)
-      ApiKey.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint", used_for: "inference_endpoint") unless public
+      ApiKey.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint", used_for: "inference_endpoint") unless is_public
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { _1.id = inference_endpoint.id }
     end

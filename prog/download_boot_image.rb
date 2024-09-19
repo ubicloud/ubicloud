@@ -58,7 +58,8 @@ class Prog::DownloadBootImage < Prog::Base
         }
         image_family = image_name.split("-").first
         suffix = suffixes.fetch(image_family, nil)
-        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}-#{vm_host.arch}-#{version}.#{suffix}", 60 * 60).to_s
+        arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
+        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}#{arch}#{version}.#{suffix}", 60 * 60).to_s
       elsif image_name == "ubuntu-noble"
         arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
         "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
@@ -105,8 +106,8 @@ class Prog::DownloadBootImage < Prog::Base
       ["github-gpu-ubuntu-2204", "x64", "20240818.1.0"] => "c366cc99107b1ea9c12cc6cfc03073a90f3aad011e333a59e0b6cfdc36776568",
       ["postgres-ubuntu-2204", "x64", "20240226.1.0"] => "f8a2b78189239717355b54ecf62a504a349c96b1ab6a21919984f58c2a367617",
       ["postgres-ubuntu-2204", "x64", "20240702.3.0"] => "02dfa6e844fa3e72224f2f0f1811e039221acee07d6b05b507d49ae17f84d0ce",
-      ["ai-ubuntu-2404", "x64", "20240820.1.0"] => "abd4a967ecced9f80f7b6012eb4c8627a8c33935a76d99cf6cab5a493c51d140",
-      ["ai-model-google-gemma-2-2b-it", "x64", "20240820.1.0"] => "72c6b58b0c00771c69081fbd97b1773d6936a22e572d2268fc7edf789f624a7a"
+      ["ai-ubuntu-2404-nvidia", "x64", "20240918.1.0"] => "8c35a729f68d5b2fb3cabf597217f1a4862d3ddab692ff04e1df40e91023de9c",
+      ["ai-model-gemma-2-2b-it", "x64", "20240918.1.0"] => "b726ead6d5f48fb8e6de7efb48fb22367c9a7c155cfee71a3a7e5527be5df08e"
     }
 
     # YYY: In future all images should be checked for sha256 sum, so the nil

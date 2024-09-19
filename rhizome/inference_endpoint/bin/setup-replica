@@ -15,7 +15,8 @@ begin
   public_endpoint = params.fetch("public_endpoint")
   ssl_crt_path = params.fetch("ssl_crt_path")
   ssl_key_path = params.fetch("ssl_key_path")
-  is_development = params.fetch("is_development")
+  use_self_signed_cert = params.fetch("use_self_signed_cert")
+  gateway_port = params.fetch("gateway_port")
 rescue KeyError => e
   puts "Needed #{e.key} in parameters"
   exit 1
@@ -29,5 +30,6 @@ replica_setup.prep(
   public_endpoint: public_endpoint,
   ssl_crt_path: ssl_crt_path,
   ssl_key_path: ssl_key_path,
-  is_development: is_development
+  use_self_signed_cert: use_self_signed_cert,
+  gateway_port: gateway_port
 )

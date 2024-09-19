@@ -122,7 +122,7 @@ class Project < Sequel::Model
     effective_quota_value(resource_type) >= current_resource_usage(resource_type) + requested_additional_usage
   end
 
-  def create_api_key(used_for)
+  def create_api_key(used_for: "inference_endpoint")
     ApiKey.create_with_id(owner_table: Project.table_name, owner_id: id, used_for: used_for)
   end
 

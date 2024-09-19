@@ -10,10 +10,10 @@ require "base64"
 require "uri"
 
 class ReplicaSetup
-  def prep(inference_engine:, inference_engine_params:, model:, replica_ubid:, public_endpoint:, ssl_crt_path:, ssl_key_path:, is_development:)
+  def prep(inference_engine:, inference_engine_params:, model:, replica_ubid:, public_endpoint:, ssl_crt_path:, ssl_key_path:, use_self_signed_cert:, gateway_port:)
     engine_start_cmd = engine_start_command(inference_engine: inference_engine, inference_engine_params: inference_engine_params, model: model)
-    write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path)
-    install_systemd_units(engine_start_cmd, is_development)
+    write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path, gateway_port)
+    install_systemd_units(engine_start_cmd, use_self_signed_cert)
     start_systemd_units
   end
 
@@ -45,19 +45,20 @@ class ReplicaSetup
   def engine_start_command(inference_engine:, inference_engine_params:, model:)
     case inference_engine
     when "vllm"
-      "/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/#{model} --served-model-name #{model} --disable-log-requests --host 127.0.0.1 #{inference_engine_params}"
+      "/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name #{model} --disable-log-requests --host 127.0.0.1 #{inference_engine_params}"
     else
       fail "BUG: unsupported inference engine"
     end
   end
 
-  def write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path)
+  def write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path, gateway_port)
     safe_write_to_file("/ie/workdir/inference-gateway.conf", <<CONFIG)
 RUST_BACKTRACE=1
 RUST_LOG=info
 IG_DAEMON=true
 IG_LOG="/ie/workdir/inference-gateway.log"
 IG_PID_FILE="/ie/workdir/inference-gateway.pid"
+IG_LISTEN_ADDRESS="0.0.0.0:#{gateway_port}"
 IG_UPGRADE_UDS="/ie/workdir/inference-gateway.upgrade.sock"
 IG_REPLICA_UBID=#{replica_ubid}
 IG_PUBLIC_ENDPOINT=#{public_endpoint}
@@ -67,7 +68,7 @@ IG_SSL_KEY_PATH=#{ssl_key_path}
 CONFIG
   end
 
-  def install_systemd_units(engine_start_command, is_development)
+  def install_systemd_units(engine_start_command, use_self_signed_cert)
     write_inference_gateway_service <<GATEWAY
 [Unit]
 Description=Inference Gateway
@@ -77,7 +78,7 @@ After=network.target
 EnvironmentFile=/ie/workdir/inference-gateway.conf
 Type=forking
 PIDFile=/ie/workdir/inference-gateway.pid
-ExecStartPre=/home/ubi/inference_endpoint/bin/get-lb-cert #{is_development ? "dev" : "prod"}
+ExecStartPre=/home/ubi/inference_endpoint/bin/get-lb-cert #{use_self_signed_cert ? "self-signed" : "load-balancer"}
 ExecStart=/opt/inference-gateway/inference-gateway
 LimitNOFILE=65536
 GATEWAY
@@ -95,6 +96,7 @@ Environment=HF_HOME=/ie/workdir
 Environment=XDG_CACHE_HOME=/ie/workdir/.cache
 Environment=XDG_CONFIG_HOME=/ie/workdir/.config
 Environment=OUTLINES_CACHE_DIR=/ie/workdir/.outlines
+Environment=TRITON_CACHE_DIR=/ie/workdir/.triton
 WorkingDirectory=/ie/workdir
 User=ie
 Group=ie

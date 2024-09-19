@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ueo pipefail
 
-if [ "$1" = "dev" ]; then
+if [ "$1" = "self-signed" ]; then
     openssl req -x509 -out /ie/workdir/ubi_cert.pem -keyout /ie/workdir/ubi_key.pem -newkey rsa:2048 -nodes -sha256 -subj '/CN=localhost'
 else
     curl -f -L3 [FD00:0B1C:100D:5afe:CE::]:8080/load-balancer/cert.pem > /ie/workdir/ubi_cert.pem
