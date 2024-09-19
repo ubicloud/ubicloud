@@ -222,87 +222,15 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
     COMMAND
 
-    # Remove comments and empty lines before sending them to the machine
-    vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
-
     if github_runner.installation.project.get_ff_transparent_cache
-      hop_setup_forked_runner
+      local_ip = vm.nics.first.private_ipv4.network.to_s
+      command += <<~COMMAND
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://#{local_ip}:51123/random_token/" | sudo tee -a /etc/environment
+      COMMAND
     end
 
-    hop_register_runner
-  end
-
-  label def setup_forked_runner
-    tarball_uri = (label_data["arch"] == "arm64") ? Config.github_cache_forked_runner_tarball_uri_arm64 : Config.github_cache_forked_runner_tarball_uri
-
-    local_ip = vm.nics.first.private_ipv4.network.to_s
-
-    command = <<~COMMAND
-      curl --output actions-runner.tar.gz -L #{tarball_uri}
-
-      rm -rf actions-runner
-      mkdir -p actions-runner
-      tar xzf actions-runner.tar.gz -C actions-runner
-
-      sudo chown -R runneradmin:runneradmin ./actions-runner
-      ./actions-runner/env.sh
-
-      cat <<EOT > ./actions-runner/run-withenv.sh
-      #!/bin/bash
-      mapfile -t env </etc/environment
-      exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
-      EOT
-      chmod +x ./actions-runner/run-withenv.sh
-
-      jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
-
-      echo "PATH=$PATH" >> ./actions-runner/.env
-
-      sudo rm -rf /home/runner/actions-runner
-      sudo mv ./actions-runner /home/runner/
-      sudo chown -R runner:runner /home/runner/actions-runner
-
-      echo "CUSTOM_ACTIONS_CACHE_URL=http://#{local_ip}:51123/random_token/" | sudo tee -a /etc/environment
-      echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
-    COMMAND
-
-    vm.sshable.cmd(command.gsub(/^\s*\n/, ""))
-
-    hop_clear_ubicloud_resolve_conf
-  end
-
-  label def clear_ubicloud_resolve_conf
-    command = <<~COMMAND
-      sudo rm -f /etc/systemd/resolved.conf.d/Ubicloud.conf
-      sudo systemctl restart systemd-resolved
-      sudo systemctl restart docker
-    COMMAND
-
-    vm.sshable.cmd(command.gsub(/^\s*\n/, ""))
-
-    hop_download_proxy
-  end
-
-  label def download_proxy
-    command = <<~COMMAND
-      sudo rm -rf cache-proxy
-      sudo git clone #{Config.github_cache_proxy_repo_uri} cache-proxy
-    COMMAND
-
-    vm.sshable.cmd(command)
-
-    hop_start_proxy
-  end
-
-  label def start_proxy
-    command = <<~COMMAND
-      export UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/
-      export UBICLOUD_RUNTIME_TOKEN=#{vm.runtime_token}
-      cd cache-proxy
-      go run transparent_cache_proxy.go > ~/cacheproxy.log 2>&1 &
-    COMMAND
-
-    vm.sshable.cmd(command)
+    # Remove comments and empty lines before sending them to the machine
+    vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
 
     hop_register_runner
   end

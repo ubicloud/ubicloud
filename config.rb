@@ -105,9 +105,6 @@ module Config
   optional :github_cache_blob_storage_secret_key, string, clear: true
   optional :github_cache_blob_storage_account_id, string
   optional :github_cache_blob_storage_api_key, string, clear: true
-  optional :github_cache_forked_runner_tarball_uri, string
-  optional :github_cache_forked_runner_tarball_uri_arm64, string
-  optional :github_cache_proxy_repo_uri, string, clear: true
 
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
