@@ -75,9 +75,9 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runners")
       expect(page).to have_content "test-user"
-      expect(page).to have_link "Configure", href: ins1.installation_url
+      expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins1.installation_id}/
       expect(page).to have_content "test-org"
-      expect(page).to have_link "Configure", href: ins2.installation_url
+      expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins2.installation_id}/
     end
 
     it "can list active runners" do

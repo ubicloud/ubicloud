@@ -7,7 +7,7 @@ class Serializers::GithubInstallation < Serializers::Base
       name: ins.name,
       type: ins.type,
       installation_id: ins.installation_id,
-      installation_url: ins.installation_url
+      installation_url: "https://github.com/apps/#{Config.github_app_name}/installations/#{ins.installation_id}"
     }
   end
 end
