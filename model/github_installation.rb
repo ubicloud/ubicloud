@@ -9,13 +9,6 @@ class GithubInstallation < Sequel::Model
 
   include ResourceMethods
 
-  def installation_url
-    if type == "Organization"
-      return "https://github.com/organizations/#{name}/settings/installations/#{installation_id}"
-    end
-    "https://github.com/settings/installations/#{installation_id}"
-  end
-
   def total_active_runner_cores
     runner_labels = runners_dataset.left_join(:strand, id: :id).exclude(Sequel[:strand][:label] => "start").exclude(Sequel[:strand][:label] => "wait_concurrency_limit").select_map(Sequel[:github_runner][:label])
     label_record_data_set = runner_labels.map { |label| Github.runner_labels[label] }
