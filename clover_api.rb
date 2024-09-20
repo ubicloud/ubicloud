@@ -84,7 +84,7 @@ class CloverApi < Roda
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI) unless const_defined?(:SCHEMA)
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true, prefix: "/api") unless const_defined?(:SCHEMA_ROUTER)
 
-  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api"
+  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api", raise: true
 
   route do |r|
     r.rodauth
