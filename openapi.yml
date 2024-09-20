@@ -945,9 +945,11 @@ components:
         type: string
   schemas:
     Error:
+      additionalProperties: false
       type: object
       properties:
         error:
+          additionalProperties: false
           type: object
           properties:
             code:
@@ -959,6 +961,12 @@ components:
             type:
               type: string
               example: InvalidCredentials
+          required:
+            - code
+            - message
+            - type
+      required:
+        - error
     Firewall:
       type: object
       properties:
@@ -1149,6 +1157,8 @@ components:
         unix_user:
           description: Unix user of the VM
           type: string
+      required:
+        - name
     VmDetailed:
       type: object
       allOf:
