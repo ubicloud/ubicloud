@@ -65,9 +65,9 @@ class CloverApi < Roda
 
         hash.clear
         hash["error"] = {
-          "code" => code,
-          "type" => type,
-          "message" => error_message
+          code: code,
+          type: type,
+          message: error_message
         }
       end
 
