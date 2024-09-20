@@ -444,6 +444,36 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect { nx.setup_forked_runner }.to hop("download_proxy")
     end
+
+    it "hops to register_runner arm" do
+      expect(Config).to receive_messages(github_cache_forked_runner_tarball_uri_arm64: "https://github.com/foo/tarball")
+      expect(github_runner).to receive(:label).and_return("ubicloud-arm").at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        curl --output actions-runner.tar.gz -L https://github.com/foo/tarball
+        rm -rf actions-runner
+        mkdir -p actions-runner
+        tar xzf actions-runner.tar.gz -C actions-runner
+        sudo chown -R runneradmin:runneradmin ./actions-runner
+        ./actions-runner/env.sh
+        cat <<EOT > ./actions-runner/run-withenv.sh
+        #!/bin/bash
+        mapfile -t env </etc/environment
+        exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
+        EOT
+        chmod +x ./actions-runner/run-withenv.sh
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-arm\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
+        echo "PATH=$PATH" >> ./actions-runner/.env
+        sudo rm -rf /home/runner/actions-runner
+        sudo mv ./actions-runner /home/runner/
+        sudo chown -R runner:runner /home/runner/actions-runner
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://localhost:51123/random_token/" | sudo tee -a /etc/environment
+        echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
+      COMMAND
+
+      expect { nx.setup_forked_runner }.to hop("download_proxy")
+    end
   end
 
   describe "#download_proxy" do

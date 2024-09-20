@@ -233,8 +233,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def setup_forked_runner
+    tarball_uri = (label_data["arch"] == "arm64") ? Config.github_cache_forked_runner_tarball_uri_arm64 : Config.github_cache_forked_runner_tarball_uri
+
     command = <<~COMMAND
-      curl --output actions-runner.tar.gz -L #{Config.github_cache_forked_runner_tarball_uri}
+      curl --output actions-runner.tar.gz -L #{tarball_uri}
 
       rm -rf actions-runner
       mkdir -p actions-runner
