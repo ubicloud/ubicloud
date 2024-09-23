@@ -10,9 +10,9 @@ require "base64"
 require "uri"
 
 class ReplicaSetup
-  def prep(inference_engine:, inference_engine_params:, model:, replica_ubid:, public_endpoint:, ssl_crt_path:, ssl_key_path:, use_self_signed_cert:, gateway_port:)
+  def prep(inference_engine:, inference_engine_params:, model:, replica_ubid:, ssl_crt_path:, ssl_key_path:, use_self_signed_cert:, gateway_port:)
     engine_start_cmd = engine_start_command(inference_engine: inference_engine, inference_engine_params: inference_engine_params, model: model)
-    write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path, gateway_port)
+    write_config_files(replica_ubid, ssl_crt_path, ssl_key_path, gateway_port)
     install_systemd_units(engine_start_cmd, use_self_signed_cert)
     start_systemd_units
   end
@@ -51,18 +51,17 @@ class ReplicaSetup
     end
   end
 
-  def write_config_files(replica_ubid, public_endpoint, ssl_crt_path, ssl_key_path, gateway_port)
+  def write_config_files(replica_ubid, ssl_crt_path, ssl_key_path, gateway_port)
     safe_write_to_file("/ie/workdir/inference-gateway.conf", <<CONFIG)
 RUST_BACKTRACE=1
 RUST_LOG=info
 IG_DAEMON=true
 IG_LOG="/ie/workdir/inference-gateway.log"
 IG_PID_FILE="/ie/workdir/inference-gateway.pid"
-IG_LISTEN_ADDRESS="0.0.0.0:#{gateway_port}"
 IG_UPGRADE_UDS="/ie/workdir/inference-gateway.upgrade.sock"
-IG_REPLICA_UBID=#{replica_ubid}
-IG_PUBLIC_ENDPOINT=#{public_endpoint}
 IG_CLOVER_UDS="/ie/workdir/inference-gateway.clover.sock"
+IG_LISTEN_ADDRESS="0.0.0.0:#{gateway_port}"
+IG_REPLICA_UBID=#{replica_ubid}
 IG_SSL_CRT_PATH=#{ssl_crt_path}
 IG_SSL_KEY_PATH=#{ssl_key_path}
 CONFIG

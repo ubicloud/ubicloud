@@ -81,7 +81,6 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         inference_engine_params: inference_endpoint.engine_params,
         model: inference_endpoint.model_name,
         replica_ubid: inference_endpoint_replica.ubid,
-        public_endpoint: inference_endpoint.is_public,
         ssl_crt_path: https ? "/ie/workdir/ubi_cert.pem " : "",
         ssl_key_path: https ? "/ie/workdir/ubi_key.pem " : "",
         use_self_signed_cert: Config.development?,

@@ -20,7 +20,7 @@ Sequel.migration do
       foreign_key :project_id, :project, type: :uuid, null: false
       foreign_key :load_balancer_id, :load_balancer, type: :uuid, null: false
       foreign_key :private_subnet_id, :private_subnet, type: :uuid, null: false
-      index :public
+      index :is_public
     end
 
     create_table(:inference_endpoint_replica) do

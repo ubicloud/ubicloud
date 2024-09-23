@@ -12,7 +12,6 @@ begin
   inference_engine_params = params.fetch("inference_engine_params")
   model = params.fetch("model")
   replica_ubid = params.fetch("replica_ubid")
-  public_endpoint = params.fetch("public_endpoint")
   ssl_crt_path = params.fetch("ssl_crt_path")
   ssl_key_path = params.fetch("ssl_key_path")
   use_self_signed_cert = params.fetch("use_self_signed_cert")
@@ -27,7 +26,6 @@ replica_setup.prep(
   inference_engine_params: inference_engine_params,
   model: model,
   replica_ubid: replica_ubid,
-  public_endpoint: public_endpoint,
   ssl_crt_path: ssl_crt_path,
   ssl_key_path: ssl_key_path,
   use_self_signed_cert: use_self_signed_cert,

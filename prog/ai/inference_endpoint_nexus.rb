@@ -59,7 +59,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
       ) { _1.id = ubid.to_uuid }
       inference_endpoint.associate_with_project(project)
-      ApiKey.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint", used_for: "inference_endpoint") unless is_public
+      ApiKey.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint", used_for: "inference_endpoint")
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { _1.id = inference_endpoint.id }
     end
@@ -75,6 +75,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
 
   label def start
     reconcile_replicas
+    register_deadline(:wait, 10 * 60)
     hop_wait_replicas
   end
 
@@ -84,7 +85,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   end
 
   label def wait
-    reconcile_replicas unless when_destroy_set?
+    reconcile_replicas
 
     nap 60
   end
@@ -93,7 +94,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     register_deadline(nil, 5 * 60)
     decr_destroy
 
-    strand.children.each(&:destroy)
+    # strand.children.each(&:destroy)
     replicas.each(&:incr_destroy)
     load_balancer.incr_destroy
     private_subnet.incr_destroy
