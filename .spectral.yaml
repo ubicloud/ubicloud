@@ -3,7 +3,7 @@ rules:
   operation-description: off
   require-additional-properties-with-properties:
     description: "Any element with properties also has additionalProperties false"
-    given: $..[?(@.properties)]
+    given: $..[?(@ && @.properties)]
     severity: error
     then:
       - field: additionalProperties
@@ -12,7 +12,7 @@ rules:
         function: falsy
   require-required-with-properties:
     description: "Any element with properties also has required array"
-    given: $..[?(@.properties)]
+    given: $..[?(@ && @.properties)]
     severity: error
     then:
       - field: required
