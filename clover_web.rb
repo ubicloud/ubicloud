@@ -328,6 +328,17 @@ class CloverWeb < Roda
     auto_add_recovery_codes? true
     auto_remove_recovery_codes? true
     recovery_auth_view { view "auth/recovery_auth", "Recovery Codes" }
+
+    # Password Requirements
+    password_minimum_length 8
+    password_maximum_bytes 72
+    password_meets_requirements? do |password|
+      password.match?(/[a-z]/) && password.match?(/[A-Z]/) && password.match?(/[0-9]/)
+    end
+
+    invalid_password_message = "Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit."
+    password_does_not_meet_requirements_message invalid_password_message
+    password_too_short_message invalid_password_message
   end
 
   def csrf_tag(*)
