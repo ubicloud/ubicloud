@@ -40,7 +40,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     when PostgresResource::HaType::SYNC then 2
     else 0
     end
-
     flavor = request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
 
     requested_postgres_core_count = (requested_standby_count + 1) * parsed_size.vcpu / 2
@@ -231,6 +230,9 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
   def view_create_page
     Authorization.authorize(@user.id, "Postgres:create", project.id)
+    flavor = @request.params["flavor"] || PostgresResource::Flavor::STANDARD
+    Validation.validate_postgres_flavor(flavor)
+    @app.instance_variable_set(:@flavor, flavor)
     @app.instance_variable_set(:@prices, @app.fetch_location_based_prices("PostgresCores", "PostgresStorage"))
     @app.instance_variable_set(:@has_valid_payment_method, project.has_valid_payment_method?)
     @app.instance_variable_set(:@enabled_postgres_sizes, Option::VmSizes.select { project.quota_available?("PostgresCores", _1.vcpu / 2) }.map(&:name))

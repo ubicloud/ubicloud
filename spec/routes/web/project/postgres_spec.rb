@@ -75,7 +75,7 @@ RSpec.describe Clover, "postgres" do
 
     describe "create" do
       it "can create new PostgreSQL database" do
-        visit "#{project.path}/postgres/create"
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
         name = "new-pg-db"
@@ -90,6 +90,32 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "'#{name}' will be ready in a few minutes"
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.projects.first.id).to eq(project.id)
+      end
+
+      it "can create new ParadeDB PostgreSQL database" do
+        expect(Util).to receive(:send_email)
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
+
+        expect(page.title).to eq("Ubicloud - Create ParadeDB PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: "eu-central-h1"
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        check "Accept Terms of Service and Privacy Policy"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_content "'#{name}' will be ready in a few minutes"
+        expect(PostgresResource.count).to eq(1)
+        expect(PostgresResource.first.projects.first.id).to eq(project.id)
+      end
+
+      it "can not open create page with invalid flavor" do
+        visit "#{project.path}/postgres/create?flavor=invalid"
+
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
       end
 
       it "can not create PostgreSQL database with same name" do
