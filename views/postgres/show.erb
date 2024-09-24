@@ -45,7 +45,53 @@
   else
     data.push(["Connection String", @pg[:connection_string], { copieble: true, revealable: true }])
   end %>
-  <%== render("components/kv_data_card", locals: { data: data }) %>
+
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-6">
+    <div class="<%= (@pg[:flavor] == PostgresResource::Flavor::STANDARD) ? "col-span-6" : "md:col-span-3" %>">
+      <%== render("components/kv_data_card", locals: { data: data }) %>
+    </div>
+    <% if @pg[:flavor] == PostgresResource::Flavor::PARADEDB %>
+      <div class="md:col-span-3">
+        <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+          <div class="px-4 py-5 sm:p-6">
+            <div class="space-y-2">
+              <img src="/logo-paradedb.png" class="h-6 object-contain mb-4"/>
+              <p class="text-sm text-gray-500 leading-6">
+                ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the
+                ParadeDB team and are optimal for search and analytics workloads.
+              </p>
+              <div class="text-sm text-gray-500 leading-6">
+                <span class="font-semibold">Support:</span>
+                <ul class="list-disc list-inside ml-2">
+                  <li>Via email at
+                    <a href="mailto:support@paradedb.com" class="text-orange-600 font-semibold">support@paradedb.com</a></li>
+                  <li>Via Slack at
+                    <a
+                      href="https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ"
+                      target="_blank"
+                      class="text-orange-600 font-semibold"
+                    >ParadeDB Community Slack</a></li>
+                </ul>
+              </div>
+              <div class="text-sm text-gray-500 leading-6">
+                <span class="font-semibold">Documentation:</span>
+                <ul class="list-disc list-inside ml-2">
+                  <li>To start writing queries:
+                    <a href="https://docs.paradedb.com/welcome/quickstart" class="text-orange-600 font-semibold">https://docs.paradedb.com/welcome/quickstart</a></li>
+                  <li>To ingest data from existing database(s) or data lake(s):
+                    <a href="https://docs.paradedb.com/ingest/quickstart" class="text-orange-600 font-semibold">https://docs.paradedb.com/ingest/quickstart</a></li>
+                </ul>
+              </div>
+              <p class="text-sm text-gray-500 leading-6">
+                * Note that ingesting into Ubicloud ParadeDB PostgreSQL via logical replication is not yet supported.
+                All other ParadeDB ingestion schemes are supported.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
   <!-- Fork database -->
   <% if @pg[:earliest_restore_time] && @pg[:latest_restore_time] > @pg[:earliest_restore_time] %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
