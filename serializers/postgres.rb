@@ -9,7 +9,8 @@ class Serializers::Postgres < Serializers::Base
       location: pg.display_location,
       vm_size: pg.target_vm_size,
       storage_size_gib: pg.target_storage_size_gib,
-      ha_type: pg.ha_type
+      ha_type: pg.ha_type,
+      flavor: pg.flavor
     }
 
     if options[:include_path]
