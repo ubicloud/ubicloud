@@ -52,7 +52,8 @@ class PostgresServer < Sequel::Model
       lc_messages: "'C.UTF-8'",
       lc_monetary: "'C.UTF-8'",
       lc_numeric: "'C.UTF-8'",
-      lc_time: "'C.UTF-8'"
+      lc_time: "'C.UTF-8'",
+      shared_preload_libraries: "'pg_cron,pg_stat_statements'"
     }
 
     if timeline.blob_storage
