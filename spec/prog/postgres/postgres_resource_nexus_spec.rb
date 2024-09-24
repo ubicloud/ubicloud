@@ -9,7 +9,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     instance_double(
       PostgresResource,
       ubid: "pgnjbsrja7ka4nk7ptcg03szg2",
-      location: "hetzner-hel1",
+      location: "hetzner-fsn1",
       root_cert_1: "root cert 1",
       root_cert_key_1: nil,
       root_cert_2: "root cert 2",
@@ -259,6 +259,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#create_billing_record" do
     it "creates billing record for cores and storage then hops" do
       expect(postgres_resource).to receive(:required_standby_count).and_return(1)
+      expect(postgres_resource).to receive(:flavor).and_return("standard").at_least(:once)
 
       expect(BillingRecord).to receive(:create_with_id).with(
         project_id: postgres_resource.project_id,
