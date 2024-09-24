@@ -1,8 +1,14 @@
-<% @page_title = "Create PostgreSQL Database" %>
+<%
+  @page_title, logo = if @flavor == PostgresResource::Flavor::PARADEDB
+    ["Create ParadeDB PostgreSQL Database", "logo-paradedb.png"]
+  else
+    ["Create PostgreSQL Database", nil]
+  end
+%>
 
 <%== render("components/billing_warning") %>
 
-<div class="space-y-1">
+<div class="space-y-1 sticky -mx-10 px-10 top-[2.9rem] bg-gray-50 z-30">
   <%== render(
     "components/breadcrumb",
     locals: {
@@ -15,20 +21,26 @@
       ]
     }
   ) %>
-  <%== render("components/page_header", locals: { title: "Create PostgreSQL Database" }) %>
+
+  <%== render(
+    "components/page_header",
+    locals: {
+      title:  @page_title,
+      right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
+    }
+  ) %>
 </div>
 
 <div class="grid gap-6">
   <form action="<%= "#{@project_data[:path]}/postgres" %>" method="POST">
     <%== csrf_tag("#{@project_data[:path]}/postgres") %>
+    <%== render("components/form/hidden", locals: {name: "flavor", value: @flavor}) %>
     <!-- Create Card -->
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="space-y-12">
           <div>
-            <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
-            <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your PostgreSQL database.</p>
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+            <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="sm:col-span-3">
                 <%== render(
                   "components/form/text",
@@ -189,6 +201,37 @@
                 </div>
               </div>
 
+              <% if @flavor == PostgresResource::Flavor::PARADEDB %>
+                <div class="col-span-full">
+                  <div class="space-y-2">
+                    <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
+                    <div class="space-y-1 text-sm leading-6 text-gray-600">
+                      <p>
+                        ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads.
+                      </p>
+                      <div>
+                        <span class="font-semibold">Support:</span>
+                        <ul class="list-disc list-inside ml-2">
+                          <li>Via email at <a href="mailto:support@paradedb.com" class="text-orange-600 font-semibold">support@paradedb.com</a></li>
+                          <li>Via Slack at <a href="https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ" target="_blank" class="text-orange-600 font-semibold">ParadeDB Community Slack</a></li>
+                        </ul>
+
+                      </div>
+                      <p>
+                        By creating a ParadeDB PostgreSQL database on Ubicloud you accept the ParadeDB <a href="https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75" target="_blank" class="text-orange-600 font-semibold">Terms of Service</a> and consent to your email being shared with ParadeDB.
+                      </p>
+                    </div>
+                    <%== render(
+                      "components/form/checkbox",
+                      locals: {
+                        options: [
+                          ["1", "Accept <a href='https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://paradedb.notion.site/Privacy-Policy-a7ce333c45c8478fb03250dff7e573b7?pvs=4' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>", {}, {required: true}],
+                        ]
+                      }
+                    ) %>
+                  </div>
+                </div>
+              <% end %>
             </div>
           </div>
         </div>
