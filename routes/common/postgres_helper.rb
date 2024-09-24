@@ -30,7 +30,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
     required_parameters = ["size"]
     required_parameters << "name" << "location" if @mode == AppMode::WEB
-    allowed_optional_parameters = ["storage_size", "ha_type"]
+    allowed_optional_parameters = ["storage_size", "ha_type", "flavor"]
     request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
     parsed_size = Validation.validate_postgres_size(request_body_params["size"])
 
@@ -41,6 +41,8 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     else 0
     end
 
+    flavor = request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
+
     requested_postgres_core_count = (requested_standby_count + 1) * parsed_size.vcpu / 2
     Validation.validate_core_quota(project, "PostgresCores", requested_postgres_core_count)
 
@@ -50,7 +52,8 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       name: name,
       target_vm_size: parsed_size.vm_size,
       target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
-      ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
+      ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
+      flavor: flavor
     )
 
     if @mode == AppMode::API
@@ -172,6 +175,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       name: request_body_params["name"],
       target_vm_size: @resource.target_vm_size,
       target_storage_size_gib: @resource.target_storage_size_gib,
+      flavor: @resource.flavor,
       parent_id: @resource.id,
       restore_target: request_body_params["restore_target"]
     )
