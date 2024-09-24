@@ -18,6 +18,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       ubid = PostgresServer.generate_ubid
 
       postgres_resource = PostgresResource[resource_id]
+      boot_image = case postgres_resource.flavor
+      when PostgresResource::Flavor::STANDARD then "postgres-ubuntu-2204"
+      when PostgresResource::Flavor::PARADEDB then "postgres-paradedb-ubuntu-2204"
+      else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
+      end
+
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         "ubi",
         Config.postgres_service_project_id,
@@ -28,7 +34,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
           {encrypted: true, size_gib: 30},
           {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
         ],
-        boot_image: postgres_resource.project.get_ff_postgresql_base_image || "postgres-ubuntu-2204",
+        boot_image: postgres_resource.project.get_ff_postgresql_base_image || boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
         allow_only_ssh: true,
