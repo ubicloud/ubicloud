@@ -1,5 +1,12 @@
 <% @page_title = "PostgreSQL Databases" %>
 
+<%
+  flavors = {
+    "standard" => ["Ubicloud", "PostgreSQL Database", "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."],
+    "paradedb" => ["ParadeDB", "ParadeDB PostgreSQL Database", "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."]
+  }
+%>
+
 <% if @postgres_databases.count > 0 %>
   <div class="space-y-1">
     <%== render(
@@ -50,16 +57,46 @@
     </div>
   </div>
 <% else %>
+
+<div class="space-y-1">
   <%== render(
-    "components/empty_state",
+    "components/breadcrumb",
     locals: {
-      icon: "hero-circle-stack",
-      title: "No PostgreSQL databases",
-      description: "You don't have permission to create PostgreSQL database."
-    }.merge(has_project_permission("Postgres:create") ? {
-      description: "Get started by creating a new PostgreSQL database.",
-      button_link: "#{@project_data[:path]}/postgres/create",
-      button_title: "New PostgreSQL Database"
-    } : {})
+      back: "#{@project_data[:path]}/postgres",
+      parts: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"]
+      ]
+    }
   ) %>
+
+  <%== render("components/page_header", locals: { title: "Create PostgreSQL Database" }) %>
+</div>
+
+<div class="grid gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
+    <% flavors.each do |flavor, (brand, title, description)| %>
+      <div class="rounded-lg shadow group relative bg-white p-6">
+        <div>
+          <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
+            <img src="/icons/pg-<%= brand.downcase %>.png" class="object-cover"/>
+          </span>
+        </div>
+        <div class="mt-4">
+          <h3 class="text-base font-semibold leading-6 text-gray-900">
+            <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= flavor %>" class="focus:outline-none">
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              Create <%= title %>
+            </a>
+          </h3>
+          <p class="mt-2 text-sm text-gray-500"><%= description %></p>
+        </div>
+        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
+          <%== render("components/icon", locals: { name: "hero-arrow-up-right" }) %>
+        </span>
+      </div>
+    <% end %>
+  </div>
+</div>
 <% end %>

@@ -52,13 +52,14 @@ RSpec.describe Clover, "postgres" do
     end
 
     describe "list" do
-      it "can list when there is no postgres databases" do
+      it "can list flavors when there is no pg databases" do
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
-        expect(page).to have_content "No PostgreSQL databases"
+        expect(page).to have_content "Create PostgreSQL Database"
+        expect(page).to have_content "Create ParadeDB PostgreSQL Database"
 
-        click_link "New PostgreSQL Database"
+        click_link "Create PostgreSQL Database"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
       end
 
