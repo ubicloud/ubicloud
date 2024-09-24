@@ -109,6 +109,17 @@ RSpec.describe Clover, "postgres" do
         expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-sync")
       end
 
+      it "sends mail to partners" do
+        expect(Util).to receive(:send_email)
+
+        post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
+          size: "standard-2",
+          flavor: "paradedb"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
       it "invalid location" do
         post "/api/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",

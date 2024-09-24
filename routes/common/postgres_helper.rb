@@ -55,6 +55,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
       flavor: flavor
     )
+    send_notification_mail_to_partners(st.subject, @user.email)
 
     if @mode == AppMode::API
       Serializers::Postgres.serialize(st.subject, {detailed: true})
@@ -179,6 +180,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       parent_id: @resource.id,
       restore_target: request_body_params["restore_target"]
     )
+    send_notification_mail_to_partners(st.subject, @user.email)
 
     if @mode == AppMode::API
       Serializers::Postgres.serialize(st.subject, {detailed: true})
@@ -252,5 +254,20 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
 
     Serializers::Postgres.serialize(@resource, {detailed: true})
+  end
+
+  def send_notification_mail_to_partners(resource, user_email)
+    if resource.flavor == PostgresResource::Flavor::PARADEDB
+      Util.send_email(Config.postgres_paradedb_notification_email, "New ParadeDB Postgres database has been created.",
+        greeting: "Hello ParadeDB team,",
+        body: ["New ParadeDB Postgres database has been created.",
+          "Id: #{resource.ubid}",
+          "Location: #{resource.location}}",
+          "Name: #{resource.name}",
+          "E-Mail: #{user_email}}",
+          "Instance VM Size: #{resource.target_vm_size}}",
+          "Instance Storage Size: #{resource.target_storage_size_gib}}",
+          "HA: #{resource.ha_type}}"])
+    end
   end
 end
