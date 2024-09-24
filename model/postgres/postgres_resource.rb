@@ -104,6 +104,11 @@ class PostgresResource < Sequel::Model
     SYNC = "sync"
   end
 
+  module Flavor
+    STANDARD = "standard"
+    PARADEDB = "paradedb"
+  end
+
   def self.redacted_columns
     super + [:root_cert_1, :root_cert_2, :server_cert]
   end
