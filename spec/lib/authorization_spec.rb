@@ -117,6 +117,27 @@ RSpec.describe Authorization do
     end
   end
 
+  describe "#ManagedPolicy" do
+    it "apply" do
+      expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true]).to be_nil
+      described_class::ManagedPolicy::ADMIN.apply(projects[0], [users[0], nil, users[1]])
+      acl = AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first
+      expect(acl["subjects"]).to contain_exactly(users[0].hyper_tag_name)
+      expect(acl["actions"]).to eq(["*"])
+      expect(acl["objects"]).to eq(["project/#{projects[0].ubid}"])
+      users[1].associate_with_project(projects[0])
+      described_class::ManagedPolicy::ADMIN.apply(projects[0], [users[0], users[1]])
+      expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first["subjects"]).to contain_exactly(users[0].hyper_tag_name, users[1].hyper_tag_name)
+      described_class::ManagedPolicy::ADMIN.apply(projects[0], [])
+      expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first["subjects"]).to eq([])
+    end
+
+    it "from_name" do
+      expect(described_class::ManagedPolicy.from_name("admin")).to eq(described_class::ManagedPolicy::ADMIN)
+      # expect(described_class::ManagedPolicy.from_name("invalid")).to be_nil
+    end
+  end
+
   describe "#Dataset" do
     it "returns authorized resources" do
       ids = [vms[0].id, vms[1].id]
