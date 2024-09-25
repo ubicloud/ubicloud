@@ -126,7 +126,7 @@ RSpec.describe Authorization do
       expect(acl["actions"]).to eq(["*"])
       expect(acl["objects"]).to eq(["project/#{projects[0].ubid}"])
       users[1].associate_with_project(projects[0])
-      described_class::ManagedPolicy::Admin.apply(projects[0], [users[0], users[1]])
+      described_class::ManagedPolicy::Admin.apply(projects[0], [users[1]], append: true)
       expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first["subjects"]).to contain_exactly(users[0].hyper_tag_name, users[1].hyper_tag_name)
       described_class::ManagedPolicy::Admin.apply(projects[0], [])
       expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first["subjects"]).to eq([])
