@@ -82,8 +82,11 @@ module Authorization
         {acls: [{subjects: Array(subjects), actions: actions, objects: Array(objects)}]}
       end
 
-      def apply(project, accounts)
+      def apply(project, accounts, append: false)
         subjects = accounts.map { _1&.hyper_tag(project) }.compact.map { _1.name }
+        if append && (existing_body = project.access_policies_dataset.where(name: name).select_map(:body).first)
+          subjects = (subjects + existing_body["acls"].first["subjects"]).uniq
+        end
         objects = project.hyper_tag_name(project)
         acls = self.acls(subjects, objects).to_json
         policy = AccessPolicy.new_with_id(project_id: project.id, name: name, managed: true, body: acls)
