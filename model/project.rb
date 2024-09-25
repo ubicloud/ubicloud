@@ -20,11 +20,12 @@ class Project < Sequel::Model
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: ProjectQuota, key: :project_id
   one_to_many :invitations, class: ProjectInvitation, key: :project_id
+  one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
 
   dataset_module Authorization::Dataset
   dataset_module Pagination
 
-  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy
+  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy
 
   include ResourceMethods
   include Authorization::HyperTagMethods
@@ -118,6 +119,10 @@ class Project < Sequel::Model
 
   def quota_available?(resource_type, requested_additional_usage)
     effective_quota_value(resource_type) >= current_resource_usage(resource_type) + requested_additional_usage
+  end
+
+  def create_api_key(used_for: "inference_endpoint")
+    ApiKey.create_with_id(owner_table: Project.table_name, owner_id: id, used_for: used_for)
   end
 
   def self.feature_flag(*flags)
