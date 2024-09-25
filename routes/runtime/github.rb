@@ -69,8 +69,8 @@ class CloverRuntime
       r.post true do
         key = r.params["key"]
         version = r.params["version"]
-        size = r.params["cacheSize"].to_i
-        fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if key.nil? || version.nil? || size == 0
+        size = r.params["cacheSize"]&.to_i
+        fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if key.nil? || version.nil?
 
         unless (scope = runner.workflow_job&.dig("head_branch"))
           # YYYY: If the webhook not delivered yet, we can try to get the branch from the API
@@ -82,7 +82,7 @@ class CloverRuntime
           fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
         end
 
-        if size > GithubRepository::CACHE_SIZE_LIMIT
+        if size && size > GithubRepository::CACHE_SIZE_LIMIT
           fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
         end
 
@@ -92,6 +92,11 @@ class CloverRuntime
           upload_id = repository.blob_storage_client.create_multipart_upload(bucket: repository.bucket_name, key: entry.blob_key).upload_id
           entry.update(upload_id: upload_id)
         end
+
+        # If size is not provided, it means that the client doesn't
+        # let us know the size of the cache. In this case, we use the
+        # GithubRepository::CACHE_SIZE_LIMIT as the size.
+        size ||= GithubRepository::CACHE_SIZE_LIMIT
 
         max_chunk_size = 32 * 1024 * 1024 # 32MB
         presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do
@@ -113,7 +118,7 @@ class CloverRuntime
         fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if etags.nil? || etags.empty? || upload_id.nil? || size == 0
 
         entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
-        fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || entry.size != size
+        fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
 
         begin
           repository.blob_storage_client.complete_multipart_upload({
@@ -127,7 +132,11 @@ class CloverRuntime
           fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
         end
 
-        entry.update(committed_at: Time.now)
+        updates = {committed_at: Time.now}
+        # If the size can not be set with reserveCache, we set it here.
+        updates[:size] = size if entry.size.nil?
+
+        entry.update(updates)
 
         {}
       end
