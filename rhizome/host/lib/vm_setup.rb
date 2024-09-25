@@ -244,6 +244,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       routes = r "ip -j route"
       main_device = parse_routes(routes)
       r "ip -6 neigh add proxy #{guest_ephemeral.nth(2)} dev #{main_device}"
+      r "ip -6 neigh add proxy #{clover_ephemeral.nth(0)} dev #{main_device}"
     end
 
     # Accept clover traffic within the namespace (don't just let it
