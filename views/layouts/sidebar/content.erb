@@ -91,16 +91,6 @@
                 has_permission: has_project_permission("Project:user")
               }
             ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
-                name: "Access Policy",
-                url: "#{@project_data[:path]}/policy",
-                is_active: request.path.start_with?("#{@project_data[:path]}/policy"),
-                icon: "hero-key",
-                has_permission: has_project_permission("Project:policy")
-              }
-            ) %>
             <% if Config.stripe_secret_key %>
               <%== render(
                 "layouts/sidebar/item",
