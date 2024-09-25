@@ -264,8 +264,10 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
 
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Member")
-        select "Admin", from: "user_policies[#{user2.ubid}]"
-        click_button "Update"
+        within "form#managed-policy" do
+          select "Admin", from: "user_policies[#{user2.ubid}]"
+          click_button "Update"
+        end
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Admin")
       end
 
@@ -294,8 +296,10 @@ RSpec.describe Clover, "project" do
 
         inv2.destroy
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Member")
-        select "Admin", from: "invitation_policies[#{invited_email}]"
-        click_button "Update"
+        within "form#managed-policy" do
+          select "Admin", from: "invitation_policies[#{invited_email}]"
+          click_button "Update"
+        end
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Admin")
       end
 
@@ -337,50 +341,31 @@ RSpec.describe Clover, "project" do
     end
 
     describe "access policies" do
-      it "can show project policy" do
-        visit project.path
-
-        within "#desktop-menu" do
-          click_link "Access Policy"
-        end
-
-        expect(page.title).to eq("Ubicloud - #{project.name} - Policy")
-        expect(page).to have_content project.access_policies.first.body.to_json
-      end
-
-      it "raises forbidden when does not have permissions" do
-        visit "#{project_wo_permissions.path}/policy"
-
-        expect(page.title).to eq("Ubicloud - Forbidden")
-        expect(page.status_code).to eq(403)
-        expect(page).to have_content "Forbidden"
-      end
-
       it "can update policy" do
         current_policy = project.access_policies.first.body
         new_policy = {
           acls: [
-            {actions: ["Project:policy"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
+            {actions: ["Project:user"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
           ]
         }
 
-        visit "#{project.path}/policy"
-
+        visit "#{project.path}/user"
         expect(page).to have_content current_policy.to_json
-
-        fill_in "body", with: new_policy.to_json
-        click_button "Update"
-
+        within "form#advanced-policy" do
+          fill_in "body", with: new_policy.to_json
+          click_button "Update"
+        end
         expect(page).to have_content new_policy.to_json
       end
 
       it "can not update policy when it is not valid JSON" do
         current_policy = project.access_policies.first.body
 
-        visit "#{project.path}/policy"
-
-        fill_in "body", with: "{'invalid': 'json',}"
-        click_button "Update"
+        visit "#{project.path}/user"
+        within "form#advanced-policy" do
+          fill_in "body", with: "{'invalid': 'json',}"
+          click_button "Update"
+        end
 
         expect(page).to have_content "The policy isn't a valid JSON object."
         expect(page).to have_content "{'invalid': 'json',}"
@@ -390,10 +375,11 @@ RSpec.describe Clover, "project" do
       it "can not update policy when its root is not JSON object" do
         current_policy = project.access_policies.first.body
 
-        visit "#{project.path}/policy"
-
-        fill_in "body", with: "[{}, {}]"
-        click_button "Update"
+        visit "#{project.path}/user"
+        within "form#advanced-policy" do
+          fill_in "body", with: "[{}, {}]"
+          click_button "Update"
+        end
 
         expect(page).to have_content "The policy isn't a valid JSON object."
         expect(page).to have_content "[{}, {}]"
@@ -403,7 +389,7 @@ RSpec.describe Clover, "project" do
       it "raises not found when access policy not exists" do
         expect(AccessPolicy).to receive(:[]).and_return(nil)
 
-        visit "#{project.path}/policy/pcqv67qwh9t23k4g88xrjya7eb"
+        visit "#{project.path}/user/policy/pcqv67qwh9t23k4g88xrjya7eb"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
