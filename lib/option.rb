@@ -3,6 +3,7 @@
 require "yaml"
 
 module Option
+  ai_models = YAML.load_file("config/ai_models.yml")
   providers = YAML.load_file("config/providers.yml")
 
   Provider = Struct.new(:name, :display_name)
@@ -27,6 +28,7 @@ module Option
     end
   end
 
+  AI_MODELS = ai_models.select { _1["enabled"] }.freeze
   PROVIDERS.freeze
   LOCATIONS.freeze
 
