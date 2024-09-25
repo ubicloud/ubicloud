@@ -1,0 +1,22 @@
+<% name = defined?(name) ? name : nil %>
+<% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
+
+<div class="">
+  <%== render(
+    "components/form/select",
+    locals: {
+      name: name,
+      options: [
+        ["", "No policy", nil, { title: "Can't access any resources, need advanced access policy" }],
+        [
+          Authorization::ManagedPolicy::MEMBER.name,
+          "Member",
+          nil,
+          { title: "Can perform all actions except managing users and billing" }
+        ],
+        [Authorization::ManagedPolicy::ADMIN.name, "Admin", nil, { title: "Can perform all actions" }]
+      ],
+      selected: selected
+    }
+  ) %>
+</div>
