@@ -67,6 +67,31 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - #{p.name} Dashboard")
   end
 
+  it "can create new account, verify it, and visit project which invited with default policy" do
+    p = Project.create_with_id(name: "Invited project").tap { _1.associate_with_project(_1) }
+    p.add_invitation(email: TEST_USER_EMAIL, policy: "admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+
+    visit "/create-account"
+    fill_in "Full Name", with: "John Doe"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(page).to have_content("An email has been sent to you with a link to verify your account")
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+    verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
+
+    visit verify_link
+    expect(page.title).to eq("Ubicloud - Verify Account")
+
+    click_button "Verify Account"
+    expect(page.title).to eq("Ubicloud - #{Account[email: TEST_USER_EMAIL].projects.first.name} Dashboard")
+
+    visit p.path
+    expect(page.title).to eq("Ubicloud - #{p.name}")
+  end
+
   it "can remember login" do
     account = create_account
 

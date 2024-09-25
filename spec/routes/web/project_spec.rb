@@ -181,17 +181,31 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content "Forbidden"
       end
 
-      it "can invite existing user to project" do
+      it "can invite existing user to project with a default policy" do
         visit "#{project.path}/user"
 
         expect(page).to have_content user.email
         expect(page).to have_no_content user2.email
 
         fill_in "Email", with: user2.email
+        select "Admin", from: "policy"
         click_button "Invite"
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Admin")
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+      end
+
+      it "can invite existing user to project without a default policy" do
+        visit "#{project.path}/user"
+
+        fill_in "Email", with: user2.email
+        select "No policy", from: "policy"
+        click_button "Invite"
+
+        expect(page).to have_content user2.email
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: nil)
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -201,11 +215,13 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content user.email
 
         fill_in "Email", with: new_email
+        select "Admin", from: "policy"
         click_button "Invite"
 
         expect(page).to have_content user.email
         expect(page).to have_content new_email
         expect(page).to have_content "Invitation sent successfully to '#{new_email}'."
+        expect(page).to have_select("invitation_policies[#{new_email}]", selected: "Admin")
         expect(Mail::TestMailer.deliveries.length).to eq 1
         expect(ProjectInvitation.where(email: new_email).count).to eq 1
 
@@ -267,6 +283,20 @@ RSpec.describe Clover, "project" do
 
         visit "#{project.path}/user"
         expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can update default policy of invited user" do
+        invited_email = "invited@example.com"
+        project.add_invitation(email: invited_email, policy: "member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        inv2 = project.add_invitation(email: "invited2@example.com", policy: "member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+
+        visit "#{project.path}/user"
+
+        inv2.destroy
+        expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Member")
+        select "Admin", from: "invitation_policies[#{invited_email}]"
+        click_button "Update"
+        expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Admin")
       end
 
       it "can not have more than 50 pending invitations" do

@@ -24,9 +24,13 @@ class CloverWeb
 
     r.post true do
       email = r.params["email"]
+      policy = r.params["policy"]
 
       if (user = Account.exclude(status_id: 3)[email: email])
         user.associate_with_project(@project)
+        if (managed_policy = Authorization::ManagedPolicy.from_name(policy))
+          managed_policy.apply(@project, [user], append: true)
+        end
       elsif ProjectInvitation[project_id: @project.id, email: email]
         flash["error"] = "'#{email}' already invited to join the project."
         r.redirect "#{@project.path}/user"
@@ -34,7 +38,7 @@ class CloverWeb
         flash["error"] = "You can't have more than 50 pending invitations."
         r.redirect "#{@project.path}/user"
       else
-        @project.add_invitation(email: email, inviter_id: @current_user.id, expires_at: Time.now + 7 * 24 * 60 * 60)
+        @project.add_invitation(email: email, policy: policy, inviter_id: @current_user.id, expires_at: Time.now + 7 * 24 * 60 * 60)
       end
 
       Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
@@ -59,6 +63,11 @@ class CloverWeb
           accounts = user_policies.select { _2 == policy.name }.keys.map { Account.from_ubid(_1) }
           policy.apply(@project, accounts)
         end
+        invitation_policies = r.params["invitation_policies"] || {}
+        invitation_policies.each do |email, policy|
+          @project.invitations.find { _1.email == email }&.update(policy: policy)
+        end
+
         flash["notice"] = "User policies updated successfully."
 
         r.redirect "#{@project.path}/user"
