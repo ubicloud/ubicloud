@@ -18,6 +18,7 @@ class CloverWeb
       end.compact.to_h
       @users = Serializers::Account.serialize(@project.accounts)
       @invitations = Serializers::ProjectInvitation.serialize(@project.invitations)
+      @policy = Serializers::AccessPolicy.serialize(@project.access_policies_dataset.where(managed: false).first)
 
       view "project/user"
     end
@@ -71,6 +72,32 @@ class CloverWeb
         flash["notice"] = "User policies updated successfully."
 
         r.redirect "#{@project.path}/user"
+      end
+
+      r.is String do |policy_ubid|
+        policy = AccessPolicy.from_ubid(policy_ubid)
+
+        unless policy
+          response.status = 404
+          r.halt
+        end
+
+        r.post true do
+          body = r.params["body"]
+
+          begin
+            fail JSON::ParserError unless JSON.parse(body).is_a?(Hash)
+          rescue JSON::ParserError
+            flash["error"] = "The policy isn't a valid JSON object."
+            return redirect_back_with_inputs
+          end
+
+          policy.update(body: body)
+
+          flash["notice"] = "Advanced policy updated for '#{@project.name}'"
+
+          r.redirect "#{@project.path}/user"
+        end
       end
     end
 
