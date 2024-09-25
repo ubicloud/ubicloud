@@ -64,10 +64,28 @@ RSpec.describe VmHost do
     expect(vh.ip6_random_vm_network.to_s).not_to eq(vh.ip6_reserved_network)
   end
 
-  it "can generate ipv6 for hosts with smaller than /64 prefix with single byte" do
+  it "can generate ipv6 for hosts with smaller than /64 prefix with two bytes" do
     vh.net6 = NetAddr.parse_net("2a01:4f9:2b:35a::/68")
-    expect(SecureRandom).to receive(:random_number).with(2...256).and_return(5)
-    expect(vh.ip6_random_vm_network.to_s).to eq("2a01:4f9:2b:35a:4::/79")
+    expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(5)
+    expect(vh.ip6_random_vm_network.to_s).to eq("2a01:4f9:2b:35a:0:4000:0:0/83")
+
+    expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(2)
+    expect(vh.ip6_random_vm_network.to_s).to eq("2a01:4f9:2b:35a:0:2000:0:0/83")
+
+    expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(2**16 - 1)
+    expect(vh.ip6_random_vm_network.to_s).to eq("2a01:4f9:2b:35a:fff:e000::/83")
+  end
+
+  it "can generate the mask properly" do
+    vh.net6 = NetAddr.parse_net("::/64")
+    expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(5001)
+    expect(vh.ip6_random_vm_network.to_s).to eq("::1388:0:0:0/79")
+    expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(2)
+    expect(vh.ip6_random_vm_network.to_s).to eq("::2:0:0:0/79")
+    expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(2**16 - 1)
+    expect(vh.ip6_random_vm_network.to_s).to eq("::fffe:0:0:0/79")
+    expect(SecureRandom).to receive(:random_number).with(2...2**16).and_return(2**15)
+    expect(vh.ip6_random_vm_network.to_s).to eq("::8000:0:0:0/79")
   end
 
   it "has a shortcut to install Rhizome" do
