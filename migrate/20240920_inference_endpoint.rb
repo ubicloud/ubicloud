@@ -25,6 +25,7 @@ Sequel.migration do
 
     create_table(:inference_endpoint_replica) do
       column :id, :uuid, primary_key: true
+      column :created_at, :timestamptz, null: false, default: Sequel.lit("now()")
       foreign_key :inference_endpoint_id, :inference_endpoint, type: :uuid, null: false
       foreign_key :vm_id, :vm, type: :uuid, null: false, unique: true
     end

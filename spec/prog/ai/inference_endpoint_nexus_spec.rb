@@ -10,12 +10,8 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
   }
   let(:replicas) { Array.new(2) { instance_double(InferenceEndpointReplica, strand: instance_double(Strand, label: "wait")) } }
 
-  # let(:load_balancer) { instance_double(LoadBalancer) }
-  # let(:private_subnet) { instance_double(PrivateSubnet) }
-
   before do
-    allow(nx).to receive(:inference_endpoint).and_return(inference_endpoint)
-    allow(nx).to receive(:replicas).and_return(replicas)
+    allow(nx).to receive_messages(inference_endpoint: inference_endpoint, replicas: replicas)
     allow(inference_endpoint).to receive(:replicas).and_return(replicas)
   end
 
@@ -90,13 +86,24 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       expect {
         described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false)
       }.not_to raise_error
+
+      expect {
+        ie_project.destroy
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false)
+      }.to raise_error("No project configured for inference endpoints")
     end
   end
 
   describe "#before_run" do
-    it "hops to destroy if destroy is set" do
+    it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the destroy state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 
@@ -164,10 +171,31 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       nx.reconcile_replicas
     end
 
-    it "destroys excess replicas if actual count is more than desired" do
+    it "destroys older excess replicas if actual count is more than desired" do
       allow(inference_endpoint).to receive(:replica_count).and_return(1)
       expect(replicas).to all(receive(:destroy_set?).at_least(:once).and_return(false))
-      expect(replicas[1]).to receive(:incr_destroy)
+      expect(replicas[0]).to receive(:created_at).and_return(Time.now)
+      expect(replicas[1]).to receive(:created_at).and_return(Time.now + 1)
+      expect(replicas[0]).to receive(:incr_destroy)
+      expect(replicas[1]).not_to receive(:incr_destroy)
+      nx.reconcile_replicas
+    end
+
+    it "destroys excess replicas not in wait if actual count is more than desired" do
+      allow(inference_endpoint).to receive(:replica_count).and_return(1)
+      expect(replicas).to all(receive(:destroy_set?).at_least(:once).and_return(false))
+      expect(replicas[0]).to receive(:strand).and_return(instance_double(Strand, label: "start")).at_least(:once)
+      expect(replicas[0]).to receive(:created_at).and_return(Time.now + 1)
+      expect(replicas[1]).to receive(:created_at).and_return(Time.now)
+      expect(replicas[0]).to receive(:incr_destroy)
+      expect(replicas[1]).not_to receive(:incr_destroy)
+      nx.reconcile_replicas
+    end
+
+    it "does nothing if actual equals to desired replica count" do
+      allow(inference_endpoint).to receive(:replica_count).and_return(2)
+      expect(replicas).to all(receive(:destroy_set?).at_least(:once).and_return(false))
+      expect(replicas).not_to include(receive(:incr_destroy))
       nx.reconcile_replicas
     end
   end

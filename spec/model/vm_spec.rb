@@ -171,4 +171,49 @@ RSpec.describe Vm do
     expect(vm).to receive(:incr_checkup)
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
+
+  describe "#params_json" do
+    it "contains an empty readonly_image by default" do
+      vm.family = "standard"
+      vm.cores = 2
+      project = Project.create_with_id(name: "default")
+      expect(vm).to receive(:projects).and_return([project])
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 6,
+        total_dies: 1,
+        total_sockets: 1,
+        ndp_needed: false
+      )).at_least(:once)
+      expect(JSON.parse(vm.params_json(4096)).fetch("readonly_image")).to eq("")
+    end
+
+    it "contains a readonly_image for inference endpoints" do
+      vm.family = "standard"
+      vm.cores = 2
+      project = Project.create_with_id(name: "default")
+      sshable = Sshable.create_with_id
+      vm_host = VmHost.create(location: "hetzner-hel1", arch: "x64", total_cpus: 8, total_cores: 4, total_dies: 1, total_sockets: 1) { _1.id = sshable.id }
+      BootImage.create_with_id(name: "ai-model-llama-3-1-8b-it", version: "20240924", vm_host_id: vm_host.id, size_gib: 14, activated_at: Time.now)
+      ier = instance_double(InferenceEndpointReplica, inference_endpoint: instance_double(InferenceEndpoint, model_name: "llama-3-1-8b-it"))
+      expect(vm).to receive(:projects).and_return([project])
+      expect(vm).to receive(:inference_endpoint_replica).and_return(ier).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
+      expect(JSON.parse(vm.params_json(4096)).fetch("readonly_image")).to eq("ai-model-llama-3-1-8b-it-20240924")
+    end
+
+    it "fails if boot image for inference endpoints is missing" do
+      vm.family = "standard"
+      vm.cores = 2
+      project = Project.create_with_id(name: "default")
+      sshable = Sshable.create_with_id
+      vm_host = VmHost.create(location: "hetzner-hel1", arch: "x64", total_cpus: 8, total_cores: 4, total_dies: 1, total_sockets: 1) { _1.id = sshable.id }
+      ier = instance_double(InferenceEndpointReplica, inference_endpoint: instance_double(InferenceEndpoint, model_name: "llama-3-1-8b-it"))
+      expect(vm).to receive(:projects).and_return([project])
+      expect(vm).to receive(:inference_endpoint_replica).and_return(ier).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
+      expect { vm.params_json(4096) }.to raise_error(RuntimeError, "Model image ai-model-llama-3-1-8b-it not found on #{vm_host.ubid}")
+    end
+  end
 end

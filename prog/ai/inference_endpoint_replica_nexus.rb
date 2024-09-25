@@ -46,7 +46,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       if strand.label != "destroy"
         hop_destroy
       elsif strand.stack.count > 1
-        pop "operation is cancelled due to the destruction of the inference endpoint"
+        pop "operation is cancelled due to the destruction of the inference endpoint replica"
       end
     end
   end
@@ -75,14 +75,13 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     when "Succeeded"
       hop_wait_endpoint_up
     when "Failed", "NotStarted"
-      https = inference_endpoint.load_balancer.health_check_protocol == "https"
       params = {
         inference_engine: inference_endpoint.engine,
         inference_engine_params: inference_endpoint.engine_params,
         model: inference_endpoint.model_name,
         replica_ubid: inference_endpoint_replica.ubid,
-        ssl_crt_path: https ? "/ie/workdir/ubi_cert.pem " : "",
-        ssl_key_path: https ? "/ie/workdir/ubi_key.pem " : "",
+        ssl_crt_path: "/ie/workdir/ubi_cert.pem",
+        ssl_key_path: "/ie/workdir/ubi_key.pem",
         use_self_signed_cert: Config.development?,
         gateway_port: inference_endpoint.load_balancer.dst_port
       }

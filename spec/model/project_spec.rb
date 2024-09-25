@@ -107,4 +107,13 @@ RSpec.describe Project do
     expect(project.quota_available?("VmCores", 5)).to be true
     expect(project.quota_available?("VmCores", 20)).to be false
   end
+
+  describe ".create_api_key" do
+    it "creates an api key" do
+      project = described_class.create_with_id(name: "test")
+      expect(project.api_keys.count).to be(0)
+      project.create_api_key
+      expect(project.reload.api_keys.count).to be(1)
+    end
+  end
 end

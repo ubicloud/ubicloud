@@ -28,8 +28,4 @@ class ApiKey < Sequel::Model
     new_key = SecureRandom.alphanumeric(32)
     update(key: new_key, updated_at: Time.now)
   end
-
-  def valid?
-    is_valid
-  end
 end

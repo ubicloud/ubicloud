@@ -39,22 +39,8 @@ class InferenceEndpoint < Sequel::Model
     "creating"
   end
 
-  def send_completion_request(content, replica: nil, project_ubid: nil)
-    hostname = replica.nil? ? "#{load_balancer.hostname}:#{load_balancer.src_port}" : "#{replicas.first.vm.ephemeral_net4}:#{load_balancer.dst_port}"
+  def chat_completion_request(content, hostname, api_key)
     uri = URI.parse("#{load_balancer.health_check_protocol}://#{hostname}/v1/chat/completions")
-    api_key = if is_public
-      fail "project_ubid is required for public inference endpoints" unless project_ubid
-      project = Project.from_ubid(project_ubid)
-      fail "Project #{project_ubid} not found" unless project
-      key = project.api_keys.detect { _1.is_valid }
-      fail "No valid API key found for project #{project_ubid}" unless key
-      key.key
-    else
-      key = api_keys.detect { _1.is_valid }
-      fail "No valid API key found for inference endpoint" unless key
-      key.key
-    end
-
     header = {"Content-Type": "application/json", Authorization: "Bearer " + api_key}
     http = Net::HTTP.new(uri.host, uri.port)
     http.read_timeout = 30

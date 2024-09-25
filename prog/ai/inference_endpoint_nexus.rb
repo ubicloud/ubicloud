@@ -51,7 +51,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       firewall = internal_project.firewalls_dataset.where(location: location).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
       fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{location}" unless firewall
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location: location, firewall_id: firewall.id)
-      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 443, health_check_endpoint: "/up", health_check_protocol: "https") # Config.production? ? "https" : "http"
+      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 443, health_check_endpoint: "/up", health_check_protocol: "https")
 
       inference_endpoint = InferenceEndpoint.create(
         project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, storage_volumes: storage_volumes,
@@ -120,7 +120,12 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       end
     elsif actual_replica_count > desired_replica_count
-      victims = replicas.select { !(_1.destroy_set? || _1.strand.label == "destroy") }.sort { (_1.strand.label == "wait") ? 1 : 0 }.take(actual_replica_count - desired_replica_count)
+      victims = replicas.select {
+                  !(_1.destroy_set? || _1.strand.label == "destroy")
+                }
+        .sort_by { |r|
+        [(r.strand.label == "wait") ? 1 : 0, r.created_at]
+      }.take(actual_replica_count - desired_replica_count)
       victims.each(&:incr_destroy)
     end
   end
