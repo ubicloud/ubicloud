@@ -217,6 +217,7 @@ RSpec.describe Clover, "project" do
 
       it "can remove user from project" do
         user2.associate_with_project(project)
+        Authorization::ManagedPolicy::Member.apply(project, [user2])
 
         visit "#{project.path}/user"
 
@@ -233,6 +234,23 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
         expect(page).to have_content user.email
         expect(page).to have_no_content user2.email
+      end
+
+      it "can update default policy of an user" do
+        user2.associate_with_project(project)
+        Authorization::ManagedPolicy::Member.apply(project, [user2])
+        # Just add a nonexistent subject to it to test edge case
+        policy = project.access_policies_dataset.where(name: "member").first
+        policy.body["acls"].first["subjects"] << "user/new@test.com"
+        policy.modified!(:body)
+        policy.save_changes
+
+        visit "#{project.path}/user"
+
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Member")
+        select "Admin", from: "user_policies[#{user2.ubid}]"
+        click_button "Update"
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Admin")
       end
 
       it "can remove invited user from project" do
