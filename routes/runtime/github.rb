@@ -27,6 +27,20 @@ class CloverRuntime
         .where(key: keys, version: version, scope: scopes).all
         .min_by { keys.index(_1.key) + (scopes.index(_1.scope) * keys.size) }
 
+      # GitHub cache supports prefix match if the key doesn't match exactly.
+      # From their docs:
+      #   When a key doesn't match directly, the action searches for keys
+      #   prefixed with the restore key. If there are multiple partial matches
+      #   for a restore key, the action returns the most recently created cache.
+      if entry.nil?
+        entry = repository.cache_entries_dataset
+          .exclude(committed_at: nil)
+          .where { keys.map { |key| Sequel.like(:key, "#{key}%") }.reduce(:|) }
+          .where(version: version, scope: scopes)
+          .order(Sequel.desc(:created_at))
+          .first
+      end
+
       fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
 
       entry.update(last_accessed_at: Time.now, last_accessed_by: runner.id)

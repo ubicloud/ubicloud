@@ -234,6 +234,19 @@ RSpec.describe Clover, "github" do
         expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k2", "v1", "dev"])
         expect(GithubCacheEntry[key: "k2", version: "v1", scope: "dev"].last_accessed_by).to eq(runner.id)
       end
+
+      it "partially matched key returns the most recently created cache" do
+        GithubCacheEntry.create_with_id(key: "k1234", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create_with_id(key: "k12345", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create_with_id(key: "k123456", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url")
+        get "/runtime/github/cache", {keys: "k12,k123", version: "v1"}
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k123456", "v1", "main"])
+        expect(GithubCacheEntry[key: "k123456", version: "v1", scope: "main"].last_accessed_by).to eq(runner.id)
+      end
     end
 
     describe "lists cache entries" do
