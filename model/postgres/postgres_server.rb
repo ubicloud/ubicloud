@@ -56,6 +56,10 @@ class PostgresServer < Sequel::Model
       shared_preload_libraries: "'pg_cron,pg_stat_statements'"
     }
 
+    if resource.flavor == PostgresResource::Flavor::PARADEDB
+      configs[:shared_preload_libraries] = "'pg_cron,pg_stat_statements,pg_analytics,pg_search'"
+    end
+
     if timeline.blob_storage
       if primary?
         configs[:archive_mode] = "on"
