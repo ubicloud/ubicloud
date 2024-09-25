@@ -59,11 +59,10 @@ RSpec.describe Clover, "github" do
     describe "reserves cache" do
       it "fails if one of the parameters are missing" do
         [
-          ["k1", "v1", nil],
-          [nil, "v1", 10],
-          ["k1", nil, 10]
-        ].each do |key, version, size|
-          params = {key: key, version: version, cacheSize: size}.compact
+          [nil, "v1"],
+          ["k1", nil]
+        ].each do |key, version|
+          params = {key: key, version: version}.compact
           post "/runtime/github/caches", params
 
           expect(last_response).to have_api_error(400, "Wrong parameters")
@@ -116,6 +115,25 @@ RSpec.describe Clover, "github" do
         expect(entry.size).to eq(75 * 1024 * 1024)
         expect(entry.upload_id).to eq("upload-id")
       end
+
+      it "returns presigned urls and upload id for the reserved cache without size" do
+        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
+        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id")) do |_, params|
+          "url-#{params[:part_number]}"
+        end.exactly(320).times
+        post "/runtime/github/caches", {key: "k1", version: "v1"}
+
+        expect(last_response.status).to eq(200)
+        response = JSON.parse(last_response.body)
+        expect(response["uploadId"]).to eq("upload-id")
+        expect(response["presignedUrls"].count).to eq(320)
+
+        entry = repository.cache_entries.first
+        expect(entry.key).to eq("k1")
+        expect(entry.version).to eq("v1")
+        expect(entry.size).to be_nil
+        expect(entry.upload_id).to eq("upload-id")
+      end
     end
 
     describe "commits cache" do
@@ -153,6 +171,18 @@ RSpec.describe Clover, "github" do
         )
         post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
 
+        expect(last_response.status).to eq(200)
+        expect(entry.reload.committed_at).not_to be_nil
+      end
+
+      it "completes multipart upload without size" do
+        entry = GithubCacheEntry.create_with_id(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id")
+        expect(blob_storage_client).to receive(:complete_multipart_upload).with(
+          hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]})
+        )
+        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
+
+        expect(entry.reload.size).to eq(100)
         expect(last_response.status).to eq(200)
         expect(entry.reload.committed_at).not_to be_nil
       end
