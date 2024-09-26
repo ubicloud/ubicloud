@@ -257,10 +257,27 @@ SQL
     postgres_server.run_query(commands)
 
     when_initial_provisioning_set? do
-      hop_wait if retval&.dig("msg") == "postgres server is restarted"
+      if retval&.dig("msg") == "postgres server is restarted"
+        hop_run_post_installation_script if postgres_server.primary? && postgres_server.resource.flavor != PostgresResource::Flavor::STANDARD
+        hop_wait
+      end
       push self.class, frame, "restart"
     end
 
+    hop_wait
+  end
+
+  label def run_post_installation_script
+    command = <<~COMMAND
+    set -ueo pipefail
+    [[ -f /etc/postgresql-partners/post-installation-script ]] || { echo "Post-installation script not found. Exiting..."; exit 0; }
+    sudo cp /etc/postgresql-partners/post-installation-script postgres/bin/post-installation-script
+    sudo chown ubi:ubi postgres/bin/post-installation-script
+    sudo chmod +x postgres/bin/post-installation-script
+    postgres/bin/post-installation-script
+    COMMAND
+
+    vm.sshable.cmd(command)
     hop_wait
   end
 

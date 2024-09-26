@@ -375,13 +375,31 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
       expect { nx.update_superuser_password }.to hop("wait")
+    end
+
+    it "updates password and hops to run_post_installation_script during initial provisioning for non-standard flavors if restart is already executed" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::PARADEDB)
+      expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
 
     it "updates password and hops to wait at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("wait")
+    end
+  end
+
+  describe "#run_post_installation_script" do
+    it "runs post installation script and hops wait" do
+      expect(sshable).to receive(:cmd).with(/post-installation-script/)
+      expect { nx.run_post_installation_script }.to hop("wait")
     end
   end
 
