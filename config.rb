@@ -175,4 +175,7 @@ module Config
   override :acme_directory, "https://acme.zerossl.com/v2/DV90", string
   optional :acme_eab_kid, string, clear: true
   optional :acme_eab_hmac_key, string, clear: true
+
+  # AI
+  optional :inference_endpoint_service_project_id, string
 end
