@@ -7,3 +7,15 @@ def login_api(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
   expect(last_response.status).to eq(200)
   header "Authorization", "Bearer #{last_response.headers["authorization"]}"
 end
+
+RSpec.configure do |config|
+  config.define_derived_metadata(file_path: %r{\A\./spec/routes/api/}) do |metadata|
+    metadata[:clover_api] = true
+  end
+
+  config.before do |example|
+    next unless example.metadata[:clover_api]
+    header "Content-Type", "application/json"
+    header "Accept", "application/json"
+  end
+end
