@@ -45,14 +45,6 @@ Warning.ignore([:unused_var], /.*lib\/aws-sdk-(s3|core)\/(endpoint_provider|cbor
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 
 RSpec.configure do |config|
-  config.define_derived_metadata(file_path: %r{/spec/}) do |metadata|
-    # Extract the name of the subdirectory that the test file is in
-    subdirectory = metadata[:file_path].split("/")[-2]
-
-    # Set the :subdirectory metadata tag to the extracted value
-    metadata[:subdirectory] = subdirectory
-  end
-
   config.before(:suite) do
     DatabaseCleaner.strategy = :transaction
     # Since we have 2 active sequel databases, we need to manually
