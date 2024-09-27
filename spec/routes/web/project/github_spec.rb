@@ -152,5 +152,32 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "created 4 days ago"
       expect(page).to have_content "3 hours ago"
     end
+
+    it "can delete cache entries" do
+      entry = create_cache_entry(key: "new-cache")
+      client = instance_double(Aws::S3::Client)
+      expect(Aws::S3::Client).to receive(:new).and_return(client)
+      expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
+
+      visit "#{project.path}/github/cache"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content entry.key
+
+      btn = find "#entry-#{entry.ubid} .delete-btn"
+      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      expect(page.status_code).to eq(204)
+
+      visit "#{project.path}/github/cache"
+      expect(page).to have_content "Cache '#{entry.key}' deleted"
+    end
+
+    it "raises not found when cache entry not exists" do
+      visit "#{project.path}/github/cache/etn0h8p5js1a4kpa9er7jkg77c"
+
+      expect(page.title).to eq("Ubicloud - ResourceNotFound")
+      expect(page.status_code).to eq(404)
+      expect(page).to have_content "ResourceNotFound"
+    end
   end
 end
