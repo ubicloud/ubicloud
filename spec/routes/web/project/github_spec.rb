@@ -50,17 +50,25 @@ RSpec.describe Clover, "github" do
       expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
-      visit "#{project.path}/github"
-
-      expect(page.title).to eq("Ubicloud - GitHub Runners")
-      expect(page).to have_content "Project doesn't have valid billing information"
-
-      click_link "Connect New Account"
+      visit "#{project.path}/github/installation/create"
 
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runners")
       expect(page).to have_content "Project doesn't have valid billing information"
-      expect(page.driver.request.session["login_redirect"]).not_to eq("/apps/runner-app/installations/new")
+    end
+
+    it "shows new billing info button instead of connect account if project has no valid payment method" do
+      expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+      expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+      # rubocop:disable RSpec/VerifiedDoubles
+      expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: ""))
+      # rubocop:enable RSpec/VerifiedDoubles
+
+      visit "#{project.path}/github"
+      click_button "New Billing Information"
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Project Billing")
     end
 
     it "can list installations" do
