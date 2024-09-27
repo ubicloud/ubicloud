@@ -7,6 +7,7 @@ RSpec.describe Clover, "github" do
   let(:project) { user.create_project_with_default_policy("project-1") }
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
   let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project_id: project.id) }
+  let(:repository) { GithubRepository.create_with_id(name: "test-repo", installation_id: installation.id) }
 
   before do
     login(user.email)
@@ -123,6 +124,33 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "reached_concurrency_limit"
       expect(page).to have_content runner_wo_strand.ubid
       expect(page).to have_content "not_created"
+    end
+  end
+
+  describe "cache" do
+    def create_cache_entry(**args)
+      defaults = {key: "k#{Random.rand}", version: "v1", scope: "main", repository_id: repository.id, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b", committed_at: Time.now}
+      GithubCacheEntry.create_with_id(**defaults.merge(args))
+    end
+
+    it "can list caches" do
+      create_cache_entry(size: nil, created_at: Time.now, last_accessed_at: nil)
+      create_cache_entry(size: 800, created_at: Time.now - 10 * 60, last_accessed_at: Time.now - 5 * 60)
+      create_cache_entry(size: 20.6 * 1024, created_at: Time.now - 4 * 24 * 60 * 60, last_accessed_at: Time.now - 3 * 60 * 60)
+
+      visit "#{project.path}/github/cache"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "3 cache entries"
+      expect(page).to have_content "21.4 KB used"
+      expect(page).to have_content "created just now"
+      expect(page).to have_content "Never used"
+      expect(page).to have_content "800 B"
+      expect(page).to have_content "created 10 minutes ago"
+      expect(page).to have_content "5 minutes ago"
+      expect(page).to have_content "20.6 KB"
+      expect(page).to have_content "created 4 days ago"
+      expect(page).to have_content "3 hours ago"
     end
   end
 end
