@@ -1,0 +1,9 @@
+<%== render(
+  "components/tabbar",
+  locals: {
+    tabs: [
+      ["Active Runners", "#{@project_data[:path]}/github/runner"],
+      ["Settings", "#{@project_data[:path]}/github/setting"]
+    ]
+  }
+) %>

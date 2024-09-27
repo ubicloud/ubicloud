@@ -10,6 +10,7 @@ RSpec.describe Clover, "github" do
 
   before do
     login(user.email)
+    allow(Config).to receive(:github_app_name).and_return("runner-app")
   end
 
   it "disabled when GitHub app name not provided" do
@@ -26,20 +27,16 @@ RSpec.describe Clover, "github" do
     expect(page).to have_content "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
   end
 
-  context "when GitHub Integration enabled" do
-    before do
-      allow(Config).to receive(:github_app_name).and_return("runner-app")
-    end
+  it "raises forbidden when does not have permissions" do
+    project_wo_permissions
+    visit "#{project_wo_permissions.path}/github"
 
-    it "raises forbidden when does not have permissions" do
-      project_wo_permissions
-      visit "#{project_wo_permissions.path}/github"
+    expect(page.title).to eq("Ubicloud - Forbidden")
+    expect(page.status_code).to eq(403)
+    expect(page).to have_content "Forbidden"
+  end
 
-      expect(page.title).to eq("Ubicloud - Forbidden")
-      expect(page.status_code).to eq(403)
-      expect(page).to have_content "Forbidden"
-    end
-
+  describe "setting" do
     it "can connect GitHub account" do
       visit "#{project.path}/github"
 
@@ -70,7 +67,7 @@ RSpec.describe Clover, "github" do
       ins1 = GithubInstallation.create_with_id(installation_id: 111, name: "test-user", type: "User", project_id: project.id)
       ins2 = GithubInstallation.create_with_id(installation_id: 222, name: "test-org", type: "Organization", project_id: project.id)
 
-      visit "#{project.path}/github"
+      visit "#{project.path}/github/setting"
 
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runners")
@@ -79,7 +76,9 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "test-org"
       expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins2.installation_id}/
     end
+  end
 
+  describe "runner" do
     it "can list active runners" do
       runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
       runner_with_job = GithubRunner.create_with_id(
@@ -99,7 +98,7 @@ RSpec.describe Clover, "github" do
       runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_concurrency_limit")
       runner_wo_strand = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo")
 
-      visit "#{project.path}/github"
+      visit "#{project.path}/github/runner"
 
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runners")
