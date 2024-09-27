@@ -90,6 +90,13 @@ module Scheduling::Allocator
         .where(Sequel[:boot_image][:name] => request.boot_image)
         .exclude(Sequel[:boot_image][:activated_at] => nil)
 
+      request.storage_volumes.select { _1[1]["read_only"] && _1[1]["image"] }.map { [_1[0], _1[1]["image"]] }.each do |idx, img|
+        table_alias = :"boot_image_#{idx}"
+        ds = ds.join(Sequel[:boot_image].as(table_alias), Sequel[:vm_host][:id] => Sequel[table_alias][:vm_host_id])
+          .where(Sequel[table_alias][:name] => img)
+          .exclude(Sequel[table_alias][:activated_at] => nil)
+      end
+
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
       ds = ds.where { available_gpus > 0 } if request.gpu_enabled
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
@@ -290,12 +297,18 @@ module Scheduling::Allocator
           )
         end
 
+        image_id = if volume["boot"]
+          allocate_boot_image(vm_host, vm.boot_image)
+        elsif volume["read_only"]
+          allocate_boot_image(vm_host, volume["image"])
+        end
+
         VmStorageVolume.create_with_id(
           vm_id: vm.id,
           boot: volume["boot"],
           size_gib: volume["size_gib"],
           use_bdev_ubi: SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"],
-          boot_image_id: volume["boot"] ? allocate_boot_image(vm_host, vm.boot_image) : nil,
+          boot_image_id: image_id,
           skip_sync: volume["skip_sync"],
           disk_index: disk_index,
           key_encryption_key_1_id: key_encryption_key&.id,
