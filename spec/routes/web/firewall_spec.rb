@@ -7,7 +7,7 @@ RSpec.describe Clover, "firewall" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:firewall) do
     fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-hel1")
@@ -326,11 +326,11 @@ RSpec.describe Clover, "firewall" do
 
       it "can not delete firewall when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        project_wo_permissions.access_policies.first.update(body: {
-          acls: [
-            {subjects: user.hyper_tag_name, actions: ["Firewall:view"], objects: project_wo_permissions.hyper_tag_name}
-          ]
-        })
+        AccessPolicy.create_with_id(
+          project_id: project_wo_permissions.id,
+          name: "only-view-firewall",
+          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Firewall:view"], objects: project_wo_permissions.hyper_tag_name}]}
+        )
 
         visit "#{project_wo_permissions.path}#{fw_wo_permission.path}"
 

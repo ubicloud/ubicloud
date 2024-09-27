@@ -6,7 +6,7 @@ require "pdf-reader"
 RSpec.describe Clover, "billing" do
   let(:user) { create_account }
   let(:project) { user.create_project_with_default_policy("project-1") }
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
   let(:billing_info) do
     bi = BillingInfo.create_with_id(stripe_id: "cs_1234567890")
     project.update(billing_info_id: bi.id)

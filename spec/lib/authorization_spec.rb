@@ -119,17 +119,17 @@ RSpec.describe Authorization do
 
   describe "#ManagedPolicy" do
     it "apply" do
-      expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true]).to be_nil
-      described_class::ManagedPolicy::Admin.apply(projects[0], [users[0], nil, users[1]])
-      acl = AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first
+      expect(AccessPolicy[project_id: projects[0].id, name: "member", managed: true]).to be_nil
+      described_class::ManagedPolicy::Member.apply(projects[0], [users[0], nil, users[1]])
+      acl = AccessPolicy[project_id: projects[0].id, name: "member", managed: true].body["acls"].first
       expect(acl["subjects"]).to contain_exactly(users[0].hyper_tag_name)
-      expect(acl["actions"]).to eq(["*"])
+      expect(acl["actions"]).to eq(["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github"])
       expect(acl["objects"]).to eq(["project/#{projects[0].ubid}"])
       users[1].associate_with_project(projects[0])
-      described_class::ManagedPolicy::Admin.apply(projects[0], [users[1]], append: true)
-      expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first["subjects"]).to contain_exactly(users[0].hyper_tag_name, users[1].hyper_tag_name)
-      described_class::ManagedPolicy::Admin.apply(projects[0], [])
-      expect(AccessPolicy[project_id: projects[0].id, name: "admin", managed: true].body["acls"].first["subjects"]).to eq([])
+      described_class::ManagedPolicy::Member.apply(projects[0], [users[1]], append: true)
+      expect(AccessPolicy[project_id: projects[0].id, name: "member", managed: true].body["acls"].first["subjects"]).to contain_exactly(users[0].hyper_tag_name, users[1].hyper_tag_name)
+      described_class::ManagedPolicy::Member.apply(projects[0], [])
+      expect(AccessPolicy[project_id: projects[0].id, name: "member", managed: true].body["acls"].first["subjects"]).to eq([])
     end
 
     it "from_name" do

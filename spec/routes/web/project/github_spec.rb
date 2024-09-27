@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe Clover, "github" do
   let(:user) { create_account }
   let(:project) { user.create_project_with_default_policy("project-1") }
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
   let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project_id: project.id) }
   let(:repository) { GithubRepository.create_with_id(name: "test-repo", installation_id: installation.id) }
 

@@ -7,7 +7,7 @@ RSpec.describe Clover, "private subnet" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:private_subnet) do
     ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").id
@@ -163,11 +163,11 @@ RSpec.describe Clover, "private subnet" do
 
       it "can not delete private subnet when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        project_wo_permissions.access_policies.first.update(body: {
-          acls: [
-            {subjects: user.hyper_tag_name, actions: ["PrivateSubnet:view"], objects: project_wo_permissions.hyper_tag_name}
-          ]
-        })
+        AccessPolicy.create_with_id(
+          project_id: project_wo_permissions.id,
+          name: "only-view-private-subnet",
+          body: {acls: [{subjects: user.hyper_tag_name, actions: ["PrivateSubnet:view"], objects: project_wo_permissions.hyper_tag_name}]}
+        )
 
         visit "#{project_wo_permissions.path}#{ps_wo_permission.path}"
 
