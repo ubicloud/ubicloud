@@ -33,7 +33,13 @@
     <% end%>
   >
     <% if icon %>
-      <%== render("components/icon", locals: { name: icon, classes: "ml-0.5 mr-1.5 h-5 w-5" }) %>
+      <%== render(
+        "components/icon",
+        locals: {
+          name: icon,
+          classes: "h-5 w-5 #{(text && !text.empty?) ? "ml-0.5 mr-1.5" : "ml-0.5 mr-0.5 "}"
+        }
+      ) %>
     <% end %>
     <%= text %>
     <% if right_icon %>
