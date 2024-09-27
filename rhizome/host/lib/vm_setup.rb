@@ -435,6 +435,9 @@ DHCP
     raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
     interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
     dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
+    address_mapping = boot_image.include?("github") ?
+      "address=/localhost.blob.core.windows.net/#{nics.first.net4.split("/").first}" :
+      ""
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
@@ -456,6 +459,7 @@ listen-address=#{dnsmasq_address_ip6}
 listen-address=#{dns_ipv4}
 dhcp-option=26,1400
 bind-interfaces
+#{address_mapping}
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
