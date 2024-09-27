@@ -48,6 +48,22 @@ class CloverWeb
 
         view "github/cache"
       end
+
+      r.is String do |entry_ubid|
+        entry = GithubCacheEntry.from_ubid(entry_ubid)
+
+        unless entry
+          response.status = 404
+          r.halt
+        end
+
+        r.delete true do
+          entry.destroy
+          flash["notice"] = "Cache '#{entry.key}' deleted."
+          response.status = 204
+          request.halt
+        end
+      end
     end
   end
 end

@@ -47,6 +47,16 @@
                   <div>Never used</div>
                 <% end %>
               </td>
+              <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
+                <%== render(
+                  "components/delete_button",
+                  locals: {
+                    url: "#{@project_data[:path]}/github/cache/#{entry[:id]}",
+                    text: "",
+                    redirect: request.path
+                  }
+                ) %>
+              </td>
             </tr>
           <% end %>
         <% else %>
