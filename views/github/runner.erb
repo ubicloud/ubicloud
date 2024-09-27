@@ -68,12 +68,20 @@
           <% end %>
         <% else %>
           <tr>
-            <td colspan="5">
-              <div class="text-center p-4">
-                No active runners. In your workflow file, change the
-                <span class="text-rose-500 bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
-                line to
-                <span class="text-rose-500 bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud</span>. Then, trigger your workflow to start a runner.
+            <td colspan="6">
+              <div class="text-center py-4 px-8 lg:px-32">
+                <h3 class="text-xl leading-10 font-medium mb-2">No active runners</h3>
+                <p class="leading-6">
+                  To use Ubicloud runners, you need to change
+                  <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
+                  line to one of our labels such as
+                  <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
+                  in your workflow file. Then, trigger your workflow to start a runner.
+                  <br>
+                  Check out
+                  <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
+                  for using larger runners, using arm64, enabling GPU.
+                </p>
               </div>
             </td>
           </tr>
