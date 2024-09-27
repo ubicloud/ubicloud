@@ -10,11 +10,23 @@ class CloverWeb
     Authorization.authorize(@current_user.id, "Project:github", @project.id)
 
     r.get true do
-      @installations = Serializers::GithubInstallation.serialize(@project.github_installations)
-      @runners = Serializers::GithubRunner.serialize(@project.github_installations_dataset.eager(runners: [:vm, :strand]).flat_map(&:runners).sort_by(&:created_at).reverse)
-      @has_valid_payment_method = @project.has_valid_payment_method?
+      if @project.github_installations.empty?
+        r.redirect "#{@project.path}/github/setting"
+      end
+      r.redirect "#{@project.path}/github/runner"
+    end
 
-      view "project/github"
+    r.get "runner" do
+      @runners = Serializers::GithubRunner.serialize(@project.github_installations_dataset.eager(runners: [:vm, :strand]).flat_map(&:runners).sort_by(&:created_at).reverse)
+
+      view "github/runner"
+    end
+
+    r.get "setting" do
+      @has_valid_payment_method = @project.has_valid_payment_method?
+      @installations = Serializers::GithubInstallation.serialize(@project.github_installations)
+
+      view "github/setting"
     end
 
     r.on "installation" do
