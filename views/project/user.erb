@@ -162,8 +162,8 @@
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form id="advanced-policy" action="<%= "#{@project_data[:path]}/user/policy/#{@policy[:ubid]}" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}/user/policy/#{@policy[:ubid]}") %>
+        <form id="advanced-policy" action="<%= "#{@project_data[:path]}/user/policy/advanced" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}/user/policy/advanced") %>
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
