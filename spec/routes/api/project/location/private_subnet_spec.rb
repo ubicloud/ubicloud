@@ -7,7 +7,7 @@ RSpec.describe Clover, "private_subnet" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:ps) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1").subject }
 

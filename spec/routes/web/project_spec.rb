@@ -8,7 +8,7 @@ RSpec.describe Clover, "project" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   describe "unauthenticated" do
     it "can not list without login" do

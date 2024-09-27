@@ -68,14 +68,6 @@ module Authorization
     SQL
   end
 
-  def self.generate_default_acls(subject, object)
-    {
-      acls: [
-        {subjects: [subject], actions: ["*"], objects: [object]}
-      ]
-    }
-  end
-
   module ManagedPolicy
     ManagedPolicyClass = Struct.new(:name, :actions) do
       def acls(subjects, objects)

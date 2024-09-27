@@ -7,7 +7,7 @@ RSpec.describe Clover, "vm" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", policy_body: []) }
+  let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:vm) do
     vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject
@@ -248,11 +248,11 @@ RSpec.describe Clover, "vm" do
 
       it "can not delete virtual machine when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        project_wo_permissions.access_policies.first.update(body: {
-          acls: [
-            {subjects: user.hyper_tag_name, actions: ["Vm:view"], objects: project_wo_permissions.hyper_tag_name}
-          ]
-        })
+        AccessPolicy.create_with_id(
+          project_id: project_wo_permissions.id,
+          name: "only-view-vm",
+          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Vm:view"], objects: project_wo_permissions.hyper_tag_name}]}
+        )
 
         visit "#{project_wo_permissions.path}#{vm_wo_permission.path}"
 

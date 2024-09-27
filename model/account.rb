@@ -12,15 +12,11 @@ class Account < Sequel::Model(:accounts)
 
   include Authorization::TaggableMethods
 
-  def create_project_with_default_policy(name, policy_body: nil)
+  def create_project_with_default_policy(name, default_policy: Authorization::ManagedPolicy::Admin)
     project = Project.create_with_id(name: name)
     project.associate_with_project(project)
     associate_with_project(project)
-    project.add_access_policy(
-      id: AccessPolicy.generate_uuid,
-      name: "default",
-      body: policy_body || Authorization.generate_default_acls(hyper_tag_name, project.hyper_tag_name)
-    )
+    default_policy&.apply(project, [self])
     project
   end
 
