@@ -340,9 +340,25 @@ RSpec.describe Clover, "project" do
       end
     end
 
-    describe "access policies" do
-      it "can update policy" do
-        current_policy = project.access_policies.first.body
+    describe "advanced policy" do
+      it "can update policy if doesn't have already" do
+        new_policy = {
+          acls: [
+            {actions: ["Project:user"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
+          ]
+        }
+
+        visit "#{project.path}/user"
+        within "form#advanced-policy" do
+          fill_in "body", with: new_policy.to_json
+          click_button "Update"
+        end
+        expect(page).to have_content new_policy.to_json
+        expect(project.access_policies_dataset.where(managed: false).first.body.to_json).to eq(new_policy.to_json)
+      end
+
+      it "can update policy existing advanced policy" do
+        current_policy = AccessPolicy.create_with_id(project_id: project.id, name: "advanced", body: {acls: [{subjects: user.hyper_tag_name, actions: ["*"], objects: project.hyper_tag_name}]}).body
         new_policy = {
           acls: [
             {actions: ["Project:user"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
@@ -385,16 +401,6 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content "[{}, {}]"
         expect(current_policy).to eq(project.access_policies.first.body)
       end
-
-      it "raises not found when access policy not exists" do
-        expect(AccessPolicy).to receive(:[]).and_return(nil)
-
-        visit "#{project.path}/user/policy/pcqv67qwh9t23k4g88xrjya7eb"
-
-        expect(page.title).to eq("Ubicloud - ResourceNotFound")
-        expect(page.status_code).to eq(404)
-        expect(page).to have_content "ResourceNotFound"
-      end
     end
 
     describe "delete" do
@@ -432,9 +438,11 @@ RSpec.describe Clover, "project" do
 
       it "can not delete project when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        project_wo_permissions.access_policies.first.update(body: {acls: [
-          {subjects: user.hyper_tag_name, actions: ["Project:view"], objects: project_wo_permissions.hyper_tag_name}
-        ]})
+        AccessPolicy.create_with_id(
+          project_id: project_wo_permissions.id,
+          name: "only-view",
+          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Project:view"], objects: project_wo_permissions.hyper_tag_name}]}
+        )
 
         visit project_wo_permissions.path
 
