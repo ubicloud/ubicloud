@@ -163,7 +163,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     storage_roots = []
 
     params = JSON.parse(File.read(vp.prep_json))
-    params["storage_volumes"].each { |params|
+    params["storage_volumes"].reject { _1["read_only"] }.each { |params|
       volume = StorageVolume.new(@vm_name, params)
       volume.purge_spdk_artifacts
       storage_roots.append(volume.storage_root)
@@ -532,7 +532,7 @@ EOS
   end
 
   def storage(storage_params, storage_secrets, prep)
-    storage_params.map { |params|
+    storage_params.reject { _1["read_only"] }.map { |params|
       device_id = params["device_id"]
       key_wrapping_secrets = storage_secrets[device_id]
       storage_volume = StorageVolume.new(@vm_name, params)
@@ -585,7 +585,11 @@ DNSMASQ_SERVICE
     storage_volumes = storage_params.map { |params| StorageVolume.new(@vm_name, params) }
 
     disk_params = storage_volumes.map { |volume|
-      "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256 \\"
+      if volume.read_only
+        "--disk path=#{volume.image_path},readonly=on \\"
+      else
+        "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256 \\"
+      end
     }
 
     spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq

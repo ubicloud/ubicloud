@@ -72,8 +72,17 @@ RSpec.describe VmSetup do
         "spdk_version" => "some-version"
       }
     }
+    let(:vol_3_params) {
+      {
+        "size_gib" => 0,
+        "device_id" => "test_2",
+        "disk_index" => 2,
+        "encrypted" => false,
+        "read_only" => true
+      }
+    }
     let(:params) {
-      JSON.generate({storage_volumes: [vol_1_params, vol_2_params]})
+      JSON.generate({storage_volumes: [vol_1_params, vol_2_params, vol_3_params]})
     }
 
     it "can purge storage" do
@@ -149,7 +158,8 @@ RSpec.describe VmSetup do
     let(:storage_params) {
       [
         {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
-        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true}
+        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true},
+        {"boot" => false, "size_gib" => 0, "device_id" => "test_2", "disk_index" => 0, "encrypted" => false, "read_only" => true}
       ]
     }
     let(:storage_secrets) {

@@ -15,6 +15,7 @@ require_relative "storage_key_encryption"
 require_relative "storage_path"
 
 class StorageVolume
+  attr_reader :image_path, :read_only
   def initialize(vm_name, params)
     @vm_name = vm_name
     @disk_index = params["disk_index"]
@@ -26,6 +27,7 @@ class StorageVolume
     @image_path = BootImage.new(params["image"], params["image_version"]).image_path if params["image"]
     @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
     @spdk_version = params["spdk_version"]
+    @read_only = params["read_only"] || false
   end
 
   def vp
