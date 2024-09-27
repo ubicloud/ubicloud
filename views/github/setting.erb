@@ -1,7 +1,5 @@
 <% @page_title = "GitHub Runners" %>
 
-<%== render("components/billing_warning") %>
-
 <% if @installations.count > 0 %>
   <div class="auto-refresh hidden" data-interval="10"></div>
   <div class="space-y-1">
@@ -59,6 +57,20 @@
       </div>
     </div>
   </div>
+<% elsif !@project.has_valid_payment_method? %>
+  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
+    <%== csrf_tag("#{@project_data[:path]}/billing") %>
+    <%== render(
+      "components/empty_state",
+      locals: {
+        icon: "hero-banknotes",
+        title: "No billing information",
+        description:
+          "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
+        button_title: "New Billing Information"
+      }
+    ) %>
+  </form>
 <% else %>
   <%== render(
     "components/empty_state",

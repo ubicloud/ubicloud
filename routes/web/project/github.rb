@@ -23,7 +23,6 @@ class CloverWeb
     end
 
     r.get "setting" do
-      @has_valid_payment_method = @project.has_valid_payment_method?
       @installations = Serializers::GithubInstallation.serialize(@project.github_installations)
 
       view "github/setting"
@@ -32,7 +31,8 @@ class CloverWeb
     r.on "installation" do
       r.get "create" do
         unless @project.has_valid_payment_method?
-          fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"})
+          flash["error"] = "Project doesn't have valid billing information"
+          r.redirect "#{@project.path}/github"
         end
         session[:github_installation_project_id] = @project.id
 
