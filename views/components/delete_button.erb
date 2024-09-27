@@ -1,5 +1,6 @@
 <% csrf_url = (defined?(csrf_url) && csrf_url) ? csrf_url : url %>
 <% text = (defined?(text) && text) ? text : "Delete" %>
+<% confirmation = (defined?(confirmation) && confirmation) ? confirmation : nil %>
 
 <%== render(
   "components/button",
