@@ -1,0 +1,31 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require_relative "../lib/replica_setup"
+
+replica_setup = ReplicaSetup.new
+params = JSON.parse($stdin.read)
+
+begin
+  inference_engine = params.fetch("inference_engine")
+  inference_engine_params = params.fetch("inference_engine_params")
+  model = params.fetch("model")
+  replica_ubid = params.fetch("replica_ubid")
+  ssl_crt_path = params.fetch("ssl_crt_path")
+  ssl_key_path = params.fetch("ssl_key_path")
+  gateway_port = params.fetch("gateway_port")
+rescue KeyError => e
+  puts "Needed #{e.key} in parameters"
+  exit 1
+end
+
+replica_setup.prep(
+  inference_engine: inference_engine,
+  inference_engine_params: inference_engine_params,
+  model: model,
+  replica_ubid: replica_ubid,
+  ssl_crt_path: ssl_crt_path,
+  ssl_key_path: ssl_key_path,
+  gateway_port: gateway_port
+)
