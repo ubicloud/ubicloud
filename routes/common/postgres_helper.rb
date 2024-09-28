@@ -264,12 +264,12 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
         greeting: "Hello ParadeDB team,",
         body: ["New ParadeDB Postgres database has been created.",
           "Id: #{resource.ubid}",
-          "Location: #{resource.location}}",
+          "Location: #{resource.location}",
           "Name: #{resource.name}",
-          "E-Mail: #{user_email}}",
-          "Instance VM Size: #{resource.target_vm_size}}",
-          "Instance Storage Size: #{resource.target_storage_size_gib}}",
-          "HA: #{resource.ha_type}}"])
+          "E-Mail: #{user_email}",
+          "Instance VM Size: #{resource.target_vm_size}",
+          "Instance Storage Size: #{resource.target_storage_size_gib}",
+          "HA: #{resource.ha_type}"])
     end
   end
 end
