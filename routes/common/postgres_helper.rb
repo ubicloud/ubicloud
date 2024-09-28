@@ -263,13 +263,13 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       Util.send_email(Config.postgres_paradedb_notification_email, "New ParadeDB Postgres database has been created.",
         greeting: "Hello ParadeDB team,",
         body: ["New ParadeDB Postgres database has been created.",
-          "Id: #{resource.ubid}",
-          "Location: #{resource.location}}",
+          "ID: #{resource.ubid}",
+          "Location: #{resource.location}",
           "Name: #{resource.name}",
-          "E-Mail: #{user_email}}",
-          "Instance VM Size: #{resource.target_vm_size}}",
-          "Instance Storage Size: #{resource.target_storage_size_gib}}",
-          "HA: #{resource.ha_type}}"])
+          "E-mail: #{user_email}",
+          "Instance VM Size: #{resource.target_vm_size}",
+          "Instance Storage Size: #{resource.target_storage_size_gib}",
+          "HA: #{resource.ha_type}"])
     end
   end
 end
