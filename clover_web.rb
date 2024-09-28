@@ -347,7 +347,7 @@ class CloverWeb < Roda
 
   def redirect_back_with_inputs
     flash["old"] = request.params
-    request.redirect env["HTTP_REFERER"]
+    request.redirect env["HTTP_REFERER"] || "/"
   end
 
   def has_project_permission(actions)
