@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "pdf-reader"
 
 RSpec.describe Clover, "billing" do
   let(:user) { create_account }
@@ -306,10 +307,12 @@ RSpec.describe Clover, "billing" do
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
 
-        visit "#{project.path}/billing/invoice/#{invoice.ubid}?print=1"
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}?pdf=1"
 
         expect(page.status_code).to eq(200)
-        expect(page.title).to eq("Ubicloud-2023-06-#{invoice.invoice_number}")
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("ACME Inc. - Foo Companye Name")
+        expect(text).to include("test-vm")
       end
 
       it "raises not found when invoice not exists" do

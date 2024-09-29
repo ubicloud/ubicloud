@@ -2,6 +2,8 @@
 
 require_relative "../model"
 require "stripe"
+require "prawn"
+require "prawn/table"
 
 class Invoice < Sequel::Model
   many_to_one :project
@@ -93,7 +95,7 @@ class Invoice < Sequel::Model
     end
     Util.send_email(ser[:billing_email], "Ubicloud #{ser[:name]} Invoice ##{ser[:invoice_number]}",
       greeting: "Dear #{ser[:billing_name]},",
-      body: ["Please find your current invoice ##{ser[:invoice_number]} at the link.",
+      body: ["Please find your current invoice ##{ser[:invoice_number]} below.",
         message,
         "If you have any questions, please send us a support request via support@ubicloud.com, and include your invoice number."],
       button_title: "View Invoice",
@@ -115,6 +117,108 @@ class Invoice < Sequel::Model
         "If you have any questions, please send us a support request via support@ubicloud.com."],
       button_title: "Update Payment Method",
       button_link: "#{Config.base_url}#{project.path}/billing")
+  end
+
+  def generate_pdf(data)
+    pdf = Prawn::Document.new(
+      page_size: "A4",
+      page_layout: :portrait,
+      info: {Title: data[:filename], Creator: "Ubicloud", reationDate: created_at}
+    )
+    # We use external fonts to support all UTF-8 characters
+    pdf.font_families.update(
+      "BeVietnamPro" => {
+        normal: "assets/font/BeVietnamPro/Regular.ttf",
+        semibold: "assets/font/BeVietnamPro/SemiBold.ttf"
+      }
+    )
+    pdf.font "BeVietnamPro"
+
+    column_width = (pdf.bounds.width / 2) - 10
+    right_column_x = column_width + 20
+    dark_gray = "1F2937" # Tailwind text-gray-800
+    light_gray = "6B7280" # Tailwind text-gray-500
+
+    pdf.fill_color light_gray
+
+    # Row 1, Left Column: Logo and issuer information
+    row_y = pdf.bounds.top
+    row = pdf.bounding_box([0, row_y], width: column_width) do
+      path = "public/logo-primary.png"
+      pdf.image path, height: 25, position: :left
+      pdf.move_down 10
+      # :nocov:
+      pdf.text data[:issuer_name], style: :semibold, color: dark_gray if data[:issuer_name]
+      # :nocov:
+      pdf.text "#{data[:issuer_address]},"
+      pdf.text "#{data[:issuer_city]}, #{data[:issuer_state]} #{data[:issuer_postal_code]},"
+      pdf.text data[:issuer_country]
+    end
+
+    # Row 1, Right Column: Invoice name and number
+    pdf.bounding_box([right_column_x, row_y], width: column_width) do
+      pdf.text "Invoice for #{data[:name]}", align: :right, style: :semibold, color: dark_gray, size: 18
+      pdf.text "##{data[:invoice_number]}", align: :right
+    end
+    pdf.move_down row.height.to_i - 20
+
+    # Row 2, Left Column: Billing information
+    row_y = pdf.cursor
+    row = pdf.bounding_box([0, row_y], width: column_width) do
+      pdf.text "Bill to:", style: :semibold, color: dark_gray, size: 14
+      pdf.text [data[:billing_name], data[:company_name]].compact.join(" - "), style: :semibold, color: dark_gray, size: 14
+      pdf.move_down 5
+      # :nocov:
+      pdf.text "Tax ID: #{data[:tax_id]}" if data[:tax_id]
+      # :nocov:
+      pdf.text "#{data[:billing_address]},"
+      pdf.text "#{data[:billing_city]}, #{data[:billing_state]} #{data[:billing_postal_code]},"
+      pdf.text data[:billing_country]
+    end
+
+    # Row 2, Right Column: Invoice dates
+    pdf.bounding_box([right_column_x, row_y], width: column_width) do
+      dates = [["Invoice date:", data[:date]], ["Due date:", data[:date]]]
+      pdf.table(dates, position: :right) do
+        style(row(0..1).columns(0..1), padding: [2, 5, 2, 5], borders: [])
+        style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
+        style(column(1), align: :right)
+      end
+    end
+    pdf.move_down row.height.to_i - 20
+
+    # Row 3: Invoice items
+    items = [["RESOURCE", "DESCRIPTION", "USAGE", "AMOUNT"]]
+    items += if data[:items].empty?
+      [[{content: "No resources", colspan: 4, align: :center, font_style: :semibold}]]
+    else
+      data[:items].map { [_1[:name], _1[:description], _1[:usage], _1[:cost_humanized]] }
+    end
+    pdf.table items, header: true, width: pdf.bounds.width, cell_style: {size: 9, border_color: "E5E7EB", borders: [], padding: [8, 5, 8, 5]} do
+      style(row(0), size: 12, font_style: :semibold, text_color: dark_gray, background_color: "F9FAFB")
+      style(column(0), text_color: dark_gray)
+      style(columns(-2..-1), align: :right)
+      style(column(0), borders: [:left, :top, :bottom])
+      style(column(-1), borders: [:right, :top, :bottom])
+      style(columns(1..-2), borders: [:top, :bottom])
+    end
+    pdf.move_down 10
+
+    # Row 4: Totals
+    totals = [
+      ["Subtotal:", data[:subtotal]],
+      # :nocov:
+      (data[:discount] != "$0.00") ? ["Discount:", "-#{data[:discount]}"] : nil,
+      (data[:credit] != "$0.00") ? ["Credit:", "-#{data[:credit]}"] : nil,
+      # :nocov:
+      ["Total:", data[:total]]
+    ].compact
+    pdf.table(totals, position: :right, cell_style: {padding: [2, 5, 2, 5], borders: []}) do
+      style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
+      style(column(1), align: :right)
+    end
+
+    pdf.render
   end
 end
 
