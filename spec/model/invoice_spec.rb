@@ -128,6 +128,7 @@ RSpec.describe Invoice do
       expect(invoice.content["payment_method"]["id"]).to eq(payment_method2.id)
       expect(invoice.content["payment_intent"]).to eq("pi_1234567890")
       expect(Mail::TestMailer.deliveries.length).to eq 1
+      expect(Mail::TestMailer.deliveries.first.attachments.length).to eq 1
     end
 
     it "does not update project reputation if cost is less than 5" do
