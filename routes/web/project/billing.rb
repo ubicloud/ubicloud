@@ -161,8 +161,14 @@ class CloverWeb
         end
 
         r.get true do
-          @full_page = r.params["print"] == "1"
           @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
+
+          if r.params["pdf"] == "1"
+            response["Content-Type"] = "application/pdf"
+            response["Content-Disposition"] = "filename=\"#{@invoice_data[:filename]}.pdf\""
+            return invoice.generate_pdf(@invoice_data)
+          end
+
           view "project/invoice"
         end
       end

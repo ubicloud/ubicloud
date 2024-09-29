@@ -21,7 +21,7 @@
       locals: {
         title: "#{@invoice_data[:name]} Invoice",
         right_items: [
-          render("components/button", locals: { text: "PDF", link: "#{@project_data[:path]}/billing#{@invoice_data[:path]}?print=1", attributes: {target: "_blank"} })
+          render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"} })
         ]
       }
     ) %>
