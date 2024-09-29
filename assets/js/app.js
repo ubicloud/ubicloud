@@ -5,7 +5,6 @@ $(function() {
   setupInstanceSizeBasedOptions();
   setupLocationBasedPostgresHaPrices();
   setupAutoRefresh();
-  setupPrint();
   setupDatePicker();
 });
 
@@ -282,12 +281,6 @@ function setupAutoRefresh() {
     setTimeout(function() {
       location.reload();
     }, interval * 1000);
-  });
-}
-
-function setupPrint() {
-  $("div.print-page").each(function() {
-    window.print();
   });
 }
 
