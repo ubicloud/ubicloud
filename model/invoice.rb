@@ -99,7 +99,8 @@ class Invoice < Sequel::Model
         message,
         "If you have any questions, please send us a support request via support@ubicloud.com, and include your invoice number."],
       button_title: "View Invoice",
-      button_link: "#{Config.base_url}#{project.path}/billing#{ser[:path]}")
+      button_link: "#{Config.base_url}#{project.path}/billing#{ser[:path]}",
+      attachments: [["#{ser[:filename]}.pdf", generate_pdf(ser)]])
   end
 
   def send_failure_email(errors)
