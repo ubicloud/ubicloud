@@ -389,6 +389,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
           #{generate_ip6_private_filter_rules(nics[1..])}
         }
       }
+
+      table ip6 nat_metadata_endpoint {
+        chain prerouting {
+          type nat hook prerouting priority dstnat; policy accept;
+          ip6 daddr FD00:0B1C:100D:5AFE:CE:: tcp dport 80 dnat to [FD00:0B1C:100D:5AFE:CE::]:8080
+        }
+      }
+
       # NAT4 rules
       #{generate_nat4_rules(ip4, nics.first.net4)}
       table inet fw_table {
