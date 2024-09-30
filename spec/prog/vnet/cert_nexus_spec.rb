@@ -69,6 +69,13 @@ RSpec.describe Prog::Vnet::CertNexus do
 
       expect { nx.start }.to hop("wait_dns_update")
     end
+
+    it "creates a self-signed certificate in development environments without dns" do
+      expect(Config).to receive(:development?).and_return(true)
+      expect(cert).to receive(:dns_zone_id).and_return(nil)
+
+      expect { nx.start }.to hop("wait")
+    end
   end
 
   describe "#wait_dns_update" do
@@ -207,6 +214,14 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:dns_challenge).and_return(nil)
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+    end
+
+    it "skips revocation and dns record deletion for self-signed certificates" do
+      expect(Config).to receive(:development?).and_return(true)
+      expect(cert).to receive(:dns_zone_id).and_return(nil)
+      expect(cert).to receive(:destroy)
+
+      expect { nx.destroy }.to exit({"msg" => "self-signed certificate destroyed"})
     end
 
     it "emits a log and continues if the cert is already revoked" do
