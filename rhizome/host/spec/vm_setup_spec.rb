@@ -264,6 +264,14 @@ table ip6 raw {
     ether saddr fb:55:dd:ba:21:0a ip6 saddr != fddf:53d2:4c89:2305:46a0::/79 drop
   }
 }
+
+table ip6 nat_metadata_endpoint {
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+    ip6 daddr FD00:0B1C:100D:5AFE:CE:: tcp dport 80 dnat to [FD00:0B1C:100D:5AFE:CE::]:8080
+  }
+}
+
 # NAT4 rules
 table ip nat {
   chain prerouting {
