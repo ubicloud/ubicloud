@@ -91,6 +91,14 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
       expect(nx.load_balancer.certs.count).to eq 2
     end
+
+    it "creates a cert without dns zone in development" do
+      expect(Config).to receive(:development?).and_return(true)
+      expect(described_class).to receive(:dns_zone).and_return(nil)
+      expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
+      expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
+      expect(nx.load_balancer.certs.count).to eq 2
+    end
   end
 
   describe "#wait_cert_provisioning" do

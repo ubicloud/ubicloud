@@ -10,7 +10,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   REVOKE_REASON = "cessationOfOperation"
 
   def self.assemble(hostname, dns_zone_id)
-    unless DnsZone[dns_zone_id]
+    unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
     end
 
@@ -29,6 +29,11 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   label def start
     register_deadline(:wait, 10 * 60)
+
+    if Config.development? && cert.dns_zone_id.nil?
+      create_self_signed_cert(60 * 60 * 24 * 30 * 3)
+      hop_wait
+    end
 
     account_key = OpenSSL::PKey::EC.generate("prime256v1")
     client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory)
@@ -97,6 +102,11 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def destroy
+    if Config.development? && cert.dns_zone_id.nil?
+      cert.destroy
+      pop "self-signed certificate destroyed"
+    end
+
     # the reason is chosen as "cessationOfOperation"
     begin
       acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
@@ -130,5 +140,21 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   def dns_zone
     @dns_zone ||= DnsZone[cert.dns_zone_id]
+  end
+
+  def create_self_signed_cert(duration)
+    key = OpenSSL::PKey::RSA.new(4096)
+    name = OpenSSL::X509::Name.parse("/CN=#{cert.hostname}")
+    crt = OpenSSL::X509::Certificate.new
+    crt.version = 2
+    crt.serial = OpenSSL::BN.rand(128, 0)
+    crt.not_before = Time.now
+    crt.not_after = Time.now + duration
+    crt.public_key = key.public_key
+    crt.subject = name
+    crt.issuer = name
+    crt.sign key, OpenSSL::Digest.new("SHA256")
+
+    cert.update(cert: crt, csr_key: key.to_pem)
   end
 end
