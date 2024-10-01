@@ -35,18 +35,22 @@ class CertServerSetup
     "/etc/systemd/system/#{service_name}.service"
   end
 
+  def server_version
+    "0.1.4"
+  end
+
   def server_main_path
-    File.join("", "opt", "metadata-endpoint")
+    File.join("", "opt", "metadata-endpoint-#{server_version}")
   end
 
   def vm_server_path
-    File.join(cert_folder, "metadata-endpoint")
+    File.join(cert_folder, "metadata-endpoint-#{server_version}")
   end
 
   def package_url
     Arch.render(
-      x64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.3/metadata-endpoint_Linux_x86_64.tar.gz",
-      arm64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v0.1.3/metadata-endpoint_Linux_arm64.tar.gz"
+      x64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v#{server_version}/metadata-endpoint_Linux_x86_64.tar.gz",
+      arm64: "https://github.com/ubicloud/metadata-endpoint/releases/download/v#{server_version}/metadata-endpoint_Linux_arm64.tar.gz"
     )
   end
 
@@ -60,13 +64,15 @@ class CertServerSetup
   end
 
   def download_server
-    temp_tarball = "/tmp/metadata-endpoint.tar.gz"
+    temp_tarball = "/tmp/metadata-endpoint-#{server_version}.tar.gz"
     r "curl -L3 -o #{temp_tarball} #{package_url}"
 
     FileUtils.mkdir_p(server_main_path)
     FileUtils.cd server_main_path do
       r "tar -xzf #{temp_tarball}"
     end
+
+    FileUtils.rm_f(temp_tarball)
   end
 
   def create_service
