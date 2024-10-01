@@ -195,12 +195,12 @@ class Invoice < Sequel::Model
     else
       data[:items].map { [_1[:name], _1[:description], _1[:usage], _1[:cost_humanized]] }
     end
-    pdf.table items, header: true, width: pdf.bounds.width, cell_style: {size: 9, border_color: "E5E7EB", borders: [], padding: [8, 5, 8, 5]} do
+    pdf.table items, header: true, width: pdf.bounds.width, cell_style: {size: 9, border_color: "E5E7EB", borders: [], padding: [5, 6, 12, 6], valign: :center} do
       style(row(0), size: 12, font_style: :semibold, text_color: dark_gray, background_color: "F9FAFB")
       style(column(0), text_color: dark_gray)
       style(columns(-2..-1), align: :right)
       style(column(0), borders: [:left, :top, :bottom])
-      style(column(-1), borders: [:right, :top, :bottom])
+      style(column(-1), borders: [:right, :top, :bottom], width: 70)
       style(columns(1..-2), borders: [:top, :bottom])
     end
     pdf.move_down 10
