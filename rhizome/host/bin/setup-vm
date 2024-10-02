@@ -28,6 +28,7 @@ end
 
 if action == "delete_net"
   vm_setup.purge_network
+  vm_setup.purge_user
   exit 0
 end
 
@@ -49,6 +50,7 @@ begin
   storage_volumes = params.fetch("storage_volumes")
   swap_size_bytes = params["swap_size_bytes"]
   pci_devices = params.fetch("pci_devices", [])
+  boot_image = params["boot_image"]
 rescue KeyError => e
   puts "Needed #{e.key} in parameters json"
   exit 1
@@ -64,7 +66,8 @@ when "prep"
 
   vm_setup.prep(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
-    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices)
+    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
+    pci_devices, boot_image)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])
@@ -89,7 +92,7 @@ when "reassign-ip6"
   end
   vm_setup.reassign_ip6(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
-    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices)
+    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices, boot_image)
 else
   puts "Invalid action #{action}"
   exit 1

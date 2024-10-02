@@ -12,7 +12,7 @@ class GithubRunner < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
-  semaphore :destroy
+  semaphore :destroy, :skip_deregistration
 
   def run_url
     "http://github.com/#{repository_name}/actions/runs/#{workflow_job["run_id"]}"

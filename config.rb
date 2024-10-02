@@ -109,6 +109,9 @@ module Config
   optional :github_cache_blob_storage_secret_key, string, clear: true
   optional :github_cache_blob_storage_account_id, string
   optional :github_cache_blob_storage_api_key, string, clear: true
+  optional :github_cache_forked_runner_tarball_uri, string
+  optional :github_cache_forked_runner_tarball_uri_arm64, string
+  optional :github_cache_proxy_repo_uri, string, clear: true
 
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
@@ -131,6 +134,7 @@ module Config
   optional :postgres_service_blob_storage_id, string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
+  optional :postgres_paradedb_notification_email, string
 
   # Logging
   optional :database_logger_level, string
@@ -151,6 +155,7 @@ module Config
   override :github_ubuntu_2004_version, "20240818.1.0", string
   override :postgres_ubuntu_2204_version, "20240702.3.0", string
   override :github_gpu_ubuntu_2204_version, "20240818.1.0", string
+  override :ai_ubuntu_2404_nvidia_version, "20240928.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
@@ -170,4 +175,7 @@ module Config
   override :acme_directory, "https://acme.zerossl.com/v2/DV90", string
   optional :acme_eab_kid, string, clear: true
   optional :acme_eab_hmac_key, string, clear: true
+
+  # AI
+  optional :inference_endpoint_service_project_id, string
 end

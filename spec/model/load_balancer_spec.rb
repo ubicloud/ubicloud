@@ -32,13 +32,22 @@ RSpec.describe LoadBalancer do
   describe "add_vm" do
     it "increments update_load_balancer and rewrite_dns_records" do
       expect(lb).to receive(:incr_rewrite_dns_records)
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.projects.first.id)
+      cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+      lb.add_cert(cert)
       lb.add_vm(vm1)
       expect(lb.load_balancers_vms.count).to eq(1)
     end
   end
 
   describe "evacuate_vm" do
+    let(:ce) {
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.projects.first.id)
+      Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+    }
+
     before do
+      lb.add_cert(ce)
       lb.add_vm(vm1)
     end
 
@@ -54,7 +63,13 @@ RSpec.describe LoadBalancer do
   end
 
   describe "remove_vm" do
+    let(:ce) {
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.projects.first.id)
+      Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+    }
+
     before do
+      lb.add_cert(ce)
       lb.add_vm(vm1)
     end
 

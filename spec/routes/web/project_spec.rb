@@ -181,7 +181,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content "Forbidden"
       end
 
-      it "can invite new user to project" do
+      it "can invite existing user to project" do
         visit "#{project.path}/user"
 
         expect(page).to have_content user.email
@@ -195,17 +195,24 @@ RSpec.describe Clover, "project" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
-      it "can invite new existing email to project and nothing happens" do
+      it "can invite non-existent user to project" do
         visit "#{project.path}/user"
-
+        new_email = "newUpper@example.com"
         expect(page).to have_content user.email
 
-        fill_in "Email", with: "new@example.com"
+        fill_in "Email", with: new_email
         click_button "Invite"
 
         expect(page).to have_content user.email
-        expect(page).to have_content "Invitation sent successfully to 'new@example.com'."
+        expect(page).to have_content new_email
+        expect(page).to have_content "Invitation sent successfully to '#{new_email}'."
         expect(Mail::TestMailer.deliveries.length).to eq 1
+        expect(ProjectInvitation.where(email: new_email).count).to eq 1
+
+        fill_in "Email", with: new_email.downcase
+        click_button "Invite"
+
+        expect(page).to have_content "'#{new_email.downcase}' already invited to join the project."
       end
 
       it "can remove user from project" do
@@ -226,6 +233,35 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
         expect(page).to have_content user.email
         expect(page).to have_no_content user2.email
+      end
+
+      it "can remove invited user from project" do
+        invited_email = "invited@example.com"
+        project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+
+        visit "#{project.path}/user"
+        expect(page).to have_content invited_email
+
+        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
+        # UI tests run without a JavaScript enginer.
+        btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        visit "#{project.path}/user"
+        expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "can not have more than 50 pending invitations" do
+        visit "#{project.path}/user"
+
+        expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
+        expect(project).to receive(:invitations_dataset).and_return(instance_double(Sequel::Dataset, count: 50))
+
+        fill_in "Email", with: "new@example.com"
+        click_button "Invite"
+
+        expect(page).to have_no_content "new@example.com"
+        expect(page).to have_content "You can't have more than 50 pending invitations"
       end
 
       it "raises bad request when it's the last user" do

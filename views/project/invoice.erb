@@ -1,37 +1,31 @@
-<% @page_title = @full_page ? @invoice_data[:filename] : "#{@invoice_data[:name]} - Invoice" %>
+<% @page_title = "#{@invoice_data[:name]} - Invoice" %>
 
-<% if @full_page %>
-  <div class="print-page"></div>
-<% else %>
-  <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        back: "#{@project_data[:path]}/billing",
-        parts: [
-          %w[Projects /project],
-          [@project_data[:name], @project_data[:path]],
-          ["Billing", "#{@project_data[:path]}/billing"],
-          ["#{@invoice_data[:name]} Invoice", "#"]
-        ]
-      }
-    ) %>
-    <%== render(
-      "components/page_header",
-      locals: {
-        title: "#{@invoice_data[:name]} Invoice",
-        right_items: [
-          render("components/button", locals: { text: "PDF", link: "#{@project_data[:path]}/billing#{@invoice_data[:path]}?print=1", attributes: {target: "_blank"} })
-        ]
-      }
-    ) %>
-  </div>
-<% end %>
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: "#{@project_data[:path]}/billing",
+      parts: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["Billing", "#{@project_data[:path]}/billing"],
+        ["#{@invoice_data[:name]} Invoice", "#"]
+      ]
+    }
+  ) %>
+  <%== render(
+    "components/page_header",
+    locals: {
+      title: "#{@invoice_data[:name]} Invoice",
+      right_items: [
+        render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"} })
+      ]
+    }
+  ) %>
+</div>
 <div class="grid gap-6">
   <!-- Invoice Card -->
-  <div
-    class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200 print:max-w-full print:w-full print:shadow-none print:ring-0"
-  >
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <div class="px-4 py-5 sm:p-6">
       <% if @invoice_data[:status] == "current" %>
         <div class="flex justify-between items-baseline text-gray-800">

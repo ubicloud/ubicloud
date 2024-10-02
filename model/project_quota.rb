@@ -10,3 +10,5 @@ class ProjectQuota < Sequel::Model
     end
   end
 end
+
+ProjectQuota.unrestrict_primary_key

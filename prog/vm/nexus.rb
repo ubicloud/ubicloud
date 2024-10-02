@@ -36,6 +36,13 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:skip_sync] ||= false
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
+
+      if volume[:read_only]
+        volume[:size_gib] = 0
+        volume[:encrypted] = false
+        volume[:skip_sync] = true
+        volume[:boot] = false
+      end
     end
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
@@ -437,7 +444,7 @@ class Prog::Vm::Nexus < Prog::Base
       nap 30
     end
 
-    vm.load_balancer.remove_vm(vm)
+    vm.load_balancer.remove_vm(vm) if vm.load_balancer
 
     vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
 

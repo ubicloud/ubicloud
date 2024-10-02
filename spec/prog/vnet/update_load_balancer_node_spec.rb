@@ -11,7 +11,11 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
   let(:lb) {
     prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
+    lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
+    dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
+    cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+    lb.add_cert(cert)
+    lb
   }
   let(:vm) {
     Prog::Vm::Nexus.assemble("pub-key", lb.projects.first.id, name: "test-vm", private_subnet_id: lb.private_subnet.id).subject
@@ -24,6 +28,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     lb.add_vm(vm)
     allow(nx).to receive_messages(vm: vm, load_balancer: lb)
     allow(vm).to receive_messages(ephemeral_net4: NetAddr::IPv4Net.parse("100.100.100.100/32"), ephemeral_net6: NetAddr::IPv6Net.parse("2a02:a464:deb2:a000::/64"))
+    allow(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: instance_double(Sshable)))
   end
 
   describe ".before_run" do
@@ -47,7 +52,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
         expect { nx.update_load_balancer }.to hop("remove_load_balancer")
       end
 
-      it "removes the VM from load balancer and hops to remove_load_balancer if the VM is detaching" do
+      it "removes the VM from load balancer if the VM is detaching" do
         lb.load_balancers_vms_dataset.update(state: "detaching")
         expect(lb).to receive(:remove_vm).with(vm)
         expect { nx.update_load_balancer }.to hop("remove_load_balancer")
@@ -304,7 +309,7 @@ table ip nat {
   }
 }
 REMOVE_LOAD_BALANCER
-      expect { nx.remove_load_balancer }.to exit({"msg" => "load balancer is updated"})
+      expect { nx.remove_load_balancer }.to exit({"msg" => "load balancer is removed"})
     end
   end
 

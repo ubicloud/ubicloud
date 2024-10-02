@@ -48,9 +48,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe ".assemble" do
-    it "creates postgres server and vm with sshable" do
-      user_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
-      postgres_resource = PostgresResource.create_with_id(
+    let(:user_project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
+    let(:postgres_resource) {
+      PostgresResource.create_with_id(
         project_id: user_project.id,
         location: "hetzner-hel1",
         name: "pg-name",
@@ -58,9 +58,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         target_storage_size_gib: 128,
         superuser_password: "dummy-password"
       )
+    }
 
+    it "creates postgres server and vm with sshable" do
       postgres_timeline = PostgresTimeline.create_with_id
-
       postgres_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
@@ -72,6 +73,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push")
       expect(PostgresServer[st.id].synchronization_status).to eq("catching_up")
+    end
+
+    it "errors out for unknown flavor" do
+      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
+      expect(postgres_resource).to receive(:flavor).and_return("boring_flavor").at_least(:once)
+      expect {
+        described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
+      }.to raise_error RuntimeError, "Unknown PostgreSQL flavor: boring_flavor"
     end
   end
 
@@ -366,13 +375,31 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
       expect { nx.update_superuser_password }.to hop("wait")
+    end
+
+    it "updates password and hops to run_post_installation_script during initial provisioning for non-standard flavors if restart is already executed" do
+      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
+      expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::PARADEDB)
+      expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
 
     it "updates password and hops to wait at times other than the initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?)
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("wait")
+    end
+  end
+
+  describe "#run_post_installation_script" do
+    it "runs post installation script and hops wait" do
+      expect(sshable).to receive(:cmd).with(/post-installation-script/)
+      expect { nx.run_post_installation_script }.to hop("wait")
     end
   end
 

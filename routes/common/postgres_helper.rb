@@ -30,7 +30,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
     required_parameters = ["size"]
     required_parameters << "name" << "location" if @mode == AppMode::WEB
-    allowed_optional_parameters = ["storage_size", "ha_type"]
+    allowed_optional_parameters = ["storage_size", "ha_type", "flavor"]
     request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
     parsed_size = Validation.validate_postgres_size(request_body_params["size"])
 
@@ -40,6 +40,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     when PostgresResource::HaType::SYNC then 2
     else 0
     end
+    flavor = request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
 
     requested_postgres_core_count = (requested_standby_count + 1) * parsed_size.vcpu / 2
     Validation.validate_core_quota(project, "PostgresCores", requested_postgres_core_count)
@@ -50,8 +51,10 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       name: name,
       target_vm_size: parsed_size.vm_size,
       target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
-      ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE
+      ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
+      flavor: flavor
     )
+    send_notification_mail_to_partners(st.subject, @user.email)
 
     if @mode == AppMode::API
       Serializers::Postgres.serialize(st.subject, {detailed: true})
@@ -172,9 +175,11 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       name: request_body_params["name"],
       target_vm_size: @resource.target_vm_size,
       target_storage_size_gib: @resource.target_storage_size_gib,
+      flavor: @resource.flavor,
       parent_id: @resource.id,
       restore_target: request_body_params["restore_target"]
     )
+    send_notification_mail_to_partners(st.subject, @user.email)
 
     if @mode == AppMode::API
       Serializers::Postgres.serialize(st.subject, {detailed: true})
@@ -225,6 +230,9 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
   def view_create_page
     Authorization.authorize(@user.id, "Postgres:create", project.id)
+    flavor = @request.params["flavor"] || PostgresResource::Flavor::STANDARD
+    Validation.validate_postgres_flavor(flavor)
+    @app.instance_variable_set(:@flavor, flavor)
     @app.instance_variable_set(:@prices, @app.fetch_location_based_prices("PostgresCores", "PostgresStorage"))
     @app.instance_variable_set(:@has_valid_payment_method, project.has_valid_payment_method?)
     @app.instance_variable_set(:@enabled_postgres_sizes, Option::VmSizes.select { project.quota_available?("PostgresCores", _1.vcpu / 2) }.map(&:name))
@@ -248,5 +256,20 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
 
     Serializers::Postgres.serialize(@resource, {detailed: true})
+  end
+
+  def send_notification_mail_to_partners(resource, user_email)
+    if resource.flavor == PostgresResource::Flavor::PARADEDB
+      Util.send_email(Config.postgres_paradedb_notification_email, "New ParadeDB Postgres database has been created.",
+        greeting: "Hello ParadeDB team,",
+        body: ["New ParadeDB Postgres database has been created.",
+          "ID: #{resource.ubid}",
+          "Location: #{resource.location}",
+          "Name: #{resource.name}",
+          "E-mail: #{user_email}",
+          "Instance VM Size: #{resource.target_vm_size}",
+          "Instance Storage Size: #{resource.target_storage_size_gib}",
+          "HA: #{resource.ha_type}"])
+    end
   end
 end

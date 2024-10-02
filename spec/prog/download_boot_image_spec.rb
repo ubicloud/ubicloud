@@ -47,6 +47,7 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.default_boot_image_version("github-ubuntu-2004")).to eq(Config.github_ubuntu_2004_version)
       expect(dbi.default_boot_image_version("github-gpu-ubuntu-2204")).to eq(Config.github_gpu_ubuntu_2204_version)
       expect(dbi.default_boot_image_version("postgres-ubuntu-2204")).to eq(Config.postgres_ubuntu_2204_version)
+      expect(dbi.default_boot_image_version("ai-ubuntu-2404-nvidia")).to eq(Config.ai_ubuntu_2404_nvidia_version)
     end
 
     it "fails for unknown images" do
@@ -108,6 +109,15 @@ RSpec.describe Prog::DownloadBootImage do
       vm_host.update(arch: "arm64")
 
       expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.4-20240507.aarch64.qcow2")
+    end
+
+    it "returns URL for ai model image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "ai-model-test-model", "version" => "20240924.1.0"}).at_least(:once)
+
+      mcl = instance_double(Minio::Client)
+      expect(Minio::Client).to receive(:new).and_return(mcl)
+      expect(mcl).to receive(:get_presigned_url).with("GET", Config.ubicloud_images_bucket_name, "ai-model-test-model-20240924.1.0.raw", 60 * 60).and_return("https://minio.example.com/ubicloud-image/ai-model-test-model-20240924.1.0.raw")
+      expect(dbi.url).to eq("https://minio.example.com/ubicloud-image/ai-model-test-model-20240924.1.0.raw")
     end
 
     it "fails if image name is unknown" do

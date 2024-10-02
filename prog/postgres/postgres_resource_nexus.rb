@@ -12,7 +12,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :destroy
 
-  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
+  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, flavor: PostgresResource::Flavor::STANDARD, ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -46,9 +46,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create_with_id(
         project_id: project_id, location: location, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: superuser_password, ha_type: ha_type, parent_id: parent_id,
-        restore_target: restore_target,
-        hostname_version: "v2"
+        superuser_password: superuser_password, ha_type: ha_type, flavor: flavor,
+        parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
       )
       postgres_resource.associate_with_project(project)
 
@@ -160,7 +159,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         project_id: postgres_resource.project_id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], "standard", postgres_resource.location)["id"],
+        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], postgres_resource.flavor, postgres_resource.location)["id"],
         amount: brp[:amount]
       )
     end

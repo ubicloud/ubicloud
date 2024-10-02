@@ -5,7 +5,6 @@ $(function() {
   setupInstanceSizeBasedOptions();
   setupLocationBasedPostgresHaPrices();
   setupAutoRefresh();
-  setupPrint();
   setupDatePicker();
 });
 
@@ -257,13 +256,14 @@ function setupLocationBasedOptions() {
 
 function setupInstanceSizeBasedOptions() {
   $(".instance-size-based-storage-sizes").each(function() {
+    resource_family = $("input[name=size]:checked").data("resource-family");
     storage_size_options = $("input[name=size]:checked").data("storage-size-options");
     storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
     storage_size_index = 0;
 
     $(this).find(".storage-size").each(function() {
       let storage_amount = storage_size_options[storage_size_index];
-      let monthlyPrice = storage_amount * $("input[name=location]:checked").data("details")[storage_resource_type]["standard"]["monthly"];
+      let monthlyPrice = storage_amount * $("input[name=location]:checked").data("details")[storage_resource_type][resource_family]["monthly"];
 
       $(this).find("input[type=radio]").val(storage_amount);
       $(this).find("input[type=radio]").data("monthly-price", monthlyPrice);
@@ -281,12 +281,6 @@ function setupAutoRefresh() {
     setTimeout(function() {
       location.reload();
     }, interval * 1000);
-  });
-}
-
-function setupPrint() {
-  $("div.print-page").each(function() {
-    window.print();
   });
 }
 

@@ -3,6 +3,7 @@
 <% icon = (defined?(icon) && icon) ? icon : nil %>
 <% extra_class = defined?(extra_class) ? extra_class : nil %>
 <% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
+<% right_icon = (defined?(right_icon) && right_icon) ? right_icon : nil %>
 
 <% case type %>
 <% when "primary" %>
@@ -26,14 +27,23 @@
   </a>
 <% else %>
   <button
-    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> <%= extra_class %>"
+    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> <%= extra_class %>"
     <% attributes.each do |atr_key, atr_value| %>
     <%= atr_key %>="<%= atr_value %>"
     <% end%>
   >
     <% if icon %>
-      <%== render("components/icon", locals: { name: icon, classes: "ml-0.5 mr-1.5 h-5 w-5" }) %>
+      <%== render(
+        "components/icon",
+        locals: {
+          name: icon,
+          classes: "h-5 w-5 #{(text && !text.empty?) ? "ml-0.5 mr-1.5" : "ml-0.5 mr-0.5 "}"
+        }
+      ) %>
     <% end %>
     <%= text %>
+    <% if right_icon %>
+      <%== render("components/icon", locals: { name: right_icon, classes: "ml-1.5 -mr-1 h-5 w-5" }) %>
+    <% end %>
   </button>
 <% end %>

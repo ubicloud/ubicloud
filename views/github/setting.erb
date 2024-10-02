@@ -1,0 +1,85 @@
+<% @page_title = "GitHub Runners" %>
+
+<% if @installations.count > 0 %>
+  <div class="auto-refresh hidden" data-interval="10"></div>
+  <div class="space-y-1">
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: @project_data[:path],
+        parts: [
+          %w[Projects /project],
+          [@project_data[:name], @project_data[:path]],
+          ["GitHub Runners", "#{@project_data[:path]}/github"],
+          %w[Settings #]
+        ]
+      }
+    ) %>
+    <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
+  </div>
+
+  <%== render("github/tabbar") %>
+
+  <div class="grid gap-6">
+    <!-- GitHub Installations Card -->
+    <div>
+      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Connected Accounts
+          </h3>
+        </div>
+        <div class="mt-4 flex md:ml-4 md:mt-0">
+          <%== render(
+            "components/button",
+            locals: {
+              text: "Connect New Account",
+              link: "#{@project_data[:path]}/github/installation/create"
+            }
+          ) %>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <table class="min-w-full divide-y divide-gray-300">
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <% @installations.each do |ins| %>
+              <tr>
+                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                  <%= ins[:name] %>
+                </td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                  <a href="<%= ins[:installation_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank">Configure</a>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<% elsif !@project.has_valid_payment_method? %>
+  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
+    <%== csrf_tag("#{@project_data[:path]}/billing") %>
+    <%== render(
+      "components/empty_state",
+      locals: {
+        icon: "hero-banknotes",
+        title: "No billing information",
+        description:
+          "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
+        button_title: "New Billing Information"
+      }
+    ) %>
+  </form>
+<% else %>
+  <%== render(
+    "components/empty_state",
+    locals: {
+      icon: "github",
+      title: "No Connected Accounts",
+      description: "Get started by installing our GitHub app to your user or organization account.",
+      button_link: "#{@project_data[:path]}/github/installation/create",
+      button_title: "Connect New Account"
+    }
+  ) %>
+<% end %>

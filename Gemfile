@@ -56,10 +56,15 @@ group :test do
   gem "capybara"
   gem "rspec"
   gem "webmock"
+  gem "pdf-reader"
 end
 
 gem "webauthn", "~> 3.1"
 
-gem "aws-sdk-s3", "~> 1.159"
+gem "aws-sdk-s3", "~> 1.163"
 
 gem "acme-client", "~> 2.0"
+
+gem "prawn", "~> 2.5"
+
+gem "prawn-table", "~> 0.2.2"

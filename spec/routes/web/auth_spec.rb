@@ -42,7 +42,10 @@ RSpec.describe Clover, "auth" do
     expect(page).to have_content("Name must only contain letters, numbers, spaces, and hyphens and have max length 63.")
   end
 
-  it "can create new account and verify it" do
+  it "can create new account, verify it, and visit project which invited" do
+    p = Project.create_with_id(name: "Invited project").tap { _1.associate_with_project(_1) }
+    p.add_invitation(email: TEST_USER_EMAIL, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+
     visit "/create-account"
     fill_in "Full Name", with: "John Doe"
     fill_in "Email Address", with: TEST_USER_EMAIL
@@ -59,6 +62,9 @@ RSpec.describe Clover, "auth" do
 
     click_button "Verify Account"
     expect(page.title).to eq("Ubicloud - #{Account[email: TEST_USER_EMAIL].projects.first.name} Dashboard")
+
+    visit "#{p.path}/dashboard"
+    expect(page.title).to eq("Ubicloud - #{p.name} Dashboard")
   end
 
   it "can remember login" do

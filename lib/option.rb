@@ -3,6 +3,7 @@
 require "yaml"
 
 module Option
+  ai_models = YAML.load_file("config/ai_models.yml")
   providers = YAML.load_file("config/providers.yml")
 
   Provider = Struct.new(:name, :display_name)
@@ -27,6 +28,7 @@ module Option
     end
   end
 
+  AI_MODELS = ai_models.select { _1["enabled"] }.freeze
   PROVIDERS.freeze
   LOCATIONS.freeze
 
@@ -59,10 +61,13 @@ module Option
   PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do
     alias_method :display_name, :name
   end
-  PostgresSizes = [2, 4, 8, 16, 30, 60].map {
+  PostgresSizes = [2, 4, 8, 16, 30, 60].flat_map {
     storage_size_options = [_1 * 64, _1 * 128, _1 * 256]
     storage_size_options = [1024, 2048, 4096] if [30, 60].include?(_1)
-    PostgresSize.new("standard-#{_1}", "standard-#{_1}", "standard", _1, _1 * 4, storage_size_options)
+    [
+      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::STANDARD, _1, _1 * 4, storage_size_options),
+      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::PARADEDB, _1, _1 * 4, storage_size_options)
+    ]
   }.freeze
 
   PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)

@@ -6,7 +6,10 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   }
 
   let(:st) {
-    described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 80)
+    cert = Prog::Vnet::CertNexus.assemble("test-host-name", dns_zone.id).subject
+    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 80).subject
+    lb.add_cert(cert)
+    lb.strand
   }
   let(:ps) {
     prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
@@ -75,6 +78,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "creates new cert if needed" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(true)
       expect { nx.wait }.to hop("create_new_cert")
     end
   end
@@ -84,8 +88,16 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       dns_zone = DnsZone.create_with_id(name: "test-dns-zone", project_id: nx.load_balancer.private_subnet.projects.first.id)
       allow(described_class).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
-      expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 1
-      expect(nx.load_balancer.certs.count).to eq 1
+      expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
+      expect(nx.load_balancer.certs.count).to eq 2
+    end
+
+    it "creates a cert without dns zone in development" do
+      expect(Config).to receive(:development?).and_return(true)
+      expect(described_class).to receive(:dns_zone).and_return(nil)
+      expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
+      expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
+      expect(nx.load_balancer.certs.count).to eq 2
     end
   end
 
@@ -95,9 +107,37 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait_cert_provisioning }.to nap(60)
     end
 
-    it "hops to wait if need_certificates? is false" do
+    it "hops to wait_cert_broadcast if need_certificates? is false and refresh_cert is set" do
+      vm = Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "testvm", private_subnet_id: ps.id).subject
+      nx.load_balancer.add_vm(vm)
+      nx.load_balancer.incr_refresh_cert
+      expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
+      expect { nx.wait_cert_provisioning }.to hop("wait_cert_broadcast")
+      expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 1
+    end
+
+    it "hops to wait need_certificates? and refresh_cert are false" do
+      vm = Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "testvm", private_subnet_id: ps.id).subject
+      nx.load_balancer.add_vm(vm)
+      expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait")
+      expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 0
+    end
+  end
+
+  describe "#wait_cert_broadcast" do
+    it "naps for 1 second if not all children are done" do
+      vm = Prog::Vm::Nexus.assemble("pub-key", ps.projects.first.id, name: "testvm", private_subnet_id: ps.id).subject
+      nx.load_balancer.add_vm(vm)
+      expect(nx).to receive(:reap)
+      expect { nx.wait_cert_broadcast }.to nap(1)
+    end
+
+    it "hops to wait if all children are done" do
+      expect(nx).to receive(:reap)
+      expect { nx.wait_cert_broadcast }.to hop("wait")
     end
   end
 
@@ -107,7 +147,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       vms.each { st.subject.add_vm(_1) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
       # Update progs are budded in update_vm_load_balancers
-      expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
+      expect(st.children_dataset.where(prog: "Vnet::UpdateLoadBalancerNode", label: "update_load_balancer").count).to eq 3
     end
   end
 
@@ -212,7 +252,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       cert = Prog::Vnet::CertNexus.assemble(st.subject.hostname, dns_zone.id).subject
       lb = st.subject
       lb.add_cert(cert)
-      expect(lb.certs.count).to eq 1
+      expect(lb.certs.count).to eq 2
       expect(nx).to receive(:reap)
       expect(nx).to receive(:leaf?).and_return(true)
       expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})

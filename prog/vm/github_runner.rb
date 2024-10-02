@@ -5,7 +5,7 @@ require "net/ssh"
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
 
-  semaphore :destroy
+  semaphore :destroy, :skip_deregistration
 
   def self.assemble(installation, repository_name:, label:, default_branch: nil)
     unless Github.runner_labels[label]
@@ -137,6 +137,11 @@ class Prog::Vm::GithubRunner < Prog::Base
       sum(:used_cores) * 100.0 / sum(:total_cores)
     }.first.to_f
 
+    if github_runner.installation.project.effective_quota_value("GithubRunnerCores") == 0
+      Clog.emit("No quota available for this project") { [github_runner] }
+      nap 2592000
+    end
+
     unless utilization < 70
       Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
       nap rand(5..15)
@@ -220,6 +225,71 @@ class Prog::Vm::GithubRunner < Prog::Base
     # Remove comments and empty lines before sending them to the machine
     vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
 
+    if github_runner.installation.project.get_ff_transparent_cache
+      hop_setup_forked_runner
+    end
+
+    hop_register_runner
+  end
+
+  label def setup_forked_runner
+    tarball_uri = (label_data["arch"] == "arm64") ? Config.github_cache_forked_runner_tarball_uri_arm64 : Config.github_cache_forked_runner_tarball_uri
+
+    command = <<~COMMAND
+      curl --output actions-runner.tar.gz -L #{tarball_uri}
+
+      rm -rf actions-runner
+      mkdir -p actions-runner
+      tar xzf actions-runner.tar.gz -C actions-runner
+
+      sudo chown -R runneradmin:runneradmin ./actions-runner
+      ./actions-runner/env.sh
+
+      cat <<EOT > ./actions-runner/run-withenv.sh
+      #!/bin/bash
+      mapfile -t env </etc/environment
+      exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
+      EOT
+      chmod +x ./actions-runner/run-withenv.sh
+
+      jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
+
+      echo "PATH=$PATH" >> ./actions-runner/.env
+
+      sudo rm -rf /home/runner/actions-runner
+      sudo mv ./actions-runner /home/runner/
+      sudo chown -R runner:runner /home/runner/actions-runner
+
+      echo "CUSTOM_ACTIONS_CACHE_URL=http://localhost:51123/random_token/" | sudo tee -a /etc/environment
+      echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
+    COMMAND
+
+    vm.sshable.cmd(command.gsub(/^\s*\n/, ""))
+
+    hop_download_proxy
+  end
+
+  label def download_proxy
+    command = <<~COMMAND
+      sudo rm -rf cache-proxy
+      sudo git clone #{Config.github_cache_proxy_repo_uri} cache-proxy
+    COMMAND
+
+    vm.sshable.cmd(command)
+
+    hop_start_proxy
+  end
+
+  label def start_proxy
+    command = <<~COMMAND
+      export UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/
+      export UBICLOUD_RUNTIME_TOKEN=#{vm.runtime_token}
+      cd cache-proxy
+      go run transparent_cache_proxy.go > ~/cacheproxy.log 2>&1 &
+    COMMAND
+
+    vm.sshable.cmd(command)
+
     hop_register_runner
   end
 
@@ -300,16 +370,23 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def destroy
     decr_destroy
 
-    # Waiting 404 Not Found response for get runner request
-    begin
-      response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      if response[:busy]
-        Clog.emit("The runner is still running a job") { github_runner }
-        nap 15
+    # When we attempt to destroy the runner, we also deregister it from GitHub.
+    # We wait to receive a 'not found' response for the runner. If the runner is
+    # still running a job and, due to stale data, it gets mistakenly hopped to
+    # destroy, this prevents the underlying VM from being destroyed and the job
+    # from failing. However, in certain situations like fraudulent activity, we
+    # might need to bypass this verification and immediately remove the runner.
+    unless github_runner.skip_deregistration_set?
+      begin
+        response = github_client.get("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
+        if response[:busy]
+          Clog.emit("The runner is still running a job") { github_runner }
+          nap 15
+        end
+        github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
+        nap 5
+      rescue Octokit::NotFound
       end
-      github_client.delete("/repos/#{github_runner.repository_name}/actions/runners/#{github_runner.runner_id}")
-      nap 5
-    rescue Octokit::NotFound
     end
 
     if vm

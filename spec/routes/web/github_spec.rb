@@ -69,6 +69,18 @@ RSpec.describe Clover, "github" do
     expect(page).to have_content("Install GitHub App from project's 'GitHub Runners' page.")
   end
 
+  it "fails if project has at least 1 account suspended" do
+    expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
+    expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
+    expect(Project).to receive(:[]).and_return(project).at_least(:once)
+    account = instance_double(Account, suspended_at: Time.now)
+    expect(project).to receive(:accounts).and_return([account])
+
+    visit "/github/callback?code=123123&installation_id=345"
+    expect(page.title).to eq("Ubicloud - Dashboard")
+    expect(page).to have_content("GitHub runner integration is not allowed for suspended accounts.")
+  end
+
   it "raises forbidden when does not have permissions to create installation for project" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})

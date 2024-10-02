@@ -294,6 +294,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -320,12 +321,25 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
       VmHost[arch: "x64"].update(used_cores: 4)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
+    end
+
+    it "naps for a long time if the quota is set to 0" do
+      dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
+
+      installation = instance_double(GithubInstallation)
+      project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(0)
+      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
+      expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
+
+      expect { nx.wait_concurrency_limit }.to nap(2592000)
     end
   end
 
@@ -371,7 +385,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to register_runner" do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
-      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx", get_ff_transparent_cache: false)).at_least(:once)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
@@ -382,6 +396,109 @@ RSpec.describe Prog::Vm::GithubRunner do
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
+    end
+
+    it "hops to setup_forked_runner" do
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(vm).to receive(:runtime_token).and_return("my_token")
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx", get_ff_transparent_cache: true)).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        set -ueo pipefail
+        echo "image version: $ImageVersion"
+        sudo usermod -a -G sudo,adm runneradmin
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+        echo "UBICLOUD_RUNTIME_TOKEN=my_token
+        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("setup_forked_runner")
+    end
+  end
+
+  describe "#setup_forked_runner" do
+    it "hops to register_runner" do
+      expect(Config).to receive_messages(github_cache_forked_runner_tarball_uri: "https://github.com/foo/tarball")
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        curl --output actions-runner.tar.gz -L https://github.com/foo/tarball
+        rm -rf actions-runner
+        mkdir -p actions-runner
+        tar xzf actions-runner.tar.gz -C actions-runner
+        sudo chown -R runneradmin:runneradmin ./actions-runner
+        ./actions-runner/env.sh
+        cat <<EOT > ./actions-runner/run-withenv.sh
+        #!/bin/bash
+        mapfile -t env </etc/environment
+        exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
+        EOT
+        chmod +x ./actions-runner/run-withenv.sh
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
+        echo "PATH=$PATH" >> ./actions-runner/.env
+        sudo rm -rf /home/runner/actions-runner
+        sudo mv ./actions-runner /home/runner/
+        sudo chown -R runner:runner /home/runner/actions-runner
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://localhost:51123/random_token/" | sudo tee -a /etc/environment
+        echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
+      COMMAND
+
+      expect { nx.setup_forked_runner }.to hop("download_proxy")
+    end
+
+    it "hops to register_runner arm" do
+      expect(Config).to receive_messages(github_cache_forked_runner_tarball_uri_arm64: "https://github.com/foo/tarball")
+      expect(github_runner).to receive(:label).and_return("ubicloud-arm").at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        curl --output actions-runner.tar.gz -L https://github.com/foo/tarball
+        rm -rf actions-runner
+        mkdir -p actions-runner
+        tar xzf actions-runner.tar.gz -C actions-runner
+        sudo chown -R runneradmin:runneradmin ./actions-runner
+        ./actions-runner/env.sh
+        cat <<EOT > ./actions-runner/run-withenv.sh
+        #!/bin/bash
+        mapfile -t env </etc/environment
+        exec env -- "\\${env[@]}" ./actions-runner/run.sh --jitconfig "\\$1"
+        EOT
+        chmod +x ./actions-runner/run-withenv.sh
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-arm\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json > ./actions-runner/.setup_info
+        echo "PATH=$PATH" >> ./actions-runner/.env
+        sudo rm -rf /home/runner/actions-runner
+        sudo mv ./actions-runner /home/runner/
+        sudo chown -R runner:runner /home/runner/actions-runner
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://localhost:51123/random_token/" | sudo tee -a /etc/environment
+        echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
+      COMMAND
+
+      expect { nx.setup_forked_runner }.to hop("download_proxy")
+    end
+  end
+
+  describe "#download_proxy" do
+    it "hops to start_proxy" do
+      expect(Config).to receive_messages(github_cache_proxy_repo_uri: "https://github.com/foo/cache_proxy")
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        sudo rm -rf cache-proxy
+        sudo git clone https://github.com/foo/cache_proxy cache-proxy
+      COMMAND
+
+      expect { nx.download_proxy }.to hop("start_proxy")
+    end
+  end
+
+  describe "#start_proxy" do
+    it "hops to register_runner" do
+      expect(vm).to receive(:runtime_token).and_return("my_token")
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        export UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/
+        export UBICLOUD_RUNTIME_TOKEN=my_token
+        cd cache-proxy
+        go run transparent_cache_proxy.go > ~/cacheproxy.log 2>&1 &
+      COMMAND
+
+      expect { nx.start_proxy }.to hop("register_runner")
     end
   end
 
@@ -518,6 +635,15 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:vm_host).and_return(vm_host)
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "skip deregistration and destroy vm immediately" do
+      expect(nx).to receive(:decr_destroy)
+      expect(github_runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")

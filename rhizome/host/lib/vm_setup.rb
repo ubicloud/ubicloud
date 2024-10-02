@@ -43,8 +43,8 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
+  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     end
@@ -65,8 +65,8 @@ class VmSetup
     start_systemd_unit
   end
 
-  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices)
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
+  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
@@ -128,6 +128,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   def purge
     purge_network
     purge_without_network
+    purge_user
   end
 
   def purge_network
@@ -147,12 +148,12 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     purge_storage
     unmount_hugepages
+  end
 
-    begin
-      r "deluser --remove-home #{q_vm}"
-    rescue CommandFail => ex
-      raise unless /The user `.*' does not exist./.match?(ex.stderr)
-    end
+  def purge_user
+    r "deluser --remove-home #{q_vm}"
+  rescue CommandFail => ex
+    raise unless /The user `.*' does not exist./.match?(ex.stderr)
   end
 
   def purge_storage
@@ -162,7 +163,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     storage_roots = []
 
     params = JSON.parse(File.read(vp.prep_json))
-    params["storage_volumes"].each { |params|
+    params["storage_volumes"].reject { _1["read_only"] }.each { |params|
       volume = StorageVolume.new(@vm_name, params)
       volume.purge_spdk_artifacts
       storage_roots.append(volume.storage_root)
@@ -243,6 +244,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       routes = r "ip -j route"
       main_device = parse_routes(routes)
       r "ip -6 neigh add proxy #{guest_ephemeral.nth(2)} dev #{main_device}"
+      r "ip -6 neigh add proxy #{clover_ephemeral.nth(0)} dev #{main_device}"
     end
 
     # Accept clover traffic within the namespace (don't just let it
@@ -277,6 +279,9 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{nic.tap}"
       r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
     end
+
+    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:5AFE:CE::/56 dev #{nics.first.tap}"
+    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:53::/48 dev #{nics.first.tap}"
   end
 
   def parse_routes(routes)
@@ -384,6 +389,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
           #{generate_ip6_private_filter_rules(nics[1..])}
         }
       }
+
+      table ip6 nat_metadata_endpoint {
+        chain prerouting {
+          type nat hook prerouting priority dstnat; policy accept;
+          ip6 daddr FD00:0B1C:100D:5AFE:CE:: tcp dport 80 dnat to [FD00:0B1C:100D:5AFE:CE::]:8080
+        }
+      }
+
       # NAT4 rules
       #{generate_nat4_rules(ip4, nics.first.net4)}
       table inet fw_table {
@@ -401,7 +414,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -418,18 +431,28 @@ DHCP
     end.join("\n")
 
     raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
-
+    interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
+    dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
 enable-ra
 dhcp-authoritative
+domain-needed
+bogus-priv
+no-resolv
 #{raparams}
+#{interfaces}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
-dhcp-option=option6:dns-server,2620:fe::fe,2620:fe::9
-dhcp-option=option:dns-server,149.112.112.112,9.9.9.9
+server=149.112.112.112
+server=9.9.9.9
+server=2620:fe::fe
+server=2620:fe::9
+dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+listen-address=#{dnsmasq_address_ip6}
 dhcp-option=26,1400
+bind-interfaces
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
@@ -439,6 +462,9 @@ DNSMASQ_CONF
       macaddress: "#{nic.mac}"
     dhcp6: true
     dhcp4: true
+    nameservers:
+      addresses:
+        - "fd00:0b1c:100d:53::"
 ETHERNETS
     end.join("\n")
 
@@ -448,7 +474,7 @@ ethernets:
 #{ethernets}
 EOS
 
-    write_user_data(unix_user, public_keys, swap_size_bytes)
+    write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
 
     FileUtils.rm_rf(vp.cloudinit_img)
     r "mkdosfs -n CIDATA -C #{vp.q_cloudinit_img} 8192"
@@ -469,7 +495,20 @@ EOS
     SWAP_CONFIG
   end
 
-  def write_user_data(unix_user, public_keys, swap_size_bytes)
+  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
+    install_cmd = if boot_image.include?("almalinux")
+      "  - [dnf, install, '-y', nftables]\n"
+    else
+      ""
+    end
+    nft_safe_sudo_allow = <<NFT_ADD_COMMS
+  - [nft, add, table, ip6, filter]
+  - [nft, add, chain, ip6, filter, output, "{", type, filter, hook, output, priority, 0, ";", "}"]
+  - [nft, add, rule, ip6, filter, output, ip6, daddr, 'fd00:0b1c:100d:5AFE::/56', meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
+NFT_ADD_COMMS
+
+    nft_safe_sudo_allow_inst = install_cmd + nft_safe_sudo_allow
+
     vp.write_user_data(<<EOS)
 #cloud-config
 users:
@@ -482,14 +521,18 @@ users:
 ssh_pwauth: False
 
 runcmd:
-  - [ systemctl, daemon-reload]
+  - [systemctl, daemon-reload]
+#{nft_safe_sudo_allow_inst}
+
+bootcmd:
+#{nft_safe_sudo_allow}
 
 #{generate_swap_config(swap_size_bytes)}
 EOS
   end
 
   def storage(storage_params, storage_secrets, prep)
-    storage_params.map { |params|
+    storage_params.reject { _1["read_only"] }.map { |params|
       device_id = params["device_id"]
       key_wrapping_secrets = storage_secrets[device_id]
       storage_volume = StorageVolume.new(@vm_name, params)
@@ -542,7 +585,11 @@ DNSMASQ_SERVICE
     storage_volumes = storage_params.map { |params| StorageVolume.new(@vm_name, params) }
 
     disk_params = storage_volumes.map { |volume|
-      "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256 \\"
+      if volume.read_only
+        "--disk path=#{volume.image_path},readonly=on \\"
+      else
+        "--disk vhost_user=true,socket=#{volume.vhost_sock},num_queues=1,queue_size=256 \\"
+      end
     }
 
     spdk_services = storage_volumes.map { |volume| volume.spdk_service }.uniq

@@ -72,21 +72,32 @@ class VmHost < Sequel::Model
 
   # Generate a random network that is a slice of the host's network
   # for delegation to a VM.
-  def ip6_random_vm_network(prefix = 79)
-    # Generates bits worth of a single byte of entropy and then shifts it to the
-    # correct position in the host's network. The bits sits in between the
-    # host's network and the network that is delegated to the VM. We use the
-    # range 2...256 to avoid the case where the lower_bits is 0 or 1, which
-    # would result in the host's network being returned. We also make sure the
-    # higest possible value is 255, so that the lower_bits is never greater than
-    # the host's network. This would be the case if the difference between the
-    # host's network and the network that is delegated to the VM is a single
-    # byte.
-    # The upper range is updated later to increase the entropy if the host has
-    # a big enough prefix. This way we avoid collisions. Keeping the range to
-    # single byte caused elevated number of collisions.
-    upper_range = ((prefix - host_prefix) < 15) ? 2**8 : 2**16
-    lower_bits = SecureRandom.random_number(2...upper_range) << (128 - prefix - 1)
+  def ip6_random_vm_network
+    prefix = host_prefix + 15
+    # We generate 2 bytes of entropy for the lower bits
+    # and append them to the host's network. This way,
+    # the first X bits are the same as the host's network.
+    # And the next 16 bits are random. To achieve that, we shift
+    # the random number to the left by (128 - prefix - 1) bits.
+    # This way, the random number is placed in the correct position.
+    # With a simple example:
+    # Let's say we have a /64 network: 0:0:0:0::/64
+    # This can be expanded to: 0:0:0:0:0:0:0:0/64
+    # With even further expansion: 0000:0000:0000:0000:0000:0000:0000:0000/64
+    # Now, we can generate a random number between 2 and 2**16 (65536). This
+    # will be our next 2 bytes. Let's say the random number is 5001. In base 16,
+    # this is 0x1389.
+    # Now, if we shift it by 48 bits (3 octets) as it is in ipv6 addresses:
+    # 1389:0:0:0
+    # now if we OR it with the host's network:
+    # 0:0:0:0:0:0:0:0 | 0:0:0:0:1389:0:0:0  = 0:0:0:0:1389:0:0:0/80
+    # We are not done yet, if you realized, we are masking it with 79 not 80.
+    # Because this /79 is later split into 2 /80s for internal and external use.
+    # Therefore, the network we return is:
+    # 2a01:4f9:2b:35a:1388:0:0:0/79
+    # and the two /80 networks are:
+    # 2a01:4f9:2b:35a:1388:0:0:0/80 and 2a01:4f9:2b:35a:1389:0:0:0/80
+    lower_bits = SecureRandom.random_number(2...2**16) << (128 - prefix - 1)
 
     # Combine it with the higher bits for the host.
     proposal = NetAddr::IPv6Net.new(
@@ -97,13 +108,13 @@ class VmHost < Sequel::Model
     fail "BUG: host should be supernet of randomized subnet" unless net6.rel(proposal) == 1
     # :nocov:
 
-    case (rn = ip6_reserved_network) && proposal.network.cmp(rn.network)
+    case (rn = ip6_reserved_network(prefix)) && proposal.network.cmp(rn.network)
     when 0
       # Guard against choosing the host-reserved network for a guest
       # and try again.  Recursion is used here because it's a likely
       # code path, and if there's a bug, it's better to stack overflow
       # rather than loop forever.
-      ip6_random_vm_network(prefix)
+      ip6_random_vm_network
     else
       proposal
     end

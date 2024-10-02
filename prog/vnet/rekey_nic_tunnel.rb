@@ -114,7 +114,7 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
           "src #{src} dst #{dst} proto esp spi #{spi} reqid #{@reqid} mode tunnel " \
           "aead 'rfc4106(gcm(aes))' {} 128 #{is_ipv4 ? "sel src 0.0.0.0/0 dst 0.0.0.0/0" : ""}", stdin: key)
       rescue Sshable::SshError => e
-        raise unless e.message.include?("File exists")
+        raise unless e.stderr.include?("File exists")
       end
     end
 

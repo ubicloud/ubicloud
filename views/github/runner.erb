@@ -1,0 +1,92 @@
+<% @page_title = "GitHub Runners" %>
+
+<div class="auto-refresh hidden" data-interval="10"></div>
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: @project_data[:path],
+      parts: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["GitHub Runners", "#{@project_data[:path]}/github"],
+        ["Active Runners", "#"]
+      ]
+    }
+  ) %>
+  <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
+</div>
+
+<%== render("github/tabbar") %>
+
+<div class="grid gap-6">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50 whitespace-nowrap">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Runner</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Repository</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Label</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Branch</th>
+          <th scope="col" class="relative py-3.5 pl-3 pr-4 text-left text-sm font-semibold text-gray-900 sm:pr-6">Workflow Job</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% if @runners.count > 0 %>
+          <% @runners.each do |runner| %>
+            <tr id="github-installation-<%= runner[:id]%>">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <% if runner[:runner_url] %>
+                  <a href="<%= runner[:runner_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= runner[:ubid] %></a>
+                <% else %>
+                  <%= runner[:ubid] %>
+                <% end %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%= runner[:repository_name] %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%= runner[:label] %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%== render("components/vm_state_label", locals: { state: runner[:state] }) %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%= runner.dig(:workflow_job, :head_branch) || "-" %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-3 pr-4 text-sm sm:pr-6">
+                <% if (workflow_job = runner[:workflow_job]) %>
+                  <a href="<%= workflow_job[:run_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= workflow_job[:workflow_name] %></a>
+                  -
+                  <a href="<%= workflow_job[:job_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank"><%= workflow_job[:job_name] %></a>
+                <% else %>
+                  Runner doesn't have a job yet
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        <% else %>
+          <tr>
+            <td colspan="6">
+              <div class="text-center py-4 px-8 lg:px-32">
+                <h3 class="text-xl leading-10 font-medium mb-2">No active runners</h3>
+                <p class="leading-6">
+                  To use Ubicloud runners, you need to change
+                  <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
+                  line to one of our labels such as
+                  <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
+                  in your workflow file. Then, trigger your workflow to start a runner.
+                  <br>
+                  Check out
+                  <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
+                  for using larger runners, using arm64, enabling GPU.
+                </p>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -231,7 +231,7 @@ class Vm < Sequel::Model
     vm_storage_volumes.map { |s|
       {
         "boot" => s.boot,
-        "image" => s.boot ? boot_image : nil,
+        "image" => s.boot_image&.name,
         "image_version" => s.boot_image&.version,
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
@@ -240,7 +240,8 @@ class Vm < Sequel::Model
         "spdk_version" => s.spdk_version,
         "use_bdev_ubi" => s.use_bdev_ubi,
         "skip_sync" => s.skip_sync,
-        "storage_device" => s.storage_device.name
+        "storage_device" => s.storage_device.name,
+        "read_only" => s.size_gib == 0
       }
     }
   end

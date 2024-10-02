@@ -30,7 +30,7 @@ RSpec.describe VmSetup do
     before { expect(vs).to receive(:vp).and_return(vps).at_least(:once) }
 
     it "templates user YAML with no swap" do
-      vs.write_user_data("some_user", ["some_ssh_key"], nil)
+      vs.write_user_data("some_user", ["some_ssh_key"], nil, "")
       expect(vps).to have_received(:write_user_data) {
         expect(_1).to match(/some_user/)
         expect(_1).to match(/some_ssh_key/)
@@ -38,7 +38,7 @@ RSpec.describe VmSetup do
     end
 
     it "templates user YAML with swap" do
-      vs.write_user_data("some_user", ["some_ssh_key"], 123)
+      vs.write_user_data("some_user", ["some_ssh_key"], 123, "")
       expect(vps).to have_received(:write_user_data) {
         expect(_1).to match(/some_user/)
         expect(_1).to match(/some_ssh_key/)
@@ -48,7 +48,7 @@ RSpec.describe VmSetup do
 
     it "fails if the swap is not an integer" do
       expect {
-        vs.write_user_data("some_user", ["some_ssh_key"], "123")
+        vs.write_user_data("some_user", ["some_ssh_key"], "123", "")
       }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
     end
   end
@@ -72,8 +72,17 @@ RSpec.describe VmSetup do
         "spdk_version" => "some-version"
       }
     }
+    let(:vol_3_params) {
+      {
+        "size_gib" => 0,
+        "device_id" => "test_2",
+        "disk_index" => 2,
+        "encrypted" => false,
+        "read_only" => true
+      }
+    }
     let(:params) {
-      JSON.generate({storage_volumes: [vol_1_params, vol_2_params]})
+      JSON.generate({storage_volumes: [vol_1_params, vol_2_params, vol_3_params]})
     }
 
     it "can purge storage" do
@@ -149,7 +158,8 @@ RSpec.describe VmSetup do
     let(:storage_params) {
       [
         {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
-        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true}
+        {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true},
+        {"boot" => false, "size_gib" => 0, "device_id" => "test_2", "disk_index" => 0, "encrypted" => false, "read_only" => true}
       ]
     }
     let(:storage_secrets) {
@@ -264,6 +274,14 @@ table ip6 raw {
     ether saddr fb:55:dd:ba:21:0a ip6 saddr != fddf:53d2:4c89:2305:46a0::/79 drop
   }
 }
+
+table ip6 nat_metadata_endpoint {
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+    ip6 daddr FD00:0B1C:100D:5AFE:CE:: tcp dport 80 dnat to [FD00:0B1C:100D:5AFE:CE::]:8080
+  }
+}
+
 # NAT4 rules
 table ip nat {
   chain prerouting {

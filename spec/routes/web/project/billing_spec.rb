@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+require "pdf-reader"
 
 RSpec.describe Clover, "billing" do
   let(:user) { create_account }
@@ -61,7 +62,6 @@ RSpec.describe Clover, "billing" do
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
       expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).twice
-      expect(Stripe::PaymentIntent).to receive(:cancel).with("pi_1234567890").once
 
       visit project.path
 
@@ -135,7 +135,6 @@ RSpec.describe Clover, "billing" do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"payment_method" => "pm_222222222"})
-      expect(Stripe::PaymentIntent).to receive(:cancel).with("pi_1234567890").once
 
       visit "#{project.path}/billing"
 
@@ -308,10 +307,12 @@ RSpec.describe Clover, "billing" do
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run.first
 
-        visit "#{project.path}/billing/invoice/#{invoice.ubid}?print=1"
+        visit "#{project.path}/billing/invoice/#{invoice.ubid}?pdf=1"
 
         expect(page.status_code).to eq(200)
-        expect(page.title).to eq("Ubicloud-2023-06-#{invoice.invoice_number}")
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("ACME Inc. - Foo Companye Name")
+        expect(text).to include("test-vm")
       end
 
       it "raises not found when invoice not exists" do

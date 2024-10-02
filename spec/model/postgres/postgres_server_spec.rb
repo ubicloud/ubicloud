@@ -43,6 +43,7 @@ RSpec.describe PostgresServer do
   describe "#configure" do
     before do
       allow(postgres_server).to receive(:timeline).and_return(instance_double(PostgresTimeline, blob_storage: "dummy-blob-storage"))
+      allow(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
     end
 
     it "does not set archival related configs if blob storage is not configured" do
@@ -90,6 +91,12 @@ RSpec.describe PostgresServer do
       postgres_server.timeline_access = "fetch"
       expect(resource).to receive(:restore_target)
       expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
+    end
+
+    it "puts pg_analytics to shared_preload_libraries for ParadeDB" do
+      postgres_server.timeline_access = "push"
+      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::PARADEDB)
+      expect(postgres_server.configure_hash[:configs]).to include(shared_preload_libraries: "'pg_cron,pg_stat_statements,pg_analytics,pg_search'")
     end
   end
 

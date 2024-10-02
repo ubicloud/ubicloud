@@ -87,13 +87,20 @@ module Validation
     end
   end
 
+  def self.validate_postgres_flavor(flavor)
+    flavors = [PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB]
+    unless flavors.include?(flavor)
+      fail ValidationFailed.new({flavor: "\"#{flavor}\" is not a valid PostgreSQL flavor option. Available options: #{flavors}"})
+    end
+  end
+
   def self.validate_os_user_name(os_user_name)
     msg = "OS user name must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also have max length of 32."
     fail ValidationFailed.new({user: msg}) unless os_user_name&.match(ALLOWED_OS_USER_NAME_PATTERN)
   end
 
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
-    allowed_keys = [:encrypted, :size_gib, :boot, :skip_sync]
+    allowed_keys = [:encrypted, :size_gib, :boot, :skip_sync, :read_only, :image]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
       fail ValidationFailed.new({boot_disk_index: "Boot disk index must be between 0 and #{storage_volumes.length - 1}"})

@@ -190,6 +190,10 @@ RSpec.describe Clover, "load balancer" do
       it "can attach vm" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
+        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+        cert.update(cert: "cert", csr_key: OpenSSL::PKey::RSA.new(4096).to_der)
+        lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb.path}"
@@ -213,6 +217,10 @@ RSpec.describe Clover, "load balancer" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
         lb1 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         lb2 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-4", src_port: 80, dst_port: 8000).subject
+        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+        cert.update(cert: "cert", csr_key: OpenSSL::PKey::RSA.new(4096).to_der)
+        lb1.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb2.path}"
@@ -244,6 +252,10 @@ RSpec.describe Clover, "load balancer" do
       it "can detach vm" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+        cert.update(cert: "cert", csr_key: OpenSSL::PKey::RSA.new(4096).to_der)
+        lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
         expect(page).to have_no_content vm.name
 
@@ -263,6 +275,10 @@ RSpec.describe Clover, "load balancer" do
       it "can not detach vm when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
+        dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
+        cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
+        cert.update(cert: "cert", csr_key: OpenSSL::PKey::RSA.new(4096).to_der)
+        lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb.path}"
