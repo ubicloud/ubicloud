@@ -37,7 +37,7 @@ module Option
   end
 
   def self.postgres_locations
-    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" }
+    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
   end
 
   BootImage = Struct.new(:name, :display_name)

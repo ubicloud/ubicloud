@@ -126,7 +126,7 @@ RSpec.describe Clover, "postgres" do
           ha_type: "sync"
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: location", {"location" => "Given location is not a valid postgres location. Available locations: [\"eu-central-h1\"]"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: location", {"location" => "Given location is not a valid postgres location. Available locations: [\"eu-central-h1\", \"us-east-a2\"]"})
       end
 
       it "invalid name" do
