@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "committee"
+
 module CloverBase
   def self.included(base)
     base.extend(ClassMethods)
