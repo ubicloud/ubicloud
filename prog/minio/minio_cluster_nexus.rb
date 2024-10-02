@@ -107,7 +107,6 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     DB.transaction do
       decr_destroy
-      minio_cluster.dissociate_with_project(minio_cluster.projects.first)
       minio_cluster.pools.each(&:incr_destroy)
     end
     hop_wait_pools_destroyed
@@ -116,7 +115,9 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   label def wait_pools_destroyed
     nap 10 unless minio_cluster.pools.empty?
     DB.transaction do
-      minio_cluster.private_subnet&.incr_destroy
+      minio_cluster.private_subnet.firewalls.map(&:destroy)
+      minio_cluster.private_subnet.incr_destroy
+      minio_cluster.dissociate_with_project(minio_cluster.projects.first)
       minio_cluster.destroy
     end
 
