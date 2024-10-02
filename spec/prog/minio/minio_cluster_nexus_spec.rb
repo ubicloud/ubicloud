@@ -145,7 +145,6 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
   describe "#destroy" do
     it "increments destroy semaphore of minio pools and hops to wait_pools_destroy" do
       expect(nx).to receive(:decr_destroy)
-      expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
       mp = instance_double(MinioPool, incr_destroy: nil)
       expect(mp).to receive(:incr_destroy)
       expect(nx.minio_cluster).to receive(:pools).and_return([mp])
@@ -159,18 +158,14 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect { nx.wait_pools_destroyed }.to nap(10)
     end
 
-    it "increments destroy semaphore of subnet and minio cluster and pops" do
+    it "increments private subnet destroy and destroys minio cluster" do
       expect(nx.minio_cluster).to receive(:pools).and_return([])
-      expect(nx.minio_cluster).to receive(:private_subnet).and_return(nil)
-      expect(nx.minio_cluster).to receive(:destroy)
-      expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
-    end
-
-    it "increments private subnet destroy if exists" do
-      expect(nx.minio_cluster).to receive(:pools).and_return([])
-      ps = instance_double(PrivateSubnet)
+      fw = instance_double(Firewall)
+      ps = instance_double(PrivateSubnet, firewalls: [fw])
       expect(ps).to receive(:incr_destroy)
-      expect(nx.minio_cluster).to receive(:private_subnet).and_return(ps)
+      expect(fw).to receive(:destroy)
+      expect(nx.minio_cluster).to receive(:private_subnet).and_return(ps).at_least(:once)
+      expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
       expect(nx.minio_cluster).to receive(:destroy)
       expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
     end
