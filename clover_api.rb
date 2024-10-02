@@ -9,6 +9,7 @@ class CloverApi < Roda
     "Content-Type" => "application/json"
 
   plugin :hash_branches
+  plugin :hooks
   plugin :json
   plugin :json_parser
 
@@ -84,7 +85,15 @@ class CloverApi < Roda
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI) unless const_defined?(:SCHEMA)
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true, prefix: "/api") unless const_defined?(:SCHEMA_ROUTER)
 
-  use Committee::Middleware::ResponseValidation, schema: SCHEMA, strict: true, prefix: "/api", raise: true
+  after do |status, headers, body|
+    schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
+    schema_validator.response_validate(status, headers, body, true) if schema_validator.link_exist?
+  rescue Committee::InvalidResponse => e
+    # FIXME: response validation has failed, and we have access to the request info, so now we can tie together/reveal
+    raise e
+  rescue JSON::ParserError => e
+    raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
+  end
 
   route do |r|
     r.rodauth
@@ -95,7 +104,6 @@ class CloverApi < Roda
       schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
       schema_validator.request_validate(Rack::Request.new(r.env))
 
-      # FIXME: strict validation
       raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
     rescue JSON::ParserError => e
       raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
