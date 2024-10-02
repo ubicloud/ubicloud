@@ -963,8 +963,7 @@ components:
               example: InvalidCredentials
             details:
               nullable: true
-              type: details
-              example: The login name was not entered
+              type: object
           required:
             - code
             - message
