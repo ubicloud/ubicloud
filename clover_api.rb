@@ -86,6 +86,7 @@ class CloverApi < Roda
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true, prefix: "/api") unless const_defined?(:SCHEMA_ROUTER)
 
   after do |status, headers, body|
+    next unless status && headers && body
     schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
     schema_validator.response_validate(status, headers, body, true) if schema_validator.link_exist?
   rescue Committee::InvalidResponse => e
