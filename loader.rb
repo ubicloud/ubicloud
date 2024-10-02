@@ -128,6 +128,14 @@ def clover_freeze
   # this Ruby standard library method patches core classes.
   "".unicode_normalize(:nfc)
 
+  # Aws SDK started to autoload modules when used, so we need to load them
+  # before freezing. https://github.com/aws/aws-sdk-ruby/pull/3105
+  # rubocop:disable Lint/Void
+  Aws::S3::Client
+  Aws::S3::Presigner
+  Aws::S3::Errors
+  # rubocop:enable Lint/Void
+
   # A standard library method that edits/creates a module variable as
   # a side effect.  We encountered it when using rubygems for its tar
   # file writing.
