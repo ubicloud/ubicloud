@@ -34,10 +34,6 @@ module Config
     Config.rack_env == "test"
   end
 
-  def self.e2e_test?
-    Config.rack_env == "e2e_test"
-  end
-
   # Mandatory -- exception is raised for these variables when missing.
   mandatory :clover_database_url, string, clear: true
   mandatory :rack_env, string

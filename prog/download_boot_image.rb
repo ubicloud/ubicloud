@@ -14,7 +14,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def download_from_blob_storage?
-    image_name.start_with?("github", "postgres", "ai-") || Config.e2e_test?
+    image_name.start_with?("github", "postgres", "ai-") || Config.production?
   end
 
   def default_boot_image_version(image_name)
