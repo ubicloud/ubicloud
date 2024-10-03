@@ -404,7 +404,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       #
       # Hence, the condition is added to check if the workflow_job is nil or
       # the conclusion is failure.
-      if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
+      if vm.vm_host && ((job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success")
         begin
           serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
           vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
