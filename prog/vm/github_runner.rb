@@ -235,6 +235,8 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def setup_forked_runner
     tarball_uri = (label_data["arch"] == "arm64") ? Config.github_cache_forked_runner_tarball_uri_arm64 : Config.github_cache_forked_runner_tarball_uri
 
+    local_ip = vm.nics.first.private_ipv4.network.to_s
+
     command = <<~COMMAND
       curl --output actions-runner.tar.gz -L #{tarball_uri}
 
@@ -260,7 +262,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       sudo mv ./actions-runner /home/runner/
       sudo chown -R runner:runner /home/runner/actions-runner
 
-      echo "CUSTOM_ACTIONS_CACHE_URL=http://localhost:51123/random_token/" | sudo tee -a /etc/environment
+      echo "CUSTOM_ACTIONS_CACHE_URL=http://#{local_ip}:51123/random_token/" | sudo tee -a /etc/environment
       echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
     COMMAND
 
