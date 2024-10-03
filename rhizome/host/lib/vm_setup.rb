@@ -611,7 +611,7 @@ After=network.target
 #{spdk_after}
 After=#{@vm_name}-dnsmasq.service
 #{spdk_requires}
-Requires=#{@vm_name}-dnsmasq.service
+Wants=#{@vm_name}-dnsmasq.service
 
 [Service]
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
