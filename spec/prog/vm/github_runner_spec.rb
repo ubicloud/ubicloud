@@ -632,7 +632,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(fws.first).to receive(:destroy)
       expect(ps).to receive(:incr_destroy)
       expect(vm).to receive(:private_subnets).and_return([ps])
-      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
@@ -656,7 +656,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect(github_runner).to receive(:workflow_job).and_return(nil)
       vm_host = instance_double(VmHost, sshable: sshable)
-      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
       expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
       expect(vm).to receive(:incr_destroy)
@@ -671,7 +671,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "failure"}).at_least(:once)
       vm_host = instance_double(VmHost, sshable: sshable)
-      expect(vm).to receive(:vm_host).and_return(vm_host)
+      expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
       expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Clog).to receive(:emit).with("Failed to move serial.log or running journalctl").and_call_original
       expect(vm).to receive(:incr_destroy)
