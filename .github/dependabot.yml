@@ -13,7 +13,7 @@ updates:
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
     allow:
       - dependency-type: "all"
     groups:
@@ -23,7 +23,7 @@ updates:
   - package-ecosystem: 'docker'
     directory: '/'
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
     allow:
       - dependency-type: "all"
     groups:
