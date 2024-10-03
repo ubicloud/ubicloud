@@ -7,9 +7,10 @@ updates:
     allow:
       - dependency-type: "all"
     groups:
-      ruby-dependencies:
-        patterns:
-          - "*"
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
   - package-ecosystem: 'npm'
     directory: '/'
     schedule:
