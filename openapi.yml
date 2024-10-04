@@ -1194,6 +1194,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Nic'
+        state:
+          description: State of the subnet
+          type: string
       required:
         - firewalls
         - id
@@ -1202,6 +1205,7 @@ components:
         - net4
         - net6
         - nics
+        - state
     Project:
       additionalProperties: false
       type: object
