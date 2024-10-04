@@ -51,6 +51,7 @@ begin
   swap_size_bytes = params["swap_size_bytes"]
   pci_devices = params.fetch("pci_devices", [])
   boot_image = params["boot_image"]
+  dns_ipv4 = params["dns_ipv4"]
 rescue KeyError => e
   puts "Needed #{e.key} in parameters json"
   exit 1
@@ -67,7 +68,7 @@ when "prep"
   vm_setup.prep(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
-    pci_devices, boot_image)
+    pci_devices, boot_image, dns_ipv4)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])
@@ -77,7 +78,7 @@ when "recreate-unpersisted"
 
   vm_setup.recreate_unpersisted(
     gua, ip4, local_ip4, nics, mem_gib,
-    ndp_needed, storage_volumes, storage_secrets,
+    ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
     multiqueue: max_vcpus > 1
   )
 when "reinstall-systemd-units"
@@ -92,7 +93,7 @@ when "reassign-ip6"
   end
   vm_setup.reassign_ip6(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
-    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices, boot_image)
+    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
 else
   puts "Invalid action #{action}"
   exit 1
