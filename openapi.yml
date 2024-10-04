@@ -1031,6 +1031,9 @@ components:
         id:
           description: ID of the firewall
           type: string
+        location:
+          description: Location of the the firewall
+          type: string
         name:
           description: Name of the firewall
           type: string
@@ -1038,6 +1041,7 @@ components:
         - description
         - firewall_rules
         - id
+        - location
         - name
     FirewallRule:
       additionalProperties: false
