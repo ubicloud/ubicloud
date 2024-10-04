@@ -266,6 +266,18 @@ class Prog::Vm::GithubRunner < Prog::Base
 
     vm.sshable.cmd(command.gsub(/^\s*\n/, ""))
 
+    hop_clear_ubicloud_resolve_conf
+  end
+
+  label def clear_ubicloud_resolve_conf
+    command = <<~COMMAND
+      sudo rm -f /etc/systemd/resolved.conf.d/Ubicloud.conf
+      sudo systemctl restart systemd-resolved
+      sudo systemctl restart docker
+    COMMAND
+
+    vm.sshable.cmd(command.gsub(/^\s*\n/, ""))
+
     hop_download_proxy
   end
 

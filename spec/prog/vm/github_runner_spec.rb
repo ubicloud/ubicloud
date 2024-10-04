@@ -442,7 +442,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
       COMMAND
 
-      expect { nx.setup_forked_runner }.to hop("download_proxy")
+      expect { nx.setup_forked_runner }.to hop("clear_ubicloud_resolve_conf")
     end
 
     it "hops to register_runner arm" do
@@ -472,7 +472,19 @@ RSpec.describe Prog::Vm::GithubRunner do
         echo "127.0.0.1 localhost.blob.core.windows.net" | sudo tee -a /etc/hosts
       COMMAND
 
-      expect { nx.setup_forked_runner }.to hop("download_proxy")
+      expect { nx.setup_forked_runner }.to hop("clear_ubicloud_resolve_conf")
+    end
+  end
+
+  describe "#clear_ubicloud_resolve_conf" do
+    it "hops to download_proxy" do
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        sudo rm -f /etc/systemd/resolved.conf.d/Ubicloud.conf
+        sudo systemctl restart systemd-resolved
+        sudo systemctl restart docker
+      COMMAND
+
+      expect { nx.clear_ubicloud_resolve_conf }.to hop("download_proxy")
     end
   end
 
