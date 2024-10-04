@@ -36,8 +36,8 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
   end
 
   label def destroy
-    nap 10 if github_installation.runners_dataset.exists
-    nap 10 if github_installation.repositories_dataset.exists
+    nap 10 unless github_installation.runners_dataset.empty?
+    nap 10 unless github_installation.repositories_dataset.empty?
 
     github_installation.destroy
     Clog.emit("GithubInstallation is deleted.") { github_installation }
