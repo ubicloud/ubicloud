@@ -213,6 +213,7 @@ class Vm < Sequel::Model
       "public_ipv6" => ephemeral_net6.to_s,
       "public_ipv4" => ip4.to_s || "",
       "local_ipv4" => local_vetho_ip.to_s.shellescape || "",
+      "dns_ipv4" => nics.first.private_subnet.net4.nth(2).to_s,
       "unix_user" => unix_user,
       "ssh_public_keys" => [public_key] + project_public_keys,
       "nics" => nics.map { |nic| [nic.private_ipv6.to_s, nic.private_ipv4.to_s, nic.ubid_to_tap_name, nic.mac] },
