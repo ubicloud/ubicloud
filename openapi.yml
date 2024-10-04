@@ -21,6 +21,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 login:
@@ -38,11 +39,14 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   success:
                     type: string
                     example: You have been logged in
+                required:
+                  - success
         default:
           $ref: '#/components/responses/Error'
       security: []
@@ -62,6 +66,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -70,6 +75,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Project'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       security:
@@ -84,6 +92,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 name:
@@ -141,6 +150,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -149,6 +159,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Firewall'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -163,6 +176,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 description:
@@ -224,6 +238,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 cidr:
@@ -294,6 +309,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -302,6 +318,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Postgres'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -348,6 +367,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 password:
@@ -378,6 +398,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 name:
@@ -435,6 +456,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 ha_type:
@@ -472,6 +494,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 password:
@@ -502,6 +525,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 name:
@@ -538,6 +562,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -546,6 +571,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -616,6 +644,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 firewall_id:
@@ -652,6 +681,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -660,6 +690,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Vm'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -730,6 +763,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: false
               type: object
               properties:
                 boot_image:
@@ -781,6 +815,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -789,6 +824,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Postgres'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -808,6 +846,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -816,6 +855,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/PrivateSubnet'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -835,6 +877,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: false
                 type: object
                 properties:
                   count:
@@ -843,6 +886,9 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Vm'
+                required:
+                  - count
+                  - items
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -971,6 +1017,7 @@ components:
       required:
         - error
     Firewall:
+      additionalProperties: false
       type: object
       properties:
         description:
@@ -987,7 +1034,13 @@ components:
         name:
           description: Name of the firewall
           type: string
+      required:
+        - description
+        - firewall_rules
+        - id
+        - name
     FirewallRule:
+      additionalProperties: false
       type: object
       properties:
         cidr:
@@ -999,7 +1052,12 @@ components:
         port_range:
           description: Port range of the firewall rule
           type: string
+      required:
+        - cidr
+        - id
+        - port_range
     Nic:
+      additionalProperties: false
       type: object
       properties:
         id:
@@ -1020,7 +1078,14 @@ components:
           description: Name of the VM
           type: string
           nullable: true
+      required:
+        - id
+        - name
+        - private_ipv4
+        - private_ipv6
+        - vm_name
     Postgres:
+      additionalProperties: false
       type: object
       properties:
         ha_type:
@@ -1044,11 +1109,21 @@ components:
         vm_size:
           description: Size of the underlying VM
           type: string
+      required:
+        - ha_type
+        - id
+        - location
+        - name
+        - state
+        - storage_size_gib
+        - vm_size
     PostgresDetailed:
+      additionalProperties: false
       type: object
       allOf:
         - $ref: '#/components/schemas/Postgres'
-        - properties:
+        - additionalProperties: false
+          properties:
             connection_string:
               description: Connection string to the Postgres database
               type: string
@@ -1068,7 +1143,14 @@ components:
             primary:
               description: Is the database primary
               type: boolean
+          required:
+            - connection_string
+            - earliest_restore_time
+            - firewall_rules
+            - latest_restore_time
+            - primary
     PostgresFirewallRule:
+      additionalProperties: false
       type: object
       properties:
         cidr:
@@ -1077,7 +1159,11 @@ components:
         id:
           description: ID of the Postgres firewall rule
           type: string
+      required:
+        - cidr
+        - id
     PrivateSubnet:
+      additionalProperties: false
       type: object
       properties:
         firewalls:
@@ -1104,7 +1190,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Nic'
+      required:
+        - firewalls
+        - id
+        - location
+        - name
+        - net4
+        - net6
+        - nics
     Project:
+      additionalProperties: false
       type: object
       properties:
         credit:
@@ -1123,7 +1218,13 @@ components:
           description: Name of the project
           type: string
           example: my-project
+      required:
+        - credit
+        - discount
+        - id
+        - name
     Vm:
+      additionalProperties: false
       type: object
       properties:
         id:
@@ -1161,12 +1262,22 @@ components:
           description: Unix user of the VM
           type: string
       required:
+        - id
+        - ip4
+        - ip6
+        - location
         - name
+        - size
+        - state
+        - storage_size_gib
+        - unix_user
     VmDetailed:
+      additionalProperties: false
       type: object
       allOf:
         - $ref: '#/components/schemas/Vm'
-        - properties:
+        - additionalProperties: false
+          properties:
             firewalls:
               description: List of firewalls
               type: array
@@ -1186,6 +1297,12 @@ components:
             unix_user:
               description: Unix user of the VM
               type: string
+          required:
+            - firewalls
+            - private_ipv4
+            - private_ipv6
+            - subnet
+            - unix_user
   responses:
     Error:
       description: an error response
