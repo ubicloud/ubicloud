@@ -351,8 +351,13 @@ class Prog::Vm::GithubRunner < Prog::Base
           serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
           vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
 
-          # Exclude the "Started" line because it contains sensitive information.
-          vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+          # We grep only the lines related to 'run-withenv' and 'systemd'. Other
+          # logs include outputs from subprocesses like php, sudo, etc., which
+          # could contain sensitive data. 'run-withenv' is the main process,
+          # while systemd lines provide valuable insights into the lifecycle of
+          # the runner script, including OOM issues.
+          # We exclude the 'Started' line to avoid exposing the JIT token.
+          vm.sshable.cmd("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
         rescue Sshable::SshError
           Clog.emit("Failed to move serial.log or running journalctl") { github_runner }
         end
