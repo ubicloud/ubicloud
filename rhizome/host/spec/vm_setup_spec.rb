@@ -145,12 +145,12 @@ RSpec.describe VmSetup do
 
   describe "#recreate_unpersisted" do
     it "can recreate unpersisted state" do
-      expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false, multiqueue: true)
+      expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false, "10.0.0.2", multiqueue: true)
       expect(vs).to receive(:hugepages).with(4)
       expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
       expect(vs).to receive(:start_systemd_unit)
 
-      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets", multiqueue: true)
+      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets", "10.0.0.2", multiqueue: true)
     end
   end
 
@@ -215,7 +215,7 @@ RSpec.describe VmSetup do
         expect(_3).to eq(gua)
         expect(_4).to be(false)
       }
-      expect(vs).to receive(:setup_taps_6).with(gua, [])
+      expect(vs).to receive(:setup_taps_6).with(gua, [], "10.0.0.2")
       expect(vs).to receive(:routes4).with(ip4, "local_ip4", [])
       expect(vs).to receive(:write_nftables_conf).with(ip4, gua, [])
       expect(vs).to receive(:forwarding)
@@ -223,19 +223,19 @@ RSpec.describe VmSetup do
       expect(vps).to receive(:write_guest_ephemeral).with(guest_ephemeral.to_s)
       expect(vps).to receive(:write_clover_ephemeral).with(clover_ephemeral.to_s)
 
-      vs.setup_networking(false, gua, ip4, "local_ip4", [], false, multiqueue: true)
+      vs.setup_networking(false, gua, ip4, "local_ip4", [], false, "10.0.0.2", multiqueue: true)
     end
 
     it "can setup networking for empty ip4" do
       gua = "fddf:53d2:4c89:2305:46a0::"
       expect(vs).to receive(:interfaces).with([], false)
       expect(vs).to receive(:setup_veths_6)
-      expect(vs).to receive(:setup_taps_6).with(gua, [])
+      expect(vs).to receive(:setup_taps_6).with(gua, [], "10.0.0.2")
       expect(vs).to receive(:routes4).with(nil, "local_ip4", [])
       expect(vs).to receive(:forwarding)
       expect(vs).to receive(:write_nftables_conf)
 
-      vs.setup_networking(true, gua, "", "local_ip4", [], false, multiqueue: false)
+      vs.setup_networking(true, gua, "", "local_ip4", [], false, "10.0.0.2", multiqueue: false)
     end
 
     it "can generate nftables config" do

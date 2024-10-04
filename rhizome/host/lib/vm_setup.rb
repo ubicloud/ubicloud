@@ -43,10 +43,10 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image)
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
+  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
     network_thread = Thread.new do
-      setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
+      setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     end
     storage_thread = Thread.new do
       storage(storage_params, storage_secrets, true)
@@ -58,22 +58,22 @@ class VmSetup
     start_systemd_unit
   end
 
-  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, multiqueue:)
-    setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: multiqueue)
+  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, multiqueue:)
+    setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: multiqueue)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     start_systemd_unit
   end
 
-  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image)
-    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
-    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, multiqueue: max_vcpus > 1)
+  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
+    cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
+    setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
   end
 
-  def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, multiqueue:)
+  def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue:)
     ip4 = nil if ip4.empty?
     guest_ephemeral, clover_ephemeral = subdivide_network(NetAddr.parse_net(gua))
 
@@ -93,7 +93,7 @@ class VmSetup
 
     interfaces(nics, multiqueue)
     setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
-    setup_taps_6(gua, nics)
+    setup_taps_6(gua, nics, dns_ipv4)
     routes4(ip4, local_ip4, nics)
     write_nftables_conf(ip4, gua, nics)
     forwarding
@@ -257,7 +257,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip -n #{q_vm} route replace 2000::/3 via #{vetho_ll.shellescape} dev vethi#{q_vm}"
   end
 
-  def setup_taps_6(gua, nics)
+  def setup_taps_6(gua, nics, dns_ipv4)
     # Write out guest-delegated and clover infrastructure address
     # ranges, designed around non-floating IPv6 networks bound to the
     # host.
@@ -267,6 +267,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     guest_intrusion = guest_ephemeral.nth(1).to_s + "/" + guest_ephemeral.netmask.prefix_len.to_s
     nics.each do |nic|
       r "ip -n #{q_vm} addr replace #{guest_intrusion.shellescape} dev #{nic.tap}"
+
+      r "ip -n #{q_vm} addr replace #{dns_ipv4} dev #{nic.tap}"
 
       # Route ephemeral address to tap.
       r "ip -n #{q_vm} link set dev #{nic.tap} up"
@@ -414,7 +416,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
   end
 
-  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image)
+  def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
     vp.write_meta_data(<<EOS)
 instance-id: #{yq(@vm_name)}
 local-hostname: #{yq(@vm_name)}
@@ -451,6 +453,7 @@ server=2620:fe::fe
 server=2620:fe::9
 dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
 listen-address=#{dnsmasq_address_ip6}
+listen-address=#{dns_ipv4}
 dhcp-option=26,1400
 bind-interfaces
 DNSMASQ_CONF
@@ -465,6 +468,7 @@ DNSMASQ_CONF
     nameservers:
       addresses:
         - "fd00:0b1c:100d:53::"
+        - #{dns_ipv4}
 ETHERNETS
     end.join("\n")
 
