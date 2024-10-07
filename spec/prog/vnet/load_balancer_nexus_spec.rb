@@ -37,6 +37,14 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(lb.projects.first).to eq ps.projects.first
       expect(lb.hostname).to eq "test-lb2.#{ps.ubid[-5...]}.lb.ubicloud.com"
     end
+
+    it "creates a new load balancer with custom hostname" do
+      dz = DnsZone.create_with_id(project_id: ps.projects.first.id, name: "custom.ubicloud.com")
+      lb = described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 80, custom_hostname_prefix: "test-custom-hostname", custom_hostname_dns_zone_id: dz.id).subject
+      expect(LoadBalancer.count).to eq 2
+      expect(lb.projects.first).to eq ps.projects.first
+      expect(lb.hostname).to eq "test-custom-hostname.custom.ubicloud.com"
+    end
   end
 
   describe "#before_run" do
@@ -86,7 +94,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   describe "#create_new_cert" do
     it "creates a new cert" do
       dns_zone = DnsZone.create_with_id(name: "test-dns-zone", project_id: nx.load_balancer.private_subnet.projects.first.id)
-      allow(described_class).to receive(:dns_zone).and_return(dns_zone)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
       expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
       expect(nx.load_balancer.certs.count).to eq 2
@@ -94,7 +102,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
     it "creates a cert without dns zone in development" do
       expect(Config).to receive(:development?).and_return(true)
-      expect(described_class).to receive(:dns_zone).and_return(nil)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(nil)
       expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
       expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
       expect(nx.load_balancer.certs.count).to eq 2
@@ -187,7 +195,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "deletes the dns record" do
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
       expect(nx).to receive(:decr_destroy)
       expect(st.children).to all(receive(:destroy))
@@ -199,7 +207,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     it "rewrites the dns records" do
       vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
@@ -207,10 +215,10 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "does not rewrite dns records if no vms" do
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return([])
-      expect(described_class).not_to receive(:dns_zone)
+      expect(nx.load_balancer).not_to receive(:dns_zone)
       nx.rewrite_dns_records
     end
 
@@ -224,7 +232,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     it "does not create dns record if ephemeral_net4 doesn't exist" do
       vms = [instance_double(Vm, ephemeral_net4: nil, ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
-      expect(described_class).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)

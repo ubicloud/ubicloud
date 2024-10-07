@@ -84,10 +84,6 @@ RSpec.describe LoadBalancer do
       DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.projects.first.id)
     }
 
-    before do
-      allow(Prog::Vnet::LoadBalancerNexus).to receive(:dns_zone).and_return(dns_zone)
-    end
-
     it "returns true if there are no certs" do
       expect(lb.need_certificates?).to be(true)
     end
@@ -111,10 +107,6 @@ RSpec.describe LoadBalancer do
     let(:dns_zone) {
       DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.projects.first.id)
     }
-
-    before do
-      allow(Prog::Vnet::LoadBalancerNexus).to receive(:dns_zone).and_return(dns_zone)
-    end
 
     it "returns the cert that is not expired" do
       cert1 = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
