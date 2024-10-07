@@ -9,20 +9,25 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
     health_check_endpoint: "/up", health_check_interval: 30, health_check_timeout: 15,
-    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http")
+    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http", custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil)
 
     unless (ps = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end
 
     Validation.validate_name(name)
+    custom_hostname = if custom_hostname_prefix
+      Validation.validate_name(custom_hostname_prefix)
+      "#{custom_hostname_prefix}.#{DnsZone[custom_hostname_dns_zone_id].name}"
+    end
 
     DB.transaction do
       lb = LoadBalancer.create_with_id(
         private_subnet_id: private_subnet_id, name: name, algorithm: algorithm, src_port: src_port, dst_port: dst_port,
         health_check_endpoint: health_check_endpoint, health_check_interval: health_check_interval,
         health_check_timeout: health_check_timeout, health_check_up_threshold: health_check_up_threshold,
-        health_check_down_threshold: health_check_down_threshold, health_check_protocol: health_check_protocol
+        health_check_down_threshold: health_check_down_threshold, health_check_protocol: health_check_protocol,
+        custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id
       )
       lb.associate_with_project(ps.projects.first)
 
@@ -55,7 +60,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def create_new_cert
-    cert = Prog::Vnet::CertNexus.assemble(load_balancer.hostname, Prog::Vnet::LoadBalancerNexus.dns_zone&.id).subject
+    cert = Prog::Vnet::CertNexus.assemble(load_balancer.hostname, load_balancer.dns_zone&.id).subject
     load_balancer.add_cert(cert)
     hop_wait_cert_provisioning
   end
@@ -107,7 +112,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     strand.children.map { _1.destroy }
     # The following if statement makes sure that it's OK to not have dns_zone
     # only if it's not in production.
-    if (dns_zone = Prog::Vnet::LoadBalancerNexus.dns_zone) && (Config.production? || dns_zone)
+    if (dns_zone = load_balancer.dns_zone) && (Config.production? || dns_zone)
       dns_zone.delete_record(record_name: load_balancer.hostname)
     end
 
@@ -132,15 +137,11 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   def rewrite_dns_records
-    Prog::Vnet::LoadBalancerNexus.dns_zone&.delete_record(record_name: load_balancer.hostname)
+    load_balancer.dns_zone&.delete_record(record_name: load_balancer.hostname)
 
     load_balancer.vms_to_dns.map do |vm|
-      Prog::Vnet::LoadBalancerNexus.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s) if vm.ephemeral_net4
-      Prog::Vnet::LoadBalancerNexus.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "AAAA", ttl: 10, data: vm.ephemeral_net6.nth(2).to_s)
+      load_balancer.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s) if vm.ephemeral_net4
+      load_balancer.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "AAAA", ttl: 10, data: vm.ephemeral_net6.nth(2).to_s)
     end
-  end
-
-  def self.dns_zone
-    @@dns_zone ||= DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 end

@@ -12,6 +12,7 @@ class LoadBalancer < Sequel::Model
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: LoadBalancersVms
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
   one_to_many :certs_load_balancers, key: :load_balancer_id, class: CertsLoadBalancers
+  many_to_one :custom_hostname_dns_zone, class: DnsZone, key: :custom_hostname_dns_zone_id
 
   plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy
 
@@ -67,7 +68,11 @@ class LoadBalancer < Sequel::Model
   end
 
   def hostname
-    "#{name}.#{private_subnet.ubid[-5...]}.#{Config.load_balancer_service_hostname}"
+    custom_hostname || "#{name}.#{private_subnet.ubid[-5...]}.#{Config.load_balancer_service_hostname}"
+  end
+
+  def dns_zone
+    custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 
   def need_certificates?
