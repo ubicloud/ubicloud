@@ -107,7 +107,7 @@ class Prog::DownloadBootImage < Prog::Base
       ["postgres-ubuntu-2204", "x64", "20240226.1.0"] => "f8a2b78189239717355b54ecf62a504a349c96b1ab6a21919984f58c2a367617",
       ["postgres-ubuntu-2204", "x64", "20240702.3.0"] => "02dfa6e844fa3e72224f2f0f1811e039221acee07d6b05b507d49ae17f84d0ce",
       ["postgres-paradedb-ubuntu-2204", "x64", "20240926.1.0"] => "9249a64a516e7e39170cea7427c0cf9c32627061755773294a19e3367f114824",
-      ["ai-ubuntu-2404-nvidia", "x64", "20240928.1.0"] => "b222788ebac32d08a6fcb4d3dfe1f0420f5da9cba1fe90fd56be834d51b8e054",
+      ["ai-ubuntu-2404-nvidia", "x64", "20241008.1.0"] => "4d3874481b796e382a7f0b6736f78eb0af8ead21d4de55b52e00160bc46bca33",
       ["ai-model-gemma-2-2b-it", "x64", "20240918.1.0"] => "b726ead6d5f48fb8e6de7efb48fb22367c9a7c155cfee71a3a7e5527be5df08e",
       ["ai-model-llama-3-2-3b-it", "x64", "20240926.1.0"] => "02b0b34fa84843ba1d09dc7f5d3877cf79dbbb3dcaa087ea16af72b95e35a354"
     }

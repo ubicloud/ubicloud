@@ -151,7 +151,7 @@ module Config
   override :github_ubuntu_2004_version, "20240818.1.0", string
   override :postgres_ubuntu_2204_version, "20240702.3.0", string
   override :github_gpu_ubuntu_2204_version, "20240818.1.0", string
-  override :ai_ubuntu_2404_nvidia_version, "20240928.1.0", string
+  override :ai_ubuntu_2404_nvidia_version, "20241008.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
