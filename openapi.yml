@@ -293,6 +293,67 @@ paths:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/firewall_id'
       - $ref: '#/components/parameters/firewall_rule_id'
+  '/project/{project_id}/location/{location}/load-balancer':
+    get:
+      operationId: listLocationLoadBalancers
+      summary: List Load Balancers in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Load Balancers in a specific location of a project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoadBalancer'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/id/{load_balancer_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_id'
+    delete:
+      operationId: deleteLoadBalancerWithID
+      summary: Delete a specific Load Balancer with ID
+      responses:
+        '204':
+          description: Load balancer is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+    get:
+      operationId: getLoadBalancerDetailsWithId
+      summary: Get details of a specific Load Balancer in a location with ID
+      responses:
+        '200':
+          description: Details of the Load Balancer in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases
@@ -691,7 +752,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Vm'
+                      $ref: '#/components/schemas/Vm/properties/id'
                 additionalProperties: false
                 required:
                   - count
@@ -803,6 +864,37 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/load-balancer':
+    get:
+      operationId: listLoadBalancers
+      summary: List Load Balancers in a specific project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Load Balancers in a specific project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoadBalancer'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
   '/project/{project_id}/postgres':
     get:
       operationId: listPostgresDatabases
@@ -909,6 +1001,13 @@ components:
       description: ID of the firewall rule
       in: path
       name: firewall_rule_id
+      required: true
+      schema:
+        type: string
+    load_balancer_id:
+      description: ID of the load balancer
+      in: path
+      name: load_balancer_id
       required: true
       schema:
         type: string
@@ -1063,6 +1162,64 @@ components:
         - cidr
         - id
         - port_range
+    LoadBalancer:
+      type: object
+      properties:
+        algorithm:
+          description: Algorithm of the Load Balancer
+          type: string
+        dst_port:
+          description: Destination port for the Load Balancer
+          type: integer
+        health_check_endpoint:
+          description: Health check endpoint URL
+          type: string
+        health_check_protocol:
+          description: Health check endpoint protocol
+          type: string
+        hostname:
+          description: Hostname of the Load Balancer
+          type: string
+        id:
+          description: ID of the Load Balancer
+          type: string
+        name:
+          description: Name of the Load Balancer
+          type: string
+        src_port:
+          description: Source port for the Load Balancer
+          type: integer
+      additionalProperties: false
+      required:
+        - algorithm
+        - dst_port
+        - health_check_endpoint
+        - health_check_protocol
+        - hostname
+        - id
+        - name
+        - src_port
+    LoadBalancerDetailed:
+      type: object
+      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/LoadBalancer'
+        - properties:
+            location:
+              description: Location of the Load Balancer
+              type: string
+            subnet:
+              description: Subnet of the Load Balancer
+              type: string
+            vms:
+              items:
+                $ref: '#/components/schemas/Vm'
+              type: array
+          additionalProperties: false
+          required:
+            - location
+            - subnet
+            - vms
     Nic:
       type: object
       properties:
@@ -1335,6 +1492,8 @@ tags:
     name: Firewall
   - description: Firewall Rule Operations
     name: Firewall Rule
+  - description: Load Balancer Operations
+    name: Load Balancer
   - description: Login Operations
     name: Login
   - description: Postgres Operations
