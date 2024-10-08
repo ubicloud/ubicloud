@@ -34,6 +34,11 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
     parsed_size = Validation.validate_postgres_size(request_body_params["size"])
 
+    if @location == "leaseweb-wdc02" && request_body_params["storage_size"].to_i == parsed_size.storage_size_options.last
+      flash["error"] = "#{parsed_size.storage_size_options.last}GB option is not available in this location, please reach out to support@ubicloud.com for more information"
+      fail Validation::ValidationFailed.new({storage_size: flash["error"]})
+    end
+
     ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
     requested_standby_count = case ha_type
     when PostgresResource::HaType::ASYNC then 1

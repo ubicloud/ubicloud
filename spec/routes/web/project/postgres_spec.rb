@@ -151,6 +151,21 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
       end
+
+      it "can not create PostgreSQL database with x4 storage in us-east-a2" do
+        visit "#{project.path}/postgres/create"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+
+        choose option: "us-east-a2"
+        choose option: "standard-2"
+        choose option: "512"
+        choose option: PostgresResource::HaType::NONE
+
+        click_button "Create"
+
+        expect(page).to have_content "512GB option is not available in this location, please reach out to support@ubicloud.com for more information"
+      end
     end
 
     describe "show" do
