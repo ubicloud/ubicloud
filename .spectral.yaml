@@ -1,7 +1,7 @@
 extends: ["spectral:oas"]
 rules:
   operation-description: off
-  require-additional-properties-with-properties:
+  additional-properties-with-properties:
     description: "Any element with properties also has additionalProperties false"
     given: $..[?(@ && @.properties)]
     severity: error
@@ -10,9 +10,9 @@ rules:
         function: defined
       - field: additionalProperties
         function: falsy
-  require-required-with-properties:
-    description: "Any element with properties also has required array"
-    given: $..[?(@ && @.properties)]
+  responses-required-with-properties:
+    description: "Any responses schema with properties also has required array"
+    given: $.paths..responses..[?(@ && @.properties)]
     severity: error
     then:
       - field: required
@@ -22,7 +22,19 @@ rules:
             type: array
             items:
               type: string
-  require-default-for-responses:
+  schemas-required-with-properties:
+    description: "Any components/schemas schema with properties also has required array"
+    given: $.components.schemas..[?(@ && @.properties)]
+    severity: error
+    then:
+      - field: required
+        function: schema
+        functionOptions:
+          schema:
+            type: array
+            items:
+              type: string
+  default-for-responses:
     description: "Responses have default value `$ref: '#/components/responses/Error'`"
     given: $.paths[*][*][responses]
     severity: error
