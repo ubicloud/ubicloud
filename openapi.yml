@@ -458,6 +458,9 @@ paths:
             schema:
               type: object
               properties:
+                flavor:
+                  description: Kind of database
+                  type: string
                 ha_type:
                   description: High availability type
                   type: string
@@ -1091,6 +1094,9 @@ components:
     Postgres:
       type: object
       properties:
+        flavor:
+          description: Kind of Postgres database
+          type: string
         ha_type:
           description: High availability type
           type: string
@@ -1114,6 +1120,7 @@ components:
           type: string
       additionalProperties: false
       required:
+        - flavor
         - ha_type
         - id
         - location
