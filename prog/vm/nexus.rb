@@ -159,6 +159,7 @@ class Prog::Vm::Nexus < Prog::Base
       if strand.label != "destroy"
         vm.active_billing_records.each(&:finalize)
         vm.assigned_vm_address&.active_billing_record&.finalize
+        vm.update(has_customer_data: true)
         register_deadline(nil, 5 * 60)
         hop_destroy
       end
@@ -240,6 +241,7 @@ class Prog::Vm::Nexus < Prog::Base
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
       vm.nics.each { _1.incr_setup_nic }
+      vm.update(has_customer_data: true) if vm.pool_id.nil?
       hop_wait_sshable
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
