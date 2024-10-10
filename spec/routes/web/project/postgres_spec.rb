@@ -94,6 +94,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create new ParadeDB PostgreSQL database" do
+        expect(Config).to receive(:postgres_paradedb_notification_email).and_return("dummy@mail.com")
         expect(Util).to receive(:send_email)
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
 

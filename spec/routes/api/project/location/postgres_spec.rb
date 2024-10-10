@@ -110,6 +110,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "sends mail to partners" do
+        expect(Config).to receive(:postgres_paradedb_notification_email).and_return("dummy@mail.com")
         expect(Util).to receive(:send_email)
 
         post "/api/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
