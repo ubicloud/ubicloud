@@ -21,51 +21,51 @@ class PostgresServer < Sequel::Model
 
   def configure_hash
     configs = {
-      listen_addresses: "'*'",
-      max_connections: (vm.mem_gib * 25).to_s,
-      superuser_reserved_connections: "3",
-      shared_buffers: "#{vm.mem_gib * 1024 / 4}MB",
-      work_mem: "#{vm.mem_gib / 8}MB",
-      maintenance_work_mem: "#{vm.mem_gib * 1024 / 16}MB",
-      max_parallel_workers: "4",
-      max_parallel_workers_per_gather: "2",
-      max_parallel_maintenance_workers: "2",
-      min_wal_size: "80MB",
-      max_wal_size: "5GB",
-      random_page_cost: "1.1",
-      effective_cache_size: "#{vm.mem_gib * 1024 * 3 / 4}MB",
-      effective_io_concurrency: "200",
-      tcp_keepalives_count: "4",
-      tcp_keepalives_idle: "2",
-      tcp_keepalives_interval: "2",
-      ssl: "on",
-      ssl_min_protocol_version: "TLSv1.3",
-      ssl_ca_file: "'/etc/ssl/certs/ca.crt'",
-      ssl_cert_file: "'/etc/ssl/certs/server.crt'",
-      ssl_key_file: "'/etc/ssl/certs/server.key'",
-      log_timezone: "'UTC'",
-      log_directory: "'pg_log'",
-      log_filename: "'postgresql.log'",
-      log_truncate_on_rotation: "true",
-      logging_collector: "on",
-      timezone: "'UTC'",
-      lc_messages: "'C.UTF-8'",
-      lc_monetary: "'C.UTF-8'",
-      lc_numeric: "'C.UTF-8'",
-      lc_time: "'C.UTF-8'",
-      shared_preload_libraries: "'pg_cron,pg_stat_statements'"
+      "listen_addresses" => "'*'",
+      "max_connections" => (vm.mem_gib * 25).to_s,
+      "superuser_reserved_connections" => "3",
+      "shared_buffers" => "#{vm.mem_gib * 1024 / 4}MB",
+      "work_mem" => "#{vm.mem_gib / 8}MB",
+      "maintenance_work_mem" => "#{vm.mem_gib * 1024 / 16}MB",
+      "max_parallel_workers" => "4",
+      "max_parallel_workers_per_gather" => "2",
+      "max_parallel_maintenance_workers" => "2",
+      "min_wal_size" => "80MB",
+      "max_wal_size" => "5GB",
+      "random_page_cost" => "1.1",
+      "effective_cache_size" => "#{vm.mem_gib * 1024 * 3 / 4}MB",
+      "effective_io_concurrency" => "200",
+      "tcp_keepalives_count" => "4",
+      "tcp_keepalives_idle" => "2",
+      "tcp_keepalives_interval" => "2",
+      "ssl" => "on",
+      "ssl_min_protocol_version" => "TLSv1.3",
+      "ssl_ca_file" => "'/etc/ssl/certs/ca.crt'",
+      "ssl_cert_file" => "'/etc/ssl/certs/server.crt'",
+      "ssl_key_file" => "'/etc/ssl/certs/server.key'",
+      "log_timezone" => "'UTC'",
+      "log_directory" => "'pg_log'",
+      "log_filename" => "'postgresql.log'",
+      "log_truncate_on_rotation" => "true",
+      "logging_collector" => "on",
+      "timezone" => "'UTC'",
+      "lc_messages" => "'C.UTF-8'",
+      "lc_monetary" => "'C.UTF-8'",
+      "lc_numeric" => "'C.UTF-8'",
+      "lc_time" => "'C.UTF-8'",
+      "shared_preload_libraries" => "'pg_cron,pg_stat_statements'"
     }
 
     if resource.flavor == PostgresResource::Flavor::PARADEDB
-      configs[:shared_preload_libraries] = "'pg_cron,pg_stat_statements,pg_analytics,pg_search'"
+      configs["shared_preload_libraries"] = "'pg_cron,pg_stat_statements,pg_analytics,pg_search'"
     elsif resource.flavor == PostgresResource::Flavor::LANTERN
-      configs[:shared_preload_libraries] = "'pg_cron,pg_stat_statements,lantern_extras'"
-      configs[:"lantern.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
-      configs[:"lantern.external_index_port"] = "443"
-      configs[:"lantern.external_index_secure"] = "true"
-      configs[:"hnsw.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
-      configs[:"hnsw.external_index_port"] = "443"
-      configs[:"hnsw.external_index_secure"] = "true"
+      configs["shared_preload_libraries"] = "'pg_cron,pg_stat_statements,lantern_extras'"
+      configs["lantern.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
+      configs["lantern.external_index_port"] = "443"
+      configs["lantern.external_index_secure"] = "true"
+      configs["hnsw.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
+      configs["hnsw.external_index_port"] = "443"
+      configs["hnsw.external_index_secure"] = "true"
     end
 
     if timeline.blob_storage
