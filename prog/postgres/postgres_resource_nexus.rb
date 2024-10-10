@@ -24,7 +24,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access = if parent_id.nil?
-        target_storage_size_gib = Validation.validate_postgres_storage_size(target_vm_size, target_storage_size_gib)
+        target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib)
         [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location: location).id, "push"]
       else
         unless (parent = PostgresResource[parent_id])
@@ -32,7 +32,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         end
 
         if target_storage_size_gib != parent.target_storage_size_gib
-          target_storage_size_gib = Validation.validate_postgres_storage_size(target_vm_size, target_storage_size_gib)
+          target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib)
         end
 
         restore_target = Validation.validate_date(restore_target, "restore_target")
