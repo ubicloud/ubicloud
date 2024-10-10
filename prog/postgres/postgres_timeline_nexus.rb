@@ -81,7 +81,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    destroy_blob_storage if postgres_timeline.blob_storage_endpoint
+    destroy_blob_storage if postgres_timeline.blob_storage
     postgres_timeline.destroy
     pop "postgres timeline is deleted"
   end
