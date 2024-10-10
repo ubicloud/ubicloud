@@ -198,7 +198,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/firewall/{firewall_id}':
+  '/project/{project_id}/firewall/{firewall_name}':
     delete:
       operationId: deleteFirewall
       summary: Delete a specific firewall
@@ -225,11 +225,11 @@ paths:
         - Firewall
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'
-  '/project/{project_id}/firewall/{firewall_id}/firewall-rule':
+      - $ref: '#/components/parameters/firewall_name'
+  '/project/{project_id}/firewall/{firewall_name}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'
+      - $ref: '#/components/parameters/firewall_name'
     post:
       operationId: createFirewallRule
       summary: Create a new firewall rule
@@ -264,7 +264,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-  '/project/{project_id}/firewall/{firewall_id}/firewall-rule/{firewall_rule_id}':
+  '/project/{project_id}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
     delete:
       operationId: deleteFirewallRule
       summary: Delete a specific firewall rule
@@ -291,7 +291,7 @@ paths:
         - Firewall Rule
     parameters:
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'
+      - $ref: '#/components/parameters/firewall_name'
       - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/load-balancer':
     get:
@@ -388,6 +388,70 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    delete:
+      operationId: deleteLocationFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getLocationFirewallRuleDetails
+      summary: Get details of a firewall rule
+      responses:
+        '200':
+          description: Details of the firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    post:
+      operationId: createLocationFirewallRule
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/location/{location}/load-balancer':
     get:
       operationId: listLocationLoadBalancers
@@ -1197,6 +1261,13 @@ components:
       description: ID of the firewall
       in: path
       name: firewall_id
+      required: true
+      schema:
+        type: string
+    firewall_name:
+      description: Name of the firewall
+      in: path
+      name: firewall_name
       required: true
       schema:
         type: string
