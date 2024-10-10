@@ -259,8 +259,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
   end
 
   def send_notification_mail_to_partners(resource, user_email)
-    if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(resource.flavor)
-      email = Config.send(:"postgres_#{resource.flavor}_notification_email")
+    if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(resource.flavor) && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
       flavor_name = resource.flavor.capitalize
       Util.send_email(email, "New #{flavor_name} Postgres database has been created.",
         greeting: "Hello #{flavor_name} team,",
