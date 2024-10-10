@@ -32,7 +32,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     required_parameters << "name" << "location" if @mode == AppMode::WEB
     allowed_optional_parameters = ["storage_size", "ha_type", "flavor"]
     request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
-    parsed_size = Validation.validate_postgres_size(request_body_params["size"])
+    parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"])
 
     ha_type = request_body_params["ha_type"] || PostgresResource::HaType::NONE
     requested_standby_count = case ha_type
