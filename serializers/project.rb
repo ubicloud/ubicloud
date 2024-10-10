@@ -6,7 +6,8 @@ class Serializers::Project < Serializers::Base
       id: p.ubid,
       name: p.name,
       credit: p.credit.to_f,
-      discount: p.discount
+      discount: p.discount,
+      feature_flags: p.feature_flags
     }
 
     if options[:include_path]
