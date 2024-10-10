@@ -58,16 +58,16 @@ module Option
     VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, [_1 * 30], false, true)
   }).freeze
 
-  PostgresSize = Struct.new(:name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do
+  PostgresSize = Struct.new(:location, :name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do
     alias_method :display_name, :name
   end
-  PostgresSizes = [2, 4, 8, 16, 30, 60].flat_map {
-    storage_size_options = [_1 * 64, _1 * 128, _1 * 256]
-    storage_size_options = [1024, 2048, 4096] if [30, 60].include?(_1)
+  PostgresSizes = Option.postgres_locations.product([2, 4, 8, 16, 30, 60]).flat_map {
+    storage_size_options = [_2 * 64, _2 * 128, _2 * 256]
+    storage_size_options = [1024, 2048, 4096] if [30, 60].include?(_2)
     [
-      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::STANDARD, _1, _1 * 4, storage_size_options),
-      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::PARADEDB, _1, _1 * 4, storage_size_options),
-      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::LANTERN, _1, _1 * 4, storage_size_options)
+      PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 4, storage_size_options),
+      PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
+      PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
     ]
   }.freeze
 
