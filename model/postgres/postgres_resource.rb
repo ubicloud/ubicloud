@@ -107,6 +107,7 @@ class PostgresResource < Sequel::Model
   module Flavor
     STANDARD = "standard"
     PARADEDB = "paradedb"
+    LANTERN = "lantern"
   end
 
   def self.redacted_columns
