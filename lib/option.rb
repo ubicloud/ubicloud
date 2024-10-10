@@ -63,7 +63,12 @@ module Option
   end
   PostgresSizes = Option.postgres_locations.product([2, 4, 8, 16, 30, 60]).flat_map {
     storage_size_options = [_2 * 64, _2 * 128, _2 * 256]
-    storage_size_options = [1024, 2048, 4096] if [30, 60].include?(_2)
+    storage_size_options.map! { |size| size / 15 * 16 } if [30, 60].include?(_2)
+
+    storage_size_options.pop if _1.name == "leaseweb-wdc02"
+
+    storage_size_limiter = [4096, storage_size_options.last].min.fdiv(storage_size_options.last)
+    storage_size_options.map! { |size| size * storage_size_limiter }
     [
       PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::STANDARD, _2, _2 * 4, storage_size_options),
       PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
