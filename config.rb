@@ -131,6 +131,7 @@ module Config
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
+  optional :postgres_lantern_notification_email, string
 
   # Logging
   optional :database_logger_level, string
