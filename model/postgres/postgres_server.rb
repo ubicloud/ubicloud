@@ -58,6 +58,14 @@ class PostgresServer < Sequel::Model
 
     if resource.flavor == PostgresResource::Flavor::PARADEDB
       configs[:shared_preload_libraries] = "'pg_cron,pg_stat_statements,pg_analytics,pg_search'"
+    elsif resource.flavor == PostgresResource::Flavor::LANTERN
+      configs[:shared_preload_libraries] = "'pg_cron,pg_stat_statements,lantern_extras'"
+      configs[:"lantern.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
+      configs[:"lantern.external_index_port"] = "443"
+      configs[:"lantern.external_index_secure"] = "true"
+      configs[:"hnsw.external_index_host"] = "'external-indexing.cloud.lantern.dev'"
+      configs[:"hnsw.external_index_port"] = "443"
+      configs[:"hnsw.external_index_secure"] = "true"
     end
 
     if timeline.blob_storage
