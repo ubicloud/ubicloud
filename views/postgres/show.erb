@@ -90,6 +90,33 @@
           </div>
         </div>
       </div>
+    <% elsif @pg[:flavor] == PostgresResource::Flavor::LANTERN %>
+      <div class="md:col-span-3">
+        <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+          <div class="px-4 py-5 sm:p-6">
+            <div class="space-y-2">
+              <img src="/logo-lantern.png" class="h-6 object-contain mb-4"/>
+              <p class="text-sm text-gray-500 leading-6">
+                Lantern is a PostgreSQL-based vector database designed specifically for building AI applications.
+                Lantern instances are managed by the Lantern team and are optimal for AI workloads.
+              </p>
+              <div class="text-sm text-gray-500 leading-6">
+                <span class="font-semibold">Support:</span>
+                <ul class="list-disc list-inside ml-2">
+                  <li>Via email at
+                    <a href="mailto:support@lantern.dev" class="text-orange-600 font-semibold">support@lantern.dev</a></li>
+                </ul>
+              </div>
+              <div class="text-sm text-gray-500 leading-6">
+                <span class="font-semibold">Documentation:</span>
+                Check out
+                <a href="https://lantern.dev/docs" class="text-orange-600 font-semibold">Lantern Documentation</a>
+                to get more information about Lantern.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     <% end %>
   </div>
   <!-- Fork database -->
