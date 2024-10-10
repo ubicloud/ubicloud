@@ -25,7 +25,7 @@ RSpec.describe Clover, "vm" do
     it "success all vms" do
       Prog::Postgres::PostgresResourceNexus.assemble(
         project_id: project.id,
-        location: "hetzner-hel1",
+        location: "hetzner-fsn1",
         name: "pg-foo-1",
         target_vm_size: "standard-2",
         target_storage_size_gib: 128
