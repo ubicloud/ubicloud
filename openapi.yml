@@ -388,6 +388,64 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    delete:
+      operationId: deleteLocationFirewallWithId
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          description: Firewall deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getLocationFirewallDetailsWithId
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          description: Details of the firewall
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+    delete:
+      operationId: deleteLocationFirewall
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          description: Firewall deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getLocationFirewallDetails
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          description: Details of the firewall
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
   '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
     delete:
       operationId: deleteLocationFirewallRule
