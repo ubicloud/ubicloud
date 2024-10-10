@@ -37,6 +37,8 @@ class Prog::DownloadBootImage < Prog::Base
       Config.github_gpu_ubuntu_2204_version
     when "postgres-ubuntu-2204"
       Config.postgres_ubuntu_2204_version
+    when "postgres-paradedb-ubuntu-2204"
+      Config.postgres_paradedb_ubuntu_2204_version
     when "ai-ubuntu-2404-nvidia"
       Config.ai_ubuntu_2404_nvidia_version
     else
