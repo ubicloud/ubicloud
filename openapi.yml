@@ -585,6 +585,70 @@ paths:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_id'
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule/{firewall_rule_id}':
+    delete:
+      operationId: deleteLocationPostgresFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getLocationPostgresFirewallRuleDetails
+      summary: Get details of a firewall rule
+      responses:
+        '200':
+          description: Details of the firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    post:
+      operationId: createLocationPostgresFirewallRule
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password':
     post:
       operationId: resetSuperuserPasswordWithID
