@@ -16,8 +16,8 @@ class CloverWeb
           end
         end
       end.compact.to_h
-      @users = Serializers::Account.serialize(@project.accounts)
-      @invitations = Serializers::ProjectInvitation.serialize(@project.invitations)
+      @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
+      @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
       @policy = Serializers::AccessPolicy.serialize(@project.access_policies_dataset.where(managed: false).first) || {body: {acls: []}.to_json}
 
       view "project/user"
@@ -70,6 +70,10 @@ class CloverWeb
         # we clear out any policy that no one is using.
         [Authorization::ManagedPolicy::Admin, Authorization::ManagedPolicy::Member].each do |policy|
           accounts = user_policies.select { _2 == policy.name }.keys.map { Account.from_ubid(_1) }
+          if policy == Authorization::ManagedPolicy::Admin && accounts.empty?
+            flash["error"] = "The project must have at least one admin."
+            return redirect_back_with_inputs
+          end
           policy.apply(@project, accounts)
         end
         invitation_policies = r.params["invitation_policies"] || {}
