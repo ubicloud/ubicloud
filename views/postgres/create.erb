@@ -1,6 +1,8 @@
 <%
   @page_title, logo = if @flavor == PostgresResource::Flavor::PARADEDB
     ["Create ParadeDB PostgreSQL Database", "logo-paradedb.png"]
+  elsif @flavor == PostgresResource::Flavor::LANTERN
+    ["Create Lantern PostgreSQL Database", "logo-lantern.png"]
   else
     ["Create PostgreSQL Database", nil]
   end
@@ -226,6 +228,36 @@
                       locals: {
                         options: [
                           ["1", "Accept <a href='https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://paradedb.notion.site/Privacy-Policy-a7ce333c45c8478fb03250dff7e573b7?pvs=4' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>", {}, {required: true}],
+                        ]
+                      }
+                    ) %>
+                  </div>
+                </div>
+              <% end %>
+
+              <% if @flavor == PostgresResource::Flavor::LANTERN %>
+                <div class="col-span-full">
+                  <div class="space-y-2">
+                    <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
+                    <div class="space-y-1 text-sm leading-6 text-gray-600">
+                      <p>
+                        Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads.
+                      </p>
+                      <div>
+                        <span class="font-semibold">Support:</span>
+                        <ul class="list-disc list-inside ml-2">
+                          <li>Via email at <a href="mailto:support@lantern.dev" class="text-orange-600 font-semibold">support@lantern.dev</a></li>
+                        </ul>
+                      </div>
+                      <p>
+                        By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information being shared with Lantern.
+                      </p>
+                    </div>
+                    <%== render(
+                      "components/form/checkbox",
+                      locals: {
+                        options: [
+                          ["1", "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>", {}, {required: true}],
                         ]
                       }
                     ) %>
