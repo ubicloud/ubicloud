@@ -141,7 +141,7 @@
                             value="<%= storage_size %>"
                             class="peer sr-only"
                             required
-                            <%= (flash.dig("old", "storage_size") == storage_size || flash.dig("old", "storage_size").nil? && idx == 0) ? "checked" : "" %>
+                            <%= (flash.dig("old", "storage_size") == storage_size.to_s || flash.dig("old", "storage_size").nil? && idx == 0) ? "checked" : "" %>
                           >
                           <span
                             class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
