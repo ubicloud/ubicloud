@@ -48,6 +48,7 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.default_boot_image_version("github-gpu-ubuntu-2204")).to eq(Config.github_gpu_ubuntu_2204_version)
       expect(dbi.default_boot_image_version("postgres-ubuntu-2204")).to eq(Config.postgres_ubuntu_2204_version)
       expect(dbi.default_boot_image_version("postgres-paradedb-ubuntu-2204")).to eq(Config.postgres_paradedb_ubuntu_2204_version)
+      expect(dbi.default_boot_image_version("postgres-lantern-ubuntu-2204")).to eq(Config.postgres_lantern_ubuntu_2204_version)
       expect(dbi.default_boot_image_version("ai-ubuntu-2404-nvidia")).to eq(Config.ai_ubuntu_2404_nvidia_version)
     end
 
