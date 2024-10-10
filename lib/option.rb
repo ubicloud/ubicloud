@@ -66,7 +66,8 @@ module Option
     storage_size_options = [1024, 2048, 4096] if [30, 60].include?(_1)
     [
       PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::STANDARD, _1, _1 * 4, storage_size_options),
-      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::PARADEDB, _1, _1 * 4, storage_size_options)
+      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::PARADEDB, _1, _1 * 4, storage_size_options),
+      PostgresSize.new("standard-#{_1}", "standard-#{_1}", PostgresResource::Flavor::LANTERN, _1, _1 * 4, storage_size_options)
     ]
   }.freeze
 
