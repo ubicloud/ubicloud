@@ -88,7 +88,7 @@ module Validation
   end
 
   def self.validate_postgres_flavor(flavor)
-    flavors = [PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB]
+    flavors = [PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN]
     unless flavors.include?(flavor)
       fail ValidationFailed.new({flavor: "\"#{flavor}\" is not a valid PostgreSQL flavor option. Available options: #{flavors}"})
     end
