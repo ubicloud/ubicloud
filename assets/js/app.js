@@ -251,13 +251,17 @@ function setupLocationBasedOptions() {
   $(".location-based-option").hide().prop('disabled', true).prop('checked', false).prop('selected', false);
   if (selectedLocation) {
     $(`.location-based-option.${selectedLocation}`).show().prop('disabled', false);
+    if($(`.location-based-option.${selectedLocation}:last input[type=radio]`).length > 0 && $(`.location-based-option.${selectedLocation} input[type=radio]:checked`).length == 0){
+      $(`.location-based-option.${selectedLocation}:last input[type=radio]`).get(0).checked = true;
+    }
   }
 }
 
 function setupInstanceSizeBasedOptions() {
   $(".instance-size-based-storage-sizes").each(function() {
+    let selectedLocation = $("input[name=location]:checked").val();
     resource_family = $("input[name=size]:checked").data("resource-family");
-    storage_size_options = $("input[name=size]:checked").data("storage-size-options");
+    storage_size_options = $("input[name=size]:checked").data("storage-size-options")[selectedLocation];
     storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
     storage_size_index = 0;
 
