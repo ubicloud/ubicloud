@@ -271,6 +271,17 @@ RSpec.describe Clover, "project" do
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Admin")
       end
 
+      it "raises bad request when it's the last admin" do
+        visit "#{project.path}/user"
+
+        within "form#managed-policy" do
+          select "Member", from: "user_policies[#{user.ubid}]"
+          click_button "Update"
+        end
+        expect(page).to have_content "The project must have at least one admin"
+        expect(page).to have_select("user_policies[#{user.ubid}]", selected: "Admin")
+      end
+
       it "can remove invited user from project" do
         invited_email = "invited@example.com"
         project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
