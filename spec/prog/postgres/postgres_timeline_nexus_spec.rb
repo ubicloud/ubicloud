@@ -166,7 +166,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     let(:admin_blob_storage_client) { instance_double(Minio::Client) }
 
     it "completes destroy even if dns zone and blob_storage are not configured" do
-      expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return(nil)
+      expect(postgres_timeline).to receive(:blob_storage).and_return(nil)
       expect(postgres_timeline).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
     end
