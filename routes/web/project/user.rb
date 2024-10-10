@@ -16,8 +16,8 @@ class CloverWeb
           end
         end
       end.compact.to_h
-      @users = Serializers::Account.serialize(@project.accounts)
-      @invitations = Serializers::ProjectInvitation.serialize(@project.invitations)
+      @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
+      @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
       @policy = Serializers::AccessPolicy.serialize(@project.access_policies_dataset.where(managed: false).first) || {body: {acls: []}.to_json}
 
       view "project/user"

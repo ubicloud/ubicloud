@@ -308,6 +308,7 @@ RSpec.describe Clover, "project" do
 
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         expect(project).to receive(:invitations_dataset).and_return(instance_double(Sequel::Dataset, count: 50))
+        expect(project).to receive(:invitations_dataset).and_call_original
 
         fill_in "Email", with: "new@example.com"
         click_button "Invite"
