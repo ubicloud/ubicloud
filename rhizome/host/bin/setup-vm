@@ -79,7 +79,7 @@ when "recreate-unpersisted"
   vm_setup.recreate_unpersisted(
     gua, ip4, local_ip4, nics, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
-    multiqueue: max_vcpus > 1
+    pci_devices, multiqueue: max_vcpus > 1
   )
 when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(

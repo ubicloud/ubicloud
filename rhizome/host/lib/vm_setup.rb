@@ -58,10 +58,11 @@ class VmSetup
     start_systemd_unit
   end
 
-  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, multiqueue:)
+  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, pci_devices, multiqueue:)
     setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: multiqueue)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
+    prepare_pci_devices(pci_devices)
     start_systemd_unit
   end
 
