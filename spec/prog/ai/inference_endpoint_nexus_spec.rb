@@ -54,6 +54,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
     it "validates input" do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
       Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(ie_project) }
+      DnsZone.create_with_id(name: "ai.ubicloud.com", project_id: ie_project.id)
 
       expect {
         described_class.assemble(project_id: "ed6afccf-7025-4f35-8241-454221d75e18", location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false)
@@ -84,13 +85,27 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       }.to raise_error("No firewall named 'inference-endpoint-firewall' configured for inference endpoints in hetzner-hel1")
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false)
+        st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false)
+        expect(st.subject.load_balancer.hostname).to eq("test-endpoint-#{st.subject.ubid.to_s[-5...]}.ai.ubicloud.com")
+      }.not_to raise_error
+
+      expect {
+        st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint-public", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: true)
+        expect(st.subject.load_balancer.hostname).to eq("test-endpoint-public.ai.ubicloud.com")
       }.not_to raise_error
 
       expect {
         ie_project.destroy
         described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false)
       }.to raise_error("No project configured for inference endpoints")
+    end
+
+    it "works without dns zone" do
+      expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
+      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(ie_project) }
+      expect {
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false)
+      }.not_to raise_error
     end
   end
 
