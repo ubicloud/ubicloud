@@ -90,16 +90,16 @@ RSpec.describe Clover, "github" do
     expect(page).to have_content("GitHub App installation failed.")
   end
 
-  it "fails if the current user's account suspended" do
+  it "fails if the project is not active" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
-    user.update(suspended_at: Time.now)
+    expect(project).to receive(:active?).and_return(false)
 
     visit "/github/callback?code=123123&installation_id=345"
 
     expect(page.title).to eq("Ubicloud - project-1 Dashboard")
-    expect(page).to have_content("GitHub runner integration is not allowed for suspended accounts.")
+    expect(page).to have_content("GitHub runner integration is not allowed for inactive projects")
   end
 
   it "creates installation with project from session" do
