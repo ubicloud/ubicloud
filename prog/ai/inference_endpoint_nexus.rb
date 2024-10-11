@@ -51,7 +51,13 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       firewall = internal_project.firewalls_dataset.where(location: location).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
       fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{location}" unless firewall
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location: location, firewall_id: firewall.id)
-      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/up", health_check_protocol: "https")
+
+      custom_dns_zone = DnsZone.where(project_id: Config.inference_endpoint_service_project_id).where(name: "ai.ubicloud.com").first
+      custom_hostname_prefix = if custom_dns_zone
+        name + (is_public ? "" : "-#{ubid.to_s[-5...]}")
+      end
+      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/up", health_check_protocol: "https",
+        custom_hostname_prefix: custom_hostname_prefix, custom_hostname_dns_zone_id: custom_dns_zone&.id)
 
       inference_endpoint = InferenceEndpoint.create(
         project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, storage_volumes: storage_volumes,
