@@ -209,7 +209,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       pj.create_api_key
       expect(inference_endpoint).to receive(:is_public).and_return(true).twice
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
-      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":true,\"projects\":[{\"ubid\":\"#{pj.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(pj.api_keys.first.key)}\"],\"quota_rps\":1.0,\"quota_tps\":100.0}]}"}).and_return("{\"projects\":[]}")
+      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":true,\"projects\":[{\"ubid\":\"#{pj.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(pj.api_keys.first.key)}\"],\"quota_rps\":50.0,\"quota_tps\":5000.0}]}"}).and_return("{\"projects\":[]}")
       nx.ping_gateway
     end
   end
