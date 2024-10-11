@@ -18,8 +18,8 @@ class ReplicaSetup
   end
 
   def start_systemd_units
-    r "systemctl start lb-cert-download.timer"
-    r "systemctl start inference-engine.service"
+    r "systemctl enable --now lb-cert-download.timer"
+    r "systemctl enable --now inference-engine.service"
   end
 
   def inference_gateway_service
@@ -197,6 +197,9 @@ DynamicUser=yes
 PrivateUsers=yes
 
 #{common_systemd_settings}
+
+[Install]
+WantedBy=multi-user.target
 ENGINE
     r "systemctl daemon-reload"
   end
