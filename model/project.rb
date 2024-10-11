@@ -78,6 +78,10 @@ class Project < Sequel::Model
     end
   end
 
+  def active?
+    visible && accounts_dataset.exclude(suspended_at: nil).empty?
+  end
+
   def current_invoice
     begin_time = invoices.first&.end_time || Time.new(Time.now.year, Time.now.month, 1)
     end_time = Time.now

@@ -103,6 +103,28 @@ RSpec.describe Project do
     end
   end
 
+  describe ".active?" do
+    it "returns false if it's soft deleted" do
+      expect(project).to receive(:visible).and_return(false)
+      expect(project.active?).to be false
+    end
+
+    it "returns false if any accounts is suspended" do
+      project = described_class.create_with_id(name: "test")
+      project.associate_with_project(project)
+      Account.create_with_id(email: "user1@example.com").tap { _1.associate_with_project(project) }
+      Account.create_with_id(email: "user2@example.com").tap { _1.associate_with_project(project) }.update(suspended_at: Time.now)
+      expect(project.active?).to be false
+    end
+
+    it "returns true if any condition not match" do
+      project = described_class.create_with_id(name: "test")
+      project.associate_with_project(project)
+      Account.create_with_id(email: "user1@example.com").tap { _1.associate_with_project(project) }
+      expect(project.active?).to be true
+    end
+  end
+
   describe ".default_location" do
     it "returns the location with the highest available core capacity" do
       VmHost.create(allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3) { _1.id = Sshable.create_with_id.id }
