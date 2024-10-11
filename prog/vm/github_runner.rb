@@ -132,6 +132,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def start
+    pop "Could not provision a runner for inactive project" unless github_runner.installation.project.active?
     hop_wait_concurrency_limit unless quota_available?
     hop_allocate_vm
   end
@@ -143,11 +144,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
       sum(:used_cores) * 100.0 / sum(:total_cores)
     }.first.to_f
-
-    if github_runner.installation.project.effective_quota_value("GithubRunnerCores") == 0
-      Clog.emit("No quota available for this project") { [github_runner] }
-      nap 2592000
-    end
 
     unless utilization < 70
       Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
