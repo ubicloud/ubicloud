@@ -376,10 +376,11 @@ class CloverWeb < Roda
     r.on "webhook" do
       r.hash_branches(:webhook_prefix)
     end
-    check_csrf!
 
     @current_user = Account[rodauth.session_value]
     r.rodauth
+
+    check_csrf!
     rodauth.load_memory
     rodauth.check_active_session
 
