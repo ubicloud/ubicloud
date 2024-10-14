@@ -1,2 +1,3 @@
+- {name: github_runner_ubuntu_2404, image_name: github-ubuntu-2404, runs: [{repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2404.yml, branch_name: main}]}
 - {name: github_runner_ubuntu_2204, image_name: github-ubuntu-2204, runs: [{repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2204.yml, branch_name: main}]}
 - {name: github_runner_ubuntu_2004, image_name: github-ubuntu-2004, runs: [{repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2004.yml, branch_name: main}]}
