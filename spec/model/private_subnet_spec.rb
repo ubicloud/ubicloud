@@ -45,6 +45,36 @@ RSpec.describe PrivateSubnet do
     end
   end
 
+  describe ".[]" do
+    let(:private_subnet) {
+      subnet = super()
+      subnet.net6 = subnet.net6.to_s
+      subnet.net4 = subnet.net4.to_s
+      subnet.id = described_class.generate_ubid.to_uuid.to_s
+      subnet.save_changes
+    }
+
+    it "looks up by ubid object" do
+      expect(described_class[UBID.parse(private_subnet.ubid)].id).to eq private_subnet.id
+    end
+
+    it "looks up by ubid string" do
+      expect(described_class[private_subnet.ubid].id).to eq private_subnet.id
+    end
+
+    it "looks up by uuid string" do
+      expect(described_class[private_subnet.id].id).to eq private_subnet.id
+    end
+
+    it "looks up by hash" do
+      expect(described_class[id: private_subnet.id].id).to eq private_subnet.id
+    end
+
+    it "doesn't raise if given something that looks like a ubid but isn't" do
+      expect(described_class["a" * 26]).to be_nil
+    end
+  end
+
   describe "uuid to name" do
     it "returns the name" do
       expect(described_class.ubid_to_name("psetv2ff83xj6h3prt2jwavh0q")).to eq "psetv2ff"
