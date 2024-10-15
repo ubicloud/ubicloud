@@ -37,6 +37,8 @@ class BillingRate
       "#{resource_family} GitHub Runner"
     when "GitHubRunnerConcurrency"
       "Additional GitHub Runner Concurrency"
+    when "InferenceTokens"
+      "#{resource_family} Inference Tokens"
     else
       fail "BUG: Unknown resource type for line item description"
     end
@@ -46,6 +48,8 @@ class BillingRate
     case resource_type
     when "GitHubRunnerMinutes"
       "#{amount.to_i} minutes"
+    when "InferenceTokens"
+      "#{amount.to_i} tokens"
     else
       "#{duration} minutes"
     end
