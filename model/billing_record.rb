@@ -14,20 +14,14 @@ class BillingRecord < Sequel::Model
   include ResourceMethods
 
   def duration(begin_time, end_time)
-    # We bill some records based on the amount, others on duration. For
-    # 'VmCores' billing records, the core counts are stored in the amount column
-    # and charges are based on duration. For example, 10 minutes of standard-4
-    # vm usage would be calculated as `10 (duration) x 2 (amount) x rate_for_standard_core`.
-    # 'GitHubRunnerMinutes' billing records, on the other hand, store used
-    # minutes in the amount column and charges are based on this amount. For
-    # instance, 10 minutes of standard-4 runner usage would be calculated as
-    # `1 (duration) x 10 (amount) x rate_for_standard_4_runner_minute`.
-    # 'GitHubRunnerMinutes' is the only category we currently bill by amount,
-    # though network costs could potentially be another suitable candidate. At
-    # present, we only perform this check for 'GitHubRunnerMinutes'. While a
-    # more generic solution may be beneficial, we are waiting to gather more
-    # data points before undertaking a more significant refactor.
-    return 1 if billing_rate["resource_type"] == "GitHubRunnerMinutes"
+    # Billing logic differs based on the resource type: some are billed by duration, others
+    # by amount. For 'VmCores' billing records, the core counts are stored in the amount
+    # column and charges are based on duration. For example, 10 minutes of standard-4 vm
+    # usage would be calculated as `10 (duration) x 2 (amount) x rate_for_standard_core`.
+    # 'GitHubRunnerMinutes' records, on the other hand, store the used minutes in the
+    # 'amount' column, and billing is based on that amount.
+    # For records billed by amount, the duration is always set to 1.
+    return 1 if billing_rate["billed_by"] == "amount"
     # begin_time and end_time refers to begin and end of the billing window. Duration of
     # BillingRecord is subjective to the billing window we are querying for. For example
     # if span of the BillingRecord is ['2023-06-15', '2023-08-20'] and billing window is
