@@ -91,6 +91,22 @@ module ResourceMethods
       s.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2').gsub(/([a-z\d])([A-Z])/, '\1_\2').tr("-", "_").upcase
     end
 
+    def [](arg)
+      if arg.is_a?(UBID)
+        super(arg.to_uuid)
+      elsif arg.is_a?(String) && arg.bytesize == 26
+        begin
+          ubid = UBID.parse(arg)
+        rescue UBIDParseError
+          super
+        else
+          super(ubid.to_uuid)
+        end
+      else
+        super
+      end
+    end
+
     def from_ubid(ubid)
       self[id: UBID.parse(ubid).to_uuid]
     rescue UBIDParseError
