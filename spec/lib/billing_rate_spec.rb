@@ -33,6 +33,10 @@ RSpec.describe BillingRate do
     it "returns usage by amount" do
       expect(described_class.line_item_usage("GitHubRunnerMinutes", "standard-2", 5, 1)).to eq("5 minutes")
     end
+
+    it "returns usage by token" do
+      expect(described_class.line_item_usage("InferenceTokens", "test-model", 10, 1)).to eq("10 tokens")
+    end
   end
 
   it "can unambiguously find active rate" do

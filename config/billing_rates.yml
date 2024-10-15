@@ -1,4 +1,7 @@
 # Active billing rates
+- { id: fc9877ec-131c-4572-a3f2-fd512d95b348, resource_type: InferenceTokens,         resource_family: test-model,      location: global,         unit_price: 0.0000000500, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
+- { id: 74eb807c-75dd-49e4-95f8-5de25163b845, resource_type: InferenceTokens,         resource_family: gemma-2-2b-it,   location: global,         unit_price: 0.0000000000, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
+- { id: 195bd918-8a0b-4c07-8b57-289de6d6163e, resource_type: InferenceTokens,         resource_family: llama-3-2-3b-it, location: global,         unit_price: 0.0000000000, billed_by: amount,   active_from: 2024-10-14T00:00:00Z }
 - { id: ebf592fd-8586-4457-8c86-aa1ed774b90d, resource_type: VmCores,                 resource_family: standard,        location: hetzner-fsn1,   unit_price: 0.0006040000, billed_by: duration, active_from: 2024-08-22T00:00:00Z }
 - { id: d31188b8-ced8-4bab-bb73-ee6b0c6a4806, resource_type: VmCores,                 resource_family: standard,        location: hetzner-hel1,   unit_price: 0.0005740000, billed_by: duration, active_from: 2024-08-22T00:00:00Z }
 - { id: a63fc107-176f-41e6-baf6-a1399446f616, resource_type: VmCores,                 resource_family: standard,        location: github-runners, unit_price: 0.0005257320, billed_by: duration, active_from: 2024-05-27T00:00:00Z }
