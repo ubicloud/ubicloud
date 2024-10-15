@@ -54,6 +54,10 @@ module ResourceMethods
     "#{self.class.name}[#{ubid}]"
   end
 
+  def inspect
+    "#<#{self.class.name}#{"[\"#{ubid}\"]" if id} @values=#{inspect_values}>"
+  end
+
   def inspect_values
     @values.except(*self.class.redacted_columns).map do |k, v|
       case v
