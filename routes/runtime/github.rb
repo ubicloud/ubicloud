@@ -92,17 +92,17 @@ class CloverRuntime
           fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
         end
 
-        if repository.cache_entries_dataset[key: key, version: version, scope: scope]
-          fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
-        end
-
         if size && size > GithubRepository::CACHE_SIZE_LIMIT
           fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
         end
 
         entry, upload_id = nil, nil
         DB.transaction do
-          entry = GithubCacheEntry.create_with_id(repository_id: runner.repository.id, key: key, version: version, size: size, scope: scope, created_by: runner.id)
+          begin
+            entry = GithubCacheEntry.create_with_id(repository_id: runner.repository.id, key: key, version: version, size: size, scope: scope, created_by: runner.id)
+          rescue Sequel::ValidationFailed, Sequel::UniqueConstraintViolation
+            fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
+          end
           upload_id = repository.blob_storage_client.create_multipart_upload(bucket: repository.bucket_name, key: entry.blob_key).upload_id
           entry.update(upload_id: upload_id)
         end
