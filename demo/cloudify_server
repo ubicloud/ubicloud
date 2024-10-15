@@ -6,7 +6,7 @@ REPL = true
 require_relative "../loader"
 require "timeout"
 
-LOCATIONS = Option::LOCATIONS.map { |l| [l.name, "#{l.provider.display_name} #{l.display_name}"] }.to_h
+LOCATIONS = Option::LOCATIONS.map { |l| [l, "#{l.provider.display_name} #{l.display_name}"] }.to_h
 
 def get_input(msg, default = nil)
   prompt = "#{msg}#{default.nil? ? "" : " [default: #{default}]"}: "
@@ -46,12 +46,19 @@ def select_option(msg, options, default = nil)
   selected
 end
 
-hostname = get_input("Enter hostname or IP address")
+hostname = get_input("Enter host IP address (required)")
+if hostname.nil?
+  puts "\n\n"
+  puts "Please enter a valid host IP address."
+  exit 1
+end
+host_id = get_input("Enter host identifier (optional)", "")
 location = select_option("Select provider and location", LOCATIONS, 1)
 
 puts "\n\nCloudifying '#{hostname}' server for '#{LOCATIONS[location]}' \n\n"
 
-strand = Prog::Vm::HostNexus.assemble(hostname, location: location)
+# puts "Hostname: #{hostname}, Provider: #{location.provider.name}, Hetzner ID: #{host_id}, Location: #{location.name}"
+strand = Prog::Vm::HostNexus.assemble(hostname, provider: location.provider.name, hetzner_server_identifier: host_id, location: location.name)
 
 puts "Waiting public SSH keys\n\n"
 until (ssh_key = strand.reload.subject.sshable.keys.map(&:public_key).first)
@@ -74,6 +81,13 @@ begin
       end
       sleep 2
     end
+
+    puts "Downloading the default boot image - Ubuntu Jammy 24.04"
+    download_strand = strand.subject.download_boot_image("ubuntu-jammy", version: "20240319")
+    while download_strand.reload
+      sleep 2
+      print "."
+    end
   end
 rescue Timeout::Error
   puts "\n\n"
@@ -84,4 +98,4 @@ rescue Timeout::Error
   exit 1
 end
 
-puts "\n\nYour server is cloudified now. You can create virtual machines at '#{location}' in the cloud dashboard."
+puts "\n\nYour server is cloudified now. You can create virtual machines at '#{location.name}' in the cloud dashboard."

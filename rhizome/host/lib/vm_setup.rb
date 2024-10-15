@@ -17,10 +17,15 @@ class VmSetup
 
   def initialize(vm_name)
     @vm_name = vm_name
+    @slice_name = "system.slice"
   end
 
   def q_vm
     @q_vm ||= @vm_name.shellescape
+  end
+
+  def q_vm_service
+    @q_vm + ".service"
   end
 
   # YAML quoting
@@ -43,7 +48,7 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
+  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4, slice_name, allowed_cpus, cpu_limit, cpu_burst_limit)
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
@@ -54,8 +59,10 @@ class VmSetup
     [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
     prepare_pci_devices(pci_devices)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    install_systemd_slice(slice_name, allowed_cpus) unless slice_name.empty?
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, cpu_limit)
     start_systemd_unit
+    enable_bursting(cpu_burst_limit)
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, pci_devices, multiqueue:)
@@ -71,7 +78,7 @@ class VmSetup
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, "")
   end
 
   def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue:)
@@ -568,7 +575,40 @@ EOS
     end
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+  # Initialize a systemd slice unit, which will contain one or more VMs
+  def install_systemd_slice(slice_name, allowed_cpus)
+    fail "BUG: slice_name must not be empty" if slice_name.empty?
+    fail "BUG: we cannot create system.slice" if slice_name == "system.slice"
+    fail "BUG: slice name cannot contain a dash" if slice_name.include?("-")
+
+    slice_name_path = File.join("/etc/systemd/system", slice_name)
+
+    # Only proceed if the slice has not yet been setup
+    unless File.exist? slice_name_path
+      safe_write_to_file(slice_name_path, <<SLICE_CONFIG)
+[Unit]
+Description=Restricting resouces for virtual machines
+Before=slices.target
+
+[Slice]
+# Add resource restrictions here
+SLICE_CONFIG
+
+      # Restrict the slice to a set of CPUs. This is of course a big hack
+      # we need some logic that will allocate the specific CPUs to specific slices
+      r "systemctl set-property #{slice_name} AllowedCPUs=#{allowed_cpus}" unless allowed_cpus.empty?
+      r "systemctl daemon-reload"
+    end
+
+    # Make sure the slice is running
+    r "systemctl start #{slice_name}"
+    r "echo \"root\" > /sys/fs/cgroup/#{slice_name}/cpuset.cpus.partition"
+
+    # If we got here, preserve the slice name
+    @slice_name = slice_name
+  end
+
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, cpu_limit)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -579,6 +619,7 @@ Description=A lightweight DHCP and caching DNS server
 After=network.target
 
 [Service]
+Slice=#{@slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
 ExecStartPre=/usr/local/sbin/dnsmasq --test
@@ -626,6 +667,7 @@ After=#{@vm_name}-dnsmasq.service
 Wants=#{@vm_name}-dnsmasq.service
 
 [Service]
+Slice=#{@slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
@@ -648,11 +690,17 @@ Group=#{@vm_name}
 LimitNOFILE=500000
 #{limit_memlock}
 SERVICE
+    r "systemctl set-property #{q_vm_service} CPUQuota=#{cpu_limit}%" unless cpu_limit.empty?
     r "systemctl daemon-reload"
   end
 
   def start_systemd_unit
-    r "systemctl start #{q_vm}"
+    r "systemctl start #{q_vm_service}"
+  end
+
+  # Allow CPU bursting using the cgroup cpu controller
+  def enable_bursting(cpu_burst_limit)
+    r "echo \"#{cpu_burst_limit}\" > /sys/fs/cgroup/#{@slice_name}/#{q_vm_service}/cpu.max.burst" unless cpu_burst_limit.empty?
   end
 
   # Generate a MAC with the "local" (generated, non-manufacturer) bit

@@ -57,6 +57,30 @@ rescue KeyError => e
   exit 1
 end
 
+# TODO:
+# This is hacking up parameters needed to set up resouce management
+# All this should be moved to and tracked on the Contrlol Plane side
+# but for this experiement is hardcoded here
+#
+# This experiement allows us to use Standard-2 instances as burstable
+# ones, with a CPU limit of 1 vCPU, bursting up to an additional 1 vCPU
+# OR, Standard-4 instances, as dedicated and resource-constrained 4 vCPU
+# OR, any other instance set up as it used to be.
+slice_name = ""
+allowed_cpus = ""
+cpu_limit = ""
+cpu_burst_limit = ""
+
+if max_vcpus == 2
+  slice_name = "burstable.slice"
+  allowed_cpus = "6-7"
+  cpu_limit = "100" # in percent
+  cpu_burst_limit = "100000" # in usec
+elsif max_vcpus == 4
+  slice_name = "dedicated_#{vm_name}.slice"
+  allowed_cpus = "2-5"
+end
+
 case action
 when "prep"
   secrets = JSON.parse($stdin.read)
@@ -68,7 +92,8 @@ when "prep"
   vm_setup.prep(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
-    pci_devices, boot_image, dns_ipv4)
+    pci_devices, boot_image, dns_ipv4,
+    slice_name, allowed_cpus, cpu_limit, cpu_burst_limit)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])
@@ -76,14 +101,16 @@ when "recreate-unpersisted"
     exit 1
   end
 
+  vm_setup.install_systemd_slice(slice_name, allowed_cpus)
   vm_setup.recreate_unpersisted(
     gua, ip4, local_ip4, nics, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
     pci_devices, multiqueue: max_vcpus > 1
   )
+  vm_setup.enable_bursting(cpu_burst_limit)
 when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(
-    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics
+    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics, "", ""
   )
 when "reassign-ip6"
   secrets = JSON.parse($stdin.read)
