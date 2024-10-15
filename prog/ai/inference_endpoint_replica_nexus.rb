@@ -154,9 +154,44 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     resp = vm.sshable.cmd("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
     project_usage = JSON.parse(resp)["projects"]
-    # project_usage is a list of the following format:
-    # [{"ubid":"aprojectubid","request_count":0,"prompt_token_count":0,"completion_token_count":0}, ...]
-    # TODO: produce billing records for public endpoints based on project_usage
     Clog.emit("Successfully pinged inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage: project_usage} }
+    update_billing_records(project_usage)
+  end
+
+  def update_billing_records(project_usage)
+    rate = BillingRate.from_resource_properties("InferenceTokens", inference_endpoint.model_name, "global")
+    return if rate["unit_price"].zero?
+    rate_id = rate["id"]
+    begin_time = Time.now.to_date.to_time
+    end_time = begin_time + 24 * 60 * 60
+
+    project_usage.each do |usage|
+      tokens = usage["prompt_token_count"] + usage["completion_token_count"]
+      next if tokens.zero?
+      project = Project.from_ubid(usage["ubid"])
+
+      begin
+        today_record = BillingRecord
+          .where(project_id: project.id, resource_id: inference_endpoint.id, billing_rate_id: rate_id)
+          .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+          .first
+
+        if today_record
+          today_record.amount = Sequel[:amount] + tokens
+          today_record.save_changes(validate: false)
+        else
+          BillingRecord.create_with_id(
+            project_id: project.id,
+            resource_id: inference_endpoint.id,
+            resource_name: "Inference tokens #{inference_endpoint.model_name} #{begin_time.strftime("%Y-%m-%d")}",
+            billing_rate_id: rate_id,
+            span: Sequel.pg_range(begin_time...end_time),
+            amount: tokens
+          )
+        end
+      rescue Sequel::Error => ex
+        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens: tokens, exception: Util.exception_to_hash(ex)}} }
+      end
+    end
   end
 end
