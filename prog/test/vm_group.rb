@@ -36,6 +36,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     boot_images = Option::BootImages.map { _1.name }
     # We don't support almalinux-8 on arm64
     boot_images.delete("almalinux-8") if frame["arch"] == "arm64"
+    boot_images.delete("almalinux-9") if frame["arch"] == "arm64"
 
     vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
