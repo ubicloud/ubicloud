@@ -38,16 +38,30 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_vms }.to hop("start", "Test::Vm")
     end
 
-    it "hops to destroy_resources if tests are done and not test_reboot" do
+    it "hops to verify_firewall_rules if tests are done" do
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM!"})
-      expect(vg_test).to receive(:frame).and_return({"test_reboot" => false})
-      expect { vg_test.verify_vms }.to hop("destroy_resources")
+      expect { vg_test.verify_vms }.to hop("verify_firewall_rules")
+    end
+  end
+
+  describe "#verify_firewall_rules" do
+    it "hops to test_reboot if tests are done" do
+      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Firewall Rules!"})
+      expect(vg_test).to receive(:frame).and_return({"test_reboot" => true})
+      expect { vg_test.verify_firewall_rules }.to hop("test_reboot")
     end
 
-    it "hops to test_reboot if tests are done and test_reboot" do
-      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM!"})
-      expect(vg_test).to receive(:frame).and_return({"test_reboot" => true})
-      expect { vg_test.verify_vms }.to hop("test_reboot")
+    it "hops to destroy_resources if tests are done and test_reboot is false" do
+      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Firewall Rules!"})
+      expect(vg_test).to receive(:frame).and_return({"test_reboot" => false})
+      expect { vg_test.verify_firewall_rules }.to hop("destroy_resources")
+    end
+
+    it "runs tests for the first firewall" do
+      subnet = instance_double(PrivateSubnet, firewalls: [instance_double(Firewall, id: "fw_id")])
+      expect(PrivateSubnet).to receive(:[]).and_return(subnet)
+      expect(vg_test).to receive(:frame).and_return({"subnets" => [subnet]})
+      expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules")
     end
   end
 
