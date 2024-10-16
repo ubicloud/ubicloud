@@ -133,6 +133,15 @@ begin
 rescue LoadError
 end
 
+desc "Run specs in parallel using turbo_tests"
+task "pspec" do
+  # Try to detect number of CPUs on both Linux and Mac
+  nproc = `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i
+
+  # Limit to 6 processes, as higher number results in more time
+  system("bundle", "exec", "turbo_tests", "-n", nproc.clamp(1, 6).to_s)
+end
+
 # Other
 
 desc "Annotate Sequel models"
