@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
+require "roda"
 require "tilt"
 require "tilt/erubi"
+
+require_relative "model"
 
 class CloverWeb < Roda
   include CloverBase
