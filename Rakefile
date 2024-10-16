@@ -157,6 +157,22 @@ task "check_separate_requires" do
   system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
 end
 
+desc "Run each spec file in a separate process"
+task :spec_separate do
+  require "rbconfig"
+
+  failures = []
+  Dir["spec/**/*_spec.rb"].each do |file|
+    failures << file unless system(RbConfig.ruby, "-S", "rspec", file)
+  end
+
+  if failures.empty?
+    puts "All files passed"
+  else
+    puts "Failures in:", failures
+  end
+end
+
 desc "Annotate Sequel models"
 task "annotate" do
   ENV["RACK_ENV"] = "development"
