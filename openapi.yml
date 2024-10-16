@@ -1345,13 +1345,8 @@ paths:
       operationId: listLocationVMs
       summary: List VMs in a specific location of a project
       parameters:
+        - $ref: '#/components/parameters/location'
         - $ref: '#/components/parameters/project_id'
-        - name: location
-          in: path
-          description: Return the list VMs created in a specific location of a project and visible to the logged in user
-          required: true
-          schema:
-            type: string
         - $ref: '#/components/parameters/start_after'
         - $ref: '#/components/parameters/page_size'
         - $ref: '#/components/parameters/order_column'
@@ -1368,7 +1363,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Vm/properties/id'
+                      $ref: '#/components/schemas/Vm'
                 additionalProperties: false
                 required:
                   - count
