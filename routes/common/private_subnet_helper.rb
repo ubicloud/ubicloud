@@ -62,6 +62,8 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
     else
       @app.instance_variable_set(:@ps, Serializers::PrivateSubnet.serialize(@resource))
       @app.instance_variable_set(:@nics, Serializers::Nic.serialize(@resource.nics))
+      @app.instance_variable_set(:@connected_subnets, Serializers::PrivateSubnet.serialize(@resource.connected_subnets))
+      @app.instance_variable_set(:@connectable_subnets, Serializers::PrivateSubnet.serialize(@resource.projects.first.private_subnets.select { |ps| ps.id != @resource.id && !@resource.connected_subnets.map(&:id).include?(ps.id) }))
       @app.view "networking/private_subnet/show"
     end
   end
@@ -85,5 +87,25 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
   def get_create
     Authorization.authorize(@user.id, "PrivateSubnet:create", project.id)
     @app.view "networking/private_subnet/create"
+  end
+
+  def connect(subnet_ubid)
+    Authorization.authorize(@user.id, "PrivateSubnet:connect", @resource.id)
+    subnet = PrivateSubnet.from_ubid(subnet_ubid)
+    Authorization.authorize(@user.id, "PrivateSubnet:connect", subnet.id)
+    @resource.connect_subnet(subnet)
+    @resource.reload
+    flash["notice"] = "#{subnet.name} will be connected in a few seconds"
+    @request.redirect "#{project.path}#{PrivateSubnet[@resource.id].path}"
+  end
+
+  def disconnect(subnet_ubid)
+    Authorization.authorize(@user.id, "PrivateSubnet:disconnect", @resource.id)
+    subnet = PrivateSubnet.from_ubid(subnet_ubid)
+    Authorization.authorize(@user.id, "PrivateSubnet:disconnect", subnet.id)
+    @resource.disconnect_subnet(subnet)
+    @resource.reload
+    flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
+    @request.halt
   end
 end

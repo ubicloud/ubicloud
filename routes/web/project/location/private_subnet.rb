@@ -7,8 +7,23 @@ class CloverWeb
         response.status = 404
         r.halt
       end
-
       ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: @current_user, location: @location, resource: ps)
+
+      r.on "connect" do
+        r.post true do
+          puts r.params.inspect
+          ps_endpoint_helper.connect(r.params["connected-subnet-ubid"])
+        end
+      end
+
+      r.on "disconnect" do
+        r.on String do |disconnecting_ps_ubid|
+          r.post true do
+            puts "DISCONNECTING"
+            ps_endpoint_helper.disconnect(disconnecting_ps_ubid)
+          end
+        end
+      end
 
       r.get true do
         ps_endpoint_helper.get

@@ -57,9 +57,11 @@ $(".delete-btn").on("click", function (event) {
     let url = $(this).data("url");
     let csrf = $(this).data("csrf");
     let confirmation = $(this).data("confirmation");
+    let confirmationMessage = $(this).data("confirmation-message");
     let redirect = $(this).data("redirect");
+    let method = $(this).data("method");
 
-    if (!confirm("Are you sure to delete?")) {
+    if (!confirm(confirmationMessage || "Are you sure to delete?")) {
         return;
     }
 
@@ -70,7 +72,7 @@ $(".delete-btn").on("click", function (event) {
 
     $.ajax({
         url: url,
-        type: "DELETE",
+        type: method || "DELETE",
         data: { "_csrf": csrf },
         dataType : "json",
         headers: {"Accept": "application/json"},
