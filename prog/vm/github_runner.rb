@@ -280,6 +280,13 @@ class Prog::Vm::GithubRunner < Prog::Base
     Clog.emit("The runner already exists but the runner script is started too") { [github_runner, {existing_runner: {runner_id: runner_id}}] }
     github_runner.update(runner_id: runner_id, ready_at: Time.now)
     hop_wait
+  rescue => e
+    if e.message.include?("Repository level self-hosted runners are disabled")
+      repository_ubid = github_runner.repository.ubid
+      Prog::PageNexus.assemble("Repository level self-hosted runners are disabled on #{repository_ubid}", ["SelfHostRunnersDisabled", repository_ubid], repository_ubid, severity: "warning")
+      nap 15 * 60
+    end
+    raise
   end
 
   label def wait
