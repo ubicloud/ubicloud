@@ -76,6 +76,14 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def verify_vms
     if retval&.dig("msg") == "Verified VM!"
+      hop_verify_firewall_rules
+    end
+
+    push Prog::Test::Vm, {subject_id: frame["vms"].first}
+  end
+
+  label def verify_firewall_rules
+    if retval&.dig("msg") == "Verified Firewall Rules!"
       if frame["test_reboot"]
         hop_test_reboot
       else
@@ -83,7 +91,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       end
     end
 
-    push Prog::Test::Vm, {subject_id: frame["vms"].first}
+    push Prog::Test::FirewallRules, {subject_id: PrivateSubnet[frame["subnets"].first].firewalls.first.id}
   end
 
   label def test_reboot
