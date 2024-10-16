@@ -127,10 +127,17 @@ end
 # Specs
 begin
   require "rspec/core/rake_task"
-  ENV["RACK_ENV"] = "test"
-  RSpec::Core::RakeTask.new(:spec)
-  task default: :spec
+  RSpec::Core::RakeTask.new(:_spec)
+  Rake::Task["_spec"].clear_comments
 rescue LoadError
+else
+  desc "Run specs"
+  task "spec" do
+    ENV["RACK_ENV"] = "test"
+    ENV["FORCE_AUTOLOAD"] = "1"
+    Rake::Task["_spec"].invoke
+  end
+  task default: :spec
 end
 
 desc "Run specs in parallel using turbo_tests"
@@ -139,7 +146,7 @@ task "pspec" do
   nproc = `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i
 
   # Limit to 6 processes, as higher number results in more time
-  system("bundle", "exec", "turbo_tests", "-n", nproc.clamp(1, 6).to_s)
+  system({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.clamp(1, 6).to_s)
 end
 
 # Other
