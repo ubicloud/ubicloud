@@ -24,7 +24,7 @@ jobs:
   run-ci:
     runs-on: ubicloud
     environment: E2E-CI
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.arch == 'x64' && 45 || 180 }}
     concurrency: e2e_environment_${{ inputs.arch }}
 
     env:
@@ -113,7 +113,7 @@ jobs:
         VM_POOL_PROJECT_ID: ${{ secrets.VM_POOL_PROJECT_ID }}
         E2E_HETZNER_SERVER_ID: ${{ inputs.arch == 'x64' && secrets.E2E_HETZNER_SERVER_ID_X64 || secrets.E2E_HETZNER_SERVER_ID_ARM64 }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
-      run: timeout 40m foreman start
+      run: timeout ${{ inputs.arch == 'x64' && 40 || 175 }}m foreman start
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
