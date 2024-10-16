@@ -388,6 +388,35 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/location/{location}/firewall':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getLocationFirewall
+      summary: Return the list of firewalls in the project and location
+      responses:
+        '200':
+          description: Firewall list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Firewall'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
   '/project/{project_id}/location/{location}/firewall/id/{firewall_id}':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -417,6 +446,173 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}/attach-subnet':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    post:
+      operationId: actionLocationFirewallAttachSubnet
+      summary: Attach a subnet to firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                private_subnet_id:
+                  description: Private subnet id to attach
+                  type: string
+              additionalProperties: false
+              required:
+                - private_subnet_id
+      responses:
+        '200':
+          description: Subnet attached successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}/detach-subnet':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    post:
+      operationId: actionLocationFirewallDetachSubnet
+      summary: Detach a subnet from firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                private_subnet_id:
+                  description: Private subnet id to detach
+                  type: string
+              additionalProperties: false
+              required:
+                - private_subnet_id
+      responses:
+        '200':
+          description: Subnet detached successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_name}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationFirewallRuleWithId
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    delete:
+      operationId: deleteLocationFirewallFirewallRuleWithId
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getLocationFirewallFirewallRuleDetailsWithId
+      summary: Get details of a firewall rule
+      responses:
+        '200':
+          description: Details of the firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    post:
+      operationId: createLocationFirewallFirewallRuleWithId
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/location/{location}/firewall/{firewall_name}':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -441,14 +637,78 @@ paths:
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    post:
+      operationId: createLocationFirewall
+      summary: Create a new firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  description: Description of the firewall
+                  type: string
+              additionalProperties: false
+      responses:
+        '200':
+          description: Firewall created successfully
+          content:
+            application/json:
+              schema:
                 $ref: '#/components/schemas/Firewall'
         default:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationFirewallRule
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
   '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
     delete:
-      operationId: deleteLocationFirewallRule
+      operationId: deleteLocationFirewallFirewallRule
       summary: Delete a specific firewall rule
       responses:
         '204':
@@ -458,7 +718,7 @@ paths:
       tags:
         - Firewall Rule
     get:
-      operationId: getLocationFirewallRuleDetails
+      operationId: getLocationFirewallFirewallRuleDetails
       summary: Get details of a firewall rule
       responses:
         '200':
@@ -472,7 +732,7 @@ paths:
       tags:
         - Firewall Rule
     post:
-      operationId: createLocationFirewallRule
+      operationId: createLocationFirewallFirewallRule
       summary: Create a new firewall rule
       requestBody:
         required: true
@@ -1484,6 +1744,20 @@ components:
         - id
         - location
         - name
+    FirewallDetailed:
+      type: object
+      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/Firewall'
+        - properties:
+            private_subnets:
+              description: List of private subnets
+              type: array
+              items:
+                type: string
+          additionalProperties: false
+          required:
+            - private_subnets
     FirewallRule:
       type: object
       properties:
