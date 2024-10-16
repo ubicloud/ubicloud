@@ -52,7 +52,6 @@ group :development do
 end
 
 group :test do
-  gem "database_cleaner-sequel"
   gem "capybara"
   gem "rspec"
   gem "webmock"

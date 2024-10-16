@@ -36,14 +36,6 @@ SQL
     Sequel.postgres(**db.opts.merge(user: ph_user)) do |ph_db|
       ph_db.loggers << Logger.new($stdout) if ph_db.loggers.empty?
       Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
-
-      if Config.test?
-        # User doesn't have permission to run TRUNCATE on password hash tables, so DatabaseCleaner
-        # can't clean Rodauth tables between test runs. While running migrations for test database,
-        # we allow it, so cleaner can clean them.
-        ph_db["GRANT TRUNCATE ON account_password_hashes TO ?", user.to_sym].get
-        ph_db["GRANT TRUNCATE ON account_previous_password_hashes TO ?", user.to_sym].get
-      end
     end
     db["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
   when 1

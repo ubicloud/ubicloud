@@ -103,10 +103,6 @@ GEM
       bigdecimal
       rexml
     crass (1.0.6)
-    database_cleaner-core (2.0.1)
-    database_cleaner-sequel (2.0.2)
-      database_cleaner-core (~> 2.0.0)
-      sequel
     date (3.3.4)
     diff-lcs (1.5.1)
     docile (1.4.1)
@@ -374,7 +370,6 @@ DEPENDENCIES
   by!
   capybara
   countries
-  database_cleaner-sequel
   ed25519
   erb-formatter!
   erubi (>= 1.5)
