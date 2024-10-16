@@ -131,8 +131,9 @@ RSpec.configure do |config|
 
   # Print the 10 slowest examples and example groups at the
   # end of the spec run, to help surface which specs are running
-  # particularly slow.
-  config.profile_examples = 10
+  # particularly slow.  However, avoid printing when parallel testing,
+  # to avoid output from every process.
+  config.profile_examples = 10 unless ENV["TEST_ENV_NUMBER"]
 
   # Run specs in random order to surface order dependencies. If you find an
   # order dependency and want to debug it, you can fix the order by providing
