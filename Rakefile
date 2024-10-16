@@ -151,6 +151,12 @@ end
 
 # Other
 
+desc "Check that model files work when required separately"
+task "check_separate_requires" do
+  require "rbconfig"
+  system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
+end
+
 desc "Annotate Sequel models"
 task "annotate" do
   ENV["RACK_ENV"] = "development"

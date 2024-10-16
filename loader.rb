@@ -91,6 +91,21 @@ autoload_normal.call("model", flat: true)
 %w[lib clover.rb clover_web.rb clover_api.rb clover_runtime.rb routes/clover_base.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers routes/common].each { autoload_normal.call(_1, include_first: true) }
 
+if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
+  files = %w[model lib scheduling prog serializers routes/common].flat_map { Dir["#{_1}/**/*.rb"] }
+  files.concat(%w[clover.rb clover_web.rb clover_api.rb clover_runtime.rb routes/clover_base.rb routes/clover_error.rb])
+  files.each do |file|
+    pid = fork do
+      require_relative file
+      exit(0)
+    rescue LoadError, StandardError => e
+      puts "ERROR: problems loading #{file}: #{e.class}: #{e.message}"
+    end
+    Process.wait(pid)
+  end
+  exit(0)
+end
+
 AUTOLOAD_CONSTANTS.freeze
 
 if force_autoload
