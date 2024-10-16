@@ -391,6 +391,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Clog.emit("The runner already exists but the runner script is started too", [github_runner, {existing_runner: {runner_id:}}])
     github_runner.update(runner_id:, ready_at: Time.now)
     hop_wait
+  rescue Octokit::Error => e
+    if e.message.include?("Repository level self-hosted runners are disabled")
+      installation_ubid = github_runner.installation.ubid
+      Prog::PageNexus.assemble("Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], installation_ubid, severity: "warning")
+      github_runner.incr_destroy
+      nap 0
+    end
+    raise
   end
 
   label def wait
