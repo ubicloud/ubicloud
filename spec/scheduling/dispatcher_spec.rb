@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-# A bit of a hack, to re-use a different spec_helper, but otherwise
-# these tests will crash DatabaseCleaner.
 require_relative "../model/spec_helper"
 
 RSpec.describe Scheduling::Dispatcher do
@@ -93,8 +91,8 @@ RSpec.describe Scheduling::Dispatcher do
         expect(di.notifiers).to be_empty
       ensure
         # Multiple transactions are required for this test across
-        # threads, so we need to clean up differently than
-        # DatabaseCleaner would.
+        # threads, so we need to clean up differently than using
+        # ROLLBACK on the main thread's transaction.
         Strand.truncate(cascade: true)
       end.join
     end
