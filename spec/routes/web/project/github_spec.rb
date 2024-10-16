@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "stripe"
 require_relative "../spec_helper"
 
 RSpec.describe Clover, "github" do
