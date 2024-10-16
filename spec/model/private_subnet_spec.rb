@@ -124,4 +124,104 @@ RSpec.describe PrivateSubnet do
       ps.destroy
     end
   end
+
+  describe ".create_tunnels" do
+    let(:src_nic) {
+      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b")
+    }
+    let(:dst_nic) {
+      instance_double(Nic, id: "6a187cc1-291b-8eac-bdfc-96801fa3118d")
+    }
+
+    it "creates tunnels if doesn't exist" do
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+
+    it "skips existing tunnels" do
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(false)
+
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+
+    it "skips existing tunnels - 2" do
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(false)
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+  end
+
+  describe "connected subnets related methods" do
+    let(:prj) {
+      prj = Project.create_with_id(name: "test-prj")
+      prj.associate_with_project(prj)
+      prj
+    }
+
+    let(:ps1) {
+      Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location: "hetzner-hel1").subject
+    }
+
+    it ".connected_subnets" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-hel1").subject
+      expect(ps1.connected_subnets).to eq []
+
+      ps1.connect_subnet(ps2)
+      expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
+      expect(ps2.connected_subnets.map(&:id)).to eq [ps1.id]
+
+      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location: "hetzner-hel1").subject
+      ps2.connect_subnet(ps3)
+      expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
+      expect(ps2.connected_subnets.map(&:id).sort).to eq [ps1.id, ps3.id].sort
+      expect(ps3.connected_subnets.map(&:id)).to eq [ps2.id]
+
+      ps1.disconnect_subnet(ps2)
+      expect(ps1.connected_subnets.map(&:id)).to eq []
+      expect(ps2.connected_subnets.map(&:id).sort).to eq [ps3.id].sort
+      expect(ps3.connected_subnets.map(&:id)).to eq [ps2.id]
+    end
+
+    it ".all_nics" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-hel1").subject
+
+      ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
+      ps2_nic = Prog::Vnet::NicNexus.assemble(ps2.id, name: "test-ps2-nic1").subject
+
+      expect(ps1.all_nics.map(&:id)).to eq [ps1_nic.id]
+
+      expect(ps1).to receive(:create_tunnels).with([ps2_nic], ps1_nic).and_call_original
+      ps1.connect_subnet(ps2)
+
+      expect(ps1.all_nics.map(&:id).sort).to eq [ps1_nic.id, ps2_nic.id].sort
+
+      ps1.disconnect_subnet(ps2)
+
+      expect(ps1.all_nics.map(&:id)).to eq [ps1_nic.id]
+    end
+
+    it "disconnect_subnet does not destroy in subnet tunnels" do
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-hel1").subject
+      ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
+      ps1_nic2 = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic2").subject
+      ps1.create_tunnels([ps1_nic], ps1_nic2)
+
+      ps2_nic = Prog::Vnet::NicNexus.assemble(ps2.id, name: "test-ps2-nic1").subject
+      ps1.connect_subnet(ps2)
+      expect(ps1.find_all_connected_nics.map(&:id).sort).to eq [ps1_nic.id, ps1_nic2.id, ps2_nic.id].sort
+      expect(IpsecTunnel.count).to eq 6
+
+      ps1.disconnect_subnet(ps2)
+      expect(ps1.find_all_connected_nics.map(&:id).sort).to eq [ps1_nic.id, ps1_nic2.id].sort
+
+      tunnels = ps1_nic.src_ipsec_tunnels + ps1_nic.dst_ipsec_tunnels
+      expect(IpsecTunnel.all.map(&:id).sort).to eq(tunnels.map(&:id).sort)
+      expect(IpsecTunnel.count).to eq 2
+    end
+  end
 end

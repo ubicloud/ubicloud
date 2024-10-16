@@ -30,6 +30,16 @@ class PrivateSubnet < Sequel::Model
 
   include Authorization::TaggableMethods
 
+  def connected_subnets
+    PrivateSubnet.where(
+      id: DB[:connected_subnet].where(subnet_id_1: id).or(subnet_id_2: id).select(Sequel.case({{subnet_id_1: id} => :subnet_id_2}, :subnet_id_1)).all.map(&:values).flatten
+    ).all
+  end
+
+  def all_nics
+    nics + connected_subnets.flat_map(&:nics)
+  end
+
   def destroy
     DB.transaction do
       FirewallsPrivateSubnets.where(private_subnet_id: id).all.each(&:destroy)
@@ -89,5 +99,38 @@ class PrivateSubnet < Sequel::Model
     return random_private_ipv6 if nics.any? { |nic| nic.private_ipv6.to_s == addr.to_s }
 
     addr
+  end
+
+  def connect_subnet(subnet)
+    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
+    ConnectedSubnet.create_with_id(subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id)
+    nics.each do |nic|
+      create_tunnels(subnet.nics, nic)
+    end
+    subnet.incr_refresh_keys
+  end
+
+  def disconnect_subnet(subnet)
+    small_id_ps, large_id_ps = [self, subnet].sort_by(&:id)
+    nics.each do |nic|
+      (nic.src_ipsec_tunnels + nic.dst_ipsec_tunnels).each do |tunnel|
+        tunnel.destroy if tunnel.src_nic.private_subnet_id == subnet.id || tunnel.dst_nic.private_subnet_id == subnet.id
+      end
+    end
+    ConnectedSubnet.where(subnet_id_1: small_id_ps.id, subnet_id_2: large_id_ps.id).all.map(&:destroy)
+    subnet.incr_refresh_keys
+    incr_refresh_keys
+  end
+
+  def create_tunnels(nics, src_nic)
+    nics.each do |dst_nic|
+      next if src_nic == dst_nic
+      IpsecTunnel.create_with_id(src_nic_id: src_nic.id, dst_nic_id: dst_nic.id) unless IpsecTunnel[src_nic_id: src_nic.id, dst_nic_id: dst_nic.id]
+      IpsecTunnel.create_with_id(src_nic_id: dst_nic.id, dst_nic_id: src_nic.id) unless IpsecTunnel[src_nic_id: dst_nic.id, dst_nic_id: src_nic.id]
+    end
+  end
+
+  def find_all_connected_nics(excluded_private_subnet_ids = [])
+    nics + connected_subnets.select { |subnet| !excluded_private_subnet_ids.include?(subnet.id) }.flat_map { _1.find_all_connected_nics(excluded_private_subnet_ids + [id]) }.uniq
   end
 end
