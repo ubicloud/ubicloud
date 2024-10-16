@@ -161,23 +161,25 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   describe "#add_new_nic" do
     let(:nic_to_add) {
       st = instance_double(Strand, label: "wait_setup")
-      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st)
+      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
     }
     let(:added_nic) {
       st = instance_double(Strand, label: "wait")
-      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st)
+      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st, lock_set?: false)
     }
 
     it "adds new nics and creates tunnels" do
       nics_to_rekey = [added_nic, nic_to_add]
       expect(nx).to receive(:decr_add_new_nic)
+      expect(nic_to_add).to receive(:incr_lock)
+      expect(added_nic).to receive(:incr_lock)
       expect(nic_to_add).to receive(:incr_start_rekey)
       expect(added_nic).to receive(:incr_start_rekey)
       expect(nx).to receive(:nics_to_rekey).and_return(nics_to_rekey)
       expect(nx).to receive(:gen_spi).and_return("0xe3af3a04").at_least(:once)
       expect(nx).to receive(:gen_reqid).and_return(86879).at_least(:once)
       expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819").at_least(:once)
-      expect(nx).to receive(:create_tunnels).and_return(true).at_least(:once)
+      expect(nx.private_subnet).to receive(:create_tunnels).and_return(true).at_least(:once)
       expect(added_nic).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
         {
           spi4: "0xe3af3a04",
@@ -197,7 +199,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   describe "#refresh_keys" do
     let(:nic) {
       st = instance_double(Strand, label: "wait")
-      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st)
+      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
     }
 
     it "refreshes keys and hops to wait_refresh_keys" do
@@ -212,6 +214,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
           reqid: 86879
         }).and_return(true)
       expect(nic).to receive(:incr_start_rekey).and_return(true)
+      expect(nic).to receive(:incr_lock).and_return(true)
       expect { nx.refresh_keys }.to hop("wait_inbound_setup")
     end
   end
@@ -257,7 +260,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe "#wait_old_state_drop" do
     let(:nic) {
-      st = instance_double(Strand, label: "wait_rekey_old_state_drop")
+      st = instance_double(Strand, label: "wait_rekey_old_state_drop", id: "0677f2e9-0189-8aac-bf5a-8f7b66c641bf")
       instance_double(Nic, strand: st, rekey_payload: {})
     }
 
@@ -275,6 +278,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:rekey_payload).and_return({})
       expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
+      expect(nic).to receive(:unlock)
       expect { nx.wait_old_state_drop }.to hop("wait")
     end
 
@@ -285,6 +289,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:update).with(state: "waiting", last_rekey_at: t).and_return(true)
       expect(nx).to receive(:rekeying_nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
+      expect(nic).to receive(:unlock)
       expect(nx).not_to receive(:decr_refresh_keys)
       expect { nx.wait_old_state_drop }.to hop("wait")
     end
@@ -314,37 +319,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(PrivateSubnet).to receive(:where).with(net6: "fd61:6161:6161:6161::/64", location: "hetzner-hel1").and_return([true])
       expect(PrivateSubnet).to receive(:where).with(net6: "fd62:6262:6262:6262::/64", location: "hetzner-hel1").and_return([])
       expect(described_class.random_private_ipv6("hetzner-hel1").to_s).to eq("fd62:6262:6262:6262::/64")
-    end
-  end
-
-  describe ".create_tunnels" do
-    let(:src_nic) {
-      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b")
-    }
-    let(:dst_nic) {
-      instance_double(Nic, id: "6a187cc1-291b-8eac-bdfc-96801fa3118d")
-    }
-
-    it "creates tunnels if not existing" do
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-      nx.create_tunnels([src_nic, dst_nic], dst_nic)
-    end
-
-    it "skips existing tunnels" do
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(false)
-
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-      nx.create_tunnels([src_nic, dst_nic], dst_nic)
-    end
-
-    it "skips existing tunnels - 2" do
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(false)
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      nx.create_tunnels([src_nic, dst_nic], dst_nic)
     end
   end
 
