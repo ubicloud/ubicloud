@@ -149,6 +149,45 @@ RSpec.describe Clover, "private subnet" do
       end
     end
 
+    describe "connected subnets" do
+      it "can show connected subnets" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-hel1").subject
+        private_subnet.connect_subnet(ps2)
+
+        visit "#{project.path}#{private_subnet.path}"
+
+        expect(page).to have_content ps2.name
+      end
+
+      it "can disconnect connected subnet" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-hel1").subject
+        private_subnet.connect_subnet(ps2)
+
+        visit "#{project.path}#{private_subnet.path}"
+
+        expect(page).to have_content ps2.name
+
+        btn = find "#cps-delete-#{ps2.ubid} .delete-btn"
+        page.driver.post btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        expect(private_subnet.reload.connected_subnets.count).to eq(0)
+      end
+
+      it "can connect to a subnet" do
+        private_subnet
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-hel1").subject
+        expect(private_subnet.connected_subnets.count).to eq(0)
+        visit "#{project.path}#{private_subnet.path}"
+
+        select ps2.name, from: "connected-subnet-ubid"
+        click_button "Connect"
+
+        expect(private_subnet.reload.connected_subnets.count).to eq(1)
+      end
+    end
+
     describe "delete" do
       it "can delete private subnet" do
         visit "#{project.path}#{private_subnet.path}"
