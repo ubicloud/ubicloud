@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require_relative "../lib/authorization"
+require_relative "../lib/pagination"
 
 class Project < Sequel::Model
   one_to_many :access_tags

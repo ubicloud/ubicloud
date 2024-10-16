@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Routes::Common::LoadBalancerHelper < Routes::Common::Base
   def list
     dataset = project.load_balancers_dataset

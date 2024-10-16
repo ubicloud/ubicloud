@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Serializers::GithubCacheEntry < Serializers::Base
   def self.serialize_internal(entry, options = {})
     {

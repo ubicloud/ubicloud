@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../routes/clover_error"
+
 module Authorization
   class Unauthorized < CloverError
     def initialize

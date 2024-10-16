@@ -2,6 +2,7 @@
 
 require "shellwords"
 require "json"
+require_relative "base"
 
 class Prog::RotateStorageKek < Prog::Base
   subject_is :vm_storage_volume

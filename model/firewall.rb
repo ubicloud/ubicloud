@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require_relative "../lib/authorization"
+require_relative "../lib/pagination"
 
 class Firewall < Sequel::Model
   one_to_many :firewall_rules, key: :firewall_id

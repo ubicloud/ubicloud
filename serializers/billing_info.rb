@@ -2,6 +2,8 @@
 
 require "countries"
 
+require_relative "base"
+
 class Serializers::BillingInfo < Serializers::Base
   def self.serialize_internal(bi, options = {})
     {

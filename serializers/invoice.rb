@@ -2,6 +2,8 @@
 
 require "countries"
 
+require_relative "base"
+
 class Serializers::Invoice < Serializers::Base
   def self.serialize_internal(inv, options = {})
     base = {

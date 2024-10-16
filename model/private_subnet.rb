@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require_relative "../lib/authorization"
+require_relative "../lib/pagination"
 
 class PrivateSubnet < Sequel::Model
   many_to_many :vms, join_table: Nic.table_name, left_key: :private_subnet_id, right_key: :vm_id

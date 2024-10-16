@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require_relative "../lib/authorization"
 
 class Account < Sequel::Model(:accounts)
   include ResourceMethods

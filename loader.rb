@@ -79,6 +79,37 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
   end
 end
 
+# Define empty modules up front to remove need for many requires
+module Hosting; end
+
+module Minio; end
+
+module Prog; end
+
+module Prog::Ai; end
+
+module Prog::DnsZone; end
+
+module Prog::Github; end
+
+module Prog::Minio; end
+
+module Prog::Postgres; end
+
+module Prog::Storage; end
+
+module Prog::Vm; end
+
+module Prog::Vnet; end
+
+module Scheduling; end
+
+module Serializers; end
+
+module Routes; end
+
+module Routes::Common; end
+
 autoload_normal.call("model", flat: true)
 %w[lib clover.rb clover_web.rb clover_api.rb clover_runtime.rb routes/clover_base.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers routes/common].each { autoload_normal.call(_1, include_first: true) }

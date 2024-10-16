@@ -2,6 +2,7 @@
 
 require "time"
 require "netaddr"
+require_relative "../routes/clover_error"
 
 module Validation
   class ValidationFailed < CloverError

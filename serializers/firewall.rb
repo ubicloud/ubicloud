@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Serializers::Firewall < Serializers::Base
   def self.serialize_internal(firewall, options = {})
     base = {

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
   def list
     if @mode == AppMode::API

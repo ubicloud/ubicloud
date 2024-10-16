@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../base"
+
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
   semaphore :destroy, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger, :setup_nic, :repopulate

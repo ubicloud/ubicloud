@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "excon"
+require_relative "base"
 
 class Prog::Heartbeat < Prog::Base
   CONNECTED_APPLICATION_QUERY = <<SQL

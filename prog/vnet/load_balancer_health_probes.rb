@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../base"
+
 class Prog::Vnet::LoadBalancerHealthProbes < Prog::Base
   subject_is :load_balancer
 

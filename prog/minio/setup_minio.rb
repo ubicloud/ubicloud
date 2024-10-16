@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../base"
+
 class Prog::Minio::SetupMinio < Prog::Base
   subject_is :minio_server
 

@@ -3,6 +3,8 @@
 require "socket"
 require "open-uri"
 require "net/http"
+require_relative "base"
+
 class Prog::ResolveGloballyBlockedDnsnames < Prog::Base
   label def wait
     GloballyBlockedDnsname.each do |globally_blocked_dnsname|

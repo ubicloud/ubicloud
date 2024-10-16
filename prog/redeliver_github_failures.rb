@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Prog::RedeliverGithubFailures < Prog::Base
   label def wait
     current_frame = strand.stack.first

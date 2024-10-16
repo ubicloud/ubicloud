@@ -2,6 +2,8 @@
 
 require "jwt"
 require_relative "../model"
+require_relative "../lib/authorization"
+require_relative "../lib/pagination"
 
 class Vm < Sequel::Model
   one_to_one :strand, key: :id

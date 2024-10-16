@@ -2,6 +2,8 @@
 
 require "forwardable"
 
+require_relative "../base"
+
 class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   subject_is :postgres_timeline
 

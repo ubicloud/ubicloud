@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../base"
+
 class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   subject_is :vm
 
