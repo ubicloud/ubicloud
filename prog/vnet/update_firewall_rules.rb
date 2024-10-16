@@ -11,7 +11,7 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
     allowed_ingress_ip6 = NetAddr.summ_IPv6Net(rules.select { _1.ip6? && !_1.port_range }.map { _1.cidr }).map(&:to_s)
     allowed_ingress_ip4_port_set = consolidate_rules(rules.select { !_1.ip6? && _1.port_range })
     allowed_ingress_ip6_port_set = consolidate_rules(rules.select { _1.ip6? && _1.port_range })
-    guest_ephemeral = subdivide_network(vm.ephemeral_net6).first.to_s
+    guest_ephemeral, clover_ephemeral = subdivide_network(vm.ephemeral_net6).map(&:to_s)
 
     globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
 
@@ -86,17 +86,26 @@ table inet fw_table {
     ip daddr @globally_blocked_ipv4s drop
     ip6 daddr @globally_blocked_ipv6s drop
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
-    ip daddr @private_ipv4_cidrs ct state established,related counter accept
+
+    # If we are using clover_ephemeral, that means we are using ipsec. We need
+    # to allow traffic for the private communication and block via firewall
+    # rules through @allowed_ipv4_port_tuple and @allowed_ipv6_port_tuple in the
+    # next section of rules.
+    ip6 daddr #{clover_ephemeral} ct state established,related,new counter accept
+    ip6 saddr #{clover_ephemeral} ct state established,related,new counter accept
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
-    ip6 daddr @private_ipv6_cidrs ct state established,related,new counter accept
     ip6 saddr #{guest_ephemeral} ct state established,related,new counter accept
-    ip6 daddr #{guest_ephemeral} ct state established,related,new counter accept
-    ip saddr @allowed_ipv4_cidrs ip daddr @private_ipv4_cidrs counter accept
-    ip6 saddr @allowed_ipv6_cidrs ip6 daddr #{guest_ephemeral} counter accept
     ip saddr . tcp dport @allowed_ipv4_port_tuple ip daddr @private_ipv4_cidrs counter accept
     ip6 saddr . tcp dport @allowed_ipv6_port_tuple ip6 daddr #{guest_ephemeral} counter accept
     ip saddr . udp dport @allowed_ipv4_port_tuple ip daddr @private_ipv4_cidrs counter accept
     ip6 saddr . udp dport @allowed_ipv6_port_tuple ip6 daddr #{guest_ephemeral} counter accept
+    ip6 saddr #{clover_ephemeral} ct state established,related,new counter accept
+    # Allow incoming traffic to the VM using the following addresses as
+    # destination address. This is needed to allow the return traffic.
+    ip6 daddr @private_ipv6_cidrs ct state established,related counter accept
+    ip6 daddr #{guest_ephemeral} ct state established,related counter accept
+    ip6 daddr #{clover_ephemeral} ct state established,related counter accept
+    ip daddr @private_ipv4_cidrs ct state established,related counter accept
     ip saddr 0.0.0.0/0 icmp type echo-request counter accept
     ip6 saddr ::/0 icmpv6 type echo-request counter accept
   }
@@ -210,11 +219,11 @@ TEMPLATE
   end
 
   def generate_private_ip4_list
-    vm.nics.map { NetAddr::IPv4Net.parse(_1.private_ipv4.network.to_s + "/26").to_s }.join(",")
+    vm.nics.map { _1.private_ipv4.to_s }.join(",")
   end
 
   def generate_private_ip6_list
-    vm.nics.map { NetAddr::IPv6Net.parse(_1.private_ipv6.network.to_s + "/64").to_s }.join(",")
+    vm.nics.map { _1.private_ipv6.to_s }.join(",")
   end
 
   def subdivide_network(net)
