@@ -6,7 +6,7 @@ require_relative "../../lib/authorization"
 class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :parent, key: :parent_id, class: self
-  one_to_one :leader, class: PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
+  one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
 
   include ResourceMethods
   include SemaphoreMethods
