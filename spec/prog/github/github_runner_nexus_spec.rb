@@ -675,6 +675,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Clog).not_to receive(:emit).with("Failed to start runner script").and_call_original
       expect { nx.register_runner }.to raise_error Sshable::SshError
     end
+
+    it "destroys the runner if generate request fails due to self runners disabled error" do
+      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
+      expect { nx.register_runner }.to nap(0)
+        .and change { Page.active.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "fails if it raises unexpected Octokit error" do
+      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Unexpected error"}))
+      expect { nx.register_runner }.to raise_error Octokit::Error
+    end
   end
 
   describe "#wait" do
