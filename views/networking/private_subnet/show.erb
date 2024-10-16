@@ -110,6 +110,75 @@
       </tbody>
     </table>
   </div>
+  <!-- List connected Private Subnets, clickable to go to the private subnet page -->
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Connected Subnets
+      </h3>
+    </div>
+  </div>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @connected_subnets.each do |subnet| %>
+          <tr>
+            <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <% if Authorization.has_permission?(current_account.id, "PrivateSubnet:view", subnet[:id]) %>
+                <a
+                  href="<%= "#{@project_data[:path]}/location/#{subnet[:location]}/private-subnet/#{subnet[:name]}" %>"
+                  class="text-orange-600 hover:text-orange-700"
+                ><%= subnet[:name] %></a>
+              <% else %>
+                <%= subnet[:name] %>
+              <% end %>
+            </td>
+            <td
+              id="cps-delete-<%=subnet[:id]%>"
+              class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+            >
+              <button
+                type="button"
+                data-url="<%= "#{request.path}/disconnect/#{subnet[:id]}" %>"
+                data-csrf="<%= csrf_token("#{request.path}/disconnect/#{subnet[:id]}", "POST") %>"
+                data-redirect="<%= request.path.to_s %>"
+                data-method="POST"
+                data-confirmation-message="Are you sure to disconnect?"
+                class="delete-btn inline-flex items-center rounded-md bg-rose-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+              >
+                <%== render("components/icon", locals: { name: "hero-trash", classes: "h-5 w-5" }) %>
+              </button>
+            </td>
+          </tr>
+        <% end %>
+        <tr>
+          <form action="<%= "#{request.path}/connect" %>" role="form" method="POST">
+            <%== csrf_tag("#{request.path}/connect") %>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== render(
+                "components/form/select",
+                locals: {
+                  name: "connected-subnet-ubid",
+                  label: "",
+                  placeholder: "Pick a subnet to connect",
+                  options: @connectable_subnets.map { |s| [s[:id], s[:name]] }
+                }
+              ) %>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <%== render("components/form/submit_button", locals: { text: "Connect" }) %>
+            </td>
+          </form>
+        </tr>
+      </tbody>
+    </table>
+  </div>
   <!-- Delete Card -->
   <% if Authorization.has_permission?(current_account.id, "PrivateSubnet:delete", @ps[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
