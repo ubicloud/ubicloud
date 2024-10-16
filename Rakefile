@@ -127,10 +127,17 @@ end
 # Specs
 begin
   require "rspec/core/rake_task"
-  ENV["RACK_ENV"] = "test"
-  RSpec::Core::RakeTask.new(:spec)
-  task default: :spec
+  RSpec::Core::RakeTask.new(:_spec)
+  Rake::Task["_spec"].clear_comments
 rescue LoadError
+else
+  desc "Run specs"
+  task "spec" do
+    ENV["RACK_ENV"] = "test"
+    ENV["NO_AUTOLOAD"] = "1"
+    Rake::Task["_spec"].invoke
+  end
+  task default: :spec
 end
 
 # Other
