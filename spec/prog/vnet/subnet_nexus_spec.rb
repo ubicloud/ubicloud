@@ -9,7 +9,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   let(:prj) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
   let(:ps) {
     PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "1.1.1.0/26", state: "waiting").tap { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+      net4: "1.1.1.0/26", state: "waiting")
+  }
+
+  let(:ps2) {
+    PrivateSubnet.create_with_id(name: "ps2", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fcc::/64",
+      net4: "1.1.1.128/26", state: "waiting")
   }
 
   before do
@@ -159,25 +164,22 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   end
 
   describe "#add_new_nic" do
-    let(:nic_to_add) {
-      st = instance_double(Strand, label: "wait_setup")
-      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st)
-    }
-    let(:added_nic) {
-      st = instance_double(Strand, label: "wait")
-      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st)
-    }
-
     it "adds new nics and creates tunnels" do
+      st = instance_double(Strand, label: "wait_setup")
+      nic_to_add = instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
+      st = instance_double(Strand, label: "wait")
+      added_nic = instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st, lock_set?: false)
       nics_to_rekey = [added_nic, nic_to_add]
       expect(nx).to receive(:decr_add_new_nic)
+      expect(nic_to_add).to receive(:incr_lock)
+      expect(added_nic).to receive(:incr_lock)
       expect(nic_to_add).to receive(:incr_start_rekey)
       expect(added_nic).to receive(:incr_start_rekey)
       expect(nx).to receive(:nics_to_rekey).and_return(nics_to_rekey)
       expect(nx).to receive(:gen_spi).and_return("0xe3af3a04").at_least(:once)
       expect(nx).to receive(:gen_reqid).and_return(86879).at_least(:once)
       expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819").at_least(:once)
-      expect(nx).to receive(:create_tunnels).and_return(true).at_least(:once)
+      expect(nx.private_subnet).to receive(:create_tunnels).and_return(true).at_least(:once)
       expect(added_nic).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
         {
           spi4: "0xe3af3a04",
@@ -192,12 +194,23 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         }).and_return(true)
       expect { nx.add_new_nic }.to hop("wait_inbound_setup")
     end
+
+    it "naps if the nics are locked" do
+      st = instance_double(Strand, label: "wait_setup")
+      nic_to_add = instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
+      st = instance_double(Strand, label: "wait")
+      added_nic = instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st, lock_set?: false)
+      nics_to_rekey = [added_nic, nic_to_add]
+      expect(added_nic).to receive(:lock_set?).and_return(true)
+      expect(nx).to receive(:nics_to_rekey).and_return(nics_to_rekey)
+      expect { nx.add_new_nic }.to nap(10)
+    end
   end
 
   describe "#refresh_keys" do
     let(:nic) {
       st = instance_double(Strand, label: "wait")
-      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st)
+      instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
     }
 
     it "refreshes keys and hops to wait_refresh_keys" do
@@ -212,7 +225,14 @@ RSpec.describe Prog::Vnet::SubnetNexus do
           reqid: 86879
         }).and_return(true)
       expect(nic).to receive(:incr_start_rekey).and_return(true)
+      expect(nic).to receive(:incr_lock).and_return(true)
       expect { nx.refresh_keys }.to hop("wait_inbound_setup")
+    end
+
+    it "naps if the nics are locked" do
+      expect(nx).to receive(:active_nics).and_return([nic])
+      expect(nic).to receive(:lock_set?).and_return(true)
+      expect { nx.refresh_keys }.to nap(10)
     end
   end
 
@@ -257,7 +277,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe "#wait_old_state_drop" do
     let(:nic) {
-      st = instance_double(Strand, label: "wait_rekey_old_state_drop")
+      st = instance_double(Strand, label: "wait_rekey_old_state_drop", id: "0677f2e9-0189-8aac-bf5a-8f7b66c641bf")
       instance_double(Nic, strand: st, rekey_payload: {})
     }
 
@@ -275,6 +295,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:rekey_payload).and_return({})
       expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
+      expect(nic).to receive(:unlock)
       expect { nx.wait_old_state_drop }.to hop("wait")
     end
 
@@ -285,6 +306,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:update).with(state: "waiting", last_rekey_at: t).and_return(true)
       expect(nx).to receive(:rekeying_nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:update).with(encryption_key: nil, rekey_payload: nil).and_return(true)
+      expect(nic).to receive(:unlock)
       expect(nx).not_to receive(:decr_refresh_keys)
       expect { nx.wait_old_state_drop }.to hop("wait")
     end
@@ -325,49 +347,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
-  describe ".create_tunnels" do
-    let(:src_nic) {
-      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b")
-    }
-    let(:dst_nic) {
-      instance_double(Nic, id: "6a187cc1-291b-8eac-bdfc-96801fa3118d")
-    }
-
-    it "creates tunnels if not existing" do
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-      nx.create_tunnels([src_nic, dst_nic], dst_nic)
-    end
-
-    it "skips existing tunnels" do
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(false)
-
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-      nx.create_tunnels([src_nic, dst_nic], dst_nic)
-    end
-
-    it "skips existing tunnels - 2" do
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(false)
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      nx.create_tunnels([src_nic, dst_nic], dst_nic)
-    end
-  end
-
   describe "#destroy" do
     let(:nic) {
       instance_double(Nic, vm_id: nil)
     }
 
-    let(:vm) {
-      Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "dummy-location").tap {
+    it "extends deadline if a vm prevents destroy" do
+      vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "dummy-location").tap {
         _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
       }
-    }
-
-    it "extends deadline if a vm prevents destroy" do
       expect(ps).to receive(:nics).and_return([nic]).twice
       expect(nic).to receive(:vm_id).and_return("vm-id")
       expect(nic).to receive(:vm).and_return(vm)
@@ -397,6 +385,21 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       expect(ps).to receive(:nics).and_return([]).at_least(:once)
       expect(ps).to receive(:projects).and_return([prj]).at_least(:once)
       expect(ps).to receive(:dissociate_with_project).with(prj).and_return(true)
+      expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
+    end
+
+    it "disconnects all subnets" do
+      prj = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
+      ps1 = described_class.assemble(prj.id, name: "ps1").subject
+      ps2 = described_class.assemble(prj.id, name: "ps2").subject
+      ps1.connect_subnet(ps2)
+      expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
+      expect(ps2.connected_subnets.map(&:id)).to eq [ps1.id]
+      expect(ps1).to receive(:projects).and_return([prj]).at_least(:once)
+      expect(ps1).to receive(:dissociate_with_project).with(prj).and_return(true)
+
+      expect(nx).to receive(:private_subnet).and_return(ps1).at_least(:once)
+      expect(ps1).to receive(:disconnect_subnet).with(ps2).and_call_original
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
   end

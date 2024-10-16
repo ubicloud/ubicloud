@@ -14,7 +14,7 @@ class Nic < Sequel::Model
   include SemaphoreMethods
 
   semaphore :destroy, :start_rekey, :trigger_outbound_update,
-    :old_state_drop_trigger, :setup_nic, :repopulate
+    :old_state_drop_trigger, :setup_nic, :repopulate, :lock
 
   plugin :column_encryption do |enc|
     enc.column :encryption_key
@@ -26,5 +26,9 @@ class Nic < Sequel::Model
 
   def ubid_to_tap_name
     ubid.to_s[0..9]
+  end
+
+  def unlock
+    Semaphore.where(strand_id: strand.id, name: "lock").delete(force: true)
   end
 end

@@ -86,11 +86,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def add_new_nic
+    register_deadline(:wait, 2 * 60)
     nics_snap = nics_to_rekey
+    nap 10 if nics_snap.any? { |nic| nic.lock_set? }
     nics_snap.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
-      create_tunnels(nics_snap, nic)
+      nic.incr_lock
+      private_subnet.create_tunnels(nics_snap, nic)
     end
 
     decr_add_new_nic
@@ -98,12 +101,14 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
+    decr_refresh_keys
+    nap 10 if active_nics.any? { |nic| nic.lock_set? }
     active_nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
+      nic.incr_lock
     end
 
-    decr_refresh_keys
     hop_wait_inbound_setup
   end
 
@@ -130,6 +135,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
       rekeying_nics.each do |nic|
         nic.update(encryption_key: nil, rekey_payload: nil)
+        nic.unlock
       end
       hop_wait
     end
@@ -149,6 +155,10 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     decr_destroy
     strand.children.each { _1.destroy }
     private_subnet.firewalls.map { _1.disassociate_from_private_subnet(private_subnet, apply_firewalls: false) }
+
+    private_subnet.connected_subnets.each do |subnet|
+      private_subnet.disconnect_subnet(subnet)
+    end
 
     if private_subnet.nics.empty? && private_subnet.load_balancers.empty?
       DB.transaction do
@@ -184,27 +194,19 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     selected_addr
   end
 
-  def create_tunnels(nics, src_nic)
-    nics.each do |dst_nic|
-      next if src_nic == dst_nic
-      IpsecTunnel.create_with_id(src_nic_id: src_nic.id, dst_nic_id: dst_nic.id) unless IpsecTunnel[src_nic_id: src_nic.id, dst_nic_id: dst_nic.id]
-      IpsecTunnel.create_with_id(src_nic_id: dst_nic.id, dst_nic_id: src_nic.id) unless IpsecTunnel[src_nic_id: dst_nic.id, dst_nic_id: src_nic.id]
-    end
-  end
-
   def to_be_added_nics
-    private_subnet.nics.select { _1.strand.label == "wait_setup" }
+    private_subnet.find_all_connected_nics.select { _1.strand.label == "wait_setup" }
   end
 
   def active_nics
-    private_subnet.nics.select { _1.strand.label == "wait" }
+    private_subnet.find_all_connected_nics.select { _1.strand.label == "wait" }
   end
 
   def nics_to_rekey
-    active_nics + to_be_added_nics
+    (active_nics + to_be_added_nics).uniq
   end
 
   def rekeying_nics
-    private_subnet.nics.select { !_1.rekey_payload.nil? }
+    private_subnet.find_all_connected_nics.select { !_1.rekey_payload.nil? }
   end
 end
