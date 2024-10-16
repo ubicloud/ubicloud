@@ -7,8 +7,10 @@ require "roda"
 class Clover < Roda
   def self.freeze
     # :nocov:
-    unless Config.test?
-      Sequel::Model.freeze_descendents
+    if Config.test?
+      Sequel::Model.descendants.each(&:finalize_associations)
+    else
+      Sequel::Model.freeze_descendants
       DB.freeze
     end
     # :nocov:
