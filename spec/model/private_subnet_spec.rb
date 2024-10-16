@@ -82,4 +82,35 @@ RSpec.describe PrivateSubnet do
       ps.destroy
     end
   end
+
+  describe ".create_tunnels" do
+    let(:src_nic) {
+      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b")
+    }
+    let(:dst_nic) {
+      instance_double(Nic, id: "6a187cc1-291b-8eac-bdfc-96801fa3118d")
+    }
+
+    it "creates tunnels if not existing" do
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+
+    it "skips existing tunnels" do
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(false)
+
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+
+    it "skips existing tunnels - 2" do
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(false)
+      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+
+      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
+      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+    end
+  end
 end
