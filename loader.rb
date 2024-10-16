@@ -89,6 +89,20 @@ if Config.production?
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
 end
 
+unless Unreloader.autoload?
+  # If not autoloading, all classes are already available, so speed up
+  # UBID.class_for_ubid using hash of prefixes to class objects
+  class UBID
+    TYPE2CLASS = TYPE2CLASSNAME.transform_values { Object.const_get(_1) }.freeze
+    private_constant :TYPE2CLASS
+
+    singleton_class.remove_method(:class_for_ubid)
+    def self.class_for_ubid(str)
+      TYPE2CLASS[str[..1]]
+    end
+  end
+end
+
 case Config.mail_driver
 when :smtp
   ::Mail.defaults do
