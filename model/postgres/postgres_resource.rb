@@ -7,11 +7,11 @@ class PostgresResource < Sequel::Model
   many_to_one :project
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
   many_to_one :parent, key: :parent_id, class: self
-  one_to_many :servers, class: PostgresServer, key: :resource_id
-  one_to_one :representative_server, class: PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
-  one_through_one :timeline, class: PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
-  one_to_many :firewall_rules, class: PostgresFirewallRule, key: :postgres_resource_id
-  one_to_many :metric_destinations, class: PostgresMetricDestination, key: :postgres_resource_id
+  one_to_many :servers, class: :PostgresServer, key: :resource_id
+  one_to_one :representative_server, class: :PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
+  one_through_one :timeline, class: :PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
+  one_to_many :firewall_rules, class: :PostgresFirewallRule, key: :postgres_resource_id
+  one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
   many_to_one :private_subnet
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy

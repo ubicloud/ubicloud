@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class PrivateSubnet < Sequel::Model
-  many_to_many :vms, join_table: Nic.table_name, left_key: :private_subnet_id, right_key: :vm_id
+  many_to_many :vms, join_table: :nic, left_key: :private_subnet_id, right_key: :vm_id
   one_to_many :nics, key: :private_subnet_id
   one_to_one :strand, key: :id
   many_to_many :firewalls

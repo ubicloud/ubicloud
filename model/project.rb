@@ -9,18 +9,18 @@ class Project < Sequel::Model
   one_to_many :usage_alerts
   one_to_many :github_installations
 
-  many_to_many :accounts, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :vms, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :minio_clusters, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :private_subnets, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :postgres_resources, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :firewalls, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :load_balancers, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
-  many_to_many :inference_endpoints, join_table: AccessTag.table_name, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :accounts, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :vms, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :minio_clusters, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :private_subnets, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :postgres_resources, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :firewalls, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :load_balancers, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :inference_endpoints, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
-  one_to_many :quotas, class: ProjectQuota, key: :project_id
-  one_to_many :invitations, class: ProjectInvitation, key: :project_id
+  one_to_many :quotas, class: :ProjectQuota, key: :project_id
+  one_to_many :invitations, class: :ProjectInvitation, key: :project_id
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
 
   dataset_module Authorization::Dataset
