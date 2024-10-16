@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../model"
+
 RSpec.describe ResourceMethods do
   let(:sa) { Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair) }
 

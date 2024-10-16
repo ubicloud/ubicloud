@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../spec_helper"
+require_relative "spec_helper"
 
 RSpec.describe ResourceMethods do
   it "hides sensitive and long columns" do
