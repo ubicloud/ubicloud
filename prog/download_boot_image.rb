@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "base"
 
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host

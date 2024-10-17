@@ -2,6 +2,7 @@
 
 require "acme-client"
 require "openssl"
+require_relative "../base"
 
 class Prog::Vnet::CertNexus < Prog::Base
   subject_is :cert

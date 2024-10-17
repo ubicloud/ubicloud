@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "base"
 
 class Prog::LearnCores < Prog::Base
   subject_is :sshable

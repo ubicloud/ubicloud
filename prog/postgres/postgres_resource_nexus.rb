@@ -3,6 +3,7 @@
 require "forwardable"
 
 require_relative "../../lib/util"
+require_relative "../base"
 
 class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource

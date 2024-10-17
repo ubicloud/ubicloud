@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Prog::LearnArch < Prog::Base
   subject_is :sshable
 

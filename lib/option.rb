@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "yaml"
+require_relative "../model/postgres/postgres_resource"
 
 module Option
   ai_models = YAML.load_file("config/ai_models.yml")

@@ -3,6 +3,7 @@
 require "forwardable"
 
 require_relative "../../lib/util"
+require_relative "../base"
 
 class Prog::Minio::MinioServerNexus < Prog::Base
   subject_is :minio_server

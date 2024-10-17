@@ -3,6 +3,8 @@
 require "tilt"
 require "tilt/erubi"
 
+require_relative "routes/clover_base"
+
 class CloverWeb < Roda
   include CloverBase
 

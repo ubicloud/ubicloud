@@ -3,6 +3,7 @@
 require "forwardable"
 
 require_relative "../../lib/util"
+require_relative "../base"
 
 class Prog::Ai::InferenceEndpointNexus < Prog::Base
   subject_is :inference_endpoint

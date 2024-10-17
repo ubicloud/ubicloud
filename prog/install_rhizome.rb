@@ -2,6 +2,7 @@
 
 require "rubygems/package"
 require "stringio"
+require_relative "base"
 
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable

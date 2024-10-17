@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../base"
+
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
   semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules

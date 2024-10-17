@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 # A no-operation prog for testing.
 class Prog::Test < Prog::Base
   subject_is :sshable

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../model"
+require_relative "../../lib/authorization"
 
 class MinioCluster < Sequel::Model
   one_to_many :pools, key: :cluster_id, class: :MinioPool do |ds|

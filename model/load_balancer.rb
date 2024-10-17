@@ -1,6 +1,8 @@
 #  frozen_string_literal: true
 
 require_relative "../model"
+require_relative "../lib/authorization"
+require_relative "../lib/pagination"
 
 class LoadBalancer < Sequel::Model
   many_to_many :vms
@@ -9,10 +11,10 @@ class LoadBalancer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :projects, through: :private_subnet
-  one_to_many :load_balancers_vms, key: :load_balancer_id, class: LoadBalancersVms
+  one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
-  one_to_many :certs_load_balancers, key: :load_balancer_id, class: CertsLoadBalancers
-  many_to_one :custom_hostname_dns_zone, class: DnsZone, key: :custom_hostname_dns_zone_id
+  one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
+  many_to_one :custom_hostname_dns_zone, class: :DnsZone, key: :custom_hostname_dns_zone_id
 
   plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy
 

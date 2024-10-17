@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Prog::CheckUsageAlerts < Prog::Base
   label def wait
     begin_time = Date.new(Time.now.year, Time.now.month, 1).to_time

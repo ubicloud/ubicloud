@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../base"
+
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
   semaphore :checkup, :reboot, :destroy

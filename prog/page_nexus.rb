@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Prog::PageNexus < Prog::Base
   subject_is :page
   semaphore :resolve

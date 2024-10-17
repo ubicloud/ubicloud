@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+require "roda"
+require_relative "../model"
+require_relative "clover_error"
+
 module CloverBase
   def self.included(base)
     base.extend(ClassMethods)

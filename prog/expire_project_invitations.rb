@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Prog::ExpireProjectInvitations < Prog::Base
   label def wait
     ProjectInvitation.where { _1.expires_at < Time.now }.all.each(&:destroy)

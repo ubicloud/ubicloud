@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../lib/util"
+require_relative "../base"
 
 class Prog::Vm::UpdateIpv6 < Prog::Base
   subject_is :vm

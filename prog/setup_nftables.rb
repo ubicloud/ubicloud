@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Prog::SetupNftables < Prog::Base
   subject_is :sshable, :vm_host
 

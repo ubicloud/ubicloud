@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative "../base"
+require_relative "../test"
+
 class Prog::Test::Base < Prog::Base
   def fail_test(msg)
     strand.update(exitval: {msg: msg})

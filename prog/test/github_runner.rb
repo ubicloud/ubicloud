@@ -3,6 +3,8 @@
 require "octokit"
 require "yaml"
 
+require_relative "base"
+
 class Prog::Test::GithubRunner < Prog::Test::Base
   FAIL_CONCLUSIONS = ["action_required", "cancelled", "failure", "skipped", "stale", "timed_out"]
   IN_PROGRESS_CONCLUSIONS = ["in_progress", "queued", "requested", "waiting", "pending", "neutral"]

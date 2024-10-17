@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Serializers::PaymentMethod < Serializers::Base
   def self.serialize_internal(pm, options = {})
     {

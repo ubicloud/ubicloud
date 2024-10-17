@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "base"
+
 class Prog::Test::Vm < Prog::Test::Base
   subject_is :vm, :sshable
 

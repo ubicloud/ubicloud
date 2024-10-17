@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../lib/util"
+require_relative "base"
 
 class Prog::BootstrapRhizome < Prog::Base
   subject_is :sshable

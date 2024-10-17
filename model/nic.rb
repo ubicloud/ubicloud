@@ -5,9 +5,9 @@ require_relative "../model"
 class Nic < Sequel::Model
   many_to_one :private_subnet
   many_to_one :vm
-  one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: IpsecTunnel
-  one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: IpsecTunnel
-  one_to_one :strand, key: :id, class: Strand
+  one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: :IpsecTunnel
+  one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: :IpsecTunnel
+  one_to_one :strand, key: :id
   plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy
 
   include ResourceMethods

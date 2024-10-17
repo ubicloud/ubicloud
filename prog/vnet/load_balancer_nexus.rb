@@ -2,6 +2,7 @@
 
 require "acme-client"
 require "openssl"
+require_relative "../base"
 
 class Prog::Vnet::LoadBalancerNexus < Prog::Base
   subject_is :load_balancer

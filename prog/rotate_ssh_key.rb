@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "shellwords"
+require_relative "base"
 
 class Prog::RotateSshKey < Prog::Base
   subject_is :sshable
