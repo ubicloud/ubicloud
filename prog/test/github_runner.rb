@@ -43,7 +43,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   label def download_boot_images
     frame["test_cases"].each do |test_case|
-      bud Prog::DownloadBootImage, {"subject_id" => vm_host_id, "image_name" => tests[test_case]["image_name"]}
+      bud Prog::DownloadBootImage, {"subject_id" => vm_host.id, "image_name" => tests[test_case]["image_name"]}
     end
 
     hop_wait_download_boot_images
@@ -149,7 +149,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   def trigger_test_run(repo_name, workflow_name, branch_name)
-    client.workflow_dispatch(repo_name, workflow_name, branch_name)
+    client.workflow_dispatch(repo_name, workflow_name, branch_name, {inputs: {arch: vm_host.arch}})
   end
 
   def latest_run(repo_name, workflow_name, branch_name)
@@ -180,8 +180,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     @test_runs ||= frame["test_cases"].flat_map { tests[_1]["runs"] }
   end
 
-  def vm_host_id
-    @vm_host_id ||= frame["vm_host_id"] || VmHost.first.id
+  def vm_host
+    @vm_host ||= VmHost[frame["vm_host_id"]]
   end
 
   def client
