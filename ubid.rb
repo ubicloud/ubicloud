@@ -6,7 +6,7 @@ class UBIDParseError < RuntimeError
 end
 
 class UBID
-  # Binary format, which is UUDIv8 compatible, is:
+  # Binary format, which is UUIDv8 compatible, is:
   # 0                   1                   2                   3
   #  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
   #  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
