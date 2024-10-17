@@ -41,8 +41,10 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
     before do
       allow(Github).to receive(:installation_client).and_return(client)
-      expect(client).to receive(:auto_paginate=)
-      expect(github_repository).to receive(:installation).and_return(instance_double(GithubInstallation, installation_id: "123")).at_least(:once)
+      allow(client).to receive(:auto_paginate=)
+      installation = instance_double(GithubInstallation, installation_id: "123")
+      expect(github_repository).to receive(:installation).and_return(installation).at_least(:once)
+      expect(installation).to receive(:project).and_return(instance_double(Project, active?: true)).at_least(:once)
     end
 
     it "creates extra runner if needed" do
@@ -87,6 +89,12 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 40, limit: 100)).at_least(:once)
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(15 * 60)
+    end
+
+    it "does not poll jobs if the project is not active" do
+      expect(github_repository.installation.project).to receive(:active?).and_return(false)
+      nx.check_queued_jobs
+      expect(nx.polling_interval).to eq(24 * 60 * 60)
     end
   end
 
