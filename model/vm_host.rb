@@ -22,6 +22,8 @@ class VmHost < Sequel::Model
   include HealthMonitorMethods
   semaphore :checkup, :reboot, :destroy
 
+  SSH_HEALTH_CHECK_COMMAND = "RFILE=/tmp/ubiiotest-$RANDOM;timeout 10 dd if=/dev/urandom of=$RFILE bs=1M count=10;rm $RFILE"
+
   def host_prefix
     net6.netmask.prefix_len
   end
@@ -251,7 +253,8 @@ class VmHost < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:ssh_session].exec!("true")
+      ret = session[:ssh_session].exec!(SSH_HEALTH_CHECK_COMMAND)
+      fail "VM Host disk IO check failed: #{ret}" unless ret.exitstatus.zero?
       "up"
     rescue
       "down"
