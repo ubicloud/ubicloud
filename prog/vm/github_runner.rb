@@ -37,7 +37,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       arch: label_data["arch"]
     ).first
 
-    if (picked_vm = pool&.pick_vm)
+    if (picked_vm = pool&.pick_vm(github_runner.ubid))
       return picked_vm
     end
 
@@ -155,7 +155,6 @@ class Prog::Vm::GithubRunner < Prog::Base
   label def allocate_vm
     picked_vm = pick_vm
     github_runner.update(vm_id: picked_vm.id)
-    picked_vm.update(name: github_runner.ubid.to_s)
     github_runner.reload.log_duration("runner_allocated", Time.now - github_runner.created_at)
 
     hop_wait_vm
