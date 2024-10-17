@@ -124,8 +124,8 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "finalizes the certificate when dns_challenge is valid" do
       expect(challenge).to receive(:status).and_return("valid")
 
-      key = OpenSSL::PKey::RSA.new(4096)
-      expect(OpenSSL::PKey::RSA).to receive(:new).with(4096).and_return(key)
+      key = OpenSSL::PKey::EC.generate("prime256v1")
+      expect(OpenSSL::PKey::EC).to receive(:generate).and_return(key)
       csr = instance_double(Acme::Client::CertificateRequest)
       acme_order = instance_double(Acme::Client::Resources::Order)
       expect(nx).to receive(:acme_order).and_return(acme_order).at_least(:once)

@@ -64,7 +64,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     when "pending"
       nap 10
     when "valid"
-      csr_key = OpenSSL::PKey::RSA.new(4096)
+      csr_key = OpenSSL::PKey::EC.generate("prime256v1")
       csr = Acme::Client::CertificateRequest.new(private_key: csr_key, common_name: cert.hostname)
       acme_order.finalize(csr: csr)
       cert.update(csr_key: csr_key.to_der)
