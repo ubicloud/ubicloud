@@ -19,7 +19,7 @@ RSpec.describe Prog::Vnet::CertServer do
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
-    cert.update(cert: "cert", csr_key: OpenSSL::PKey::RSA.new(4096).to_der)
+    cert.update(cert: "cert", csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
     lb.add_cert(cert)
     lb
   }
@@ -57,7 +57,7 @@ RSpec.describe Prog::Vnet::CertServer do
     it "creates a certificate folder, puts the certificate and hops to start_certificate_server" do
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo -u #{vm.inhost_name} mkdir -p /vm/#{vm.inhost_name}/cert")
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo -u #{vm.inhost_name} tee /vm/#{vm.inhost_name}/cert/cert.pem", stdin: "cert")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo -u #{vm.inhost_name} tee /vm/#{vm.inhost_name}/cert/key.pem", stdin: OpenSSL::PKey::RSA.new(cert.csr_key).to_pem)
+      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo -u #{vm.inhost_name} tee /vm/#{vm.inhost_name}/cert/key.pem", stdin: OpenSSL::PKey::EC.new(cert.csr_key).to_pem)
       expect { nx.put_certificate }.to hop("start_certificate_server")
     end
 

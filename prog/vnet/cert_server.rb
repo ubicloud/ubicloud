@@ -50,7 +50,7 @@ class Prog::Vnet::CertServer < Prog::Base
     cert = load_balancer.active_cert
 
     cert_payload = cert.cert
-    cert_key_payload = OpenSSL::PKey::RSA.new(cert.csr_key).to_pem
+    cert_key_payload = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
     vm.vm_host.sshable.cmd("sudo -u #{vm.inhost_name} mkdir -p #{cert_folder}")
     vm.vm_host.sshable.cmd("sudo -u #{vm.inhost_name} tee #{cert_path}", stdin: cert_payload)
     vm.vm_host.sshable.cmd("sudo -u #{vm.inhost_name} tee #{key_path}", stdin: cert_key_payload)
