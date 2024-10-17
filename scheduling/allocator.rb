@@ -71,8 +71,8 @@ module Scheduling::Allocator
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
         .select(Sequel[:vm_host][:id].as(:vm_host_id), :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :location, :num_storage_devices, :available_storage_gib, :total_storage_gib, :storage_devices, :total_ipv4, :used_ipv4, Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus), Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus), :available_iommu_groups, Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count))
         .where(arch: request.arch_filter)
-        #        .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
-        #        .where { (total_cores - used_cores >= request_cores) }
+        .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
+        .where { (total_cores - used_cores >= request.cores) }
         .with(:total_ipv4, DB[:address]
           .select_group(:routed_to_host_id)
           .select_append { round(sum(power(2, 32 - masklen(cidr)))).cast(:integer).as(total_ipv4) }
@@ -111,13 +111,6 @@ module Scheduling::Allocator
           .exclude(Sequel[table_alias][:activated_at] => nil)
       end
 
-      # HACK: This is to allow allocating some extra Standard-2 instances
-      if request.cores != 1
-        ds = ds
-          .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
-          .where { (total_cores - used_cores >= request.cores) }
-      end
-
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
       ds = ds.where { available_gpus >= request.gpu_count } if request.gpu_count > 0
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
@@ -143,7 +136,7 @@ module Scheduling::Allocator
     def initialize(candidate_host, request)
       @candidate_host = candidate_host
       @request = request
-      @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
+      @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], 0), # HACK removed for now: request.cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
@@ -157,6 +150,13 @@ module Scheduling::Allocator
 
     def update(vm)
       vm_host = VmHost[@candidate_host[:vm_host_id]]
+
+      # HACK: For now we deal with the slice allocation here,
+      # as it has to be done once we know the host
+      slice = vm_host.allocate_slice(vm.family, vm.cores, vm_name: Vm.ubid_to_name(vm.ubid))
+      fail "Could not allocate a slice. Already allocated slices: #{vm_host.slices}" if slice.nil?
+      vm.add_to_slice(slice)
+
       DB.transaction do
         Allocation.update_vm(vm_host, vm)
         VmHost.dataset.where(id: @candidate_host[:vm_host_id]).update(@vm_host_allocations.map { _1.get_vm_host_update }.reduce(&:merge))

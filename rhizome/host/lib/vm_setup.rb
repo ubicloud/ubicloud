@@ -690,7 +690,7 @@ Group=#{@vm_name}
 LimitNOFILE=500000
 #{limit_memlock}
 SERVICE
-    r "systemctl set-property #{q_vm_service} CPUQuota=#{cpu_limit}%" unless cpu_limit.empty?
+    r "systemctl set-property #{q_vm_service} CPUQuota=#{cpu_limit}%" unless cpu_limit.nil?
     r "systemctl daemon-reload"
   end
 
@@ -700,7 +700,7 @@ SERVICE
 
   # Allow CPU bursting using the cgroup cpu controller
   def enable_bursting(cpu_burst_limit)
-    r "echo \"#{cpu_burst_limit}\" > /sys/fs/cgroup/#{@slice_name}/#{q_vm_service}/cpu.max.burst" unless cpu_burst_limit.empty?
+    r "echo \"#{cpu_burst_limit}\" > /sys/fs/cgroup/#{@slice_name}/#{q_vm_service}/cpu.max.burst" unless cpu_burst_limit.nil? || cpu_burst_limit == 0
   end
 
   # Generate a MAC with the "local" (generated, non-manufacturer) bit

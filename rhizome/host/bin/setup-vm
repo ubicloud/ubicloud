@@ -52,33 +52,13 @@ begin
   pci_devices = params.fetch("pci_devices", [])
   boot_image = params.fetch("boot_image")
   dns_ipv4 = params.fetch("dns_ipv4")
+  slice_name = params.fetch("slice_name")
+  allowed_cpus = params.fetch("allowed_cpus")
+  cpu_limit = params.fetch("max_cpu") # in percent
+  cpu_burst_limit = params.fetch("max_cpu_burst") # in usec
 rescue KeyError => e
   puts "Needed #{e.key} in parameters json"
   exit 1
-end
-
-# TODO:
-# This is hacking up parameters needed to set up resouce management
-# All this should be moved to and tracked on the Contrlol Plane side
-# but for this experiement is hardcoded here
-#
-# This experiement allows us to use Standard-2 instances as burstable
-# ones, with a CPU limit of 1 vCPU, bursting up to an additional 1 vCPU
-# OR, Standard-4 instances, as dedicated and resource-constrained 4 vCPU
-# OR, any other instance set up as it used to be.
-slice_name = ""
-allowed_cpus = ""
-cpu_limit = ""
-cpu_burst_limit = ""
-
-if max_vcpus == 2
-  slice_name = "burstable.slice"
-  allowed_cpus = "6-7"
-  cpu_limit = "100" # in percent
-  cpu_burst_limit = "100000" # in usec
-elsif max_vcpus == 4
-  slice_name = "dedicated_#{vm_name}.slice"
-  allowed_cpus = "2-5"
 end
 
 case action

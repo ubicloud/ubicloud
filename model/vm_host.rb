@@ -3,6 +3,22 @@
 require_relative "../model"
 require_relative "../lib/hosting/apis"
 
+# TODO: This should be replaced with a proper model and a table in DB
+#
+Slice = Struct.new(:name, :first_cpu, :last_cpu) do
+  def allowed_cpus
+    if first_cpu == last_cpu
+      first_cpu.to_s
+    else
+      "#{first_cpu}-#{last_cpu}"
+    end
+  end
+
+  def unit_name
+    "#{name}.slice"
+  end
+end
+
 class VmHost < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :sshable, key: :id
@@ -32,6 +48,50 @@ class VmHost < Sequel::Model
 
   def provider
     hetzner_host ? HetznerHost::PROVIDER_NAME : nil
+  end
+
+  # TODO: Slice allocation logic
+  #       Move this to a separate class
+  #
+  # For now we assume some simple rules
+  # - we create a new slice for each Stadard family VM
+  # - we create shared and one-and-only slice for Burstable family
+  # - we create shared and one-and-only slice for Shared family
+  #
+  # We reserve CPUs 0-1 for the host
+  # We start allocating Standard slices from CPU 2
+  # We ignore the problem of removing the slices and freeing up the capacity (for now)
+  # We also ignore the problem of allocating slices that use non-continous list of CPUs
+  def allocate_slice(family, cores, vm_name: "")
+    # Convert a collection of slices from the model to in-memory strucutre
+    slices_hash = slices.nil? ? {} : slices.map { |k, v| [k, Slice.new(*v.values_at("name", "first_cpu", "last_cpu"))] }.to_h
+
+    slice = slices_hash[family]
+    if slice.nil? && cores > 0
+      # We need to allocate a new slice
+      first_available_cpu = slices_hash.values.reduce(1) { |memo, slice|
+        memo = (slice.last_cpu > memo) ? slice.last_cpu : memo
+        memo
+      } + 1
+
+      cpus = (cores * total_cpus) / total_cores
+
+      if first_available_cpu < total_cpus && first_available_cpu + cpus <= total_cpus
+        # If have some cores available, we can create a slice
+        slice = Slice.new(
+          (family == "standard") ? "#{family}_#{vm_name}" : family, # name
+          first_available_cpu,                                      # first_cpu
+          first_available_cpu + cpus - 1                            # last_cpu
+        )
+
+        slices_hash[slice.name] = slice
+
+        # Convert back to a serializable collection
+        update(slices: slices_hash.map { |k, v| [k, v.to_h.transform_keys(&:to_s)] }.to_h)
+      end
+    end
+
+    slice
   end
 
   # Compute the IPv6 Subnet that can be used to address the host

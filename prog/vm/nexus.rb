@@ -97,7 +97,8 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, family: vm_size.family, cores: cores, location: location,
-        boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
+        boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch,
+        max_cpu: vm_size.max_cpu, max_cpu_burst: vm_size.max_cpu_burst, memory: vm_size.memory) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
       vm.associate_with_project(project)
@@ -424,7 +425,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       VmHost.dataset.where(id: vm.vm_host_id).update(
-        used_cores: Sequel[:used_cores] - vm.cores,
+        # HACK removed for now: used_cores: Sequel[:used_cores] - vm.cores,
         used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib
       )
 

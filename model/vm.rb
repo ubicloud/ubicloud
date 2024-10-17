@@ -72,7 +72,11 @@ class Vm < Sequel::Model
   end
 
   def mem_gib
-    (cores * mem_gib_ratio).to_i
+    # TODO: This method overrides what was specified in VmSize per each SKU
+    #       Need to find out why it is hardcoded here and how we can update it
+    #       I'd suggest to add per-arch memory size to VmSize and use that
+    # WAS: (cores * mem_gib_ratio).to_i
+    memory
   end
 
   # cloud-hypervisor takes topology information in this format:
@@ -201,6 +205,11 @@ class Vm < Sequel::Model
     super + [:public_key]
   end
 
+  # TODO: This is temporary, need to convert slice to a proper model object
+  def add_to_slice(slice)
+    update(slice_name: slice.unit_name, allowed_cpus: slice.allowed_cpus)
+  end
+
   def params_json(swap_size_bytes)
     topo = cloud_hypervisor_cpu_topology
 
@@ -220,6 +229,10 @@ class Vm < Sequel::Model
       "boot_image" => boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
+      "max_cpu" => max_cpu, # in precent
+      "max_cpu_burst" => max_cpu_burst * 1000, # in usec
+      "slice_name" => slice_name || "",
+      "allowed_cpus" => allowed_cpus || "",
       "mem_gib" => mem_gib,
       "ndp_needed" => vm_host.ndp_needed,
       "storage_volumes" => storage_volumes,

@@ -82,11 +82,11 @@ begin
       sleep 2
     end
 
-    puts "Downloading the default boot image - Ubuntu Jammy 24.04"
-    download_strand = strand.subject.download_boot_image("ubuntu-jammy", version: "20240319")
-    while download_strand.reload
-      sleep 2
+    puts "Downloading the default boot image - Ubuntu Jammy 22.04"
+    download = strand.subject.download_boot_image("ubuntu-jammy", version: "20240319")
+    while download.exists?
       print "."
+      sleep 2
     end
   end
 rescue Timeout::Error
