@@ -33,9 +33,15 @@ RSpec.describe Prog::InstallRhizome do
 
   describe "#install_gems" do
     it "runs some commands and exits" do
-      expect(sshable).to receive(:cmd).with("bundle config set --local path vendor/bundle")
-      expect(sshable).to receive(:cmd).with("bundle install")
-      expect { ir.install_gems }.to exit({"msg" => "installed rhizome"})
+      expect(sshable).to receive(:cmd).with("bundle config set --local path vendor/bundle && bundle install")
+      expect { ir.install_gems }.to hop
+    end
+  end
+
+  describe "#validate" do
+    it "runs the validate script" do
+      expect(sshable).to receive(:cmd).with("common/bin/validate")
+      expect { ir.validate }.to exit({"msg" => "installed rhizome"})
     end
   end
 end
