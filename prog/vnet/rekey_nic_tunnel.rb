@@ -9,12 +9,6 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
     end
   end
 
-  label def add_subnet_addr
-    addr = nic.private_subnet.net4.nth(1).to_s + nic.private_subnet.net4.netmask.to_s
-    nic.vm.vm_host.sshable.cmd("sudo ip -n #{nic.vm.inhost_name.shellescape} addr replace #{addr} dev #{nic.ubid_to_tap_name}")
-    pop "add_subnet_addr is complete"
-  end
-
   label def setup_inbound
     nic.dst_ipsec_tunnels.each do |tunnel|
       args = tunnel.src_nic.rekey_payload
