@@ -120,7 +120,7 @@ SQL
     rescue Prog::Base::Nap => e
       save_changes
 
-      scheduled = DB[<<SQL, e.seconds, id].single_value
+      scheduled = DB[<<SQL, e.seconds, id].get
 UPDATE strand
 SET try = 0, schedule = now() + (? * '1 second'::interval)
 WHERE id = ?
