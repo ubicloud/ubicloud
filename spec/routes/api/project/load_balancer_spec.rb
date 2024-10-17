@@ -9,7 +9,7 @@ RSpec.describe Clover, "vm" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ubid}/load-balancer"
+      get "/project/#{project.ubid}/load-balancer"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
@@ -26,7 +26,7 @@ RSpec.describe Clover, "vm" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-hel1")
       Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80)
       Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-2", src_port: 80, dst_port: 80)
-      get "/api/project/#{project.ubid}/load-balancer"
+      get "/project/#{project.ubid}/load-balancer"
 
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(2)

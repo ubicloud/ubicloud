@@ -9,7 +9,7 @@ RSpec.describe Clover, "vm" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ubid}/pg"
+      get "/project/#{project.ubid}/pg"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
@@ -39,7 +39,7 @@ RSpec.describe Clover, "vm" do
         target_storage_size_gib: 128
       )
 
-      get "/api/project/#{project.ubid}/postgres"
+      get "/project/#{project.ubid}/postgres"
 
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(2)
