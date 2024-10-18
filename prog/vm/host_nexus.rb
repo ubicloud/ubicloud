@@ -245,7 +245,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   def available?
-    sshable.cmd("true")
+    sshable.cmd(VmHost::SSH_HEALTH_CHECK_COMMAND)
     true
   rescue
     false
