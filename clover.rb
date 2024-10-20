@@ -18,8 +18,7 @@ class Clover < Roda
   end
 
   route do |r|
-    subdomain = r.host.split(".").first
-    if subdomain == "api"
+    if r.host.start_with?("api.")
       r.run CloverApi
     end
 
