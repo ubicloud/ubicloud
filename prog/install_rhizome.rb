@@ -32,7 +32,7 @@ class Prog::InstallRhizome < Prog::Base
         end
       end
 
-      writer.add_file("hashes.json", File.stat(base + "/Gemfile").mode) do |tf|
+      writer.add_file("hashes.json", "100755".to_i(8)) do |tf|
         tf.write hash_map.to_json
       end
     end
