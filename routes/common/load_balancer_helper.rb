@@ -27,7 +27,7 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
 
     required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol]
     required_parameters << "name" if @mode == AppMode::WEB
-    optional_parameters = %w[health_check_endpoint]
+    optional_parameters = %w[health_check_endpoint custom_hostname]
     request_body_params = Validation.validate_request_body(params, required_parameters, optional_parameters)
 
     ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
@@ -41,6 +41,17 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
       end
     end
     Authorization.authorize(@user.id, "PrivateSubnet:view", ps.id)
+    prefix, dns_zone_id = if (custom_hostname = request_body_params["custom_hostname"])
+      prefix, dns_zone_name = custom_hostname.split(".", 2)
+      dns_zone = DnsZone[name: dns_zone_name]
+      unless prefix && dns_zone
+        response.status = 404
+        @request.halt
+      end
+
+      Authorization.authorize(@user.id, "DnsZone:edit", dns_zone.id)
+      [prefix, dns_zone.id]
+    end
 
     lb = Prog::Vnet::LoadBalancerNexus.assemble(
       ps.id,
@@ -49,7 +60,9 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
       src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
       dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
       health_check_endpoint: request_body_params["health_check_endpoint"],
-      health_check_protocol: request_body_params["health_check_protocol"]
+      health_check_protocol: request_body_params["health_check_protocol"],
+      custom_hostname_prefix: prefix,
+      custom_hostname_dns_zone_id: dns_zone_id
     ).subject
 
     if @mode == AppMode::API

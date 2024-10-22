@@ -45,6 +45,12 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(lb.projects.first).to eq ps.projects.first
       expect(lb.hostname).to eq "test-custom-hostname.custom.ubicloud.com"
     end
+
+    it "fails to create if the passed dns zone is not in the subnet project" do
+      prj = Project.create_with_id(name: "test-prj2").tap { _1.associate_with_project(_1) }
+      dz = DnsZone.create_with_id(project_id: prj.id, name: "custom.ubicloud.com")
+      expect { described_class.assemble(ps.id, name: "test-lb2", src_port: 80, dst_port: 80, custom_hostname_prefix: "test-custom-hostname", custom_hostname_dns_zone_id: dz.id).subject }.to raise_error "DNS zone #{dz.id} is not associated with project #{ps.projects.first.id}"
+    end
   end
 
   describe "#before_run" do
