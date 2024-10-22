@@ -51,6 +51,7 @@ group :development do
   gem "simplecov"
   gem "turbo_tests"
   gem "cuprite"
+  gem "text-table"
 end
 
 group :test do
