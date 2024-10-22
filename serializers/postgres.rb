@@ -9,6 +9,7 @@ class Serializers::Postgres < Serializers::Base
       location: pg.display_location,
       vm_size: pg.target_vm_size,
       storage_size_gib: pg.target_storage_size_gib,
+      version: pg.version,
       ha_type: pg.ha_type,
       flavor: pg.flavor
     }
