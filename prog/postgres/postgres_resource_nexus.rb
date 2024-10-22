@@ -50,6 +50,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
+      if flavor == PostgresResource::Flavor::LANTERN && version == "17"
+        fail Validation::ValidationFailed.new({version: "Lantern flavor is not supported with version 17"})
+      end
+
       postgres_resource = PostgresResource.create_with_id(
         project_id: project_id, location: location, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
