@@ -210,6 +210,11 @@ task :spec_separate do
   end
 end
 
+desc "Regenerate screenshots for documentation site"
+task "screenshots" do
+  sh("bundle", "exec", "ruby", "bin/regen_screenshots")
+end
+
 desc "Annotate Sequel models"
 task "annotate" do
   ENV["RACK_ENV"] = "development"

@@ -99,6 +99,7 @@
                   url: "#{@project_data[:path]}/billing",
                   is_active: request.path.start_with?("#{@project_data[:path]}/billing"),
                   icon: "hero-banknotes",
+                  html_id: "billing-icon",
                   has_permission: has_project_permission("Project:billing")
                 }
               ) %>
