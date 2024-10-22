@@ -35,6 +35,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       server_cert: "server_cert",
       server_cert_key: "server_cert_key",
       superuser_password: "dummy-password",
+      version: "16",
       representative_server: postgres_server,
       metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")]
     )
@@ -197,7 +198,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#initialize_empty_database" do
     it "triggers initialize_empty_database if initialize_empty_database command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database' initialize_empty_database").twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database 16' initialize_empty_database").twice
 
       # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_empty_database").and_return("NotStarted")
@@ -224,7 +225,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now).twice
       expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label").twice
       expect(postgres_server).to receive(:standby?).and_return(false).twice
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup backup-label' initialize_database_from_backup").twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup 16 backup-label' initialize_database_from_backup").twice
 
       # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
@@ -248,7 +249,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "triggers initialize_database_from_backup with LATEST as backup_label for standbys" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check initialize_database_from_backup").and_return("NotStarted")
       expect(postgres_server).to receive(:standby?).and_return(true)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup LATEST' initialize_database_from_backup")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup 16 LATEST' initialize_database_from_backup")
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
   end
@@ -311,7 +312,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure" do
     it "triggers configure if configure command is not sent yet or failed" do
       expect(postgres_server).to receive(:configure_hash).and_return("dummy-configure-hash").twice
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/configure' configure_postgres", stdin: JSON.generate("dummy-configure-hash")).twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/configure 16' configure_postgres", stdin: JSON.generate("dummy-configure-hash")).twice
 
       # NotStarted
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check configure_postgres").and_return("NotStarted")
@@ -618,7 +619,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#restart" do
     it "restarts and exits" do
-      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart")
+      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart 16")
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
     end
   end

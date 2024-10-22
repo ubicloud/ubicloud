@@ -115,7 +115,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database' initialize_empty_database")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database #{postgres_server.resource.version}' initialize_empty_database")
     end
 
     nap 5
@@ -131,7 +131,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else
         postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
       end
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{backup_label}' initialize_database_from_backup")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{postgres_server.resource.version} #{backup_label}' initialize_database_from_backup")
     end
 
     nap 5
@@ -159,7 +159,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       hop_configure_prometheus
     end
 
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster 16 main reload")
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.resource.version} main reload")
     hop_wait
   end
 
@@ -234,7 +234,7 @@ CONFIG
       hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure' configure_postgres", stdin: JSON.generate(configure_hash))
+      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure #{postgres_server.resource.version}' configure_postgres", stdin: JSON.generate(configure_hash))
     end
 
     nap 5
@@ -396,7 +396,7 @@ SQL
       postgres_server.incr_restart
       hop_configure
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo pg_ctlcluster 16 main promote' promote_postgres")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo pg_ctlcluster #{postgres_server.resource.version} main promote' promote_postgres")
       nap 0
     end
 
@@ -415,7 +415,7 @@ SQL
 
   label def restart
     decr_restart
-    vm.sshable.cmd("sudo postgres/bin/restart")
+    vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.resource.version}")
     pop "postgres server is restarted"
   end
 
@@ -438,7 +438,7 @@ SQL
 
     # Do not declare unavailability if Postgres is in crash recovery
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").include?("redo in progress")
+      return true if vm.sshable.cmd("sudo tail -n 5 /dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log").include?("redo in progress")
     rescue
     end
 
