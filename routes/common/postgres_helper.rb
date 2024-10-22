@@ -30,7 +30,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
     required_parameters = ["size"]
     required_parameters << "name" << "location" if @mode == AppMode::WEB
-    allowed_optional_parameters = ["storage_size", "ha_type", "flavor"]
+    allowed_optional_parameters = ["storage_size", "ha_type", "version", "flavor"]
     request_body_params = Validation.validate_request_body(params, required_parameters, allowed_optional_parameters)
     parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"])
 
@@ -51,6 +51,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       target_vm_size: parsed_size.vm_size,
       target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
       ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
+      version: request_body_params["version"] || PostgresResource::DEFAULT_VERSION,
       flavor: request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
     )
     send_notification_mail_to_partners(st.subject, @user.email)
@@ -174,6 +175,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       name: request_body_params["name"],
       target_vm_size: @resource.target_vm_size,
       target_storage_size_gib: @resource.target_storage_size_gib,
+      version: @resource.version,
       flavor: @resource.flavor,
       parent_id: @resource.id,
       restore_target: request_body_params["restore_target"]

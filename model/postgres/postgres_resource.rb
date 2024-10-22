@@ -110,6 +110,8 @@ class PostgresResource < Sequel::Model
     LANTERN = "lantern"
   end
 
+  DEFAULT_VERSION = "16"
+
   def self.redacted_columns
     super + [:root_cert_1, :root_cert_2, :server_cert]
   end

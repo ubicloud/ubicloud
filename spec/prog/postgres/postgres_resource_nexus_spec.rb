@@ -80,6 +80,15 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
     end
 
+    it "does not allow giving different version than parent for restore" do
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+      parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, version: "16").subject
+      expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
+      expect {
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, version: "17", restore_target: Time.now)
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
+    end
+
     it "validates storage size during restore if the storage size is different from the parent" do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
