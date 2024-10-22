@@ -149,6 +149,8 @@ module Config
   override :github_ubuntu_2004_version, "20241006.1.0", string
   override :postgres16_ubuntu_2204_version, "20240702.3.0", string
   override :postgres16_paradedb_ubuntu_2204_version, "20240926.1.0", string
+  override :postgres17_ubuntu_2204_version, "20241022.1.0", string
+  override :postgres17_paradedb_ubuntu_2204_version, "20241022.1.0", string
   override :postgres16_lantern_ubuntu_2204_version, "20241010.1.0", string
   override :github_gpu_ubuntu_2204_version, "20241006.1.0", string
   override :ai_ubuntu_2404_nvidia_version, "20241016.1.0", string
