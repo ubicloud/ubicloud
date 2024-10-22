@@ -12,7 +12,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :destroy
 
-  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:, flavor: PostgresResource::Flavor::STANDARD, ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
+  def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:,
+    version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
+    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
+
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -23,12 +26,16 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     Validation.validate_postgres_ha_type(ha_type)
 
     DB.transaction do
-      superuser_password, timeline_id, timeline_access = if parent_id.nil?
+      superuser_password, timeline_id, timeline_access, version = if parent_id.nil?
         target_storage_size_gib = Validation.validate_postgres_storage_size(location, target_vm_size, target_storage_size_gib)
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location: location).id, "push"]
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location: location).id, "push", version]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
+        end
+
+        if version && version != parent.version
+          fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
         end
 
         if target_storage_size_gib != parent.target_storage_size_gib
@@ -40,13 +47,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
             parent.timeline.latest_restore_time && restore_target <= parent.timeline.latest_restore_time
           fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{parent.timeline.latest_restore_time}"})
         end
-        [parent.superuser_password, parent.timeline.id, "fetch"]
+        [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
       postgres_resource = PostgresResource.create_with_id(
         project_id: project_id, location: location, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: superuser_password, ha_type: ha_type, flavor: flavor,
+        superuser_password: superuser_password, ha_type: ha_type, version: version, flavor: flavor,
         parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
       )
       postgres_resource.associate_with_project(project)
