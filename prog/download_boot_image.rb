@@ -35,12 +35,12 @@ class Prog::DownloadBootImage < Prog::Base
       Config.github_ubuntu_2004_version
     when "github-gpu-ubuntu-2204"
       Config.github_gpu_ubuntu_2204_version
-    when "postgres-ubuntu-2204"
-      Config.postgres_ubuntu_2204_version
-    when "postgres-paradedb-ubuntu-2204"
-      Config.postgres_paradedb_ubuntu_2204_version
-    when "postgres-lantern-ubuntu-2204"
-      Config.postgres_lantern_ubuntu_2204_version
+    when "postgres16-ubuntu-2204"
+      Config.postgres16_ubuntu_2204_version
+    when "postgres16-paradedb-ubuntu-2204"
+      Config.postgres16_paradedb_ubuntu_2204_version
+    when "postgres16-lantern-ubuntu-2204"
+      Config.postgres16_lantern_ubuntu_2204_version
     when "ai-ubuntu-2404-nvidia"
       Config.ai_ubuntu_2404_nvidia_version
     else
@@ -55,7 +55,7 @@ class Prog::DownloadBootImage < Prog::Base
       elsif download_from_blob_storage?
         suffixes = {
           "github" => "raw",
-          "postgres" => "raw",
+          "postgres16" => "raw",
           "ubuntu" => "img",
           "almalinux" => "qcow2",
           "ai" => "raw"
@@ -109,10 +109,9 @@ class Prog::DownloadBootImage < Prog::Base
       ["github-ubuntu-2004", "arm64", "20241006.1.0"] => "6582137985903269787ce024054f636c06e6309968afe61fef569f61d733626f",
       ["github-gpu-ubuntu-2204", "x64", "20240818.1.0"] => "c366cc99107b1ea9c12cc6cfc03073a90f3aad011e333a59e0b6cfdc36776568",
       ["github-gpu-ubuntu-2204", "x64", "20241006.1.0"] => "ef2d6bab4dcbd7f4c72ba213dea76d06da06af33750fc8477efff03ea9ff23e9",
-      ["postgres-ubuntu-2204", "x64", "20240226.1.0"] => "f8a2b78189239717355b54ecf62a504a349c96b1ab6a21919984f58c2a367617",
-      ["postgres-ubuntu-2204", "x64", "20240702.3.0"] => "02dfa6e844fa3e72224f2f0f1811e039221acee07d6b05b507d49ae17f84d0ce",
-      ["postgres-paradedb-ubuntu-2204", "x64", "20240926.1.0"] => "9249a64a516e7e39170cea7427c0cf9c32627061755773294a19e3367f114824",
-      ["postgres-lantern-ubuntu-2204", "x64", "20241010.1.0"] => "43601010e593c4ceca7d7904329928530cfd151b26c357d9a798f94521b5693c",
+      ["postgres16-ubuntu-2204", "x64", "20240702.3.0"] => "02dfa6e844fa3e72224f2f0f1811e039221acee07d6b05b507d49ae17f84d0ce",
+      ["postgres16-paradedb-ubuntu-2204", "x64", "20240926.1.0"] => "9249a64a516e7e39170cea7427c0cf9c32627061755773294a19e3367f114824",
+      ["postgres16-lantern-ubuntu-2204", "x64", "20241010.1.0"] => "43601010e593c4ceca7d7904329928530cfd151b26c357d9a798f94521b5693c",
       ["ai-ubuntu-2404-nvidia", "x64", "20241016.1.0"] => "a96b8fdaa6ba35796d74d5cc00f5611501807814f541a88235c676101ade7f4e",
       ["ai-model-gemma-2-2b-it", "x64", "20240918.1.0"] => "b726ead6d5f48fb8e6de7efb48fb22367c9a7c155cfee71a3a7e5527be5df08e",
       ["ai-model-llama-3-2-3b-it", "x64", "20240926.1.0"] => "02b0b34fa84843ba1d09dc7f5d3877cf79dbbb3dcaa087ea16af72b95e35a354",

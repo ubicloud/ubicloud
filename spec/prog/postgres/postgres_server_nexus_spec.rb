@@ -78,7 +78,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "picks correct base image for Lantern" do
       expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
       expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, anything, hash_including(boot_image: "postgres-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, anything, hash_including(boot_image: "postgres16-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
       expect(PostgresServer).to receive(:create).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
       described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
     end
