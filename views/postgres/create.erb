@@ -175,6 +175,22 @@
               </div>
 
               <div class="col-span-full">
+                <% versions = Option::POSTGRES_VERSION_OPTIONS[@flavor] %>
+                <%== render(
+                  "components/form/radio_small_cards",
+                  locals: {
+                    name: "version",
+                    label: "Version",
+                    options: versions.map { |v| [v, "Postgres #{v}"] },
+                    selected: versions[0],
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+              </div>
+
+              <div class="col-span-full">
                 <div class="space-y-2">
                   <label for="size" class="text-sm font-medium leading-6 text-gray-900">High Availability</label>
                   <fieldset class="radio-small-cards" id="size-radios">
