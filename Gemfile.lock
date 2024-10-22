@@ -1,4 +1,11 @@
 GIT
+  remote: https://github.com/jeremyevans/by.git
+  revision: f022615e367da3a23f012c3ab06ff664fe3776d3
+  ref: f022615e367da3a23f012c3ab06ff664fe3776d3
+  specs:
+    by (1.0.1)
+
+GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: a9ff0001a1eb028e2186b222aeb02b07c04f9808
   ref: a9ff0001a1eb028e2186b222aeb02b07c04f9808
@@ -364,6 +371,7 @@ DEPENDENCIES
   aws-sdk-s3 (~> 1.167)
   bcrypt_pbkdf
   brakeman
+  by!
   capybara
   countries
   database_cleaner-sequel
