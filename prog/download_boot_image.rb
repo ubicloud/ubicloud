@@ -37,8 +37,12 @@ class Prog::DownloadBootImage < Prog::Base
       Config.github_gpu_ubuntu_2204_version
     when "postgres16-ubuntu-2204"
       Config.postgres16_ubuntu_2204_version
+    when "postgres17-ubuntu-2204"
+      Config.postgres17_ubuntu_2204_version
     when "postgres16-paradedb-ubuntu-2204"
       Config.postgres16_paradedb_ubuntu_2204_version
+    when "postgres17-paradedb-ubuntu-2204"
+      Config.postgres17_paradedb_ubuntu_2204_version
     when "postgres16-lantern-ubuntu-2204"
       Config.postgres16_lantern_ubuntu_2204_version
     when "ai-ubuntu-2404-nvidia"
@@ -56,6 +60,7 @@ class Prog::DownloadBootImage < Prog::Base
         suffixes = {
           "github" => "raw",
           "postgres16" => "raw",
+          "postgres17" => "raw",
           "ubuntu" => "img",
           "almalinux" => "qcow2",
           "ai" => "raw"
@@ -111,6 +116,8 @@ class Prog::DownloadBootImage < Prog::Base
       ["github-gpu-ubuntu-2204", "x64", "20241006.1.0"] => "ef2d6bab4dcbd7f4c72ba213dea76d06da06af33750fc8477efff03ea9ff23e9",
       ["postgres16-ubuntu-2204", "x64", "20240702.3.0"] => "02dfa6e844fa3e72224f2f0f1811e039221acee07d6b05b507d49ae17f84d0ce",
       ["postgres16-paradedb-ubuntu-2204", "x64", "20240926.1.0"] => "9249a64a516e7e39170cea7427c0cf9c32627061755773294a19e3367f114824",
+      ["postgres17-ubuntu-2204", "x64", "20241022.1.0"] => "ad2c1dd2029bd9ffaff105ca231d820d59b318a9b32c0155d8d5baa13343e6fa",
+      ["postgres17-paradedb-ubuntu-2204", "x64", "20241022.1.0"] => "5a78af87dd09d788f5743d348556fc62e4e56c5422259fb67d181ccf7305cee4",
       ["postgres16-lantern-ubuntu-2204", "x64", "20241010.1.0"] => "43601010e593c4ceca7d7904329928530cfd151b26c357d9a798f94521b5693c",
       ["ai-ubuntu-2404-nvidia", "x64", "20241016.1.0"] => "a96b8fdaa6ba35796d74d5cc00f5611501807814f541a88235c676101ade7f4e",
       ["ai-model-gemma-2-2b-it", "x64", "20240918.1.0"] => "b726ead6d5f48fb8e6de7efb48fb22367c9a7c155cfee71a3a7e5527be5df08e",
