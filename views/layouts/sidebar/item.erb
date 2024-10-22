@@ -2,6 +2,9 @@
   <li>
     <a
       href="<%= url %>"
+      <% if defined?(html_id) %>
+        id="<%= html_id %>"
+      <% end %>
       class="<%= is_active ? "bg-orange-700 text-white" : "text-orange-100 hover:text-white hover:bg-orange-700" %> group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
     >
       <%== render("components/icon", locals: { name: icon, classes: "h-6 w-6 shrink-0 text-white" }) %>
