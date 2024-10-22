@@ -28,7 +28,8 @@
     ["Name", @pg[:name]],
     ["Location", @pg[:location]],
     ["Compute", @pg[:vm_size]],
-    ["Storage", "#{@pg[:storage_size_gib]} GB"]
+    ["Storage", "#{@pg[:storage_size_gib]} GB"],
+    ["Version", "Postgres #{@pg[:version]}"]
   ]
   
   case @pg[:ha_type]
