@@ -4,6 +4,11 @@
 require "json"
 require_relative "../../common/lib/util"
 
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+end
+
+v = ARGV[0]
 configure_hash = JSON.parse($stdin.read)
 
 # Update /etc/hosts
@@ -21,7 +26,7 @@ safe_write_to_file("/etc/hosts", hosts)
 
 # Update postgresql.conf
 configs = configure_hash["configs"].map { |k, v| "#{k} = #{v}" }.join("\n")
-safe_write_to_file("/etc/postgresql/16/main/conf.d/001-service.conf", configs)
+safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/001-service.conf", configs)
 
 # Update pg_hba.conf
 private_subnets = configure_hash["private_subnets"].flat_map {
@@ -70,7 +75,7 @@ hostssl replication     ubi_replication all                     cert map=standby
 # Allow connections from public internet with SCRAM authentication
 host    all             all             all                     scram-sha-256
 PG_HBA
-safe_write_to_file("/etc/postgresql/16/main/pg_hba.conf", pg_hba_entries)
+safe_write_to_file("/etc/postgresql/#{v}/main/pg_hba.conf", pg_hba_entries)
 
 identity = configure_hash["identity"]
 pg_ident_entries = <<-PG_IDENT
@@ -84,7 +89,7 @@ system2postgres       postgres                postgres
 system2postgres       ubi                     postgres
 standby2replication   #{identity}             ubi_replication
 PG_IDENT
-safe_write_to_file("/etc/postgresql/16/main/pg_ident.conf", pg_ident_entries)
+safe_write_to_file("/etc/postgresql/#{v}/main/pg_ident.conf", pg_ident_entries)
 
 # Reload the postmaster to apply changes
-r "pg_ctlcluster 16 main reload || pg_ctlcluster 16 main restart"
+r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"

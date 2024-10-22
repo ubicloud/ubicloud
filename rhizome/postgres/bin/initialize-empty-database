@@ -3,13 +3,19 @@
 
 require_relative "../../common/lib/util"
 
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+end
+
+v = ARGV[0]
+
 r "chown postgres /dat"
 
 # Below commands are required for idempotency
-r "rm -rf /dat/16"
-r "rm -rf /etc/postgresql/16"
+r "rm -rf /dat/#{v}"
+r "rm -rf /etc/postgresql/#{v}"
 
-r "pg_createcluster 16 main --start --locale=C.UTF8"
+r "pg_createcluster #{v} main --start --locale=C.UTF8"
 
 r "sudo -u postgres psql -c 'CREATE ROLE ubi_replication WITH REPLICATION LOGIN'"
 r "sudo -u postgres psql -c 'CREATE ROLE ubi_monitoring WITH LOGIN IN ROLE pg_monitor'"
