@@ -47,15 +47,21 @@ SQL
 end
 
 desc "Migrate test database to latest version"
-task :test_up do
+task test_up: [:_test_up, :refresh_sequel_caches]
+
+desc "Migrate test database down. If VERSION isn't given, migrates to all the way down."
+task test_down: [:_test_down, :refresh_sequel_caches]
+
+# rubocop:disable Rake/Desc
+task :_test_up do
   migrate.call("test", nil)
 end
 
-desc "Migrate test database down. If VERSION isn't given, migrates to all the way down."
-task :test_down do
+task :_test_down do
   version = ENV["VERSION"].to_i || 0
   migrate.call("test", version)
 end
+# rubocop:enable Rake/Desc
 
 desc "Migrate development database to latest version"
 task :dev_up do
@@ -71,6 +77,14 @@ end
 desc "Migrate production database to latest version"
 task :prod_up do
   migrate.call("production", nil)
+end
+
+desc "Refresh schema and index caches"
+task :refresh_sequel_caches do
+  sh({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "ruby", "-r", "./loader", "-e", <<~END)
+     DB.dump_schema_cache("cache/schema.cache")
+     DB.dump_index_cache("cache/index.cache")
+  END
 end
 
 # Database setup
