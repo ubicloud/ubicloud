@@ -5,6 +5,9 @@ demo/.env
 var/*
 tmp/*
 
+# Used by rake by
+/bin/by
+
 # rhizome/Gemfile is combination of all Gemfiles in subdirectories, so does rhizome/Gemfile.lock
 rhizome/*/Gemfile.lock
 

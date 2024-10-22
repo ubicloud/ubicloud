@@ -162,6 +162,21 @@ task "assets:precompile" do
   fail unless $?.success?
 end
 
+desc "Open a new shell allowing use of by for speeding up tests"
+task "by" do
+  by_path = "bin/by"
+
+  require "rbconfig"
+
+  by_content = File.binread(Gem.activate_bin_path("by", "by"))
+  by_content.sub!(/\A#!.*/, "#!#{RbConfig.ruby} --disable-gems")
+  File.binwrite(by_path, by_content)
+  ENV["PATH"] = "#{__dir__}/bin:#{ENV["PATH"]}"
+  sh("bundle", "exec", "by-session", "./.by-session-setup.rb")
+ensure
+  File.delete(by_path) if File.file?(by_path)
+end
+
 begin
   namespace :linter do
     # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
