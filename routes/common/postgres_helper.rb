@@ -40,7 +40,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     when PostgresResource::HaType::SYNC then 2
     else 0
     end
-    flavor = request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
 
     requested_postgres_core_count = (requested_standby_count + 1) * parsed_size.vcpu / 2
     Validation.validate_core_quota(project, "PostgresCores", requested_postgres_core_count)
@@ -52,7 +51,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       target_vm_size: parsed_size.vm_size,
       target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
       ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
-      flavor: flavor
+      flavor: request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
     )
     send_notification_mail_to_partners(st.subject, @user.email)
 
