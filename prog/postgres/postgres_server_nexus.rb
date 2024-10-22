@@ -19,9 +19,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       postgres_resource = PostgresResource[resource_id]
       boot_image = case postgres_resource.flavor
-      when PostgresResource::Flavor::STANDARD then "postgres-ubuntu-2204"
-      when PostgresResource::Flavor::PARADEDB then "postgres-paradedb-ubuntu-2204"
-      when PostgresResource::Flavor::LANTERN then "postgres-lantern-ubuntu-2204"
+      when PostgresResource::Flavor::STANDARD then "postgres16-ubuntu-2204"
+      when PostgresResource::Flavor::PARADEDB then "postgres16-paradedb-ubuntu-2204"
+      when PostgresResource::Flavor::LANTERN then "postgres16-lantern-ubuntu-2204"
       else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
       end
 
