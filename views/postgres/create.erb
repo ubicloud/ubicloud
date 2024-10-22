@@ -192,9 +192,9 @@
 
               <div class="col-span-full">
                 <div class="space-y-2">
-                  <label for="size" class="text-sm font-medium leading-6 text-gray-900">High Availability</label>
-                  <fieldset class="radio-small-cards" id="size-radios">
-                    <legend class="sr-only">Server size</legend>
+                  <label for="ha_type" class="text-sm font-medium leading-6 text-gray-900">High Availability</label>
+                  <fieldset class="radio-small-cards" id="ha_type-radios">
+                    <legend class="sr-only">High Availability</legend>
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                       <% Option::PostgresHaOptions.each_with_index do |ha_type, idx| %>
                         <label>
