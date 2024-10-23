@@ -21,15 +21,6 @@ class Clover < Roda
       r.run CloverApi
     end
 
-    # To make test and development easier
-    # :nocov:
-    unless Config.production?
-      r.on "api" do
-        r.run CloverApi
-      end
-    end
-    # :nocov:
-
     r.on "runtime" do
       r.run CloverRuntime
     end
