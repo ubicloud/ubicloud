@@ -1381,6 +1381,62 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationPostgresMetricDestination
+      summary: Create a new Postgres Metric Destination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  description: Password for the Metric Destination
+                  type: string
+                url:
+                  description: URL for the Metric Destination
+                  type: string
+                username:
+                  description: Username for the Metric Destination
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+                - url
+                - username
+      responses:
+        '200':
+          description: Postgres Metric Destiantion created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination/{metric_destination_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/metric_destination_id'
+      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/project_id'
+    delete:
+      operationId: deleteLocationPostgresMetricDestination
+      summary: Delete a specific Metric Destination
+      responses:
+        '204':
+          description: Metric Destination deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password':
     post:
       operationId: resetSuperuserPassword
@@ -1833,6 +1889,13 @@ components:
       schema:
         type: string
         example: eu-central-h1
+    metric_destination_id:
+      description: Postgres Metric Destination ID
+      in: path
+      name: metric_destination_id
+      required: true
+      schema:
+        type: string
     order_column:
       description: Pagination - Order column
       in: query
@@ -2328,6 +2391,8 @@ tags:
     name: Postgres
   - description: Postgres Firewall Rule Operations
     name: Postgres Firewall Rule
+  - description: Postgres Metric Destination
+    name: Postgres Metric Destination
   - description: Private Subnet Operations
     name: Private Subnet
   - description: Project Operations
