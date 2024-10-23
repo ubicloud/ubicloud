@@ -860,6 +860,45 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
+    patch:
+      operationId: patchLocationLoadBalancer
+      summary: Update a Load Balancer in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                algorithm:
+                  description: Algorithm of the Load Balancer
+                  type: string
+                dst_port:
+                  description: Destination port for the Load Balancer
+                  type: integer
+                health_check_endpoint:
+                  description: Health check endpoint URL
+                  type: string
+                src_port:
+                  description: Source port for the Load Balancer
+                  type: integer
+                vms:
+                  description: List of VM apids for the Load Balancer
+                  type: array
+                  items:
+                    type: string
+              additionalProperties: false
+      responses:
+        '200':
+          description: Load Balancer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
     post:
       operationId: createLocationLoadBalancer
       summary: Create a new Load Balancer in a specific location of a project
