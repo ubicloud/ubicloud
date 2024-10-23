@@ -945,6 +945,70 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/attach-vm':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_name'
+    post:
+      operationId: attachVmLocationLoadBalancer
+      summary: Attach a VM to a Load Balancer in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vm_id:
+                  description: Apid of VM to attach to Load Balancer
+                  type: string
+              additionalProperties: false
+              required:
+                - vm_id
+      responses:
+        '200':
+          description: VM attached to Load Balancer successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/detach-vm':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_name'
+    post:
+      operationId: detachVmLocationLoadBalancer
+      summary: Detach a VM from a Load Balancer in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vm_id:
+                  description: Apid of VM to detach from Load Balancer
+                  type: string
+              additionalProperties: false
+              required:
+                - vm_id
+      responses:
+        '200':
+          description: VM detached from Load Balancer successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases
