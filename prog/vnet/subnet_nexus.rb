@@ -18,8 +18,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     Validation.validate_name(name)
     Validation.validate_location(location)
 
-    ipv6_range ||= random_private_ipv6(location).to_s
-    ipv4_range ||= random_private_ipv4(location).to_s
+    ipv6_range ||= random_private_ipv6(location, project).to_s
+    ipv4_range ||= random_private_ipv4(location, project).to_s
     DB.transaction do
       ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
       ps.associate_with_project(project)
@@ -163,32 +163,23 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def self.random_private_ipv6(location)
+  def self.random_private_ipv6(location, project)
     network_address = NetAddr::IPv6.new((SecureRandom.bytes(7) + 0xfd.chr).unpack1("Q<") << 64)
     network_mask = NetAddr::Mask128.new(64)
-    addr = NetAddr::IPv6Net.new(network_address, network_mask)
-    return random_private_ipv6(location) unless PrivateSubnet.where(net6: addr.to_s, location: location).first.nil?
+    selected_addr = NetAddr::IPv6Net.new(network_address, network_mask)
 
-    addr
+    selected_addr = random_private_ipv6(location, project) if project.private_subnets_dataset[Sequel[:net6] => selected_addr.to_s, :location => location]
+
+    selected_addr
   end
 
-  def self.random_private_ipv4(location)
+  def self.random_private_ipv4(location, project)
     private_range = PrivateSubnet.random_subnet
     addr = NetAddr::IPv4Net.parse(private_range)
 
     selected_addr = addr.nth_subnet(26, SecureRandom.random_number(2**(26 - addr.netmask.prefix_len) - 1).to_i + 1)
-    # We're excluding the 172.17.0.0 subnet to avoid conflicts with Docker,
-    # which uses this range by default. Docker, pre-installed on runners,
-    # automatically sets up a bridge network using 172.17.0.0/16 and subsequent
-    # subnets (e.g., 172.18.0.0/16). If a subnet is in use, Docker moves to the
-    # next available one. However, since dnsmasq assigns private IP addresses
-    # post-VM initialization, there's a race condition: Docker can assign its
-    # address before the VM is necessarily aware of its virtual networking
-    # address information, leading to routing clashes that render IPv4 internet
-    # access inoperable in some interleavings.
-    if PrivateSubnet[net4: selected_addr.to_s, location: location] || selected_addr.network.to_s == "172.17.0.0"
-      return random_private_ipv4(location)
-    end
+
+    selected_addr = random_private_ipv4(location, project) if banned_subnets.any? { _1.rel(selected_addr) } || project.private_subnets_dataset[Sequel[:net4] => selected_addr.to_s, :location => location]
 
     selected_addr
   end

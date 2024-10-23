@@ -292,28 +292,36 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe ".random_private_ipv4" do
     it "returns a random private ipv4 range" do
-      expect(described_class.random_private_ipv4("hetzner-hel1")).to be_a NetAddr::IPv4Net
+      expect(described_class.random_private_ipv4("hetzner-hel1", prj)).to be_a NetAddr::IPv4Net
     end
 
     it "finds a new subnet if the one it found is taken" do
-      expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/12").twice
-      expect(SecureRandom).to receive(:random_number).with(16383).and_return(1, 2)
-      expect(PrivateSubnet).to receive(:[]).with(net4: "172.16.0.128/26", location: "hetzner-hel1").and_return([true])
-      expect(PrivateSubnet).to receive(:[]).with(net4: "172.16.0.192/26", location: "hetzner-hel1").and_return(nil)
-      expect(described_class.random_private_ipv4("hetzner-hel1").to_s).to eq("172.16.0.192/26")
+      expect(PrivateSubnet).to receive(:random_subnet).and_return("10.0.0.0/8").at_least(:once)
+      project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
+      described_class.assemble(project.id, location: "hetzner-hel1", name: "test-subnet", ipv4_range: "10.0.0.128/26")
+      allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1, 2)
+      expect(described_class.random_private_ipv4("hetzner-hel1", project).to_s).to eq("10.0.0.192/26")
+    end
+
+    it "finds a new subnet if the one it found is banned" do
+      expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/16", "10.0.0.0/8")
+      project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
+      allow(SecureRandom).to receive(:random_number).with(2**(26 - 16) - 1).and_return(1)
+      allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1)
+      expect(described_class.random_private_ipv4("hetzner-hel1", project).to_s).to eq("10.0.0.128/26")
     end
   end
 
   describe ".random_private_ipv6" do
     it "returns a random private ipv6 range" do
-      expect(described_class.random_private_ipv6("hetzner-hel1")).to be_a NetAddr::IPv6Net
+      expect(described_class.random_private_ipv6("hetzner-hel1", prj)).to be_a NetAddr::IPv6Net
     end
 
     it "finds a new subnet if the one it found is taken" do
+      project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
+      described_class.assemble(project.id, location: "hetzner-hel1", name: "test-subnet", ipv6_range: "fd61:6161:6161:6161::/64")
       expect(SecureRandom).to receive(:bytes).with(7).and_return("a" * 7, "b" * 7)
-      expect(PrivateSubnet).to receive(:where).with(net6: "fd61:6161:6161:6161::/64", location: "hetzner-hel1").and_return([true])
-      expect(PrivateSubnet).to receive(:where).with(net6: "fd62:6262:6262:6262::/64", location: "hetzner-hel1").and_return([])
-      expect(described_class.random_private_ipv6("hetzner-hel1").to_s).to eq("fd62:6262:6262:6262::/64")
+      expect(described_class.random_private_ipv6("hetzner-hel1", project).to_s).to eq("fd62:6262:6262:6262::/64")
     end
   end
 
