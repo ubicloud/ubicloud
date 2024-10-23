@@ -105,6 +105,22 @@ RSpec.describe Clover, "auth" do
     expect(DB[:account_remember_keys].first(id: account.id)).not_to be_nil
   end
 
+  it "has correct current user when logged in via remember token" do
+    account = create_account
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    check "Remember me"
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
+    # page.refresh does not work, sends deleted _Clover.session cookie
+    visit page.current_path
+    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+  end
+
   it "can reset password" do
     create_account
 

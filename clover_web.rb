@@ -388,6 +388,7 @@ class CloverWeb < Roda
       r.redirect rodauth.login_route
     end
     rodauth.require_authentication
+    @current_user ||= Account[rodauth.session_value]
 
     r.hash_branches("")
   end
