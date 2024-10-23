@@ -13,7 +13,7 @@ require_relative "cloud_hypervisor"
 require_relative "storage_volume"
 
 class VmSetup
-  Nic = Struct.new(:net6, :net4, :tap, :mac)
+  Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
 
   def initialize(vm_name)
     @vm_name = vm_name
@@ -226,6 +226,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     multiqueue_fragment = multiqueue ? " multi_queue vnet_hdr " : " "
     nics.each do |nic|
       r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm} #{multiqueue_fragment}"
+      r "ip -n #{q_vm} addr replace #{nic.private_ipv4_gateway} dev #{nic.tap}"
     end
   end
 

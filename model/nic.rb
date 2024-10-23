@@ -27,4 +27,8 @@ class Nic < Sequel::Model
   def ubid_to_tap_name
     ubid.to_s[0..9]
   end
+
+  def private_ipv4_gateway
+    private_subnet.net4.nth(1).to_s + private_subnet.net4.netmask.to_s
+  end
 end
