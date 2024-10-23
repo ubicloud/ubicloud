@@ -1070,6 +1070,25 @@ paths:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_id'
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/failover':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+    post:
+      operationId: failoverPostgresDatabaseWithID
+      summary: Failover a specific Postgres database with ID
+      responses:
+        '200':
+          description: Details of the failed over Postgres databases in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/location'
