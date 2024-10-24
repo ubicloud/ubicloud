@@ -154,8 +154,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "takes backup if it is needed" do
       expect(postgres_timeline).to receive(:need_backup?).and_return(true)
       sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/take-backup' take_postgres_backup")
-      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, vm: instance_double(Vm, sshable: sshable)))
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo postgres/bin/take-backup 16' take_postgres_backup")
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer, resource: instance_double(PostgresResource, version: "16"), vm: instance_double(Vm, sshable: sshable))).at_least(:once)
       expect(postgres_timeline).to receive(:latest_backup_started_at=)
       expect(postgres_timeline).to receive(:save_changes)
       expect { nx.take_backup }.to hop("wait")
