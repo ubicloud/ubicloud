@@ -8,26 +8,35 @@ class CloverApi
       ps_endpoint_helper.list
     end
 
-    r.on "id" do
-      r.is String do |ps_id|
+    r.on NAME_OR_UBID do |ps_name, ps_id|
+      if ps_name
+        r.post true do
+          ps_endpoint_helper.post(ps_name)
+        end
+
+        ps = @project.private_subnets_dataset.first(:location => @location, Sequel[:private_subnet][:name] => ps_name)
+      else
         ps = PrivateSubnet.from_ubid(ps_id)
 
         if ps&.location != @location
           ps = nil
         end
-
-        ps_endpoint_helper.instance_variable_set(:@resource, ps)
-        handle_ps_requests(ps_endpoint_helper)
       end
+
+      ps_endpoint_helper.instance_variable_set(:@resource, ps)
+      handle_ps_requests(ps_endpoint_helper)
     end
 
+    # 204 response for invalid names
     r.is String do |ps_name|
-      r.post true do
+      r.post do
         ps_endpoint_helper.post(ps_name)
       end
 
-      ps_endpoint_helper.instance_variable_set(:@resource, @project.private_subnets_dataset.where(location: @location).where { {Sequel[:private_subnet][:name] => ps_name} }.first)
-      handle_ps_requests(ps_endpoint_helper)
+      r.delete do
+        response.status = 204
+        nil
+      end
     end
   end
 

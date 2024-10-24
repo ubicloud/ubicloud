@@ -15,34 +15,43 @@ class CloverApi
       }
     end
 
-    r.on "id" do
-      r.on String do |firewall_id|
+    r.on NAME_OR_UBID do |firewall_name, firewall_id|
+      if firewall_name
+        r.post true do
+          Authorization.authorize(@current_user.id, "Firewall:create", @project.id)
+
+          allowed_optional_parameters = ["description"]
+          request_body_params = Validation.validate_request_body(r.body.read, [], allowed_optional_parameters)
+          Validation.validate_name(firewall_name)
+
+          firewall = Firewall.create_with_id(name: firewall_name, location: @location, description: request_body_params["description"] || "")
+          firewall.associate_with_project(@project)
+
+          Serializers::Firewall.serialize(firewall)
+        end
+
+        @firewall = @project.firewalls_dataset.first(:location => @location, Sequel[:firewall][:name] => firewall_name)
+      else
         @firewall = Firewall.from_ubid(firewall_id)
 
         if @firewall&.location != @location
           @firewall = nil
         end
-
-        handle_firewall_requests(@current_user, @firewall, @location)
       end
+
+      handle_firewall_requests(@current_user, @firewall, @location)
     end
 
+    # 204 response for invalid names
     r.is String do |firewall_name|
-      r.post true do
-        Authorization.authorize(@current_user.id, "Firewall:create", @project.id)
-
-        allowed_optional_parameters = ["description"]
-        request_body_params = Validation.validate_request_body(r.body.read, [], allowed_optional_parameters)
+      r.post do
         Validation.validate_name(firewall_name)
-
-        firewall = Firewall.create_with_id(name: firewall_name, location: @location, description: request_body_params["description"] || "")
-        firewall.associate_with_project(@project)
-
-        Serializers::Firewall.serialize(firewall)
       end
 
-      @firewall = @project.firewalls_dataset.where(location: @location).where { {Sequel[:firewall][:name] => firewall_name} }.first
-      handle_firewall_requests(@current_user, @firewall, @location)
+      r.delete do
+        response.status = 204
+        nil
+      end
     end
   end
 

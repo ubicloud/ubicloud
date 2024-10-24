@@ -13,6 +13,8 @@ class CloverApi < Roda
   plugin :json
   plugin :json_parser
 
+  NAME_OR_UBID = /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)|_([a-z0-9]{26})/
+
   autoload_routes("api")
 
   plugin :not_found do

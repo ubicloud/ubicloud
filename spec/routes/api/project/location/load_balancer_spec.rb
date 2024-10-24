@@ -25,7 +25,7 @@ RSpec.describe Clover, "load-balancer" do
         [:get, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}"],
         [:post, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/attach-vm", {vm_id: "vm-1"}],
         [:post, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/detach-vm", {vm_id: "vm-1"}],
-        [:get, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/id/#{lb.ubid}"]
+        [:get, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/_#{lb.ubid}"]
       ].each do |method, path, body|
         send(method, path, body)
 
@@ -71,14 +71,14 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "id" do
       it "success" do
-        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/id/#{lb.ubid}"
+        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/_#{lb.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("lb-1")
       end
 
       it "not found" do
-        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/id/invalid"
+        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/_invalid"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
