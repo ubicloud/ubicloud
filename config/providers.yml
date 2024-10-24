@@ -5,7 +5,8 @@
     locations: [
       {display_name: eu-central-h1, internal_name: hetzner-fsn1, ui_name: "Germany", visible: true },
       {display_name: eu-north-h1, internal_name: hetzner-hel1, ui_name: "Finland", visible: true },
-      {display_name: github-runners, internal_name: github-runners, ui_name: "GithubRunner", visible: false }
+      {display_name: github-runners, internal_name: github-runners, ui_name: "GithubRunner", visible: false },
+      {display_name: hetzner-ai, internal_name: hetzner-ai, ui_name: "hetzner-ai", visible: false }
     ]
   },
   {
