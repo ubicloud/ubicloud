@@ -182,6 +182,23 @@ RSpec.describe Clover, "auth" do
     expect(page).to have_content("Your account has been suspended")
   end
 
+  it "can not login if the account is suspended via remember token" do
+    account = create_account
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    check "Remember me"
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
+    account.suspend
+    # page.refresh does not work, sends deleted _Clover.session cookie
+    visit page.current_path
+    expect(page.title).to eq("Ubicloud - Login")
+  end
+
   it "redirects to otp page if the otp is only 2FA method" do
     create_account(enable_otp: true)
 
