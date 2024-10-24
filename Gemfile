@@ -33,6 +33,7 @@ gem "octokit"
 gem "argon2-kdf"
 
 group :development do
+  gem "awesome_print"
   gem "brakeman"
   gem "by", github: "jeremyevans/by", ref: "f022615e367da3a23f012c3ab06ff664fe3776d3"
   gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
