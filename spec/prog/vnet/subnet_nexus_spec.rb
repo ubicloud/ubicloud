@@ -296,12 +296,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "finds a new subnet if the one it found is taken" do
-<<<<<<< HEAD
-      project = instance_double(Project, private_subnets: [instance_double(PrivateSubnet, net4: "10.0.0.128/26", location: "hetzner-hel1")])
-      allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1, 2)
-      expect(described_class.random_private_ipv4("hetzner-hel1", project).to_s).to eq("10.0.0.192/26")
-    end
-=======
       expect(PrivateSubnet).to receive(:random_subnet).and_return("10.0.0.0/8").at_least(:once)
       project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
       described_class.assemble(project.id, location: "hetzner-hel1", name: "test-subnet", ipv4_range: "10.0.0.128/26")
@@ -316,7 +310,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1)
       expect(described_class.random_private_ipv4("hetzner-hel1", project).to_s).to eq("10.0.0.128/26")
     end
->>>>>>> 7c80ac40 (first commit)
   end
 
   describe ".random_private_ipv6" do

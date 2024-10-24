@@ -175,6 +175,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
   def self.random_private_ipv4(location, project)
     private_range = PrivateSubnet.random_subnet
+    banned_subnets = PrivateSubnet::BANNED_IPV4_SUBNETS.map { NetAddr::IPv4Net.parse(_1) }
     addr = NetAddr::IPv4Net.parse(private_range)
 
     selected_addr = addr.nth_subnet(26, SecureRandom.random_number(2**(26 - addr.netmask.prefix_len) - 1).to_i + 1)
