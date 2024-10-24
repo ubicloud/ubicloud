@@ -8,26 +8,35 @@ class CloverApi
       vm_endpoint_helper.list
     end
 
-    r.on "id" do
-      r.on String do |vm_ubid|
+    r.on NAME_OR_UBID do |vm_name, vm_ubid|
+      if vm_name
+        r.post true do
+          vm_endpoint_helper.post(vm_name)
+        end
+
+        vm = @project.vms_dataset.first(:location => @location, Sequel[:vm][:name] => vm_name)
+      else
         vm = Vm.from_ubid(vm_ubid)
 
         if vm&.location != @location
           vm = nil
         end
-
-        vm_endpoint_helper.instance_variable_set(:@resource, vm)
-        handle_vm_requests(vm_endpoint_helper)
       end
+
+      vm_endpoint_helper.instance_variable_set(:@resource, vm)
+      handle_vm_requests(vm_endpoint_helper)
     end
 
-    r.on String do |vm_name|
-      r.post true do
+    # 204 response for invalid names
+    r.is String do |vm_name|
+      r.post do
         vm_endpoint_helper.post(vm_name)
       end
 
-      vm_endpoint_helper.instance_variable_set(:@resource, @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first)
-      handle_vm_requests(vm_endpoint_helper)
+      r.delete do
+        response.status = 204
+        nil
+      end
     end
   end
 

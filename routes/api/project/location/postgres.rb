@@ -8,27 +8,35 @@ class CloverApi
       pg_endpoint_helper.list
     end
 
-    r.on "id" do
-      r.on String do |pg_ubid|
+    r.on NAME_OR_UBID do |pg_name, pg_ubid|
+      if pg_name
+        r.post true do
+          pg_endpoint_helper.post(name: pg_name)
+        end
+
+        pg = @project.postgres_resources_dataset.first(:location => @location, Sequel[:postgres_resource][:name] => pg_name)
+      else
         pg = PostgresResource.from_ubid(pg_ubid)
 
         if pg&.location != @location
           pg = nil
         end
-
-        pg_endpoint_helper.instance_variable_set(:@resource, pg)
-        handle_pg_requests(pg_endpoint_helper)
       end
+
+      pg_endpoint_helper.instance_variable_set(:@resource, pg)
+      handle_pg_requests(pg_endpoint_helper)
     end
 
-    r.on String do |pg_name|
-      r.post true do
+    # 204 response for invalid names
+    r.is String do |pg_name|
+      r.post do
         pg_endpoint_helper.post(name: pg_name)
       end
 
-      pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
-      pg_endpoint_helper.instance_variable_set(:@resource, pg)
-      handle_pg_requests(pg_endpoint_helper)
+      r.delete do
+        response.status = 204
+        nil
+      end
     end
   end
 

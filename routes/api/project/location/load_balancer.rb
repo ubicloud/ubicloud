@@ -8,19 +8,16 @@ class CloverApi
 
     pss = @project.private_subnets_dataset.where(location: @location).all
 
-    r.on "id" do
-      r.is String do |lb_id|
+    r.on NAME_OR_UBID do |lb_name, lb_id|
+      if lb_name
+        lb = pss.flat_map { _1.load_balancers_dataset.where_all(Sequel[:load_balancer][:name] => lb_name) }.first
+      else
         lb = LoadBalancer.from_ubid(lb_id)
         unless pss.any? { _1.load_balancers.map(&:ubid).include?(lb_id) }
           lb = nil
         end
-
-        handle_lb_requests(@current_user, lb)
       end
-    end
 
-    r.on String do |lb_name|
-      lb = pss.flat_map { _1.load_balancers_dataset.where { {Sequel[:load_balancer][:name] => lb_name} }.all }.first
       handle_lb_requests(@current_user, lb)
     end
   end
