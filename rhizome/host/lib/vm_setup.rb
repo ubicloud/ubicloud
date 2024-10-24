@@ -456,6 +456,7 @@ server=9.9.9.9
 server=2620:fe::fe
 server=2620:fe::9
 dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+dhcp-option=6,#{dns_ipv4}
 listen-address=#{dnsmasq_address_ip6}
 listen-address=#{dns_ipv4}
 dhcp-option=26,1400
@@ -470,10 +471,6 @@ DNSMASQ_CONF
       macaddress: "#{nic.mac}"
     dhcp6: true
     dhcp4: true
-    nameservers:
-      addresses:
-        - "fd00:0b1c:100d:53::"
-        - #{dns_ipv4}
 ETHERNETS
     end.join("\n")
 
