@@ -102,21 +102,21 @@ class Prog::DownloadBootImage < Prog::Base
       ["github-ubuntu-2204", "x64", "20240818.1.0"] => "7f1b4366cb0fe7021afbf84129c5b2fba07bb513216708871c3024443a7b52fa",
       ["github-ubuntu-2204", "x64", "20241006.1.0"] => "d0ced50be5ea43e1bb413cc8eef8fd21d63643ee19189637331419b882ad58e3",
       ["github-ubuntu-2204", "arm64", "20240818.1.0"] => "74a7ab1b0d18825057b7366849305e49c063cf26cde0ed8a3f6d51a82c35c27b",
-      ["github-ubuntu-2204", "arm64", "20241006.1.0"] => "c72b389c41b6a5289c9fe38f24ad2ee9b91422194fe607bc83b93b9b586ac327",
+      ["github-ubuntu-2204", "arm64", "20241006.1.0"] => "4a6994c7664eaea7bb120329513ed5cacbf85c16b0030dd5ee838bcd40a90152",
       ["github-ubuntu-2004", "x64", "20240818.1.0"] => "e5af8ed1204241a884a01f044fc01ca0fa3f50bf2bea3fb12e27a523135e50a3",
       ["github-ubuntu-2004", "x64", "20241006.1.0"] => "e87dc79f31ae0fe85370b910e615a341ad1bd657d93423575173867b23992315",
       ["github-ubuntu-2004", "arm64", "20240818.1.0"] => "0609ee072f53af0ca402b7d769c0986ad8a36a6eb19229f01b0195bba7ed8ae2",
-      ["github-ubuntu-2004", "arm64", "20241006.1.0"] => "e7615b2882985aa20cfb7b6337be7f11a8ea33199cd84f839b9f8c4cd51c7ad5",
+      ["github-ubuntu-2004", "arm64", "20241006.1.0"] => "6582137985903269787ce024054f636c06e6309968afe61fef569f61d733626f",
       ["github-gpu-ubuntu-2204", "x64", "20240818.1.0"] => "c366cc99107b1ea9c12cc6cfc03073a90f3aad011e333a59e0b6cfdc36776568",
       ["github-gpu-ubuntu-2204", "x64", "20241006.1.0"] => "ef2d6bab4dcbd7f4c72ba213dea76d06da06af33750fc8477efff03ea9ff23e9",
       ["postgres-ubuntu-2204", "x64", "20240226.1.0"] => "f8a2b78189239717355b54ecf62a504a349c96b1ab6a21919984f58c2a367617",
       ["postgres-ubuntu-2204", "x64", "20240702.3.0"] => "02dfa6e844fa3e72224f2f0f1811e039221acee07d6b05b507d49ae17f84d0ce",
       ["postgres-paradedb-ubuntu-2204", "x64", "20240926.1.0"] => "9249a64a516e7e39170cea7427c0cf9c32627061755773294a19e3367f114824",
       ["postgres-lantern-ubuntu-2204", "x64", "20241010.1.0"] => "43601010e593c4ceca7d7904329928530cfd151b26c357d9a798f94521b5693c",
-      ["ai-ubuntu-2404-nvidia", "x64", "20241008.1.0"] => "4d3874481b796e382a7f0b6736f78eb0af8ead21d4de55b52e00160bc46bca33",
-      ["ai-ubuntu-2404-nvidia", "x64", "20241011.1.0"] => "e40c77a1bbe39ab40fd3a31e3f767aa59badbedee98ede9883fc881d5fa119da",
+      ["ai-ubuntu-2404-nvidia", "x64", "20241016.1.0"] => "a96b8fdaa6ba35796d74d5cc00f5611501807814f541a88235c676101ade7f4e",
       ["ai-model-gemma-2-2b-it", "x64", "20240918.1.0"] => "b726ead6d5f48fb8e6de7efb48fb22367c9a7c155cfee71a3a7e5527be5df08e",
-      ["ai-model-llama-3-2-3b-it", "x64", "20240926.1.0"] => "02b0b34fa84843ba1d09dc7f5d3877cf79dbbb3dcaa087ea16af72b95e35a354"
+      ["ai-model-llama-3-2-3b-it", "x64", "20240926.1.0"] => "02b0b34fa84843ba1d09dc7f5d3877cf79dbbb3dcaa087ea16af72b95e35a354",
+      ["ai-model-e5-mistral-7b-it", "x64", "20241016.1.0"] => "999b0ff41968ffede0408ce3d4a9a21ff23e391f7aeac2f2d492fd505e73826c"
     }
 
     # YYY: In future all images should be checked for sha256 sum, so the nil

@@ -1,27 +1,29 @@
-.env.rb
-coverage
-spec/examples.txt
-demo/.env
-var/*
-tmp/*
+/.env.rb
+/coverage
+/spec/examples.txt
+/demo/.env
+/var/*
+/tmp/*
+
+# Used by rake by
+/bin/by
 
 # rhizome/Gemfile is combination of all Gemfiles in subdirectories, so does rhizome/Gemfile.lock
-rhizome/*/Gemfile.lock
+/rhizome/*/Gemfile.lock
 
 # Frontend
-node_modules
-assets/css/app.css
+/node_modules
 
 # vscode: https://github.com/github/gitignore/blob/4488915eec0b3a45b5c63ead28f286819c0917de/Global/VisualStudioCode.gitignore
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
+/.vscode/*
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
+!/.vscode/*.code-snippets
 
 # Local History for Visual Studio Code
-.history/
+/.history/
 
 # Built Visual Studio Code Extensions
-*.vsix
+/*.vsix

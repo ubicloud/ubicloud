@@ -1,4 +1,11 @@
 GIT
+  remote: https://github.com/jeremyevans/by.git
+  revision: f022615e367da3a23f012c3ab06ff664fe3776d3
+  ref: f022615e367da3a23f012c3ab06ff664fe3776d3
+  specs:
+    by (1.0.1)
+
+GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: a9ff0001a1eb028e2186b222aeb02b07c04f9808
   ref: a9ff0001a1eb028e2186b222aeb02b07c04f9808
@@ -96,10 +103,6 @@ GEM
       bigdecimal
       rexml
     crass (1.0.6)
-    database_cleaner-core (2.0.1)
-    database_cleaner-sequel (2.0.2)
-      database_cleaner-core (~> 2.0.0)
-      sequel
     date (3.3.4)
     diff-lcs (1.5.1)
     docile (1.4.1)
@@ -364,9 +367,9 @@ DEPENDENCIES
   aws-sdk-s3 (~> 1.167)
   bcrypt_pbkdf
   brakeman
+  by!
   capybara
   countries
-  database_cleaner-sequel
   ed25519
   erb-formatter!
   erubi (>= 1.5)

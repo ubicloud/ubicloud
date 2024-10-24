@@ -36,14 +36,6 @@ SQL
     Sequel.postgres(**db.opts.merge(user: ph_user)) do |ph_db|
       ph_db.loggers << Logger.new($stdout) if ph_db.loggers.empty?
       Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
-
-      if Config.test?
-        # User doesn't have permission to run TRUNCATE on password hash tables, so DatabaseCleaner
-        # can't clean Rodauth tables between test runs. While running migrations for test database,
-        # we allow it, so cleaner can clean them.
-        ph_db["GRANT TRUNCATE ON account_password_hashes TO ?", user.to_sym].get
-        ph_db["GRANT TRUNCATE ON account_previous_password_hashes TO ?", user.to_sym].get
-      end
     end
     db["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
   when 1
@@ -114,7 +106,7 @@ task :overwrite_envrb do
 case ENV["RACK_ENV"] ||= "development"
 when "test"
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
-  ENV["CLOVER_DATABASE_URL"] ||= 'postgres:///clover_test#{ENV["TEST_ENV_NUMBER"]}?user=clover'
+  ENV["CLOVER_DATABASE_URL"] ||= "postgres:///clover_test\#{ENV["TEST_ENV_NUMBER"]}?user=clover"
   ENV["CLOVER_COLUMN_ENCRYPTION_KEY"] ||= "#{SecureRandom.base64(32)}"
 else
   ENV["CLOVER_SESSION_SECRET"] ||= "#{SecureRandom.base64(64)}"
@@ -127,13 +119,51 @@ end
 # Specs
 begin
   require "rspec/core/rake_task"
-  ENV["RACK_ENV"] = "test"
-  RSpec::Core::RakeTask.new(:spec)
-  task default: :spec
+  RSpec::Core::RakeTask.new(:_spec)
+  Rake::Task["_spec"].clear_comments
 rescue LoadError
+else
+  desc "Run specs"
+  task "spec" do
+    ENV["RACK_ENV"] = "test"
+    ENV["FORCE_AUTOLOAD"] = "1"
+    Rake::Task["_spec"].invoke
+  end
+  task default: :spec
+end
+
+desc "Run specs in parallel using turbo_tests"
+task "pspec" do
+  # Try to detect number of CPUs on both Linux and Mac
+  nproc = `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i
+
+  # Limit to 6 processes, as higher number results in more time
+  system({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.clamp(1, 6).to_s)
 end
 
 # Other
+
+desc "Check that model files work when required separately"
+task "check_separate_requires" do
+  require "rbconfig"
+  system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
+end
+
+desc "Run each spec file in a separate process"
+task :spec_separate do
+  require "rbconfig"
+
+  failures = []
+  Dir["spec/**/*_spec.rb"].each do |file|
+    failures << file unless system(RbConfig.ruby, "-S", "rspec", file)
+  end
+
+  if failures.empty?
+    puts "All files passed"
+  else
+    puts "Failures in:", failures
+  end
+end
 
 desc "Annotate Sequel models"
 task "annotate" do
@@ -151,6 +181,21 @@ task "assets:precompile" do
   fail unless $?.success?
   `npm run prod`
   fail unless $?.success?
+end
+
+desc "Open a new shell allowing use of by for speeding up tests"
+task "by" do
+  by_path = "bin/by"
+
+  require "rbconfig"
+
+  by_content = File.binread(Gem.activate_bin_path("by", "by"))
+  by_content.sub!(/\A#!.*/, "#!#{RbConfig.ruby} --disable-gems")
+  File.binwrite(by_path, by_content)
+  ENV["PATH"] = "#{__dir__}/bin:#{ENV["PATH"]}"
+  sh("bundle", "exec", "by-session", "./.by-session-setup.rb")
+ensure
+  File.delete(by_path) if File.file?(by_path)
 end
 
 begin

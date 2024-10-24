@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "jwt"
+require "roda"
 
 class CloverRuntime < Roda
   include CloverBase

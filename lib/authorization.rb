@@ -111,7 +111,7 @@ module Authorization
   module HyperTagMethods
     def self.included(base)
       base.class_eval do
-        many_to_many :projects, join_table: AccessTag.table_name, left_key: :hyper_tag_id, right_key: :project_id
+        many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
       end
     end
 
@@ -154,7 +154,7 @@ module Authorization
   module TaggableMethods
     def self.included(base)
       base.class_eval do
-        many_to_many :applied_access_tags, class: AccessTag, join_table: AppliedTag.table_name, left_key: :tagged_id, right_key: :access_tag_id
+        many_to_many :applied_access_tags, class: :AccessTag, join_table: :applied_tag, left_key: :tagged_id, right_key: :access_tag_id
       end
     end
 

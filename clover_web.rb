@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
+require "roda"
 require "tilt"
 require "tilt/erubi"
+
+require_relative "model"
 
 class CloverWeb < Roda
   include CloverBase
@@ -15,7 +18,7 @@ class CloverWeb < Roda
     "X-Content-Type-Options" => "nosniff"
   }.merge(
     # :nocov:
-    Config.production? ? {"Strict-Transport-Security" => "max-age=2629800; includeSubDomains"} : {}
+    Config.production? ? {"Strict-Transport-Security" => "max-age=63072000; includeSubDomains"} : {}
     # :nocov:
   )
 

@@ -17,6 +17,7 @@ require "rack/unreloader"
 REPL = false unless defined? REPL
 Warning.ignore(/To use (retry|multipart) middleware with Faraday v2\.0\+, install `faraday-(retry|multipart)` gem/)
 
+force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) { Clover }
 
 Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
@@ -41,7 +42,6 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
     # "/home/myuser/..."
     Regexp.new('\A' + Regexp.escape((File.file?(absolute) ? File.dirname(absolute) : absolute) + "/") + '(.*)\.rb\z')
   end
-  last_namespace = nil
 
   # Copied from sequel/model/inflections.rb's camelize, to convert
   # file paths into module and class names.
@@ -51,42 +51,77 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
 
   Unreloader.autoload(absolute) do |f|
     full_name = camelize.call((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
-    parts = full_name.split("::")
-    namespace = parts[0..-2].freeze
-
-    # Skip namespace traversal if the last namespace handled has the
-    # same components, forming a fast-path that works well when output
-    # is the result of a depth-first traversal of the file system, as
-    # is normally the case.
-    unless namespace == last_namespace
-      scope = Object
-      namespace.each { |nested|
-        scope = if scope.const_defined?(nested, false)
-          scope.const_get(nested, false)
-        else
-          Module.new.tap { scope.const_set(nested, _1) }
-        end
-      }
-      last_namespace = namespace
-    end
-
-    # Reloading re-executes this block, which will crash on the
-    # subsequently frozen AUTOLOAD_CONSTANTS.  It's also undesirable
-    # to have re-additions to the array.
     AUTOLOAD_CONSTANTS << full_name unless AUTOLOAD_CONSTANTS.frozen?
-
     full_name
   end
 end
+
+# Define empty modules instead of trying to have autoload_normal create them via metaprogramming
+module Hosting; end
+
+module Minio; end
+
+module Prog; end
+
+module Prog::Ai; end
+
+module Prog::DnsZone; end
+
+module Prog::Github; end
+
+module Prog::Minio; end
+
+module Prog::Postgres; end
+
+module Prog::Storage; end
+
+module Prog::Vm; end
+
+module Prog::Vnet; end
+
+module Scheduling; end
+
+module Serializers; end
+
+module Routes; end
+
+module Routes::Common; end
 
 autoload_normal.call("model", flat: true)
 %w[lib clover.rb clover_web.rb clover_api.rb clover_runtime.rb routes/clover_base.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers routes/common].each { autoload_normal.call(_1, include_first: true) }
 
+if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
+  files = %w[model lib scheduling prog serializers routes/common].flat_map { Dir["#{_1}/**/*.rb"] }
+  files.concat(%w[clover.rb clover_web.rb clover_api.rb clover_runtime.rb routes/clover_base.rb routes/clover_error.rb])
+  files.each do |file|
+    pid = fork do
+      require_relative file
+      exit(0)
+    rescue LoadError, StandardError => e
+      puts "ERROR: problems loading #{file}: #{e.class}: #{e.message}"
+    end
+    Process.wait(pid)
+  end
+  exit(0)
+end
+
 AUTOLOAD_CONSTANTS.freeze
 
-if Config.production?
+if force_autoload
   AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
+
+  # All classes are already available, so speed up UBID.class_for_ubid using
+  # hash of prefixes to class objects
+  class UBID
+    TYPE2CLASS = TYPE2CLASSNAME.transform_values { Object.const_get(_1) }.freeze
+    private_constant :TYPE2CLASS
+
+    singleton_class.remove_method(:class_for_ubid)
+    def self.class_for_ubid(str)
+      TYPE2CLASS[str[..1]]
+    end
+  end
 end
 
 case Config.mail_driver

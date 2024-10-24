@@ -115,6 +115,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can not open create page with invalid flavor" do
+        default_project = Project[name: "Default"]
+        url = "#{default_project.path}/dashboard"
+        Capybara.current_session.driver.header "Referer", url
         visit "#{project.path}/postgres/create?flavor=invalid"
 
         expect(page.title).to eq("Ubicloud - Default Dashboard")

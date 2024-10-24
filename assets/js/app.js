@@ -261,7 +261,12 @@ function setupInstanceSizeBasedOptions() {
   $(".instance-size-based-storage-sizes").each(function() {
     let selectedLocation = $("input[name=location]:checked").val();
     resource_family = $("input[name=size]:checked").data("resource-family");
-    storage_size_options = $("input[name=size]:checked").data("storage-size-options")[selectedLocation];
+    storage_size_options = $("input[name=size]:checked").data("storage-size-options");
+    // Available storage sizes for postgres depend on location, but this is not
+    // the case for VM. If it's an array, location doesn't matter; otherwise, it does.
+    if (!Array.isArray(storage_size_options)) {
+      storage_size_options = storage_size_options[selectedLocation];
+    }
     storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
     storage_size_index = 0;
 

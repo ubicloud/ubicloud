@@ -103,13 +103,25 @@ class UBID
     s.delete_prefix("TYPE").split("_").map(&:capitalize).join
   end
 
-  TYPE2CLASS = constants.select { _1.start_with?("TYPE_") }.reject { _1.to_s == "TYPE_ETC" }
-    .map { [const_get(_1), Object.const_get(camelize(_1.to_s).to_s)] }.to_h
+  # Map of prefixes to class name symbols, to avoid autoloading
+  # classes until they are referenced by class_for_ubid
+  TYPE2CLASSNAME = constants.select { _1.start_with?("TYPE_") }.reject { _1.to_s == "TYPE_ETC" }
+    .map { [const_get(_1), camelize(_1.to_s).to_sym] }.to_h.freeze
+  private_constant :TYPE2CLASSNAME
+
+  def self.class_for_ubid(str)
+    # :nocov:
+    # Overridden in production and when forcing autoloads in tests
+    if (sym = TYPE2CLASSNAME[str[..1]])
+      Object.const_get(sym)
+    end
+    # :nocov:
+  end
 
   def self.decode(ubid)
     ubid_str = ubid.to_s
     uuid = UBID.parse(ubid_str).to_uuid
-    klass = TYPE2CLASS[ubid_str[..1]]
+    klass = class_for_ubid(ubid)
     fail "Couldn't decode ubid: #{ubid_str}" if klass.nil?
 
     klass[uuid]
@@ -194,7 +206,7 @@ class UBID
   end
 
   def inspect
-    "#<UBID:#{TYPE2CLASS[to_s[..1]] || "Unknown"} @ubid=#{to_s.inspect} @uuid=#{to_uuid.inspect}>"
+    "#<UBID:#{TYPE2CLASSNAME[to_s[..1]] || "Unknown"} @ubid=#{to_s.inspect} @uuid=#{to_uuid.inspect}>"
   end
 
   #

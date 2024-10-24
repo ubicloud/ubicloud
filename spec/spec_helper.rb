@@ -23,20 +23,9 @@ ENV["HETZNER_PASSWORD"] = "pass"
 require_relative "coverage_helper"
 require_relative "../loader"
 require "rspec"
-require "database_cleaner/sequel"
 require "logger"
 require "sequel/core"
 require "webmock/rspec"
-
-# DatabaseCleaner assumes the usual DATABASE_URL, but the
-# "roda-sequel-stack" way names each environment *and* application
-# variable differently, e.g. "clover_test" and "clover_dev,"
-# presumably to work with multiple applications and environments at
-# the same time.  While it perhaps overkill for us, I don't feel like
-# changing things right now.
-DatabaseCleaner.url_allowlist = [
-  nil
-]
 
 Warning.ignore([:not_reached, :unused_var], /.*lib\/mail\/parser.*/)
 Warning.ignore([:mismatched_indentations], /.*lib\/stripe\/api_operations.*/)
@@ -45,24 +34,11 @@ Warning.ignore([:unused_var], /.*lib\/aws-sdk-(s3|core)\/(endpoint_provider|cbor
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 
 RSpec.configure do |config|
-  config.before(:suite) do
-    DatabaseCleaner.strategy = :transaction
-    # Since we have 2 active sequel databases, we need to manually
-    # specify which one to clean.
-    DatabaseCleaner[:sequel].db = DB
-    DatabaseCleaner.clean_with(:truncation,
-      # Skip tables that are filled with migrations.
-      except: %w[
-        schema_migrations_password
-        account_statuses
-      ])
-  end
-
   config.around do |example|
-    DatabaseCleaner.cleaning do
+    DB.transaction(rollback: :always, auto_savepoint: true) do
       example.run
-      Mail::TestMailer.deliveries.clear if defined?(Mail)
     end
+    Mail::TestMailer.deliveries.clear if defined?(Mail)
   end
 
   # rspec-expectations config goes here. You can use an alternate
@@ -131,8 +107,9 @@ RSpec.configure do |config|
 
   # Print the 10 slowest examples and example groups at the
   # end of the spec run, to help surface which specs are running
-  # particularly slow.
-  config.profile_examples = 10
+  # particularly slow.  However, avoid printing when parallel testing,
+  # to avoid output from every process.
+  config.profile_examples = 10 unless ENV["TEST_ENV_NUMBER"]
 
   # Run specs in random order to surface order dependencies. If you find an
   # order dependency and want to debug it, you can fix the order by providing
