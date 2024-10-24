@@ -522,6 +522,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#create_billing_record" do
     before do
+      skip_if_frozen
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)

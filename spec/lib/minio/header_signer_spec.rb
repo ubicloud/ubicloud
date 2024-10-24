@@ -15,6 +15,7 @@ RSpec.describe Minio::HeaderSigner do
 
   describe "build_headers" do
     it "can build headers and sign with and without Content-Md5" do
+      skip_if_frozen
       method = "PUT"
       uri = URI.parse("http://localhost:9000/test")
       body = "test"
