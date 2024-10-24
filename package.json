@@ -1,11 +1,11 @@
 {
   "devDependencies": {
-    "@redocly/cli": "^1.25.5",
+    "@redocly/cli": "^1.25.8",
     "@stoplight/spectral-cli": "^6.13.1",
     "openapi-format": "^1.24.2",
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/typography": "^0.5.15",
-    "tailwindcss": "^3.4.13"
+    "tailwindcss": "^3.4.14"
   },
   "scripts": {
     "dev": "npx tailwindcss -o assets/css/app.css",
