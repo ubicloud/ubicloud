@@ -110,9 +110,12 @@ class UBID
   private_constant :TYPE2CLASSNAME
 
   def self.class_for_ubid(str)
+    # :nocov:
+    # Overridden in production and when forcing autoloads in tests
     if (sym = TYPE2CLASSNAME[str[..1]])
       Object.const_get(sym)
     end
+    # :nocov:
   end
 
   def self.decode(ubid)
