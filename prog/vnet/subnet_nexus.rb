@@ -179,7 +179,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     selected_addr = addr.nth_subnet(26, SecureRandom.random_number(2**(26 - addr.netmask.prefix_len) - 1).to_i + 1)
 
-    selected_addr = random_private_ipv4(location, project) if banned_subnets.any? { _1.rel(selected_addr) } || project.private_subnets_dataset[Sequel[:net4] => selected_addr.to_s, :location => location]
+    selected_addr = random_private_ipv4(location, project) if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { _1.rel(selected_addr) } || project.private_subnets_dataset[Sequel[:net4] => selected_addr.to_s, :location => location]
 
     selected_addr
   end
