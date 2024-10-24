@@ -6,7 +6,10 @@ REPL = true
 require_relative "../loader"
 
 require "pry"
-require "awesome_print"
+
+if Config.development?
+  require "awesome_print"
+end
 
 def dev_project
   return unless Config.development?
