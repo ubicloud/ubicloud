@@ -6,18 +6,15 @@ class CloverApi
       Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: @current_user, location: @location, resource: nil).list
     end
 
-    pss = @project.private_subnets_dataset.where(location: @location).all
-
     r.on NAME_OR_UBID do |lb_name, lb_id|
-      if lb_name
-        lb = pss.flat_map { _1.load_balancers_dataset.where_all(Sequel[:load_balancer][:name] => lb_name) }.first
+      filter = if lb_name
+        {Sequel[:load_balancer][:name] => lb_name}
       else
-        lb = LoadBalancer.from_ubid(lb_id)
-        unless pss.any? { _1.load_balancers.map(&:ubid).include?(lb_id) }
-          lb = nil
-        end
+        {Sequel[:load_balancer][:id] => UBID.to_uuid(lb_id)}
       end
 
+      filter[:private_subnet_id] = @project.private_subnets_dataset.where(location: @location).select(Sequel[:private_subnet][:id])
+      lb = LoadBalancer.first(filter)
       handle_lb_requests(@current_user, lb)
     end
   end

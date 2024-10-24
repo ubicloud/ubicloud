@@ -14,15 +14,13 @@ class CloverApi
           ps_endpoint_helper.post(ps_name)
         end
 
-        ps = @project.private_subnets_dataset.first(:location => @location, Sequel[:private_subnet][:name] => ps_name)
+        filter = {Sequel[:private_subnet][:name] => ps_name}
       else
-        ps = PrivateSubnet.from_ubid(ps_id)
-
-        if ps&.location != @location
-          ps = nil
-        end
+        filter = {Sequel[:private_subnet][:id] => UBID.to_uuid(ps_id)}
       end
 
+      filter[:location] = @location
+      ps = @project.private_subnets_dataset.first(filter)
       ps_endpoint_helper.instance_variable_set(:@resource, ps)
       handle_ps_requests(ps_endpoint_helper)
     end

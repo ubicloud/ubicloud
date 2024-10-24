@@ -267,8 +267,14 @@ RSpec.describe Clover, "postgres" do
 
       it "failover" do
         project.set_ff_postgresql_base_image(true)
-        expect(PostgresResource).to receive(:[]).and_return(pg)
-        expect(pg.representative_server).to receive(:trigger_failover).and_return(true)
+        pg.save_changes
+        rs = pg.representative_server
+        rs.update(timeline_access: "push")
+        st = Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: rs.timeline_id, timeline_access: "fetch")
+        st.update(label: "wait")
+        # rubocop:disable RSpec/AnyInstance
+        expect_any_instance_of(PostgresServer).to receive(:run_query).and_return "16/B374D848"
+        # rubocop:enable RSpec/AnyInstance
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
 
@@ -276,8 +282,8 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "failover invalid restore" do
-        expect(PostgresResource).to receive(:[]).and_return(pg)
-        expect(pg.representative_server).to receive(:primary?).and_return(false)
+        pg.save_changes
+        pg.representative_server.update(timeline_access: "fetch")
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
 
@@ -285,8 +291,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "failover no ff base image" do
-        expect(PostgresResource).to receive(:[]).and_return(pg)
-        expect(pg.representative_server).to receive(:primary?).and_return(true)
+        pg.save_changes
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
 
@@ -295,9 +300,7 @@ RSpec.describe Clover, "postgres" do
 
       it "failover no standby" do
         project.set_ff_postgresql_base_image(true)
-        expect(PostgresResource).to receive(:[]).and_return(pg)
-        expect(pg.representative_server).to receive(:primary?).and_return(true)
-        expect(pg.representative_server).to receive(:trigger_failover).and_return(false)
+        pg.save_changes
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
 

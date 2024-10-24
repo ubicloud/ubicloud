@@ -120,6 +120,11 @@ class UBID
     new(value)
   end
 
+  def self.to_uuid(ubid_str)
+    parse(ubid_str).to_uuid
+  rescue UBIDParseError
+  end
+
   def to_uuid
     # 8-4-4-4-12 format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     a = UBID.extract_bits_as_hex(@value, 24, 8)
