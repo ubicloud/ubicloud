@@ -55,8 +55,14 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(200)
     end
 
-    it "get does not exist" do
+    it "get does not exist for invalid name" do
       get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/foo_name"
+
+      expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+    end
+
+    it "get does not exist for valid name" do
+      get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/fooname"
 
       expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
     end
@@ -69,13 +75,27 @@ RSpec.describe Clover, "firewall" do
       expect(last_response.status).to eq(200)
     end
 
+    it "failure post" do
+      post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/FooName", {
+        description: "Firewall description"
+      }.to_json
+
+      expect(last_response).to have_api_error(400, "Validation failed for following fields: name")
+    end
+
     it "success delete" do
       delete "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}"
 
       expect(last_response.status).to eq(204)
     end
 
-    it "delete not exist" do
+    it "delete not exist for valid ubid format" do
+      delete "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{"0" * 26}"
+
+      expect(last_response.status).to eq(204)
+    end
+
+    it "delete not exist for invalid ubid format" do
       delete "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_foo_ubid"
 
       expect(last_response.status).to eq(204)

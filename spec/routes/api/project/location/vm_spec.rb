@@ -125,6 +125,17 @@ RSpec.describe Clover, "vm" do
         expect(last_response.status).to eq(200)
       end
 
+      it "invalid name" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/MyVM", {
+          public_key: "ssh key",
+          unix_user: "ubi",
+          size: "standard-2",
+          enable_ip4: true
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
+      end
+
       it "invalid boot image" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
