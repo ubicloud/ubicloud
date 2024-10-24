@@ -1,0 +1,122 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+unless File.directory?("../documentation")
+  warn "Documentation site must be checked out in ../documentation"
+  exit(1)
+end
+
+unless File.directory?("../documentation/screenshots")
+  warn "Documentation site must have screenshots directory"
+  exit(1)
+end
+
+require "capybara"
+require "capybara/dsl"
+require "capybara/cuprite"
+require "puma/cli"
+require "nio"
+require "securerandom"
+
+ENV["RACK_ENV"] = "test"
+ENV["SHARED_CONNECTION"] = "1"
+
+require_relative "../loader"
+
+PORT = 8383
+db_name = DB.get { current_database.function }
+raise "Doesn't look like a test database (#{db_name}), not generating screenshots" unless db_name.end_with?("test")
+
+Capybara.exact = true
+Capybara.default_selector = :css
+Capybara.default_driver = :cuprite
+Capybara.server_port = PORT
+Capybara.register_driver(:cuprite) do |app|
+  Capybara::Cuprite::Driver.new(app, window_size: [1200, 800], browser_options: {timeout: 15}, base_url: "http://localhost:#{PORT}")
+end
+
+require "tilt/erubi"
+require "tilt/string"
+
+queue = Queue.new
+server = Puma::CLI.new(["-s", "-e", "test", "-b", "tcp://localhost:#{PORT}", "-t", "1:1", "config.ru"])
+server.launcher.events.on_booted { queue.push(nil) }
+Thread.new do
+  server.launcher.run
+end
+queue.pop
+
+::Mail.defaults do
+  delivery_method :test
+end
+
+class RegenScreenshots
+  include Capybara::DSL
+
+  SCREENSHOT_DIR = "../documentation/screenshots/"
+  SCREENSHOTS = Dir.children(SCREENSHOT_DIR).sort.map { |f| [f, true] }.to_h
+  def screenshot(name)
+    filename = "#{name}.png"
+    path = File.join(SCREENSHOT_DIR, filename)
+    # rubocop:disable Lint/Debugger
+    save_screenshot(path:)
+    # rubocop:enable Lint/Debugger
+    puts "Saved screenshot: #{name}"
+    SCREENSHOTS.delete(filename)
+  end
+
+  def call
+    visit "/"
+    screenshot("login")
+
+    click_link "Create a new account"
+    screenshot("create_account")
+
+    password = SecureRandom.base64(48)
+    fill_in "Full Name", with: "Demo"
+    fill_in "Email Address", with: "demo@example.com"
+    fill_in "Password", with: password
+    fill_in "Password Confirmation", with: password
+    click_button "Create Account"
+    screenshot("post_create_account")
+
+    mail = Mail::TestMailer.deliveries.shift
+    body = mail.parts[1].decoded
+    unless (match = %r{(/verify-account\?key=[^"]+)"}.match(body))
+      raise "no verify link in email"
+    end
+    visit match[1]
+    screenshot("verify_account")
+
+    click_button "Verify Account"
+    screenshot("post_verify_account")
+
+    visit "/"
+    screenshot("dashboard")
+
+    click_link "Compute"
+    screenshot("compute")
+
+    click_link "Networking"
+    screenshot("networking")
+
+    click_link "PostgreSQL"
+    screenshot("postgres")
+
+    click_link "Users"
+    screenshot("users")
+
+    click_link "Settings"
+    screenshot("settings")
+  end
+end
+
+DB.transaction(rollback: :always, auto_savepoint: true) do |conn|
+  DB.temporarily_release_connection(conn) do
+    RegenScreenshots.new.call
+  end
+end
+
+unless RegenScreenshots::SCREENSHOTS.empty?
+  warn "Missing screenshots:", RegenScreenshots::SCREENSHOTS.keys.sort
+end
