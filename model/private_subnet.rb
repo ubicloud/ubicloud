@@ -15,6 +15,12 @@ class PrivateSubnet < Sequel::Model
     "192.168.0.0/16"
   ].freeze
 
+  BANNED_IPV4_SUBNETS = [
+    NetAddr::IPv4Net.parse("172.16.0.0/16"),
+    NetAddr::IPv4Net.parse("172.17.0.0/16"),
+    NetAddr::IPv4Net.parse("172.18.0.0/16")
+  ].freeze
+
   dataset_module Pagination
   dataset_module Authorization::Dataset
   include Authorization::HyperTagMethods
@@ -53,7 +59,11 @@ class PrivateSubnet < Sequel::Model
   semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
 
   def self.random_subnet
-    PRIVATE_SUBNET_RANGES.sample
+    subnet_dict = PRIVATE_SUBNET_RANGES.each_with_object({}) do |subnet, hash|
+      prefix_length = Integer(subnet.split("/").last, 10)
+      hash[subnet] = (2**16 + 2**12 + 2**8 - 2**prefix_length)
+    end
+    subnet_dict.max_by { |_, weight| rand**(1.0 / weight) }.first
   end
 
   # Here we are blocking the bottom 4 and top 1 addresses of each subnet
