@@ -14,15 +14,13 @@ class CloverApi
           pg_endpoint_helper.post(name: pg_name)
         end
 
-        pg = @project.postgres_resources_dataset.first(:location => @location, Sequel[:postgres_resource][:name] => pg_name)
+        filter = {Sequel[:postgres_resource][:name] => pg_name}
       else
-        pg = PostgresResource.from_ubid(pg_ubid)
-
-        if pg&.location != @location
-          pg = nil
-        end
+        filter = {Sequel[:postgres_resource][:id] => UBID.to_uuid(pg_ubid)}
       end
 
+      filter[:location] = @location
+      pg = @project.postgres_resources_dataset.first(filter)
       pg_endpoint_helper.instance_variable_set(:@resource, pg)
       handle_pg_requests(pg_endpoint_helper)
     end

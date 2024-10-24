@@ -30,15 +30,13 @@ class CloverApi
           Serializers::Firewall.serialize(firewall)
         end
 
-        @firewall = @project.firewalls_dataset.first(:location => @location, Sequel[:firewall][:name] => firewall_name)
+        filter = {Sequel[:firewall][:name] => firewall_name}
       else
-        @firewall = Firewall.from_ubid(firewall_id)
-
-        if @firewall&.location != @location
-          @firewall = nil
-        end
+        filter = {Sequel[:firewall][:id] => UBID.to_uuid(firewall_id)}
       end
 
+      filter[:location] = @location
+      @firewall = @project.firewalls_dataset.first(filter)
       handle_firewall_requests(@current_user, @firewall, @location)
     end
 

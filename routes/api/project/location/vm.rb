@@ -14,15 +14,13 @@ class CloverApi
           vm_endpoint_helper.post(vm_name)
         end
 
-        vm = @project.vms_dataset.first(:location => @location, Sequel[:vm][:name] => vm_name)
+        filter = {Sequel[:vm][:name] => vm_name}
       else
-        vm = Vm.from_ubid(vm_ubid)
-
-        if vm&.location != @location
-          vm = nil
-        end
+        filter = {Sequel[:vm][:id] => UBID.to_uuid(vm_ubid)}
       end
 
+      filter[:location] = @location
+      vm = @project.vms_dataset.first(filter)
       vm_endpoint_helper.instance_variable_set(:@resource, vm)
       handle_vm_requests(vm_endpoint_helper)
     end
