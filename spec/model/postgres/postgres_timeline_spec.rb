@@ -80,6 +80,7 @@ PGHOST=/var/run/postgresql
 
   describe "#latest_backup_label_before_target" do
     it "returns most recent backup before given target" do
+      skip_if_frozen
       stub_const("Backup", Struct.new(:last_modified))
       most_recent_backup_time = Time.now
       expect(postgres_timeline).to receive(:backups).and_return(
@@ -94,6 +95,7 @@ PGHOST=/var/run/postgresql
     end
 
     it "raises error if no backups before given target" do
+      skip_if_frozen
       stub_const("Backup", Struct.new(:last_modified))
       expect(postgres_timeline).to receive(:backups).and_return([])
 
@@ -123,6 +125,7 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns list of backups" do
+    skip_if_frozen
     stub_const("Backup", Struct.new(:key))
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
 

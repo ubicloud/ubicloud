@@ -60,6 +60,7 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "can create new virtual machine" do
+        skip_if_frozen
         project
 
         visit "#{project.path}/vm/create"
@@ -106,6 +107,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can create new virtual machine with chosen private subnet" do
+        skip_if_frozen
         project
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1").id
         ps = PrivateSubnet[ps_id]
@@ -130,6 +132,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not create virtual machine with invalid name" do
+        skip_if_frozen
         project
         visit "#{project.path}/vm/create"
 
@@ -148,6 +151,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not create virtual machine with same name" do
+        skip_if_frozen
         project
         visit "#{project.path}/vm/create"
 

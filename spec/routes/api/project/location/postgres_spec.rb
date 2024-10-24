@@ -208,6 +208,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "restore" do
+        skip_if_frozen
         stub_const("Backup", Struct.new(:key, :last_modified))
         restore_target = Time.now.utc
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)

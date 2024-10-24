@@ -34,6 +34,10 @@ Warning.ignore([:unused_var], /.*lib\/aws-sdk-(s3|core)\/(endpoint_provider|cbor
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 
 RSpec.configure do |config|
+  config.before(:suite) do
+    clover_freeze if ENV["CLOVER_FREEZE"] == "1"
+  end
+
   config.around do |example|
     DB.transaction(rollback: :always, auto_savepoint: true) do
       example.run
@@ -199,6 +203,19 @@ RSpec.configure do |config|
     failure_message_when_negated do
       "not expected: ".rjust(16) + "nap" + (expected_seconds.nil? ? "" : " #{expected_seconds} seconds") + "\n" +
         "got: ".rjust(16) + (@nap.nil? ? "not nap" : "nap #{@nap.seconds} seconds") + "\n "
+    end
+  end
+
+  if ENV["CLOVER_FREEZE"] == "1"
+    # Required by rspec after running examples
+    require "ripper"
+    require "coderay"
+
+    def skip_if_frozen
+      skip("Spec skipped when running with frozen environment")
+    end
+  else
+    def skip_if_frozen
     end
   end
 end

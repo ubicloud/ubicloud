@@ -129,16 +129,34 @@ else
     ENV["FORCE_AUTOLOAD"] = "1"
     Rake::Task["_spec"].invoke
   end
-  task default: :spec
+
+  desc "Run specs with coverage"
+  task "coverage" do
+    sh({"RACK_ENV" => "test", "COVERAGE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "rspec", "spec")
+  end
+
+  desc "Run specs with frozen environment (similar to production)"
+  task "frozen_spec" do
+    sh({"RACK_ENV" => "test", "CLOVER_FREEZE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "rspec", "spec")
+  end
+
+  desc "Run specs in with coverage in unfrozen mode, and without coverage in frozen mode"
+  task default: [:coverage, :frozen_spec]
+end
+
+nproc = lambda do
+  # Limit to 6 processes, as higher number results in more time
+  `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i.clamp(1, 6).to_s
 end
 
 desc "Run specs in parallel using turbo_tests"
 task "pspec" do
-  # Try to detect number of CPUs on both Linux and Mac
-  nproc = `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i
+  system({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call)
+end
 
-  # Limit to 6 processes, as higher number results in more time
-  system({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.clamp(1, 6).to_s)
+desc "Run parallel specs with frozen environment (similar to production)"
+task "frozen_pspec" do
+  sh({"CLOVER_FREEZE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call)
 end
 
 # Other

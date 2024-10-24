@@ -97,6 +97,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     end
 
     it "moves root_cert_2 to root_cert_1 and creates new root_cert_2 if root_cert_1 is about to expire, also updates server_cert" do
+      skip_if_frozen
       rc2 = nx.minio_cluster.root_cert_2
       rck2 = nx.minio_cluster.root_cert_key_2
       certificate_last_checked_at = nx.minio_cluster.certificate_last_checked_at

@@ -61,6 +61,7 @@ RSpec.describe InferenceEndpoint do
     end
 
     it "sends the request correctly" do
+      skip_if_frozen
       if development
         allow(Config).to receive(:development?).and_return(true)
         allow(http).to receive(:verify_mode=).with(OpenSSL::SSL::VERIFY_NONE)
