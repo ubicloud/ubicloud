@@ -5,6 +5,7 @@ RSpec.describe Minio::Client do
   let(:minio_client) { described_class.new(endpoint: endpoint, access_key: "minioadmin", secret_key: "minioadminpw", ssl_ca_file_data: "data") }
 
   it "can use ssl_ca_file_data" do
+    skip_if_frozen
     ssl_ca_file_name = "3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7"
     expect(File).to receive(:exist?).with(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")).and_return(false)
     expect(FileUtils).to receive(:mkdir_p).with(File.dirname(File.join(Dir.pwd, "var", "ca_bundles", ssl_ca_file_name + ".crt")))

@@ -138,6 +138,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "creates new billing record when no daily record" do
+      skip_if_frozen
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
@@ -150,6 +151,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses separate billing rate for arm64 runners" do
+      skip_if_frozen
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:label).and_return("ubicloud-arm").at_least(:once)
@@ -164,6 +166,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses separate billing rate for gpu runners" do
+      skip_if_frozen
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:label).and_return("ubicloud-gpu").at_least(:once)
@@ -178,6 +181,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "updates the amount of existing billing record" do
+      skip_if_frozen
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
@@ -190,6 +194,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "create a new record for a new day" do
+      skip_if_frozen
       today = Time.now
       tomorrow = today + 24 * 60 * 60
       expect(Time).to receive(:now).and_return(today).exactly(5)
@@ -209,6 +214,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "tries 3 times and creates single billing record" do
+      skip_if_frozen
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
@@ -221,6 +227,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "tries 4 times and fails" do
+      skip_if_frozen
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
@@ -471,6 +478,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#wait" do
     it "does not destroy runner if it does not pick a job in five minutes, and busy" do
+      skip_if_frozen
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
       expect(client).to receive(:get).and_return({busy: true})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
@@ -480,6 +488,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "destroys runner if it does not pick a job in five minutes and not busy" do
+      skip_if_frozen
       expect(github_runner).to receive(:workflow_job).and_return(nil)
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 6 * 60)
       expect(client).to receive(:get).and_return({busy: false})
@@ -491,6 +500,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
+      skip_if_frozen
       expect(github_runner).to receive(:workflow_job).and_return(nil)
       expect(Time).to receive(:now).and_return(github_runner.ready_at + 1 * 60)
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")

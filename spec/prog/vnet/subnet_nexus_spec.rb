@@ -268,6 +268,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "hops to wait if all is done" do
+      skip_if_frozen
       t = Time.now
       expect(Time).to receive(:now).and_return(t)
       expect(nic.strand).to receive(:label).and_return("wait")
@@ -279,6 +280,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "doesn't decrement refresh_keys if there are missed nics" do
+      skip_if_frozen
       t = Time.now
       expect(Time).to receive(:now).and_return(t)
       expect(nic.strand).to receive(:label).and_return("wait")

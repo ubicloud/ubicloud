@@ -120,6 +120,7 @@ RSpec.describe Sshable do
     end
 
     it "can run a command" do
+      skip_if_frozen
       [false, true].each do |repl_value|
         [false, true].each do |log_value|
           stub_const("REPL", repl_value)

@@ -147,7 +147,7 @@ when :test
 end
 
 def clover_freeze
-  return unless Config.production?
+  return unless Config.production? || ENV["CLOVER_FREEZE"] == "1"
   require "refrigerator"
 
   # Take care of library dependencies that modify core classes.
