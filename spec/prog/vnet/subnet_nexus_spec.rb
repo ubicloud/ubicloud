@@ -8,12 +8,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   let(:st) { Strand.new }
   let(:prj) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
   let(:ps) {
-    PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+    PrivateSubnet.create_with_id(name: "ps", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "1.1.1.0/26", state: "waiting")
   }
 
   let(:ps2) {
-    PrivateSubnet.create_with_id(name: "ps2", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fcc::/64",
+    PrivateSubnet.create_with_id(name: "ps2", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fcc::/64",
       net4: "1.1.1.128/26", state: "waiting")
   }
 
@@ -33,7 +33,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ps = described_class.assemble(
         prj.id,
         name: "default-ps",
-        location: "hetzner-hel1",
+        location: "hetzner-fsn1",
         ipv6_range: "fd10:9b0b:6b4b:8fbb::/64"
       )
 
@@ -45,7 +45,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ps = described_class.assemble(
         prj.id,
         name: "default-ps",
-        location: "hetzner-hel1",
+        location: "hetzner-fsn1",
         ipv4_range: "10.0.0.0/26"
       )
 
@@ -53,7 +53,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "uses firewall if provided" do
-      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1").tap { _1.associate_with_project(prj) }
+      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(prj) }
       ps = described_class.assemble(prj.id, firewall_id: fw.id)
       expect(ps.subject.firewalls.count).to eq(1)
       expect(ps.subject.firewalls.first).to eq(fw)
@@ -62,18 +62,18 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "fails if provided firewall does not exist" do
       expect {
         described_class.assemble(prj.id, firewall_id: "550e8400-e29b-41d4-a716-446655440000")
-      }.to raise_error RuntimeError, "Firewall with id 550e8400-e29b-41d4-a716-446655440000 and location hetzner-hel1 does not exist"
+      }.to raise_error RuntimeError, "Firewall with id 550e8400-e29b-41d4-a716-446655440000 and location hetzner-fsn1 does not exist"
     end
 
     it "fails if firewall is not in the project" do
-      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1")
+      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1")
       expect {
         described_class.assemble(prj.id, firewall_id: fw.id)
-      }.to raise_error RuntimeError, "Firewall with id #{fw.id} and location hetzner-hel1 does not exist"
+      }.to raise_error RuntimeError, "Firewall with id #{fw.id} and location hetzner-fsn1 does not exist"
     end
 
     it "fails if both allow_only_ssh and firewall_id are specified" do
-      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1").tap { _1.associate_with_project(prj) }
+      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(prj) }
       expect {
         described_class.assemble(prj.id, firewall_id: fw.id, allow_only_ssh: true)
       }.to raise_error RuntimeError, "Cannot specify both allow_only_ssh and firewall_id"
@@ -314,15 +314,15 @@ RSpec.describe Prog::Vnet::SubnetNexus do
 
   describe ".random_private_ipv4" do
     it "returns a random private ipv4 range" do
-      expect(described_class.random_private_ipv4("hetzner-hel1", prj)).to be_a NetAddr::IPv4Net
+      expect(described_class.random_private_ipv4("hetzner-fsn1", prj)).to be_a NetAddr::IPv4Net
     end
 
     it "finds a new subnet if the one it found is taken" do
       expect(PrivateSubnet).to receive(:random_subnet).and_return("10.0.0.0/8").at_least(:once)
       project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
-      described_class.assemble(project.id, location: "hetzner-hel1", name: "test-subnet", ipv4_range: "10.0.0.128/26")
+      described_class.assemble(project.id, location: "hetzner-fsn1", name: "test-subnet", ipv4_range: "10.0.0.128/26")
       allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1, 2)
-      expect(described_class.random_private_ipv4("hetzner-hel1", project).to_s).to eq("10.0.0.192/26")
+      expect(described_class.random_private_ipv4("hetzner-fsn1", project).to_s).to eq("10.0.0.192/26")
     end
 
     it "finds a new subnet if the one it found is banned" do
@@ -330,20 +330,20 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
       allow(SecureRandom).to receive(:random_number).with(2**(26 - 16) - 1).and_return(1)
       allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1)
-      expect(described_class.random_private_ipv4("hetzner-hel1", project).to_s).to eq("10.0.0.128/26")
+      expect(described_class.random_private_ipv4("hetzner-fsn1", project).to_s).to eq("10.0.0.128/26")
     end
   end
 
   describe ".random_private_ipv6" do
     it "returns a random private ipv6 range" do
-      expect(described_class.random_private_ipv6("hetzner-hel1", prj)).to be_a NetAddr::IPv6Net
+      expect(described_class.random_private_ipv6("hetzner-fsn1", prj)).to be_a NetAddr::IPv6Net
     end
 
     it "finds a new subnet if the one it found is taken" do
       project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
-      described_class.assemble(project.id, location: "hetzner-hel1", name: "test-subnet", ipv6_range: "fd61:6161:6161:6161::/64")
+      described_class.assemble(project.id, location: "hetzner-fsn1", name: "test-subnet", ipv6_range: "fd61:6161:6161:6161::/64")
       expect(SecureRandom).to receive(:bytes).with(7).and_return("a" * 7, "b" * 7)
-      expect(described_class.random_private_ipv6("hetzner-hel1", project).to_s).to eq("fd62:6262:6262:6262::/64")
+      expect(described_class.random_private_ipv6("hetzner-fsn1", project).to_s).to eq("fd62:6262:6262:6262::/64")
     end
   end
 

@@ -4,7 +4,7 @@ class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
   semaphore :checkup, :reboot, :destroy
 
-  def self.assemble(sshable_hostname, location: "hetzner-hel1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
+  def self.assemble(sshable_hostname, location: "hetzner-fsn1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
     DB.transaction do
       ubid = VmHost.generate_ubid
 

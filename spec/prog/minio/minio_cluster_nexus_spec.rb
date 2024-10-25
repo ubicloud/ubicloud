@@ -7,7 +7,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     expect(Config).to receive(:minio_service_project_id).and_return(minio_project.id).at_least(:once)
     described_class.new(
       described_class.assemble(
-        minio_project.id, "minio", "hetzner-hel1", "minio-admin", 100, 1, 1, 1, "standard-2"
+        minio_project.id, "minio", "hetzner-fsn1", "minio-admin", 100, 1, 1, 1, "standard-2"
       )
     )
   }
@@ -21,7 +21,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
 
     it "validates input" do
       expect {
-        described_class.assemble(SecureRandom.uuid, "minio", "hetzner-hel1", "minio-admin", 100, 1, 1, 1, "standard-2")
+        described_class.assemble(SecureRandom.uuid, "minio", "hetzner-fsn1", "minio-admin", 100, 1, 1, 1, "standard-2")
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
@@ -29,20 +29,20 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
 
       expect {
-        described_class.assemble(minio_project.id, "minio/name", "hetzner-hel1", "minio-admin", 100, 1, 1, 1, "standard-2")
+        described_class.assemble(minio_project.id, "minio/name", "hetzner-fsn1", "minio-admin", 100, 1, 1, 1, "standard-2")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(minio_project.id, "minio", "hetzner-hel1", "mu", 100, 1, 1, 1, "standard-2")
+        described_class.assemble(minio_project.id, "minio", "hetzner-fsn1", "mu", 100, 1, 1, 1, "standard-2")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: username"
     end
 
     it "creates a minio cluster" do
-      described_class.assemble(minio_project.id, "minio2", "hetzner-hel1", "minio-admin", 100, 1, 1, 1, "standard-2")
+      described_class.assemble(minio_project.id, "minio2", "hetzner-fsn1", "minio-admin", 100, 1, 1, 1, "standard-2")
 
       expect(MinioCluster.count).to eq 1
       expect(MinioCluster.first.name).to eq "minio2"
-      expect(MinioCluster.first.location).to eq "hetzner-hel1"
+      expect(MinioCluster.first.location).to eq "hetzner-fsn1"
       expect(MinioCluster.first.admin_user).to eq "minio-admin"
       expect(MinioCluster.first.admin_password).to match(/^[A-Za-z0-9_-]{20}$/)
       expect(MinioCluster.first.storage_size_gib).to eq 100

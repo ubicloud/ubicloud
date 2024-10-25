@@ -6,7 +6,7 @@ RSpec.describe Prog::RemoveBootImage do
   subject(:rbi) { described_class.new(Strand.new(stack: [{}])) }
 
   let(:sshable) { Sshable.create_with_id }
-  let(:vm_host) { VmHost.create(location: "hetzner-hel1") { _1.id = sshable.id } }
+  let(:vm_host) { VmHost.create(location: "hetzner-fsn1") { _1.id = sshable.id } }
   let(:boot_image) { BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14) }
 
   before do

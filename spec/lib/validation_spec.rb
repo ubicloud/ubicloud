@@ -69,7 +69,6 @@ RSpec.describe Validation do
     describe "#validate_location" do
       it "valid locations" do
         [
-          "hetzner-hel1",
           "hetzner-fsn1",
           "github-runners"
         ].each do |location|

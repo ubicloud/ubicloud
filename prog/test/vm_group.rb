@@ -24,11 +24,11 @@ class Prog::Test::VmGroup < Prog::Test::Base
     project.associate_with_project(project)
 
     subnet1_s = Prog::Vnet::SubnetNexus.assemble(
-      project.id, name: "the-first-subnet", location: "hetzner-hel1"
+      project.id, name: "the-first-subnet", location: "hetzner-fsn1"
     )
 
     subnet2_s = Prog::Vnet::SubnetNexus.assemble(
-      project.id, name: "the-second-subnet", location: "hetzner-hel1"
+      project.id, name: "the-second-subnet", location: "hetzner-fsn1"
     )
 
     storage_encrypted = frame.fetch("storage_encrypted", true)

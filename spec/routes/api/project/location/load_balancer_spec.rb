@@ -8,7 +8,7 @@ RSpec.describe Clover, "load-balancer" do
   let(:project) { user.create_project_with_default_policy("project-1") }
 
   let(:lb) do
-    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-hel1")
+    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-fsn1")
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80).subject
@@ -43,7 +43,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "list" do
       it "empty" do
-        get "/api/project/#{project.ubid}/location/eu-north-h1/load-balancer"
+        get "/api/project/#{project.ubid}/location/eu-central-h1/load-balancer"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"]).to eq([])
@@ -52,7 +52,7 @@ RSpec.describe Clover, "load-balancer" do
       it "success single" do
         lb
 
-        get "/api/project/#{project.ubid}/location/eu-north-h1/load-balancer"
+        get "/api/project/#{project.ubid}/location/eu-central-h1/load-balancer"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"].length).to eq(1)
@@ -62,7 +62,7 @@ RSpec.describe Clover, "load-balancer" do
         lb
         Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 80).subject
 
-        get "/api/project/#{project.ubid}/location/eu-north-h1/load-balancer"
+        get "/api/project/#{project.ubid}/location/eu-central-h1/load-balancer"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"].length).to eq(2)
@@ -86,7 +86,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "create" do
       it "success" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-fsn1").subject
         post "/api/project/#{project.ubid}/load-balancer/lb1", {
           private_subnet_id: ps.ubid,
           src_port: "80", dst_port: "80",

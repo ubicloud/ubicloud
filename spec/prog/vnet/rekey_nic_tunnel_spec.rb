@@ -7,7 +7,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
 
   let(:st) { Strand.new }
   let(:ps) {
-    PrivateSubnet.create_with_id(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+    PrivateSubnet.create_with_id(name: "ps", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "1.1.1.0/26", state: "waiting")
   }
   let(:tunnel) {

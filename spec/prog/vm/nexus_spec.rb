@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_2.spdk_installation = si
     disk_2.storage_device = dev2
     disk_2.boot_image = bi
-    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-hel1", created_at: Time.now).tap {
+    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-fsn1", created_at: Time.now).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
@@ -47,7 +47,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe ".assemble" do
     let(:ps) {
-      PrivateSubnet.create(name: "ps", location: "hetzner-hel1", net6: "fd10:9b0b:6b4b:8fbb::/64",
+      PrivateSubnet.create(name: "ps", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "1.1.1.0/26", state: "waiting") { _1.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
     }
     let(:nic) {
@@ -97,7 +97,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(Prog::Vnet::NicNexus).not_to receive(:assemble)
       expect(Project).to receive(:[]).with(prj.id).and_return(prj)
       expect(prj.private_subnets).to receive(:any?).and_return(true)
-      described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location: "hetzner-hel1")
+      described_class.assemble("some_ssh_key", prj.id, nic_id: nic.id, location: "hetzner-fsn1")
     end
 
     def requested_disk_size(st)
@@ -243,7 +243,7 @@ RSpec.describe Prog::Vm::Nexus do
       vm.unix_user = "test_user"
       vm.public_key = "test_ssh_key"
       vm.local_vetho_ip = "169.254.0.0"
-      ps = instance_double(PrivateSubnet, location: "hetzner-hel1", net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
+      ps = instance_double(PrivateSubnet, location: "hetzner-fsn1", net4: NetAddr::IPv4Net.parse("10.0.0.0/26"))
       nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
       pci = PciDevice.new(slot: "01:00.0", iommu_group: 23)
       expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
@@ -367,7 +367,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [],
-        location_filter: ["hetzner-hel1"],
+        location_filter: ["hetzner-fsn1"],
         location_preference: [],
         gpu_count: 0
       )
@@ -382,7 +382,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [],
-        location_filter: ["github-runners", "hetzner-fsn1", "hetzner-hel1"],
+        location_filter: ["github-runners", "hetzner-fsn1"],
         location_preference: ["github-runners"],
         gpu_count: 0
       )
@@ -436,7 +436,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [:vm_host_id, "another-vm-host-id"],
-        location_filter: ["hetzner-hel1"],
+        location_filter: ["hetzner-fsn1"],
         location_preference: [],
         gpu_count: 0
       )
@@ -462,7 +462,7 @@ RSpec.describe Prog::Vm::Nexus do
         allocation_state_filter: ["accepting"],
         distinct_storage_devices: true,
         host_filter: [],
-        location_filter: ["hetzner-hel1"],
+        location_filter: ["hetzner-fsn1"],
         host_exclusion_filter: [],
         location_preference: [],
         gpu_count: 0
@@ -482,7 +482,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [],
-        location_filter: ["hetzner-hel1"],
+        location_filter: ["hetzner-fsn1"],
         location_preference: [],
         gpu_count: 3
       )

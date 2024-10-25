@@ -11,7 +11,7 @@ class Prog::Vm::Nexus < Prog::Base
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
-    unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
+    unix_user: "ubi", location: "hetzner-fsn1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0)
@@ -176,7 +176,7 @@ class Prog::Vm::Nexus < Prog::Base
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
         elsif vm.location == "github-runners"
-          runner_locations = (vm.cores == 30) ? [] : ["github-runners", "hetzner-fsn1", "hetzner-hel1"]
+          runner_locations = (vm.cores == 30) ? [] : ["github-runners", "hetzner-fsn1"]
           [["accepting"], runner_locations, ["github-runners"], []]
         else
           [["accepting"], [vm.location], [], []]

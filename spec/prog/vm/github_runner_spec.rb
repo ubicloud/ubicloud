@@ -283,7 +283,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#wait_concurrency_limit" do
     before do
-      [["hetzner-hel1", "x64"], ["github-runners", "x64"], ["github-runners", "arm64"]].each_with_index do |(location, arch), i|
+      [["hetzner-fsn1", "x64"], ["github-runners", "x64"], ["github-runners", "arm64"]].each_with_index do |(location, arch), i|
         ssh = Sshable.create_with_id(host: "0.0.0.#{i}")
         VmHost.create(location: location, allocation_state: "accepting", arch: arch, total_cores: 16, used_cores: 16) { _1.id = ssh.id }
       end
@@ -374,23 +374,23 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe ".setup_info" do
     it "returns setup info with vm pool ubid" do
       expect(vm).to receive(:pool_id).and_return("ccd51c1e-2c78-8f76-b182-467e6cdc51f0").at_least(:once)
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
 
-      expect(nx.setup_info[:detail]).to eq("Name: #{github_runner.ubid}\nLabel: ubicloud-standard-4\nArch: \nImage: \nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\nVM Pool: vpskahr7hcf26p614czkcvh8z1\nLocation: hetzner-hel1\nDatacenter: FSN1-DC8\nProject: pjwnadpt27b21p81d7334f11rx\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github")
+      expect(nx.setup_info[:detail]).to eq("Name: #{github_runner.ubid}\nLabel: ubicloud-standard-4\nArch: \nImage: \nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\nVM Pool: vpskahr7hcf26p614czkcvh8z1\nLocation: hetzner-fsn1\nDatacenter: FSN1-DC8\nProject: pjwnadpt27b21p81d7334f11rx\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github")
     end
   end
 
   describe "#setup_environment" do
     it "hops to register_runner" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx", get_ff_transparent_cache: false)).at_least(:once)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
       COMMAND
@@ -399,7 +399,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "hops to stop_service with after enabling transparent cache" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-hel1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx", get_ff_transparent_cache: true)).at_least(:once)
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))])
@@ -407,7 +407,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         set -ueo pipefail
         echo "image version: $ImageVersion"
         sudo usermod -a -G sudo,adm runneradmin
-        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-hel1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment

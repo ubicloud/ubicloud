@@ -7,7 +7,7 @@ RSpec.describe Clover, "firewall" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1").tap { _1.associate_with_project(project) } }
+  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(project) } }
 
   describe "unauthenticated" do
     it "not delete" do
@@ -41,7 +41,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "success get all location firewalls" do
-      Firewall.create_with_id(name: "#{firewall.name}-2", location: "hetzner-hel1").associate_with_project(project)
+      Firewall.create_with_id(name: "#{firewall.name}-2", location: "hetzner-fsn1").associate_with_project(project)
 
       get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall"
 
@@ -102,7 +102,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach to subnet" do
-      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
@@ -124,7 +124,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "detach from subnet" do
-      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
@@ -144,7 +144,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach and detach" do
-      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps).twice
       expect(ps).to receive(:incr_update_firewall_rules).twice
 

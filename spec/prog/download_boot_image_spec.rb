@@ -9,7 +9,7 @@ RSpec.describe Prog::DownloadBootImage do
   let(:dbi_with_version_nil) { described_class.new(Strand.new(stack: [{"image_name" => "my-image", "version" => nil, "custom_url" => "https://example.com/my-image.raw"}])) }
 
   let(:sshable) { Sshable.create_with_id }
-  let(:vm_host) { VmHost.create(location: "hetzner-hel1", arch: "x64") { _1.id = sshable.id } }
+  let(:vm_host) { VmHost.create(location: "hetzner-fsn1", arch: "x64") { _1.id = sshable.id } }
 
   before do
     allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)

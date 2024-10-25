@@ -6,7 +6,7 @@ RSpec.describe Prog::DownloadFirmware do
   subject(:df) { described_class.new(Strand.new(stack: [{"version" => "202405", "sha256" => "thesha"}])) }
 
   let(:sshable) { Sshable.create_with_id }
-  let(:vm_host) { VmHost.create(location: "hetzner-hel1", arch: "x64") { _1.id = sshable.id } }
+  let(:vm_host) { VmHost.create(location: "hetzner-fsn1", arch: "x64") { _1.id = sshable.id } }
 
   before do
     allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)
