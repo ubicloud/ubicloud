@@ -8,7 +8,7 @@ require "argon2"
 
 TEST_USER_EMAIL = "user@example.com"
 TEST_USER_PASSWORD = "Secret@Password123"
-TEST_LOCATION = "eu-north-h1"
+TEST_LOCATION = "eu-central-h1"
 
 RSpec.configure do |config|
   include Rack::Test::Methods

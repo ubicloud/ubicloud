@@ -41,9 +41,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       project = Project.create_with_id(name: "mc-project").tap { _1.associate_with_project(_1) }
       expect(Config).to receive(:minio_service_project_id).and_return(project.id).at_least(:once)
       expect(Config).to receive(:postgres_service_project_id).and_return(project.id)
-      mc = Prog::Minio::MinioClusterNexus.assemble(project.id, "minio", "hetzner-hel1", "minio-admin", 100, 1, 1, 1, "standard-2").subject
+      mc = Prog::Minio::MinioClusterNexus.assemble(project.id, "minio", "hetzner-fsn1", "minio-admin", 100, 1, 1, 1, "standard-2").subject
 
-      st = described_class.assemble(location: "hetzner-hel1")
+      st = described_class.assemble(location: "hetzner-fsn1")
 
       postgres_timeline = PostgresTimeline[st.id]
       expect(postgres_timeline.blob_storage_id).to eq(mc.id)

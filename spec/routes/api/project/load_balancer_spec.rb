@@ -23,7 +23,7 @@ RSpec.describe Clover, "vm" do
     end
 
     it "success all load balancers" do
-      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-hel1")
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-fsn1")
       Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80)
       Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-2", src_port: 80, dst_port: 80)
       get "/api/project/#{project.ubid}/load-balancer"

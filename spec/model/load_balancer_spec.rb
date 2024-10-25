@@ -21,7 +21,7 @@ RSpec.describe LoadBalancer do
 
     it "returns hyper_tag_name" do
       prj = lb.private_subnet.projects.first
-      expect(lb.hyper_tag_name(prj)).to eq("project/#{prj.ubid}/location/eu-north-h1/load-balancer/test-lb")
+      expect(lb.hyper_tag_name(prj)).to eq("project/#{prj.ubid}/location/eu-central-h1/load-balancer/test-lb")
     end
 
     it "returns hostname" do

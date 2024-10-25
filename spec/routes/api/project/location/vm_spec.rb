@@ -50,7 +50,7 @@ RSpec.describe Clover, "vm" do
       it "success multiple location with pagination" do
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-3")
-        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-4", location: "hetzner-fsn1")
+        Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-4", location: "leaseweb-wdc02")
 
         get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm", {
           order_column: "name",
@@ -85,7 +85,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success with private subnet" do
-        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").ubid
+        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").ubid
 
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
@@ -180,11 +180,11 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"invalid-ubid\" is not found in the location \"eu-north-h1\""})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"invalid-ubid\" is not found in the location \"eu-central-h1\""})
       end
 
       it "invalid ps id in other location" do
-        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").ubid
+        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "leaseweb-wdc02").ubid
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
@@ -194,7 +194,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-north-h1\""})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-central-h1\""})
       end
 
       it "invalid body" do

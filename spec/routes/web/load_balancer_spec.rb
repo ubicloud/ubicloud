@@ -10,14 +10,14 @@ RSpec.describe Clover, "load balancer" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:lb) do
-    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
     lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
     lb.associate_with_project(project)
     lb
   end
 
   let(:lb_wo_permission) {
-    ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2", location: "hetzner-hel1").subject
+    ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
     lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
     lb.associate_with_project(project_wo_permissions)
     lb
@@ -67,7 +67,7 @@ RSpec.describe Clover, "load balancer" do
     describe "create" do
       it "can create new load balancer" do
         project
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         visit "#{project.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
@@ -90,7 +90,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "can not create load balancer with invalid name" do
         project
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         visit "#{project.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
@@ -111,7 +111,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not create load balancer in a project when does not have permissions" do
-        Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         visit "#{project_wo_permissions.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
@@ -121,7 +121,7 @@ RSpec.describe Clover, "load balancer" do
 
       it "can not create load balancer with invalid private subnet" do
         project
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         visit "#{project.path}/load-balancer/create"
 
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
@@ -160,7 +160,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "raises forbidden when does not have permissions" do
-        visit "#{project_wo_permissions.path}/location/eu-north-h1/load-balancer/#{lb_wo_permission.name}"
+        visit "#{project_wo_permissions.path}/location/eu-central-h1/load-balancer/#{lb_wo_permission.name}"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
@@ -168,7 +168,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "raises not found when load balancer not exists" do
-        visit "#{project.path}/location/eu-north-h1/load-balancer/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/eu-central-h1/load-balancer/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
@@ -188,7 +188,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can attach vm" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
@@ -214,7 +214,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not attach vm when it is already attached to another load balancer" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         lb1 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         lb2 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-4", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
@@ -234,7 +234,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not attach vm when it does not exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
@@ -250,7 +250,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can detach vm" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
@@ -273,7 +273,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not detach vm when it does not exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
@@ -300,7 +300,7 @@ RSpec.describe Clover, "load balancer" do
 
     describe "delete" do
       it "can delete load balancer" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
         visit "#{project.path}#{lb.path}"
@@ -327,7 +327,7 @@ RSpec.describe Clover, "load balancer" do
       end
 
       it "can not delete load balancer when it doesn't exist" do
-        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").subject
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
         visit "#{project.path}#{lb.path}"

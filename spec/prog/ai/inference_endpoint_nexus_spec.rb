@@ -80,8 +80,8 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       }.to raise_error("Invalid replica count")
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-hel1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
-      }.to raise_error("No firewall named 'inference-endpoint-firewall' configured for inference endpoints in hetzner-hel1")
+        described_class.assemble(project_id: customer_project.id, location: "leaseweb-wdc02", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+      }.to raise_error("No firewall named 'inference-endpoint-firewall' configured for inference endpoints in leaseweb-wdc02")
 
       expect {
         st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)

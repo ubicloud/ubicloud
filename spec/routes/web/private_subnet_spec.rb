@@ -10,7 +10,7 @@ RSpec.describe Clover, "private subnet" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:private_subnet) do
-    ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-hel1").id
+    ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").id
     ps = PrivateSubnet[ps_id]
     ps.update(net6: "2a01:4f8:173:1ed3::/64")
     ps.update(net4: "172.17.226.128/26")
@@ -71,7 +71,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
         name = "dummy-ps"
         fill_in "Name", with: name
-        choose option: "eu-north-h1"
+        choose option: "eu-central-h1"
 
         click_button "Create"
 
@@ -88,7 +88,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
 
         fill_in "Name", with: private_subnet.name
-        choose option: "eu-north-h1"
+        choose option: "eu-central-h1"
 
         click_button "Create"
 
@@ -112,7 +112,7 @@ RSpec.describe Clover, "private subnet" do
       end
 
       it "raises not found when private subnet not exists" do
-        visit "#{project.path}/location/hetzner-hel1/private-subnet/08s56d4kaj94xsmrnf5v5m3mav"
+        visit "#{project.path}/location/hetzner-fsn1/private-subnet/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
@@ -138,7 +138,7 @@ RSpec.describe Clover, "private subnet" do
     describe "show firewalls" do
       it "can show attached firewalls" do
         private_subnet
-        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-hel1")
+        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1")
         fw.associate_with_private_subnet(private_subnet)
 
         visit "#{project.path}#{private_subnet.path}"

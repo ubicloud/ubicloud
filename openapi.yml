@@ -868,7 +868,7 @@ components:
       required: true
       schema:
         type: string
-        example: eu-north-h1
+        example: eu-central-h1
     order_column:
       description: Pagination - Order column
       in: query
@@ -1130,7 +1130,7 @@ components:
         location:
           description: Location of the VM
           type: string
-          example: eu-north-h1
+          example: eu-central-h1
         name:
           description: Name of the VM
           type: string

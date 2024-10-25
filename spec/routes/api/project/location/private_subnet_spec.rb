@@ -104,7 +104,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "with valid firewall" do
-        fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-hel1").tap { _1.associate_with_project(project) }
+        fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(project) }
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: fw.ubid}.to_json
 
         expect(last_response.status).to eq(200)
@@ -116,7 +116,7 @@ RSpec.describe Clover, "private_subnet" do
       it "with invalid firewall id" do
         post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: "invalidid"}.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"invalidid\" and location \"hetzner-hel1\" is not found"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: firewall_id", {"firewall_id" => "Firewall with id \"invalidid\" and location \"hetzner-fsn1\" is not found"})
       end
 
       it "with empty body" do
