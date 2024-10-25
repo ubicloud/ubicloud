@@ -31,7 +31,8 @@ class Prog::Vnet::CertNexus < Prog::Base
     register_deadline(:wait, 10 * 60)
 
     if Config.development? && cert.dns_zone_id.nil?
-      create_self_signed_cert(60 * 60 * 24 * 30 * 3)
+      crt, key = Util.create_certificate(subject: "/CN=" + cert.hostname, duration: 60 * 60 * 24 * 30 * 3)
+      cert.update(cert: crt, csr_key: key.to_pem)
       hop_wait
     end
 
@@ -140,21 +141,5 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   def dns_zone
     @dns_zone ||= DnsZone[cert.dns_zone_id]
-  end
-
-  def create_self_signed_cert(duration)
-    key = OpenSSL::PKey::RSA.new(4096)
-    name = OpenSSL::X509::Name.parse("/CN=#{cert.hostname}")
-    crt = OpenSSL::X509::Certificate.new
-    crt.version = 2
-    crt.serial = OpenSSL::BN.rand(128, 0)
-    crt.not_before = Time.now
-    crt.not_after = Time.now + duration
-    crt.public_key = key.public_key
-    crt.subject = name
-    crt.issuer = name
-    crt.sign key, OpenSSL::Digest.new("SHA256")
-
-    cert.update(cert: crt, csr_key: key.to_pem)
   end
 end
