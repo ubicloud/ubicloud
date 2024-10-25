@@ -18,38 +18,9 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def default_boot_image_version(image_name)
-    case image_name
-    when "ubuntu-noble"
-      Config.ubuntu_noble_version
-    when "ubuntu-jammy"
-      Config.ubuntu_jammy_version
-    when "almalinux-9"
-      Config.almalinux_9_version
-    when "almalinux-8"
-      Config.almalinux_8_version
-    when "github-ubuntu-2404"
-      Config.github_ubuntu_2404_version
-    when "github-ubuntu-2204"
-      Config.github_ubuntu_2204_version
-    when "github-ubuntu-2004"
-      Config.github_ubuntu_2004_version
-    when "github-gpu-ubuntu-2204"
-      Config.github_gpu_ubuntu_2204_version
-    when "postgres16-ubuntu-2204"
-      Config.postgres16_ubuntu_2204_version
-    when "postgres17-ubuntu-2204"
-      Config.postgres17_ubuntu_2204_version
-    when "postgres16-paradedb-ubuntu-2204"
-      Config.postgres16_paradedb_ubuntu_2204_version
-    when "postgres17-paradedb-ubuntu-2204"
-      Config.postgres17_paradedb_ubuntu_2204_version
-    when "postgres16-lantern-ubuntu-2204"
-      Config.postgres16_lantern_ubuntu_2204_version
-    when "ai-ubuntu-2404-nvidia"
-      Config.ai_ubuntu_2404_nvidia_version
-    else
-      fail "Unknown boot image: #{image_name}"
-    end
+    config_name = image_name.tr("-", "_") + "_version"
+    fail "Unknown boot image: #{image_name}" unless Config.respond_to?(config_name)
+    Config.send(config_name)
   end
 
   def url

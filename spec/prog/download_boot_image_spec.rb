@@ -39,19 +39,6 @@ RSpec.describe Prog::DownloadBootImage do
   describe "#default_boot_image_version" do
     it "returns the version for the default image" do
       expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
-      expect(dbi.default_boot_image_version("ubuntu-jammy")).to eq(Config.ubuntu_jammy_version)
-      expect(dbi.default_boot_image_version("almalinux-9")).to eq(Config.almalinux_9_version)
-      expect(dbi.default_boot_image_version("almalinux-8")).to eq(Config.almalinux_8_version)
-      expect(dbi.default_boot_image_version("github-ubuntu-2404")).to eq(Config.github_ubuntu_2404_version)
-      expect(dbi.default_boot_image_version("github-ubuntu-2204")).to eq(Config.github_ubuntu_2204_version)
-      expect(dbi.default_boot_image_version("github-ubuntu-2004")).to eq(Config.github_ubuntu_2004_version)
-      expect(dbi.default_boot_image_version("github-gpu-ubuntu-2204")).to eq(Config.github_gpu_ubuntu_2204_version)
-      expect(dbi.default_boot_image_version("postgres16-ubuntu-2204")).to eq(Config.postgres16_ubuntu_2204_version)
-      expect(dbi.default_boot_image_version("postgres17-ubuntu-2204")).to eq(Config.postgres17_ubuntu_2204_version)
-      expect(dbi.default_boot_image_version("postgres16-paradedb-ubuntu-2204")).to eq(Config.postgres16_paradedb_ubuntu_2204_version)
-      expect(dbi.default_boot_image_version("postgres17-paradedb-ubuntu-2204")).to eq(Config.postgres17_paradedb_ubuntu_2204_version)
-      expect(dbi.default_boot_image_version("postgres16-lantern-ubuntu-2204")).to eq(Config.postgres16_lantern_ubuntu_2204_version)
-      expect(dbi.default_boot_image_version("ai-ubuntu-2404-nvidia")).to eq(Config.ai_ubuntu_2404_nvidia_version)
     end
 
     it "fails for unknown images" do
