@@ -10,16 +10,18 @@
   <label for="<%= name %>" class="text-sm font-medium leading-6 text-gray-900"><%= label %></label>
   <fieldset class="radio-small-cards" id="<%= name %>-radios">
     <legend class="sr-only"><%= label %></legend>
-    <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-      <% options.each do |opt_val, opt_text, opt_details| %>
+    <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+      <% options.each do |opt_val, opt_text, opt_classes, opt_attrs| %>
         <label>
           <input
             type="radio"
             name="<%= name %>"
             value="<%= opt_val %>"
-            data-details="<%= opt_details %>"
-            class="peer sr-only"
+            class="peer sr-only <%= opt_classes %>"
             <%= (opt_val == selected) ? "checked" : "" %>
+            <% (opt_attrs || {}).each do |opt_atr_key, opt_atr_value| %>
+              <%= opt_atr_key %>="<%= opt_atr_value %>"
+            <% end%>
             <% attributes.each do |atr_key, atr_value| %>
             <%= atr_key %>="<%= atr_value %>"
             <% end%>
