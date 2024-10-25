@@ -46,6 +46,7 @@ group :development do
   gem "rubocop-rake"
   gem "rubocop-rspec"
   gem "rubocop-sequel"
+  gem "ruby-lsp", require: false
   gem "standard", ">= 1.24.3"
   gem "simplecov"
   gem "turbo_tests"
