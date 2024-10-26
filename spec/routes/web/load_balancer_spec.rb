@@ -192,7 +192,7 @@ RSpec.describe Clover, "load balancer" do
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
-        cert.update(cert: "cert", csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+        cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
@@ -219,7 +219,7 @@ RSpec.describe Clover, "load balancer" do
         lb2 = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-4", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
-        cert.update(cert: "cert", csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+        cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb1.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
@@ -254,7 +254,7 @@ RSpec.describe Clover, "load balancer" do
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
-        cert.update(cert: "cert", csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+        cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
         expect(page).to have_no_content vm.name
@@ -277,7 +277,7 @@ RSpec.describe Clover, "load balancer" do
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
-        cert.update(cert: "cert", csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+        cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("key", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 

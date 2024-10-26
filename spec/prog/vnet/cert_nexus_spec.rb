@@ -57,7 +57,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "registers a deadline and starts the certificate creation process" do
       client = instance_double(Acme::Client)
-      key = OpenSSL::PKey::EC.generate("prime256v1")
+      key = Clec::Cert.ec_key
       expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(key)
       expect(Acme::Client).to receive(:new).with(private_key: key, directory: Config.acme_directory).and_return(client)
       expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
@@ -124,7 +124,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "finalizes the certificate when dns_challenge is valid" do
       expect(challenge).to receive(:status).and_return("valid")
 
-      key = OpenSSL::PKey::EC.generate("prime256v1")
+      key = Clec::Cert.ec_key
       expect(OpenSSL::PKey::EC).to receive(:generate).and_return(key)
       csr = instance_double(Acme::Client::CertificateRequest)
       acme_order = instance_double(Acme::Client::Resources::Order)
