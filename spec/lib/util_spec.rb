@@ -30,4 +30,18 @@ RSpec.describe Util do
       expect { described_class.rootish_ssh("hostname", "user", [], "failing command") }.to raise_error RuntimeError, "Ssh command failed: it didn't work"
     end
   end
+
+  describe "#parse_key" do
+    it "can parse an elliptic key" do
+      expect(described_class.parse_key(Clec::Cert::EC_KEY_PEM)).to be_instance_of OpenSSL::PKey::EC
+    end
+
+    it "can parse an RSA key" do
+      expect(described_class.parse_key(Clec::Cert::RSA_KEY_PEM)).to be_instance_of OpenSSL::PKey::RSA
+    end
+
+    it "rejects unformatted information" do
+      expect { described_class.parse_key("") }.to raise_error OpenSSL::PKey::RSAError
+    end
+  end
 end

@@ -22,6 +22,12 @@ module Util
     end
   end
 
+  def self.parse_key(key_data)
+    OpenSSL::PKey::EC.new(key_data)
+  rescue OpenSSL::PKey::ECError, OpenSSL::PKey::DSAError
+    OpenSSL::PKey::RSA.new(key_data)
+  end
+
   def self.create_root_certificate(common_name:, duration:)
     create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{common_name}",
