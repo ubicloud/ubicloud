@@ -122,7 +122,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   def acme_client
     # If the private_key is not yet set, we did not start the communication with
     # ACME server yet, therefore, we return nil.
-    Acme::Client.new(private_key: OpenSSL::PKey::EC.new(cert.account_key), directory: Config.acme_directory, kid: cert.kid) if cert.account_key
+    Acme::Client.new(private_key: Util.parse_key(cert.account_key), directory: Config.acme_directory, kid: cert.kid) if cert.account_key
   end
 
   def acme_order
