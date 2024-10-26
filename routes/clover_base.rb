@@ -37,8 +37,7 @@ module CloverBase
       message = e.message
       details = e.details
     else
-      $stderr.print "#{e.class}: #{e.message}\n"
-      warn e.backtrace
+      Clog.emit("route exception") { Util.exception_to_hash(e) }
 
       code = 500
       type = "UnexceptedError"
