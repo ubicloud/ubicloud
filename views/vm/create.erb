@@ -89,6 +89,31 @@
                 ) %>
               </div>
               <div class="col-span-full">
+                <%== render(
+                  "components/form/radio_small_cards",
+                  locals: {
+                    name: "size",
+                    label: "Server size (Dedicated CPU)",
+                    options: Option::VmSizes.select { _1.visible }.map {
+                      [
+                        _1.name,
+                        [_1.display_name, "#{_1.vcpu} vCPUs / #{_1.memory} GB RAM"],
+                        "location-based-price",
+                        {
+                          "data-resource-type" => "VmCores",
+                          "data-resource-family" => _1.family,
+                          "data-amount" => _1.vcpu / 2,
+                          "data-storage-resource-type" => "VmStorage",
+                          "data-storage-size-options" => _1.storage_size_options,
+                          "disabled-text" => !@enabled_vm_sizes.include?(_1.name)
+                        }
+                      ] },
+                    attributes: {
+                      required: true
+                    }
+                  }
+                ) %>
+
                 <div class="space-y-2">
                   <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size (Dedicated CPU)</label>
                   <fieldset class="radio-small-cards" id="size-radios">
