@@ -287,7 +287,7 @@ RSpec.describe Clover, "github" do
 
         response = JSON.parse(last_response.body)
         expect(response["totalCount"]).to eq(1)
-        expect(response["artifactCaches"].map { [_1["cacheKey"], _1["cacheVersion"]] }).to eq([["k1", "v2"]])
+        expect(response["artifactCaches"].sort.map { [_1["cacheKey"], _1["cacheVersion"]] }).to eq([["k1", "v2"]])
       end
     end
   end
