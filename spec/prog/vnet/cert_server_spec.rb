@@ -19,7 +19,7 @@ RSpec.describe Prog::Vnet::CertServer do
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
-    cert.update(cert: "cert", csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+    cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
     lb.add_cert(cert)
     lb
   }
