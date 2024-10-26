@@ -13,7 +13,10 @@ RSpec.describe Clover do
   end
 
   it "handles unexpected errors" do
-    expect { visit "/webhook/test-error" }.to output(/RuntimeError.*/).to_stderr
+    expect(Clog).to receive(:emit).with("route exception").and_call_original
+
+    visit "/webhook/test-error"
+
     expect(page.title).to eq("Ubicloud - UnexceptedError")
   end
 end
