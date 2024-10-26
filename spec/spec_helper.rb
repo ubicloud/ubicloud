@@ -224,3 +224,7 @@ def create_vm(**args)
   defaults = {unix_user: "ubi", public_key: "ssh-ed25519 key", name: "test-vm", family: "standard", cores: 1, arch: "x64", location: "hetzner-hel1", boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: false, created_at: Time.now}
   Vm.create_with_id(**defaults.merge(args))
 end
+
+# Autoload helper files that may have expensive startup.
+module Clec; end
+Unreloader.autoload("#{__dir__}/clec/cert.rb") { "Clec::Cert" }
