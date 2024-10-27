@@ -504,6 +504,11 @@ EOS
   def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image)
     install_cmd = if boot_image.include?("almalinux")
       "  - [dnf, install, '-y', nftables]\n"
+    elsif boot_image.include?("debian")
+      <<YAML
+  - [apt-get, update]
+  - [apt-get, install, -y, nftables]
+YAML
     else
       ""
     end

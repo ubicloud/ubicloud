@@ -44,6 +44,7 @@ module Option
   BootImages = [
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
+    ["debian-12", "Debian 12"],
     ["almalinux-9", "AlmaLinux 9"],
     ["almalinux-8", "AlmaLinux 8"]
   ].map { |args| BootImage.new(*args) }.freeze
