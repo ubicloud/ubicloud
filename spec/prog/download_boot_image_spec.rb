@@ -79,6 +79,18 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-arm64.img")
     end
 
+    it "returns URL for arm64 debian-12 image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "debian-12", "version" => "20241004-1890"}).at_least(:once)
+      vm_host.arch = "arm64"
+      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/bookworm/20241004-1890/debian-12-genericcloud-arm64-20241004-1890.raw")
+    end
+
+    it "returns URL for x64 debian-12 image" do
+      expect(dbi).to receive(:frame).and_return({"image_name" => "debian-12", "version" => "20241004-1890"}).at_least(:once)
+      vm_host.arch = "x64"
+      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/bookworm/20241004-1890/debian-12-genericcloud-amd64-20241004-1890.raw")
+    end
+
     it "returns URL for x64 almalinux-9 image" do
       expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.4-20240507"}).at_least(:once)
       expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.4-20240507.x86_64.qcow2")

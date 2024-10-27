@@ -142,6 +142,7 @@ module Config
 
   override :ubuntu_noble_version, "20240702", string
   override :ubuntu_jammy_version, "20240701", string
+  override :debian_12_version, "20241004-1890", string
   override :almalinux_9_version, "9.4-20240805", string
   override :almalinux_8_version, "8.10-20240530", string
   override :github_ubuntu_2404_version, "20241006.1.0", string
