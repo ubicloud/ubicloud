@@ -101,5 +101,5 @@ jobs:
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: code-coverage-report
+        name: code-coverage-report-${{ matrix.runs-on }}
         path: coverage/
