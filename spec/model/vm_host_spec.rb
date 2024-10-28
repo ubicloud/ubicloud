@@ -35,6 +35,24 @@ RSpec.describe VmHost do
       Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
     }
   }
+  let(:storage_device) {
+    [
+      StorageDevice.new(
+        vm_host_id: 1,
+        name: "DEFAULT",
+        available_storage_gib: 100,
+        total_storage_gib: 100,
+        blk_dev_serial_number: ["11110000", "22220000"]
+      ),
+      StorageDevice.new(
+        vm_host_id: 1,
+        name: "testdrive",
+        available_storage_gib: 100,
+        total_storage_gib: 100,
+        blk_dev_serial_number: ["33330000", "44440000"]
+      )
+    ]
+  }
 
   it "requires an Sshable too" do
     expect {
@@ -338,6 +356,22 @@ RSpec.describe VmHost do
   end
 
   it "checks pulse" do
+    sds = [
+      StorageDevice.create_with_id(
+        vm_host_id: vh.id,
+        name: "DEFAULT",
+        available_storage_gib: 100,
+        total_storage_gib: 100,
+        blk_dev_serial_number: ["11110000", "22220000"]
+      ),
+      StorageDevice.create_with_id(
+        vm_host_id: vh.id,
+        name: "testdrive",
+        available_storage_gib: 100,
+        total_storage_gib: 100,
+        blk_dev_serial_number: ["33330000", "44440000"]
+      )
+    ]
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session)
     }
@@ -346,11 +380,21 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
+    expected_cmd = "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '11110000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
+                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '22220000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
+                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '33330000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
+                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '44440000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'"
 
-    expect(session[:ssh_session]).to receive(:exec!).and_return("true\n")
+    expect(vh).to receive(:storage_devices).and_return(sds).exactly(3).times
+    expect(session[:ssh_session]).to receive(:exec!).with(expected_cmd).and_return("up\nup")
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
 
-    expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+    expect(session[:ssh_session]).to receive(:exec!).with(expected_cmd).and_return("up\ndown")
+    expect(vh).to receive(:reload).and_return(vh)
+    expect(vh).to receive(:incr_checkup)
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+
+    expect(session[:ssh_session]).to receive(:exec!).with(expected_cmd).and_raise Sshable::SshError
     expect(vh).to receive(:reload).and_return(vh)
     expect(vh).to receive(:incr_checkup)
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
