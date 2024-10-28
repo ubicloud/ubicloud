@@ -2,6 +2,9 @@
 
 require "sequel"
 
+auto_parallel_tests = nil
+auto_parallel_tests_file = ".auto-parallel-tests"
+
 # Migrate
 migrate = lambda do |env, version, db: nil|
   ENV["RACK_ENV"] = env
@@ -88,12 +91,19 @@ task :refresh_sequel_caches do
 end
 
 # Database setup
+
+nproc = lambda do
+  # Limit to 6 processes, as higher number results in more time
+  `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i.clamp(1, 6).to_s
+end
+
 desc "Setup database"
 task :setup_database, [:env, :parallel] do |_, args|
   raise "env must be test or dev" if !["test", "development"].include?(args[:env])
   raise "parallel can only be used in test" if args[:parallel] && args[:env] != "test"
+  File.binwrite(auto_parallel_tests_file, "1") if args[:parallel] && !File.file?(auto_parallel_tests_file)
 
-  database_count = args[:parallel] ? `nproc`.to_i : 1
+  database_count = args[:parallel] ? nproc.call.to_i : 1
   threads = []
   database_count.times do |i|
     threads << Thread.new do
@@ -131,74 +141,59 @@ ENVRB
 end
 
 # Specs
-begin
-  require "rspec/core/rake_task"
-  RSpec::Core::RakeTask.new(:_spec)
-  Rake::Task["_spec"].clear_comments
-rescue LoadError
-else
-  desc "Run specs"
-  task "spec" do
-    ENV["RACK_ENV"] = "test"
-    ENV["FORCE_AUTOLOAD"] = "1"
-    Rake::Task["_spec"].invoke
-  end
 
-  rspec = lambda do |env|
-    sh(env.merge("RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "rspec", "spec")
-  end
+desc "Run specs in with coverage in unfrozen mode, and without coverage in frozen mode"
+task default: [:coverage, :frozen_spec]
 
-  desc "Run specs with coverage"
-  task "coverage" do
-    rspec.call("COVERAGE" => "1")
-  end
-
-  desc "Run specs with frozen core, Database, and models (similar to production)"
-  task "frozen_spec" do
-    rspec.call("CLOVER_FREEZE_CORE" => "1", "CLOVER_FREEZE_MODELS" => "1")
-  end
-
-  desc "Run specs with frozen core"
-  task "frozen_core_spec" do
-    rspec.call("CLOVER_FREEZE_CORE" => "1")
-  end
-
-  desc "Run specs with frozen Database and models"
-  task "frozen_db_model_spec" do
-    rspec.call("CLOVER_FREEZE_MODELS" => "1")
-  end
-
-  desc "Run specs in with coverage in unfrozen mode, and without coverage in frozen mode"
-  task default: [:coverage, :frozen_spec]
-end
-
-nproc = lambda do
-  # Limit to 6 processes, as higher number results in more time
-  `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i.clamp(1, 6).to_s
+rspec = lambda do |env|
+  sh(env.merge("RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "rspec", "spec")
 end
 
 turbo_tests = lambda do |env|
   sh(env.merge("RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "turbo_tests", "-r", "./spec/suppress_pending", "-n", nproc.call)
 end
 
-desc "Run specs in parallel using turbo_tests"
-task "pspec" do
-  turbo_tests.call({})
+spec = lambda do |env|
+  if auto_parallel_tests.nil?
+    auto_parallel_tests = File.file?(auto_parallel_tests_file) && File.binread(auto_parallel_tests_file) == "1"
+  end
+
+  block = auto_parallel_tests ? turbo_tests : rspec
+  block.call(env)
 end
 
-desc "Run parallel specs with frozen core, Database, and models (similar to production)"
-task "frozen_pspec" do
-  turbo_tests.call("CLOVER_FREEZE_CORE" => "1", "CLOVER_FREEZE_MODELS" => "1")
-end
+desc "Run specs with coverage"
+task "coverage" => [:coverage_spec]
 
-desc "Run parallel specs with frozen core"
-task "frozen_core_pspec" do
-  turbo_tests.call("CLOVER_FREEZE_CORE" => "1")
-end
+{
+  "sspec" => [" in serial", rspec],
+  "pspec" => [" in parallel", turbo_tests],
+  "spec" => ["", spec]
+}.each do |task_suffix, (desc_suffix, block)|
+  desc "Run specs#{desc_suffix}"
+  task task_suffix do
+    block.call({})
+  end
 
-desc "Run parallel specs with frozen Database and models"
-task "frozen_db_model_pspec" do
-  turbo_tests.call("CLOVER_FREEZE_MODELS" => "1")
+  desc "Run specs#{desc_suffix} with frozen core, Database, and models (similar to production)"
+  task "frozen_#{task_suffix}" do
+    block.call("CLOVER_FREEZE_CORE" => "1", "CLOVER_FREEZE_MODELS" => "1")
+  end
+
+  desc "Run specs#{desc_suffix} with frozen core"
+  task "frozen_core_#{task_suffix}" do
+    block.call("CLOVER_FREEZE_CORE" => "1")
+  end
+
+  desc "Run specs#{desc_suffix} with frozen Database and models"
+  task "frozen_db_model_#{task_suffix}" do
+    block.call("CLOVER_FREEZE_MODELS" => "1")
+  end
+
+  desc "Run specs#{desc_suffix} with coverage"
+  task "coverage_#{task_suffix}" do
+    block.call("COVERAGE" => "1")
+  end
 end
 
 # Other
