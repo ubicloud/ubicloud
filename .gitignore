@@ -4,6 +4,7 @@
 /demo/.env
 /var/*
 /tmp/*
+/.auto-parallel-tests
 
 # Used by rake by
 /bin/by
