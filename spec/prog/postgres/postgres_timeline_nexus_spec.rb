@@ -126,6 +126,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "resolves the missing page if last completed backup is more recent than 2 days" do
       skip_if_frozen
+      skip_if_frozen_models
       expect(postgres_timeline).to receive(:need_backup?).and_return(false)
       stub_const("Backup", Struct.new(:last_modified))
       expect(postgres_timeline).to receive(:backups).and_return([instance_double(Backup, last_modified: Time.now - 1 * 24 * 60 * 60)])

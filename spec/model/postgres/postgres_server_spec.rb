@@ -229,6 +229,7 @@ RSpec.describe PostgresServer do
   end
 
   it "catches Sequel::Error if updating PostgresLsnMonitor fails" do
+    skip_if_frozen_models
     lsn_monitor = instance_double(PostgresLsnMonitor, last_known_lsn: "1/5")
     expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)

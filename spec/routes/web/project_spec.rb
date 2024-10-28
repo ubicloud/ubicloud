@@ -31,6 +31,7 @@ RSpec.describe Clover, "project" do
 
     describe "list" do
       it "can list no projects" do
+        skip_if_frozen_models
         expect(Account).to receive(:[]).and_return(user).twice
         expect(user).to receive(:projects).and_return([]).at_least(1)
 
@@ -315,6 +316,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "can not have more than 50 pending invitations" do
+        skip_if_frozen_models
         visit "#{project.path}/user"
 
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)

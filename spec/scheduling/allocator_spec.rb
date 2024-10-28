@@ -665,6 +665,7 @@ RSpec.describe Al do
     end
 
     it "allocates the vm to a host with IPv4 address" do
+      skip_if_frozen_models
       vm = create_vm
       vmh = VmHost.first
       address = Address.new(cidr: "0.0.0.0/30", routed_to_host_id: vmh.id)

@@ -18,6 +18,7 @@ RSpec.describe ResourceMethods do
   end
 
   it "archives scrubbed version of the model when deleted" do
+    skip_if_frozen_models
     scrubbed_values_hash = sa.values.merge(model_name: "Sshable")
     scrubbed_values_hash.delete(:raw_private_key_1)
     scrubbed_values_hash.delete(:raw_private_key_2)

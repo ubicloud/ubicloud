@@ -7,7 +7,8 @@ require "capybara/rspec"
 
 Gem.suffix_pattern
 
-Capybara.app = Clover.freeze.app
+Clover.freeze if ENV["FORCE_AUTOLOAD"] == "1"
+Capybara.app = Clover.app
 Capybara.exact = true
 
 module RackTestPlus

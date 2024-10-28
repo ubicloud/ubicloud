@@ -17,6 +17,7 @@ RSpec.describe GithubRunner do
   end
 
   it "can log duration when it's from a vm pool" do
+    skip_if_frozen_models
     expect(VmPool).to receive(:[]).with("pool-id").and_return(instance_double(VmPool, ubid: "pool-ubid"))
     expect(Clog).to receive(:emit).with("runner_tested").and_call_original
     github_runner.log_duration("runner_tested", 10)

@@ -9,6 +9,7 @@ RSpec.describe Prog::CheckUsageAlerts do
 
   describe "#wait" do
     it "triggers alerts if usage is exceeded given threshold" do
+      skip_if_frozen_models
       exceeded = instance_double(UsageAlert, limit: 100, project: instance_double(Project, current_invoice: instance_double(Invoice, content: {"cost" => 1000})))
       not_exceeded = instance_double(UsageAlert, limit: 100, project: instance_double(Project, current_invoice: instance_double(Invoice, content: {"cost" => 10})))
       expect(UsageAlert).to receive(:where).and_return([exceeded, not_exceeded])

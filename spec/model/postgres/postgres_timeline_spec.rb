@@ -137,11 +137,13 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns blob storage endpoint" do
+    skip_if_frozen_models
     expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
     expect(postgres_timeline.blob_storage_endpoint).to eq("https://blob-endpoint")
   end
 
   it "returns blob storage client from cache" do
+    skip_if_frozen_models
     expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "certs")).once
     expect(Minio::Client).to receive(:new).and_return("dummy-client").once

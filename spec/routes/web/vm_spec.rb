@@ -169,6 +169,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "can not create virtual machine if project has no valid payment method" do
+        skip_if_frozen_models
         expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 

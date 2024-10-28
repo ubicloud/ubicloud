@@ -13,6 +13,7 @@ RSpec.describe Clover do
   end
 
   it "handles unexpected errors" do
+    skip_if_frozen_models
     expect(Account).to receive(:[]).and_raise(RuntimeError)
     expect { visit "/create-account" }.to output(/RuntimeError.*/).to_stderr
     expect(page.title).to eq("Ubicloud - UnexceptedError")

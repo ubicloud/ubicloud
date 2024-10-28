@@ -71,6 +71,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "provisions a VM if the pool is not existing" do
+      skip_if_frozen_models
       expect(VmPool).to receive(:where).and_return([])
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
@@ -83,6 +84,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
+      skip_if_frozen_models
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "x64")
       expect(VmPool).to receive(:where).with(
         vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
@@ -100,6 +102,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "uses the existing vm if pool can pick one" do
+      skip_if_frozen_models
       git_runner_pool = VmPool.create_with_id(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners", storage_size_gib: 150, arch: "arm64")
       expect(VmPool).to receive(:where).with(
         vm_size: "standard-4", boot_image: "github-ubuntu-2204", location: "github-runners",
@@ -139,6 +142,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "creates new billing record when no daily record" do
       skip_if_frozen
+      skip_if_frozen_models
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
@@ -152,6 +156,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "uses separate billing rate for arm64 runners" do
       skip_if_frozen
+      skip_if_frozen_models
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:label).and_return("ubicloud-arm").at_least(:once)
@@ -167,6 +172,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "uses separate billing rate for gpu runners" do
       skip_if_frozen
+      skip_if_frozen_models
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:label).and_return("ubicloud-gpu").at_least(:once)
@@ -182,6 +188,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "updates the amount of existing billing record" do
       skip_if_frozen
+      skip_if_frozen_models
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
@@ -195,6 +202,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "create a new record for a new day" do
       skip_if_frozen
+      skip_if_frozen_models
       today = Time.now
       tomorrow = today + 24 * 60 * 60
       expect(Time).to receive(:now).and_return(today).exactly(5)
@@ -215,6 +223,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "tries 3 times and creates single billing record" do
       skip_if_frozen
+      skip_if_frozen_models
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)
@@ -228,6 +237,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "tries 4 times and fails" do
       skip_if_frozen
+      skip_if_frozen_models
       time = Time.now
       expect(Time).to receive(:now).and_return(time).at_least(:once)
       expect(github_runner).to receive(:ready_at).and_return(time - 5 * 60).at_least(:once)

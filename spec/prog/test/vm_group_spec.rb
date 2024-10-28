@@ -20,12 +20,14 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#wait_vms" do
     it "hops to verify_vms if vms are ready" do
+      skip_if_frozen_models
       expect(vg_test).to receive(:frame).and_return({"vms" => ["111"]})
       expect(Vm).to receive(:[]).with("111").and_return(instance_double(Vm, display_state: "running"))
       expect { vg_test.wait_vms }.to hop("verify_vms")
     end
 
     it "naps if vms are not running" do
+      skip_if_frozen_models
       expect(vg_test).to receive(:frame).and_return({"vms" => ["111"]})
       expect(Vm).to receive(:[]).with("111").and_return(instance_double(Vm, display_state: "creating"))
       expect { vg_test.wait_vms }.to nap(10)
@@ -81,6 +83,7 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#destroy_resources" do
     it "hops to wait_resources_destroyed" do
+      skip_if_frozen_models
       allow(vg_test).to receive(:frame).and_return({"vms" => ["vm_id"], "subnets" => ["subnet_id"]}).twice
       expect(Vm).to receive(:[]).with("vm_id").and_return(instance_double(Vm, incr_destroy: nil))
       expect(PrivateSubnet).to receive(:[]).with("subnet_id").and_return(instance_double(PrivateSubnet, incr_destroy: nil))
@@ -90,6 +93,7 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#wait_resources_destroyed" do
     it "hops to finish if all resources are destroyed" do
+      skip_if_frozen_models
       allow(vg_test).to receive(:frame).and_return({"vms" => ["vm_id"], "subnets" => ["subnet_id"]}).twice
       expect(Vm).to receive(:[]).with("vm_id").and_return(nil)
       expect(PrivateSubnet).to receive(:[]).with("subnet_id").and_return(nil)
@@ -98,6 +102,7 @@ RSpec.describe Prog::Test::VmGroup do
     end
 
     it "naps if all resources are not destroyed yet" do
+      skip_if_frozen_models
       allow(vg_test).to receive(:frame).and_return({"vms" => ["vm_id"], "subnets" => ["subnet_id"]}).twice
       expect(Vm).to receive(:[]).with("vm_id").and_return(instance_double(Vm))
       expect { vg_test.wait_resources_destroyed }.to nap(5)

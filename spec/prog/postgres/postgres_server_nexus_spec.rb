@@ -77,6 +77,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "picks correct base image for Lantern" do
+      skip_if_frozen_models
       expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
       expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
       expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, anything, hash_including(boot_image: "postgres16-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb"))
@@ -85,6 +86,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "errors out for unknown flavor" do
+      skip_if_frozen_models
       expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
       expect(postgres_resource).to receive(:flavor).and_return("boring_flavor").at_least(:once)
       expect {

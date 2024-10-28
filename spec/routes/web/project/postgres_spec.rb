@@ -189,6 +189,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can restore PostgreSQL database" do
         skip_if_frozen
+        skip_if_frozen_models
         stub_const("Backup", Struct.new(:key, :last_modified))
         restore_target = Time.now.utc
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
@@ -347,6 +348,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "cannot delete metric destination if it is not exist" do
+        skip_if_frozen_models
         md = PostgresMetricDestination.create_with_id(
           postgres_resource_id: pg.id,
           url: "https://example.com",

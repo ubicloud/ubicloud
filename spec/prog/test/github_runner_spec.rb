@@ -51,6 +51,7 @@ RSpec.describe Prog::Test::GithubRunner do
 
   describe "#wait_vm_pool_to_be_ready" do
     it "hops to trigger_test_runs when the pool is ready" do
+      skip_if_frozen_models
       pool = instance_double(VmPool, size: 1)
       expect(VmPool).to receive(:[]).and_return(pool)
       expect(pool).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, exclude: [instance_double(Vm)]))
@@ -59,6 +60,7 @@ RSpec.describe Prog::Test::GithubRunner do
     end
 
     it "naps if the vm in the pool not provisioned yet" do
+      skip_if_frozen_models
       pool = instance_double(VmPool, size: 1)
       expect(VmPool).to receive(:[]).and_return(pool)
       expect(pool).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, exclude: []))
@@ -127,6 +129,7 @@ RSpec.describe Prog::Test::GithubRunner do
 
   describe "#clean_resources" do
     it "not clean with github exists" do
+      skip_if_frozen_models
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client).at_least(:twice)
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
@@ -136,6 +139,7 @@ RSpec.describe Prog::Test::GithubRunner do
     end
 
     it "cleans resources and hop finish" do
+      skip_if_frozen_models
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client).at_least(:twice)
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
@@ -147,6 +151,7 @@ RSpec.describe Prog::Test::GithubRunner do
     end
 
     it "cleans resources and hop failed" do
+      skip_if_frozen_models
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client).at_least(:twice)
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
@@ -159,6 +164,7 @@ RSpec.describe Prog::Test::GithubRunner do
     end
 
     it "cleans resources already cancelled" do
+      skip_if_frozen_models
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client).at_least(:twice)
       expect(client).to receive(:workflow_runs).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})

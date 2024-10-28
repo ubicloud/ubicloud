@@ -36,6 +36,7 @@ Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 RSpec.configure do |config|
   config.before(:suite) do
     clover_freeze if ENV["CLOVER_FREEZE_CORE"] == "1"
+    Clover.freeze if ENV["CLOVER_FREEZE_MODELS"] == "1"
   end
 
   config.around do |example|
@@ -114,6 +115,10 @@ RSpec.configure do |config|
   # particularly slow.  However, avoid printing when parallel testing,
   # to avoid output from every process.
   config.profile_examples = 10 unless ENV["TEST_ENV_NUMBER"]
+
+  if ENV["CLOVER_FREEZE_CORE"] == "1" || ENV["CLOVER_FREEZE_MODELS"] == "1"
+    require_relative "suppress_pending"
+  end
 
   # Run specs in random order to surface order dependencies. If you find an
   # order dependency and want to debug it, you can fix the order by providing
@@ -212,10 +217,19 @@ RSpec.configure do |config|
     require "coderay"
 
     def skip_if_frozen
-      skip("Spec skipped when running with frozen environment")
+      skip("Spec skipped when running with frozen core")
     end
   else
     def skip_if_frozen
+    end
+  end
+
+  if ENV["CLOVER_FREEZE_MODELS"] == "1"
+    def skip_if_frozen_models
+      skip("Spec skipped when running with frozen Database/models")
+    end
+  else
+    def skip_if_frozen_models
     end
   end
 end

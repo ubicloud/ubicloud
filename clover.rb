@@ -7,7 +7,7 @@ require "roda"
 class Clover < Roda
   def self.freeze
     # :nocov:
-    if Config.test?
+    if Config.test? && ENV["CLOVER_FREEZE_MODELS"] != "1"
       Sequel::Model.descendants.each(&:finalize_associations)
     else
       Sequel::Model.freeze_descendants

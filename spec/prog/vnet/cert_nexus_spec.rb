@@ -80,6 +80,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#wait_dns_update" do
     it "waits for dns_record to be seen by all servers" do
+      skip_if_frozen_models
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_content: "content")).at_least(:once)
       dns_record = instance_double(DnsRecord, id: SecureRandom.uuid)
@@ -288,6 +289,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#dns_zone" do
     it "returns the dns zone" do
+      skip_if_frozen_models
       expect(DnsZone).to receive(:[]).with(cert.dns_zone_id).and_return("dns-zone")
       expect(nx.dns_zone).to eq "dns-zone"
     end
