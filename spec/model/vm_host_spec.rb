@@ -380,10 +380,10 @@ RSpec.describe VmHost do
       reading_rpt: 5,
       reading_chg: Time.now - 30
     }
-    expected_cmd = "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '11110000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
-                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '22220000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
-                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '33330000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
-                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '44440000$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'"
+    expected_cmd = "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '11110000$' | head -n1) | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
+                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '22220000$' | head -n1) | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
+                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '33330000$' | head -n1) | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'; " \
+                   "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '44440000$' | head -n1) | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'"
 
     expect(vh).to receive(:storage_devices).and_return(sds).exactly(3).times
     expect(session[:ssh_session]).to receive(:exec!).with(expected_cmd).and_return("up\nup")

@@ -385,10 +385,15 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#available?" do
     it "returns the available status" do
-      expect(sshable).to receive(:cmd).and_return("true")
+      expect(sshable).to receive(:connect).and_return(nil)
+      expect(vm_host).to receive(:run_health_checks).and_return(true)
       expect(nx.available?).to be true
 
-      expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
+      expect(sshable).to receive(:connect).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
+      expect(nx.available?).to be false
+
+      expect(sshable).to receive(:connect).and_return(nil)
+      expect(vm_host).to receive(:run_health_checks).and_return(false)
       expect(nx.available?).to be false
     end
   end

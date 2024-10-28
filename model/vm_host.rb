@@ -250,29 +250,30 @@ class VmHost < Sequel::Model
   end
 
   def check_pulse(session:, previous_pulse:)
-    reading = begin
-      all_bdevs = storage_devices.flat_map(&:blk_dev_serial_number)
-      commands = all_bdevs.map do |serial|
-        "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '#{serial}$') | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'"
-      end
-      stdout = session[:ssh_session].exec!(commands.join("; "))
-      all_up = stdout.split("\n").all? { |res| res.strip == "up" }
-      all_up ? "up" : "down"
-    rescue => ex
-      Clog.emit(ex)
-      "down"
-    end
-
+    reading = run_health_checks(session) ? "up" : "down"
     pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
-
     if pulse[:reading] == "down" &&
         pulse[:reading_rpt] > 5 &&
         Time.now - pulse[:reading_chg] > 30 &&
         !reload.checkup_set?
       incr_checkup
     end
-
     pulse
+  end
+
+  def run_health_checks(session)
+    all_bdevs = storage_devices.flat_map(&:blk_dev_serial_number)
+    commands = all_bdevs.map do |serial|
+      # Health check for each storage device
+      "sudo smartctl -H /dev/disk/by-id/$(ls /dev/disk/by-id/ | grep -E '#{serial}$' | head -n1) | grep -qE 'OK|PASSED' && echo 'up' || echo 'down'"
+    end
+    begin
+      stdout = session[:ssh_session].exec!(commands.join("; "))
+      stdout.split("\n").all? { |res| res.strip == "up" }
+    rescue => ex
+      Clog.emit(ex)
+      false
+    end
   end
 
   def available_storage_gib
