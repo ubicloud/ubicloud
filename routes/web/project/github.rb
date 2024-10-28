@@ -7,7 +7,7 @@ class CloverWeb
       return "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
     end
 
-    Authorization.authorize(current_user.id, "Project:github", @project.id)
+    Authorization.authorize(current_account.id, "Project:github", @project.id)
 
     r.get true do
       if @project.github_installations.empty?

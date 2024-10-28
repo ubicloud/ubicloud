@@ -3,7 +3,7 @@
 class CloverApi
   hash_branch(:project_location_prefix, "load-balancer") do |r|
     r.get true do
-      Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_user, location: @location, resource: nil).list
+      Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil).list
     end
 
     r.on NAME_OR_UBID do |lb_name, lb_id|
@@ -15,7 +15,7 @@ class CloverApi
 
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location: @location).select(Sequel[:private_subnet][:id])
       lb = LoadBalancer.first(filter)
-      handle_lb_requests(current_user, lb)
+      handle_lb_requests(current_account, lb)
     end
   end
 

@@ -3,13 +3,13 @@
 class CloverWeb
   hash_branch("project") do |r|
     r.get true do
-      @projects = Serializers::Project.serialize(current_user.projects.filter(&:visible), {include_path: true})
+      @projects = Serializers::Project.serialize(current_account.projects.filter(&:visible), {include_path: true})
 
       view "project/index"
     end
 
     r.post true do
-      project = current_user.create_project_with_default_policy(r.params["name"])
+      project = current_account.create_project_with_default_policy(r.params["name"])
 
       r.redirect project.path
     end
@@ -29,12 +29,12 @@ class CloverWeb
         r.halt
       end
 
-      unless @project.accounts.any? { _1.id == current_user.id }
+      unless @project.accounts.any? { _1.id == current_account.id }
         fail Authorization::Unauthorized
       end
 
       @project_data = Serializers::Project.serialize(@project, {include_path: true})
-      @project_permissions = Authorization.all_permissions(current_user.id, @project.id)
+      @project_permissions = Authorization.all_permissions(current_account.id, @project.id)
       @quotas = ["VmCores", "PostgresCores"].map {
         {
           resource_type: _1,
@@ -44,13 +44,13 @@ class CloverWeb
       }
 
       r.get true do
-        Authorization.authorize(current_user.id, "Project:view", @project.id)
+        Authorization.authorize(current_account.id, "Project:view", @project.id)
 
         view "project/show"
       end
 
       r.post true do
-        Authorization.authorize(current_user.id, "Project:edit", @project.id)
+        Authorization.authorize(current_account.id, "Project:edit", @project.id)
         @project.update(name: r.params["name"])
 
         flash["notice"] = "The project name is updated to '#{@project.name}'."
@@ -59,7 +59,7 @@ class CloverWeb
       end
 
       r.delete true do
-        Authorization.authorize(current_user.id, "Project:delete", @project.id)
+        Authorization.authorize(current_account.id, "Project:delete", @project.id)
 
         # If it has some resources, do not allow to delete it.
         if @project.has_resources

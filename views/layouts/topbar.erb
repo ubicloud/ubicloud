@@ -12,10 +12,10 @@
     <div class="flex items-center gap-x-4 lg:gap-x-6">
       <!-- Profile dropdown -->
       <div class="relative group dropdown text-sm leading-6 text-gray-900">
-        <button type="button" class="-m-1.5 flex items-center p-1.5" title="<%= current_user.email %>">
+        <button type="button" class="-m-1.5 flex items-center p-1.5" title="<%= current_account.email %>">
           <%== render("components/icon", locals: { name: "hero-user-circle", classes: "h-8 w-8 rounded-full bg-gray-50" }) %>
           <span class="hidden lg:flex lg:items-center">
-            <span class="ml-3 font-semibold" aria-hidden="true"><%= current_user.name %></span>
+            <span class="ml-3 font-semibold" aria-hidden="true"><%= current_account.name %></span>
             <%== render("components/icon", locals: { name: "hero-chevron-down", classes: "h-5 w-5 ml-2 text-gray-400" }) %>
           </span>
         </button>
@@ -27,7 +27,7 @@
           <div class="px-3 py-2">
             <p class="text-sm">Signed in as</p>
             <p class="truncate text-sm font-medium text-gray-900">
-              <%= current_user.email %></p>
+              <%= current_account.email %></p>
           </div>
           <div>
             <a href="/account" class="block px-3 py-1 hover:bg-gray-100" role="menuitem" tabindex="-1">My Account</a>

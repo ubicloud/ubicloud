@@ -3,7 +3,7 @@
 class CloverApi
   hash_branch("project") do |r|
     r.get true do
-      result = Project.authorized(current_user.id, "Project:view").where(visible: true).paginated_result(
+      result = Project.authorized(current_account.id, "Project:view").where(visible: true).paginated_result(
         start_after: r.params["start_after"],
         page_size: r.params["page_size"],
         order_column: r.params["order_column"]
@@ -20,7 +20,7 @@ class CloverApi
 
       request_body_params = Validation.validate_request_body(r.body.read, required_parameters)
 
-      project = current_user.create_project_with_default_policy(request_body_params["name"])
+      project = current_account.create_project_with_default_policy(request_body_params["name"])
 
       Serializers::Project.serialize(project)
     end
@@ -34,12 +34,12 @@ class CloverApi
         r.halt
       end
 
-      unless @project.accounts.any? { _1.id == current_user.id }
+      unless @project.accounts.any? { _1.id == current_account.id }
         fail Authorization::Unauthorized
       end
 
       r.delete true do
-        Authorization.authorize(current_user.id, "Project:delete", @project.id)
+        Authorization.authorize(current_account.id, "Project:delete", @project.id)
 
         # If it has some resources, do not allow to delete it.
         if @project.has_resources
@@ -53,7 +53,7 @@ class CloverApi
       end
 
       r.get true do
-        Authorization.authorize(current_user.id, "Project:view", @project.id)
+        Authorization.authorize(current_account.id, "Project:view", @project.id)
 
         Serializers::Project.serialize(@project)
       end
