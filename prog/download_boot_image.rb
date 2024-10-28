@@ -41,16 +41,16 @@ class Prog::DownloadBootImage < Prog::Base
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
         blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}#{arch}#{version}.#{suffix}", 60 * 60).to_s
       elsif image_name == "ubuntu-noble"
-        arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
+        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
       elsif image_name == "ubuntu-jammy"
-        arch = (vm_host.arch == "x64") ? "amd64" : "arm64"
+        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
       elsif image_name == "almalinux-8"
         fail "Only x64 is supported for almalinux-8" unless vm_host.arch == "x64"
         "https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-#{version}.x86_64.qcow2"
       elsif image_name == "almalinux-9"
-        arch = (vm_host.arch == "x64") ? "x86_64" : "aarch64"
+        arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
         "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
       else
         fail "Unknown image name: #{image_name}"

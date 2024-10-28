@@ -355,4 +355,9 @@ RSpec.describe VmHost do
     expect(vh).to receive(:incr_checkup)
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
+
+  it "#render_arch errors on an unexpected architecture" do
+    expect(vh).to receive(:arch).and_return("nope")
+    expect { vh.render_arch(arm64: "a", x64: "x") }.to raise_error RuntimeError, "BUG: inexhaustive render code"
+  end
 end
