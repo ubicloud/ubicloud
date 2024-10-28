@@ -4,6 +4,10 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnStorage do
   describe "#start" do
+    before do
+      allow_any_instance_of(StorageDevice).to receive(:populate_blk_dev_serial_number).and_return(nil) # rubocop:disable RSpec/AnyInstance
+    end
+
     it "exits, saving StorageDevice model instances" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))

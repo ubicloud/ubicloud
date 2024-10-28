@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "../model/storage_device"
+
 class Prog::LearnStorage < Prog::Base
   subject_is :sshable, :vm_host
 
@@ -28,7 +30,7 @@ class Prog::LearnStorage < Prog::Base
     devices = DfRecord.parse_all(sshable.cmd(df_command))
     rec = DfRecord.parse_all(sshable.cmd(df_command("/var/storage"))).first
     sds = [StorageDevice.new_with_id(
-      vm_host_id: vm_host.id, name: "DEFAULT",
+      vm_host_id: vm_host.id, name: StorageDevice::DEFAULT_NAME,
       # reserve 5G the host.
       available_storage_gib: [rec.avail_gib - 5, 0].max,
       total_storage_gib: rec.size_gib
@@ -55,6 +57,7 @@ class Prog::LearnStorage < Prog::Base
             available_storage_gib: Sequel[:excluded][:available_storage_gib]
           }).save_changes
       end
+      sd.populate_blk_dev_serial_number
     end
 
     pop("created StorageDevice records")

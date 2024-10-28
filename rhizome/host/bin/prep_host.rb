@@ -89,6 +89,7 @@ r "apt-get -y install qemu-utils mtools acl"
 # debugging crashes.
 r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 
+r "apt-get update && apt-get -y install smartmontools"
 SpdkSetup.prep
 
 # cron job to store serial.log files
