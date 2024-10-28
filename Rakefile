@@ -135,9 +135,9 @@ else
     sh({"RACK_ENV" => "test", "COVERAGE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "rspec", "spec")
   end
 
-  desc "Run specs with frozen environment (similar to production)"
+  desc "Run specs with frozen core (similar to production)"
   task "frozen_spec" do
-    sh({"RACK_ENV" => "test", "CLOVER_FREEZE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "rspec", "spec")
+    sh({"RACK_ENV" => "test", "CLOVER_FREEZE_CORE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "rspec", "spec")
   end
 
   desc "Run specs in with coverage in unfrozen mode, and without coverage in frozen mode"
@@ -154,9 +154,9 @@ task "pspec" do
   system({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call)
 end
 
-desc "Run parallel specs with frozen environment (similar to production)"
+desc "Run parallel specs with frozen core (similar to production)"
 task "frozen_pspec" do
-  sh({"CLOVER_FREEZE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call)
+  sh({"CLOVER_FREEZE_CORE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call)
 end
 
 # Other

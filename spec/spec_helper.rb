@@ -35,7 +35,7 @@ Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 
 RSpec.configure do |config|
   config.before(:suite) do
-    clover_freeze if ENV["CLOVER_FREEZE"] == "1"
+    clover_freeze if ENV["CLOVER_FREEZE_CORE"] == "1"
   end
 
   config.around do |example|
@@ -206,7 +206,7 @@ RSpec.configure do |config|
     end
   end
 
-  if ENV["CLOVER_FREEZE"] == "1"
+  if ENV["CLOVER_FREEZE_CORE"] == "1"
     # Required by rspec after running examples
     require "ripper"
     require "coderay"
