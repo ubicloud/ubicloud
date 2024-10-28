@@ -437,7 +437,7 @@ DHCP
     interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
     dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
     address_mapping = boot_image.include?("github") ?
-      "address=/localhost.blob.core.windows.net/#{nics.first.net4.split("/").first}" :
+      "address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}" :
       ""
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
