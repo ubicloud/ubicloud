@@ -96,17 +96,6 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.4-20240507.x86_64.qcow2")
     end
 
-    it "returns URL for x64 almalinux-8 image" do
-      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-8", "version" => "8.9-20231128"}).at_least(:once)
-      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-8.9-20231128.x86_64.qcow2")
-    end
-
-    it "crashes when asked for almalinux-8 on arm64" do
-      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-8", "version" => "8.9-20231128"}).at_least(:once)
-      vm_host.update(arch: "arm64")
-      expect { dbi.url }.to raise_error RuntimeError, "Only x64 is supported for almalinux-8"
-    end
-
     it "returns URL for arm64 almalinux-9 image" do
       expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.4-20240507"}).at_least(:once)
       vm_host.update(arch: "arm64")
