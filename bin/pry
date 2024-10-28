@@ -9,6 +9,7 @@ require "pry"
 
 if Config.development?
   require "awesome_print"
+  require "awesome_print/ext/sequel"
 end
 
 def dev_project
