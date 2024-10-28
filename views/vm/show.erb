@@ -74,7 +74,7 @@
           <% fw[:firewall_rules].each do |fwr| %>
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <% if Authorization.has_permission?(@current_user.id, "Firewall:view", fw[:id]) %>
+                <% if Authorization.has_permission?(current_user.id, "Firewall:view", fw[:id]) %>
                   <a
                     href="<%= "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" %>"
                     class="text-orange-600 hover:text-orange-700"
@@ -92,7 +92,7 @@
     </table>
   </div>
   <!-- Delete Card -->
-  <% if Authorization.has_permission?(@current_user.id, "Vm:delete", @vm[:id]) %>
+  <% if Authorization.has_permission?(current_user.id, "Vm:delete", @vm[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">

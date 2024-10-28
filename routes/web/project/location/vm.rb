@@ -8,7 +8,7 @@ class CloverWeb
         r.halt
       end
 
-      vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: @current_user, location: @location, resource: vm)
+      vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_user, location: @location, resource: vm)
 
       r.get true do
         vm_endpoint_helper.get

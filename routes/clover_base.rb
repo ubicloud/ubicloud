@@ -19,6 +19,11 @@ module CloverBase
     base.plugin :common_logger, logger
   end
 
+  def current_user
+    return @current_user if defined?(@current_user)
+    @current_user = Account[rodauth.session_value]
+  end
+
   # Assign some HTTP response codes to common exceptions.
   def parse_error(e)
     case e

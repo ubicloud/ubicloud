@@ -87,9 +87,6 @@ class CloverApi < Roda
     r.rodauth
     rodauth.check_active_session
     rodauth.require_authentication
-
-    @current_user = Account[rodauth.session_value]
-
     r.hash_branches("")
   end
 end

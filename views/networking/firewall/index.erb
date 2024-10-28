@@ -19,7 +19,7 @@
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium
               text-gray-900 sm:pl-6" scope="row">
-                <% if Authorization.has_permission?(@current_user.id, "Firewall:view", fw[:id]) %>
+                <% if Authorization.has_permission?(current_user.id, "Firewall:view", fw[:id]) %>
                   <a href="<%= @project_data[:path] %><%= fw[:path] %>"
                   class="text-orange-600 hover:text-orange-700"><%= fw[:name]
                   %></a>

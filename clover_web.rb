@@ -365,12 +365,20 @@ class CloverWeb < Roda
   end
 
   hash_branch("after-login") do |r|
-    if (project = @current_user.projects_dataset.order(:created_at).first)
+    if (project = current_user.projects_dataset.order(:created_at).first)
       r.redirect "#{project.path}/dashboard"
     else
       r.redirect "/project"
     end
   end
+
+  # :nocov:
+  if Config.test?
+    hash_branch(:webhook_prefix, "test-error") do |r|
+      raise
+    end
+  end
+  # :nocov:
 
   route do |r|
     r.public
@@ -380,7 +388,6 @@ class CloverWeb < Roda
       r.hash_branches(:webhook_prefix)
     end
 
-    @current_user = Account[rodauth.session_value]
     r.rodauth
 
     check_csrf!
@@ -391,7 +398,6 @@ class CloverWeb < Roda
       r.redirect rodauth.login_route
     end
     rodauth.require_authentication
-    @current_user ||= Account[rodauth.session_value]
 
     r.hash_branches("")
   end

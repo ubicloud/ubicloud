@@ -8,7 +8,7 @@ class CloverWeb
         r.halt
       end
 
-      ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: @current_user, location: @location, resource: ps)
+      ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: current_user, location: @location, resource: ps)
 
       r.get true do
         ps_endpoint_helper.get

@@ -3,7 +3,7 @@
 class CloverApi
   hash_branch(:project_location_prefix, "firewall") do |r|
     r.get true do
-      result = @project.firewalls_dataset.where(location: @location).authorized(@current_user.id, "Firewall:view").eager(:firewall_rules).paginated_result(
+      result = @project.firewalls_dataset.where(location: @location).authorized(current_user.id, "Firewall:view").eager(:firewall_rules).paginated_result(
         start_after: r.params["start_after"],
         page_size: r.params["page_size"],
         order_column: r.params["order_column"]
@@ -18,7 +18,7 @@ class CloverApi
     r.on NAME_OR_UBID do |firewall_name, firewall_id|
       if firewall_name
         r.post true do
-          Authorization.authorize(@current_user.id, "Firewall:create", @project.id)
+          Authorization.authorize(current_user.id, "Firewall:create", @project.id)
 
           allowed_optional_parameters = ["description"]
           request_body_params = Validation.validate_request_body(r.body.read, [], allowed_optional_parameters)
@@ -37,7 +37,7 @@ class CloverApi
 
       filter[:location] = @location
       @firewall = @project.firewalls_dataset.first(filter)
-      handle_firewall_requests(@current_user, @firewall, @location)
+      handle_firewall_requests(current_user, @firewall, @location)
     end
 
     # 204 response for invalid names
@@ -91,7 +91,7 @@ class CloverApi
     end
 
     request.post "detach-subnet" do
-      Authorization.authorize(@current_user.id, "PrivateSubnet:edit", @project.id)
+      Authorization.authorize(current_user.id, "PrivateSubnet:edit", @project.id)
 
       required_parameters = ["private_subnet_id"]
       request_body_params = Validation.validate_request_body(request.body.read, required_parameters)
