@@ -3,7 +3,7 @@
 class CloverApi
   hash_branch(:project_location_firewall_prefix, "firewall-rule") do |r|
     r.post true do
-      Authorization.authorize(@current_user.id, "Firewall:edit", @firewall.id)
+      Authorization.authorize(current_user.id, "Firewall:edit", @firewall.id)
 
       required_parameters = ["cidr"]
       allowed_optional_parameters = ["port_range"]
@@ -29,7 +29,7 @@ class CloverApi
 
       request.delete true do
         if firewall_rule
-          Authorization.authorize(@current_user.id, "Firewall:edit", @firewall.id)
+          Authorization.authorize(current_user.id, "Firewall:edit", @firewall.id)
           @firewall.remove_firewall_rule(firewall_rule)
         end
 
@@ -39,7 +39,7 @@ class CloverApi
 
       request.get true do
         if firewall_rule
-          Authorization.authorize(@current_user.id, "Firewall:view", @firewall.id)
+          Authorization.authorize(current_user.id, "Firewall:view", @firewall.id)
           Serializers::FirewallRule.serialize(firewall_rule)
         end
       end

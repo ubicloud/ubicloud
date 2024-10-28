@@ -11,7 +11,7 @@ class CloverWeb
         r.halt
       end
 
-      load_balancer_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: @current_user, resource: lb, location: nil)
+      load_balancer_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_user, resource: lb, location: nil)
 
       r.get true do
         load_balancer_endpoint_helper.get

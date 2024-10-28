@@ -3,7 +3,7 @@
 class CloverWeb
   hash_branch(:project_prefix, "firewall") do |r|
     r.get true do
-      authorized_firewalls = @project.firewalls_dataset.authorized(@current_user.id, "Firewall:view").all
+      authorized_firewalls = @project.firewalls_dataset.authorized(current_user.id, "Firewall:view").all
       @firewalls = Serializers::Firewall.serialize(authorized_firewalls, {include_path: true})
 
       view "networking/firewall/index"
@@ -11,8 +11,8 @@ class CloverWeb
 
     r.on "create" do
       r.get true do
-        Authorization.authorize(@current_user.id, "Firewall:create", @project.id)
-        authorized_subnets = @project.private_subnets_dataset.authorized(@current_user.id, "PrivateSubnet:edit").all
+        Authorization.authorize(current_user.id, "Firewall:create", @project.id)
+        authorized_subnets = @project.private_subnets_dataset.authorized(current_user.id, "PrivateSubnet:edit").all
         @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
         @default_location = @project.default_location
         view "networking/firewall/create"
@@ -20,7 +20,7 @@ class CloverWeb
     end
 
     r.post true do
-      Authorization.authorize(@current_user.id, "Firewall:create", @project.id)
+      Authorization.authorize(current_user.id, "Firewall:create", @project.id)
       Validation.validate_name(r.params["name"])
       location = LocationNameConverter.to_internal_name(r.params["location"])
 

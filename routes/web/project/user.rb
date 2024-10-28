@@ -2,7 +2,7 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "user") do |r|
-    Authorization.authorize(@current_user.id, "Project:user", @project.id)
+    Authorization.authorize(current_user.id, "Project:user", @project.id)
 
     r.get true do
       @user_policies = @project.access_policies_dataset.where(managed: true).flat_map do |policy|
@@ -42,16 +42,16 @@ class CloverWeb
         end
         Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
           greeting: "Hello,",
-          body: ["You're invited by '#{@current_user.name}' to join the '#{@project.name}' project on Ubicloud.",
+          body: ["You're invited by '#{current_user.name}' to join the '#{@project.name}' project on Ubicloud.",
             "To join project, click the button below.",
             "For any questions or assistance, reach out to our team at support@ubicloud.com."],
           button_title: "Join Project",
           button_link: "#{Config.base_url}#{@project.path}/dashboard")
       else
-        @project.add_invitation(email: email, policy: policy, inviter_id: @current_user.id, expires_at: Time.now + 7 * 24 * 60 * 60)
+        @project.add_invitation(email: email, policy: policy, inviter_id: current_user.id, expires_at: Time.now + 7 * 24 * 60 * 60)
         Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
           greeting: "Hello,",
-          body: ["You're invited by '#{@current_user.name}' to join the '#{@project.name}' project on Ubicloud.",
+          body: ["You're invited by '#{current_user.name}' to join the '#{@project.name}' project on Ubicloud.",
             "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
             "For any questions or assistance, reach out to our team at support@ubicloud.com."],
           button_title: "Create Account",

@@ -2,7 +2,7 @@
 
 class CloverApi
   hash_branch(:project_location_prefix, "private-subnet") do |r|
-    ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: @current_user, location: @location, resource: nil)
+    ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: current_user, location: @location, resource: nil)
 
     r.get true do
       ps_endpoint_helper.list

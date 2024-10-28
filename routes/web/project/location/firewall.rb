@@ -13,7 +13,7 @@ class CloverWeb
 
       r.on "attach-subnet" do
         r.post true do
-          Authorization.authorize(@current_user.id, "Firewall:view", fw.id)
+          Authorization.authorize(current_user.id, "Firewall:view", fw.id)
           ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
           unless ps && ps.location == @location
             flash["error"] = "Private subnet not found"
@@ -21,7 +21,7 @@ class CloverWeb
             r.redirect "#{@project.path}#{fw.path}"
           end
 
-          Authorization.authorize(@current_user.id, "PrivateSubnet:edit", ps.id)
+          Authorization.authorize(current_user.id, "PrivateSubnet:edit", ps.id)
 
           fw.associate_with_private_subnet(ps)
 
@@ -33,7 +33,7 @@ class CloverWeb
 
       r.on "detach-subnet" do
         r.post true do
-          Authorization.authorize(@current_user.id, "Firewall:view", fw.id)
+          Authorization.authorize(current_user.id, "Firewall:view", fw.id)
           ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
           unless ps && ps.location == @location
             flash["error"] = "Private subnet not found"
@@ -41,7 +41,7 @@ class CloverWeb
             r.redirect "#{@project.path}#{fw.path}"
           end
 
-          Authorization.authorize(@current_user.id, "PrivateSubnet:edit", ps.id)
+          Authorization.authorize(current_user.id, "PrivateSubnet:edit", ps.id)
 
           fw.disassociate_from_private_subnet(ps)
 
@@ -52,8 +52,8 @@ class CloverWeb
       end
 
       r.get true do
-        Authorization.authorize(@current_user.id, "Firewall:view", fw.id)
-        project_subnets = @project.private_subnets_dataset.where(location: @location).authorized(@current_user.id, "PrivateSubnet:view").all
+        Authorization.authorize(current_user.id, "Firewall:view", fw.id)
+        project_subnets = @project.private_subnets_dataset.where(location: @location).authorized(current_user.id, "PrivateSubnet:view").all
         attached_subnets = fw.private_subnets_dataset.all
         @attachable_subnets = Serializers::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.map(&:id).include?(ps.id) })
         @firewall = Serializers::Firewall.serialize(fw, {detailed: true})
@@ -63,7 +63,7 @@ class CloverWeb
 
       r.on "firewall-rule" do
         r.post true do
-          Authorization.authorize(@current_user.id, "Firewall:edit", fw.id)
+          Authorization.authorize(current_user.id, "Firewall:edit", fw.id)
 
           port_range = if r.params["port_range"].empty?
             [0, 65535]
@@ -82,7 +82,7 @@ class CloverWeb
 
         r.is String do |firewall_rule_ubid|
           r.delete true do
-            Authorization.authorize(@current_user.id, "Firewall:edit", fw.id)
+            Authorization.authorize(current_user.id, "Firewall:edit", fw.id)
             fwr = FirewallRule.from_ubid(firewall_rule_ubid)
             unless fwr
               response.status = 204
@@ -97,8 +97,8 @@ class CloverWeb
       end
 
       r.delete true do
-        Authorization.authorize(@current_user.id, "Firewall:delete", fw.id)
-        fw.private_subnets.map { Authorization.authorize(@current_user.id, "PrivateSubnet:edit", _1.id) }
+        Authorization.authorize(current_user.id, "Firewall:delete", fw.id)
+        fw.private_subnets.map { Authorization.authorize(current_user.id, "PrivateSubnet:edit", _1.id) }
         fw.destroy
 
         return {message: "Deleting #{fw.name}"}.to_json

@@ -10,7 +10,7 @@ class CloverWeb
         r.halt
       end
 
-      pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: @current_user, location: @location, resource: pg)
+      pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: current_user, location: @location, resource: pg)
 
       r.get true do
         pg_endpoint_helper.get
