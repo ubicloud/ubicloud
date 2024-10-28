@@ -2,14 +2,14 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "usage-alert") do |r|
-    Authorization.authorize(current_user.id, "Project:billing", @project.id)
+    Authorization.authorize(current_account.id, "Project:billing", @project.id)
 
     r.post true do
       name = r.params["alert_name"]
       Validation.validate_short_text(name, "name")
       limit = Validation.validate_usage_limit(r.params["limit"])
 
-      UsageAlert.create_with_id(project_id: @project.id, user_id: current_user.id, name: name, limit: limit)
+      UsageAlert.create_with_id(project_id: @project.id, user_id: current_account.id, name: name, limit: limit)
 
       r.redirect "#{@project.path}/billing"
     end

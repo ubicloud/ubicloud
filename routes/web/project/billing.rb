@@ -10,7 +10,7 @@ class CloverWeb
       return "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
     end
 
-    Authorization.authorize(current_user.id, "Project:billing", @project.id)
+    Authorization.authorize(current_account.id, "Project:billing", @project.id)
 
     r.get true do
       if (billing_info = @project.billing_info)

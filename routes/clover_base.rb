@@ -19,9 +19,9 @@ module CloverBase
     base.plugin :common_logger, logger
   end
 
-  def current_user
-    return @current_user if defined?(@current_user)
-    @current_user = Account[rodauth.session_value]
+  def current_account
+    return @current_account if defined?(@current_account)
+    @current_account = Account[rodauth.session_value]
   end
 
   # Assign some HTTP response codes to common exceptions.

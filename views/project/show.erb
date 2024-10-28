@@ -22,7 +22,7 @@
         data: [
           ["ID", @project_data[:id]],
           (
-            if Authorization.has_permission?(current_user.id, "Project:edit", @project_data[:id])
+            if Authorization.has_permission?(current_account.id, "Project:edit", @project_data[:id])
               [
                 "Name",
                 render(
@@ -73,7 +73,7 @@
 
   </div>
   <!-- Delete Card -->
-  <% if Authorization.has_permission?(current_user.id, "Project:delete", @project_data[:id]) %>
+  <% if Authorization.has_permission?(current_account.id, "Project:delete", @project_data[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">

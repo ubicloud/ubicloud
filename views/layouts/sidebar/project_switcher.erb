@@ -16,7 +16,7 @@
     tabindex="-1"
   >
     <div class="py-1 max-h-64 overflow-y-auto" role="none">
-      <% current_user.projects.each do |p| %>
+      <% current_account.projects.each do |p| %>
         <a
           href="<%= p.path %>/dashboard"
           class="block px-4 py-2 hover:bg-gray-100 hover:text-gray-900 <% if p.id == @project&.id %> bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 <% end %>"

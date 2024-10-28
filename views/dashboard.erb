@@ -7,7 +7,7 @@
 <div class="grid gap-6">
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-10">
     <% [
-      if (project = current_user.projects_dataset.order(:created_at).first)
+      if (project = current_account.projects_dataset.order(:created_at).first)
         [
           "hero-server-stack", "bg-teal-50 text-teal-700", "Create Virtual Machine",
           "Linux-based virtual machines that run on top of virtualized hardware. Comprehensive, cost-effective cloud computing.",
