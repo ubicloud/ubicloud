@@ -12,6 +12,14 @@ class Page < Sequel::Model
     end
   end
 
+  # This cannot be covered, as the current coverage tests run without freezing models.
+  # :nocov:
+  def self.freeze
+    new.pagerduty_client
+    super
+  end
+  # :nocov:
+
   include SemaphoreMethods
   include ResourceMethods
   semaphore :resolve
