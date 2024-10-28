@@ -232,6 +232,44 @@ class Prog::Vm::GithubRunner < Prog::Base
     # Remove comments and empty lines before sending them to the machine
     vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
 
+    # Just to make testing proxy code easier, it will be removed once it is tested.
+    if github_runner.installation.project.get_ff_transparent_cache
+      hop_stop_service
+    end
+
+    hop_register_runner
+  end
+
+  label def stop_service
+    command = <<~COMMAND
+      sudo systemctl stop cache-proxy.service
+      sudo systemctl disable cache-proxy.service
+    COMMAND
+
+    vm.sshable.cmd(command)
+
+    hop_download_proxy
+  end
+
+  label def download_proxy
+    command = <<~COMMAND
+      sudo rm -rf cache-proxy
+      sudo git clone #{Config.github_cache_proxy_repo_uri} cache-proxy
+    COMMAND
+
+    vm.sshable.cmd(command)
+
+    hop_start_proxy
+  end
+
+  label def start_proxy
+    command = <<~COMMAND
+      cd cache-proxy
+      go run transparent_cache_proxy.go > ~/cacheproxy.log 2>&1 &
+    COMMAND
+
+    vm.sshable.cmd(command)
+
     hop_register_runner
   end
 
