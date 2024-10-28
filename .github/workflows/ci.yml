@@ -37,6 +37,13 @@ jobs:
         psql "postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}" \
           -c "CREATE EXTENSION citext; CREATE EXTENSION btree_gist; CREATE ROLE clover_password PASSWORD '${{ env.DB_PASSWORD }}' LOGIN; ALTER ROLE ${{ env.DB_USER }} NOSUPERUSER"
 
+    - name: change DNS provider to Quad9
+      run: |
+        sudo mkdir -p /etc/systemd/resolved.conf.d
+        echo "[Resolve]
+        DNS=9.9.9.9 149.112.112.112 2620:fe::fe 2620:fe::9" | sudo tee /etc/systemd/resolved.conf.d/Ubicloud.conf
+        sudo systemctl restart systemd-resolved.service
+
     - name: Check out code
       uses: actions/checkout@v4
 
