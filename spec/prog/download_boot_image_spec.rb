@@ -209,6 +209,7 @@ RSpec.describe Prog::DownloadBootImage do
 
   describe "#activate_boot_image" do
     it "activates the boot image" do
+      skip_if_frozen_models
       dataset = instance_double(Sequel::Dataset)
       expect(BootImage).to receive(:where).with(vm_host_id: vm_host.id, name: "my-image", version: "20230303").and_return(dataset)
       expect(dataset).to receive(:update) do |args|

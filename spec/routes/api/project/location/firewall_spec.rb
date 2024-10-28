@@ -102,6 +102,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach to subnet" do
+      skip_if_frozen_models
       ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
@@ -124,6 +125,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "detach from subnet" do
+      skip_if_frozen_models
       ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
@@ -144,6 +146,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach and detach" do
+      skip_if_frozen_models
       ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-hel1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps).twice
       expect(ps).to receive(:incr_update_firewall_rules).twice

@@ -23,6 +23,7 @@ RSpec.describe Strand do
     end
 
     it "does an integrity check that deleted records are gone" do
+      skip_if_frozen_models
       st.label = "hop_exit"
       st.save_changes
       original = DB.method(:[])
@@ -39,6 +40,7 @@ RSpec.describe Strand do
     end
 
     it "does an integrity check that the lease was modified as expected" do
+      skip_if_frozen_models
       st.label = "napper"
       st.save_changes
       original = DB.method(:[])

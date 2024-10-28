@@ -104,6 +104,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "updates job details of runner when receive in_progress action" do
+      skip_if_frozen_models
       expect(Clog).to receive(:emit).with("runner_started")
       expect(runner).to receive(:vm).and_return(instance_double(Vm, ubid: "vm-ubid", arch: "x64", cores: 2, vm_host: nil, pool_id: nil)).at_least(:once)
       expect(GithubRunner).to receive(:first).and_return(runner)
@@ -125,6 +126,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "fails if unexpected action" do
+      skip_if_frozen_models
       expect(GithubRunner).to receive(:first).and_return(runner)
       send_webhook("workflow_job", workflow_job_payload(action: "approved"))
 

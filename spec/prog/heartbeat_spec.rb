@@ -11,6 +11,7 @@ RSpec.describe Prog::Heartbeat do
     before { allow(Config).to receive(:heartbeat_url).and_return("http://localhost:3000") }
 
     it "fails if it can't connect to the database" do
+      skip_if_frozen_models
       expect(DB).to receive(:[]).with(described_class::CONNECTED_APPLICATION_QUERY).and_raise(Sequel::DatabaseConnectionError)
 
       expect { hb.wait }.to raise_error Sequel::DatabaseConnectionError

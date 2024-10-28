@@ -30,6 +30,7 @@ RSpec.describe Prog::Vnet::CertServer do
   }
 
   before do
+    skip_if_frozen_models
     allow(lb).to receive(:active_cert).and_return(lb.certs.first)
     allow(Vm).to receive(:[]).and_return(vm)
   end

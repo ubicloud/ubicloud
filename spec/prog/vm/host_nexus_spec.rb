@@ -245,6 +245,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "resolves the page if host is available" do
+      skip_if_frozen_models
       expect(vm_host).to receive(:ubid).and_return("vhxxxx").at_least(:once)
       expect(Prog::PageNexus).to receive(:assemble)
       pg = instance_double(Page)
@@ -255,6 +256,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "does not resolves the page if there is none" do
+      skip_if_frozen_models
       expect(vm_host).to receive(:ubid).and_return("vhxxxx").at_least(:once)
       expect(Prog::PageNexus).to receive(:assemble)
       expect(nx).to receive(:available?).and_return(true)

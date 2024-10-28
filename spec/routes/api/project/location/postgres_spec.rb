@@ -209,6 +209,7 @@ RSpec.describe Clover, "postgres" do
 
       it "restore" do
         skip_if_frozen
+        skip_if_frozen_models
         stub_const("Backup", Struct.new(:key, :last_modified))
         restore_target = Time.now.utc
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
@@ -267,6 +268,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "failover" do
+        skip_if_frozen_models
         project.set_ff_postgresql_base_image(true)
         pg.save_changes
         rs = pg.representative_server

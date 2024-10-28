@@ -79,6 +79,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates Nic if only subnet_id is passed" do
+      skip_if_frozen_models
       expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps)
       expect(Prog::Vnet::NicNexus).to receive(:assemble).and_return(nic)
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
@@ -90,6 +91,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "adds the VM to a private subnet if nic_id is passed" do
+      skip_if_frozen_models
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
       expect(nic).to receive(:update).and_return(nic)
@@ -127,6 +129,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if nic is assigned to a different vm" do
+      skip_if_frozen_models
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:vm_id).and_return("57afa8a7-2357-4012-9632-07fbe13a3133")
       expect {
@@ -135,6 +138,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if nic subnet is in another location" do
+      skip_if_frozen_models
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(ps).to receive(:location).and_return("hel2")
@@ -144,6 +148,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if subnet of nic belongs to another project" do
+      skip_if_frozen_models
       expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
       expect(nic).to receive(:private_subnet).and_return(ps)
       expect(Project).to receive(:[]).with(prj.id).and_return(prj)
@@ -155,6 +160,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "fails if subnet belongs to another project" do
+      skip_if_frozen_models
       expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps)
       expect(Project).to receive(:[]).with(prj.id).and_return(prj)
       expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
@@ -174,6 +180,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe ".assemble_with_sshable" do
     it "calls .assemble with generated ssh key" do
+      skip_if_frozen_models
       st_id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5"
       expect(SshKey).to receive(:generate).and_return(instance_double(SshKey, public_key: "public", keypair: "pair"))
       expect(described_class).to receive(:assemble) do |public_key, project_id, **kwargs|
@@ -530,6 +537,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates billing records when ip4 is enabled" do
+      skip_if_frozen_models
       vm_addr = instance_double(AssignedVmAddress, id: "46ca6ded-b056-4723-bd91-612959f52f6f", ip: NetAddr::IPv4Net.parse("10.0.0.1"))
       expect(vm).to receive(:assigned_vm_address).and_return(vm_addr).at_least(:once)
       expect(vm).to receive(:ip4_enabled).and_return(true)
@@ -539,6 +547,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "creates billing records when ip4 is not enabled" do
+      skip_if_frozen_models
       expect(vm).to receive(:ip4_enabled).and_return(false)
       expect(BillingRecord).to receive(:create_with_id).exactly(3).times
       expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
@@ -546,6 +555,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "not create billing records when the project is not billable" do
+      skip_if_frozen_models
       expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
       expect(prj).to receive(:billable).and_return(false)
       expect(BillingRecord).not_to receive(:create_with_id)
@@ -668,6 +678,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "resolves the page if vm is available" do
+      skip_if_frozen_models
       pg = instance_double(Page)
       expect(pg).to receive(:incr_resolve)
       expect(nx).to receive(:available?).and_return(true)
@@ -676,6 +687,7 @@ RSpec.describe Prog::Vm::Nexus do
     end
 
     it "does not resolves the page if there is none" do
+      skip_if_frozen_models
       expect(nx).to receive(:available?).and_return(true)
       expect(Page).to receive(:from_tag_parts).and_return(nil)
       expect { nx.unavailable }.to hop("wait")

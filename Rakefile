@@ -130,14 +130,28 @@ else
     Rake::Task["_spec"].invoke
   end
 
-  desc "Run specs with coverage"
-  task "coverage" do
-    sh({"RACK_ENV" => "test", "COVERAGE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "rspec", "spec")
+  rspec = lambda do |env|
+    sh(env.merge("RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "rspec", "spec")
   end
 
-  desc "Run specs with frozen core (similar to production)"
+  desc "Run specs with coverage"
+  task "coverage" do
+    rspec.call("COVERAGE" => "1")
+  end
+
+  desc "Run specs with frozen core, Database, and models (similar to production)"
   task "frozen_spec" do
-    sh({"RACK_ENV" => "test", "CLOVER_FREEZE_CORE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "rspec", "spec")
+    rspec.call("CLOVER_FREEZE_CORE" => "1", "CLOVER_FREEZE_MODELS" => "1")
+  end
+
+  desc "Run specs with frozen core"
+  task "frozen_core_spec" do
+    rspec.call("CLOVER_FREEZE_CORE" => "1")
+  end
+
+  desc "Run specs with frozen Database and models"
+  task "frozen_db_model_spec" do
+    rspec.call("CLOVER_FREEZE_MODELS" => "1")
   end
 
   desc "Run specs in with coverage in unfrozen mode, and without coverage in frozen mode"
@@ -149,14 +163,28 @@ nproc = lambda do
   `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i.clamp(1, 6).to_s
 end
 
-desc "Run specs in parallel using turbo_tests"
-task "pspec" do
-  system({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call)
+turbo_tests = lambda do |env|
+  sh(env.merge("RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "turbo_tests", "-r", "./spec/suppress_pending", "-n", nproc.call)
 end
 
-desc "Run parallel specs with frozen core (similar to production)"
+desc "Run specs in parallel using turbo_tests"
+task "pspec" do
+  turbo_tests.call({})
+end
+
+desc "Run parallel specs with frozen core, Database, and models (similar to production)"
 task "frozen_pspec" do
-  sh({"CLOVER_FREEZE_CORE" => "1", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call)
+  turbo_tests.call("CLOVER_FREEZE_CORE" => "1", "CLOVER_FREEZE_MODELS" => "1")
+end
+
+desc "Run parallel specs with frozen core"
+task "frozen_core_pspec" do
+  turbo_tests.call("CLOVER_FREEZE_CORE" => "1")
+end
+
+desc "Run parallel specs with frozen Database and models"
+task "frozen_db_model_pspec" do
+  turbo_tests.call("CLOVER_FREEZE_MODELS" => "1")
 end
 
 # Other

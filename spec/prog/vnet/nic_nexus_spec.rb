@@ -19,6 +19,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "uses ipv6_addr if passed" do
+      skip_if_frozen_models
       expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps)
       expect(ps).to receive(:random_private_ipv4).and_return("10.0.0.12/32")
       expect(ps).not_to receive(:random_private_ipv6)
@@ -35,6 +36,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     end
 
     it "uses ipv4_addr if passed" do
+      skip_if_frozen_models
       expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps)
       expect(ps).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/128")
       expect(ps).not_to receive(:random_private_ipv4)

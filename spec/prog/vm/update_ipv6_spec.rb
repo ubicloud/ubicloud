@@ -30,6 +30,7 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   end
 
   it "returns vm_host" do
+    skip_if_frozen_models
     expect(VmHost).to receive(:[]).with(1).and_return(vm_host)
     expect(pr.vm_host).to eq(vm_host)
   end

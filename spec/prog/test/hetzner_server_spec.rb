@@ -190,6 +190,7 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#vm_host" do
     it "returns the vm_host" do
+      skip_if_frozen_models
       prg = described_class.new(Strand.new(stack: [{"vm_host_id" => "123"}]))
       vmh = instance_double(VmHost)
       expect(VmHost).to receive(:[]).with("123").and_return(vmh)
