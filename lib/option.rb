@@ -45,8 +45,7 @@ module Option
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
     ["debian-12", "Debian 12"],
-    ["almalinux-9", "AlmaLinux 9"],
-    ["almalinux-8", "AlmaLinux 8"]
+    ["almalinux-9", "AlmaLinux 9"]
   ].map { |args| BootImage.new(*args) }.freeze
 
   VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_options, :visible, :gpu) do

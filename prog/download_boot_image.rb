@@ -50,9 +50,6 @@ class Prog::DownloadBootImage < Prog::Base
       elsif image_name == "debian-12"
         arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud.debian.org/images/cloud/bookworm/#{version}/debian-12-genericcloud-#{arch}-#{version}.raw"
-      elsif image_name == "almalinux-8"
-        fail "Only x64 is supported for almalinux-8" unless vm_host.arch == "x64"
-        "https://repo.almalinux.org/almalinux/8/cloud/x86_64/images/AlmaLinux-8-GenericCloud-#{version}.x86_64.qcow2"
       elsif image_name == "almalinux-9"
         arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
         "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
@@ -73,7 +70,6 @@ class Prog::DownloadBootImage < Prog::Base
       ["ubuntu-jammy", "arm64", "20240701"] => "76423945c97fddd415fa17610c7472b07c46d6758d42f4f706f1bbe972f51155",
       ["debian-12", "arm64", "20241004-1890"] => "7965a9b9f02eb473138e6357def557029053178e4cd37c19e620f674ca7224c0",
       ["debian-12", "x64", "20241004-1890"] => "5af3d0e134eb3560ab035021763401d1ec72a25c761fe0ce964351e1409c523d",
-      ["almalinux-8", "x64", "8.10-20240530"] => "41a6bcdefb35afbd2819f0e6c68005cd5e9a346adf2dc093b1116a2b7c647d86",
       ["almalinux-9", "x64", "9.4-20240507"] => "bff0885c804c01fff8aac4b70c9ca4f04e8c119f9ee102043838f33e06f58390",
       ["almalinux-9", "arm64", "9.4-20240507"] => "75b2e68f6aaa41c039274595ff15968201b7201a7f2f03b109af691f2d3687a1",
       ["almalinux-9", "x64", "9.4-20240805"] => "4f2984589020c0d82b9a410cf9e29715a607c948dfdca652025cdc79ddb5e816",
