@@ -190,10 +190,10 @@ RSpec.describe Clover, "postgres" do
       it "can restore PostgreSQL database" do
         skip_if_frozen
         skip_if_frozen_models
-        stub_const("Backup", Struct.new(:key, :last_modified))
+        backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
         expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
-        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [Backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         visit "#{project.path}#{pg.path}"
         expect(page).to have_content "Fork PostgreSQL database"
