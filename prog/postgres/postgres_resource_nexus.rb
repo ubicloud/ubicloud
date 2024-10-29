@@ -236,7 +236,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     ).map(&:to_pem)
   end
 
+  def self.freeze
+    dns_zone
+    super
+  end
+
   def self.dns_zone
-    @@dns_zone ||= DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname]
+    @dns_zone ||= DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname]
   end
 end

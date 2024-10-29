@@ -30,8 +30,13 @@ module Github
     client
   end
 
+  def self.freeze
+    runner_labels
+    super
+  end
+
   def self.runner_labels
-    @@runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
+    @runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
   end
 
   def self.failed_deliveries(since, max_page = 50)
