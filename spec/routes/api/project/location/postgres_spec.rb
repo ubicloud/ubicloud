@@ -275,9 +275,7 @@ RSpec.describe Clover, "postgres" do
         rs.update(timeline_access: "push")
         st = Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: rs.timeline_id, timeline_access: "fetch")
         st.update(label: "wait")
-        # rubocop:disable RSpec/AnyInstance
-        expect_any_instance_of(PostgresServer).to receive(:run_query).and_return "16/B374D848"
-        # rubocop:enable RSpec/AnyInstance
+        expect(PostgresServer).to receive(:run_query).and_return "16/B374D848"
 
         post "/api/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"
 
