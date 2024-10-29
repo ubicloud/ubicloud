@@ -49,7 +49,6 @@ RSpec.describe Clover, "github" do
     end
 
     it "can not connect GitHub account if project has no valid payment method" do
-      skip_if_frozen_models
       expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
@@ -61,7 +60,6 @@ RSpec.describe Clover, "github" do
     end
 
     it "shows new billing info button instead of connect account if project has no valid payment method" do
-      skip_if_frozen_models
       expect(Project).to receive(:from_ubid).and_return(project).at_least(:once)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
       # rubocop:disable RSpec/VerifiedDoubles

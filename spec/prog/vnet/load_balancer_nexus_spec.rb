@@ -223,7 +223,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "does not rewrite dns records if no dns zone" do
-      skip_if_frozen_models
       vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(DnsRecord).not_to receive(:create)

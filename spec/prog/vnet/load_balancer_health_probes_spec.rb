@@ -31,7 +31,6 @@ RSpec.describe Prog::Vnet::LoadBalancerHealthProbes do
     }
 
     before do
-      skip_if_frozen_models
       allow(vm).to receive(:vm_host).and_return(vmh)
       lb.add_vm(vm)
       lb.load_balancers_vms_dataset.update(state: "up")

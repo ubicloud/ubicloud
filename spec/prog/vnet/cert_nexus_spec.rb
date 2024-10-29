@@ -80,7 +80,6 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#wait_dns_update" do
     it "waits for dns_record to be seen by all servers" do
-      skip_if_frozen_models
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_content: "content")).at_least(:once)
       dns_record = instance_double(DnsRecord, id: SecureRandom.uuid)
@@ -160,7 +159,6 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "updates the certificate when certificate is valid" do
-      skip_if_frozen
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name"))
       expect(acme_order).to receive(:status).and_return("valid")
       expect(acme_order).to receive(:certificate).and_return("test-certificate")
@@ -174,14 +172,12 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#wait" do
     it "waits for 1 month" do
-      skip_if_frozen
       expect(cert).to receive(:created_at).and_return(Time.new(2021, 4, 1, 0, 0, 0))
       expect(Time).to receive(:now).and_return(Time.new(2021, 4, 1, 0, 0, 0))
       expect { nx.wait }.to nap(60 * 60 * 24 * 30 * 1)
     end
 
     it "destroys the certificate after 3 months" do
-      skip_if_frozen
       created_at = Time.new(2021, 1, 1, 0, 0, 0)
       expect(cert).to receive(:created_at).and_return(created_at)
       expect(Time).to receive(:now).and_return(created_at + 60 * 60 * 24 * 30 * 3 + 1)
@@ -289,7 +285,6 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#dns_zone" do
     it "returns the dns zone" do
-      skip_if_frozen_models
       expect(DnsZone).to receive(:[]).with(cert.dns_zone_id).and_return("dns-zone")
       expect(nx.dns_zone).to eq "dns-zone"
     end

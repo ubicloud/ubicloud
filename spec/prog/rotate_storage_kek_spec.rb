@@ -54,7 +54,6 @@ RSpec.describe Prog::RotateStorageKek do
 
   describe "#start" do
     it "creates a key & hops to install" do
-      skip_if_frozen_models
       expect(StorageKeyEncryptionKey).to receive(:create).and_return(current_kek)
       expect(volume).to receive(:update).with({key_encryption_key_2_id: current_kek.id})
       expect { rsk.start }.to hop("install")

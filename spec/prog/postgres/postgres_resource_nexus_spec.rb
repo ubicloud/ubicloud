@@ -47,7 +47,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     let(:postgres_project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
 
     it "validates input" do
-      skip_if_frozen_models
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
       expect {
@@ -86,7 +85,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "does not allow giving different version than parent for restore" do
-      skip_if_frozen_models
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, version: "16").subject
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
@@ -96,7 +94,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "validates storage size during restore if the storage size is different from the parent" do
-      skip_if_frozen_models
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       parent.update(target_storage_size_gib: 1024)
@@ -114,7 +111,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "passes timeline of parent resource if parent is passed" do
-      skip_if_frozen_models
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
 
       parent = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
@@ -275,7 +271,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#create_billing_record" do
     it "creates billing record for cores and storage then hops" do
-      skip_if_frozen_models
       expect(postgres_resource).to receive(:required_standby_count).and_return(1)
       expect(postgres_resource).to receive(:flavor).and_return("standard").at_least(:once)
 

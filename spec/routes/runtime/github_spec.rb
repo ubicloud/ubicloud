@@ -33,7 +33,6 @@ RSpec.describe Clover, "github" do
   end
 
   it "setups blob storage if no access key" do
-    skip_if_frozen_models
     vm = create_vm
     login_runtime(vm)
     repository = instance_double(GithubRepository, access_key: nil)

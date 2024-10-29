@@ -89,7 +89,6 @@ RSpec.describe VmHost do
   end
 
   it "has a shortcut to install Rhizome" do
-    skip_if_frozen_models
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("InstallRhizome")
@@ -99,7 +98,6 @@ RSpec.describe VmHost do
   end
 
   it "has a shortcut to download a new boot image" do
-    skip_if_frozen_models
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     expect(Strand).to receive(:create) do |args|
       expect(args[:prog]).to eq("DownloadBootImage")
@@ -109,7 +107,6 @@ RSpec.describe VmHost do
   end
 
   it "has a shortcut to download a new firmware for x64" do
-    skip_if_frozen_models
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     vh.arch = "x64"
     expect(Strand).to receive(:create) do |args|
@@ -120,7 +117,6 @@ RSpec.describe VmHost do
   end
 
   it "has a shortcut to download a new firmware for arm64" do
-    skip_if_frozen_models
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     vh.arch = "arm64"
     expect(Strand).to receive(:create) do |args|
@@ -140,7 +136,6 @@ RSpec.describe VmHost do
   end
 
   it "has a shortcut to download a new version of cloud hypervisor for x64" do
-    skip_if_frozen_models
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     vh.arch = "x64"
     expect(Strand).to receive(:create) do |args|
@@ -151,7 +146,6 @@ RSpec.describe VmHost do
   end
 
   it "has a shortcut to download a new version of cloud hypervisor for arm64" do
-    skip_if_frozen_models
     vh.id = "46683a25-acb1-4371-afe9-d39f303e44b4"
     vh.arch = "arm64"
     expect(Strand).to receive(:create) do |args|
@@ -211,7 +205,6 @@ RSpec.describe VmHost do
   end
 
   it "hetznerifies a host" do
-    skip_if_frozen_models
     expect(vh).to receive(:create_addresses).at_least(:once)
     expect(HetznerHost).to receive(:create).with(server_identifier: "12").and_return(true)
 
@@ -287,7 +280,6 @@ RSpec.describe VmHost do
   end
 
   it "updates the routed_to_host_id if the address is reassigned to another host and there is no vm using the ip range" do
-    skip_if_frozen_models
     hetzner_ips = [
       Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)
     ]
@@ -309,7 +301,6 @@ RSpec.describe VmHost do
   end
 
   it "fails if the ip range is already assigned to a vm" do
-    skip_if_frozen_models
     hetzner_ips = [
       Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)
     ]

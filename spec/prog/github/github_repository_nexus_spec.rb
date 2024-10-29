@@ -18,7 +18,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
   describe ".assemble" do
     it "creates github repository or updates last_job_at if the repository exists" do
-      skip_if_frozen
       project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
@@ -75,7 +74,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "naps until the resets_at if remaining quota is low" do
-      skip_if_frozen
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
       now = Time.now
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: now + 8 * 60)).at_least(:once)

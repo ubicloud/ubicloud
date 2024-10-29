@@ -214,16 +214,7 @@ RSpec.configure do |config|
     require "diff/lcs"
     require "ripper"
     require "coderay"
-
-    def skip_if_frozen
-      itself # Satisfy Rubocop
-    end
-  else
-    def skip_if_frozen
-    end
   end
-
-  alias_method :skip_if_frozen_models, :skip_if_frozen
 end
 
 def create_vm(**args)
