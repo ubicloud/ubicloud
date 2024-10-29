@@ -35,8 +35,10 @@ RSpec.describe Project do
 
     it "sets and gets feature flags" do
       skip_if_frozen_models
-      described_class.feature_flag(:dummy_flag)
+      mod = Module.new
+      described_class.feature_flag(:dummy_flag, into: mod)
       project = described_class.create_with_id(name: "dummy-name")
+      project.extend(mod)
 
       expect(project.get_ff_dummy_flag).to be_nil
       project.set_ff_dummy_flag("new-value")
