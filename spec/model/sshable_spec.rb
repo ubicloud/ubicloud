@@ -123,7 +123,7 @@ RSpec.describe Sshable do
       skip_if_frozen
       [false, true].each do |repl_value|
         [false, true].each do |log_value|
-          stub_const("REPL", repl_value)
+          allow(described_class).to receive(:repl?).and_return(repl_value)
           if repl_value
             # Note that in the REPL, stdout and stderr get multiplexed
             # into stderr in real time, packet by packet.

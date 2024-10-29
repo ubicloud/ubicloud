@@ -29,6 +29,14 @@ class Sshable < Sequel::Model
     }
   end
 
+  def self.repl?
+    REPL
+  end
+
+  def repl?
+    self.class.repl?
+  end
+
   def cmd(cmd, stdin: nil, log: true)
     start = Time.now
     stdout = StringIO.new
@@ -42,12 +50,12 @@ class Sshable < Sequel::Model
         channel_duration = Time.now - start
         ch.exec(cmd) do |ch, success|
           ch.on_data do |ch, data|
-            $stderr.write(data) if REPL
+            $stderr.write(data) if repl?
             stdout.write(data)
           end
 
           ch.on_extended_data do |ch, type, data|
-            $stderr.write(data) if REPL
+            $stderr.write(data) if repl?
             stderr.write(data)
           end
 
@@ -84,7 +92,7 @@ class Sshable < Sequel::Model
         # real time to $stderr could be removed, but when supervising
         # a tty, I've found it can be useful to see data arrive in
         # real time from SSH.
-        unless REPL
+        unless repl?
           embed[:stderr] = stderr_str
           embed[:stdout] = stdout_str
         end
