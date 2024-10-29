@@ -67,14 +67,14 @@ elements = {fd00::/64 . 0-9999,fd00::1/128 . 10000-65535}
     type ipv4_addr;
     flags interval;
     elements = {
-      10.0.0.0/26
+      10.0.0.0/32
     }
   }
 
   set private_ipv6_cidrs {
     type ipv6_addr
     flags interval
-    elements = { fd00::/64 }
+    elements = { fd00::1/128 }
   }
 
   set globally_blocked_ipv4s {
@@ -164,14 +164,14 @@ table inet fw_table {
     type ipv4_addr;
     flags interval;
     elements = {
-      10.0.0.0/26
+      10.0.0.0/32
     }
   }
 
   set private_ipv6_cidrs {
     type ipv6_addr
     flags interval
-    elements = { fd00::/64 }
+    elements = { fd00::1/128 }
   }
 
   set globally_blocked_ipv4s {
