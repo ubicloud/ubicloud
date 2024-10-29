@@ -81,13 +81,12 @@ PGHOST=/var/run/postgresql
   describe "#latest_backup_label_before_target" do
     it "returns most recent backup before given target" do
       skip_if_frozen
-      stub_const("Backup", Struct.new(:last_modified))
       most_recent_backup_time = Time.now
       expect(postgres_timeline).to receive(:backups).and_return(
         [
-          instance_double(Backup, key: "basebackups_005/0001_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 200),
-          instance_double(Backup, key: "basebackups_005/0002_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 100),
-          instance_double(Backup, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_recent_backup_time)
+          instance_double(Minio::Client::Blob, key: "basebackups_005/0001_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 200),
+          instance_double(Minio::Client::Blob, key: "basebackups_005/0002_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 100),
+          instance_double(Minio::Client::Blob, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_recent_backup_time)
         ]
       )
 
@@ -96,7 +95,6 @@ PGHOST=/var/run/postgresql
 
     it "raises error if no backups before given target" do
       skip_if_frozen
-      stub_const("Backup", Struct.new(:last_modified))
       expect(postgres_timeline).to receive(:backups).and_return([])
 
       expect { postgres_timeline.latest_backup_label_before_target(target: Time.now) }.to raise_error RuntimeError, "BUG: no backup found"
@@ -126,11 +124,10 @@ PGHOST=/var/run/postgresql
 
   it "returns list of backups" do
     skip_if_frozen
-    stub_const("Backup", Struct.new(:key))
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
 
     minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key", ssl_ca_file_data: "data")
-    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Backup, key: "backup_stop_sentinel.json"), instance_double(Backup, key: "unrelated_file.txt")])
+    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Minio::Client::Blob, key: "backup_stop_sentinel.json"), instance_double(Minio::Client::Blob, key: "unrelated_file.txt")])
     expect(Minio::Client).to receive(:new).and_return(minio_client)
 
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
