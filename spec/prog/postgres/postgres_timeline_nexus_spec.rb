@@ -117,8 +117,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "creates a missing backup page if last completed backup is older than 2 days" do
       skip_if_frozen
       expect(postgres_timeline).to receive(:need_backup?).and_return(false)
-      stub_const("Backup", Struct.new(:last_modified))
-      expect(postgres_timeline).to receive(:backups).and_return([instance_double(Backup, last_modified: Time.now - 3 * 24 * 60 * 60)])
+      backup = Struct.new(:last_modified)
+      expect(postgres_timeline).to receive(:backups).and_return([instance_double(backup, last_modified: Time.now - 3 * 24 * 60 * 60)])
       expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer))
       expect { nx.wait }.to nap(20 * 60)
       expect(Page.active.count).to eq(1)
@@ -128,8 +128,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       skip_if_frozen
       skip_if_frozen_models
       expect(postgres_timeline).to receive(:need_backup?).and_return(false)
-      stub_const("Backup", Struct.new(:last_modified))
-      expect(postgres_timeline).to receive(:backups).and_return([instance_double(Backup, last_modified: Time.now - 1 * 24 * 60 * 60)])
+      backup = Struct.new(:last_modified)
+      expect(postgres_timeline).to receive(:backups).and_return([instance_double(backup, last_modified: Time.now - 1 * 24 * 60 * 60)])
       expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer))
       page = instance_double(Page)
       expect(page).to receive(:incr_resolve)
@@ -141,8 +141,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "naps if there is nothing to do" do
       skip_if_frozen
       expect(postgres_timeline).to receive(:need_backup?).and_return(false)
-      stub_const("Backup", Struct.new(:last_modified))
-      expect(postgres_timeline).to receive(:backups).and_return([instance_double(Backup, last_modified: Time.now - 1 * 24 * 60 * 60)])
+      backup = Struct.new(:last_modified)
+      expect(postgres_timeline).to receive(:backups).and_return([instance_double(backup, last_modified: Time.now - 1 * 24 * 60 * 60)])
       expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer))
 
       expect { nx.wait }.to nap(20 * 60)
