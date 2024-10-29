@@ -84,6 +84,13 @@ RSpec.describe Prog::Test::Vm do
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
+    it "installs packages for debian images and hops to next step" do
+      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "debian-12")).at_least(:once)
+      expect(sshable).to receive(:cmd).with("sudo apt update")
+      expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential")
+      expect { vm_test.install_packages }.to hop("verify_extra_disks")
+    end
+
     it "installs packages for almalinux images and hops to next step" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "almalinux-9")).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo dnf check-update || [ $? -eq 100 ]")
