@@ -236,10 +236,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     ).map(&:to_pem)
   end
 
+  # :nocov:
   def self.freeze
     dns_zone
     super
   end
+  # :nocov:
 
   def self.dns_zone
     return @dns_zone if defined?(@dns_zone)

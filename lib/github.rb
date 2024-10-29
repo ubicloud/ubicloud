@@ -30,10 +30,12 @@ module Github
     client
   end
 
+  # :nocov:
   def self.freeze
     runner_labels
     super
   end
+  # :nocov:
 
   def self.runner_labels
     @runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }

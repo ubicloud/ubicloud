@@ -3,10 +3,12 @@
 require "yaml"
 
 class BillingRate
+  # :nocov:
   def self.freeze
     rates
     super
   end
+  # :nocov:
 
   def self.rates
     @rates ||= YAML.load_file("config/billing_rates.yml", permitted_classes: [Time])

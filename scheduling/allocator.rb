@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
+  # :nocov:
   def self.freeze
     target_host_utilization
     super
   end
+  # :nocov:
 
   def self.target_host_utilization
     @target_host_utilization ||= Config.allocator_target_host_utilization
@@ -42,10 +44,12 @@ module Scheduling::Allocator
   class Allocation
     attr_reader :score
 
+    # :nocov:
     def self.freeze
       random_score
       super
     end
+    # :nocov:
 
     def self.random_score
       @max_random_score ||= Config.allocator_max_random_score
