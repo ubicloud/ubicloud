@@ -53,7 +53,7 @@ jobs:
     - name: Apply migrations
       env:
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
-      run: bundle exec rake test_up
+      run: bundle exec rake _test_up
 
     - name: Cache ngrok binary
       id: cache-ngrok
