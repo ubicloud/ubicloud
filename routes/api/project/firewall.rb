@@ -2,17 +2,10 @@
 
 class CloverApi
   hash_branch(:project_prefix, "firewall") do |r|
-    r.get true do
-      result = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view").eager(:firewall_rules).paginated_result(
-        start_after: r.params["start_after"],
-        page_size: r.params["page_size"],
-        order_column: r.params["order_column"]
-      )
+    firewall_endpoint_helper = Routes::Common::FirewallHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
 
-      {
-        items: Serializers::Firewall.serialize(result[:records]),
-        count: result[:count]
-      }
+    r.get true do
+      firewall_endpoint_helper.list
     end
   end
 end

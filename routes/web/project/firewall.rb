@@ -2,11 +2,10 @@
 
 class CloverWeb
   hash_branch(:project_prefix, "firewall") do |r|
-    r.get true do
-      authorized_firewalls = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view").all
-      @firewalls = Serializers::Firewall.serialize(authorized_firewalls, {include_path: true})
+    firewall_endpoint_helper = Routes::Common::FirewallHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
 
-      view "networking/firewall/index"
+    r.get true do
+      firewall_endpoint_helper.list
     end
 
     r.on "create" do
