@@ -32,7 +32,7 @@ class Prog::Vnet::CertNexus < Prog::Base
 
     if Config.development? && cert.dns_zone_id.nil?
       crt, key = Util.create_certificate(subject: "/CN=" + cert.hostname, duration: 60 * 60 * 24 * 30 * 3)
-      cert.update(cert: crt, csr_key: key.to_pem)
+      cert.update(cert: crt, csr_key: key.to_der)
       hop_wait
     end
 
