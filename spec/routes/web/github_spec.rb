@@ -48,7 +48,6 @@ RSpec.describe Clover, "github" do
   end
 
   it "raises forbidden when does not have permissions to the project in session" do
-    skip_if_frozen_models
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
     project.access_policies.first.update(body: {})
@@ -61,7 +60,6 @@ RSpec.describe Clover, "github" do
   end
 
   it "redirects to user management page if it requires approval" do
-    skip_if_frozen_models
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
 
@@ -72,7 +70,6 @@ RSpec.describe Clover, "github" do
   end
 
   it "fails if oauth code is invalid" do
-    skip_if_frozen_models
     expect(oauth_client).to receive(:exchange_code_for_token).with("invalid").and_return({})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
 
@@ -83,7 +80,6 @@ RSpec.describe Clover, "github" do
   end
 
   it "fails if installation not found" do
-    skip_if_frozen_models
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: []})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
@@ -95,7 +91,6 @@ RSpec.describe Clover, "github" do
   end
 
   it "fails if the current user's account suspended" do
-    skip_if_frozen_models
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
@@ -108,7 +103,6 @@ RSpec.describe Clover, "github" do
   end
 
   it "creates installation with project from session" do
-    skip_if_frozen_models
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)

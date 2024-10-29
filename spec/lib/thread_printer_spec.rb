@@ -9,7 +9,6 @@ RSpec.describe ThreadPrinter do
     end
 
     it "can handle threads with a nil backtrace" do
-      skip_if_frozen
       # The documentation calls out that the backtrace is an array or
       # nil.
       expect(described_class).to receive(:puts).with(/Thread: #<InstanceDouble.*>/)

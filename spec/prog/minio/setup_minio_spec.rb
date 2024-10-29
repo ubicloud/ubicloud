@@ -98,7 +98,6 @@ ECHO
     }
 
     before do
-      skip_if_frozen_models
       allow(DnsZone).to receive(:where).and_return([instance_double(DnsZone, name: "minio.ubicloud.com")])
     end
 

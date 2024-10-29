@@ -4,7 +4,6 @@ RSpec.describe Clog do
   let(:now) { Time.parse("2023-01-17 12:10:54 -0800") }
 
   before do
-    skip_if_frozen
     allow(Config).to receive(:test?).and_return(false)
     allow(Time).to receive(:now).and_return(now)
   end

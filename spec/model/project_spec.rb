@@ -34,7 +34,6 @@ RSpec.describe Project do
     end
 
     it "sets and gets feature flags" do
-      skip_if_frozen_models
       mod = Module.new
       described_class.feature_flag(:dummy_flag, into: mod)
       project = described_class.create_with_id(name: "dummy-name")

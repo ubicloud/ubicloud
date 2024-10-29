@@ -70,7 +70,6 @@ RSpec.describe Prog::Vm::VmPool do
     end
 
     it "waits even if the vm count is less when there are waiting GithubRunners" do
-      skip_if_frozen_models
       pool.update(size: 1)
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
       expect(GithubRunner).to receive_message_chain(:join, :where, :count).and_return(1) # rubocop:disable RSpec/MessageChain

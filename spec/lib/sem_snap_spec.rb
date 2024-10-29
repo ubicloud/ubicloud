@@ -27,7 +27,6 @@ RSpec.describe SemSnap do
   end
 
   it "operates immediately by default in non-block form" do
-    skip_if_frozen_models
     snap = described_class.new(st.id)
     snap.incr(:test)
     delete_set = instance_double(Sequel::Model::DatasetMethods)

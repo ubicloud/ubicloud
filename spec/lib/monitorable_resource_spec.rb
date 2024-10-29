@@ -45,7 +45,6 @@ RSpec.describe MonitorableResource do
     end
 
     it "returns if session is nil or resource does not need event loop" do
-      skip_if_frozen
       expect(Thread).not_to receive(:new)
 
       # session is nil
@@ -57,7 +56,6 @@ RSpec.describe MonitorableResource do
     end
 
     it "creates a new thread and runs the event loop" do
-      skip_if_frozen
       session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
       r_w_event_loop.instance_variable_set(:@session, session)
       expect(Thread).to receive(:new).and_yield
@@ -66,7 +64,6 @@ RSpec.describe MonitorableResource do
     end
 
     it "swallows exception and logs it if event loop fails" do
-      skip_if_frozen
       session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
       r_w_event_loop.instance_variable_set(:@session, session)
       expect(Thread).to receive(:new).and_yield
@@ -135,7 +132,6 @@ RSpec.describe MonitorableResource do
 
   describe "#force_stop_if_stuck" do
     it "does nothing if pulse check is not stuck" do
-      skip_if_frozen
       expect(Kernel).not_to receive(:exit!)
 
       # not locked

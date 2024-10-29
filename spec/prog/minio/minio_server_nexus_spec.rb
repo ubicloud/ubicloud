@@ -289,7 +289,6 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "creates new certificates from root_cert_2 if root_cert_1 is about to expire" do
-      skip_if_frozen
       expect(Time).to receive(:now).and_return(Time.now + 60 * 60 * 24 * 365 * 4 + 1).at_least(:once)
       cert = nx.minio_server.cert
       cert_key = nx.minio_server.cert_key
