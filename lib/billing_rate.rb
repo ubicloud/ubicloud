@@ -3,8 +3,15 @@
 require "yaml"
 
 class BillingRate
+  # :nocov:
+  def self.freeze
+    rates
+    super
+  end
+  # :nocov:
+
   def self.rates
-    @@rates ||= YAML.load_file("config/billing_rates.yml", permitted_classes: [Time])
+    @rates ||= YAML.load_file("config/billing_rates.yml", permitted_classes: [Time])
   end
 
   def self.from_resource_properties(resource_type, resource_family, location, active_at = Time.now)

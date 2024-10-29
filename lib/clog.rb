@@ -3,7 +3,7 @@
 require "json"
 
 class Clog
-  @@mutex = Mutex.new
+  MUTEX = Mutex.new
 
   def self.emit(message)
     out = if block_given?
@@ -39,7 +39,7 @@ class Clog
     end
 
     raw = (JSON.generate(out) << "\n").freeze
-    @@mutex.synchronize do
+    MUTEX.synchronize do
       $stdout.write(raw)
     end
     nil
