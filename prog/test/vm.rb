@@ -22,7 +22,7 @@ class Prog::Test::Vm < Prog::Test::Base
   end
 
   label def install_packages
-    if vm.boot_image.start_with?("ubuntu")
+    if /ubuntu|debian/.match?(vm.boot_image)
       sshable.cmd("sudo apt update")
       sshable.cmd("sudo apt install -y build-essential")
     elsif vm.boot_image.start_with?("almalinux")
