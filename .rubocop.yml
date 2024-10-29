@@ -69,7 +69,7 @@ RSpec/SpecFilePathFormat:
   Exclude:
     - 'spec/routes/**/*.rb'
 
-Sequel/ColumnDefault:
+Sequel/IrreversibleMigration:
   Enabled: false
 
 Capybara/ClickLinkOrButtonStyle:
