@@ -10,6 +10,13 @@ require "pry"
 if Config.development?
   require "awesome_print"
   require "awesome_print/ext/sequel"
+
+  module AwesomePrint::Sequel
+    remove_method(:awesome_sequel_document)
+    def awesome_sequel_document(object)
+      "#{object} #{awesome_hash(object.values)}"
+    end
+  end
 end
 
 def dev_project
