@@ -14,7 +14,7 @@ class CloverWeb
       r.on "attach-subnet" do
         r.post true do
           Authorization.authorize(current_account.id, "Firewall:view", fw.id)
-          ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
+          ps = PrivateSubnet.from_ubid(r.params["private_subnet_id"])
           unless ps && ps.location == @location
             flash["error"] = "Private subnet not found"
             response.status = 404
@@ -34,7 +34,7 @@ class CloverWeb
       r.on "detach-subnet" do
         r.post true do
           Authorization.authorize(current_account.id, "Firewall:view", fw.id)
-          ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
+          ps = PrivateSubnet.from_ubid(r.params["private_subnet_id"])
           unless ps && ps.location == @location
             flash["error"] = "Private subnet not found"
             response.status = 404

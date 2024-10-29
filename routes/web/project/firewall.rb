@@ -30,7 +30,7 @@ class CloverWeb
       )
       fw.associate_with_project(@project)
 
-      ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
+      ps = PrivateSubnet.from_ubid(r.params["private_subnet_id"])
       fw.associate_with_private_subnet(ps) if ps
 
       flash["notice"] = "'#{r.params["name"]}' is created"
