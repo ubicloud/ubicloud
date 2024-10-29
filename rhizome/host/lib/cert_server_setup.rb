@@ -36,7 +36,7 @@ class CertServerSetup
   end
 
   def server_version
-    "0.1.4"
+    "0.1.5"
   end
 
   def server_main_path
