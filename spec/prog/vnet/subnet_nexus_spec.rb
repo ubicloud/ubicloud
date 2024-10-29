@@ -268,7 +268,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "hops to wait if all is done" do
-      skip_if_frozen
       t = Time.now
       expect(Time).to receive(:now).and_return(t)
       expect(nic.strand).to receive(:label).and_return("wait")
@@ -280,7 +279,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "doesn't decrement refresh_keys if there are missed nics" do
-      skip_if_frozen
       t = Time.now
       expect(Time).to receive(:now).and_return(t)
       expect(nic.strand).to receive(:label).and_return("wait")
@@ -298,7 +296,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "finds a new subnet if the one it found is taken" do
-      skip_if_frozen_models
       expect(PrivateSubnet).to receive(:random_subnet).and_return("10.0.0.0/8").at_least(:once)
       project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
       described_class.assemble(project.id, location: "hetzner-hel1", name: "test-subnet", ipv4_range: "10.0.0.128/26")
@@ -307,7 +304,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "finds a new subnet if the one it found is banned" do
-      skip_if_frozen_models
       expect(PrivateSubnet).to receive(:random_subnet).and_return("172.16.0.0/16", "10.0.0.0/8")
       project = Project.create_with_id(name: "test-project").tap { _1.associate_with_project(_1) }
       allow(SecureRandom).to receive(:random_number).with(2**(26 - 16) - 1).and_return(1)
@@ -338,14 +334,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     }
 
     it "creates tunnels if not existing" do
-      skip_if_frozen_models
       expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
       expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
       nx.create_tunnels([src_nic, dst_nic], dst_nic)
     end
 
     it "skips existing tunnels" do
-      skip_if_frozen_models
       expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
       expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(false)
 
@@ -354,7 +348,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "skips existing tunnels - 2" do
-      skip_if_frozen_models
       expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(false)
       expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
 

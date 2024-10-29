@@ -35,7 +35,6 @@ RSpec.describe VmPool do
     }
 
     it "returns the vm if there is one in running state" do
-      skip_if_frozen_models
       locking_vms = class_double(Vm)
       expect(pool).to receive(:vms_dataset).and_return(locking_vms).at_least(:once)
       expect(locking_vms).to receive_message_chain(:for_update, :all).and_return([])  # rubocop:disable RSpec/MessageChain

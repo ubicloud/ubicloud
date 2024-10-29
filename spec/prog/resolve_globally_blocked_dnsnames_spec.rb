@@ -15,7 +15,6 @@ RSpec.describe Prog::ResolveGloballyBlockedDnsnames do
     end
 
     it "resolves dnsnames to ip addresses and updates records" do
-      skip_if_frozen
       expect(Socket).to receive(:getaddrinfo).with("example.com", nil).and_return([[nil, nil, nil, "1.1.1.1"], [nil, nil, nil, "2a00:1450:400e:811::200e"], [nil, nil, nil, "1.1.1.1"]])
       expect(Time).to receive(:now).and_return(Time.new("2023-10-19 23:27:47 +0000")).at_least(:once)
       expect { rgbd.wait }.to nap(60 * 60)
@@ -24,7 +23,6 @@ RSpec.describe Prog::ResolveGloballyBlockedDnsnames do
     end
 
     it "skips if socket fails" do
-      skip_if_frozen
       expect(Socket).to receive(:getaddrinfo).with("example.com", nil).and_raise(SocketError)
       expect { rgbd.wait }.to nap(60 * 60)
 

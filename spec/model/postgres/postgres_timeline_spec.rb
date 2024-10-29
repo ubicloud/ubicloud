@@ -80,7 +80,6 @@ PGHOST=/var/run/postgresql
 
   describe "#latest_backup_label_before_target" do
     it "returns most recent backup before given target" do
-      skip_if_frozen
       backup = Struct.new(:key, :last_modified)
       most_recent_backup_time = Time.now
       expect(postgres_timeline).to receive(:backups).and_return(
@@ -95,7 +94,6 @@ PGHOST=/var/run/postgresql
     end
 
     it "raises error if no backups before given target" do
-      skip_if_frozen
       expect(postgres_timeline).to receive(:backups).and_return([])
 
       expect { postgres_timeline.latest_backup_label_before_target(target: Time.now) }.to raise_error RuntimeError, "BUG: no backup found"
@@ -124,7 +122,6 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns list of backups" do
-    skip_if_frozen
     backup = Struct.new(:key)
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
 
@@ -136,13 +133,11 @@ PGHOST=/var/run/postgresql
   end
 
   it "returns blob storage endpoint" do
-    skip_if_frozen_models
     expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
     expect(postgres_timeline.blob_storage_endpoint).to eq("https://blob-endpoint")
   end
 
   it "returns blob storage client from cache" do
-    skip_if_frozen_models
     expect(postgres_timeline).to receive(:blob_storage_endpoint).and_return("https://blob-endpoint")
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "certs")).once
     expect(Minio::Client).to receive(:new).and_return("dummy-client").once

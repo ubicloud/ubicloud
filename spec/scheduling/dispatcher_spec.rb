@@ -37,7 +37,6 @@ RSpec.describe Scheduling::Dispatcher do
     end
 
     it "exits if all strands have finished when shutting down" do
-      skip_if_frozen
       expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
       expect(Kernel).to receive(:exit)
       di.wait_cohort
@@ -99,7 +98,6 @@ RSpec.describe Scheduling::Dispatcher do
     end
 
     it "can trigger thread dumps and exit if the Prog takes too long" do
-      skip_if_frozen
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!)
 
