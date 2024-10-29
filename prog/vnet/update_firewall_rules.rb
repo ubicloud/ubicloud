@@ -210,11 +210,11 @@ TEMPLATE
   end
 
   def generate_private_ip4_list
-    vm.nics.map { NetAddr::IPv4Net.parse(_1.private_ipv4.network.to_s + "/26").to_s }.join(",")
+    vm.nics.map { _1.private_ipv4.to_s }.join(",")
   end
 
   def generate_private_ip6_list
-    vm.nics.map { NetAddr::IPv6Net.parse(_1.private_ipv6.network.to_s + "/64").to_s }.join(",")
+    vm.nics.map { _1.private_ipv6.to_s }.join(",")
   end
 
   def subdivide_network(net)
