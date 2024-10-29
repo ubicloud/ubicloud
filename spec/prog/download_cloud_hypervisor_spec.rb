@@ -52,7 +52,7 @@ RSpec.describe Prog::DownloadCloudHypervisor do
 
     it "waits for manual intervention if failed" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_ch_35.1").and_return("Failed")
-      expect { df.download }.to raise_error RuntimeError, "Failed to download cloud hypervisor version 35.1 on VmHost[#{vm_host.ubid}]"
+      expect { df.download }.to raise_error RuntimeError, "Failed to download cloud hypervisor version 35.1 on VmHost[\"#{vm_host.ubid}\"]"
     end
 
     it "waits for the download to complete" do

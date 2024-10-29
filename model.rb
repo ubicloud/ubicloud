@@ -51,7 +51,7 @@ module ResourceMethods
   end
 
   def to_s
-    "#{self.class.name}[#{ubid}]"
+    "#{self.class.name}[\"#{ubid}\"]"
   end
 
   def inspect

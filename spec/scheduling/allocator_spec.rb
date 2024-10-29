@@ -30,7 +30,7 @@ RSpec.describe Al do
 
     it "fails if no valid allocation is found" do
       expect(Al::Allocation).to receive(:best_allocation).and_return(nil)
-      expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, "Vm[#{vm.ubid}] no space left on any eligible host"
+      expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, "Vm[\"#{vm.ubid}\"] no space left on any eligible host"
     end
 
     it "persists valid allocation" do
