@@ -109,7 +109,7 @@ end
 AUTOLOAD_CONSTANTS.freeze
 
 if force_autoload
-  AUTOLOAD_CONSTANTS.each { Object.const_get(_1) }
+  AUTOLOAD_CONSTANT_VALUES = AUTOLOAD_CONSTANTS.map { Object.const_get(_1) }.freeze
 
   # All classes are already available, so speed up UBID.class_for_ubid using
   # hash of prefixes to class objects
@@ -175,6 +175,10 @@ def clover_freeze
   # a side effect.  We encountered it when using rubygems for its tar
   # file writing.
   Gem.source_date_epoch
+
+  # Freeze all constants that are autoloaded
+  Sequel::Model.freeze_descendants
+  AUTOLOAD_CONSTANT_VALUES.each(&:freeze)
 
   Refrigerator.freeze_core
 end
