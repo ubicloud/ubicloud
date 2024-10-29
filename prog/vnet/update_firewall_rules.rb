@@ -7,8 +7,6 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
 
   label def update_firewall_rules
     rules = vm.firewalls.map(&:firewall_rules).flatten
-    allowed_ingress_ip4 = NetAddr.summ_IPv4Net(rules.select { !_1.ip6? && !_1.port_range }.map { _1.cidr }).map(&:to_s)
-    allowed_ingress_ip6 = NetAddr.summ_IPv6Net(rules.select { _1.ip6? && !_1.port_range }.map { _1.cidr }).map(&:to_s)
     allowed_ingress_ip4_port_set = consolidate_rules(rules.select { !_1.ip6? && _1.port_range })
     allowed_ingress_ip6_port_set = consolidate_rules(rules.select { _1.ip6? && _1.port_range })
     guest_ephemeral, clover_ephemeral = subdivide_network(vm.ephemeral_net6).map(&:to_s)
@@ -22,18 +20,6 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
 table inet fw_table;
 delete table inet fw_table;
 table inet fw_table {
-  set allowed_ipv4_cidrs {
-    type ipv4_addr;
-    flags interval;
-#{allowed_ingress_ip4.any? ? "elements = {#{allowed_ingress_ip4.join(",")}}" : ""}
-  }
-
-  set allowed_ipv6_cidrs {
-    type ipv6_addr;
-    flags interval;
-#{allowed_ingress_ip6.any? ? "elements = {#{allowed_ingress_ip6.join(",")}}" : ""}
-  }
-
   set allowed_ipv4_port_tuple {
     type ipv4_addr . inet_service;
     flags interval;
@@ -79,12 +65,25 @@ table inet fw_table {
 
   chain forward_ingress {
     type filter hook forward priority filter; policy drop;
+
+    # Offload to ubi_flowtable. This is used to offload already filtered
+    # traffic to reduce the latency.
     meta l4proto { tcp, udp } flow offload @ubi_flowtable
+
+    # Destination port 111 is reserved for the portmapper. We block it to
+    # prevent abuse.
     meta l4proto { tcp, udp } th dport 111 drop
+
+    # Drop all traffic from globally blocked IPs. This is mainly used to
+    # block access to malicious IPs that are known to cause issues on the
+    # internet.
     ip saddr @globally_blocked_ipv4s drop
     ip6 saddr @globally_blocked_ipv6s drop
     ip daddr @globally_blocked_ipv4s drop
     ip6 daddr @globally_blocked_ipv6s drop
+
+    # If we are using @private_ipv4_cidrs as source address, we allow all
+    # established,related,new traffic because this is outgoing traffic.
     ip saddr @private_ipv4_cidrs ct state established,related,new counter accept
 
     # If we are using clover_ephemeral, that means we are using ipsec. We need
@@ -93,6 +92,21 @@ table inet fw_table {
     # next section of rules.
     ip6 daddr #{clover_ephemeral} counter accept
     ip6 saddr #{clover_ephemeral} counter accept
+
+    # Allow TCP and UDP traffic for allowed_ipv4_port_tuple and
+    # allowed_ipv6_port_tuple into the VM using any address, such as;
+    #  - public ipv4
+    #  - private ipv4
+    #  - public ipv6 (guest_ephemeral)
+    #  - private ipv6
+    #  - private clover ephemeral ipv6
+    ip saddr . tcp dport @allowed_ipv4_port_tuple ct state established,related,new counter accept
+    ip saddr . udp dport @allowed_ipv4_port_tuple ct state established,related,new counter accept
+    ip6 saddr . tcp dport @allowed_ipv6_port_tuple ct state established,related,new counter accept
+    ip6 saddr . udp dport @allowed_ipv6_port_tuple ct state established,related,new counter accept
+
+    # Allow outgoing traffic from the VM using the following addresses as
+    # source address.
     ip6 saddr @private_ipv6_cidrs ct state established,related,new counter accept
     ip6 saddr #{guest_ephemeral} ct state established,related,new counter accept
 
@@ -100,10 +114,17 @@ table inet fw_table {
     # destination address. This is needed to allow the return traffic.
     ip6 daddr @private_ipv6_cidrs ct state established,related counter accept
     ip6 daddr #{guest_ephemeral} ct state established,related counter accept
-    ip6 daddr #{clover_ephemeral} ct state established,related counter accept
     ip daddr @private_ipv4_cidrs ct state established,related counter accept
+
+    # Allow ping for all
     ip saddr 0.0.0.0/0 icmp type echo-request counter accept
+    ip daddr 0.0.0.0/0 icmp type echo-request counter accept
+    ip saddr 0.0.0.0/0 icmp type echo-reply counter accept
+    ip daddr 0.0.0.0/0 icmp type echo-reply counter accept
     ip6 saddr ::/0 icmpv6 type echo-request counter accept
+    ip6 daddr ::/0 icmpv6 type echo-request counter accept
+    ip6 saddr ::/0 icmpv6 type echo-reply counter accept
+    ip6 daddr ::/0 icmpv6 type echo-reply counter accept
   }
 }
 TEMPLATE
