@@ -18,11 +18,8 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
   describe ".assemble_with_model" do
     let(:model) { {"id" => "model_id", "boot_image" => "ai-ubuntu-2404-nvidia", "vm_size" => "standard-gpu-6", "storage_volumes" => "storage_volumes", "model_name" => "llama-3-1-8b-it", "engine" => "vllm", "engine_params" => "engine_params"} }
 
-    before do
-      stub_const("Option::AI_MODELS", [model])
-    end
-
     it "assembles with model" do
+      expect(described_class).to receive(:model_for_id).and_return(model)
       expect(described_class).to receive(:assemble).with(
         project_id: 1,
         location: "hetzner-fsn1",
@@ -41,6 +38,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
     end
 
     it "raises an error if model is not found" do
+      expect(described_class).to receive(:model_for_id).and_return(nil)
       expect {
         described_class.assemble_with_model(project_id: 1, location: "hetzner-fsn1", name: "test-endpoint", model_id: "invalid_id")
       }.to raise_error("Model with id invalid_id not found")
