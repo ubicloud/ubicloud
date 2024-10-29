@@ -121,14 +121,16 @@ class Project < Sequel::Model
     ApiKey.create_with_id(owner_table: Project.table_name, owner_id: id, used_for: used_for)
   end
 
-  def self.feature_flag(*flags)
+  def self.feature_flag(*flags, into: self)
     flags.map(&:to_s).each do |flag|
-      define_method :"set_ff_#{flag}" do |value|
-        update(feature_flags: feature_flags.merge({flag => value}))
-      end
+      into.module_eval do
+        define_method :"set_ff_#{flag}" do |value|
+          update(feature_flags: feature_flags.merge({flag => value}))
+        end
 
-      define_method :"get_ff_#{flag}" do
-        feature_flags[flag]
+        define_method :"get_ff_#{flag}" do
+          feature_flags[flag]
+        end
       end
     end
   end
