@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - bigger-machine
   pull_request:
 
 jobs:
@@ -11,8 +11,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubicloud, ubicloud-arm]
-    name: Ruby CI - ${{matrix.runs-on}}
+        runs-on: [
+          ubicloud-standard-2, ubicloud-standard-4, ubicloud-standard-8, ubicloud-standard-16,
+          ubicloud-standard-2-arm, ubicloud-standard-4-arm, ubicloud-standard-8-arm, ubicloud-standard-16-arm
+        ]
+    name: ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
 
     env:
