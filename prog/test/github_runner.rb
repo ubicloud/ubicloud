@@ -56,7 +56,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def create_vm_pool
-    label_data = Github.runner_labels["ubicloud"]
+    label_data = Github.runner_labels[(vm_host.arch == "x64") ? "ubicloud" : "ubicloud-arm"]
     pool = Prog::Vm::VmPool.assemble(
       size: 1,
       vm_size: label_data["vm_size"],
@@ -149,6 +149,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   def trigger_test_run(repo_name, workflow_name, branch_name)
+    puts "HEYO 2: #{vm_host.arch}"
     client.workflow_dispatch(repo_name, workflow_name, branch_name, {inputs: {arch: vm_host.arch}})
   end
 

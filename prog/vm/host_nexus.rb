@@ -119,6 +119,10 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def wait_download_boot_images
     reap
+    begin
+      vm_host.sshable.cmd("sudo ls -lah /var/storage/images")
+    rescue
+    end
     hop_prep_reboot if leaf?
     donate
   end

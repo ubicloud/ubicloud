@@ -10,6 +10,8 @@ def main(options)
   wait_until(hetzner_server_st, "wait")
   vm_host = VmHost[hetzner_server_st.reload.stack.first["vm_host_id"]]
 
+  puts "HEYO 1: #{vm_host.arch}"
+
   tests_to_wait = []
   if options[:test_cases].include?("vm")
     encrypted_vms_st = Prog::Test::VmGroup.assemble(storage_encrypted: true, test_reboot: true, arch: vm_host.arch)

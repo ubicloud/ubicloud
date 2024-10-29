@@ -154,6 +154,11 @@ class Prog::DownloadBootImage < Prog::Base
       fail "Failed to download '#{image_name}' image on #{vm_host}"
     end
 
+    begin
+      sshable.cmd("sudo ls -lah /var/storage/images")
+    rescue
+    end
+
     nap 15
   end
 
