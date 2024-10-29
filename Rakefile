@@ -177,17 +177,7 @@ task "coverage" => [:coverage_spec]
 
   desc "Run specs#{desc_suffix} with frozen core, Database, and models (similar to production)"
   task "frozen_#{task_suffix}" do
-    block.call("CLOVER_FREEZE_CORE" => "1", "CLOVER_FREEZE_MODELS" => "1")
-  end
-
-  desc "Run specs#{desc_suffix} with frozen core"
-  task "frozen_core_#{task_suffix}" do
-    block.call("CLOVER_FREEZE_CORE" => "1")
-  end
-
-  desc "Run specs#{desc_suffix} with frozen Database and models"
-  task "frozen_db_model_#{task_suffix}" do
-    block.call("CLOVER_FREEZE_MODELS" => "1")
+    block.call("CLOVER_FREEZE" => "1")
   end
 
   desc "Run specs#{desc_suffix} with coverage"

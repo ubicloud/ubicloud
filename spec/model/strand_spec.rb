@@ -27,6 +27,7 @@ RSpec.describe Strand do
       st.label = "hop_exit"
       st.save_changes
       original = DB.method(:[])
+      original = original.super_method unless original.owner == Sequel::Database
       expect(DB).to receive(:[]) do |*args, **kwargs|
         case args
         when ["SELECT FROM strand WHERE id = ?", st.id]
@@ -44,6 +45,7 @@ RSpec.describe Strand do
       st.label = "napper"
       st.save_changes
       original = DB.method(:[])
+      original = original.super_method unless original.owner == Sequel::Database
       expect(DB).to receive(:[]) do |*args, **kwargs|
         case args[0]
         when <<SQL
