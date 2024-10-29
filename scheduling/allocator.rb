@@ -1,8 +1,15 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
+  # :nocov:
+  def self.freeze
+    target_host_utilization
+    super
+  end
+  # :nocov:
+
   def self.target_host_utilization
-    @@target_host_utilization ||= Config.allocator_target_host_utilization
+    @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
@@ -37,9 +44,16 @@ module Scheduling::Allocator
   class Allocation
     attr_reader :score
 
+    # :nocov:
+    def self.freeze
+      random_score
+      super
+    end
+    # :nocov:
+
     def self.random_score
-      @@max_random_score ||= Config.allocator_max_random_score
-      rand(0..@@max_random_score)
+      @max_random_score ||= Config.allocator_max_random_score
+      rand(0..@max_random_score)
     end
 
     def self.best_allocation(request)

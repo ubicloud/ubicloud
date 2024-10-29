@@ -15,17 +15,21 @@ class Page < Sequel::Model
   # This cannot be covered, as the current coverage tests run without freezing models.
   # :nocov:
   def self.freeze
-    new.pagerduty_client
+    pagerduty_client
     super
   end
   # :nocov:
+
+  def self.pagerduty_client
+    @pagerduty_client ||= Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
+  end
 
   include SemaphoreMethods
   include ResourceMethods
   semaphore :resolve
 
   def pagerduty_client
-    @@pagerduty_client ||= Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
+    self.class.pagerduty_client
   end
 
   def trigger
