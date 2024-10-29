@@ -12,9 +12,13 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
 
   semaphore :destroy
 
+  def self.model_for_id(model_id)
+    Option::AI_MODELS.detect { _1["id"] == model_id }
+  end
+
   def self.assemble_with_model(project_id:, location:, name:, model_id:,
     replica_count: 1, is_public: false)
-    model = Option::AI_MODELS.detect { _1["id"] == model_id }
+    model = model_for_id(model_id)
 
     fail "Model with id #{model_id} not found" unless model
 
