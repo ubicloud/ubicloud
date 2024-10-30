@@ -84,6 +84,14 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def verify_firewall_rules
     if retval&.dig("msg") == "Verified Firewall Rules!"
+      hop_verify_connected_subnets
+    end
+
+    push Prog::Test::FirewallRules, {subject_id: PrivateSubnet[frame["subnets"].first].firewalls.first.id}
+  end
+
+  label def verify_connected_subnets
+    if retval&.dig("msg") == "Verified Connected Subnets!"
       if frame["test_reboot"]
         hop_test_reboot
       else
@@ -91,7 +99,8 @@ class Prog::Test::VmGroup < Prog::Test::Base
       end
     end
 
-    push Prog::Test::FirewallRules, {subject_id: PrivateSubnet[frame["subnets"].first].firewalls.first.id}
+    ps1, ps2 = frame["subnets"].map { PrivateSubnet[_1] }
+    push Prog::Test::ConnectedSubnets, {subnet_id_multiple: ((ps1.vms.count > 1) ? ps1.id : ps2.id), subnet_id_single: ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
   end
 
   label def test_reboot

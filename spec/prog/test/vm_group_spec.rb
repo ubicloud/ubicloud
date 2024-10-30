@@ -47,14 +47,7 @@ RSpec.describe Prog::Test::VmGroup do
   describe "#verify_firewall_rules" do
     it "hops to test_reboot if tests are done" do
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Firewall Rules!"})
-      expect(vg_test).to receive(:frame).and_return({"test_reboot" => true})
-      expect { vg_test.verify_firewall_rules }.to hop("test_reboot")
-    end
-
-    it "hops to destroy_resources if tests are done and test_reboot is false" do
-      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Firewall Rules!"})
-      expect(vg_test).to receive(:frame).and_return({"test_reboot" => false})
-      expect { vg_test.verify_firewall_rules }.to hop("destroy_resources")
+      expect { vg_test.verify_firewall_rules }.to hop("verify_connected_subnets")
     end
 
     it "runs tests for the first firewall" do
@@ -62,6 +55,39 @@ RSpec.describe Prog::Test::VmGroup do
       expect(PrivateSubnet).to receive(:[]).and_return(subnet)
       expect(vg_test).to receive(:frame).and_return({"subnets" => [subnet]})
       expect { vg_test.verify_firewall_rules }.to hop("start", "Test::FirewallRules")
+    end
+  end
+
+  describe "#verify_connected_subnets" do
+    it "hops to test_reboot if tests are done" do
+      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Connected Subnets!"})
+      expect { vg_test.verify_connected_subnets }.to hop("test_reboot")
+    end
+
+    it "runs tests for the first connected subnet" do
+      prj = Project.create_with_id(name: "project 1")
+      prj.associate_with_project(prj)
+      ps1 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location: "hetzner-hel1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location: "hetzner-hel1").subject
+      expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id]}).at_least(:once)
+      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
+    end
+
+    it "runs tests for the second connected subnet" do
+      prj = Project.create_with_id(name: "project 1")
+      prj.associate_with_project(prj)
+      ps1 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location: "hetzner-hel1").subject
+      expect(ps1).to receive(:vms).and_return([instance_double(Vm, id: "vm1"), instance_double(Vm, id: "vm2")]).at_least(:once)
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location: "hetzner-hel1").subject
+      expect(PrivateSubnet).to receive(:[]).and_return(ps1, ps2)
+      expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id]}).at_least(:once)
+      expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
+    end
+
+    it "hops to destroy_resources if tests are done and reboot is not set" do
+      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Connected Subnets!"})
+      expect(vg_test).to receive(:frame).and_return({"test_reboot" => false})
+      expect { vg_test.verify_connected_subnets }.to hop("destroy_resources")
     end
   end
 
