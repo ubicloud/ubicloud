@@ -61,7 +61,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Verify Account")
 
     click_button "Verify Account"
-    expect(page.title).to eq("Ubicloud - #{Account[email: TEST_USER_EMAIL].projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit "#{p.path}/dashboard"
     expect(page.title).to eq("Ubicloud - #{p.name} Dashboard")
@@ -86,7 +86,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Verify Account")
 
     click_button "Verify Account"
-    expect(page.title).to eq("Ubicloud - #{Account[email: TEST_USER_EMAIL].projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit p.path
     expect(page.title).to eq("Ubicloud - #{p.name}")
