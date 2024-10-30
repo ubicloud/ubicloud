@@ -16,12 +16,14 @@
 <div class="grid gap-6">
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <table class="min-w-full divide-y divide-gray-300">
-      <thead class="bg-gray-50 whitespace-nowrap">
-        <tr>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6" colspan="2"><%= @entries.count %> cache entries</th>
-          <th scope="col" class="relative py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6" colspan="3"><%= @total_usage %> used</th>
-        </tr>
-      </thead>
+      <% if @total_usage %>
+        <thead class="bg-gray-50 whitespace-nowrap">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6" colspan="2"><%= @entries.count %> cache entries</th>
+            <th scope="col" class="relative py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6" colspan="3"><%= @total_usage %> used</th>
+          </tr>
+        </thead>
+      <% end %>
       <tbody class="divide-y divide-gray-200 bg-white">
         <% if @entries.count > 0 %>
           <% @entries.each do |entry| %>
