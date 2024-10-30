@@ -14,7 +14,7 @@ class Prog::Vm::Nexus < Prog::Base
     unix_user: "ubi", location: "hetzner-hel1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
-    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [])
+    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -102,6 +102,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm.associate_with_project(project)
 
+      gpu_count = 1 if gpu_count == 0 && vm_size.gpu
       Strand.create(
         prog: "Vm::Nexus",
         label: "start",
@@ -111,7 +112,7 @@ class Prog::Vm::Nexus < Prog::Base
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,
           "exclude_host_ids" => exclude_host_ids,
-          "gpu_enabled" => vm_size.gpu
+          "gpu_count" => gpu_count
         }]
       ) { _1.id = vm.id }
     end
@@ -170,7 +171,7 @@ class Prog::Vm::Nexus < Prog::Base
     begin
       distinct_storage_devices = frame["distinct_storage_devices"] || false
       host_exclusion_filter = frame["exclude_host_ids"] || []
-      gpu_enabled = frame["gpu_enabled"] || false
+      gpu_count = frame["gpu_count"] || 0
       allocation_state_filter, location_filter, location_preference, host_filter =
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
@@ -189,7 +190,7 @@ class Prog::Vm::Nexus < Prog::Base
         location_preference: location_preference,
         host_filter: host_filter,
         host_exclusion_filter: host_exclusion_filter,
-        gpu_enabled: gpu_enabled
+        gpu_count: gpu_count
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")

@@ -12,7 +12,7 @@ module Scheduling::Allocator
     @target_host_utilization ||= Config.allocator_target_host_utilization
   end
 
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_enabled: false, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
       vm.cores,
@@ -21,7 +21,7 @@ module Scheduling::Allocator
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       vm.boot_image,
       distinct_storage_devices,
-      gpu_enabled,
+      gpu_count,
       vm.ip4_enabled,
       target_host_utilization,
       vm.arch,
@@ -38,7 +38,7 @@ module Scheduling::Allocator
     Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
   end
 
-  Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_enabled, :ip4_enabled,
+  Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
     :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference)
 
   class Allocation
@@ -112,7 +112,7 @@ module Scheduling::Allocator
       end
 
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
-      ds = ds.where { available_gpus > 0 } if request.gpu_enabled
+      ds = ds.where { available_gpus >= request.gpu_count } if request.gpu_count > 0
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
@@ -130,7 +130,7 @@ module Scheduling::Allocator
         allocated_at: Time.now
       )
       AssignedVmAddress.create_with_id(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
-      vm.sshable&.update(host: vm.ephemeral_net4 || vm.ephemeral_net6.nth(2))
+      vm.sshable&.update(host: vm.ephemeral_net4 || NetAddr.parse_net(vm.ephemeral_net6).nth(2))
     end
 
     def initialize(candidate_host, request)
@@ -139,7 +139,7 @@ module Scheduling::Allocator
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
-      @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_enabled
+      @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
       @allocations = @vm_host_allocations + @device_allocations
       @score = calculate_score
     end
@@ -180,7 +180,7 @@ module Scheduling::Allocator
       score += 0.5 if @candidate_host[:total_cores] == 32
 
       # penalty of 5 if host has a GPU but VM doesn't require a GPU
-      score += 5 unless @request.gpu_enabled || @candidate_host[:num_gpus] == 0
+      score += 5 unless @request.gpu_count > 0 || @candidate_host[:num_gpus] == 0
 
       # penalty of 10 if location preference is not honored
       score += 10 unless @request.location_preference.empty? || @request.location_preference.include?(@candidate_host[:location])
@@ -217,7 +217,8 @@ module Scheduling::Allocator
     def initialize(candidate_host, request)
       @used = candidate_host[:num_gpus] - candidate_host[:available_gpus]
       @total = candidate_host[:num_gpus]
-      @iommu_group = candidate_host[:available_iommu_groups].sample
+      @requested = request.gpu_count
+      @iommu_groups = candidate_host[:available_iommu_groups].take(@requested)
     end
 
     def is_valid
@@ -233,8 +234,8 @@ module Scheduling::Allocator
       PciDevice.dataset
         .where(vm_host_id: vm_host.id)
         .where(vm_id: nil)
-        .where(iommu_group: @iommu_group)
-        .update(vm_id: vm.id).zero?
+        .where(iommu_group: @iommu_groups)
+        .update(vm_id: vm.id) < @requested
     end
   end
 

@@ -170,6 +170,21 @@ RSpec.describe Prog::Vm::Nexus do
       expect(st.subject.mem_gib_ratio).to eq(3.2)
       expect(st.subject.mem_gib).to eq(12)
     end
+
+    it "requests as many gpus as specified" do
+      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-2", gpu_count: 2)
+      expect(st.stack[0]["gpu_count"]).to eq(2)
+    end
+
+    it "requests at least a single gpu for standard-gpu-6" do
+      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-gpu-6")
+      expect(st.stack[0]["gpu_count"]).to eq(1)
+    end
+
+    it "requests no gpus by default" do
+      st = described_class.assemble("some_ssh_key", prj.id, size: "standard-2")
+      expect(st.stack[0]["gpu_count"]).to eq(0)
+    end
   end
 
   describe ".assemble_with_sshable" do
@@ -354,7 +369,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: ["hetzner-hel1"],
         location_preference: [],
-        gpu_enabled: false
+        gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -369,7 +384,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: ["github-runners", "hetzner-fsn1", "hetzner-hel1"],
         location_preference: ["github-runners"],
-        gpu_enabled: false
+        gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -385,7 +400,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: [],
         location_preference: ["github-runners"],
-        gpu_enabled: false
+        gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -404,7 +419,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: [],
         location_preference: [],
-        gpu_enabled: false
+        gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -423,7 +438,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [:vm_host_id, "another-vm-host-id"],
         location_filter: ["hetzner-hel1"],
         location_preference: [],
-        gpu_enabled: false
+        gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -439,7 +454,7 @@ RSpec.describe Prog::Vm::Nexus do
       allow(nx).to receive(:frame).and_return({
         "distinct_storage_devices" => true,
         "storage_volumes" => :storage_volumes,
-        "gpu_enabled" => false
+        "gpu_count" => 0
       })
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -450,14 +465,14 @@ RSpec.describe Prog::Vm::Nexus do
         location_filter: ["hetzner-hel1"],
         host_exclusion_filter: [],
         location_preference: [],
-        gpu_enabled: false
+        gpu_count: 0
       )
       expect { nx.start }.to hop("create_unix_user")
     end
 
-    it "requests a gpu" do
+    it "requests gpus" do
       allow(nx).to receive(:frame).and_return({
-        "gpu_enabled" => true,
+        "gpu_count" => 3,
         "storage_volumes" => :storage_volumes
       })
 
@@ -469,7 +484,7 @@ RSpec.describe Prog::Vm::Nexus do
         host_exclusion_filter: [],
         location_filter: ["hetzner-hel1"],
         location_preference: [],
-        gpu_enabled: true
+        gpu_count: 3
       )
       expect { nx.start }.to hop("create_unix_user")
     end
