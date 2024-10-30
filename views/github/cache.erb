@@ -20,7 +20,7 @@
         <thead class="bg-gray-50 whitespace-nowrap">
           <tr>
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6" colspan="2"><%= @entries.count %> cache entries</th>
-            <th scope="col" class="relative py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6" colspan="3"><%= @total_usage %> used</th>
+            <th scope="col" class="relative py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6" colspan="3"><%= @total_usage %> used of <%= @total_quota %></th>
           </tr>
         </thead>
       <% end %>
