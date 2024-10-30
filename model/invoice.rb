@@ -88,15 +88,21 @@ class Invoice < Sequel::Model
 
   def send_success_email(below_threshold: false)
     ser = Serializers::Invoice.serialize(self, {detailed: true})
-    message = if below_threshold
-      "Since the invoice total of #{ser[:total]} is below our minimum charge threshold, there will be no charges for this month."
+    messages = if below_threshold
+      ["Since the invoice total of #{ser[:total]} is below our minimum charge threshold, there will be no charges for this month."]
     else
-      "The invoice amount of #{ser[:total]} will be debited from your credit card on file."
+      ["The invoice amount of #{ser[:total]} will be debited from your credit card on file."]
     end
+    github_usage = ser[:items].select { _1[:description].include?("GitHub Runner") }.sum { _1[:cost] }
+    saved_amount = 9 * github_usage
+    if saved_amount > 1
+      messages << "You saved $#{saved_amount.to_i} this month using managed Ubicloud runners instead of GitHub hosted runners!"
+    end
+
     Util.send_email(ser[:billing_email], "Ubicloud #{ser[:name]} Invoice ##{ser[:invoice_number]}",
       greeting: "Dear #{ser[:billing_name]},",
       body: ["Please find your current invoice ##{ser[:invoice_number]} below.",
-        message,
+        *messages,
         "If you have any questions, please send us a support request via support@ubicloud.com, and include your invoice number."],
       button_title: "View Invoice",
       button_link: "#{Config.base_url}#{project.path}/billing#{ser[:path]}",
