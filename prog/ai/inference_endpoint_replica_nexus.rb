@@ -26,7 +26,8 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         storage_volumes: inference_endpoint.storage_volumes.map { _1.transform_keys(&:to_sym) },
         boot_image: inference_endpoint.boot_image,
         private_subnet_id: inference_endpoint.load_balancer.private_subnet.id,
-        enable_ip4: true
+        enable_ip4: true,
+        gpu_count: inference_endpoint.gpu_count
       )
 
       inference_endpoint.load_balancer.add_vm(vm_st.subject)

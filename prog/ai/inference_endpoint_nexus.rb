@@ -33,12 +33,13 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       engine: model["engine"],
       engine_params: model["engine_params"],
       replica_count: replica_count,
-      is_public: is_public
+      is_public: is_public,
+      gpu_count: model["gpu_count"]
     )
   end
 
   def self.assemble(project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:, model_name:,
-    engine:, engine_params:, replica_count:, is_public:)
+    engine:, engine_params:, replica_count:, is_public:, gpu_count:)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -66,7 +67,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       inference_endpoint = InferenceEndpoint.create(
         project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, storage_volumes: storage_volumes,
         model_name: model_name, engine: engine, engine_params: engine_params, replica_count: replica_count, is_public: is_public,
-        load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
+        load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count: gpu_count
       ) { _1.id = ubid.to_uuid }
       inference_endpoint.associate_with_project(project)
       ApiKey.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint", used_for: "inference_endpoint")
