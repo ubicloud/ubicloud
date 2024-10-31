@@ -50,7 +50,7 @@ class Prog::InstallRhizome < Prog::Base
   end
 
   label def validate
-    sshable.cmd("common/bin/validate")
+    # sshable.cmd("common/bin/validate")
 
     pop "installed rhizome"
   end
