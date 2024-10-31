@@ -12,7 +12,7 @@ hashes.each do |filename, expected_hash|
   calculated_hash = Digest::SHA384.file(filename).hexdigest
   next if calculated_hash == expected_hash
 
-  violations << {name: file, expected: expected_hash, calculated: calculated_hash}
+  violations << {name: filename, expected: expected_hash, calculated: calculated_hash}
 end
 
 puts violations
