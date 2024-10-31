@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch(:project_location_prefix, "firewall") do |r|
+  hash_branch(:api_project_location_prefix, "firewall") do |r|
     r.get true do
       result = @project.firewalls_dataset.where(location: @location).authorized(current_account.id, "Firewall:view").eager(:firewall_rules).paginated_result(
         start_after: r.params["start_after"],
@@ -106,6 +106,6 @@ class CloverApi
       Serializers::Firewall.serialize(firewall, {detailed: true})
     end
 
-    request.hash_branches(:project_location_firewall_prefix)
+    request.hash_branches(:api_project_location_firewall_prefix)
   end
 end

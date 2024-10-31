@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch(:project_prefix, "firewall") do |r|
+  hash_branch(:api_project_prefix, "firewall") do |r|
     r.get true do
       result = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view").eager(:firewall_rules).paginated_result(
         start_after: r.params["start_after"],

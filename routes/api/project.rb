@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch("project") do |r|
+  hash_branch("api", "project") do |r|
     r.get true do
       result = Project.authorized(current_account.id, "Project:view").where(visible: true).paginated_result(
         start_after: r.params["start_after"],
@@ -58,7 +58,7 @@ class CloverApi
         Serializers::Project.serialize(@project)
       end
 
-      r.hash_branches(:project_prefix)
+      r.hash_branches(:api_project_prefix)
     end
   end
 end
