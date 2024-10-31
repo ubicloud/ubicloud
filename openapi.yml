@@ -2163,6 +2163,9 @@ components:
         storage_size_gib:
           description: Storage size in GiB
           type: integer
+        version:
+          description: Postgres version
+          type: string
         vm_size:
           description: Size of the underlying VM
           type: string
@@ -2175,6 +2178,7 @@ components:
         - name
         - state
         - storage_size_gib
+        - version
         - vm_size
     PostgresDetailed:
       type: object
