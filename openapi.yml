@@ -417,35 +417,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}':
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_id'
-    delete:
-      operationId: deleteLocationFirewallWithId
-      summary: Delete a specific firewall
-      responses:
-        '204':
-          description: Firewall deleted successfully
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
-    get:
-      operationId: getLocationFirewallDetailsWithId
-      summary: Get details of a specific firewall
-      responses:
-        '200':
-          description: Details of the firewall
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Firewall'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Firewall
   '/project/{project_id}/location/{location}/firewall/_{firewall_id}/attach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -506,6 +477,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    delete:
+      operationId: deleteLocationFirewallWithId
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          description: Firewall deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getLocationFirewallDetailsWithId
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          description: Details of the firewall
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1041,35 +1041,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}':
-    delete:
-      operationId: deletePostgresDatabaseWithID
-      summary: Delete a specific Postgres database with ID
-      responses:
-        '204':
-          description: Postgres database is deleted successfully
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres
-    get:
-      operationId: getPostgresDetailsWithId
-      summary: Get details of a specific Postgres database in a location with ID
-      responses:
-        '200':
-          description: Details of the Postgres databases in a location
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PostgresDetailed'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Postgres
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
   '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/failover':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1146,6 +1117,35 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}':
+    delete:
+      operationId: deletePostgresDatabaseWithID
+      summary: Delete a specific Postgres database with ID
+      responses:
+        '204':
+          description: Postgres database is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    get:
+      operationId: getPostgresDetailsWithId
+      summary: Get details of a specific Postgres database in a location with ID
+      responses:
+        '200':
+          description: Details of the Postgres databases in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule/{firewall_rule_id}':
     delete:
       operationId: deleteLocationPostgresFirewallRuleWithId
