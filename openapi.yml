@@ -446,7 +446,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}/attach-subnet':
+  '/project/{project_id}/location/{location}/firewall/_{firewall_id}/attach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
@@ -478,7 +478,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}/detach-subnet':
+  '/project/{project_id}/location/{location}/firewall/_{firewall_id}/detach-subnet':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/project_id'
@@ -1070,7 +1070,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_id'
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/failover':
+  '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/failover':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
@@ -1089,7 +1089,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule':
+  '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_id'
