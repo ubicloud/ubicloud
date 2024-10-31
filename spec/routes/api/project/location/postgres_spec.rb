@@ -159,7 +159,7 @@ RSpec.describe Clover, "postgres" do
           foo_key: "foo_val"
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: size, storage_size, ha_type, version, flavor"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body contains unrecognized parameters: foo_key"})
       end
 
       it "firewall-rule" do
