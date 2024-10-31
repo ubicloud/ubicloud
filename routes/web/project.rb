@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch("project") do |r|
     r.get true do
       @projects = Serializers::Project.serialize(current_account.projects.filter(&:visible), {include_path: true})

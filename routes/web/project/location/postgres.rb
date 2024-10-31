@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_location_prefix, "postgres") do |r|
     r.on String do |pg_name|
       pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first

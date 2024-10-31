@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_prefix, "load-balancer") do |r|
     load_balancer_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
 

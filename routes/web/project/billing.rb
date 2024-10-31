@@ -3,7 +3,7 @@
 require "stripe"
 require "countries"
 
-class CloverWeb
+class Clover
   hash_branch(:project_prefix, "billing") do |r|
     unless (Stripe.api_key = Config.stripe_secret_key)
       response.status = 501

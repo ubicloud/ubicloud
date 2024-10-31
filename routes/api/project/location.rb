@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverApi
+class Clover
   hash_branch(:api_project_prefix, "location") do |r|
     r.on String do |location_display_name|
       @location = LocationNameConverter.to_internal_name(location_display_name)

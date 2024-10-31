@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_prefix, "firewall") do |r|
     r.get true do
       authorized_firewalls = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view").all

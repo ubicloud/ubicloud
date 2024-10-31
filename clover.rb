@@ -7,9 +7,6 @@ require "tilt"
 require "tilt/erubi"
 
 class Clover < Roda
-  # XXX: Temporarily Compatibility
-  ::CloverWeb = ::CloverApi = ::CloverRuntime = Clover
-
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverApi
+class Clover
   hash_branch(:api_project_location_prefix, "postgres") do |r|
     pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
 

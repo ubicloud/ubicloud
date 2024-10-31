@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_prefix, "usage-alert") do |r|
     Authorization.authorize(current_account.id, "Project:billing", @project.id)
 

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_location_prefix, "load-balancer") do |r|
     r.on String do |lb_name|
       pss = @project.private_subnets_dataset.where(location: @location).all
