@@ -12,13 +12,7 @@ class Routes::Common::Base
     @user = user
     @resource = resource
     @location = location
-    @mode = if app.instance_of?(::CloverApi)
-      AppMode::API
-    elsif app.instance_of?(::CloverWeb)
-      AppMode::WEB
-    else
-      raise "Unknown app mode"
-    end
+    @mode = app.api? ? AppMode::API : AppMode::WEB
   end
 
   def project

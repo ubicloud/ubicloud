@@ -73,25 +73,27 @@ module CloverBase
   end
 
   module ClassMethods
-    def autoload_routes(route)
+    # rubocop:disable Style/OptionalArguments
+    def autoload_routes(namespace = "", route)
+      # rubocop:enable Style/OptionalArguments # different indents required by Rubocop
       route_path = "routes/#{route}"
-      if Config.production?
-        # :nocov:
+      if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
         Unreloader.require(route_path)
-        # :nocov:
       else
+        # :nocov:
         plugin :autoload_hash_branches
         Dir["#{route_path}/**/*.rb"].each do |full_path|
           parts = full_path.delete_prefix("#{route_path}/").split("/")
           namespaces = parts[0...-1]
           filename = parts.last
           if namespaces.empty?
-            autoload_hash_branch(File.basename(filename, ".rb").tr("_", "-"), full_path)
+            autoload_hash_branch(namespace, File.basename(filename, ".rb").tr("_", "-"), full_path)
           else
-            autoload_hash_branch(:"#{namespaces.join("_")}_prefix", File.basename(filename, ".rb").tr("_", "-"), full_path)
+            autoload_hash_branch(:"#{namespace + "_" unless namespace.empty?}#{namespaces.join("_")}_prefix", File.basename(filename, ".rb").tr("_", "-"), full_path)
           end
         end
         Unreloader.autoload(route_path, delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
+        # :nocov:
       end
     end
   end

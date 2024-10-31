@@ -14,7 +14,7 @@ RSpec.configure do |config|
   include Rack::Test::Methods
 
   def app
-    Clover.freeze.app
+    Clover.app
   end
 
   RSpec::Matchers.define :have_api_error do |expected_state, expected_message, expected_details|

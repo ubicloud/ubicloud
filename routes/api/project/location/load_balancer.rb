@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class CloverApi
-  hash_branch(:project_location_prefix, "load-balancer") do |r|
+  hash_branch(:api_project_location_prefix, "load-balancer") do |r|
     r.get true do
       Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil).list
     end
