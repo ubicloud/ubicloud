@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:webhook_prefix, "github") do |r|
     r.post true do
       body = r.body.read

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_prefix, "github") do |r|
     unless Config.github_app_name
       response.status = 501

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_location_prefix, "vm") do |r|
     r.on String do |vm_name|
       unless (vm = @project.vms_dataset.where(location: @location).where { {Sequel[:vm][:name] => vm_name} }.first)

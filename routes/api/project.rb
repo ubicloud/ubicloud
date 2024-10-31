@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverApi
+class Clover
   hash_branch("api", "project") do |r|
     r.get true do
       result = Project.authorized(current_account.id, "Project:view").where(visible: true).paginated_result(

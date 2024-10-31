@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch(:project_location_prefix, "firewall") do |r|
     r.on String do |firewall_name|
       fw = @project.firewalls_dataset.where(location: @location).where { {Sequel[:firewall][:name] => firewall_name} }.first

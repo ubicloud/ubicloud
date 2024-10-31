@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverWeb
+class Clover
   hash_branch("github") do |r|
     r.get "callback" do
       oauth_code = r.params["code"]

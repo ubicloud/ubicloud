@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CloverApi
+class Clover
   hash_branch(:api_project_prefix, "vm") do |r|
     vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
 
