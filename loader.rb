@@ -88,7 +88,7 @@ module Routes; end
 module Routes::Common; end
 
 autoload_normal.call("model", flat: true)
-%w[lib clover.rb routes/clover_base.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
+%w[lib clover.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers routes/common].each { autoload_normal.call(_1, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
@@ -186,7 +186,6 @@ def clover_freeze
     Authorization::ManagedPolicy,
     Authorization::TaggableMethods,
     Authorization::Unauthorized,
-    CloverBase::ClassMethods,
     HealthMonitorMethods,
     Hosting,
     Minio,
