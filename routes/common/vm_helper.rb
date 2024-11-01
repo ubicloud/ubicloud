@@ -1,28 +1,6 @@
 # frozen_string_literal: true
 
 class Routes::Common::VmHelper < Routes::Common::Base
-  def list
-    if @mode == AppMode::API
-      dataset = project.vms_dataset
-      dataset = dataset.where(location: @location) if @location
-      result = dataset.authorized(@user.id, "Vm:view").paginated_result(
-        start_after: @request.params["start_after"],
-        page_size: @request.params["page_size"],
-        order_column: @request.params["order_column"]
-      )
-
-      {
-        items: Serializers::Vm.serialize(result[:records]),
-        count: result[:count]
-      }
-    else
-      vms = Serializers::Vm.serialize(project.vms_dataset.authorized(@user.id, "Vm:view").eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).order(Sequel.desc(:created_at)).all, {include_path: true})
-      @app.instance_variable_set(:@vms, vms)
-
-      @app.view "vm/index"
-    end
-  end
-
   def post(name)
     Authorization.authorize(@user.id, "Vm:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?

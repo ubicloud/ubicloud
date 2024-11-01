@@ -10,6 +10,8 @@ class Clover < Roda
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
+  Unreloader.require("routes/helpers") {}
+
   def self.freeze
     if Config.test? && ENV["CLOVER_FREEZE"] != "1"
       Sequel::Model.descendants.each(&:finalize_associations)
