@@ -311,7 +311,7 @@ begin
     task :openapi do
       sh "npx redocly lint openapi/openapi.yml --config openapi/redocly.yml"
       sh "npx @stoplight/spectral-cli lint openapi/openapi.yml --fail-severity=warn --ruleset openapi/.spectral.yml"
-      sh "npx openapi-format openapi/openapi.yml --output openapi/openapi.yml --sortFile openapi/openapi_format_sortfile.yml"
+      sh "npx openapi-format openapi/openapi.yml --configFile openapi/openapi_format.yml"
     end
   end
 
