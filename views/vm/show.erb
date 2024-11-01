@@ -17,7 +17,7 @@
 ) %>
 
 <div class="grid gap-6">
-  <!-- Detail Card -->
+  <!-- Vm Detail Card -->
   <%== render(
     "components/kv_data_card",
     locals: {
@@ -44,45 +44,25 @@
       ]
     }
   ) %>
-  <!-- Firewall Rules Card -->
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Applied Firewall Rules
-      </h3>
-    </div>
-  </div>
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <table class="min-w-full divide-y divide-gray-300">
-      <thead class="bg-gray-50">
-        <tr>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Firewall</th>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Port Range</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200 bg-white">
-        <% @vm[:firewalls].each do |fw| %>
-          <% fw[:firewall_rules].each do |fwr| %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <% if has_permission?("Firewall:view", fw[:id]) %>
-                  <a
-                    href="<%= "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" %>"
-                    class="text-orange-600 hover:text-orange-700"
-                  ><%= fw[:name] %></a>
-                <% else %>
-                  <%= fw[:name] %>
-                <% end %>
-              </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:port_range] %></td>
-            </tr>
-          <% end %>
-        <% end %>
-      </tbody>
-    </table>
-  </div>
+  <!-- Firewall Rule List -->
+  <%== render(
+    "components/table_card",
+    locals: {
+      title: "Applied Firewall Rules",
+      headers: ["Firewall", "CIDR", "Port Range"],
+      empty_state: "This VM doesn't have applied firewall",
+      rows:
+        @vm[:firewalls].flat_map do |fw|
+          view_perm = has_permission?("Firewall:view", fw[:id])
+          (fw[:firewall_rules] || []).map do |fwr|
+            [
+              [[fw[:name], view_perm ? { link: @project_data[:path] + fw[:path] } : {}], fwr[:cidr], fwr[:port_range]],
+              { id: "firewall-rule-#{fwr[:id]}" }
+            ]
+          end
+        end
+    }
+  ) %>
   <!-- Danger Zone -->
   <div>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
