@@ -2,8 +2,16 @@
 
 require "sequel"
 
-auto_parallel_tests = nil
+use_auto_parallel_tests = nil
 auto_parallel_tests_file = ".auto-parallel-tests"
+
+auto_parallel_tests = lambda do
+  if use_auto_parallel_tests.nil?
+    use_auto_parallel_tests = File.file?(auto_parallel_tests_file) && File.binread(auto_parallel_tests_file) == "1"
+  end
+
+  use_auto_parallel_tests
+end
 
 # Migrate
 migrate = lambda do |env, version, db: nil|
@@ -58,11 +66,13 @@ task test_down: [:_test_down, :refresh_sequel_caches]
 # rubocop:disable Rake/Desc
 task :_test_up do
   migrate.call("test", nil)
+  Rake::Task["setup_database"].invoke("test", true) if auto_parallel_tests.call
 end
 
 task :_test_down do
   version = ENV["VERSION"].to_i || 0
   migrate.call("test", version)
+  Rake::Task["setup_database"].invoke("test", true) if auto_parallel_tests.call
 end
 # rubocop:enable Rake/Desc
 
@@ -154,12 +164,7 @@ turbo_tests = lambda do |env|
 end
 
 spec = lambda do |env|
-  if auto_parallel_tests.nil?
-    auto_parallel_tests = File.file?(auto_parallel_tests_file) && File.binread(auto_parallel_tests_file) == "1"
-  end
-
-  block = auto_parallel_tests ? turbo_tests : rspec
-  block.call(env)
+  (auto_parallel_tests.call ? turbo_tests : rspec).call(env)
 end
 
 desc "Run specs with coverage"
