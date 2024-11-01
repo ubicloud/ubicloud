@@ -35,40 +35,24 @@
   ) %>
 
   <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Managed by</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @postgres_databases.each do |pg| %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-6" scope="row">
-                <a href="<%= @project_data[:path] %><%= pg[:path] %>" class="text-orange-600 hover:text-orange-700">
-                  <%= pg[:name] %>
-                </a>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <% (brand, _, _) = flavors[pg[:flavor]] %>
-                <div class="inline-flex gap-x-1 items-center">
-                  <img src="/icons/pg-<%= brand.downcase %>.png" class="object-cover rounded-lg overflow-hidden w-6 h-6"/>
-                  <p><%= brand %></p>
-                </div>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= pg[:location] %></td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <%== render("components/pg_state_label", locals: { state: pg[:state] }) %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+    <%== render(
+      "components/table_card",
+      locals: {
+        headers: ["Name", "Managed by", "Location", "State"],
+        rows: @postgres_databases.map do |pg|
+          brand, = flavors[pg[:flavor]]
+          [
+            [
+              [pg[:name], {link: @project_data[:path] + pg[:path]}],
+              ["<div class='inline-flex gap-x-1 items-center'><img src='/icons/pg-#{brand.downcase}.png' class='object-cover rounded-lg overflow-hidden w-6 h-6'/><p>#{brand}</p></div>", {escape: false}],
+              pg[:location],
+              ["pg_state_label", {component: { state: pg[:state] }}]
+            ],
+            {id: "pg-#{pg[:id]}"}
+          ]
+        end
+      }
+    ) %>
   </div>
 <% else %>
 

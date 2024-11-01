@@ -2,41 +2,40 @@
 <%== render("inference/tabbar") %>
 
 <div>
-  <% unless @inference_api_keys.empty? %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">ID</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">API Key</th>
-            <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @inference_api_keys.each do |token| %>
-            <tr id="token-<%= token[:id] %>">
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%= token[:id] %>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <%== render("components/copyable_content", locals: { content: token[:key], revealable: true }) %>
-              </td>
-              <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                <%== has_project_permission("InferenceApiKey:delete") ? render(
-                  "components/delete_button",
-                  locals: {
-                    text: "Delete",
-                    url: "#{@project_data[:path]}/inference-api-key/#{token[:id]}",
-                    confirmation: "delete key"
-                  }
-                ) : "No Permission to delete" %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
-  <% end %>
+  <%== render(
+    "components/table_card",
+    locals: {
+      headers: ["ID", "API Key", ""],
+      empty_state: "No inference API keys",
+      rows:
+        @inference_api_keys.map do |token|
+          [
+            [
+              token[:id],
+              [token[:key], { revealable: true, copyable: true }],
+              (
+                if has_project_permission("InferenceApiKey:delete")
+                  [
+                    "delete_button",
+                    {
+                      component: {
+                        text: "Delete",
+                        url: "#{@project_data[:path]}/inference-api-key/#{token[:id]}",
+                        confirmation: "delete api key"
+                      }
+                    }
+                  ]
+                else
+                  "No Permission to delete"
+                end
+              )
+            ],
+            { id: "api-key-#{token[:id]}" }
+          ]
+        end
+    }
+  ) %>
+
   <% if has_project_permission("InferenceApiKey:create") && @inference_api_keys.size < 10 %>
   <div class="flex justify-end space-y-1 mt-6">
     <form id="create-inference-api-key" action="<%= "#{@project_data[:path]}/inference-api-key" %>" role="form" method="POST">

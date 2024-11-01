@@ -169,20 +169,15 @@ RSpec.describe Clover, "project" do
         expect(page.title).to eq("Ubicloud - Projects")
         expect(page).to have_content project.name
 
-        click_link "Show", href: project.path
+        find("#project-#{project.ubid}").click_link project.name
 
-        expect(page.title).to eq("Ubicloud - #{project.name}")
+        expect(page.title).to eq("Ubicloud - #{project.name} Dashboard")
         expect(page).to have_content project.name
       end
 
       it "raises forbidden when does not have permissions" do
         project_wo_permissions
-        visit "/project"
-
-        expect(page.title).to eq("Ubicloud - Projects")
-        expect(page).to have_content project_wo_permissions.name
-
-        click_link "Show", href: project_wo_permissions.path
+        visit "/project/#{project_wo_permissions.ubid}"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)

@@ -133,7 +133,6 @@ RSpec.describe Clover, "github" do
       runner_wo_strand = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo")
 
       visit "#{project.path}/github/runner"
-
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Active Runners")
       expect(page).to have_content runner_deleted.ubid
