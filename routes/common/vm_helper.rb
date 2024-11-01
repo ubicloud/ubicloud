@@ -80,14 +80,4 @@ class Routes::Common::VmHelper < Routes::Common::Base
       @request.redirect "#{project.path}#{st.subject.path}"
     end
   end
-
-  def get
-    Authorization.authorize(@user.id, "Vm:view", @resource.id)
-    if @mode == AppMode::API
-      Serializers::Vm.serialize(@resource, {detailed: true})
-    else
-      @app.instance_variable_set(:@vm, Serializers::Vm.serialize(@resource, {detailed: true}))
-      @app.view "vm/show"
-    end
-  end
 end

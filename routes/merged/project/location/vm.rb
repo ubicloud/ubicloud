@@ -23,14 +23,18 @@ class Clover
       vm = @project.vms_dataset.first(filter)
 
       unless vm
-        response.status = request.delete? ? 204 : 404
-        request.halt
+        response.status = r.delete? ? 204 : 404
+        r.halt
       end
 
-      vm_endpoint_helper.instance_variable_set(:@resource, vm)
-
       r.get true do
-        vm_endpoint_helper.get
+        Authorization.authorize(current_account.id, "Vm:view", vm.id)
+        @vm = Serializers::Vm.serialize(vm, {detailed: true})
+        if api?
+          @vm
+        else
+          view "vm/show"
+        end
       end
 
       r.delete true do
