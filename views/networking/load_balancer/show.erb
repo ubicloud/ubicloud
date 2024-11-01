@@ -119,7 +119,6 @@
             <%== render(
               "components/delete_button",
               locals: {
-                url: request.path,
                 confirmation: @lb[:name],
                 redirect: "#{@project_data[:path]}/load-balancer"
               }

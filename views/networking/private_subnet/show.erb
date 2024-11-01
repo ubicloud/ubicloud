@@ -194,7 +194,6 @@
             <%== render(
               "components/delete_button",
               locals: {
-                url: request.path,
                 confirmation: @ps[:name],
                 redirect: "#{@project_data[:path]}/private-subnet"
               }

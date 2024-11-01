@@ -232,14 +232,7 @@
                   id="fwr-delete-<%=fwr[:id]%>"
                   class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
                 >
-                  <%== render(
-                    "components/delete_button",
-                    locals: {
-                      url: "#{request.path}/firewall-rule/#{fwr[:id]}",
-                      text: "",
-                      redirect: request.path
-                    }
-                  ) %>
+                  <%== render("components/delete_button", locals: { url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "" }) %>
                 </td>
               <% end %>
             </tr>
@@ -306,14 +299,7 @@
                   id="md-delete-<%=md[:id]%>"
                   class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
                 >
-                  <%== render(
-                    "components/delete_button",
-                    locals: {
-                      url: "#{request.path}/metric-destination/#{md[:id]}",
-                      text: "",
-                      redirect: request.path
-                    }
-                  ) %>
+                  <%== render("components/delete_button", locals: { url: "#{request.path}/metric-destination/#{md[:id]}", text: "" }) %>
                 </td>
               <% end %>
             </tr>
@@ -387,14 +373,7 @@
               </div>
             </div>
             <div id="postgres-delete-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== render(
-                "components/delete_button",
-                locals: {
-                  url: request.path,
-                  confirmation: @pg[:name],
-                  redirect: "#{@project_data[:path]}/postgres"
-                }
-              ) %>
+              <%== render("components/delete_button", locals: { confirmation: @pg[:name], redirect: "#{@project_data[:path]}/postgres" }) %>
             </div>
           </div>
         </div>

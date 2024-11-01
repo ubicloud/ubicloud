@@ -84,14 +84,7 @@
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                url: request.path,
-                confirmation: @project_data[:name],
-                redirect: "/project"
-              }
-            ) %>
+            <%== render("components/delete_button", locals: { confirmation: @project_data[:name], redirect: "/project" }) %>
           </div>
         </div>
       </div>
