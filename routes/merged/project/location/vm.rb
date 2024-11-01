@@ -34,7 +34,10 @@ class Clover
       end
 
       r.delete true do
-        vm_endpoint_helper.delete
+        Authorization.authorize(current_account.id, "Vm:delete", vm.id)
+        vm.incr_destroy
+        response.status = 204
+        nil
       end
     end
 
