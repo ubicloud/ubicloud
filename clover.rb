@@ -56,9 +56,12 @@ class Clover < Roda
       super
     end
 
-    # Only use sessions in web routes, not in api/runtime routes
+    # Do not allow session access in api routes
     def session
-      scope.web? ? super : (@_session = {})
+      # :nocov:
+      raise(Roda::RodaError, "sessions are not used in api/runtime routes") unless scope.web?
+      # :nocov:
+      super
     end
   end
 
@@ -346,6 +349,11 @@ class Clover < Roda
       end
 
       hash.to_json
+    end
+
+    clear_session do
+      session.clear
+      set_jwt
     end
 
     hmac_secret Config.clover_session_secret
