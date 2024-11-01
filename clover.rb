@@ -242,6 +242,8 @@ class Clover < Roda
     end
   end
   plugin :not_found do
+    next if runtime?
+
     @error = {
       code: 404,
       type: "ResourceNotFound",
