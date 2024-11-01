@@ -14,10 +14,15 @@ class Clover
         vm_endpoint_helper.post(r.params["name"])
       end
 
-      r.on "create" do
-        r.get true do
-          vm_endpoint_helper.get_create
-        end
+      r.get "create" do
+        Authorization.authorize(current_account.id, "Vm:create", @project.id)
+        @subnets = Serializers::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").all)
+        @prices = fetch_location_based_prices("VmCores", "VmStorage", "IPAddress")
+        @has_valid_payment_method = @project.has_valid_payment_method?
+        @default_location = @project.default_location
+        @enabled_vm_sizes = Option::VmSizes.select { _1.visible && @project.quota_available?("VmCores", _1.vcpu / 2) }.map(&:name)
+
+        view "vm/create"
       end
     end
   end

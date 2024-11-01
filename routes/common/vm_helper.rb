@@ -97,15 +97,4 @@ class Routes::Common::VmHelper < Routes::Common::Base
     response.status = 204
     @request.halt
   end
-
-  def get_create
-    Authorization.authorize(@user.id, "Vm:create", project.id)
-    @app.instance_variable_set(:@subnets, Serializers::PrivateSubnet.serialize(project.private_subnets_dataset.authorized(@user.id, "PrivateSubnet:view").all))
-    @app.instance_variable_set(:@prices, @app.fetch_location_based_prices("VmCores", "VmStorage", "IPAddress"))
-    @app.instance_variable_set(:@has_valid_payment_method, project.has_valid_payment_method?)
-    @app.instance_variable_set(:@default_location, project.default_location)
-    @app.instance_variable_set(:@enabled_vm_sizes, Option::VmSizes.select { _1.visible && project.quota_available?("VmCores", _1.vcpu / 2) }.map(&:name))
-
-    @app.view "vm/create"
-  end
 end
