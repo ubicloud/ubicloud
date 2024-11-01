@@ -190,6 +190,10 @@ class Clover < Roda
     @current_account = Account[rodauth.session_value]
   end
 
+  def json_params
+    @params ||= api? ? request.body.read : request.params.reject { _1 == "_csrf" }.to_json
+  end
+
   # Assign some HTTP response codes to common exceptions.
   def parse_error(e)
     case e

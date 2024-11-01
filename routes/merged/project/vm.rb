@@ -15,9 +15,8 @@ class Clover
 
     r.on web? do
       r.post true do
-        vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
-        vm_endpoint_helper.instance_variable_set(:@location, LocationNameConverter.to_internal_name(r.params["location"]))
-        vm_endpoint_helper.post(r.params["name"])
+        @location = LocationNameConverter.to_internal_name(r.params["location"])
+        vm_post(r.params["name"])
       end
 
       r.get "create" do
