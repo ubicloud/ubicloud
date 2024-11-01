@@ -39,22 +39,13 @@
           ) %>
         </div>
       </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table class="min-w-full divide-y divide-gray-300">
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% @installations.each do |ins| %>
-              <tr>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%= ins[:name] %>
-                </td>
-                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                  <a href="<%= ins[:installation_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank">Configure</a>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
+      <%== render(
+        "components/table_card",
+        locals: {
+          rows:
+            @installations.map { |ins| [ins[:name], ["Configure", { link: ins[:installation_url], classes: "text-right" }]] }
+        }
+      ) %>
     </div>
   </div>
 <% elsif !@project.has_valid_payment_method? %>
