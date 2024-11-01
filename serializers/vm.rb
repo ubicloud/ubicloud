@@ -21,7 +21,7 @@ class Serializers::Vm < Serializers::Base
 
     if options[:detailed]
       base.merge!(
-        firewalls: Serializers::Firewall.serialize(vm.firewalls),
+        firewalls: Serializers::Firewall.serialize(vm.firewalls, {include_path: true}),
         private_ipv4: vm.nics.first.private_ipv4.network,
         private_ipv6: vm.nics.first.private_ipv6.nth(2),
         subnet: vm.nics.first.private_subnet.name

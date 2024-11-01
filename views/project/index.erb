@@ -9,28 +9,20 @@
   ) %>
 
   <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-              <span class="sr-only">Show</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @projects.each do |project| %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= project[:name] %></td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <a href="<%= project[:path] %>" class="text-orange-600 hover:text-orange-700">Show</a>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+    <%== render(
+        "components/table_card",
+        locals: {
+          headers: ["Name"],
+          rows: @projects.map do |p|
+             [
+               [
+                 [p[:name], {link: p[:path] + "/dashboard"}]
+               ],
+               { id: "project-#{p[:id]}" }
+             ]
+          end
+        }
+      ) %>
   </div>
 <% else %>
   <%== render(
