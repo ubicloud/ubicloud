@@ -90,11 +90,4 @@ class Routes::Common::VmHelper < Routes::Common::Base
       @app.view "vm/show"
     end
   end
-
-  def delete
-    Authorization.authorize(@user.id, "Vm:delete", @resource.id)
-    @resource.incr_destroy
-    response.status = 204
-    @request.halt
-  end
 end
