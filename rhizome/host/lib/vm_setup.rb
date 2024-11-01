@@ -462,6 +462,7 @@ listen-address=#{dns_ipv4}
 dhcp-option=26,1400
 bind-interfaces
 #{address_mapping}
+dhcp-option=54,#{dns_ipv4}
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
