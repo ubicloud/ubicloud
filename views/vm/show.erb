@@ -104,14 +104,7 @@
             </div>
           </div>
           <div id="vm-delete-<%=@vm[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                url: request.path,
-                confirmation: @vm[:name],
-                redirect: "#{@project_data[:path]}/vm"
-              }
-            ) %>
+            <%== render("components/delete_button", locals: { confirmation: @vm[:name], redirect: "#{@project_data[:path]}/vm" }) %>
           </div>
         </div>
       </div>

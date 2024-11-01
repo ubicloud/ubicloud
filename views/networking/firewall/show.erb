@@ -56,14 +56,7 @@
                 id="fwr-delete-<%=fwr[:id]%>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
               >
-                <%== render(
-                  "components/delete_button",
-                  locals: {
-                    url: "#{request.path}/firewall-rule/#{fwr[:id]}",
-                    text: "",
-                    redirect: request.path
-                  }
-                ) %>
+                <%== render("components/delete_button", locals: { url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "" }) %>
               </td>
             <% end %>
           </tr>
@@ -174,7 +167,6 @@
             <%== render(
               "components/delete_button",
               locals: {
-                url: request.path,
                 confirmation: @firewall[:name],
                 redirect: "#{@project_data[:path]}/firewall"
               }

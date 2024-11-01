@@ -102,8 +102,7 @@
                     locals: {
                       text: "Remove",
                       url: "#{@project_data[:path]}/user/#{user[:ubid]}",
-                      confirmation: user[:email],
-                      redirect: "#{@project_data[:path]}/user"
+                      confirmation: user[:email]
                     }
                   ) %>
                 </td>
@@ -136,8 +135,7 @@
                     locals: {
                       text: "Remove",
                       url: "#{@project_data[:path]}/user/invitation/#{invitation[:email]}",
-                      confirmation: invitation[:email],
-                      redirect: "#{@project_data[:path]}/user"
+                      confirmation: invitation[:email]
                     }
                   ) %>
                 </td>

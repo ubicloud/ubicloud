@@ -217,8 +217,7 @@
                       locals: {
                         url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
                         csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
-                        confirmation: pm[:last4],
-                        redirect: request.path
+                        confirmation: pm[:last4]
                       }
                     ) %>
                   </td>
@@ -396,8 +395,7 @@
                     locals: {
                       text: "Remove",
                       url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
-                      confirmation: alert[:name],
-                      redirect: "#{@project_data[:path]}/billing"
+                      confirmation: alert[:name]
                     }
                   ) %>
                 </td>
