@@ -2,14 +2,20 @@
 
 class Clover
   branch = lambda do |r|
-    vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
-
     r.get true do
-      vm_endpoint_helper.list
+      dataset = vm_list_dataset
+
+      if api?
+        vm_list_api_response(dataset)
+      else
+        @vms = Serializers::Vm.serialize(dataset.eager(:semaphores, :assigned_vm_address, :vm_storage_volumes).reverse(:created_at).all, {include_path: true})
+        view "vm/index"
+      end
     end
 
     r.on web? do
       r.post true do
+        vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
         vm_endpoint_helper.instance_variable_set(:@location, LocationNameConverter.to_internal_name(r.params["location"]))
         vm_endpoint_helper.post(r.params["name"])
       end

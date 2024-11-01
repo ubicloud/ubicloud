@@ -2,15 +2,14 @@
 
 class Clover
   branch = lambda do |r|
-    vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
-
     r.get api? do
-      vm_endpoint_helper.list
+      vm_list_api_response(vm_list_dataset)
     end
 
     r.on NAME_OR_UBID do |vm_name, vm_ubid|
       if vm_name
         r.post api? do
+          vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
           vm_endpoint_helper.post(vm_name)
         end
 
@@ -48,6 +47,7 @@ class Clover
     # 204 response for invalid names
     r.is String do |vm_name|
       r.post do
+        vm_endpoint_helper = Routes::Common::VmHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
         vm_endpoint_helper.post(vm_name)
       end
 
