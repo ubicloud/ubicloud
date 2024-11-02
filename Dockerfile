@@ -7,7 +7,7 @@ RUN npm ci
 RUN npm run prod
 
 
-FROM ruby:3.2.5-alpine3.19 as bundler
+FROM ruby:3.2.6-alpine3.19 as bundler
 # Install build dependencies
 # - build-base, git, curl: To ensure certain gems can be compiled
 # - postgresql-dev: Required for postgresql gem
@@ -19,7 +19,7 @@ RUN bundle config set --local without development:test
 RUN bundle install
 
 
-FROM ruby:3.2.5-alpine3.19
+FROM ruby:3.2.6-alpine3.19
 # Install runtime dependencies
 # - tzdata: The public-domain time zone database
 # - curl: Required for healthcheck and some basic operations
