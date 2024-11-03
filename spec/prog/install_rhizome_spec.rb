@@ -16,6 +16,8 @@ RSpec.describe Prog::InstallRhizome do
       expect(sshable).to receive(:cmd) do |*args, **kwargs|
         expect(args).to eq ["tar xf -"]
 
+        expect(kwargs[:stdin].scan("Gemfile.lock").count).to be < 2
+
         # Take offset from
         # https://www.gnu.org/software/tar/manual/html_node/Standard.html
         expect(kwargs[:stdin][257..261]).to eq "ustar"
@@ -40,7 +42,7 @@ RSpec.describe Prog::InstallRhizome do
 
   describe "#validate" do
     it "runs the validate script" do
-      # expect(sshable).to receive(:cmd).with("common/bin/validate")
+      expect(sshable).to receive(:cmd).with("common/bin/validate")
       expect { ir.validate }.to exit({"msg" => "installed rhizome"})
     end
   end
