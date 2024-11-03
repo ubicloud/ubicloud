@@ -7,6 +7,8 @@ require "digest/sha2"
 class Prog::InstallRhizome < Prog::Base
   subject_is :sshable
 
+  SKIP_VALIDATION = ["Gemfile.lock"]
+
   label def start
     tar = StringIO.new
     file_hash_map = {} # pun intended
@@ -24,7 +26,8 @@ class Prog::InstallRhizome < Prog::Base
               IO.copy_stream(_1, tf)
             end
           end
-          file_hash_map[file] = Digest::SHA384.file(full_path).hexdigest
+
+          file_hash_map[file] = Digest::SHA384.file(full_path).hexdigest unless SKIP_VALIDATION.include?(file)
         else
           # :nocov:
           fail "BUG"
@@ -50,7 +53,7 @@ class Prog::InstallRhizome < Prog::Base
   end
 
   label def validate
-    # sshable.cmd("common/bin/validate")
+    sshable.cmd("common/bin/validate")
 
     pop "installed rhizome"
   end
