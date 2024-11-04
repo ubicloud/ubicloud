@@ -41,9 +41,7 @@ class Clover
 
     # 204 response for invalid names
     r.is String do |vm_name|
-      r.post do
-        vm_post(vm_name)
-      end
+      r.post { vm_post(vm_name) }
 
       r.delete do
         response.status = 204
