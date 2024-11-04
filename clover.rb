@@ -277,10 +277,10 @@ class Clover < Roda
     # raise e
     error = parse_error(e)
 
-    if api? || runtime?
-      unless runtime? && error[:code] == 204
-        {error: error}.to_json
-      end
+    if error[:code] == 204
+      # nothing
+    elsif api? || runtime?
+      {error: error}
     else
       @error = error
 
