@@ -2,6 +2,7 @@
 <% text = (defined?(text) && text) ? text : "Delete" %>
 <% confirmation = (defined?(confirmation) && confirmation) ? confirmation : nil %>
 <% confirmation_message = (defined?(confirmation_message) && confirmation_message) ? confirmation_message : nil %>
+<% method = (defined?(method) && method) ? method : "DELETE" %>
 
 <%== render(
   "components/button",
@@ -12,10 +13,11 @@
     type: "danger",
     attributes: {
       "data-url" => url,
-      "data-csrf" => csrf_token(csrf_url, "DELETE"),
+      "data-csrf" => csrf_token(csrf_url, method),
       "data-confirmation" => confirmation,
       "data-confirmation-message" => confirmation_message,
-      "data-redirect" => redirect
+      "data-redirect" => redirect,
+      "data-method" => method
     }
   }
 ) %>
