@@ -1,6 +1,7 @@
 <% csrf_url = (defined?(csrf_url) && csrf_url) ? csrf_url : url %>
 <% text = (defined?(text) && text) ? text : "Delete" %>
 <% confirmation = (defined?(confirmation) && confirmation) ? confirmation : nil %>
+<% confirmation_message = (defined?(confirmation_message) && confirmation_message) ? confirmation_message : nil %>
 
 <%== render(
   "components/button",
@@ -13,6 +14,7 @@
       "data-url" => url,
       "data-csrf" => csrf_token(csrf_url, "DELETE"),
       "data-confirmation" => confirmation,
+      "data-confirmation-message" => confirmation_message,
       "data-redirect" => redirect
     }
   }
