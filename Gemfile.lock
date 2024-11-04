@@ -16,7 +16,7 @@ GIT
 GEM
   remote: https://rubygems.org/
   specs:
-    Ascii85 (1.1.1)
+    Ascii85 (2.0.1)
     acme-client (2.0.19)
       base64 (~> 0.2.0)
       faraday (>= 1.0, < 3.0.0)
@@ -199,8 +199,8 @@ GEM
       ast (~> 2.4.1)
       racc
     pdf-core (0.10.0)
-    pdf-reader (2.12.0)
-      Ascii85 (~> 1.0)
+    pdf-reader (2.13.0)
+      Ascii85 (>= 1.0, < 3.0, != 2.0.0)
       afm (~> 0.2.1)
       hashery (~> 2.0)
       ruby-rc4
@@ -227,9 +227,8 @@ GEM
     rack-test (2.1.0)
       rack (>= 1.3)
     rack-unreloader (2.1.0)
-    rackup (2.1.0)
+    rackup (2.2.0)
       rack (>= 3)
-      webrick (~> 1.8)
     rails-dom-testing (2.2.0)
       activesupport (>= 5.0.0)
       minitest
@@ -275,7 +274,7 @@ GEM
       rubocop-ast (>= 1.32.2, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 3.0)
-    rubocop-ast (1.33.0)
+    rubocop-ast (1.34.0)
       parser (>= 3.3.1.0)
     rubocop-capybara (2.21.0)
       rubocop (~> 1.41)
