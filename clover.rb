@@ -157,8 +157,7 @@ class Clover < Roda
   # :nocov:
 
   def runtime?
-    return @is_runtime if defined?(@is_runtime)
-    @is_runtime = env["PATH_INFO"].start_with?("/runtime")
+    !!@is_runtime
   end
 
   def web?
@@ -660,6 +659,7 @@ class Clover < Roda
       r.hash_branches("api")
     else
       r.on "runtime" do
+        @is_runtime = true
         response.json = true
 
         if (jwt_payload = get_jwt_payload(r)).nil? || (@vm = Vm.from_ubid(jwt_payload["sub"])).nil?
