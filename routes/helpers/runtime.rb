@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  def get_jwt_payload(request)
+  def get_runtime_jwt_payload
     return unless (v = request.env["HTTP_AUTHORIZATION"])
     jwt_token = v.sub(%r{\ABearer:?\s+}, "")
     begin
