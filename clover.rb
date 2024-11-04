@@ -472,7 +472,7 @@ class Clover < Roda
         @is_runtime = true
         response.json = true
 
-        if (jwt_payload = get_jwt_payload(r)).nil? || (@vm = Vm.from_ubid(jwt_payload["sub"])).nil?
+        if (jwt_payload = get_runtime_jwt_payload).nil? || (@vm = Vm.from_ubid(jwt_payload["sub"])).nil?
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
