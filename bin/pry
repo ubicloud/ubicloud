@@ -36,4 +36,20 @@ else
   "clover-#{Config.rack_env}"
 end
 
+if Config.development?
+  module PryReloader
+    def evaluate_ruby(code)
+      begin
+        Unreloader.reload!
+      rescue StandardError, ScriptError => e
+        puts "#{e.class}: #{e.message}"
+        puts e.backtrace[0...5]
+      end
+
+      super
+    end
+  end
+  Pry.prepend(PryReloader)
+end
+
 Pry::CLI.start(opts)
