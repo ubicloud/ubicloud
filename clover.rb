@@ -658,16 +658,17 @@ class Clover < Roda
       rodauth.check_active_session
       rodauth.require_authentication
       r.hash_branches("api")
-    elsif runtime?
-      response.json = true
-      if (jwt_payload = get_jwt_payload(r)).nil? || (@vm = Vm.from_ubid(jwt_payload["sub"])).nil?
-        fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
-      end
-
+    else
       r.on "runtime" do
+        response.json = true
+
+        if (jwt_payload = get_jwt_payload(r)).nil? || (@vm = Vm.from_ubid(jwt_payload["sub"])).nil?
+          fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
+        end
+
         r.hash_branches("runtime")
       end
-    else
+
       r.public
       r.assets
 
