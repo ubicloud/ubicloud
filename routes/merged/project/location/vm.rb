@@ -28,11 +28,7 @@ class Clover
       r.get true do
         Authorization.authorize(current_account.id, "Vm:view", vm.id)
         @vm = Serializers::Vm.serialize(vm, {detailed: true})
-        if api?
-          @vm
-        else
-          view "vm/show"
-        end
+        api? ? @vm : view("vm/show")
       end
 
       r.delete true do
