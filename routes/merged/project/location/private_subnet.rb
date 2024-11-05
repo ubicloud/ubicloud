@@ -30,7 +30,13 @@ class Clover
 
       if web?
         r.post "connect" do
-          ps_endpoint_helper.connect(r.params["connected-subnet-ubid"])
+          Authorization.authorize(current_account.id, "PrivateSubnet:connect", ps.id)
+          subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-ubid"])
+          Authorization.authorize(current_account.id, "PrivateSubnet:connect", subnet.id)
+          ps.connect_subnet(subnet)
+          ps.reload
+          flash["notice"] = "#{subnet.name} will be connected in a few seconds"
+          r.redirect "#{@project.path}#{PrivateSubnet[ps.id].path}"
         end
 
         r.post "disconnect", String do |disconnecting_ps_ubid|
