@@ -64,7 +64,19 @@ class Clover
       end
 
       request.delete true do
-        ps_endpoint_helper.delete
+        Authorization.authorize(current_account.id, "PrivateSubnet:delete", ps.id)
+        if ps.vms_dataset.count > 0
+          if api?
+            fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
+          else
+            response.status = 400
+            next {message: "Private subnet has VMs attached, first, delete them."}.to_json
+          end
+        end
+
+        ps.incr_destroy
+        response.status = 204
+        r.halt
       end
     end
 

@@ -54,20 +54,4 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
       @request.redirect "#{project.path}#{PrivateSubnet[st.id].path}"
     end
   end
-
-  def delete
-    Authorization.authorize(@user.id, "PrivateSubnet:delete", @resource.id)
-    if @resource.vms_dataset.count > 0
-      if @mode == AppMode::API
-        fail DependencyError.new("Private subnet '#{@resource.name}' has VMs attached, first, delete them.")
-      else
-        response.status = 400
-        return {message: "Private subnet has VMs attached, first, delete them."}.to_json
-      end
-    end
-
-    @resource.incr_destroy
-    response.status = 204
-    @request.halt
-  end
 end
