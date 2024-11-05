@@ -40,7 +40,13 @@ class Clover
         end
 
         r.post "disconnect", String do |disconnecting_ps_ubid|
-          ps_endpoint_helper.disconnect(disconnecting_ps_ubid)
+          Authorization.authorize(current_account.id, "PrivateSubnet:disconnect", ps.id)
+          subnet = PrivateSubnet.from_ubid(disconnecting_ps_ubid)
+          Authorization.authorize(current_account.id, "PrivateSubnet:disconnect", subnet.id)
+          ps.disconnect_subnet(subnet)
+          ps.reload
+          flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
+          r.halt
         end
       end
 
