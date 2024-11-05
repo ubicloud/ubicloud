@@ -1,11 +1,11 @@
-<% name = defined?(name) ? name : nil %>
-<% label = defined?(label) ? label : nil %>
-<% options = (defined?(options) && options) ? options : {} %>
-<% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
-<% placeholder = defined?(placeholder) ? placeholder : nil %>
-<% error = defined?(error) ? error : flash.dig("errors", name) %>
-<% description = defined?(description) ? description : nil %>
-<% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
+<% name ||= nil
+label ||= nil
+options ||= {}
+selected = flash.dig("old", name) || selected
+placeholder ||= nil
+error ||= flash.dig("errors", name)
+description ||= nil
+attributes ||= {} %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>

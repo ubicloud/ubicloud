@@ -1,6 +1,6 @@
-<% description = (defined?(description) && description) ? description : nil %>
-<% button_link = (defined?(button_link) && button_link) ? button_link : nil %>
-<% button_title = (defined?(button_title) && button_title) ? button_title : nil %>
+<% description ||= nil
+button_link ||= nil
+button_title ||= nil %>
 
 <div class="text-center">
   <%== render("components/icon", locals: { name: icon, classes: "mx-auto h-12 w-12 text-gray-400" }) %>

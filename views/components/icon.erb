@@ -1,4 +1,4 @@
-<% classes = (defined?(classes) && !classes.nil?) ? classes : "w-6 h-6" %>
+<% classes ||= "w-6 h-6" %>
 <% case name %>
 <% when "hero-arrow-up-right" %>
   <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="<%= classes %>">
@@ -126,5 +126,3 @@
 <% else %>
   <p>Not found icon</p>
 <% end %>
-
-

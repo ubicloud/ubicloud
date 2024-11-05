@@ -1,4 +1,4 @@
-<% revealable = defined?(revealable) ? revealable : false %>
+<% revealable ||= false %>
 
 <span class="copieble-content inline-flex items-center" data-content="<%= content %>" data-message="<%= message %>">
   <% if revealable %>

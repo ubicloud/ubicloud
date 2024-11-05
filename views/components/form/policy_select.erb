@@ -1,5 +1,5 @@
-<% name = defined?(name) ? name : nil %>
-<% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
+<% name ||= nil
+selected = flash.dig("old", name) || selected %>
 
 <div class="">
   <%== render(

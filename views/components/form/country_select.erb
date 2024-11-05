@@ -1,9 +1,8 @@
-<% name = (defined?(name) && name) ? name : "country" %>
-<% label = (defined?(label) && label) ? label : "Country" %>
-<% selected = flash.dig("old", name) || (defined?(selected) ? selected : nil) %>
-<% error = defined?(error) ? error : flash.dig("errors", name) %>
-<% description = defined?(description) ? description : nil %>
-<% attributes = defined?(attributes) ? attributes : {} %>
+<% name ||= "country"
+label ||= "Country"
+selected = flash.dig("old", name) || selected
+description ||= nil
+attributes ||= {} %>
 
 <%== render(
   "components/form/select",
@@ -19,7 +18,6 @@
         .sort_by(&:common_name)
         .map { |c| [c.alpha2, c.common_name] }
         .to_h,
-    error: error,
     description: description,
     attributes: attributes
   }

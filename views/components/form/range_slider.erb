@@ -1,11 +1,11 @@
-<% name = defined?(name) ? name : nil %>
-<% label = defined?(label) ? label : nil %>
-<% range_labels = (defined?(range_labels) && range_labels) ? range_labels : {} %>
-<% value = flash.dig("old", name) || ((defined?(value) && value) ? value : 0) %>
-<% error = (defined?(error) && error) ? error : rodauth.field_error(name) || flash.dig("errors", name) %>
-<% description = (defined?(description) && description) ? description : nil %>
-<% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
-<% extra_class = (defined?(extra_class) && extra_class) ? extra_class : {} %>
+<% name ||= nil
+label ||= nil
+range_labels ||= {}
+value = flash.dig("old", name) || value || 0
+error ||= rodauth.field_error(name) || flash.dig("errors", name)
+description ||= nil
+attributes ||= {}
+extra_class ||= {} %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
