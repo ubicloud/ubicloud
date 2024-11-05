@@ -2,8 +2,6 @@
 
 class Clover
   branch = lambda do |r|
-    ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
-
     r.get api? do
       private_subnet_list
     end
@@ -11,7 +9,7 @@ class Clover
     r.on NAME_OR_UBID do |ps_name, ps_id|
       if ps_name
         r.post true do
-          ps_endpoint_helper.post(ps_name)
+          private_subnet_post(ps_name)
         end
 
         filter = {Sequel[:private_subnet][:name] => ps_name}
@@ -21,7 +19,6 @@ class Clover
 
       filter[:location] = @location
       ps = @project.private_subnets_dataset.first(filter)
-      ps_endpoint_helper.instance_variable_set(:@resource, ps)
 
       unless ps
         response.status = request.delete? ? 204 : 404
@@ -83,7 +80,7 @@ class Clover
     # 204 response for invalid names
     r.is String do |ps_name|
       r.post do
-        ps_endpoint_helper.post(ps_name)
+        private_subnet_post(ps_name)
       end
 
       r.delete do
