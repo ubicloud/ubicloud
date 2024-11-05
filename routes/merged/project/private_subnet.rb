@@ -15,7 +15,8 @@ class Clover
       end
 
       r.get "create" do
-        ps_endpoint_helper.get_create
+        Authorization.authorize(current_account.id, "PrivateSubnet:create", @project.id)
+        view "networking/private_subnet/create"
       end
     end
   end

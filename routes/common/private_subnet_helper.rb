@@ -84,11 +84,6 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
     @request.halt
   end
 
-  def get_create
-    Authorization.authorize(@user.id, "PrivateSubnet:create", project.id)
-    @app.view "networking/private_subnet/create"
-  end
-
   def connect(subnet_ubid)
     Authorization.authorize(@user.id, "PrivateSubnet:connect", @resource.id)
     subnet = PrivateSubnet.from_ubid(subnet_ubid)
