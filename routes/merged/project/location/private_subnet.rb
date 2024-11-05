@@ -5,7 +5,7 @@ class Clover
     ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
 
     r.get api? do
-      ps_endpoint_helper.list
+      private_subnet_list
     end
 
     r.on NAME_OR_UBID do |ps_name, ps_id|
