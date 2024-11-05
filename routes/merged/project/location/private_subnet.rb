@@ -51,7 +51,16 @@ class Clover
       end
 
       request.get true do
-        ps_endpoint_helper.get
+        Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
+        @ps = Serializers::PrivateSubnet.serialize(ps)
+        if api?
+          @ps
+        else
+          @nics = Serializers::Nic.serialize(ps.nics)
+          @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
+          @connectable_subnets = Serializers::PrivateSubnet.serialize(ps.projects.first.private_subnets.select { |ps1| ps1.id != ps.id && !ps.connected_subnets.map(&:id).include?(ps1.id) })
+          view "networking/private_subnet/show"
+        end
       end
 
       request.delete true do
