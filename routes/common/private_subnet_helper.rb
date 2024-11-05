@@ -55,19 +55,6 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
     end
   end
 
-  def get
-    Authorization.authorize(@user.id, "PrivateSubnet:view", @resource.id)
-    if @mode == AppMode::API
-      Serializers::PrivateSubnet.serialize(@resource)
-    else
-      @app.instance_variable_set(:@ps, Serializers::PrivateSubnet.serialize(@resource))
-      @app.instance_variable_set(:@nics, Serializers::Nic.serialize(@resource.nics))
-      @app.instance_variable_set(:@connected_subnets, Serializers::PrivateSubnet.serialize(@resource.connected_subnets))
-      @app.instance_variable_set(:@connectable_subnets, Serializers::PrivateSubnet.serialize(@resource.projects.first.private_subnets.select { |ps| ps.id != @resource.id && !@resource.connected_subnets.map(&:id).include?(ps.id) }))
-      @app.view "networking/private_subnet/show"
-    end
-  end
-
   def delete
     Authorization.authorize(@user.id, "PrivateSubnet:delete", @resource.id)
     if @resource.vms_dataset.count > 0
