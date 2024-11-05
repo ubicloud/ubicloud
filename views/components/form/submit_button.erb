@@ -1,5 +1,5 @@
-<% name = defined?(name) ? name : nil %>
-<% extra_class = defined?(extra_class) ? extra_class : nil %>
+<% name ||= nil
+extra_class ||= nil %>
 
 <%== render(
   "components/button",

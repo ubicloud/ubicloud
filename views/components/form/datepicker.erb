@@ -1,10 +1,10 @@
 <% @enable_datepicker = true %>
 
-<% name = defined?(name) ? name : nil %>
-<% label = defined?(label) ? label : nil %>
-<% default_date = defined?(default_date) ? default_date : nil %>
-<% min_date = defined?(min_date) ? min_date : nil %>
-<% max_date = defined?(max_date) ? max_date : nil %>
+<% name ||= nil
+label ||= nil
+default_date ||= nil
+min_date ||= nil
+max_date ||= nil %>
 
 <%== render(
   "components/form/text",

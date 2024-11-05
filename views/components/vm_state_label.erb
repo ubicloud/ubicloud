@@ -8,7 +8,7 @@
 <% else %>
   <% color = "bg-slate-100 text-slate-800" %>
 <% end %>
-<% extra_class = defined?(extra_class) ? extra_class : nil %>
+<% extra_class ||= nil %>
 
 <span
   class="inline-flex items-baseline rounded-full px-2 text-xs font-semibold leading-5 <%= color %> <%= extra_class %>"

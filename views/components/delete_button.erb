@@ -1,10 +1,10 @@
-<% url = (defined?(url) && url) ? url : request.path %>
-<% csrf_url = (defined?(csrf_url) && csrf_url) ? csrf_url : url %>
-<% text = (defined?(text) && text) ? text : "Delete" %>
-<% confirmation = (defined?(confirmation) && confirmation) ? confirmation : nil %>
-<% confirmation_message = (defined?(confirmation_message) && confirmation_message) ? confirmation_message : nil %>
-<% redirect = (defined?(redirect) && redirect) ? redirect : request.path %>
-<% method = (defined?(method) && method) ? method : "DELETE" %>
+<% url ||= request.path
+csrf_url ||= url
+text ||= "Delete"
+confirmation ||= nil
+confirmation_message ||= nil
+redirect ||= request.path
+method ||= "DELETE" %>
 
 <%== render(
   "components/button",
