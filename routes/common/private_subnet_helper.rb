@@ -84,16 +84,6 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
     @request.halt
   end
 
-  def connect(subnet_ubid)
-    Authorization.authorize(@user.id, "PrivateSubnet:connect", @resource.id)
-    subnet = PrivateSubnet.from_ubid(subnet_ubid)
-    Authorization.authorize(@user.id, "PrivateSubnet:connect", subnet.id)
-    @resource.connect_subnet(subnet)
-    @resource.reload
-    flash["notice"] = "#{subnet.name} will be connected in a few seconds"
-    @request.redirect "#{project.path}#{PrivateSubnet[@resource.id].path}"
-  end
-
   def disconnect(subnet_ubid)
     Authorization.authorize(@user.id, "PrivateSubnet:disconnect", @resource.id)
     subnet = PrivateSubnet.from_ubid(subnet_ubid)
