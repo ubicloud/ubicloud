@@ -1,9 +1,9 @@
-<% type = (defined?(type) && type) ? type : "primary" %>
-<% link = (defined?(link) && link) ? link : nil %>
-<% icon = (defined?(icon) && icon) ? icon : nil %>
-<% extra_class = defined?(extra_class) ? extra_class : nil %>
-<% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
-<% right_icon = (defined?(right_icon) && right_icon) ? right_icon : nil %>
+<% type ||= "primary"
+link ||= nil
+icon ||= nil
+extra_class ||= nil
+attributes ||= {}
+right_icon ||= nil %>
 
 <% case type %>
 <% when "primary" %>

@@ -1,9 +1,9 @@
-<% name = defined?(name) ? name : nil %>
-<% value = flash.dig("old", name) || (defined?(value) ? value : nil) %>
-<% label = defined?(label) ? label : nil %>
-<% error = defined?(error) ? error : flash.dig("errors", name) %>
-<% description = defined?(description) ? description : nil %>
-<% attributes = defined?(attributes) ? attributes : {} %>
+<% name ||= nil
+value = flash.dig("old", name) || value
+label ||= nil
+error ||= flash.dig("errors", name)
+description ||= nil
+attributes ||= {} %>
 
 <div class="space-y-2">
   <% if label %>

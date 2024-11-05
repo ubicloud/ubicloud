@@ -1,12 +1,12 @@
-<% name = defined?(name) ? name : nil %>
-<% label = defined?(label) ? label : nil %>
-<% type = (defined?(type) && type) ? type : "text" %>
-<% value = flash.dig("old", name) || ((defined?(value) && value) ? value : nil) %>
-<% error = (defined?(error) && error) ? error : rodauth.field_error(name) || flash.dig("errors", name) %>
-<% description = (defined?(description) && description) ? description : nil %>
-<% attributes = (defined?(attributes) && attributes) ? attributes : {} %>
-<% extra_class = defined?(extra_class) ? extra_class : nil %>
-<% button_title = defined?(button_title) ? button_title : nil %>
+<% name ||= nil
+label ||= nil
+type ||= "text"
+value = flash.dig("old", name) || value
+error ||= rodauth.field_error(name) || flash.dig("errors", name)
+description ||= nil
+attributes ||= {}
+extra_class ||= nil
+button_title ||= nil %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
