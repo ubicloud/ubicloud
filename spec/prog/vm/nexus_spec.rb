@@ -229,8 +229,6 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
-      nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
-      expect(nic).to receive(:incr_setup_nic)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
       expect { nx.prep }.to hop("wait_sshable")
