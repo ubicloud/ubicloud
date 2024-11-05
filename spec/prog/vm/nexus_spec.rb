@@ -299,7 +299,6 @@ RSpec.describe Prog::Vm::Nexus do
 
     before do
       allow(nx).to receive(:frame).and_return("storage_volumes" => :storage_volumes)
-      allow(nx).to receive(:clear_stack_storage_volumes)
       allow(vm).to receive(:update)
     end
 
@@ -500,6 +499,10 @@ RSpec.describe Prog::Vm::Nexus do
   end
 
   describe "#wait_sshable" do
+    before do
+      allow(nx).to receive(:clear_stack_storage_volumes)
+    end
+
     it "naps 8 second if it's the first time we execute wait_sshable" do
       expect(vm).to receive(:update_firewall_rules_set?).and_return(false)
       expect(vm).to receive(:incr_update_firewall_rules)
@@ -600,6 +603,31 @@ RSpec.describe Prog::Vm::Nexus do
       expect(assigned_adr).to receive(:active_billing_record).and_return(nil)
 
       expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "hops to destroy if recreate is set, can_recreate is set, and strand label is not destroy" do
+      expect(nx).to receive(:when_recreate_set?).and_yield
+      expect(nx).to receive(:when_can_recreate_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("not_destroy").at_least(:once)
+      expect { nx.before_run }.to hop("destroy")
+    end
+
+    it "does not hop to destroy if strand label is destroy" do
+      expect(nx).to receive(:when_recreate_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("destroy").at_least(:once)
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "does not hop to destroy if can_recreate is not set" do
+      expect(nx).to receive(:when_recreate_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("not_destroy").at_least(:once)
+      expect(nx).to receive(:when_can_recreate_set?).and_return(false)
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "does not hop to destroy if recreate is not set" do
+      expect(nx).to receive(:when_recreate_set?).and_return(false)
+      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 
@@ -747,6 +775,7 @@ RSpec.describe Prog::Vm::Nexus do
 
       before do
         allow(vm).to receive(:update).with(display_state: "deleting")
+        allow(vm).to receive(:update).with(vm_host_id: nil)
         vol = instance_double(VmStorageVolume)
         dev = instance_double(StorageDevice)
         allow(Sequel).to receive(:[]).with(:available_storage_gib).and_return(100)
@@ -846,6 +875,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:incr_destroy)
       expect(vm).to receive(:nics).and_return([nic])
       expect(vm).to receive(:update).with(display_state: "deleting")
+      expect(vm).to receive(:update).with(vm_host_id: nil)
       expect(vm).to receive(:destroy)
       allow(vm).to receive(:vm_storage_volumes).and_return([])
 
@@ -857,10 +887,123 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:pci_devices_dataset).and_return(ds)
       expect(ds).to receive(:update).with(vm_id: nil)
       expect(vm).to receive(:update).with(display_state: "deleting")
+      expect(vm).to receive(:update).with(vm_host_id: nil)
       expect(vm).to receive(:destroy)
       allow(vm).to receive(:vm_storage_volumes).and_return([])
 
       expect { nx.destroy }.to exit({"msg" => "vm deleted"})
+    end
+
+    context "when recreate is set" do
+      let(:sshable) { instance_double(Sshable) }
+      let(:vm_host) { instance_double(VmHost, sshable: sshable) }
+
+      before do
+        allow(vm).to receive(:update).with(display_state: "deleting")
+        allow(vm).to receive(:update).with(vm_host_id: nil)
+        vol = instance_double(VmStorageVolume)
+        dev = instance_double(StorageDevice)
+        nic = instance_double(Nic, private_subnet: instance_double(PrivateSubnet, id: 1))
+        assigned_adr = instance_double(AssignedVmAddress)
+        allow(Sequel).to receive(:[]).with(:available_storage_gib).and_return(100)
+        allow(Sequel).to receive(:[]).with(:used_cores).and_return(1)
+        allow(Sequel).to receive(:[]).with(:used_hugepages_1g).and_return(8)
+        allow(vol).to receive(:storage_device_dataset).and_return(dev)
+        allow(dev).to receive(:update).with(available_storage_gib: 105)
+        allow(vol).to receive_messages(storage_device: dev, size_gib: 5)
+        allow(vm).to receive_messages(vm_host: vm_host, vm_storage_volumes: [vol], nics: [nic], assigned_vm_address: assigned_adr, recreate_set?: true)
+      end
+
+      it "hops to start" do
+        expect(nx).to receive(:clean_up_host).with(force_network_cleanup: true, omit_failure: true)
+        expect(nx).to receive(:give_back_resources)
+        expect(vm.vm_storage_volumes.first).to receive(:destroy)
+
+        expect(vm.nics.first).to receive(:update).with(vm_id: nil)
+        expect(vm.nics.first).to receive(:incr_destroy)
+        expect(Prog::Vnet::NicNexus).to receive(:assemble).with(1, name: "#{vm.name}-nic").and_return(instance_double(Strand, subject: vm.nics.first))
+        expect(vm.nics.first).to receive(:update).with(vm_id: vm.id)
+        expect(vm.assigned_vm_address).to receive(:destroy)
+        expect { nx.destroy }.to hop("start")
+      end
+
+      it "handles load balancer and hops to start" do
+        expect(nx).to receive(:clean_up_host).with(force_network_cleanup: true, omit_failure: true)
+        expect(nx).to receive(:give_back_resources)
+        expect(vm.vm_storage_volumes.first).to receive(:destroy)
+        lb = instance_double(LoadBalancer)
+        expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
+        expect(lb).to receive(:evacuate_vm).with(vm)
+        expect(lb).to receive(:remove_vm).with(vm)
+
+        expect(vm).to receive(:assigned_vm_address).and_return(nil)
+        expect(vm.nics.first).to receive(:update).with(vm_id: nil)
+        expect(vm.nics.first).to receive(:incr_destroy)
+        expect(Prog::Vnet::NicNexus).to receive(:assemble).with(1, name: "#{vm.name}-nic").and_return(instance_double(Strand, subject: vm.nics.first))
+        expect(vm.nics.first).to receive(:update).with(vm_id: vm.id)
+        expect { nx.destroy }.to hop("start")
+      end
+    end
+  end
+
+  describe ".clean_up_host" do
+    before do
+      st.stack.first["deadline_at"] = Time.now + 1
+    end
+
+    context "when has vm_host" do
+      let(:sshable) { instance_double(Sshable) }
+      let(:vm_host) { instance_double(VmHost, sshable: sshable) }
+
+      before do
+        allow(vm).to receive(:vm_host).and_return(vm_host)
+      end
+
+      it "absorbs errors if the vm is not already started and omit_failure is true, keeps the network if not specified and there is a load balancer" do
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/).and_raise(
+          Sshable::SshError.new("stop", "", "Failure!", 1, nil)
+        )
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
+          Sshable::SshError.new("stop", "", "Failure!", 1, nil)
+        )
+
+        expect(vm).to receive(:load_balancer).and_return(true)
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm.delete_keep_net.#{nx.vm_name}/)
+
+        nx.clean_up_host(omit_failure: true)
+      end
+
+      it "absorbs errors if the vm is not already started and omit_failure is true, deletes the network if specified" do
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/).and_raise(
+          Sshable::SshError.new("stop", "", "Failure!", 1, nil)
+        )
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
+          Sshable::SshError.new("stop", "", "Failure!", 1, nil)
+        )
+
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm.delete.#{nx.vm_name}/)
+
+        nx.clean_up_host(force_network_cleanup: true, omit_failure: true)
+      end
+
+      it "absorbs errors if the vm is already started and omit_failure is true, deletes the network if not specified and there is not a load balancer" do
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}/).and_raise(
+          Sshable::SshError.new("stop", "", "Failure!", 1, nil)
+        )
+        expect(sshable).to receive(:cmd).with(/sudo.*systemctl.*stop.*#{nx.vm_name}-dnsmasq/).and_raise(
+          Sshable::SshError.new("stop", "", "Failure!", 1, nil)
+        )
+
+        expect(sshable).to receive(:cmd).with(/sudo.*bin\/setup-vm.delete.#{nx.vm_name}/)
+
+        nx.clean_up_host(force_network_cleanup: false, omit_failure: true)
+      end
+    end
+
+    context "when does not have vm_host" do
+      it "does nothing" do
+        expect(nx.clean_up_host).to be_nil
+      end
     end
   end
 

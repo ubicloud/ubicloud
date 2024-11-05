@@ -107,7 +107,7 @@ class Prog::Vm::Nexus < Prog::Base
           "exclude_host_ids" => exclude_host_ids,
           "gpu_count" => gpu_count
         }]
-      ) { _1.id = vm.id }
+      ) { _1.id = vm.id }.tap { vm.incr_can_recreate }
     end
   end
 
@@ -157,6 +157,14 @@ class Prog::Vm::Nexus < Prog::Base
         hop_destroy
       end
     end
+
+    when_recreate_set? do
+      unless strand.label == "destroy"
+        when_can_recreate_set? do
+          hop_destroy
+        end
+      end
+    end
   end
 
   label def start
@@ -203,10 +211,6 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     register_deadline("wait", 10 * 60)
-
-    # We don't need storage_volume info anymore, so delete it before
-    # transitioning to the next state.
-    clear_stack_storage_volumes
 
     hop_create_unix_user
   end
@@ -260,15 +264,20 @@ class Prog::Vm::Nexus < Prog::Base
       # to reduce the amount of load on the control plane unnecessarily.
       nap 8
     end
-    addr = vm.ephemeral_net4
-    hop_create_billing_record unless addr
 
-    begin
-      Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
-    rescue SystemCallError
-      nap 1
+    if (addr = vm.ephemeral_net4)
+      begin
+        Socket.tcp(addr.to_s, 22, connect_timeout: 1) {}
+      rescue SystemCallError
+        nap 1
+      end
     end
 
+    decr_can_recreate
+
+    # We don't need storage_volume info anymore, so delete it before
+    # transitioning to the next state.
+    clear_stack_storage_volumes
     hop_create_billing_record
   end
 
@@ -415,26 +424,58 @@ class Prog::Vm::Nexus < Prog::Base
     end
 
     vm.update(display_state: "deleting")
+    to_recreate = vm.recreate_set?
+    clean_up_host(force_network_cleanup: to_recreate, omit_failure: to_recreate)
+    give_back_resources
 
+    if to_recreate
+      if vm.load_balancer
+        vm.load_balancer.evacuate_vm(vm)
+        vm.load_balancer.remove_vm(vm)
+      end
+
+      vm.assigned_vm_address&.destroy
+      vm.vm_storage_volumes.each(&:destroy)
+      vm.nics.each do |nic|
+        ps = nic.private_subnet
+        nic.update(vm_id: nil)
+        nic.incr_destroy
+        new_nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "#{vm.name}-nic").subject
+        new_nic.update(vm_id: vm.id)
+      end
+
+      hop_start
+    end
+
+    hop_wait_lb_expiry if vm.load_balancer
+
+    final_clean_up
+
+    pop "vm deleted"
+  end
+
+  def clean_up_host(force_network_cleanup: false, omit_failure: false)
     unless host.nil?
       begin
         host.sshable.cmd("sudo systemctl stop #{q_vm}")
       rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
+        raise unless omit_failure || /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
       begin
         host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
       rescue Sshable::SshError => ex
-        raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
+        raise unless omit_failure || /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
       # If there is a load balancer setup, we want to keep the network setup in
       # tact for a while
-      action = vm.load_balancer ? "delete_keep_net" : "delete"
+      action = (force_network_cleanup || !vm.load_balancer) ? "delete" : "delete_keep_net"
       host.sshable.cmd("sudo host/bin/setup-vm #{action} #{q_vm}")
     end
+  end
 
+  def give_back_resources
     DB.transaction do
       vm.vm_storage_volumes.each do |vol|
         vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
@@ -446,13 +487,8 @@ class Prog::Vm::Nexus < Prog::Base
       )
 
       vm.pci_devices_dataset.update(vm_id: nil)
+      vm.update(vm_host_id: nil)
     end
-
-    hop_wait_lb_expiry if vm.load_balancer
-
-    final_clean_up
-
-    pop "vm deleted"
   end
 
   label def wait_lb_expiry
