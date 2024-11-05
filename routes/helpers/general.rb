@@ -9,7 +9,7 @@ class Clover < Roda
       Sequel::Model.freeze_descendants
       DB.freeze
     end
-    return if frozen? # XXX: Remove after Roda 3.86.0
+    return self if frozen? # XXX: Remove after Roda 3.86.0
     # :nocov:
     super
   end
