@@ -64,29 +64,27 @@ class Prog::Vm::Nexus < Prog::Base
       # then we create a nic on that subnet.
       # - If the user provided neither nic_id nor private_subnet_id, that's OK, we create both.
       nic = nil
-      subnet = nil
-      if nic_id
+      subnet = if nic_id
         nic = Nic[nic_id]
         raise("Given nic doesn't exist with the id #{nic_id}") unless nic
         raise("Given nic is assigned to a VM already") if nic.vm_id
         raise("Given nic is created in a different location") if nic.private_subnet.location != location
         raise("Given nic is not available in the given project") unless project.private_subnets.any? { |ps| ps.id == nic.private_subnet_id }
 
-        subnet = nic.private_subnet
+        nic.private_subnet
       end
 
       unless nic
-        subnet = nil
-        if private_subnet_id
+        subnet = if private_subnet_id
           subnet = PrivateSubnet[private_subnet_id]
           raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
           raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
+          subnet
         else
-          subnet_s = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location, allow_only_ssh: allow_only_ssh)
-          subnet = PrivateSubnet[subnet_s.id]
+          subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location, allow_only_ssh: allow_only_ssh).subject
+          PrivateSubnet[subnet.id]
         end
-        nic_s = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic")
-        nic = Nic[nic_s.id]
+        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
 
       cores = if arch == "arm64"
@@ -240,7 +238,7 @@ class Prog::Vm::Nexus < Prog::Base
     case host.sshable.cmd("common/bin/daemonizer --check prep_#{q_vm}")
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
-      vm.nics.each { _1.incr_setup_nic }
+      vm.private_subnets.each(&:incr_add_new_nic)
       hop_wait_sshable
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
@@ -473,7 +471,7 @@ class Prog::Vm::Nexus < Prog::Base
     })
 
     host.sshable.cmd("sudo host/bin/setup-vm recreate-unpersisted #{q_vm}", stdin: secrets_json)
-    vm.nics.each { _1.incr_repopulate }
+    vm.nics.each(&:incr_repopulate)
 
     vm.update(display_state: "running")
 
