@@ -114,6 +114,49 @@ RSpec.describe Clover, "load-balancer" do
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
+
+      it "passes custom_hostname properly" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-2", location: "hetzner-hel1").subject
+        dz = DnsZone.create_with_id(name: "test.com", project_id: project.id)
+        dz.associate_with_project(project)
+        post "/api/project/#{project.ubid}/load-balancer/lb2", {
+          private_subnet_id: ps.ubid,
+          src_port: "80", dst_port: "80",
+          health_check_endpoint: "/up", algorithm: "round_robin",
+          health_check_protocol: "http", custom_hostname: "lb2.test.com"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+
+        lb = LoadBalancer.first(name: "lb2")
+        expect(lb.hostname).to eq("lb2.test.com")
+        expect(lb.dns_zone.id).to eq(dz.id)
+      end
+
+      it "validation fails if dns zone is not associated with project" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-2", location: "hetzner-hel1").subject
+        DnsZone.create_with_id(name: "test.com", project_id: project.id)
+        post "/api/project/#{project.ubid}/load-balancer/lb2", {
+          private_subnet_id: ps.ubid,
+          src_port: "80", dst_port: "80",
+          health_check_endpoint: "/up", algorithm: "round_robin",
+          health_check_protocol: "http", custom_hostname: "lb2.test.com"
+        }.to_json
+
+        expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
+      end
+
+      it "fails if custom_hostname is not properly set" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-2", location: "hetzner-hel1").subject
+        post "/api/project/#{project.ubid}/load-balancer/lb2", {
+          private_subnet_id: ps.ubid,
+          src_port: "80", dst_port: "80",
+          health_check_endpoint: "/up", algorithm: "round_robin",
+          health_check_protocol: "http", custom_hostname: "lb2test.com"
+        }.to_json
+
+        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      end
     end
 
     describe "delete" do

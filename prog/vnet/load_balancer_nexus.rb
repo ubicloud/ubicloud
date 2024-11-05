@@ -21,6 +21,12 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       "#{custom_hostname_prefix}.#{DnsZone[custom_hostname_dns_zone_id].name}"
     end
 
+    if DnsZone[custom_hostname_dns_zone_id]
+      unless ps.projects.map(&:id).include?(DnsZone[custom_hostname_dns_zone_id].project_id)
+        fail "DNS zone #{custom_hostname_dns_zone_id} is not associated with project #{ps.projects.first.id}"
+      end
+    end
+
     DB.transaction do
       lb = LoadBalancer.create_with_id(
         private_subnet_id: private_subnet_id, name: name, algorithm: algorithm, src_port: src_port, dst_port: dst_port,
