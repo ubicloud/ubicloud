@@ -83,14 +83,4 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
     response.status = 204
     @request.halt
   end
-
-  def disconnect(subnet_ubid)
-    Authorization.authorize(@user.id, "PrivateSubnet:disconnect", @resource.id)
-    subnet = PrivateSubnet.from_ubid(subnet_ubid)
-    Authorization.authorize(@user.id, "PrivateSubnet:disconnect", subnet.id)
-    @resource.disconnect_subnet(subnet)
-    @resource.reload
-    flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-    @request.halt
-  end
 end
