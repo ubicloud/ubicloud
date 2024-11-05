@@ -1,28 +1,6 @@
 # frozen_string_literal: true
 
 class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
-  def list
-    if @mode == AppMode::API
-      dataset = project.private_subnets_dataset
-      dataset = dataset.where(location: @location) if @location
-      result = dataset.authorized(@user.id, "PrivateSubnet:view").eager(nics: [:private_subnet]).paginated_result(
-        start_after: @request.params["start_after"],
-        page_size: @request.params["page_size"],
-        order_column: @request.params["order_column"]
-      )
-
-      {
-        items: Serializers::PrivateSubnet.serialize(result[:records]),
-        count: result[:count]
-      }
-    else
-      pss = Serializers::PrivateSubnet.serialize(project.private_subnets_dataset.authorized(@user.id, "PrivateSubnet:view").all, {include_path: true})
-      @app.instance_variable_set(:@pss, pss)
-
-      @app.view "networking/private_subnet/index"
-    end
-  end
-
   def post(name)
     Authorization.authorize(@user.id, "PrivateSubnet:create", project.id)
 
