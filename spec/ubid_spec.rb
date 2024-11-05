@@ -115,18 +115,30 @@ RSpec.describe UBID do
       ubids = (1..10).map { described_class.generate(type).to_i }
       max_ubid = ubids.max
       min_ubid = ubids.min
-      expect(max_ubid - min_ubid).to be > (1 << 83)
+
+      # Timestamp is the left 48 bits of the 128-bit ubid.
+      time_difference = (max_ubid >> 80) - (min_ubid >> 80)
+
+      # Timestamp parts are random, so with a very high probability
+      # the difference between them will be > 8ms.
+      expect(time_difference).to be > 8
     }
   end
 
-  it "generates clock timestamp for strand and semaphor" do
+  it "generates clock timestamp for strand and semaphore" do
     described_class::CURRENT_TIMESTAMP_TYPES.each { |type|
       # generate 10 ids with this type, and verify that their timestamp
       # part is close
       ubids = (1..10).map { described_class.generate(type).to_i }
       max_ubid = ubids.max
       min_ubid = ubids.min
-      expect(max_ubid - min_ubid).to be < (1 << 83)
+
+      # Timestamp is the left 48 bits of the 128-bit ubid.
+      time_difference = (max_ubid >> 80) - (min_ubid >> 80)
+
+      # Timestamp parts are sequential, so with a very high probability
+      # the difference between them will be < 128ms.
+      expect(time_difference).to be < 128
     }
   end
 
