@@ -1,4 +1,4 @@
-FROM node:22.9-alpine3.19 as frontend-builder
+FROM node:22.9-alpine3.19 AS frontend-builder
 WORKDIR /app
 COPY tailwind.config.js package.json package-lock.json ./
 COPY views/ ./views/
@@ -7,7 +7,7 @@ RUN npm ci
 RUN npm run prod
 
 
-FROM ruby:3.2.6-alpine3.19 as bundler
+FROM ruby:3.2.6-alpine3.19 AS bundler
 # Install build dependencies
 # - build-base, git, curl: To ensure certain gems can be compiled
 # - postgresql-dev: Required for postgresql gem
