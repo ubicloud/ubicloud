@@ -16,8 +16,8 @@ class Prog::Vnet::NicNexus < Prog::Base
     ipv4_addr ||= subnet.random_private_ipv4.to_s
 
     DB.transaction do
-      Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
-      Strand.create(prog: "Vnet::NicNexus", label: "wait_vm") { _1.id = ubid.to_uuid }
+      nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
+      Strand.create(prog: "Vnet::NicNexus", label: "wait_setup") { _1.id = nic.id }
     end
   end
 
@@ -25,21 +25,6 @@ class Prog::Vnet::NicNexus < Prog::Base
     when_destroy_set? do
       hop_destroy if strand.label != "destroy"
     end
-  end
-
-  label def wait_vm
-    nap 60 unless nic.vm
-
-    if retval&.dig("msg") == "add_subnet_addr is complete"
-      nic.private_subnet.incr_add_new_nic
-      hop_wait_setup
-    end
-
-    when_setup_nic_set? do
-      push Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
-    end
-
-    nap 5
   end
 
   label def wait_setup
@@ -52,7 +37,8 @@ class Prog::Vnet::NicNexus < Prog::Base
 
   label def wait
     when_repopulate_set? do
-      hop_repopulate
+      nic.private_subnet.incr_refresh_keys
+      decr_repopulate
     end
 
     when_start_rekey_set? do
@@ -60,17 +46,6 @@ class Prog::Vnet::NicNexus < Prog::Base
     end
 
     nap 30
-  end
-
-  label def repopulate
-    decr_repopulate
-
-    if retval&.dig("msg") == "add_subnet_addr is complete"
-      nic.private_subnet.incr_refresh_keys
-      hop_wait
-    end
-
-    push Prog::Vnet::RekeyNicTunnel, {}, :add_subnet_addr
   end
 
   label def start_rekey
