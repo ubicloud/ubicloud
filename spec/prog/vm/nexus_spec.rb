@@ -80,8 +80,8 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "creates Nic if only subnet_id is passed" do
       expect(PrivateSubnet).to receive(:[]).with(ps.id).and_return(ps)
-      expect(Prog::Vnet::NicNexus).to receive(:assemble).and_return(nic)
-      expect(Nic).to receive(:[]).with(nic.id).and_return(nic)
+      nic_strand = instance_double(Strand, subject: nic)
+      expect(Prog::Vnet::NicNexus).to receive(:assemble).and_return(nic_strand)
       expect(nic).to receive(:update).and_return(nic)
       expect(Project).to receive(:[]).with(prj.id).and_return(prj)
       expect(prj).to receive(:private_subnets).and_return([ps]).at_least(:once)
@@ -230,7 +230,6 @@ RSpec.describe Prog::Vm::Nexus do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
       nic = Nic.new(private_ipv6: "fd10:9b0b:6b4b:8fbb::/64", private_ipv4: "10.0.0.3/32", mac: "5a:0f:75:80:c3:64")
-      expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:incr_setup_nic)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
@@ -271,7 +270,7 @@ RSpec.describe Prog::Vm::Nexus do
           "cpu_topology" => "1:1:1:1",
           "mem_gib" => 8,
           "local_ipv4" => "169.254.0.0",
-          "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64"]],
+          "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64", "10.0.0.1/26"]],
           "swap_size_bytes" => nil,
           "pci_devices" => [["01:00.0", 23]]
         })

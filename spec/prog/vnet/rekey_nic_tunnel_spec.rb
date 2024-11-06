@@ -50,15 +50,6 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
     end
   end
 
-  describe "#add_subnet_addr" do
-    it "adds the subnet net4 address to the nic" do
-      allow(tunnel.src_nic.vm).to receive_messages(ephemeral_net6: NetAddr.parse_net("2a01:4f8:10a:128b:4919::/80"), inhost_name: "hellovm")
-      expect(tunnel.src_nic).to receive(:ubid_to_tap_name).and_return("ncname")
-      expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:cmd).with("sudo ip -n hellovm addr replace 1.1.1.1/26 dev ncname")
-      expect { nx.add_subnet_addr }.to exit({"msg" => "add_subnet_addr is complete"})
-    end
-  end
-
   describe "#setup_inbound" do
     before do
       allow(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([tunnel])
