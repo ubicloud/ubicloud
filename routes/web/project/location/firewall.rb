@@ -91,7 +91,7 @@ class Clover
 
             fw.remove_firewall_rule(fwr)
 
-            return {message: "Firewall rule deleted"}.to_json
+            return {message: "Firewall rule deleted"}
           end
         end
       end
@@ -101,7 +101,7 @@ class Clover
         fw.private_subnets.map { Authorization.authorize(current_account.id, "PrivateSubnet:edit", _1.id) }
         fw.destroy
 
-        return {message: "Deleting #{fw.name}"}.to_json
+        return {message: "Deleting #{fw.name}"}
       end
     end
   end
