@@ -62,16 +62,16 @@ class Clover
       end
 
       request.get true do
-        if api?
-          Authorization.authorize(user.id, "Firewall:view", @project.id)
+        Authorization.authorize(current_account.id, "Firewall:view", @project.id)
+        Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
+        @firewall = Serializers::Firewall.serialize(fw, {detailed: true})
 
-          Serializers::Firewall.serialize(firewall, {detailed: true})
+        if api?
+          @firewall
         else
-          Authorization.authorize(current_account.id, "Firewall:view", fw.id)
           project_subnets = @project.private_subnets_dataset.where(location: @location).authorized(current_account.id, "PrivateSubnet:view").all
           attached_subnets = fw.private_subnets_dataset.all
-          @attachable_subnets = Serializers::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.map(&:id).include?(ps.id) })
-          @firewall = Serializers::Firewall.serialize(fw, {detailed: true})
+          @attachable_subnets = Serializers::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.find { |as| as.id == ps.id } })
 
           view "networking/firewall/show"
         end
