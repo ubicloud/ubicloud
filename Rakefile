@@ -188,6 +188,23 @@ task "coverage" => [:coverage_spec]
   desc "Run specs#{desc_suffix} with coverage"
   task "coverage_#{task_suffix}" do
     block.call("COVERAGE" => "1")
+    if task_suffix == "pspec" || (task_suffix == "spec" && auto_parallel_tests.call)
+      # turbo_tests with coverage does not fail if coverage is not 100%,
+      # because it forks and each worker until the last is likely to have
+      # failing tests.  Check the generated coverage output after specs run to
+      # see if it is 100%.
+      coverage_output = File.binread("coverage/index.html")
+
+      # Results for the entire run are before the results for individual files,
+      # so this will get the results for the entire run.
+      lines_missed = %r{<b>(\d+)</b> lines missed\.}.match(coverage_output)[1]
+      branches_missed = %r{<b>(\d+)</b> branches missed\.}.match(coverage_output)[1]
+
+      unless lines_missed == "0" && branches_missed == "0"
+        warn "SimpleCov failed with exit 2 due to a coverage related error"
+        exit(2)
+      end
+    end
   end
 end
 
