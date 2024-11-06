@@ -62,10 +62,10 @@ class Clover
         private_subnet_id = if api?
           Validation.validate_request_body(r.body.read, ["private_subnet_id"])["private_subnet_id"]
         else
-          r.params["private-subnet-id"]
+          r.params["private-subnet-id"].to_s
         end
 
-        private_subnet = PrivateSubnet.from_ubid(private_subnet_id) if private_subnet_id
+        private_subnet = PrivateSubnet.from_ubid(private_subnet_id)
 
         unless private_subnet && private_subnet.location == @location
           if api?
