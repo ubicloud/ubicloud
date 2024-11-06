@@ -37,7 +37,6 @@ class Clover
 
       filter[:location] = @location
       @firewall = @project.firewalls_dataset.first(filter)
-      user = current_account
       fw = firewall = @firewall
       location = @location
       @fw = Serializers::Firewall.serialize(fw)
@@ -78,36 +77,36 @@ class Clover
       end
 
       request.post "attach-subnet" do
-        if api?
-          Authorization.authorize(user.id, "PrivateSubnet:edit", @project.id)
+        Authorization.authorize(current_account.id, "PrivateSubnet:edit", @project.id)
+        Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
 
-          required_parameters = ["private_subnet_id"]
-          request_body_params = Validation.validate_request_body(request.body.read, required_parameters)
-
-          private_subnet = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
-          unless private_subnet && private_subnet.location == @location
-            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{request_body_params["private_subnet_id"]}\" and the location \"#{location}\" is not found"})
-          end
-
-          firewall.associate_with_private_subnet(private_subnet)
-
-          Serializers::Firewall.serialize(firewall, {detailed: true})
+        private_subnet_id = if api?
+          Validation.validate_request_body(request.body.read, ["private_subnet_id"])["private_subnet_id"]
         else
-          Authorization.authorize(current_account.id, "Firewall:view", fw.id)
-          ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
-          unless ps && ps.location == @location
+          r.params["private-subnet-id"]
+        end
+
+        private_subnet = PrivateSubnet.from_ubid(private_subnet_id) if private_subnet_id
+
+        unless private_subnet && private_subnet.location == @location
+          if api?
+            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{private_subnet_id}\" and the location \"#{location}\" is not found"})
+          else
             flash["error"] = "Private subnet not found"
             response.status = 404
-            r.redirect "#{@project.path}#{fw.path}"
+            r.redirect "#{@project.path}#{firewall.path}"
           end
+        end
 
-          Authorization.authorize(current_account.id, "PrivateSubnet:edit", ps.id)
+        # XXX: differing authorization between api and web routes!
+        Authorization.authorize(current_account.id, "PrivateSubnet:edit", private_subnet.id) unless api?
+        firewall.associate_with_private_subnet(private_subnet)
 
-          fw.associate_with_private_subnet(ps)
-
+        if api?
+          Serializers::Firewall.serialize(firewall, {detailed: true})
+        else
           flash["notice"] = "Private subnet is attached to the firewall"
-
-          r.redirect "#{@project.path}#{fw.path}"
+          r.redirect "#{@project.path}#{firewall.path}"
         end
       end
 
