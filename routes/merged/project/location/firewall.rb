@@ -3,16 +3,7 @@
 class Clover
   branch = lambda do |r|
     r.get api? do
-      result = @project.firewalls_dataset.where(location: @location).authorized(current_account.id, "Firewall:view").eager(:firewall_rules).paginated_result(
-        start_after: r.params["start_after"],
-        page_size: r.params["page_size"],
-        order_column: r.params["order_column"]
-      )
-
-      {
-        items: Serializers::Firewall.serialize(result[:records]),
-        count: result[:count]
-      }
+      firewall_list_api_response(firewall_list_dataset)
     end
 
     r.on NAME_OR_UBID do |firewall_name, firewall_id|
