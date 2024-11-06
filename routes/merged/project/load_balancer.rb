@@ -20,10 +20,11 @@ class Clover
       lb_endpoint_helper.post(name: r.params["name"])
     end
 
-    r.on "create" do
-      r.get true do
-        lb_endpoint_helper.view_create_page
-      end
+    r.get "create" do
+      Authorization.authorize(current_account.id, "LoadBalancer:create", @project.id)
+      authorized_subnets = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").all
+      @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
+      view "networking/load_balancer/create"
     end
   end
 
