@@ -28,6 +28,10 @@ class Nic < Sequel::Model
     ubid.to_s[0..9]
   end
 
+  def private_ipv4_gateway
+    private_subnet.net4.nth(1).to_s + private_subnet.net4.netmask.to_s
+  end
+
   def unlock
     Semaphore.where(strand_id: strand.id, name: "lock").delete(force: true)
   end
