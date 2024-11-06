@@ -84,4 +84,18 @@ class LoadBalancer < Sequel::Model
   def active_cert
     certs_dataset.where { created_at > Time.now - 60 * 60 * 24 * 30 * 3 }.order(Sequel.desc(:created_at)).first
   end
+
+  def ipv4_enabled?
+    stack == Stack::IPV4 || stack == Stack::DUAL
+  end
+
+  def ipv6_enabled?
+    stack == Stack::IPV6 || stack == Stack::DUAL
+  end
+
+  module Stack
+    IPV4 = "ipv4"
+    IPV6 = "ipv6"
+    DUAL = "dual"
+  end
 end

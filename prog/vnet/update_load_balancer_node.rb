@@ -52,6 +52,11 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
       fail ArgumentError, "Unsupported load balancer algorithm: #{load_balancer.algorithm}"
     end
 
+    ipv4_prerouting_rule = load_balancer.ipv4_enabled? ? "ip daddr #{public_ipv4} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip4} mod #{modulo} map { #{ipv4_map_def} }" : ""
+    ipv6_prerouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr #{public_ipv6} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip6} mod #{modulo} map { #{ipv6_map_def} }" : ""
+
+    ipv4_postrouting_rule = load_balancer.ipv4_enabled? ? "ip daddr @neighbor_ips_v4 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv4}" : ""
+    ipv6_postrouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr @neighbor_ips_v6 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv6}" : ""
     <<TEMPLATE
 table ip nat;
 delete table ip nat;
@@ -70,15 +75,19 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr #{public_ipv4} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip4} mod #{modulo} map { #{ipv4_map_def} }
-    ip6 daddr #{public_ipv6} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip6} mod #{modulo} map { #{ipv6_map_def} }
+#{ipv4_prerouting_rule}
+#{ipv6_prerouting_rule}
+
+    # Basic NAT for public IPv4 to private IPv4
     ip daddr #{public_ipv4} dnat to #{private_ipv4}
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip daddr @neighbor_ips_v4 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv4}
-    ip6 daddr @neighbor_ips_v6 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv6}
+#{ipv4_postrouting_rule}
+#{ipv6_postrouting_rule}
+
+    # Basic NAT for private IPv4 to public IPv4
     ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
     ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
   }
