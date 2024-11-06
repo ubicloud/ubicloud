@@ -50,7 +50,7 @@ class Clover
 
         flash["notice"] = "'#{r.params["name"]}' is created"
 
-        r.redirect "#{@project.path}#{Firewall[fw.id].path}"
+        r.redirect "#{@project.path}#{fw.path}"
       end
     end
   end
