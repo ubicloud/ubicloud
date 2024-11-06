@@ -3,19 +3,10 @@
 class Clover
   branch = lambda do |r|
     r.get true do
-      dataset = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view")
+      dataset = firewall_list_dataset
 
       if api?
-        result = dataset.eager(:firewall_rules).paginated_result(
-          start_after: r.params["start_after"],
-          page_size: r.params["page_size"],
-          order_column: r.params["order_column"]
-        )
-
-        {
-          items: Serializers::Firewall.serialize(result[:records]),
-          count: result[:count]
-        }
+        firewall_list_api_response(dataset)
       else
         authorized_firewalls = dataset.all
         @firewalls = Serializers::Firewall.serialize(authorized_firewalls, {include_path: true})
