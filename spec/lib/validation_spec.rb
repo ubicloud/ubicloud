@@ -417,4 +417,16 @@ RSpec.describe Validation do
       expect { described_class.validate_core_quota(p, "VmCores", 1) }.to raise_error described_class::ValidationFailed
     end
   end
+
+  describe "#validate_load_balancer_stack" do
+    it "valid load balancer stack" do
+      expect { described_class.validate_load_balancer_stack("ipv4") }.not_to raise_error
+      expect { described_class.validate_load_balancer_stack("ipv6") }.not_to raise_error
+      expect { described_class.validate_load_balancer_stack("dual") }.not_to raise_error
+    end
+
+    it "invalid load balancer stack" do
+      expect { described_class.validate_load_balancer_stack("invalid") }.to raise_error described_class::ValidationFailed
+    end
+  end
 end

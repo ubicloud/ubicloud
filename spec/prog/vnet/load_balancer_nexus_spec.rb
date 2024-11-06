@@ -238,6 +238,28 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
       nx.rewrite_dns_records
     end
+
+    it "does not create ipv4 dns record if stack is ipv6" do
+      nx.load_balancer.update(stack: "ipv6")
+      vms = [instance_double(Vm, ephemeral_net4: nil, ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
+      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      nx.rewrite_dns_records
+    end
+
+    it "does not create ipv6 dns record if stack is ipv4" do
+      nx.load_balancer.update(stack: "ipv4")
+      vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: nil)]
+      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      nx.rewrite_dns_records
+    end
   end
 
   describe "#wait_destroy" do

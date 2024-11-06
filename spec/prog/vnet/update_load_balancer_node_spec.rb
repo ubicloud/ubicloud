@@ -91,15 +91,62 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+
+    # Basic NAT for public IPv4 to private IPv4
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-    ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+
+    # Basic NAT for private IPv4 to public IPv4
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+  }
+}
+LOAD_BALANCER
+        expect { nx.update_load_balancer }.to exit({"msg" => "load balancer is updated"})
+      end
+
+      it "does not hop to remove load balancer and creates basic load balancing with nat specifically for ipv4" do
+        expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
+        lb.update(stack: "ipv4")
+        expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
+        expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+table ip nat;
+delete table ip nat;
+table inet nat;
+delete table inet nat;
+table inet nat {
+  set neighbor_ips_v4 {
+    type ipv4_addr;
+
+  }
+
+  set neighbor_ips_v6 {
+    type ipv6_addr;
+
+  }
+
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+
+
+    # Basic NAT for public IPv4 to private IPv4
+    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+  }
+
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
+
+
+    # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -131,15 +178,19 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to jhash ip saddr . tcp sport . ip daddr . tcp dport mod 1 map { 0 : 192.168.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to jhash ip saddr . tcp sport . ip daddr . tcp dport mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+
+    # Basic NAT for public IPv4 to private IPv4
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-    ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+
+    # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -180,15 +231,61 @@ elements = {fd10:9b0b:6b4b:aaa::2}
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 172.10.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 8080 }
+ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : 192.168.1.0 . 8080, 1 : 172.10.1.0 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 8080 }
+
+    # Basic NAT for public IPv4 to private IPv4
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-    ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+
+    # Basic NAT for private IPv4 to public IPv4
+    ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
+    ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
+  }
+}
+LOAD_BALANCER
+
+        expect { nx.update_load_balancer }.to exit({"msg" => "load balancer is updated"})
+      end
+
+      it "creates load balancing with multiple vms if all active ipv6 only" do
+        lb.update(stack: "ipv6")
+        expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+table ip nat;
+delete table ip nat;
+table inet nat;
+delete table inet nat;
+table inet nat {
+  set neighbor_ips_v4 {
+    type ipv4_addr;
+elements = {172.10.1.0}
+  }
+
+  set neighbor_ips_v6 {
+    type ipv6_addr;
+elements = {fd10:9b0b:6b4b:aaa::2}
+  }
+
+  chain prerouting {
+    type nat hook prerouting priority dstnat; policy accept;
+
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 8080 }
+
+    # Basic NAT for public IPv4 to private IPv4
+    ip daddr 100.100.100.100/32 dnat to 192.168.1.0
+  }
+
+  chain postrouting {
+    type nat hook postrouting priority srcnat; policy accept;
+
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+
+    # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -218,15 +315,19 @@ elements = {fd10:9b0b:6b4b:aaa::2}
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 172.10.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:aaa::2 . 8080 }
+ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 172.10.1.0 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:aaa::2 . 8080 }
+
+    # Basic NAT for public IPv4 to private IPv4
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-    ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+
+    # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -256,15 +357,19 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-    ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
-    ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : 192.168.1.0 . 8080 }
+ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
+
+    # Basic NAT for public IPv4 to private IPv4
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-    ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-    ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+
+    # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }

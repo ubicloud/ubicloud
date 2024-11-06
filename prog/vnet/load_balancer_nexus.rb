@@ -9,7 +9,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
     health_check_endpoint: "/up", health_check_interval: 30, health_check_timeout: 15,
-    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http", custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil)
+    health_check_up_threshold: 3, health_check_down_threshold: 2, health_check_protocol: "http",
+    custom_hostname_prefix: nil, custom_hostname_dns_zone_id: nil, stack: LoadBalancer::Stack::DUAL)
 
     unless (ps = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
@@ -21,13 +22,16 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       "#{custom_hostname_prefix}.#{DnsZone[custom_hostname_dns_zone_id].name}"
     end
 
+    Validation.validate_load_balancer_stack(stack)
+
     DB.transaction do
       lb = LoadBalancer.create_with_id(
         private_subnet_id: private_subnet_id, name: name, algorithm: algorithm, src_port: src_port, dst_port: dst_port,
         health_check_endpoint: health_check_endpoint, health_check_interval: health_check_interval,
         health_check_timeout: health_check_timeout, health_check_up_threshold: health_check_up_threshold,
         health_check_down_threshold: health_check_down_threshold, health_check_protocol: health_check_protocol,
-        custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id
+        custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id,
+        stack: stack
       )
       lb.associate_with_project(ps.projects.first)
 
@@ -139,9 +143,26 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   def rewrite_dns_records
     load_balancer.dns_zone&.delete_record(record_name: load_balancer.hostname)
 
-    load_balancer.vms_to_dns.map do |vm|
-      load_balancer.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s) if vm.ephemeral_net4
-      load_balancer.dns_zone&.insert_record(record_name: load_balancer.hostname, type: "AAAA", ttl: 10, data: vm.ephemeral_net6.nth(2).to_s)
+    load_balancer.vms_to_dns.each do |vm|
+      # Insert IPv4 record if stack is ipv4 or dual, and vm has IPv4
+      if load_balancer.ipv4_enabled? && vm.ephemeral_net4
+        load_balancer.dns_zone&.insert_record(
+          record_name: load_balancer.hostname,
+          type: "A",
+          ttl: 10,
+          data: vm.ephemeral_net4.to_s
+        )
+      end
+
+      # Insert IPv6 record if stack is ipv6 or dual
+      if load_balancer.ipv6_enabled?
+        load_balancer.dns_zone&.insert_record(
+          record_name: load_balancer.hostname,
+          type: "AAAA",
+          ttl: 10,
+          data: vm.ephemeral_net6.nth(2).to_s
+        )
+      end
     end
   end
 end
