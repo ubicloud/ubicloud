@@ -64,7 +64,8 @@ class Clover
         scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
         entries = repository.cache_entries_dataset
           .exclude(committed_at: nil)
-          .where(key: key, scope: scopes).all
+          .where(key: key, scope: scopes)
+          .order(:version).all
 
         {
           totalCount: entries.count,
