@@ -24,11 +24,11 @@ class Clover
   end
 
   def error(msg)
-    {error: {message: msg}}.to_json
+    {error: {message: msg}}
   end
 
   def success(msg)
-    {message: msg}.to_json
+    {message: msg}
   end
 
   def check_signature(signature, body)
