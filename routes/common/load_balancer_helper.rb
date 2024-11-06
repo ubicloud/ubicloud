@@ -98,33 +98,4 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     @resource.incr_update_load_balancer
     Serializers::LoadBalancer.serialize(@resource.reload, {detailed: true})
   end
-
-  def post_detach_vm
-    Authorization.authorize(@user.id, "LoadBalancer:edit", @resource.id)
-    required_parameters = %w[vm_id]
-    request_body_params = Validation.validate_request_body(params, required_parameters)
-
-    vm = Vm.from_ubid(request_body_params["vm_id"])
-    unless vm
-      response.status = 404
-
-      if @mode == AppMode::API
-        @request.halt
-      else
-        flash["error"] = "VM not found"
-        @request.redirect "#{project.path}#{@resource.path}"
-      end
-    end
-
-    Authorization.authorize(@user.id, "Vm:view", vm.id)
-
-    @resource.detach_vm(vm)
-
-    if @mode == AppMode::API
-      Serializers::LoadBalancer.serialize(@resource, {detailed: true})
-    else
-      flash["notice"] = "VM is detached"
-      @request.redirect "#{project.path}#{@resource.path}"
-    end
-  end
 end

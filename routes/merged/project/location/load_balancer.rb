@@ -58,9 +58,32 @@ class Clover
         end
       end
 
-      r.on "detach-vm" do
-        r.post true do
-          lb_endpoint_helper.post_detach_vm
+      r.post "detach-vm" do
+        Authorization.authorize(current_account.id, "LoadBalancer:edit", lb.id)
+        required_parameters = %w[vm_id]
+        request_body_params = Validation.validate_request_body(json_params, required_parameters)
+
+        vm = Vm.from_ubid(request_body_params["vm_id"])
+        unless vm
+          response.status = 404
+
+          if api?
+            r.halt
+          else
+            flash["error"] = "VM not found"
+            r.redirect "#{@project.path}#{lb.path}"
+          end
+        end
+
+        Authorization.authorize(current_account.id, "Vm:view", vm.id)
+
+        lb.detach_vm(vm)
+
+        if api?
+          Serializers::LoadBalancer.serialize(lb, {detailed: true})
+        else
+          flash["notice"] = "VM is detached"
+          r.redirect "#{@project.path}#{lb.path}"
         end
       end
 
