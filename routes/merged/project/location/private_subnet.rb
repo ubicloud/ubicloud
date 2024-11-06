@@ -69,7 +69,7 @@ class Clover
             fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
           else
             response.status = 400
-            next {message: "Private subnet has VMs attached, first, delete them."}.to_json
+            next {message: "Private subnet has VMs attached, first, delete them."}
           end
         end
 
