@@ -31,9 +31,8 @@ class Clover
           subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-ubid"])
           Authorization.authorize(current_account.id, "PrivateSubnet:connect", subnet.id)
           ps.connect_subnet(subnet)
-          ps.reload
           flash["notice"] = "#{subnet.name} will be connected in a few seconds"
-          r.redirect "#{@project.path}#{PrivateSubnet[ps.id].path}"
+          r.redirect "#{@project.path}#{ps.path}"
         end
 
         r.post "disconnect", String do |disconnecting_ps_ubid|
@@ -41,7 +40,6 @@ class Clover
           subnet = PrivateSubnet.from_ubid(disconnecting_ps_ubid)
           Authorization.authorize(current_account.id, "PrivateSubnet:disconnect", subnet.id)
           ps.disconnect_subnet(subnet)
-          ps.reload
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
           ""
         end
