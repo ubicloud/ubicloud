@@ -86,11 +86,13 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       expect {
         st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
         expect(st.subject.load_balancer.hostname).to eq("test-endpoint-#{st.subject.ubid.to_s[-5...]}.ai.ubicloud.com")
+        expect(st.subject.load_balancer.stack).to eq("ipv4")
       }.not_to raise_error
 
       expect {
         st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint-public", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: true, gpu_count: 1)
         expect(st.subject.load_balancer.hostname).to eq("test-endpoint-public.ai.ubicloud.com")
+        expect(st.subject.load_balancer.stack).to eq("ipv4")
       }.not_to raise_error
 
       expect {
