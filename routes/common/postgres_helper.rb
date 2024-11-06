@@ -66,6 +66,8 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
 
   def get
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
+    response.headers["Cache-Control"] = "no-store"
+
     if @mode == AppMode::API
       Serializers::Postgres.serialize(@resource, {detailed: true})
     else
