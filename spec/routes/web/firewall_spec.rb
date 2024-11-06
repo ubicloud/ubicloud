@@ -180,7 +180,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_content "Private subnet is attached to the firewall"
+        expect(page).to have_content "Private subnet #{ps.name} is attached to the firewall"
         expect(firewall.private_subnets_dataset.count).to eq(1)
 
         visit "#{project.path}#{firewall.path}"

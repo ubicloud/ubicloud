@@ -76,7 +76,7 @@ class Clover
         end
       end
 
-      request.post "attach-subnet" do
+      request.post %w[attach-subnet detach-subnet] do |action|
         Authorization.authorize(current_account.id, "PrivateSubnet:edit", @project.id)
         Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
 
@@ -99,46 +99,20 @@ class Clover
 
         # XXX: differing authorization between api and web routes!
         Authorization.authorize(current_account.id, "PrivateSubnet:edit", private_subnet.id) unless api?
-        firewall.associate_with_private_subnet(private_subnet)
 
-        if api?
-          Serializers::Firewall.serialize(firewall, {detailed: true})
+        if action == "attach-subnet"
+          firewall.associate_with_private_subnet(private_subnet)
+          actioned = "attached to"
         else
-          flash["notice"] = "Private subnet is attached to the firewall"
-          r.redirect "#{@project.path}#{firewall.path}"
-        end
-      end
-
-      request.post "detach-subnet" do
-        if api?
-          Authorization.authorize(current_account.id, "PrivateSubnet:edit", @project.id)
-
-          required_parameters = ["private_subnet_id"]
-          request_body_params = Validation.validate_request_body(request.body.read, required_parameters)
-
-          private_subnet = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
-          unless private_subnet && private_subnet.location == @location
-            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{request_body_params["private_subnet_id"]}\" and the location \"#{location}\" is not found"})
-          end
-
           firewall.disassociate_from_private_subnet(private_subnet)
+          actioned = "detached from"
+        end
 
+        if api?
           Serializers::Firewall.serialize(firewall, {detailed: true})
         else
-          Authorization.authorize(current_account.id, "Firewall:view", fw.id)
-          ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
-          unless ps && ps.location == @location
-            flash["error"] = "Private subnet not found"
-            r.redirect "#{@project.path}#{fw.path}"
-          end
-
-          Authorization.authorize(current_account.id, "PrivateSubnet:edit", ps.id)
-
-          fw.disassociate_from_private_subnet(ps)
-
-          flash["notice"] = "Private subnet #{ps.name} is detached from the firewall"
-
-          r.redirect "#{@project.path}#{fw.path}"
+          flash["notice"] = "Private subnet #{private_subnet.name} is #{actioned} the firewall"
+          r.redirect "#{@project.path}#{firewall.path}"
         end
       end
 
