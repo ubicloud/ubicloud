@@ -17,5 +17,12 @@
       {display_name: us-east-a2, internal_name: leaseweb-wdc02, ui_name: "Virginia, US", visible: true},
       {display_name: us-south-a13, internal_name: leaseweb-dal13,  ui_name: "Dallas, US", visible: false},
     ]
+  },
+  {
+    provider_display_name: Latitude,
+    provider_internal_name: latitude,
+    locations: [
+      {display_name: eu-central-a1, internal_name: latitude-fra, ui_name: "Germany (Latitude)", visible: false}
+    ]
   }
 ]
