@@ -9,16 +9,7 @@ class Clover
     r.on NAME_OR_UBID do |firewall_name, firewall_id|
       if firewall_name
         r.post api? do
-          Authorization.authorize(current_account.id, "Firewall:create", @project.id)
-
-          allowed_optional_parameters = ["description"]
-          request_body_params = Validation.validate_request_body(r.body.read, [], allowed_optional_parameters)
-          Validation.validate_name(firewall_name)
-
-          firewall = Firewall.create_with_id(name: firewall_name, location: @location, description: request_body_params["description"] || "")
-          firewall.associate_with_project(@project)
-
-          Serializers::Firewall.serialize(firewall)
+          firewall_post(firewall_name)
         end
 
         filter = {Sequel[:firewall][:name] => firewall_name}
