@@ -39,11 +39,11 @@ class Clover
       firewall = @project.firewalls_dataset.first(filter)
 
       unless firewall
-        response.status = request.delete? ? 204 : 404
-        request.halt
+        response.status = r.delete? ? 204 : 404
+        r.halt
       end
 
-      request.delete true do
+      r.delete true do
         Authorization.authorize(current_account.id, "Firewall:delete", @project.id)
         Authorization.authorize(current_account.id, "Firewall:delete", firewall.id)
         firewall.private_subnets.map { Authorization.authorize(current_account.id, "PrivateSubnet:edit", _1.id) }
@@ -57,7 +57,7 @@ class Clover
         end
       end
 
-      request.get true do
+      r.get true do
         Authorization.authorize(current_account.id, "Firewall:view", @project.id)
         Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
         @firewall = Serializers::Firewall.serialize(firewall, {detailed: true})
@@ -73,12 +73,12 @@ class Clover
         end
       end
 
-      request.post %w[attach-subnet detach-subnet] do |action|
+      r.post %w[attach-subnet detach-subnet] do |action|
         Authorization.authorize(current_account.id, "PrivateSubnet:edit", @project.id)
         Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
 
         private_subnet_id = if api?
-          Validation.validate_request_body(request.body.read, ["private_subnet_id"])["private_subnet_id"]
+          Validation.validate_request_body(r.body.read, ["private_subnet_id"])["private_subnet_id"]
         else
           r.params["private-subnet-id"]
         end
@@ -115,7 +115,7 @@ class Clover
 
       r.on api? do
         @firewall = firewall
-        request.hash_branches(:api_project_location_firewall_prefix)
+        r.hash_branches(:api_project_location_firewall_prefix)
       end
 
       r.on "firewall-rule" do
