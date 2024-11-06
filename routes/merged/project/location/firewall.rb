@@ -48,18 +48,15 @@ class Clover
       end
 
       request.delete true do
+        Authorization.authorize(current_account.id, "Firewall:delete", @project.id)
+        Authorization.authorize(current_account.id, "Firewall:delete", firewall.id)
+        firewall.private_subnets.map { Authorization.authorize(current_account.id, "PrivateSubnet:edit", _1.id) }
+        firewall.destroy
+
         if api?
-          Authorization.authorize(user.id, "Firewall:delete", @project.id)
-
-          firewall.destroy
-
           response.status = 204
-          request.halt
+          nil
         else
-          Authorization.authorize(current_account.id, "Firewall:delete", fw.id)
-          fw.private_subnets.map { Authorization.authorize(current_account.id, "PrivateSubnet:edit", _1.id) }
-          fw.destroy
-
           {message: "Deleting #{fw.name}"}
         end
       end
