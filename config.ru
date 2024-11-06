@@ -4,6 +4,6 @@ require_relative "loader"
 
 clover_freeze
 
-run(Config.development? ? Unreloader : Clover.freeze.app)
+run(Config.development? ? Unreloader : Clover.app)
 
 Tilt.finalize! unless Config.development?

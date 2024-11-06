@@ -36,7 +36,6 @@ Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 RSpec.configure do |config|
   config.before(:suite) do
     clover_freeze
-    Clover.freeze if ENV["CLOVER_FREEZE"] == "1"
   end
 
   config.around do |example|
