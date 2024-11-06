@@ -99,14 +99,6 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     Serializers::LoadBalancer.serialize(@resource.reload, {detailed: true})
   end
 
-  def delete
-    Authorization.authorize(@user.id, "LoadBalancer:delete", @resource.id)
-
-    @resource.incr_destroy
-    response.status = 204
-    @request.halt
-  end
-
   def post_attach_vm
     Authorization.authorize(@user.id, "LoadBalancer:edit", @resource.id)
     required_parameters = %w[vm_id]
