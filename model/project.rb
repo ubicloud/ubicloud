@@ -135,5 +135,5 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :transparent_cache
+  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra
 end
