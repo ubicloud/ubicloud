@@ -32,8 +32,8 @@ module Option
   PROVIDERS.freeze
   LOCATIONS.freeze
 
-  def self.locations(only_visible: true)
-    Option::LOCATIONS.select { !only_visible || _1.visible }
+  def self.locations(only_visible: true, feature_flags: [])
+    Option::LOCATIONS.select { !only_visible || (_1.visible || feature_flags.include?("location_#{_1.name.tr("-", "_")}")) }
   end
 
   def self.postgres_locations
