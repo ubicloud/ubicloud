@@ -20,7 +20,6 @@ tilt/erubi
 tilt/string
 sequel/adapters/postgres
 sequel/connection_pool/timed_queue
-sequel/connection_pool/threaded
 capybara/dsl
 capybara/rspec
 mail/network/delivery_methods/test_mailer
