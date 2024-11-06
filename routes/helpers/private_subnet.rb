@@ -42,9 +42,9 @@ class Clover
 
     st = Prog::Vnet::SubnetNexus.assemble(
       @project.id,
-      name: name,
+      name:,
       location: @location,
-      firewall_id: firewall_id
+      firewall_id:
     )
 
     if api?
