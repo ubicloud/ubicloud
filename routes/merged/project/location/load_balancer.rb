@@ -51,7 +51,10 @@ class Clover
       end
 
       r.delete true do
-        lb_endpoint_helper.delete
+        Authorization.authorize(current_account.id, "LoadBalancer:delete", lb.id)
+        lb.incr_destroy
+        response.status = 204
+        r.halt
       end
 
       r.patch api? do
