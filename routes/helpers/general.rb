@@ -1,19 +1,6 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  def self.freeze
-    if Config.test? && ENV["CLOVER_FREEZE"] != "1"
-      Sequel::Model.descendants.each(&:finalize_associations)
-    # :nocov:
-    else
-      Sequel::Model.freeze_descendants
-      DB.freeze
-    end
-    return self if frozen? # XXX: Remove after Roda 3.86.0
-    # :nocov:
-    super
-  end
-
   # rubocop:disable Style/OptionalArguments
   def self.autoload_routes(namespace = "", route)
     # rubocop:enable Style/OptionalArguments # different indents required by Rubocop

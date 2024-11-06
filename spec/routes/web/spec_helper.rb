@@ -10,7 +10,6 @@ require "capybara/rspec"
 
 Gem.suffix_pattern
 
-Clover.freeze if ENV["FORCE_AUTOLOAD"] == "1"
 Capybara.app = Clover.app
 Capybara.exact = true
 
