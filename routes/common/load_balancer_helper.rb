@@ -184,11 +184,4 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
       @request.redirect "#{project.path}#{@resource.path}"
     end
   end
-
-  def view_create_page
-    Authorization.authorize(@user.id, "LoadBalancer:create", project.id)
-    authorized_subnets = project.private_subnets_dataset.authorized(@user.id, "PrivateSubnet:view").all
-    @app.instance_variable_set(:@subnets, Serializers::PrivateSubnet.serialize(authorized_subnets))
-    @app.view "networking/load_balancer/create"
-  end
 end
