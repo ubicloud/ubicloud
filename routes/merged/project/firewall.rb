@@ -3,8 +3,10 @@
 class Clover
   branch = lambda do |r|
     r.get true do
+      dataset = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view")
+
       if api?
-        result = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view").eager(:firewall_rules).paginated_result(
+        result = dataset.eager(:firewall_rules).paginated_result(
           start_after: r.params["start_after"],
           page_size: r.params["page_size"],
           order_column: r.params["order_column"]
@@ -15,7 +17,7 @@ class Clover
           count: result[:count]
         }
       else
-        authorized_firewalls = @project.firewalls_dataset.authorized(current_account.id, "Firewall:view").all
+        authorized_firewalls = dataset.all
         @firewalls = Serializers::Firewall.serialize(authorized_firewalls, {include_path: true})
 
         view "networking/firewall/index"
