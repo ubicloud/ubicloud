@@ -40,7 +40,7 @@ class Clover
 
       unless firewall
         response.status = r.delete? ? 204 : 404
-        r.halt
+        next
       end
 
       r.delete true do
@@ -143,7 +143,7 @@ class Clover
             fwr = FirewallRule.from_ubid(firewall_rule_ubid)
             unless fwr
               response.status = 204
-              r.halt
+              next
             end
 
             firewall.remove_firewall_rule(fwr)
