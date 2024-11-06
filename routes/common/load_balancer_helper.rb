@@ -99,20 +99,6 @@ class Routes::Common::LoadBalancerHelper < Routes::Common::Base
     Serializers::LoadBalancer.serialize(@resource.reload, {detailed: true})
   end
 
-  def get
-    Authorization.authorize(@user.id, "LoadBalancer:view", @resource.id)
-    if @mode == AppMode::API
-      Serializers::LoadBalancer.serialize(@resource, {detailed: true})
-    else
-      vms = @resource.private_subnet.vms_dataset.authorized(@user.id, "Vm:view").all
-      attached_vm_ids = @resource.vms.map(&:id)
-      @app.instance_variable_set(:@attachable_vms, Serializers::Vm.serialize(vms.reject { attached_vm_ids.include?(_1.id) }))
-      @app.instance_variable_set(:@lb, Serializers::LoadBalancer.serialize(@resource, {detailed: true, vms_serialized: true}))
-
-      @app.view "networking/load_balancer/show"
-    end
-  end
-
   def delete
     Authorization.authorize(@user.id, "LoadBalancer:delete", @resource.id)
 

@@ -37,7 +37,17 @@ class Clover
       end
 
       r.get true do
-        lb_endpoint_helper.get
+        Authorization.authorize(current_account.id, "LoadBalancer:view", lb.id)
+        @lb = Serializers::LoadBalancer.serialize(lb, {detailed: true, vms_serialized: !api?})
+        if api?
+          @lb
+        else
+          vms = lb.private_subnet.vms_dataset.authorized(current_account.id, "Vm:view").all
+          attached_vm_ids = lb.vms.map(&:id)
+          @attachable_vms = Serializers::Vm.serialize(vms.reject { attached_vm_ids.include?(_1.id) })
+
+          view "networking/load_balancer/show"
+        end
       end
 
       r.delete true do
