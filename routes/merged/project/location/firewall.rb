@@ -93,7 +93,6 @@ class Clover
             fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{private_subnet_id}\" and the location \"#{location}\" is not found"})
           else
             flash["error"] = "Private subnet not found"
-            response.status = 404
             r.redirect "#{@project.path}#{firewall.path}"
           end
         end
@@ -130,7 +129,6 @@ class Clover
           ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
           unless ps && ps.location == @location
             flash["error"] = "Private subnet not found"
-            response.status = 404
             r.redirect "#{@project.path}#{fw.path}"
           end
 
