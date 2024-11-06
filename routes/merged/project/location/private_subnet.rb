@@ -22,7 +22,7 @@ class Clover
 
       unless ps
         response.status = request.delete? ? 204 : 404
-        request.halt
+        next
       end
 
       if web?
@@ -43,7 +43,7 @@ class Clover
           ps.disconnect_subnet(subnet)
           ps.reload
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-          r.halt
+          ""
         end
       end
 
@@ -73,7 +73,7 @@ class Clover
 
         ps.incr_destroy
         response.status = 204
-        r.halt
+        nil
       end
     end
 
