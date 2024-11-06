@@ -36,10 +36,7 @@ class Clover
       end
 
       filter[:location] = @location
-      @firewall = @project.firewalls_dataset.first(filter)
-      fw = firewall = @firewall
-      location = @location
-      @fw = Serializers::Firewall.serialize(fw)
+      firewall = @project.firewalls_dataset.first(filter)
 
       unless firewall
         response.status = request.delete? ? 204 : 404
@@ -56,20 +53,20 @@ class Clover
           response.status = 204
           nil
         else
-          {message: "Deleting #{fw.name}"}
+          {message: "Deleting #{firewall.name}"}
         end
       end
 
       request.get true do
         Authorization.authorize(current_account.id, "Firewall:view", @project.id)
         Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
-        @firewall = Serializers::Firewall.serialize(fw, {detailed: true})
+        @firewall = Serializers::Firewall.serialize(firewall, {detailed: true})
 
         if api?
           @firewall
         else
           project_subnets = @project.private_subnets_dataset.where(location: @location).authorized(current_account.id, "PrivateSubnet:view").all
-          attached_subnets = fw.private_subnets_dataset.all
+          attached_subnets = firewall.private_subnets_dataset.all
           @attachable_subnets = Serializers::PrivateSubnet.serialize(project_subnets.reject { |ps| attached_subnets.find { |as| as.id == ps.id } })
 
           view "networking/firewall/show"
@@ -90,7 +87,7 @@ class Clover
 
         unless private_subnet && private_subnet.location == @location
           if api?
-            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{private_subnet_id}\" and the location \"#{location}\" is not found"})
+            fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{private_subnet_id}\" and the location \"#{@location}\" is not found"})
           else
             flash["error"] = "Private subnet not found"
             r.redirect "#{@project.path}#{firewall.path}"
@@ -117,12 +114,13 @@ class Clover
       end
 
       r.on api? do
+        @firewall = firewall
         request.hash_branches(:api_project_location_firewall_prefix)
       end
 
       r.on "firewall-rule" do
         r.post true do
-          Authorization.authorize(current_account.id, "Firewall:edit", fw.id)
+          Authorization.authorize(current_account.id, "Firewall:edit", firewall.id)
 
           port_range = if r.params["port_range"].empty?
             [0, 65535]
@@ -133,22 +131,22 @@ class Clover
           parsed_cidr = Validation.validate_cidr(r.params["cidr"])
           pg_range = Sequel.pg_range(port_range.first..port_range.last)
 
-          fw.insert_firewall_rule(parsed_cidr.to_s, pg_range)
+          firewall.insert_firewall_rule(parsed_cidr.to_s, pg_range)
           flash["notice"] = "Firewall rule is created"
 
-          r.redirect "#{@project.path}#{fw.path}"
+          r.redirect "#{@project.path}#{firewall.path}"
         end
 
         r.is String do |firewall_rule_ubid|
           r.delete true do
-            Authorization.authorize(current_account.id, "Firewall:edit", fw.id)
+            Authorization.authorize(current_account.id, "Firewall:edit", firewall.id)
             fwr = FirewallRule.from_ubid(firewall_rule_ubid)
             unless fwr
               response.status = 204
               r.halt
             end
 
-            fw.remove_firewall_rule(fwr)
+            firewall.remove_firewall_rule(fwr)
 
             {message: "Firewall rule deleted"}
           end
