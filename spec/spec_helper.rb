@@ -208,7 +208,6 @@ RSpec.configure do |config|
   end
 
   if ENV["CLOVER_FREEZE"] == "1"
-    require_relative "suppress_pending"
     require_relative "thawed_mock"
 
     require "diff/lcs"

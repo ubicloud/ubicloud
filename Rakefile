@@ -160,7 +160,7 @@ rspec = lambda do |env|
 end
 
 turbo_tests = lambda do |env|
-  sh(env.merge("RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "turbo_tests", "-r", "./spec/suppress_pending", "-n", nproc.call)
+  sh(env.merge("RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"), "bundle", "exec", "turbo_tests", "-n", nproc.call)
 end
 
 spec = lambda do |env|
