@@ -119,19 +119,17 @@ class Clover
           r.redirect "#{@project.path}#{firewall.path}"
         end
 
-        r.is String do |firewall_rule_ubid|
-          r.delete true do
-            Authorization.authorize(current_account.id, "Firewall:edit", firewall.id)
-            fwr = FirewallRule.from_ubid(firewall_rule_ubid)
-            unless fwr
-              response.status = 204
-              next
-            end
-
-            firewall.remove_firewall_rule(fwr)
-
-            {message: "Firewall rule deleted"}
+        r.delete String do |firewall_rule_ubid|
+          Authorization.authorize(current_account.id, "Firewall:edit", firewall.id)
+          fwr = FirewallRule.from_ubid(firewall_rule_ubid)
+          unless fwr
+            response.status = 204
+            next
           end
+
+          firewall.remove_firewall_rule(fwr)
+
+          {message: "Firewall rule deleted"}
         end
       end
     end
