@@ -382,7 +382,7 @@ RSpec.describe Prog::Vm::Nexus do
         distinct_storage_devices: false,
         host_filter: [],
         host_exclusion_filter: [],
-        location_filter: ["github-runners", "hetzner-fsn1"],
+        location_filter: ["github-runners", "hetzner-fsn1", "hetzner-hel1"],
         location_preference: ["github-runners"],
         gpu_count: 0
       )
