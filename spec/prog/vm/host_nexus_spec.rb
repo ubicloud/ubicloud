@@ -19,9 +19,11 @@ RSpec.describe Prog::Vm::HostNexus do
   let(:vms) { [instance_double(Vm, mem_gib: 1), instance_double(Vm, mem_gib: 2)] }
   let(:vm_host) { instance_double(VmHost, vms: vms) }
   let(:sshable) { instance_double(Sshable) }
+  let(:ssh_session) { instance_double(Net::SSH::Connection::Session) }
 
   before do
     allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+    allow(sshable).to receive(:start_fresh_session).and_return(ssh_session)
   end
 
   describe ".assemble" do
@@ -384,11 +386,20 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#available?" do
-    it "returns the available status" do
-      expect(sshable).to receive(:cmd).and_return("true")
+    it "returns the available status when disks are healthy" do
+      expect(sshable).to receive(:connect).and_return(nil)
+      expect(vm_host).to receive(:perform_health_checks).and_return(true)
       expect(nx.available?).to be true
+    end
 
-      expect(sshable).to receive(:cmd).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
+    it "returns the available status when disks are not healthy" do
+      expect(sshable).to receive(:connect).and_return(nil)
+      allow(vm_host).to receive(:perform_health_checks).and_return(false)
+      expect(nx.available?).to be false
+    end
+
+    it "returns an error trying to connect to VmHost" do
+      expect(sshable).to receive(:connect).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
       expect(nx.available?).to be false
     end
   end
