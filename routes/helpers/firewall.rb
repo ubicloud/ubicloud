@@ -23,11 +23,9 @@ class Clover
     Authorization.authorize(current_account.id, "Firewall:create", @project.id)
     Validation.validate_name(firewall_name)
 
-    description = if api?
-      Validation.validate_request_body(request.body.read, [], ["description"])["description"] || ""
-    else
-      request.params["description"]
-    end
+    optional_parameters = %w[description]
+    optional_parameters.concat(%w[name location private-subnet-id]) if web?
+    description = Validation.validate_request_body(json_params, [], optional_parameters)["description"] || ""
 
     firewall = Firewall.create_with_id(
       name: firewall_name,
