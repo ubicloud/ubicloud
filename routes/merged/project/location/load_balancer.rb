@@ -5,7 +5,7 @@ class Clover
     lb_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
 
     r.get api? do
-      lb_endpoint_helper.list
+      load_balancer_list
     end
 
     r.on NAME_OR_UBID do |lb_name, lb_id|
