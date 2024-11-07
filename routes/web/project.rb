@@ -63,8 +63,7 @@ class Clover
 
         # If it has some resources, do not allow to delete it.
         if @project.has_resources
-          flash["error"] = "'#{@project.name}' project has some resources. Delete all related resources first."
-          return {message: "'#{@project.name}' project has some resources. Delete all related resources first."}
+          fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
         end
 
         @project.soft_delete

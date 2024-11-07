@@ -222,8 +222,9 @@ RSpec.describe Clover, "private subnet" do
 
         visit "#{project.path}#{private_subnet.path}"
         btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(page.body).to eq({message: "Private subnet has VMs attached, first, delete them."}.to_json)
+        Capybara.current_session.driver.header "Accept", "application/json"
+        response = page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(response).to have_api_error(409, "Private subnet '#{private_subnet.name}' has VMs attached, first, delete them.")
       end
     end
   end
