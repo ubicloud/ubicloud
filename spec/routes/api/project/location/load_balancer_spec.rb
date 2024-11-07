@@ -124,7 +124,7 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "not found" do
-        delete "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid"
+        delete "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid_name"
 
         expect(last_response.status).to eq(204)
       end
