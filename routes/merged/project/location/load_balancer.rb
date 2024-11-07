@@ -124,7 +124,7 @@ class Clover
           end
 
           Authorization.authorize(current_account.id, "Vm:view", vm.id)
-          if vm.reload.load_balancer && vm.load_balancer.id != lb.id
+          if vm.load_balancer && vm.load_balancer.id != lb.id
             fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
           elsif vm.load_balancer && vm.load_balancer.id == lb.id
             next
