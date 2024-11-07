@@ -30,8 +30,9 @@ class Clover
       @project = nil unless @project&.visible
 
       unless @project
-        response.status = r.delete? ? 204 : 404
-        r.halt
+        fail NoContentError if request.delete?
+        response.status = 404
+        request.halt
       end
 
       unless @project.accounts.any? { _1.id == current_account.id }
@@ -48,8 +49,7 @@ class Clover
 
         @project.soft_delete
 
-        response.status = 204
-        r.halt
+        fail NoContentError
       end
 
       r.get true do

@@ -33,8 +33,7 @@ class Clover
           @firewall.remove_firewall_rule(firewall_rule)
         end
 
-        response.status = 204
-        r.halt
+        fail NoContentError
       end
 
       request.get true do

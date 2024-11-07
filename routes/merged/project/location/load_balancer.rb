@@ -17,7 +17,8 @@ class Clover
       lb = LoadBalancer.first(filter)
 
       unless lb
-        response.status = request.delete? ? 204 : 404
+        fail NoContentError if request.delete?
+        response.status = 404
         request.halt
       end
 
@@ -76,8 +77,7 @@ class Clover
       r.delete true do
         Authorization.authorize(current_account.id, "LoadBalancer:delete", lb.id)
         lb.incr_destroy
-        response.status = 204
-        r.halt
+        fail NoContentError
       end
 
       r.patch api? do
@@ -122,10 +122,7 @@ class Clover
 
     # 204 response for invalid names
     r.is String do |lb_name|
-      r.delete do
-        response.status = 204
-        nil
-      end
+      r.delete { fail NoContentError }
     end
   end
 

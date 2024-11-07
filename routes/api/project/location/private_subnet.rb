@@ -31,16 +31,14 @@ class Clover
         ps_endpoint_helper.post(ps_name)
       end
 
-      r.delete do
-        response.status = 204
-        nil
-      end
+      r.delete { fail NoContentError }
     end
   end
 
   def handle_ps_requests(ps_endpoint_helper)
     unless ps_endpoint_helper.instance_variable_get(:@resource)
-      response.status = request.delete? ? 204 : 404
+      fail NoContentError if request.delete?
+      response.status = 404
       request.halt
     end
 

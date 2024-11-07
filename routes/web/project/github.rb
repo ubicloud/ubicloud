@@ -61,8 +61,7 @@ class Clover
         r.delete true do
           entry.destroy
           flash["notice"] = "Cache '#{entry.key}' deleted."
-          response.status = 204
-          request.halt
+          fail NoContentError
         end
       end
     end

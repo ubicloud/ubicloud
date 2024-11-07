@@ -84,10 +84,8 @@ class Clover
           r.delete true do
             Authorization.authorize(current_account.id, "Firewall:edit", fw.id)
             fwr = FirewallRule.from_ubid(firewall_rule_ubid)
-            unless fwr
-              response.status = 204
-              r.halt
-            end
+
+            fail NoContentError unless fwr
 
             fw.remove_firewall_rule(fwr)
 

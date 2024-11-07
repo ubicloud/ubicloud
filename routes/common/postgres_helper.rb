@@ -79,8 +79,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
   def delete
     Authorization.authorize(@user.id, "Postgres:delete", @resource.id)
     @resource.incr_destroy
-    response.status = 204
-    @request.halt
+    fail NoContentError
   end
 
   def post_firewall_rule
@@ -120,8 +119,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
         @resource.incr_update_firewall_rules
       end
     end
-    response.status = 204
-    @request.halt
+    fail NoContentError
   end
 
   def post_metric_destination
@@ -160,8 +158,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
       end
     end
 
-    response.status = 204
-    @request.halt
+    fail NoContentError
   end
 
   def restore

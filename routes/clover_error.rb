@@ -19,3 +19,9 @@ class DependencyError < CloverError
     super(409, "DependencyError", message)
   end
 end
+
+class NoContentError < CloverError
+  def initialize
+    super(204, "NoContent", nil)
+  end
+end

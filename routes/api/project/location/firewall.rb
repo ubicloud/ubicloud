@@ -46,26 +46,22 @@ class Clover
         Validation.validate_name(firewall_name)
       end
 
-      r.delete do
-        response.status = 204
-        nil
-      end
+      r.delete { fail NoContentError }
     end
   end
 
   def handle_firewall_requests(user, firewall, location)
     unless firewall
-      response.status = request.delete? ? 204 : 404
+      fail NoContentError if request.delete?
+      response.status = 404
       request.halt
     end
 
     request.delete true do
       Authorization.authorize(user.id, "Firewall:delete", @project.id)
-
       firewall.destroy
 
-      response.status = 204
-      request.halt
+      fail NoContentError
     end
 
     request.get true do

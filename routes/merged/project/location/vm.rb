@@ -21,7 +21,8 @@ class Clover
       vm = @project.vms_dataset.first(filter)
 
       unless vm
-        response.status = r.delete? ? 204 : 404
+        fail NoContentError if r.delete?
+        response.status = 404
         r.halt
       end
 
@@ -34,8 +35,7 @@ class Clover
       r.delete true do
         Authorization.authorize(current_account.id, "Vm:delete", vm.id)
         vm.incr_destroy
-        response.status = 204
-        nil
+        fail NoContentError
       end
     end
 
@@ -43,10 +43,7 @@ class Clover
     r.is String do |vm_name|
       r.post { vm_post(vm_name) }
 
-      r.delete do
-        response.status = 204
-        nil
-      end
+      r.delete { fail NoContentError }
     end
   end
 

@@ -41,7 +41,7 @@ class Clover
           .first
       end
 
-      fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
+      fail NoContentError unless entry
 
       entry.update(last_accessed_at: Time.now, last_accessed_by: runner.id)
       signed_url = repository.url_presigner.presigned_url(:get_object, bucket: repository.bucket_name, key: entry.blob_key, expires_in: 900)
@@ -59,7 +59,7 @@ class Clover
       # listCache
       r.get true do
         key = r.params["key"]
-        fail CloverError.new(204, "NotFound", "No cache entry") if key.nil?
+        fail NoContentError unless key
 
         scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
         entries = repository.cache_entries_dataset
@@ -132,7 +132,7 @@ class Clover
         fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if etags.nil? || etags.empty? || upload_id.nil? || size == 0
 
         entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
-        fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
+        fail NoContentError if entry.nil? || (entry.size && entry.size != size)
 
         begin
           repository.blob_storage_client.complete_multipart_upload({

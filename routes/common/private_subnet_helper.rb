@@ -80,8 +80,7 @@ class Routes::Common::PrivateSubnetHelper < Routes::Common::Base
     end
 
     @resource.incr_destroy
-    response.status = 204
-    @request.halt
+    fail NoContentError
   end
 
   def get_create
