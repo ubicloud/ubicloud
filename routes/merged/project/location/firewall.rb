@@ -26,7 +26,6 @@ class Clover
       end
 
       r.delete true do
-        Authorization.authorize(current_account.id, "Firewall:delete", @project.id)
         Authorization.authorize(current_account.id, "Firewall:delete", firewall.id)
         firewall.private_subnets.map { Authorization.authorize(current_account.id, "PrivateSubnet:edit", _1.id) }
         firewall.destroy
@@ -40,7 +39,6 @@ class Clover
       end
 
       r.get true do
-        Authorization.authorize(current_account.id, "Firewall:view", @project.id)
         Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
         @firewall = Serializers::Firewall.serialize(firewall, {detailed: true})
 
@@ -56,7 +54,6 @@ class Clover
       end
 
       r.post %w[attach-subnet detach-subnet] do |action|
-        Authorization.authorize(current_account.id, "PrivateSubnet:edit", @project.id)
         Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
 
         private_subnet_id = if api?
