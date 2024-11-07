@@ -2,8 +2,6 @@
 
 class Clover
   branch = lambda do |r|
-    lb_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
-
     r.get api? do
       load_balancer_list
     end
@@ -17,7 +15,6 @@ class Clover
 
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location: @location).select(Sequel[:private_subnet][:id])
       lb = LoadBalancer.first(filter)
-      lb_endpoint_helper.instance_variable_set(:@resource, lb)
 
       unless lb
         response.status = request.delete? ? 204 : 404

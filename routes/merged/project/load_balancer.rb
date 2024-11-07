@@ -2,22 +2,18 @@
 
 class Clover
   branch = lambda do |r|
-    lb_endpoint_helper = Routes::Common::LoadBalancerHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
-
     r.get true do
       load_balancer_list
     end
 
     r.on api? do
-      r.on String do |lb_name|
-        r.post true do
-          lb_endpoint_helper.post(name: lb_name)
-        end
+      r.post String do |lb_name|
+        load_balancer_post(lb_name)
       end
     end
 
     r.post true do
-      lb_endpoint_helper.post(name: r.params["name"])
+      load_balancer_post(r.params["name"])
     end
 
     r.get "create" do
