@@ -90,9 +90,8 @@ class Clover
         if api?
           @lb
         else
-          vms = lb.private_subnet.vms_dataset.authorized(current_account.id, "Vm:view").all
-          attached_vm_ids = lb.vms.map(&:id)
-          @attachable_vms = Serializers::Vm.serialize(vms.reject { attached_vm_ids.include?(_1.id) })
+          vms = lb.private_subnet.vms_dataset.authorized(current_account.id, "Vm:view").exclude(Sequel[:vm][:id] => lb.vms_dataset.select(Sequel[:vm][:id])).all
+          @attachable_vms = Serializers::Vm.serialize(vms)
 
           view "networking/load_balancer/show"
         end
