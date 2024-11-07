@@ -194,12 +194,7 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
 
     unless @resource.representative_server.primary?
-      if @mode == AppMode::API
-        fail CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated during restore!")
-      else
-        flash["error"] = "Superuser password cannot be updated during restore!"
-        return @app.redirect_back_with_inputs
-      end
+      fail InvalidRequestError.new("Superuser password cannot be updated during restore!")
     end
 
     required_parameters = (@mode == AppMode::API) ? ["password"] : ["password", "repeat_password"]
@@ -244,15 +239,15 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
 
     unless @resource.representative_server.primary?
-      fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered during restore!")
+      fail InvalidRequestError.new("Failover cannot be triggered during restore!")
     end
 
     unless project.get_ff_postgresql_base_image
-      fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered for this resource!")
+      fail InvalidRequestError.new("Failover cannot be triggered for this resource!")
     end
 
     unless @resource.representative_server.trigger_failover
-      fail CloverError.new(400, "InvalidRequest", "There is not a suitable standby server to failover!")
+      fail InvalidRequestError.new("There is not a suitable standby server to failover!")
     end
 
     Serializers::Postgres.serialize(@resource, {detailed: true})

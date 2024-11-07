@@ -3,7 +3,7 @@
 class Clover
   hash_branch("runtime", "github") do |r|
     if (runner = GithubRunner[vm_id: @vm.id]).nil? || (repository = runner.repository).nil?
-      fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
+      fail InvalidRequestError.new("invalid JWT format or claim in Authorization header")
     end
 
     repository.setup_blob_storage unless repository.access_key
@@ -11,7 +11,7 @@ class Clover
     # getCacheEntry
     r.get "cache" do
       keys, version = r.params["keys"]&.split(","), r.params["version"]
-      fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if keys.nil? || keys.empty? || version.nil?
+      fail InvalidRequestError.new("Wrong parameters") if keys.nil? || keys.empty? || version.nil?
 
       # Clients can send multiple keys; we return the first matching cache in
       # incoming key order. The function `.min_by { keys.index(_1.key) }` helps
@@ -84,16 +84,16 @@ class Clover
         key = r.params["key"]
         version = r.params["version"]
         size = r.params["cacheSize"]&.to_i
-        fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if key.nil? || version.nil?
+        fail InvalidRequestError.new("Wrong parameters") if key.nil? || version.nil?
 
         unless (scope = runner.workflow_job&.dig("head_branch"))
           # YYYY: If the webhook not delivered yet, we can try to get the branch from the API
           Clog.emit("The runner does not have a workflow job") { {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}} }
-          fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
+          fail InvalidRequestError.new("No workflow job data available")
         end
 
         if size && size > GithubRepository::CACHE_SIZE_LIMIT
-          fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
+          fail InvalidRequestError.new("The cache size is over the 10GB limit")
         end
 
         entry, upload_id = nil, nil
@@ -129,7 +129,7 @@ class Clover
         etags = r.params["etags"]
         upload_id = r.params["uploadId"]
         size = r.params["size"].to_i
-        fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if etags.nil? || etags.empty? || upload_id.nil? || size == 0
+        fail InvalidRequestError.new("Wrong parameters") if etags.nil? || etags.empty? || upload_id.nil? || size == 0
 
         entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
         fail NoContentError if entry.nil? || (entry.size && entry.size != size)
@@ -143,7 +143,7 @@ class Clover
           })
         rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload => ex
           Clog.emit("could not complete multipart upload") { {failed_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
-          fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
+          fail InvalidRequestError.new("Wrong parameters")
         end
 
         updates = {committed_at: Time.now}

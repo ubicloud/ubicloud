@@ -102,7 +102,7 @@ class Clover < Roda
       @error = error
 
       case e
-      when Sequel::ValidationFailed, DependencyError
+      when Sequel::ValidationFailed, DependencyError, InvalidRequestError
         flash["error"] = @error[:message]
         return redirect_back_with_inputs
       when Validation::ValidationFailed
@@ -473,7 +473,7 @@ class Clover < Roda
         response.json = true
 
         if (jwt_payload = get_runtime_jwt_payload).nil? || (@vm = Vm.from_ubid(jwt_payload["sub"])).nil?
-          fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
+          fail InvalidRequestError.new("invalid JWT format or claim in Authorization header")
         end
 
         r.hash_branches("runtime")

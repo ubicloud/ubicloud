@@ -29,3 +29,9 @@ class NotFoundError < CloverError
     super(404, "ResourceNotFound", message)
   end
 end
+
+class InvalidRequestError < CloverError
+  def initialize(message)
+    super(400, "InvalidRequest", message)
+  end
+end

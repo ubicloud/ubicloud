@@ -125,8 +125,7 @@ class Clover
 
       r.delete true do
         unless @project.accounts.count > 1
-          response.status = 400
-          return {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}
+          fail InvalidRequestError.new("You can't remove the last user from '#{@project.name}' project. Delete project instead.")
         end
         hyper_tag = user.hyper_tag_name(@project)
         @project.access_policies_dataset.where(managed: true).each do |policy|

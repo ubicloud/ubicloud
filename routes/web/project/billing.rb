@@ -138,8 +138,7 @@ class Clover
 
         r.delete true do
           unless payment_method.billing_info.payment_methods.count > 1
-            response.status = 400
-            return {message: "You can't delete the last payment method of a project."}
+            fail InvalidRequestError.new("You can't delete the last payment method of a project.")
           end
 
           payment_method.destroy
