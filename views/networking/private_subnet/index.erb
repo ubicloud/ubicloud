@@ -30,25 +30,31 @@
     </div>
   </div>
   <div class="flex justify-end space-y-1 mt-6">
-    <% if has_project_permission("PrivateSubnet:create")%>
-    <%== render(
-      "components/button", locals: { text: "Create Private Subnet", link: "private-subnet/create" })
-    %>
+    <% if has_project_permission("PrivateSubnet:create") %>
+      <%== render("components/button", locals: { text: "Create Private Subnet", link: "private-subnet/create" }) %>
     <% end %>
   </div>
 <% else %>
   <div class="mt-6">
     <%== render(
-    "components/empty_state",
-    locals: {
-      icon: "hero-globe-alt",
-      title: "No Private Subnets",
-      description: "You don't have permission to create Private Subnets."
-    }.merge(has_project_permission("PrivateSubnet:create") ? {
-      description: "Get started by creating a new Private Subnet.",
-      button_link: "#{@project_data[:path]}/private-subnet/create",
-      button_title: "New Private Subnet"
-    } : {})
-  ) %>
+      "components/empty_state",
+      locals: {
+        icon: "hero-globe-alt",
+        title: "No Private Subnets",
+        description: "You don't have permission to create Private Subnets."
+      }.merge(
+        (
+          if has_project_permission("PrivateSubnet:create")
+            {
+              description: "Get started by creating a new Private Subnet.",
+              button_link: "#{@project_data[:path]}/private-subnet/create",
+              button_title: "New Private Subnet"
+            }
+          else
+            {}
+          end
+        )
+      )
+    ) %>
   </div>
 <% end %>

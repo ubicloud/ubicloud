@@ -43,12 +43,12 @@
                 ) %>
               </div>
               <div class="col-span-full">
-                <% locations = Option
+                <% locations =
+                  Option
                     .locations(feature_flags: @project_data[:feature_flags])
                     .map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] }
-
-                   default_location = Option.locations.detect { |l| l.name == @default_location }&.display_name
-                %>
+                
+                default_location = Option.locations.detect { |l| l.name == @default_location }&.display_name %>
                 <%== render(
                   "components/form/radio_small_cards",
                   locals: {
@@ -78,9 +78,20 @@
                   "components/form/checkbox",
                   locals: {
                     name: "enable_ip4",
-                    label: "Public IPv4 Support (+<span class='enable_ip4-1-monthly-price'>-</span><span class='text-xs text-gray-500'>/mo</span>)",
+                    label:
+                      "Public IPv4 Support (+<span class='enable_ip4-1-monthly-price'>-</span><span class='text-xs text-gray-500'>/mo</span>)",
                     options: [
-                     ["1", "Enable Public IPv4", "location-based-price", {"data-amount" => "1", "data-resource-type" => "IPAddress", "data-resource-family" => "IPv4", "data-default" => "true"}]
+                      [
+                        "1",
+                        "Enable Public IPv4",
+                        "location-based-price",
+                        {
+                          "data-amount" => "1",
+                          "data-resource-type" => "IPAddress",
+                          "data-resource-family" => "IPv4",
+                          "data-default" => "true"
+                        }
+                      ]
                     ],
                     selected: "1",
                     description:
@@ -96,7 +107,10 @@
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                       <% Option::VmSizes.select { _1.visible }.each_with_index do |size, idx| %>
                         <% disabled = !@enabled_vm_sizes.include?(size.name) %>
-                        <label class="size-<%= size.name %>" title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>">
+                        <label
+                          class="size-<%= size.name %>"
+                          title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>"
+                        >
                           <input
                             type="radio"
                             name="size"
@@ -144,7 +158,7 @@
                 <div class="space-y-2">
                   <label for="storage_size" class="text-sm font-medium leading-6 text-gray-900">Storage size</label>
                   <fieldset class="radio-small-cards" id="storage-size-radios">
-                  <legend class="sr-only">Storage size</legend>
+                    <legend class="sr-only">Storage size</legend>
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                       <% size = flash.dig("old", "size") ? Option::VmSizes.find { _1.name == flash.dig("old", "size") } : Option::VmSizes[0] %>
                       <% size.storage_size_options.each_with_index do |storage_size, idx| %>

@@ -6,23 +6,17 @@
       <table class="min-w-full divide-y divide-gray-300">
         <thead class="bg-gray-50">
           <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
-            font-semibold text-gray-900 sm:pl-6">Name</th>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
-            font-semibold text-gray-900 sm:pl-6">Location</th>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
-            font-semibold text-gray-900 sm:pl-6">Description</th>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Location</th>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Description</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @firewalls.each do |fw| %>
             <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium
-              text-gray-900 sm:pl-6" scope="row">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <% if Authorization.has_permission?(current_account.id, "Firewall:view", fw[:id]) %>
-                  <a href="<%= @project_data[:path] %><%= fw[:path] %>"
-                  class="text-orange-600 hover:text-orange-700"><%= fw[:name]
-                  %></a>
+                  <a href="<%= @project_data[:path] %><%= fw[:path] %>" class="text-orange-600 hover:text-orange-700"><%= fw[:name] %></a>
                 <% else %>
                   <%= fw[:name] %>
                 <% end %>
@@ -36,11 +30,9 @@
     </div>
   </div>
   <div class="flex justify-end space-y-1 mt-6">
-      <% if has_project_permission("Firewall:create")%>
-      <%== render(
-        "components/button", locals: { text: "Create Firewall", link: "firewall/create" })
-      %>
-      <% end %>
+    <% if has_project_permission("Firewall:create") %>
+      <%== render("components/button", locals: { text: "Create Firewall", link: "firewall/create" }) %>
+    <% end %>
   </div>
 <% else %>
   <div class="mt-6">
@@ -50,11 +42,19 @@
         icon: "hero-x-circle",
         title: "No firewalls",
         description: "You don't have permission to create firewalls."
-      }.merge(has_project_permission("Firewall:create") ? {
-        description: "Get started by creating a new firewall.",
-        button_link: "#{@project_data[:path]}/firewall/create",
-        button_title: "New Firewall"
-      } : {})
+      }.merge(
+        (
+          if has_project_permission("Firewall:create")
+            {
+              description: "Get started by creating a new firewall.",
+              button_link: "#{@project_data[:path]}/firewall/create",
+              button_title: "New Firewall"
+            }
+          else
+            {}
+          end
+        )
+      )
     ) %>
   </div>
 <% end %>

@@ -1,12 +1,22 @@
 <% @page_title = "PostgreSQL Databases" %>
 
-<%
-  flavors = {
-    "standard" => ["Ubicloud", "PostgreSQL Database", "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."],
-    "paradedb" => ["ParadeDB", "ParadeDB PostgreSQL Database", "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."],
-    "lantern" => ["Lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."]
-  }.compact
-%>
+<% flavors = {
+  "standard" => [
+    "Ubicloud",
+    "PostgreSQL Database",
+    "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."
+  ],
+  "paradedb" => [
+    "ParadeDB",
+    "ParadeDB PostgreSQL Database",
+    "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."
+  ],
+  "lantern" => [
+    "Lantern",
+    "Lantern PostgreSQL Database",
+    "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."
+  ]
+}.compact %>
 
 <% if @postgres_databases.count > 0 %>
   <div class="space-y-1">
@@ -27,18 +37,22 @@
           <div>
             <%== render("components/button", locals: { text: "Create PostgreSQL Database", right_icon: "hero-chevron-down" }) %>
           </div>
-          <div class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" tabindex="-1">
+          <div
+            class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+            role="menu"
+            tabindex="-1"
+          >
             <% flavors.each do |flavor, (_, title, description)| %>
               <div class="py-1 hover:bg-gray-50" role="none">
-                  <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= flavor %>" class="block px-4 py-3 focus:outline-none">
-                    <h3 class="text-base font-semibold leading-6 text-gray-900"><%= title %></h3>
-                    <p class="mt-1 text-sm text-gray-500"><%= description %></p>
-                  </a>
+                <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= flavor %>" class="block px-4 py-3 focus:outline-none">
+                  <h3 class="text-base font-semibold leading-6 text-gray-900"><%= title %></h3>
+                  <p class="mt-1 text-sm text-gray-500"><%= description %></p>
+                </a>
               </div>
             <% end %>
           </div>
         </div>
-        </div>
+      </div>
     </div>
   </div>
 
@@ -62,7 +76,7 @@
                 </a>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <% (brand, _, _) = flavors[pg[:flavor]] %>
+                <% brand, _, _ = flavors[pg[:flavor]] %>
                 <div class="inline-flex gap-x-1 items-center">
                   <img src="/icons/pg-<%= brand.downcase %>.png" class="object-cover rounded-lg overflow-hidden w-6 h-6"/>
                   <p><%= brand %></p>
@@ -80,45 +94,46 @@
   </div>
 <% else %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "#{@project_data[:path]}/postgres",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"]
-      ]
-    }
-  ) %>
+  <div class="space-y-1">
+    <%== render(
+      "components/breadcrumb",
+      locals: {
+        back: "#{@project_data[:path]}/postgres",
+        parts: [
+          %w[Projects /project],
+          [@project_data[:name], @project_data[:path]],
+          ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"]
+        ]
+      }
+    ) %>
 
-  <%== render("components/page_header", locals: { title: "Create PostgreSQL Database" }) %>
-</div>
+    <%== render("components/page_header", locals: { title: "Create PostgreSQL Database" }) %>
+  </div>
 
-<div class="grid gap-6">
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
-    <% flavors.each do |flavor, (brand, title, description)| %>
-      <div class="rounded-lg shadow group relative bg-white p-6">
-        <div>
-          <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
-            <img src="/icons/pg-<%= brand.downcase %>.png" class="object-cover"/>
+  <div class="grid gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
+      <% flavors.each do |flavor, (brand, title, description)| %>
+        <div class="rounded-lg shadow group relative bg-white p-6">
+          <div>
+            <span class="inline-flex rounded-lg overflow-hidden w-12 h-12">
+              <img src="/icons/pg-<%= brand.downcase %>.png" class="object-cover"/>
+            </span>
+          </div>
+          <div class="mt-4">
+            <h3 class="text-base font-semibold leading-6 text-gray-900">
+              <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= flavor %>" class="focus:outline-none">
+                <span class="absolute inset-0" aria-hidden="true"></span>
+                Create
+                <%= title %>
+              </a>
+            </h3>
+            <p class="mt-2 text-sm text-gray-500"><%= description %></p>
+          </div>
+          <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
+            <%== render("components/icon", locals: { name: "hero-arrow-up-right" }) %>
           </span>
         </div>
-        <div class="mt-4">
-          <h3 class="text-base font-semibold leading-6 text-gray-900">
-            <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= flavor %>" class="focus:outline-none">
-              <span class="absolute inset-0" aria-hidden="true"></span>
-              Create <%= title %>
-            </a>
-          </h3>
-          <p class="mt-2 text-sm text-gray-500"><%= description %></p>
-        </div>
-        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
-          <%== render("components/icon", locals: { name: "hero-arrow-up-right" }) %>
-        </span>
-      </div>
-    <% end %>
+      <% end %>
+    </div>
   </div>
-</div>
 <% end %>

@@ -15,9 +15,14 @@
       "components/page_header",
       locals: {
         title: "Virtual Machines",
-        right_items: has_project_permission("Vm:create") ? [
-          render("components/button", locals: { text: "Create Virtual Machine", link: "vm/create" })
-        ] : []
+        right_items:
+          (
+            if has_project_permission("Vm:create")
+              [render("components/button", locals: { text: "Create Virtual Machine", link: "vm/create" })]
+            else
+              []
+            end
+          )
       }
     ) %>
   </div>
@@ -70,10 +75,18 @@
       icon: "hero-server-stack",
       title: "No virtual machines",
       description: "You don't have permission to create virtual machines."
-    }.merge(has_project_permission("Vm:create") ? {
-      description: "Get started by creating a new virtual machine.",
-      button_link: "#{@project_data[:path]}/vm/create",
-      button_title: "New Virtual Machine"
-    } : {})
+    }.merge(
+      (
+        if has_project_permission("Vm:create")
+          {
+            description: "Get started by creating a new virtual machine.",
+            button_link: "#{@project_data[:path]}/vm/create",
+            button_title: "New Virtual Machine"
+          }
+        else
+          {}
+        end
+      )
+    )
   ) %>
 <% end %>

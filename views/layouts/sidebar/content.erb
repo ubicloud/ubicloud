@@ -32,8 +32,8 @@
                 url: "#{@project_data[:path]}/private-subnet",
                 is_active:
                   request.path.start_with?("#{@project_data[:path]}/private-subnet") ||
-                  request.path.start_with?("#{@project_data[:path]}/firewall") ||
-                  request.path.start_with?("#{@project_data[:path]}/load-balancer"),
+                    request.path.start_with?("#{@project_data[:path]}/firewall") ||
+                    request.path.start_with?("#{@project_data[:path]}/load-balancer"),
                 icon: "hero-globe-alt"
               }
             ) %>
@@ -118,7 +118,7 @@
         </li>
       <% end %>
       <% if @project_data && has_project_permission("Project:github") %>
-              <li>
+        <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
             <% if Config.github_app_name %>
