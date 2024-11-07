@@ -20,4 +20,42 @@ class Clover
       view "networking/load_balancer/index"
     end
   end
+
+  def load_balancer_post(name)
+    Authorization.authorize(current_account.id, "LoadBalancer:create", @project.id)
+
+    required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol]
+    required_parameters << "name" if web?
+    optional_parameters = %w[health_check_endpoint]
+    request_body_params = Validation.validate_request_body(json_params, required_parameters, optional_parameters)
+
+    ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
+    unless ps
+      response.status = 404
+      if api?
+        request.halt
+      else
+        flash["error"] = "Private subnet not found"
+        request.redirect "#{@project.path}/load-balancer/create"
+      end
+    end
+    Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
+
+    lb = Prog::Vnet::LoadBalancerNexus.assemble(
+      ps.id,
+      name: name,
+      algorithm: request_body_params["algorithm"],
+      src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
+      dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
+      health_check_endpoint: request_body_params["health_check_endpoint"],
+      health_check_protocol: request_body_params["health_check_protocol"]
+    ).subject
+
+    if api?
+      Serializers::LoadBalancer.serialize(lb, {detailed: true})
+    else
+      flash["notice"] = "'#{name}' is created"
+      request.redirect "#{@project.path}#{lb.path}"
+    end
+  end
 end
