@@ -398,7 +398,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect { nx.setup_environment }.to hop("register_runner")
     end
 
-    it "hops to stop_service with after enabling transparent cache" do
+    it "hops to register_runner with after enabling transparent cache" do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx", get_ff_transparent_cache: true)).at_least(:once)
@@ -413,41 +413,7 @@ RSpec.describe Prog::Vm::GithubRunner do
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment
       COMMAND
 
-      expect { nx.setup_environment }.to hop("stop_service")
-    end
-  end
-
-  describe "#stop_service" do
-    it "stops service" do
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
-        sudo systemctl stop cache-proxy.service
-        sudo systemctl disable cache-proxy.service
-      COMMAND
-
-      expect { nx.stop_service }.to hop("download_proxy")
-    end
-  end
-
-  describe "#download_proxy" do
-    it "hops to start_proxy" do
-      expect(Config).to receive_messages(github_cache_proxy_repo_uri: "https://github.com/foo/cache_proxy")
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
-        sudo rm -rf cache-proxy
-        sudo git clone https://github.com/foo/cache_proxy cache-proxy
-      COMMAND
-
-      expect { nx.download_proxy }.to hop("start_proxy")
-    end
-  end
-
-  describe "#start_proxy" do
-    it "hops to register_runner" do
-      expect(sshable).to receive(:cmd).with(<<~COMMAND)
-        cd cache-proxy
-        go run transparent_cache_proxy.go > ~/cacheproxy.log 2>&1 &
-      COMMAND
-
-      expect { nx.start_proxy }.to hop("register_runner")
+      expect { nx.setup_environment }.to hop("register_runner")
     end
   end
 
