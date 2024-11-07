@@ -44,6 +44,10 @@ Layout/SpaceInsideHashLiteralBraces:
   Exclude:
     - 'views/**/*.erb'
 
+Layout/AssignmentIndentation:
+  Exclude:
+    - 'views/**/*.erb'
+
 RSpec/ExampleLength:
   Enabled: false
 
