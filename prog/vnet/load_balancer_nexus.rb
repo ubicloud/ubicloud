@@ -51,8 +51,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
 
     when_rewrite_dns_records_set? do
-      rewrite_dns_records
-      decr_rewrite_dns_records
+      hop_rewrite_dns_records
     end
 
     if load_balancer.need_certificates?
@@ -60,7 +59,25 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       hop_create_new_cert
     end
 
+    if need_to_rewrite_dns_records?
+      load_balancer.incr_rewrite_dns_records
+    end
+
     nap 5
+  end
+
+  def need_to_rewrite_dns_records?
+    load_balancer.vms_to_dns.each do |vm|
+      if load_balancer.ipv4_enabled? && vm.ephemeral_net4
+        return true unless load_balancer.dns_zone.records_dataset.find { _1.name == load_balancer.hostname + "." && _1.type == "A" && _1.data == vm.ephemeral_net4.to_s }
+      end
+
+      if load_balancer.ipv6_enabled?
+        return true unless load_balancer.dns_zone.records_dataset.find { _1.name == load_balancer.hostname + "." && _1.type == "AAAA" && _1.data == vm.ephemeral_net6.nth(2).to_s }
+      end
+    end
+
+    false
   end
 
   label def create_new_cert
@@ -140,7 +157,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     nap 5
   end
 
-  def rewrite_dns_records
+  label def rewrite_dns_records
+    decr_rewrite_dns_records
+
     load_balancer.dns_zone&.delete_record(record_name: load_balancer.hostname)
 
     load_balancer.vms_to_dns.each do |vm|
@@ -164,5 +183,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         )
       end
     end
+
+    hop_wait
   end
 end
