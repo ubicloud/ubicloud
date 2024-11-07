@@ -44,7 +44,7 @@ class Clover
 
     lb = Prog::Vnet::LoadBalancerNexus.assemble(
       ps.id,
-      name: name,
+      name:,
       algorithm: request_body_params["algorithm"],
       src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),
       dst_port: Validation.validate_port(:dst_port, request_body_params["dst_port"]),
