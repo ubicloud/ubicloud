@@ -1,27 +1,6 @@
 # frozen_string_literal: true
 
 class Routes::Common::LoadBalancerHelper < Routes::Common::Base
-  def list
-    dataset = project.load_balancers_dataset
-    dataset = dataset.join(:private_subnet, id: Sequel[:load_balancer][:private_subnet_id]).where(location: @location).select_all(:load_balancer) if @location
-    if @mode == AppMode::API
-      result = dataset.authorized(@user.id, "LoadBalancer:view").paginated_result(
-        start_after: @request.params["start_after"],
-        page_size: @request.params["page_size"],
-        order_column: @request.params["order_column"]
-      )
-
-      {
-        items: Serializers::LoadBalancer.serialize(result[:records]),
-        count: result[:count]
-      }
-    else
-      lbs = Serializers::LoadBalancer.serialize(dataset.authorized(@user.id, "LoadBalancer:view").all, {include_path: true})
-      @app.instance_variable_set(:@lbs, lbs)
-      @app.view "networking/load_balancer/index"
-    end
-  end
-
   def post(name: nil)
     Authorization.authorize(@user.id, "LoadBalancer:create", project.id)
 
