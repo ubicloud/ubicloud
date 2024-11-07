@@ -32,13 +32,7 @@ class Clover
 
     ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
     unless ps
-      response.status = 404
-      if api?
-        request.halt
-      else
-        flash["error"] = "Private subnet not found"
-        request.redirect "#{@project.path}/load-balancer/create"
-      end
+      fail InvalidRequestError.new("Private subnet not found")
     end
     Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
 

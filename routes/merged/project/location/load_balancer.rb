@@ -27,13 +27,7 @@ class Clover
         vm = Vm.from_ubid(request_body_params["vm_id"])
 
         unless vm
-          response.status = 404
-          if api?
-            r.halt
-          else
-            flash["error"] = "VM not found"
-            r.redirect "#{@project.path}#{lb.path}"
-          end
+          fail InvalidRequestError.new("VM not found")
         end
 
         Authorization.authorize(current_account.id, "Vm:view", vm.id)
@@ -90,8 +84,7 @@ class Clover
           vm_id = vm_id.delete("\"")
           vm = Vm.from_ubid(vm_id)
           unless vm
-            response.status = 404
-            r.halt
+            fail InvalidRequestError.new("VM not found")
           end
 
           Authorization.authorize(current_account.id, "Vm:view", vm.id)

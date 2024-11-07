@@ -15,9 +15,7 @@ class Clover
           Authorization.authorize(current_account.id, "Firewall:view", fw.id)
           ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
           unless ps && ps.location == @location
-            flash["error"] = "Private subnet not found"
-            response.status = 404
-            r.redirect "#{@project.path}#{fw.path}"
+            fail InvalidRequestError.new("Private subnet not found")
           end
 
           Authorization.authorize(current_account.id, "PrivateSubnet:edit", ps.id)
@@ -35,9 +33,7 @@ class Clover
           Authorization.authorize(current_account.id, "Firewall:view", fw.id)
           ps = PrivateSubnet.from_ubid(r.params["private-subnet-id"])
           unless ps && ps.location == @location
-            flash["error"] = "Private subnet not found"
-            response.status = 404
-            r.redirect "#{@project.path}#{fw.path}"
+            fail InvalidRequestError.new("Private subnet not found")
           end
 
           Authorization.authorize(current_account.id, "PrivateSubnet:edit", ps.id)
