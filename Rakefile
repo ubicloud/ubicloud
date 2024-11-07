@@ -184,28 +184,31 @@ task "coverage" => [:coverage_spec]
   task "frozen_#{task_suffix}" do
     block.call("CLOVER_FREEZE" => "1")
   end
+end
 
-  desc "Run specs#{desc_suffix} with coverage"
-  task "coverage_#{task_suffix}" do
-    block.call("COVERAGE" => "1")
-    if task_suffix == "pspec" || (task_suffix == "spec" && auto_parallel_tests.call)
-      # turbo_tests with coverage does not fail if coverage is not 100%,
-      # because it forks and each worker until the last is likely to have
-      # failing tests.  Check the generated coverage output after specs run to
-      # see if it is 100%.
-      coverage_output = File.binread("coverage/index.html")
+desc "Run specs with coverage"
+task "coverage_spec" do
+  Rake::Task[auto_parallel_tests.call ? "coverage_pspec" : "coverage_sspec"].invoke
+end
 
-      # Results for the entire run are before the results for individual files,
-      # so this will get the results for the entire run.
-      lines_missed = %r{<b>(\d+)</b> lines missed\.}.match(coverage_output)[1]
-      branches_missed = %r{<b>(\d+)</b> branches missed\.}.match(coverage_output)[1]
+desc "Run specs in serial with coverage"
+task "coverage_sspec" do
+  rspec.call("COVERAGE" => "1")
+end
 
-      unless lines_missed == "0" && branches_missed == "0"
-        warn "SimpleCov failed with exit 2 due to a coverage related error"
-        exit(2)
-      end
-    end
+desc "Run specs in parallel with coverage"
+task "coverage_pspec" do
+  Dir.mkdir("coverage") unless File.directory?("coverage")
+  output_file = "coverage/output.txt"
+  command = "bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}"
+  sh({"RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1"}, command)
+  command_output = File.binread(output_file)
+  unless command_output.include?("Line Coverage: 100.0%") && command_output.include?("Branch Coverage: 100.0%")
+    warn "SimpleCov failed with exit 2 due to a coverage related error"
+    exit(2)
   end
+ensure
+  File.delete(output_file) if File.file?(output_file)
 end
 
 # Other
