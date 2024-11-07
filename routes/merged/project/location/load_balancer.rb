@@ -21,7 +21,7 @@ class Clover
         request.halt
       end
 
-      r.post "attach-vm" do
+      r.post %w[attach-vm detach-vm] do |action|
         Authorization.authorize(current_account.id, "LoadBalancer:edit", lb.id)
         required_parameters = %w[vm_id]
         request_body_params = Validation.validate_request_body(json_params, required_parameters)
@@ -39,47 +39,23 @@ class Clover
 
         Authorization.authorize(current_account.id, "Vm:view", vm.id)
 
-        if vm.load_balancer
-          flash["error"] = "VM is already attached to a load balancer"
-          response.status = 400
-          r.redirect "#{@project.path}#{lb.path}"
-        end
-
-        lb.add_vm(vm)
-
-        if api?
-          Serializers::LoadBalancer.serialize(lb, {detailed: true})
-        else
-          flash["notice"] = "VM is attached"
-          r.redirect "#{@project.path}#{lb.path}"
-        end
-      end
-
-      r.post "detach-vm" do
-        Authorization.authorize(current_account.id, "LoadBalancer:edit", lb.id)
-        required_parameters = %w[vm_id]
-        request_body_params = Validation.validate_request_body(json_params, required_parameters)
-
-        vm = Vm.from_ubid(request_body_params["vm_id"])
-        unless vm
-          response.status = 404
-
-          if api?
-            r.halt
-          else
-            flash["error"] = "VM not found"
+        if action == "attach-vm"
+          if vm.load_balancer
+            flash["error"] = "VM is already attached to a load balancer"
+            response.status = 400
             r.redirect "#{@project.path}#{lb.path}"
           end
+          lb.add_vm(vm)
+          actioned = "attached"
+        else
+          lb.detach_vm(vm)
+          actioned = "detached"
         end
-
-        Authorization.authorize(current_account.id, "Vm:view", vm.id)
-
-        lb.detach_vm(vm)
 
         if api?
           Serializers::LoadBalancer.serialize(lb, {detailed: true})
         else
-          flash["notice"] = "VM is detached"
+          flash["notice"] = "VM is #{actioned} from the load balancer"
           r.redirect "#{@project.path}#{lb.path}"
         end
       end
