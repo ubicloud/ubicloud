@@ -90,31 +90,27 @@ class Clover
           health_check_endpoint: request_body_params["health_check_endpoint"]
         )
 
-        request_body_params["vms"].each do |vm_id|
-          vm_id = vm_id.delete("\"")
-          vm = Vm.from_ubid(vm_id)
+        new_vms = request_body_params["vms"].map { Vm.from_ubid(_1.delete("\"")) }
+        new_vms.each do |vm|
           unless vm
             response.status = 404
             r.halt
           end
 
           Authorization.authorize(current_account.id, "Vm:view", vm.id)
-          if vm.load_balancer && vm.load_balancer.id != lb.id
-            fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
-          elsif vm.load_balancer && vm.load_balancer.id == lb.id
-            next
+          if vm.load_balancer
+            next if vm.load_balancer.id == lb.id
+            fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
           end
-
           lb.add_vm(vm)
         end
 
-        lb.vms.map { _1.ubid }.reject { request_body_params["vms"].map { |vm_id| vm_id.delete("\"") }.include?(_1) }.each do |vm_id|
-          vm = Vm.from_ubid(vm_id)
+        lb.vms.each do |vm|
+          next if new_vms.any? { _1.id == vm.id }
           lb.evacuate_vm(vm)
           lb.remove_vm(vm)
         end
 
-        response.status = 200
         lb.incr_update_load_balancer
         Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
