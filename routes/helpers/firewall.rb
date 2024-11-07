@@ -22,7 +22,6 @@ class Clover
   def firewall_post(firewall_name)
     Authorization.authorize(current_account.id, "Firewall:create", @project.id)
     Validation.validate_name(firewall_name)
-    @location ||= LocationNameConverter.to_internal_name(request.params["location"])
 
     description = if api?
       Validation.validate_request_body(request.body.read, [], ["description"])["description"] || ""
