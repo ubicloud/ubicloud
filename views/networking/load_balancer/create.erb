@@ -9,9 +9,9 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["Load Balancers", "#{@project_data[:path]}/load-balancer"],
-        %w[Create #]
-      ]
-    }
+        %w[Create #],
+      ],
+    },
   ) %>
   <%== render("components/page_header", locals: { title: "Create Load Balancer" }) %>
 </div>
@@ -35,9 +35,9 @@
                     label: "Name",
                     attributes: {
                       required: true,
-                      placeholder: "Enter name"
-                    }
-                  }
+                      placeholder: "Enter name",
+                    },
+                  },
                 ) %>
               </div>
             </div>
@@ -49,8 +49,8 @@
                     name: "private_subnet_id",
                     label: "Private Subnet",
                     options: @subnets.map { |s| [s[:id], s[:name]] },
-                    placeholder: "Select private subnet"
-                  }
+                    placeholder: "Select private subnet",
+                  },
                 ) %>
               </div>
             </div>
@@ -61,8 +61,8 @@
                   locals: {
                     name: "algorithm",
                     label: "Load Balancing Algorithm",
-                    options: ["Round Robin", "Hash Based"].map { |a| [a.downcase.tr(" ", "_"), a] }
-                  }
+                    options: ["Round Robin", "Hash Based"].map { |a| [a.downcase.tr(" ", "_"), a] },
+                  },
                 ) %>
               </div>
             </div>
@@ -84,9 +84,9 @@
                     type: "number",
                     attributes: {
                       required: true,
-                      placeholder: "80"
-                    }
-                  }
+                      placeholder: "80",
+                    },
+                  },
                 ) %>
               </div>
               <div class="col-span-6 md:col-span-2 xl:col-span-1">
@@ -98,9 +98,9 @@
                     type: "number",
                     attributes: {
                       required: true,
-                      placeholder: "80"
-                    }
-                  }
+                      placeholder: "80",
+                    },
+                  },
                 ) %>
               </div>
             </div>
@@ -120,9 +120,9 @@
                     name: "health_check_endpoint",
                     label: "HTTP Health Check Endpoint",
                     attributes: {
-                      placeholder: "/up"
-                    }
-                  }
+                      placeholder: "/up",
+                    },
+                  },
                 ) %>
               </div>
               <div class="col-span-6 md:col-span-2 xl:col-span-1">
@@ -134,9 +134,9 @@
                     options: %w[http https tcp].map { |p| [p, p.upcase] },
                     placeholder: "Select health check protocol",
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </div>
             </div>

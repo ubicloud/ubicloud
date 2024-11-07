@@ -9,16 +9,16 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-        [@pg[:name], "#"]
-      ]
-    }
+        [@pg[:name], "#"],
+      ],
+    },
   ) %>
   <%== render(
     "components/page_header",
     locals: {
       title: @pg[:name],
-      right_items: [render("components/pg_state_label", locals: { state: @pg[:state], extra_class: "text-md" })]
-    }
+      right_items: [render("components/pg_state_label", locals: { state: @pg[:state], extra_class: "text-md" })],
+    },
   ) %>
 </div>
 <div class="grid gap-6">
@@ -29,7 +29,7 @@
     ["Location", @pg[:location]],
     ["Compute", @pg[:vm_size]],
     ["Storage", "#{@pg[:storage_size_gib]} GB"],
-    ["Version", "Postgres #{@pg[:version]}"]
+    ["Version", "Postgres #{@pg[:version]}"],
   ]
   
   case @pg[:ha_type]
@@ -141,8 +141,8 @@
                     name: "restore_target",
                     default_date: @pg[:latest_restore_time],
                     max_date: @pg[:latest_restore_time],
-                    min_date: @pg[:earliest_restore_time]
-                  }
+                    min_date: @pg[:earliest_restore_time],
+                  },
                 ) %>
               </div>
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
@@ -173,10 +173,10 @@
                     name: "password",
                     type: "password",
                     attributes: {
-                      required: true
+                      required: true,
                     },
-                    extra_class: "reset-superuser-password-new-password"
-                  }
+                    extra_class: "reset-superuser-password-new-password",
+                  },
                 ) %>
               </div>
               <div class="col-span-12 sm:col-span-5">
@@ -187,10 +187,10 @@
                     name: "repeat_password",
                     type: "password",
                     attributes: {
-                      required: true
+                      required: true,
                     },
-                    extra_class: "reset-superuser-password-new-password-repeat"
-                  }
+                    extra_class: "reset-superuser-password-new-password-repeat",
+                  },
                 ) %>
               </div>
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
@@ -249,9 +249,9 @@
                       type: "cidr",
                       attributes: {
                         placeholder: "0.0.0.0/0",
-                        required: true
-                      }
-                    }
+                        required: true,
+                      },
+                    },
                   ) %>
                 </td>
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
@@ -322,10 +322,10 @@
                       type: "password",
                       attributes: {
                         required: true,
-                        autocomplete: "new-password"
+                        autocomplete: "new-password",
                       },
-                      extra_class: "metric-destination-password"
-                    }
+                      extra_class: "metric-destination-password",
+                    },
                   ) %>
                 </td>
                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">

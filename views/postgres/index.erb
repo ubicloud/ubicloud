@@ -4,18 +4,18 @@
   "standard" => [
     "Ubicloud",
     "PostgreSQL Database",
-    "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."
+    "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases.",
   ],
   "paradedb" => [
     "ParadeDB",
     "ParadeDB PostgreSQL Database",
-    "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."
+    "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads.",
   ],
   "lantern" => [
     "Lantern",
     "Lantern PostgreSQL Database",
-    "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."
-  ]
+    "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads.",
+  ],
 }.compact %>
 
 <% if @postgres_databases.count > 0 %>
@@ -24,8 +24,8 @@
       "components/breadcrumb",
       locals: {
         back: @project_data[:path],
-        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
-      }
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]],
+      },
     ) %>
 
     <div class="md:flex md:items-center md:justify-between pb-4 lg:pb-8">
@@ -38,7 +38,11 @@
             <%== render("components/button", locals: { text: "Create PostgreSQL Database", right_icon: "hero-chevron-down" }) %>
           </div>
           <div
-            class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+            class="
+              hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition
+              ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white
+              shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none
+            "
             role="menu"
             tabindex="-1"
           >
@@ -102,9 +106,9 @@
         parts: [
           %w[Projects /project],
           [@project_data[:name], @project_data[:path]],
-          ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"]
-        ]
-      }
+          ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
+        ],
+      },
     ) %>
 
     <%== render("components/page_header", locals: { title: "Create PostgreSQL Database" }) %>

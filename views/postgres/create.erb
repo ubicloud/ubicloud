@@ -18,17 +18,17 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-        %w[Create #]
-      ]
-    }
+        %w[Create #],
+      ],
+    },
   ) %>
 
   <%== render(
     "components/page_header",
     locals: {
       title: @page_title,
-      right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
-    }
+      right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil],
+    },
   ) %>
 </div>
 
@@ -50,9 +50,9 @@
                     label: "Name",
                     attributes: {
                       required: true,
-                      placeholder: "Enter name"
-                    }
-                  }
+                      placeholder: "Enter name",
+                    },
+                  },
                 ) %>
               </div>
               <div class="col-span-full">
@@ -65,9 +65,9 @@
                     options: locations,
                     selected: locations.first[0],
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </div>
               <div class="col-span-full">
@@ -104,10 +104,12 @@
                             <%= disabled ? "disabled" : "" %>
                           >
                           <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
-                                <%= disabled ? "opacity-50" : "" %>"
+                            class="
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
+                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
+                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
+                              <%= disabled ? "opacity-50" : "" %>
+                            "
                           >
                             <span class="flex flex-col">
                               <span class="text-md font-semibold"><%= size.display_name %></span>
@@ -153,9 +155,11 @@
                             <%= (flash.dig("old", "storage_size") == storage_size.to_s || flash.dig("old", "storage_size").nil? && idx == 0) ? "checked" : "" %>
                           >
                           <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
+                            class="
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
+                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
+                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
+                            "
                           >
                             <span class="text-md font-semibold storage-size-label"><%= storage_size %>GB</span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
@@ -180,9 +184,9 @@
                     options: versions.map { |v| [v, "Postgres #{v}"] },
                     selected: versions[0],
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </div>
 
@@ -204,9 +208,11 @@
                             <%= (flash.dig("old", "ha_type") == ha_type.name || flash.dig("old", "ha_type").nil? && idx == 0) ? "checked" : "" %>
                           >
                           <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
+                            class="
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
+                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
+                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
+                            "
                           >
                             <span class="flex flex-col">
                               <span class="text-md font-semibold"><%= ha_type.title %></span>
@@ -269,10 +275,10 @@
                             "1",
                             "Accept <a href='https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://paradedb.notion.site/Privacy-Policy-a7ce333c45c8478fb03250dff7e573b7?pvs=4' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>",
                             {},
-                            { required: true }
-                          ]
-                        ]
-                      }
+                            { required: true },
+                          ],
+                        ],
+                      },
                     ) %>
                   </div>
                 </div>
@@ -305,10 +311,10 @@
                             "1",
                             "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>",
                             {},
-                            { required: true }
-                          ]
-                        ]
-                      }
+                            { required: true },
+                          ],
+                        ],
+                      },
                     ) %>
                   </div>
                 </div>

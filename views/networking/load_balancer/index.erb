@@ -41,20 +41,20 @@
       locals: {
         icon: "hero-arrows-pointing-out",
         title: "No Load Balancers",
-        description: "You don't have permission to create Load Balancers."
+        description: "You don't have permission to create Load Balancers.",
       }.merge(
         (
           if has_project_permission("LoadBalancer:create")
             {
               description: "Get started by creating a new Load Balancer.",
               button_link: "#{@project_data[:path]}/load-balancer/create",
-              button_title: "New Load Balancer"
+              button_title: "New Load Balancer",
             }
           else
             {}
           end
-        )
-      )
+        ),
+      ),
     ) %>
   </div>
 <% end %>

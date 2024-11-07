@@ -9,9 +9,9 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
-        [@lb[:name], "#"]
-      ]
-    }
+        [@lb[:name], "#"],
+      ],
+    },
   ) %>
   <%== render("components/page_header", locals: { title: @lb[:name] }) %>
 </div>
@@ -27,14 +27,14 @@
         [
           "Private Subnet",
           "<a href='#{@project_data[:path]}/location/#{@lb[:location]}/private-subnet/#{@lb[:subnet]}' class='text-rose-500 hover:underline'>#{@lb[:subnet]}</a>",
-          { escape: false }
+          { escape: false },
         ],
         ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
         ["Load Balancer Port", @lb[:src_port]],
         ["Application Port", @lb[:dst_port]],
-        ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
-      ]
-    }
+        ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]],
+      ],
+    },
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
@@ -87,9 +87,9 @@
                     placeholder: "Select a VM",
                     options: @attachable_vms.map { |s| [s[:id], s[:name]] },
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
@@ -120,8 +120,8 @@
               "components/delete_button",
               locals: {
                 confirmation: @lb[:name],
-                redirect: "#{@project_data[:path]}/load-balancer"
-              }
+                redirect: "#{@project_data[:path]}/load-balancer",
+              },
             ) %>
           </div>
         </div>

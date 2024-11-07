@@ -5,8 +5,8 @@
     "components/breadcrumb",
     locals: {
       back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
-    }
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]],
+    },
   ) %>
   <%== render("components/page_header", locals: { title: "Project Settings" }) %>
 </div>
@@ -32,18 +32,18 @@
                     value: @project_data[:name],
                     button_title: "Save",
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ),
-                { escape: false }
+                { escape: false },
               ]
             else
               ["Name", @project_data[:name]]
             end
-          )
-        ]
-      }
+          ),
+        ],
+      },
     ) %>
   </form>
   <!-- Quota Card -->
@@ -64,8 +64,8 @@
             locals: {
               title: quota[:resource_type],
               numerator: quota[:current_resource_usage],
-              denominator: quota[:quota]
-            }
+              denominator: quota[:quota],
+            },
           ) %>
         </div>
       <% end %>

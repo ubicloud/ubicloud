@@ -11,9 +11,9 @@
           %w[Projects /project],
           [@project_data[:name], @project_data[:path]],
           ["GitHub Runners", "#{@project_data[:path]}/github"],
-          %w[Settings #]
-        ]
-      }
+          %w[Settings #],
+        ],
+      },
     ) %>
     <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
   </div>
@@ -34,8 +34,8 @@
             "components/button",
             locals: {
               text: "Connect New Account",
-              link: "#{@project_data[:path]}/github/installation/create"
-            }
+              link: "#{@project_data[:path]}/github/installation/create",
+            },
           ) %>
         </div>
       </div>
@@ -67,8 +67,8 @@
         title: "No billing information",
         description:
           "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
-        button_title: "New Billing Information"
-      }
+        button_title: "New Billing Information",
+      },
     ) %>
   </form>
 <% else %>
@@ -79,7 +79,7 @@
       title: "No Connected Accounts",
       description: "Get started by installing our GitHub app to your user or organization account.",
       button_link: "#{@project_data[:path]}/github/installation/create",
-      button_title: "Connect New Account"
-    }
+      button_title: "Connect New Account",
+    },
   ) %>
 <% end %>

@@ -17,8 +17,8 @@
     "components/form/hidden",
     locals: {
       name: rodauth.webauthn_auth_challenge_hmac_param,
-      value: rodauth.compute_hmac(cred.challenge)
-    }
+      value: rodauth.compute_hmac(cred.challenge),
+    },
   ) %>
   <input id="webauthn-auth" class="hidden" type="text" name="<%= rodauth.webauthn_auth_param %>" value="" hidden/>
   <div id="webauthn-auth-button" class="flex flex-col text-center">

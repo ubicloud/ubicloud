@@ -6,8 +6,8 @@
       "components/breadcrumb",
       locals: {
         back: @project_data[:path],
-        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
-      }
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]],
+      },
     ) %>
     <%== render("components/page_header", locals: { title: "Project Billing" }) %>
   </div>
@@ -60,9 +60,9 @@
                       value: @billing_info_data[:name],
                       attributes: {
                         required: true,
-                        placeholder: "Individual or Company Name"
-                      }
-                    }
+                        placeholder: "Individual or Company Name",
+                      },
+                    },
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
@@ -74,9 +74,9 @@
                       value: @billing_info_data[:email],
                       attributes: {
                         required: true,
-                        placeholder: "Billing Email"
-                      }
-                    }
+                        placeholder: "Billing Email",
+                      },
+                    },
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
@@ -85,9 +85,9 @@
                     locals: {
                       selected: @billing_info_data[:country],
                       attributes: {
-                        required: true
-                      }
-                    }
+                        required: true,
+                      },
+                    },
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
@@ -98,9 +98,9 @@
                       label: "State",
                       value: @billing_info_data[:state],
                       attributes: {
-                        placeholder: "State"
-                      }
-                    }
+                        placeholder: "State",
+                      },
+                    },
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
@@ -111,9 +111,9 @@
                       label: "City",
                       value: @billing_info_data[:city],
                       attributes: {
-                        placeholder: "City"
-                      }
-                    }
+                        placeholder: "City",
+                      },
+                    },
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
@@ -124,9 +124,9 @@
                       label: "Postal Code",
                       value: @billing_info_data[:postal_code],
                       attributes: {
-                        placeholder: "Postal Code"
-                      }
-                    }
+                        placeholder: "Postal Code",
+                      },
+                    },
                   ) %>
                 </div>
                 <div class="col-span-full">
@@ -137,9 +137,9 @@
                       label: "Address",
                       value: @billing_info_data[:address],
                       attributes: {
-                        required: true
-                      }
-                    }
+                        required: true,
+                      },
+                    },
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
@@ -148,8 +148,8 @@
                     locals: {
                       name: "tax_id",
                       label: "Tax ID (Optional)",
-                      value: @billing_info_data[:tax_id]
-                    }
+                      value: @billing_info_data[:tax_id],
+                    },
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
@@ -158,8 +158,8 @@
                     locals: {
                       name: "company_name",
                       label: "Company Name (Optional)",
-                      value: @billing_info_data[:company_name]
-                    }
+                      value: @billing_info_data[:company_name],
+                    },
                   ) %>
                 </div>
               </div>
@@ -187,8 +187,8 @@
             "components/button",
             locals: {
               text: "Add Payment Method",
-              link: "#{@project_data[:path]}/billing/payment-method/create"
-            }
+              link: "#{@project_data[:path]}/billing/payment-method/create",
+            },
           ) %>
         </div>
       </div>
@@ -217,8 +217,8 @@
                       locals: {
                         url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
                         csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
-                        confirmation: pm[:last4]
-                      }
+                        confirmation: pm[:last4],
+                      },
                     ) %>
                   </td>
                 </tr>
@@ -299,8 +299,8 @@
         icon: "hero-banknotes",
         title: "No billing information",
         description: "Get started by adding new billing information.",
-        button_title: "Add new billing information"
-      }
+        button_title: "Add new billing information",
+      },
     ) %>
   </form>
 <% end %>
@@ -341,10 +341,10 @@
                     type: "text",
                     attributes: {
                       required: true,
-                      placeholder: "Alert Name"
+                      placeholder: "Alert Name",
                     },
-                    extra_class: "pr-3"
-                  }
+                    extra_class: "pr-3",
+                  },
                 ) %>
               </div>
               <div class="col-span-5 sm:col-span-3">
@@ -356,10 +356,10 @@
                     type: "number",
                     attributes: {
                       required: true,
-                      placeholder: "100"
+                      placeholder: "100",
                     },
-                    extra_class: "pr-3"
-                  }
+                    extra_class: "pr-3",
+                  },
                 ) %>
               </div>
               <div class="col-span-2 sm:col-span-3 flex justify-begin items-end">
@@ -395,8 +395,8 @@
                     locals: {
                       text: "Remove",
                       url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
-                      confirmation: alert[:name]
-                    }
+                      confirmation: alert[:name],
+                    },
                   ) %>
                 </td>
               </tr>

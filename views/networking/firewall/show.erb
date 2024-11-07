@@ -9,9 +9,9 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["Firewall", "#{@project_data[:path]}/firewall"],
-        [@firewall[:name], "#"]
-      ]
-    }
+        [@firewall[:name], "#"],
+      ],
+    },
   ) %>
   <%== render("components/page_header", locals: { title: @firewall[:name] }) %>
 </div>
@@ -24,9 +24,9 @@
         ["ID", @firewall[:id]],
         ["Name", @firewall[:name]],
         ["Location", @firewall[:location]],
-        ["Description", @firewall[:description]]
-      ]
-    }
+        ["Description", @firewall[:description]],
+      ],
+    },
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
@@ -73,9 +73,9 @@
                     type: "cidr",
                     attributes: {
                       placeholder: "0.0.0.0/0",
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
@@ -137,9 +137,9 @@
                     placeholder: "Select a subnet",
                     options: @attachable_subnets.map { |s| [s[:id], s[:name]] },
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
@@ -168,8 +168,8 @@
               "components/delete_button",
               locals: {
                 confirmation: @firewall[:name],
-                redirect: "#{@project_data[:path]}/firewall"
-              }
+                redirect: "#{@project_data[:path]}/firewall",
+              },
             ) %>
           </div>
         </div>

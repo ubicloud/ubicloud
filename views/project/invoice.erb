@@ -9,9 +9,9 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["Billing", "#{@project_data[:path]}/billing"],
-        ["#{@invoice_data[:name]} Invoice", "#"]
-      ]
-    }
+        ["#{@invoice_data[:name]} Invoice", "#"],
+      ],
+    },
   ) %>
   <%== render(
     "components/page_header",
@@ -24,12 +24,12 @@
             text: "View PDF",
             link: "#{request.url}?pdf=1",
             attributes: {
-              target: "_blank"
-            }
-          }
-        )
-      ]
-    }
+              target: "_blank",
+            },
+          },
+        ),
+      ],
+    },
   ) %>
 </div>
 <div class="grid gap-6">

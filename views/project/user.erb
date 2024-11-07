@@ -5,8 +5,8 @@
     "components/breadcrumb",
     locals: {
       back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]]
-    }
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]],
+    },
   ) %>
   <%== render("components/page_header", locals: { title: "User Management" }) %>
 </div>
@@ -44,9 +44,9 @@
                     type: "email",
                     attributes: {
                       required: true,
-                      placeholder: "Email"
-                    }
-                  }
+                      placeholder: "Email",
+                    },
+                  },
                 ) %>
               </div>
               <div class="col-span-12 sm:col-span-3">
@@ -92,8 +92,8 @@
                     "components/form/policy_select",
                     locals: {
                       name: "user_policies[#{user[:ubid]}]",
-                      selected: @user_policies[user[:ubid]]
-                    }
+                      selected: @user_policies[user[:ubid]],
+                    },
                   ) %>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
@@ -102,8 +102,8 @@
                     locals: {
                       text: "Remove",
                       url: "#{@project_data[:path]}/user/#{user[:ubid]}",
-                      confirmation: user[:email]
-                    }
+                      confirmation: user[:email],
+                    },
                   ) %>
                 </td>
 
@@ -114,7 +114,9 @@
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%= invitation[:email] %>
                   <span
-                    class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
+                    class="
+                      inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800
+                    "
                   >
                     Invitation expires on
                     <%= invitation[:expires_at] %>
@@ -125,8 +127,8 @@
                     "components/form/policy_select",
                     locals: {
                       name: "invitation_policies[#{invitation[:email]}]",
-                      selected: invitation[:policy]
-                    }
+                      selected: invitation[:policy],
+                    },
                   ) %>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
@@ -135,8 +137,8 @@
                     locals: {
                       text: "Remove",
                       url: "#{@project_data[:path]}/user/invitation/#{invitation[:email]}",
-                      confirmation: invitation[:email]
-                    }
+                      confirmation: invitation[:email],
+                    },
                   ) %>
                 </td>
               </tr>

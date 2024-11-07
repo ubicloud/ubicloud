@@ -41,20 +41,20 @@
       locals: {
         icon: "hero-x-circle",
         title: "No firewalls",
-        description: "You don't have permission to create firewalls."
+        description: "You don't have permission to create firewalls.",
       }.merge(
         (
           if has_project_permission("Firewall:create")
             {
               description: "Get started by creating a new firewall.",
               button_link: "#{@project_data[:path]}/firewall/create",
-              button_title: "New Firewall"
+              button_title: "New Firewall",
             }
           else
             {}
           end
-        )
-      )
+        ),
+      ),
     ) %>
   </div>
 <% end %>

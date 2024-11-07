@@ -11,8 +11,8 @@
                 locals: {
                   content: value,
                   message: "Copied #{name}",
-                  revealable: opts[:revealable]
-                }
+                  revealable: opts[:revealable],
+                },
               ) %>
             <% elsif opts && opts[:revealable] && value %>
               <%== render("components/revealable_content", locals: { content: value }) %>

@@ -23,8 +23,8 @@
                     locals: {
                       text: rodauth.otp_disable_link_text,
                       link: rodauth.otp_disable_path,
-                      type: "danger"
-                    }
+                      type: "danger",
+                    },
                   ) %>
                 <% else %>
                   <%== render("components/button", locals: { text: rodauth.otp_setup_link_text, link: rodauth.otp_setup_path }) %>
@@ -46,8 +46,8 @@
                     locals: {
                       text: rodauth.webauthn_remove_link_text,
                       link: rodauth.webauthn_remove_path,
-                      type: "danger"
-                    }
+                      type: "danger",
+                    },
                   ) %>
                 <% end %>
               </div>
@@ -73,8 +73,8 @@
                 locals: {
                   text: rodauth.two_factor_disable_link_text,
                   link: rodauth.two_factor_disable_path,
-                  type: "danger"
-                }
+                  type: "danger",
+                },
               ) %>
             </div>
           <% end %>

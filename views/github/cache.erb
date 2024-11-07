@@ -9,9 +9,9 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["GitHub Runners", "#{@project_data[:path]}/github"],
-        %w[Caches #]
-      ]
-    }
+        %w[Caches #],
+      ],
+    },
   ) %>
   <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
 </div>
@@ -47,7 +47,9 @@
               </td>
               <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
                 <div
-                  class="inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800"
+                  class="
+                    inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800
+                  "
                   title="<%= entry[:size] %> bytes"
                 >
                   <%= entry[:size_human] %>
