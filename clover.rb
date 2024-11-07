@@ -104,7 +104,7 @@ class Clover < Roda
       @error = error
 
       case e
-      when Sequel::ValidationFailed
+      when Sequel::ValidationFailed, DependencyError
         flash["error"] = @error[:message]
         return redirect_back_with_inputs
       when Validation::ValidationFailed
@@ -324,8 +324,7 @@ class Clover < Roda
       # Do not allow to close account if the project has resources and
       # the account is the only user
       if (project = account.projects.find { _1.accounts.count == 1 && _1.has_resources })
-        flash["error"] = "'#{project.name}' project has some resources. Delete all related resources first."
-        redirect "/project"
+        fail DependencyError.new("'#{project.name}' project has some resources. Delete all related resources first.")
       end
     end
 

@@ -439,9 +439,9 @@ RSpec.describe Clover, "project" do
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
         btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.body).to eq({message: "'#{project.name}' project has some resources. Delete all related resources first."}.to_json)
+        Capybara.current_session.driver.header "Accept", "application/json"
+        response = page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(response).to have_api_error(409, "'#{project.name}' project has some resources. Delete all related resources first.")
 
         visit "/project"
 
