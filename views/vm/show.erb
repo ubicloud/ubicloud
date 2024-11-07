@@ -8,20 +8,15 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/vm",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Virtual Machines", "#{@project_data[:path]}/vm"],
-        [@vm[:name], "#"]
-      ]
-    }
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#{@project_data[:path]}/vm"], [@vm[:name], "#"]],
+    },
   ) %>
   <%== render(
     "components/page_header",
     locals: {
       title: @vm[:name],
-      right_items: [render("components/vm_state_label", locals: { state: @vm[:state], extra_class: "text-md" })]
-    }
+      right_items: [render("components/vm_state_label", locals: { state: @vm[:state], extra_class: "text-md" })],
+    },
   ) %>
 </div>
 <div class="grid gap-6">
@@ -40,17 +35,17 @@
         [
           "SSH Command",
           "<span class='bg-slate-100 text-rose-500 font-mono px-2 py-1 rounded'>#{h("ssh -i <PRIVATE_KEY_PATH> #{@vm[:unix_user]}@#{@vm[:ip4] || @vm[:ip6]}")}</span>",
-          { escape: false }
+          { escape: false },
         ],
         ["Private IPv4", @vm[:private_ipv4], { copieble: true }],
         ["Private IPv6", @vm[:private_ipv6], { copieble: true }],
         [
           "Private subnet",
           "<a href='#{@project_data[:path]}/location/#{@vm[:location]}/private-subnet/#{@vm[:subnet]}' class='text-rose-500 hover:underline'>#{@vm[:subnet]}</a>",
-          { escape: false }
-        ]
-      ]
-    }
+          { escape: false },
+        ],
+      ],
+    },
   ) %>
   <!-- Firewall Rules Card -->
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -75,10 +70,7 @@
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <% if Authorization.has_permission?(current_account.id, "Firewall:view", fw[:id]) %>
-                  <a
-                    href="<%= "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" %>"
-                    class="text-orange-600 hover:text-orange-700"
-                  ><%= fw[:name] %></a>
+                  <a href="<%= "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" %>" class="text-orange-600 hover:text-orange-700"><%= fw[:name] %></a>
                 <% else %>
                   <%= fw[:name] %>
                 <% end %>
@@ -99,8 +91,7 @@
           <div>
             <h3 class="text-base font-semibold leading-6 text-gray-900">Delete virtual machine</h3>
             <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this virtual machine. Deleted data cannot be recovered. Use it
-                carefully.</p>
+              <p>This action will permanently delete this virtual machine. Deleted data cannot be recovered. Use it carefully.</p>
             </div>
           </div>
           <div id="vm-delete-<%=@vm[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">

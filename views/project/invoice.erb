@@ -9,18 +9,16 @@
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["Billing", "#{@project_data[:path]}/billing"],
-        ["#{@invoice_data[:name]} Invoice", "#"]
-      ]
-    }
+        ["#{@invoice_data[:name]} Invoice", "#"],
+      ],
+    },
   ) %>
   <%== render(
     "components/page_header",
     locals: {
       title: "#{@invoice_data[:name]} Invoice",
-      right_items: [
-        render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"} })
-      ]
-    }
+      right_items: [render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: { target: "_blank" } })],
+    },
   ) %>
 </div>
 <div class="grid gap-6">
@@ -30,7 +28,9 @@
       <% if @invoice_data[:status] == "current" %>
         <div class="flex justify-between items-baseline text-gray-800">
           <div class="text-4xl font-semibold">Current Usage Summary</div>
-          <div class="text-right text-3xl"><%= @invoice_data[:begin_time] %> to <%= @invoice_data[:end_time] %></div>
+          <div class="text-right text-3xl"><%= @invoice_data[:begin_time] %>
+            to
+            <%= @invoice_data[:end_time] %></div>
         </div>
         <h3 class="text-lg text-gray-500">
           This invoice will be finalized on the first day of next month.
@@ -52,7 +52,8 @@
           </div>
           <div class="text-right">
             <h2 class="text-3xl font-semibold text-gray-800">
-              Invoice for <%= @invoice_data[:name] %>
+              Invoice for
+              <%= @invoice_data[:name] %>
             </h2>
             <span class="mt-1 block text-gray-500">#<%= @invoice_data[:invoice_number] %></span>
           </div>
@@ -63,12 +64,15 @@
             <h3 class="text-lg font-semibold text-gray-800">
               <%= @invoice_data[:billing_name] %>
               <% if @invoice_data[:company_name] %>
-                - <%= @invoice_data[:company_name] %>
+                -
+                <%= @invoice_data[:company_name] %>
               <% end %>
             </h3>
             <address class="mt-2 not-italic text-gray-500">
               <% if @invoice_data[:tax_id] %>
-                Tax ID: <%= @invoice_data[:tax_id] %> <br>
+                Tax ID:
+                <%= @invoice_data[:tax_id] %>
+                <br>
               <% end %>
               <%= @invoice_data[:billing_address] %>,<br>
               <%= @invoice_data[:billing_city] %>,
@@ -104,14 +108,14 @@
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% if @invoice_data[:items].count > 0 %>
-            <% @invoice_data[:items].each do |item| %>
-              <tr>
-                <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= item[:name] %></td>
-                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500"><%= item[:description] %></td>
-                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500 text-right"><%= item[:usage] %></td>
-                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-right text-sm text-gray-500 sm:pr-6"><%= item[:cost_humanized] %></td>
-              </tr>
-            <% end %>
+              <% @invoice_data[:items].each do |item| %>
+                <tr>
+                  <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= item[:name] %></td>
+                  <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500"><%= item[:description] %></td>
+                  <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500 text-right"><%= item[:usage] %></td>
+                  <td class="whitespace-nowrap py-3 pl-3 pr-4 text-right text-sm text-gray-500 sm:pr-6"><%= item[:cost_humanized] %></td>
+                </tr>
+              <% end %>
             <% else %>
               <tr>
                 <td colspan="4" class="whitespace-nowrap px-3 py-3 text-center font-medium text-gray-900">No resources</td>
@@ -121,28 +125,28 @@
         </table>
 
         <div class="mt-8 flex justify-end">
-            <div class="grid gap-2 text-right">
+          <div class="grid gap-2 text-right">
+            <dl class="grid grid-cols-2 gap-x-3">
+              <dt class="text-right font-semibold text-gray-800">Subtotal:</dt>
+              <dd class="text-gray-500"><%= @invoice_data[:subtotal] %></dd>
+            </dl>
+            <% if @invoice_data[:discount] != "$0.00" %>
               <dl class="grid grid-cols-2 gap-x-3">
-                <dt class="text-right font-semibold text-gray-800">Subtotal:</dt>
-                <dd class="text-gray-500"><%= @invoice_data[:subtotal] %></dd>
+                <dt class="text-right font-semibold text-gray-800">Discount:</dt>
+                <dd class="text-gray-500">-<%= @invoice_data[:discount] %></dd>
               </dl>
-              <% if @invoice_data[:discount] != "$0.00" %>
-                <dl class="grid grid-cols-2 gap-x-3">
-                  <dt class="text-right font-semibold text-gray-800">Discount:</dt>
-                  <dd class="text-gray-500">-<%= @invoice_data[:discount] %></dd>
-                </dl>
-              <% end %>
-              <% if @invoice_data[:credit] != "$0.00" %>
-                <dl class="grid grid-cols-2 gap-x-3">
-                  <dt class="text-right font-semibold text-gray-800">Credit:</dt>
-                  <dd class="text-gray-500">-<%= @invoice_data[:credit] %></dd>
-                </dl>
-              <% end %>
-              <dl class="grid grid-cols-2 gap-x-3 text-2xl">
-                <dt class="text-right font-semibold text-gray-800">Total:</dt>
-                <dd class="text-gray-500"><%= @invoice_data[:total] %></dd>
+            <% end %>
+            <% if @invoice_data[:credit] != "$0.00" %>
+              <dl class="grid grid-cols-2 gap-x-3">
+                <dt class="text-right font-semibold text-gray-800">Credit:</dt>
+                <dd class="text-gray-500">-<%= @invoice_data[:credit] %></dd>
               </dl>
-            </div>
+            <% end %>
+            <dl class="grid grid-cols-2 gap-x-3 text-2xl">
+              <dt class="text-right font-semibold text-gray-800">Total:</dt>
+              <dd class="text-gray-500"><%= @invoice_data[:total] %></dd>
+            </dl>
+          </div>
         </div>
       </div>
     </div>

@@ -1,13 +1,7 @@
 <% @page_title = "#{@project_data[:name]} - Policy" %>
 
 <div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Policy #]]
-    }
-  ) %>
+  <%== render("components/breadcrumb", locals: { back: "/project", parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Policy #]] }) %>
   <%== render("components/page_header", locals: { title: "Update Access Policy" }) %>
 </div>
 
@@ -35,13 +29,11 @@
       <div class="space-y-4 text-gray-500 text-sm">
         <h4 class="font-medium text-gray-900 text-lg">Access Policy Language</h4>
         <p>
-          Access policies have 3 main parts: subjects, actions, and objects. All of them can be a single string or a
-          list of strings.
+          Access policies have 3 main parts: subjects, actions, and objects. All of them can be a single string or a list of strings.
           <span class="text-gray-700 font-medium">"project/&lt;PROJECT_ID&gt;"</span>,
           <span class="text-gray-700 font-medium">"user/&lt;EMAIL&gt;"</span>,
           <span class="text-gray-700 font-medium">"project/&lt;PROJECT_ID&gt;/location/&lt;LOCATION_NAME&gt;/vm/&lt;VM_NAME&gt;"</span>
-          or custom tags can be used for subjects, and objects. To use a tag in policy, it has to be associated with
-          the project. Actions are predefined.
+          or custom tags can be used for subjects, and objects. To use a tag in policy, it has to be associated with the project. Actions are predefined.
         </p>
         <table class="min-w-full divide-y divide-gray-300 text-left">
           <thead class="font-semibold">
@@ -146,8 +138,7 @@
           </tbody>
         </table>
         <p>
-          Be careful while updating policy, if you remove your project permissions, you may lose your access to this
-          project.
+          Be careful while updating policy, if you remove your project permissions, you may lose your access to this project.
         </p>
       </div>
     </div>

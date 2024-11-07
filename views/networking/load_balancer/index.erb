@@ -18,11 +18,11 @@
               </a>
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-            <% if lb[:hostname] %>
-              <%== render("components/copieble_content", locals: { content: lb[:hostname], message: "Copied hostname" }) %>
-            <% else %>
-              Waiting for hostname to be ready
-            <% end %>
+              <% if lb[:hostname] %>
+                <%== render("components/copieble_content", locals: { content: lb[:hostname], message: "Copied hostname" }) %>
+              <% else %>
+                Waiting for hostname to be ready
+              <% end %>
             </td>
           </tr>
         <% end %>
@@ -30,25 +30,27 @@
     </table>
   </div>
   <div class="flex justify-end space-y-1 mt-6">
-    <% if has_project_permission("LoadBalancer:create")%>
-      <%== render(
-        "components/button", locals: { text: "Create Load Balancer", link: "load-balancer/create" })
-      %>
+    <% if has_project_permission("LoadBalancer:create") %>
+      <%== render("components/button", locals: { text: "Create Load Balancer", link: "load-balancer/create" }) %>
     <% end %>
   </div>
 <% else %>
-<div class="mt-6">
-  <%== render(
-    "components/empty_state",
-    locals: {
-      icon: "hero-arrows-pointing-out",
-      title: "No Load Balancers",
-      description: "You don't have permission to create Load Balancers."
-    }.merge(has_project_permission("LoadBalancer:create") ? {
-      description: "Get started by creating a new Load Balancer.",
-      button_link: "#{@project_data[:path]}/load-balancer/create",
-      button_title: "New Load Balancer"
-    } : {})
-  ) %>
-</div>
+  <div class="mt-6">
+    <%== render(
+      "components/empty_state",
+      locals: { icon: "hero-arrows-pointing-out", title: "No Load Balancers", description: "You don't have permission to create Load Balancers." }.merge(
+        (
+          if has_project_permission("LoadBalancer:create")
+            {
+              description: "Get started by creating a new Load Balancer.",
+              button_link: "#{@project_data[:path]}/load-balancer/create",
+              button_title: "New Load Balancer",
+            }
+          else
+            {}
+          end
+        ),
+      ),
+    ) %>
+  </div>
 <% end %>
