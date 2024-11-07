@@ -6,8 +6,7 @@ class Clover
       fw = @project.firewalls_dataset.where(location: @location).where { {Sequel[:firewall][:name] => firewall_name} }.first
 
       unless fw
-        response.status = 404
-        r.halt
+        fail r.delete? ? NoContentError : NotFoundError
       end
       @fw = Serializers::Firewall.serialize(fw)
 

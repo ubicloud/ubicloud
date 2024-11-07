@@ -17,9 +17,7 @@ class Clover
       lb = LoadBalancer.first(filter)
 
       unless lb
-        fail NoContentError if request.delete?
-        response.status = 404
-        request.halt
+        fail request.delete? ? NoContentError : NotFoundError
       end
 
       r.post %w[attach-vm detach-vm] do |action|

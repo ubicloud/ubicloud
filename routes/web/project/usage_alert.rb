@@ -17,8 +17,7 @@ class Clover
     r.is String do |usage_alert_ubid|
       usage_alert = UsageAlert.from_ubid(usage_alert_ubid)
       unless usage_alert
-        response.status = 404
-        return {message: "Usage alert is not found."}
+        fail r.delete? ? NoContentError : NotFoundError.new("Usage alert not found")
       end
 
       r.delete true do

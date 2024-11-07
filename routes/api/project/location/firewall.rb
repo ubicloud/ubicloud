@@ -52,9 +52,7 @@ class Clover
 
   def handle_firewall_requests(user, firewall, location)
     unless firewall
-      fail NoContentError if request.delete?
-      response.status = 404
-      request.halt
+      fail request.delete? ? NoContentError : NotFoundError
     end
 
     request.delete true do

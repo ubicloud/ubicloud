@@ -30,9 +30,7 @@ class Clover
       @project = nil unless @project&.visible
 
       unless @project
-        fail NoContentError if request.delete?
-        response.status = 404
-        request.halt
+        fail request.delete? ? NoContentError : NotFoundError
       end
 
       unless @project.accounts.any? { _1.id == current_account.id }

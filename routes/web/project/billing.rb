@@ -115,8 +115,7 @@ class Clover
     r.on "payment-method" do
       r.get "create" do
         unless (billing_info = @project.billing_info)
-          response.status = 404
-          r.halt
+          fail NotFoundError
         end
 
         checkout = Stripe::Checkout::Session.create(
@@ -134,8 +133,7 @@ class Clover
         payment_method = PaymentMethod.from_ubid(pm_ubid)
 
         unless payment_method
-          response.status = 404
-          r.halt
+          fail r.delete? ? NoContentError : NotFoundError
         end
 
         r.delete true do
@@ -155,10 +153,7 @@ class Clover
       r.is String do |invoice_ubid|
         invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice.from_ubid(invoice_ubid)
 
-        unless invoice
-          response.status = 404
-          r.halt
-        end
+        fail NotFoundError unless invoice
 
         r.get true do
           @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})

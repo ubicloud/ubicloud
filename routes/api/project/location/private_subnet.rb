@@ -37,9 +37,7 @@ class Clover
 
   def handle_ps_requests(ps_endpoint_helper)
     unless ps_endpoint_helper.instance_variable_get(:@resource)
-      fail NoContentError if request.delete?
-      response.status = 404
-      request.halt
+      fail request.delete? ? NoContentError : NotFoundError
     end
 
     request.get true do

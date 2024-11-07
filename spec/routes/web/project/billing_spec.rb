@@ -358,7 +358,7 @@ RSpec.describe Clover, "billing" do
         expect(page).to have_no_content "alert-1"
       end
 
-      it "returns 404 if usage alert not found" do
+      it "returns 204 if usage alert not found" do
         visit project.path + "/billing"
         expect(page).to have_content "alert-1"
 
@@ -367,7 +367,7 @@ RSpec.describe Clover, "billing" do
         project.usage_alerts.first.destroy
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.status_code).to eq(404)
+        expect(page.status_code).to eq(204)
       end
     end
   end

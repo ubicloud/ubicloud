@@ -6,8 +6,7 @@ class Clover
       pg = @project.postgres_resources_dataset.where(location: @location).where { {Sequel[:postgres_resource][:name] => pg_name} }.first
 
       unless pg
-        response.status = 404
-        r.halt
+        fail r.delete? ? NoContentError : NotFoundError
       end
 
       pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: current_account, location: @location, resource: pg)

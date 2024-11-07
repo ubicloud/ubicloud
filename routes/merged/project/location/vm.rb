@@ -21,9 +21,7 @@ class Clover
       vm = @project.vms_dataset.first(filter)
 
       unless vm
-        fail NoContentError if r.delete?
-        response.status = 404
-        r.halt
+        fail r.delete? ? NoContentError : NotFoundError
       end
 
       r.get true do

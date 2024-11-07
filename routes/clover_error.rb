@@ -23,3 +23,9 @@ class NoContentError < CloverError
     super(204, "NoContent", nil)
   end
 end
+
+class NotFoundError < CloverError
+  def initialize(message = "Sorry, we couldn’t find the resource you’re looking for.")
+    super(404, "ResourceNotFound", message)
+  end
+end

@@ -54,8 +54,7 @@ class Clover
         entry = GithubCacheEntry.from_ubid(entry_ubid)
 
         unless entry
-          response.status = 404
-          r.halt
+          fail r.delete? ? NoContentError : NotFoundError
         end
 
         r.delete true do

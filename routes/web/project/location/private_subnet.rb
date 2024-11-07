@@ -4,8 +4,7 @@ class Clover
   hash_branch(:project_location_prefix, "private-subnet") do |r|
     r.on String do |ps_name|
       unless (ps = @project.private_subnets_dataset.where(location: @location).where { {Sequel[:private_subnet][:name] => ps_name} }.first)
-        response.status = 404
-        r.halt
+        fail r.delete? ? NoContentError : NotFoundError
       end
       ps_endpoint_helper = Routes::Common::PrivateSubnetHelper.new(app: self, request: r, user: current_account, location: @location, resource: ps)
 

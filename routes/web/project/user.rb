@@ -120,8 +120,7 @@ class Clover
       user = Account.from_ubid(user_ubid)
 
       unless user
-        response.status = 404
-        r.halt
+        fail r.delete? ? NoContentError : NotFoundError
       end
 
       r.delete true do
