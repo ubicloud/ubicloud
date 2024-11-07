@@ -85,6 +85,66 @@ class Clover < Roda
     @params ||= api? ? request.body.read : request.params.reject { _1 == "_csrf" }.to_json
   end
 
+  # Assign some HTTP response codes to common exceptions.
+  def parse_error(e)
+    case e
+    when Sequel::ValidationFailed
+      code = 400
+      type = "InvalidRequest"
+      message = e.to_s
+    when CloverError
+      code = e.code
+      type = e.type
+      message = e.message
+      details = e.details
+    when Committee::BadRequest, Committee::InvalidRequest
+      code = 400
+      type = "BadRequest"
+      message = e.message
+
+      case e.original_error
+      when JSON::ParserError
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body isn't a valid JSON object."}
+      when OpenAPIParser::NotExistPropertyDefinition
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body contains unrecognized parameters: #{keys.join(", ")}"}
+      when OpenAPIParser::NotExistRequiredKey
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
+      else
+        raise e if Config.test?
+      end
+    when Committee::InvalidResponse
+      raise e if Config.test?
+      code = 500
+      type = "InternalServerError"
+      message = e.message
+    when Committee::NotFound
+      raise e if Config.test?
+      code = 404
+      type = "NotFound"
+      message = e.message
+    else
+      Clog.emit("route exception") { Util.exception_to_hash(e) }
+
+      code = 500
+      type = "UnexceptedError"
+      message = "Sorry, we couldn’t process your request because of an unexpected error."
+    end
+
+    response.status = code
+
+    {
+      code: code,
+      type: type,
+      message: message,
+      details: details
+    }
+  end
+
   def fetch_location_based_prices(*resource_types)
     # We use 1 month = 672 hours for conversion. Number of hours
     # in a month changes between 672 and 744, We are  also capping

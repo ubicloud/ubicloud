@@ -153,7 +153,6 @@ GEM
       concurrent-ruby (~> 1.0)
     jmespath (1.6.2)
     json (2.8.2)
-    jwt (2.9.3)
     json_schema (0.21.0)
       base64
     jwt (2.9.3)
