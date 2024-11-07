@@ -7,7 +7,6 @@
       {display_name: eu-north-h1, internal_name: hetzner-hel1, ui_name: "Finland", visible: true },
       {display_name: github-runners, internal_name: github-runners, ui_name: "GithubRunner", visible: false },
       {display_name: hetzner-ai, internal_name: hetzner-ai, ui_name: "hetzner-ai", visible: false },
-      {display_name: latitude-ai, internal_name: latitude-ai, ui_name: "latitude-ai", visible: false }
     ]
   },
   {
@@ -22,7 +21,8 @@
     provider_display_name: Latitude,
     provider_internal_name: latitude,
     locations: [
-      {display_name: eu-central-a1, internal_name: latitude-fra, ui_name: "Germany (Latitude)", visible: false}
+      {display_name: eu-central-a1, internal_name: latitude-fra, ui_name: "Germany (Latitude)", visible: false},
+      {display_name: latitude-ai, internal_name: latitude-ai, ui_name: "latitude-ai", visible: false }
     ]
   }
 ]
