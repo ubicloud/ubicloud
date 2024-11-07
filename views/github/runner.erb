@@ -6,12 +6,7 @@
     "components/breadcrumb",
     locals: {
       back: @project_data[:path],
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["GitHub Runners", "#{@project_data[:path]}/github"],
-        ["Active Runners", "#"],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["GitHub Runners", "#{@project_data[:path]}/github"], ["Active Runners", "#"]],
     },
   ) %>
   <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>

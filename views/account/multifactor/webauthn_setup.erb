@@ -22,13 +22,7 @@
               <%== rodauth.webauthn_setup_additional_form_tags %>
               <%== rodauth.csrf_tag("/" + rodauth.webauthn_setup_route) %>
               <%== render("components/form/hidden", locals: { name: rodauth.webauthn_setup_challenge_param, value: cred.challenge }) %>
-              <%== render(
-                "components/form/hidden",
-                locals: {
-                  name: rodauth.webauthn_setup_challenge_hmac_param,
-                  value: rodauth.compute_hmac(cred.challenge),
-                },
-              ) %>
+              <%== render("components/form/hidden", locals: { name: rodauth.webauthn_setup_challenge_hmac_param, value: rodauth.compute_hmac(cred.challenge) }) %>
               <input id="webauthn-setup" class="hidden" type="text" name="<%= rodauth.webauthn_setup_param %>" value="" hidden/>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-3 xl:col-span-2">

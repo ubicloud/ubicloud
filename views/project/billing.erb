@@ -80,41 +80,13 @@
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== render(
-                    "components/form/country_select",
-                    locals: {
-                      selected: @billing_info_data[:country],
-                      attributes: {
-                        required: true,
-                      },
-                    },
-                  ) %>
+                  <%== render("components/form/country_select", locals: { selected: @billing_info_data[:country], attributes: { required: true } }) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "state",
-                      label: "State",
-                      value: @billing_info_data[:state],
-                      attributes: {
-                        placeholder: "State",
-                      },
-                    },
-                  ) %>
+                  <%== render("components/form/text", locals: { name: "state", label: "State", value: @billing_info_data[:state], attributes: { placeholder: "State" } }) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "city",
-                      label: "City",
-                      value: @billing_info_data[:city],
-                      attributes: {
-                        placeholder: "City",
-                      },
-                    },
-                  ) %>
+                  <%== render("components/form/text", locals: { name: "city", label: "City", value: @billing_info_data[:city], attributes: { placeholder: "City" } }) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
                   <%== render(
@@ -130,37 +102,13 @@
                   ) %>
                 </div>
                 <div class="col-span-full">
-                  <%== render(
-                    "components/form/textarea",
-                    locals: {
-                      name: "address",
-                      label: "Address",
-                      value: @billing_info_data[:address],
-                      attributes: {
-                        required: true,
-                      },
-                    },
-                  ) %>
+                  <%== render("components/form/textarea", locals: { name: "address", label: "Address", value: @billing_info_data[:address], attributes: { required: true } }) %>
                 </div>
                 <div class="sm:col-span-4">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "tax_id",
-                      label: "Tax ID (Optional)",
-                      value: @billing_info_data[:tax_id],
-                    },
-                  ) %>
+                  <%== render("components/form/text", locals: { name: "tax_id", label: "Tax ID (Optional)", value: @billing_info_data[:tax_id] }) %>
                 </div>
                 <div class="sm:col-span-4">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "company_name",
-                      label: "Company Name (Optional)",
-                      value: @billing_info_data[:company_name],
-                    },
-                  ) %>
+                  <%== render("components/form/text", locals: { name: "company_name", label: "Company Name (Optional)", value: @billing_info_data[:company_name] }) %>
                 </div>
               </div>
             </div>
@@ -183,13 +131,7 @@
           </h3>
         </div>
         <div class="mt-4 flex md:ml-4 md:mt-0">
-          <%== render(
-            "components/button",
-            locals: {
-              text: "Add Payment Method",
-              link: "#{@project_data[:path]}/billing/payment-method/create",
-            },
-          ) %>
+          <%== render("components/button", locals: { text: "Add Payment Method", link: "#{@project_data[:path]}/billing/payment-method/create" }) %>
         </div>
       </div>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -279,8 +221,7 @@
             <% if @invoices.count == 1 %>
               <tr>
                 <td colspan="3">
-                  <div class="text-center text-lg p-4">No invoices finalized yet. Invoice for the current month will be created on the first day of next
-                    month.</div>
+                  <div class="text-center text-lg p-4">No invoices finalized yet. Invoice for the current month will be created on the first day of next month.</div>
                 </td>
               </tr>
             <% end %>
@@ -324,8 +265,8 @@
             <div>
               <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
               <p class="mt-1 text-sm text-gray-500">
-                Usage alerts will be sent to your email address. If you want to send alerts to specific email
-                addresses, you need to log in with that email address.
+                Usage alerts will be sent to your email address. If you want to send alerts to specific email addresses, you need to log in with that email
+                address.
                 <br/>
                 <br/>
                 Please note that alerts are only for informational purposes and no action is taken automatically.
@@ -390,14 +331,7 @@
                 <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:limit] %></td>
                 <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:email] %></td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                  <%== render(
-                    "components/delete_button",
-                    locals: {
-                      text: "Remove",
-                      url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
-                      confirmation: alert[:name],
-                    },
-                  ) %>
+                  <%== render("components/delete_button", locals: { text: "Remove", url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}", confirmation: alert[:name] }) %>
                 </td>
               </tr>
             <% end %>

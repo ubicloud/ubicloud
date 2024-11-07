@@ -6,17 +6,7 @@
   <%== rodauth.create_account_additional_form_tags %>
   <%== rodauth.csrf_tag %>
 
-  <%== render(
-    "components/form/text",
-    locals: {
-      name: "name",
-      label: "Full Name",
-      attributes: {
-        required: true,
-        autocomplete: "name",
-      },
-    },
-  ) %>
+  <%== render("components/form/text", locals: { name: "name", label: "Full Name", attributes: { required: true, autocomplete: "name" } }) %>
 
   <%== render("components/rodauth/login_field") %>
 
@@ -38,11 +28,7 @@
   <% if Config.managed_service %>
     <div class="flex items-center justify-center">
       <p class="text-sm text-gray-500 text-center">By signing up you agree to our
-        <a
-          href="https://ubicloud.com/terms-of-service"
-          target="_blank"
-          class="font-medium text-orange-500 hover:text-orange-600 underline underline-offset-2"
-        >terms of service</a>.</p>
+        <a href="https://ubicloud.com/terms-of-service" target="_blank" class="font-medium text-orange-500 hover:text-orange-600 underline underline-offset-2">terms of service</a>.</p>
     </div>
   <% end %>
 </form>

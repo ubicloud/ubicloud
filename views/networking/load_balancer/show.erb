@@ -5,12 +5,7 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/load-balancer",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
-        [@lb[:name], "#"],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Load Balancer", "#{@project_data[:path]}/load-balancer"], [@lb[:name], "#"]],
     },
   ) %>
   <%== render("components/page_header", locals: { title: @lb[:name] }) %>
@@ -61,10 +56,7 @@
               <%== csrf_tag("#{request.path}/detach-vm") %>
               <input type="hidden" name="vm_id" value="<%= vm[:id] %>">
               <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <a
-                  href="<%= "#{@project_data[:path]}/location/#{vm[:location]}/vm/#{vm[:name]}" %>"
-                  class="text-orange-600 hover:text-orange-700"
-                ><%= vm[:name] %></a>
+                <a href="<%= "#{@project_data[:path]}/location/#{vm[:location]}/vm/#{vm[:name]}" %>" class="text-orange-600 hover:text-orange-700"><%= vm[:name] %></a>
               </td>
               <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
                 <%= vm[:load_balancer_state] %>
@@ -111,18 +103,11 @@
           <div>
             <h3 class="text-base font-semibold leading-6 text-gray-900">Delete load balancer</h3>
             <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this load balancer. Deleted load balancer cannot be recovered. Use
-                it carefully.</p>
+              <p>This action will permanently delete this load balancer. Deleted load balancer cannot be recovered. Use it carefully.</p>
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                confirmation: @lb[:name],
-                redirect: "#{@project_data[:path]}/load-balancer",
-              },
-            ) %>
+            <%== render("components/delete_button", locals: { confirmation: @lb[:name], redirect: "#{@project_data[:path]}/load-balancer" }) %>
           </div>
         </div>
       </div>

@@ -5,12 +5,7 @@
     "components/breadcrumb",
     locals: {
       back: @project_data[:path],
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["GitHub Runners", "#{@project_data[:path]}/github"],
-        %w[Caches #],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["GitHub Runners", "#{@project_data[:path]}/github"], %w[Caches #]],
     },
   ) %>
   <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
@@ -46,12 +41,7 @@
                 <div class="mt-1 text-gray-500 text-xs"><%= entry[:repository_name] %></div>
               </td>
               <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                <div
-                  class="
-                    inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800
-                  "
-                  title="<%= entry[:size] %> bytes"
-                >
+                <div class=" inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800 " title="<%= entry[:size] %> bytes">
                   <%= entry[:size_human] %>
                 </div>
               </td>

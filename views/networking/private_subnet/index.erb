@@ -38,11 +38,7 @@
   <div class="mt-6">
     <%== render(
       "components/empty_state",
-      locals: {
-        icon: "hero-globe-alt",
-        title: "No Private Subnets",
-        description: "You don't have permission to create Private Subnets.",
-      }.merge(
+      locals: { icon: "hero-globe-alt", title: "No Private Subnets", description: "You don't have permission to create Private Subnets." }.merge(
         (
           if has_project_permission("PrivateSubnet:create")
             {

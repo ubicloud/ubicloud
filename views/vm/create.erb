@@ -7,12 +7,7 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/vm",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Virtual Machines", "#{@project_data[:path]}/vm"],
-        %w[Create #],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#{@project_data[:path]}/vm"], %w[Create #]],
     },
   ) %>
   <%== render("components/page_header", locals: { title: "Create Virtual Machine" }) %>
@@ -30,23 +25,10 @@
             <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your virtual machine.</p>
             <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="sm:col-span-3">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "name", label: "Name", attributes: { required: true, placeholder: "Enter name" } }) %>
               </div>
               <div class="col-span-full">
-                <% locations =
-                  Option
-                    .locations(feature_flags: @project_data[:feature_flags])
-                    .map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] }
+                <% locations = Option.locations(feature_flags: @project_data[:feature_flags]).map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] }
                 
                 default_location = Option.locations.detect { |l| l.name == @default_location }&.display_name %>
                 <%== render(
@@ -78,24 +60,17 @@
                   "components/form/checkbox",
                   locals: {
                     name: "enable_ip4",
-                    label:
-                      "Public IPv4 Support (+<span class='enable_ip4-1-monthly-price'>-</span><span class='text-xs text-gray-500'>/mo</span>)",
+                    label: "Public IPv4 Support (+<span class='enable_ip4-1-monthly-price'>-</span><span class='text-xs text-gray-500'>/mo</span>)",
                     options: [
                       [
                         "1",
                         "Enable Public IPv4",
                         "location-based-price",
-                        {
-                          "data-amount" => "1",
-                          "data-resource-type" => "IPAddress",
-                          "data-resource-family" => "IPv4",
-                          "data-default" => "true",
-                        },
+                        { "data-amount" => "1", "data-resource-type" => "IPAddress", "data-resource-family" => "IPv4", "data-default" => "true" },
                       ],
                     ],
                     selected: "1",
-                    description:
-                      "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address.",
+                    description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address.",
                   },
                 ) %>
               </div>
@@ -107,10 +82,7 @@
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                       <% Option::VmSizes.select { _1.visible }.each_with_index do |size, idx| %>
                         <% disabled = !@enabled_vm_sizes.include?(size.name) %>
-                        <label
-                          class="size-<%= size.name %>"
-                          title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>"
-                        >
+                        <label class="size-<%= size.name %>" title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>">
                           <input
                             type="radio"
                             name="size"
@@ -127,10 +99,9 @@
                           >
                           <span
                             class="
-                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
-                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
-                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
-                              <%= disabled ? "opacity-50" : "" %>
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700 <%= disabled ? "opacity-50" : "" %>
                             "
                           >
                             <span class="flex flex-col">
@@ -175,9 +146,9 @@
                           >
                           <span
                             class="
-                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
-                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
-                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700
                             "
                           >
                             <span class="text-md font-semibold storage-size-label"><%= storage_size %>GB</span>
@@ -214,18 +185,7 @@
 
             <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="sm:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "unix_user",
-                    label: "User",
-                    value: "ubi",
-                    attributes: {
-                      required: true,
-                      placeholder: "Unix username",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "unix_user", label: "User", value: "ubi", attributes: { required: true, placeholder: "Unix username" } }) %>
               </div>
 
               <div class="col-span-full">

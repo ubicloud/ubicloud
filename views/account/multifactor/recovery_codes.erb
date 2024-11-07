@@ -55,13 +55,7 @@
                   <%== rodauth.csrf_tag("/" + rodauth.recovery_codes_route) %>
                   <div class="mt-6 grid grid-cols-6 gap-6">
                     <div class="col-span-6">
-                      <%== render(
-                        "components/form/submit_button",
-                        locals: {
-                          text: rodauth.add_recovery_codes_button,
-                          name: rodauth.add_recovery_codes_param,
-                        },
-                      ) %>
+                      <%== render("components/form/submit_button", locals: { text: rodauth.add_recovery_codes_button, name: rodauth.add_recovery_codes_param }) %>
                     </div>
                   </div>
                 </form>

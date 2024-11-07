@@ -5,12 +5,7 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/load-balancer",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Load Balancers", "#{@project_data[:path]}/load-balancer"],
-        %w[Create #],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Load Balancers", "#{@project_data[:path]}/load-balancer"], %w[Create #]],
     },
   ) %>
   <%== render("components/page_header", locals: { title: "Create Load Balancer" }) %>
@@ -28,17 +23,7 @@
             <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your load balancer.</p>
             <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="col-span-6 md:col-span-4 xl:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "name", label: "Name", attributes: { required: true, placeholder: "Enter name" } }) %>
               </div>
             </div>
             <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
@@ -76,32 +61,10 @@
             <p class="mt-1 text-sm leading-6 text-gray-600">Configures the routing of traffic from the load balancer to your virtual machines.</p>
             <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "src_port",
-                    label: "Load Balancer Port",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "80",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "src_port", label: "Load Balancer Port", type: "number", attributes: { required: true, placeholder: "80" } }) %>
               </div>
               <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "dst_port",
-                    label: "Application Port",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "80",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "dst_port", label: "Application Port", type: "number", attributes: { required: true, placeholder: "80" } }) %>
               </div>
             </div>
           </div>
@@ -114,16 +77,7 @@
             <p class="mt-1 text-sm leading-6 text-gray-600">The health check endpoint is used in combination with the Application Port. Make sure it returns 200.</p>
             <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "health_check_endpoint",
-                    label: "HTTP Health Check Endpoint",
-                    attributes: {
-                      placeholder: "/up",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "health_check_endpoint", label: "HTTP Health Check Endpoint", attributes: { placeholder: "/up" } }) %>
               </div>
               <div class="col-span-6 md:col-span-2 xl:col-span-1">
                 <%== render(

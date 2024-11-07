@@ -17,18 +17,7 @@
     "components/page_header",
     locals: {
       title: "#{@invoice_data[:name]} Invoice",
-      right_items: [
-        render(
-          "components/button",
-          locals: {
-            text: "View PDF",
-            link: "#{request.url}?pdf=1",
-            attributes: {
-              target: "_blank",
-            },
-          },
-        ),
-      ],
+      right_items: [render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: { target: "_blank" } })],
     },
   ) %>
 </div>

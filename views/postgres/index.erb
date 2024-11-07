@@ -39,9 +39,8 @@
           </div>
           <div
             class="
-              hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition
-              ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white
-              shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none
+              hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10
+              mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none
             "
             role="menu"
             tabindex="-1"
@@ -103,11 +102,7 @@
       "components/breadcrumb",
       locals: {
         back: "#{@project_data[:path]}/postgres",
-        parts: [
-          %w[Projects /project],
-          [@project_data[:name], @project_data[:path]],
-          ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-        ],
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"]],
       },
     ) %>
 

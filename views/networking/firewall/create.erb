@@ -5,12 +5,7 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/firewall",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Firewalls", "#{@project_data[:path]}/firewall"],
-        %w[Create #],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Firewalls", "#{@project_data[:path]}/firewall"], %w[Create #]],
     },
   ) %>
   <%== render("components/page_header", locals: { title: "Create Firewall" }) %>
@@ -28,29 +23,10 @@
             <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your firewall.</p>
             <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="sm:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "name", label: "Name", attributes: { required: true, placeholder: "Enter name" } }) %>
               </div>
               <div class="sm:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "description",
-                    label: "Description",
-                    attributes: {
-                      placeholder: "Enter description",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "description", label: "Description", attributes: { placeholder: "Enter description" } }) %>
               </div>
               <div class="col-span-full">
                 <%== render(

@@ -7,12 +7,7 @@
       "components/breadcrumb",
       locals: {
         back: @project_data[:path],
-        parts: [
-          %w[Projects /project],
-          [@project_data[:name], @project_data[:path]],
-          ["GitHub Runners", "#{@project_data[:path]}/github"],
-          %w[Settings #],
-        ],
+        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["GitHub Runners", "#{@project_data[:path]}/github"], %w[Settings #]],
       },
     ) %>
     <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
@@ -30,13 +25,7 @@
           </h3>
         </div>
         <div class="mt-4 flex md:ml-4 md:mt-0">
-          <%== render(
-            "components/button",
-            locals: {
-              text: "Connect New Account",
-              link: "#{@project_data[:path]}/github/installation/create",
-            },
-          ) %>
+          <%== render("components/button", locals: { text: "Connect New Account", link: "#{@project_data[:path]}/github/installation/create" }) %>
         </div>
       </div>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -65,8 +54,7 @@
       locals: {
         icon: "hero-banknotes",
         title: "No billing information",
-        description:
-          "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
+        description: "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
         button_title: "New Billing Information",
       },
     ) %>

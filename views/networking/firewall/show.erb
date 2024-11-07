@@ -5,12 +5,7 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/firewall",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Firewall", "#{@project_data[:path]}/firewall"],
-        [@firewall[:name], "#"],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Firewall", "#{@project_data[:path]}/firewall"], [@firewall[:name], "#"]],
     },
   ) %>
   <%== render("components/page_header", locals: { title: @firewall[:name] }) %>
@@ -20,12 +15,7 @@
   <%== render(
     "components/kv_data_card",
     locals: {
-      data: [
-        ["ID", @firewall[:id]],
-        ["Name", @firewall[:name]],
-        ["Location", @firewall[:location]],
-        ["Description", @firewall[:description]],
-      ],
+      data: [["ID", @firewall[:id]], ["Name", @firewall[:name]], ["Location", @firewall[:location]], ["Description", @firewall[:description]]],
     },
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -52,10 +42,7 @@
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:port_range] %></td>
             <% if Authorization.has_permission?(current_account.id, "Firewall:edit", @firewall[:id]) %>
-              <td
-                id="fwr-delete-<%=fwr[:id]%>"
-                class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
-              >
+              <td id="fwr-delete-<%=fwr[:id]%>" class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                 <%== render("components/delete_button", locals: { url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "" }) %>
               </td>
             <% end %>
@@ -66,17 +53,7 @@
             <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST">
               <%== csrf_tag("#{request.path}/firewall-rule") %>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "cidr",
-                    type: "cidr",
-                    attributes: {
-                      placeholder: "0.0.0.0/0",
-                      required: true,
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "cidr", type: "cidr", attributes: { placeholder: "0.0.0.0/0", required: true } }) %>
               </td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <%== render("components/form/text", locals: { name: "port_range", type: "text", attributes: { placeholder: "0..65536" } }) %>
@@ -114,10 +91,7 @@
               <%== csrf_tag("#{request.path}/detach-subnet") %>
               <input type="hidden" name="private-subnet-id" value="<%= ps[:id] %>">
               <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <a
-                  href="<%= "#{@project_data[:path]}/location/#{ps[:location]}/private-subnet/#{ps[:name]}" %>"
-                  class="text-orange-600 hover:text-orange-700"
-                ><%= ps[:name] %></a>
+                <a href="<%= "#{@project_data[:path]}/location/#{ps[:location]}/private-subnet/#{ps[:name]}" %>" class="text-orange-600 hover:text-orange-700"><%= ps[:name] %></a>
               </td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                 <%== render("components/form/submit_button", locals: { text: "Detach" }) %>
@@ -159,18 +133,11 @@
           <div>
             <h3 class="text-base font-semibold leading-6 text-gray-900">Delete firewall</h3>
             <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this firewall. Deleted firewall cannot be recovered. Use it
-                carefully.</p>
+              <p>This action will permanently delete this firewall. Deleted firewall cannot be recovered. Use it carefully.</p>
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                confirmation: @firewall[:name],
-                redirect: "#{@project_data[:path]}/firewall",
-              },
-            ) %>
+            <%== render("components/delete_button", locals: { confirmation: @firewall[:name], redirect: "#{@project_data[:path]}/firewall" }) %>
           </div>
         </div>
       </div>

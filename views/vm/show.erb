@@ -8,12 +8,7 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/vm",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Virtual Machines", "#{@project_data[:path]}/vm"],
-        [@vm[:name], "#"],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#{@project_data[:path]}/vm"], [@vm[:name], "#"]],
     },
   ) %>
   <%== render(
@@ -75,10 +70,7 @@
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <% if Authorization.has_permission?(current_account.id, "Firewall:view", fw[:id]) %>
-                  <a
-                    href="<%= "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" %>"
-                    class="text-orange-600 hover:text-orange-700"
-                  ><%= fw[:name] %></a>
+                  <a href="<%= "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" %>" class="text-orange-600 hover:text-orange-700"><%= fw[:name] %></a>
                 <% else %>
                   <%= fw[:name] %>
                 <% end %>
@@ -99,8 +91,7 @@
           <div>
             <h3 class="text-base font-semibold leading-6 text-gray-900">Delete virtual machine</h3>
             <div class="mt-2 text-sm text-gray-500">
-              <p>This action will permanently delete this virtual machine. Deleted data cannot be recovered. Use it
-                carefully.</p>
+              <p>This action will permanently delete this virtual machine. Deleted data cannot be recovered. Use it carefully.</p>
             </div>
           </div>
           <div id="vm-delete-<%=@vm[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">

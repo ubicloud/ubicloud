@@ -38,11 +38,7 @@
   <div class="mt-6">
     <%== render(
       "components/empty_state",
-      locals: {
-        icon: "hero-arrows-pointing-out",
-        title: "No Load Balancers",
-        description: "You don't have permission to create Load Balancers.",
-      }.merge(
+      locals: { icon: "hero-arrows-pointing-out", title: "No Load Balancers", description: "You don't have permission to create Load Balancers." }.merge(
         (
           if has_project_permission("LoadBalancer:create")
             {

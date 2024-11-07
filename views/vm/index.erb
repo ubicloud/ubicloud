@@ -71,18 +71,10 @@
 <% else %>
   <%== render(
     "components/empty_state",
-    locals: {
-      icon: "hero-server-stack",
-      title: "No virtual machines",
-      description: "You don't have permission to create virtual machines.",
-    }.merge(
+    locals: { icon: "hero-server-stack", title: "No virtual machines", description: "You don't have permission to create virtual machines." }.merge(
       (
         if has_project_permission("Vm:create")
-          {
-            description: "Get started by creating a new virtual machine.",
-            button_link: "#{@project_data[:path]}/vm/create",
-            button_title: "New Virtual Machine",
-          }
+          { description: "Get started by creating a new virtual machine.", button_link: "#{@project_data[:path]}/vm/create", button_title: "New Virtual Machine" }
         else
           {}
         end

@@ -1,14 +1,4 @@
 <% name = defined?(name) ? name : nil %>
 <% extra_class = defined?(extra_class) ? extra_class : nil %>
 
-<%== render(
-  "components/button",
-  locals: {
-    text: text,
-    extra_class: extra_class,
-    attributes: {
-      "type" => "submit",
-      "name" => name,
-    },
-  },
-) %>
+<%== render("components/button", locals: { text: text, extra_class: extra_class, attributes: { "type" => "submit", "name" => name } }) %>

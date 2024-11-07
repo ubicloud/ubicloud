@@ -1,13 +1,7 @@
 <% @page_title = "#{@project_data[:name]} - Users" %>
 
 <div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]],
-    },
-  ) %>
+  <%== render("components/breadcrumb", locals: { back: "/project", parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]] }) %>
   <%== render("components/page_header", locals: { title: "User Management" }) %>
 </div>
 
@@ -28,8 +22,8 @@
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
-                You can invite a new user to your project using one of the preconfigured access policies below. If
-                you'd like to further customize permissions, you can use the
+                You can invite a new user to your project using one of the preconfigured access policies below. If you'd like to further customize permissions,
+                you can use the
                 <a href="#policy-editor" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">
                   advanced policy editor</a>
                 below.
@@ -37,17 +31,7 @@
             </div>
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "email",
-                    type: "email",
-                    attributes: {
-                      required: true,
-                      placeholder: "Email",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "email", type: "email", attributes: { required: true, placeholder: "Email" } }) %>
               </div>
               <div class="col-span-12 sm:col-span-3">
                 <%== render("components/form/policy_select", locals: { name: "policy", selected: "member" }) %>
@@ -88,23 +72,10 @@
                   <%= user[:email] %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%== render(
-                    "components/form/policy_select",
-                    locals: {
-                      name: "user_policies[#{user[:ubid]}]",
-                      selected: @user_policies[user[:ubid]],
-                    },
-                  ) %>
+                  <%== render("components/form/policy_select", locals: { name: "user_policies[#{user[:ubid]}]", selected: @user_policies[user[:ubid]] }) %>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                  <%== render(
-                    "components/delete_button",
-                    locals: {
-                      text: "Remove",
-                      url: "#{@project_data[:path]}/user/#{user[:ubid]}",
-                      confirmation: user[:email],
-                    },
-                  ) %>
+                  <%== render("components/delete_button", locals: { text: "Remove", url: "#{@project_data[:path]}/user/#{user[:ubid]}", confirmation: user[:email] }) %>
                 </td>
 
               </tr>
@@ -113,23 +84,13 @@
               <tr id="invitation-<%= invitation[:email].gsub(/\W+/, "") %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%= invitation[:email] %>
-                  <span
-                    class="
-                      inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800
-                    "
-                  >
+                  <span class=" inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800 ">
                     Invitation expires on
                     <%= invitation[:expires_at] %>
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%== render(
-                    "components/form/policy_select",
-                    locals: {
-                      name: "invitation_policies[#{invitation[:email]}]",
-                      selected: invitation[:policy],
-                    },
-                  ) %>
+                  <%== render("components/form/policy_select", locals: { name: "invitation_policies[#{invitation[:email]}]", selected: invitation[:policy] }) %>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== render(
@@ -167,9 +128,9 @@
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
-                If our predefined policies do not meet your needs, you can give more granular permissions by editing
-                the policy below. Any permissions given through the access policy ediyor will be combined with the
-                user's default access policy. You can learn more about our access policy language in
+                If our predefined policies do not meet your needs, you can give more granular permissions by editing the policy below. Any permissions given
+                through the access policy ediyor will be combined with the user's default access policy. You can learn more about our access policy language
+                in
                 <a href="" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">our documentation</a>.
               </p>
             </div>

@@ -14,22 +14,11 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/postgres",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-        %w[Create #],
-      ],
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"], %w[Create #]],
     },
   ) %>
 
-  <%== render(
-    "components/page_header",
-    locals: {
-      title: @page_title,
-      right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil],
-    },
-  ) %>
+  <%== render("components/page_header", locals: { title: @page_title, right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil] }) %>
 </div>
 
 <div class="grid gap-6">
@@ -43,17 +32,7 @@
           <div>
             <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="sm:col-span-3">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name",
-                    },
-                  },
-                ) %>
+                <%== render("components/form/text", locals: { name: "name", label: "Name", attributes: { required: true, placeholder: "Enter name" } }) %>
               </div>
               <div class="col-span-full">
                 <% locations = Option.postgres_locations.map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] } %>
@@ -85,10 +64,7 @@
                           .map { [LocationNameConverter.to_display_name(_1.location), _1.storage_size_options] }
                           .to_h
                           ) %>
-                        <label
-                          class="size-<%= size.name %>"
-                          title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>"
-                        >
+                        <label class="size-<%= size.name %>" title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>">
                           <input
                             type="radio"
                             name="size"
@@ -105,10 +81,9 @@
                           >
                           <span
                             class="
-                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
-                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
-                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
-                              <%= disabled ? "opacity-50" : "" %>
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700 <%= disabled ? "opacity-50" : "" %>
                             "
                           >
                             <span class="flex flex-col">
@@ -156,9 +131,9 @@
                           >
                           <span
                             class="
-                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
-                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
-                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700
                             "
                           >
                             <span class="text-md font-semibold storage-size-label"><%= storage_size %>GB</span>
@@ -209,9 +184,9 @@
                           >
                           <span
                             class="
-                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300
-                              bg-white text-gray-900 hover:bg-gray-50 peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600
-                              peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700
                             "
                           >
                             <span class="flex flex-col">
@@ -240,8 +215,8 @@
                     <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
                     <div class="space-y-1 text-sm leading-6 text-gray-600">
                       <p>
-                        ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by
-                        the ParadeDB team and are optimal for search and analytics workloads.
+                        ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for
+                        search and analytics workloads.
                       </p>
                       <div>
                         <span class="font-semibold">Support:</span>
@@ -249,21 +224,13 @@
                           <li>Via email at
                             <a href="mailto:support@paradedb.com" class="text-orange-600 font-semibold">support@paradedb.com</a></li>
                           <li>Via Slack at
-                            <a
-                              href="https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ"
-                              target="_blank"
-                              class="text-orange-600 font-semibold"
-                            >ParadeDB Community Slack</a></li>
+                            <a href="https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ" target="_blank" class="text-orange-600 font-semibold">ParadeDB Community Slack</a></li>
                         </ul>
 
                       </div>
                       <p>
                         By creating a ParadeDB PostgreSQL database on Ubicloud you accept the ParadeDB
-                        <a
-                          href="https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75"
-                          target="_blank"
-                          class="text-orange-600 font-semibold"
-                        >Terms of Service</a>
+                        <a href="https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75" target="_blank" class="text-orange-600 font-semibold">Terms of Service</a>
                         and consent to your email being shared with ParadeDB.
                       </p>
                     </div>
@@ -290,17 +257,15 @@
                     <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
                     <div class="space-y-1 text-sm leading-6 text-gray-600">
                       <p>
-                        Lantern is a PostgreSQL-based vector database designed specifically for building AI
-                        applications. Lantern instances are managed by the Lantern team and are optimal for AI
-                        workloads.
+                        Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the
+                        Lantern team and are optimal for AI workloads.
                       </p>
                       <p>
                         You can reach to Lantern team for support at
                         <a href="mailto:support@lantern.dev" class="text-orange-600 font-semibold">support@lantern.dev</a>
                       </p>
                       <p>
-                        By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information
-                        being shared with Lantern.
+                        By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information being shared with Lantern.
                       </p>
                     </div>
                     <%== render(
