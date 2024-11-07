@@ -143,6 +143,14 @@ class Clover
         Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
     end
+
+    # 204 response for invalid names
+    r.is String do |lb_name|
+      r.delete do
+        response.status = 204
+        nil
+      end
+    end
   end
 
   hash_branch(:api_project_location_prefix, "load-balancer", &branch)
