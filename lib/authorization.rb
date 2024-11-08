@@ -38,10 +38,14 @@ module Authorization
   def self.matched_policies(subject_id, actions = nil, object_id = nil)
     object_filter = if object_id
       begin
-        Sequel.lit("AND object_applied_tags.tagged_id = ?", UBID.parse(object_id).to_uuid)
+        ubid = UBID.parse(object_id)
       rescue UBIDParseError
-        Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
+        # nothing
+      else
+        object_id = ubid.to_uuid
       end
+
+      Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
     else
       Sequel.lit("")
     end
