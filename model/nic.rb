@@ -36,3 +36,24 @@ class Nic < Sequel::Model
     Semaphore.where(strand_id: strand.id, name: "lock").delete(force: true)
   end
 end
+
+# Table: nic
+# Columns:
+#  id                | uuid                     | PRIMARY KEY
+#  private_subnet_id | uuid                     | NOT NULL
+#  mac               | macaddr                  | NOT NULL
+#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
+#  private_ipv4      | cidr                     | NOT NULL
+#  private_ipv6      | cidr                     | NOT NULL
+#  vm_id             | uuid                     |
+#  encryption_key    | text                     |
+#  name              | text                     | NOT NULL
+#  rekey_payload     | jsonb                    |
+# Indexes:
+#  nic_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  nic_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
+#  nic_vm_id_fkey             | (vm_id) REFERENCES vm(id)
+# Referenced By:
+#  ipsec_tunnel | ipsec_tunnel_dst_nic_id_fkey | (dst_nic_id) REFERENCES nic(id)
+#  ipsec_tunnel | ipsec_tunnel_src_nic_id_fkey | (src_nic_id) REFERENCES nic(id)

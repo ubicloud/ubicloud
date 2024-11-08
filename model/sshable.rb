@@ -155,3 +155,16 @@ end
 # We need to unrestrict primary key so Sshable.new(...).save_changes works
 # in sshable_spec.rb.
 Sshable.unrestrict_primary_key
+
+# Table: sshable
+# Columns:
+#  id                | uuid | PRIMARY KEY
+#  host              | text |
+#  raw_private_key_1 | text |
+#  raw_private_key_2 | text |
+#  unix_user         | text | NOT NULL DEFAULT 'rhizome'::text
+# Indexes:
+#  sshable_pkey     | PRIMARY KEY btree (id)
+#  sshable_host_key | UNIQUE btree (host)
+# Referenced By:
+#  vm_host | vm_host_id_fkey | (id) REFERENCES sshable(id)

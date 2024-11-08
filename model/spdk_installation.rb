@@ -16,3 +16,20 @@ class SpdkInstallation < Sequel::Model
     version.match?(/^v[0-9]+\.[0-9]+-ubi-.*/)
   end
 end
+
+# Table: spdk_installation
+# Columns:
+#  id                | uuid                     | PRIMARY KEY
+#  version           | text                     | NOT NULL
+#  allocation_weight | integer                  | NOT NULL
+#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
+#  vm_host_id        | uuid                     |
+#  cpu_count         | integer                  | NOT NULL DEFAULT 2
+#  hugepages         | integer                  | NOT NULL DEFAULT 2
+# Indexes:
+#  spdk_installation_pkey                   | PRIMARY KEY btree (id)
+#  spdk_installation_vm_host_id_version_key | UNIQUE btree (vm_host_id, version)
+# Foreign key constraints:
+#  spdk_installation_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
+# Referenced By:
+#  vm_storage_volume | vm_storage_volume_spdk_installation_id_fkey | (spdk_installation_id) REFERENCES spdk_installation(id)

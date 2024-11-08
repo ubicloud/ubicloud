@@ -87,3 +87,23 @@ class GithubRepository < Sequel::Model
     end
   end
 end
+
+# Table: github_repository
+# Columns:
+#  id              | uuid                     | PRIMARY KEY
+#  installation_id | uuid                     |
+#  name            | text                     | NOT NULL
+#  created_at      | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_job_at     | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  last_check_at   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  default_branch  | text                     |
+#  access_key      | text                     |
+#  secret_key      | text                     |
+# Indexes:
+#  github_repository_pkey                       | PRIMARY KEY btree (id)
+#  github_repository_installation_id_name_index | UNIQUE btree (installation_id, name)
+# Foreign key constraints:
+#  github_repository_installation_id_fkey | (installation_id) REFERENCES github_installation(id)
+# Referenced By:
+#  github_cache_entry | github_cache_entry_repository_id_fkey | (repository_id) REFERENCES github_repository(id)
+#  github_runner      | github_runner_repository_id_fkey      | (repository_id) REFERENCES github_repository(id)

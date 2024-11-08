@@ -27,3 +27,17 @@ class ApiKey < Sequel::Model
     update(key: new_key, updated_at: Time.now)
   end
 end
+
+# Table: api_key
+# Columns:
+#  id          | uuid                     | PRIMARY KEY
+#  created_at  | timestamp with time zone | NOT NULL DEFAULT now()
+#  updated_at  | timestamp with time zone | NOT NULL DEFAULT now()
+#  owner_table | text                     | NOT NULL
+#  owner_id    | uuid                     | NOT NULL
+#  used_for    | text                     | NOT NULL
+#  key         | text                     | NOT NULL
+#  is_valid    | boolean                  | NOT NULL DEFAULT true
+# Indexes:
+#  api_key_pkey                       | PRIMARY KEY btree (id)
+#  api_key_owner_table_owner_id_index | btree (owner_table, owner_id)

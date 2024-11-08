@@ -284,3 +284,43 @@ class VmHost < Sequel::Model
     end
   end
 end
+
+# Table: vm_host
+# Columns:
+#  id                 | uuid                     | PRIMARY KEY
+#  allocation_state   | allocation_state         | NOT NULL DEFAULT 'unprepared'::allocation_state
+#  ip6                | inet                     |
+#  net6               | cidr                     |
+#  location           | text                     | NOT NULL
+#  total_mem_gib      | integer                  |
+#  total_sockets      | integer                  |
+#  total_cores        | integer                  |
+#  total_cpus         | integer                  |
+#  used_cores         | integer                  | NOT NULL DEFAULT 0
+#  ndp_needed         | boolean                  | NOT NULL DEFAULT false
+#  total_hugepages_1g | integer                  | NOT NULL DEFAULT 0
+#  used_hugepages_1g  | integer                  | NOT NULL DEFAULT 0
+#  last_boot_id       | text                     |
+#  created_at         | timestamp with time zone | NOT NULL DEFAULT now()
+#  data_center        | text                     |
+#  arch               | arch                     |
+#  total_dies         | integer                  |
+# Indexes:
+#  vm_host_pkey     | PRIMARY KEY btree (id)
+#  vm_host_ip6_key  | UNIQUE btree (ip6)
+#  vm_host_net6_key | UNIQUE btree (net6)
+# Check constraints:
+#  core_allocation_limit      | (used_cores <= total_cores)
+#  hugepages_allocation_limit | (used_hugepages_1g <= total_hugepages_1g)
+#  used_cores_above_zero      | (used_cores >= 0)
+# Foreign key constraints:
+#  vm_host_id_fkey | (id) REFERENCES sshable(id)
+# Referenced By:
+#  address               | address_routed_to_host_id_fkey     | (routed_to_host_id) REFERENCES vm_host(id)
+#  assigned_host_address | assigned_host_address_host_id_fkey | (host_id) REFERENCES vm_host(id)
+#  boot_image            | boot_image_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
+#  hetzner_host          | hetzner_host_id_fkey               | (id) REFERENCES vm_host(id)
+#  pci_device            | pci_device_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
+#  spdk_installation     | spdk_installation_vm_host_id_fkey  | (vm_host_id) REFERENCES vm_host(id)
+#  storage_device        | storage_device_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)
+#  vm                    | vm_vm_host_id_fkey                 | (vm_host_id) REFERENCES vm_host(id)

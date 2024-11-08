@@ -137,3 +137,30 @@ class Project < Sequel::Model
 
   feature_flag :postgresql_base_image, :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra
 end
+
+# Table: project
+# Columns:
+#  id              | uuid                     | PRIMARY KEY
+#  name            | text                     | NOT NULL
+#  visible         | boolean                  | NOT NULL DEFAULT true
+#  billing_info_id | uuid                     |
+#  credit          | numeric                  | NOT NULL DEFAULT 0
+#  discount        | integer                  | NOT NULL DEFAULT 0
+#  created_at      | timestamp with time zone | NOT NULL DEFAULT now()
+#  feature_flags   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  billable        | boolean                  | NOT NULL DEFAULT true
+#  reputation      | project_reputation       | NOT NULL DEFAULT 'new'::project_reputation
+# Indexes:
+#  project_pkey                      | PRIMARY KEY btree (id)
+#  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))
+# Check constraints:
+#  max_discount_amount | (discount <= 100)
+#  min_credit_amount   | (credit >= 0::numeric)
+# Foreign key constraints:
+#  project_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
+# Referenced By:
+#  access_policy       | access_policy_project_id_fkey       | (project_id) REFERENCES project(id)
+#  access_tag          | access_tag_project_id_fkey          | (project_id) REFERENCES project(id)
+#  github_installation | github_installation_project_id_fkey | (project_id) REFERENCES project(id)
+#  inference_endpoint  | inference_endpoint_project_id_fkey  | (project_id) REFERENCES project(id)
+#  usage_alert         | usage_alert_project_id_fkey         | (project_id) REFERENCES project(id)

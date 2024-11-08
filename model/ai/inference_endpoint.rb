@@ -51,3 +51,32 @@ class InferenceEndpoint < Sequel::Model
     http.request(req)
   end
 end
+
+# Table: inference_endpoint
+# Columns:
+#  id                | uuid                     | PRIMARY KEY
+#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
+#  updated_at        | timestamp with time zone | NOT NULL DEFAULT now()
+#  is_public         | boolean                  | NOT NULL DEFAULT false
+#  visible           | boolean                  | NOT NULL DEFAULT true
+#  location          | text                     | NOT NULL
+#  boot_image        | text                     | NOT NULL
+#  name              | text                     | NOT NULL
+#  vm_size           | text                     | NOT NULL
+#  model_name        | text                     | NOT NULL
+#  storage_volumes   | jsonb                    | NOT NULL
+#  engine            | text                     | NOT NULL
+#  engine_params     | text                     | NOT NULL
+#  replica_count     | integer                  | NOT NULL
+#  project_id        | uuid                     | NOT NULL
+#  load_balancer_id  | uuid                     | NOT NULL
+#  private_subnet_id | uuid                     | NOT NULL
+#  gpu_count         | integer                  | NOT NULL DEFAULT 1
+# Indexes:
+#  inference_endpoint_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  inference_endpoint_load_balancer_id_fkey  | (load_balancer_id) REFERENCES load_balancer(id)
+#  inference_endpoint_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
+#  inference_endpoint_project_id_fkey        | (project_id) REFERENCES project(id)
+# Referenced By:
+#  inference_endpoint_replica | inference_endpoint_replica_inference_endpoint_id_fkey | (inference_endpoint_id) REFERENCES inference_endpoint(id)

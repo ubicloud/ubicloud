@@ -22,3 +22,15 @@ class BillingInfo < Sequel::Model
     super
   end
 end
+
+# Table: billing_info
+# Columns:
+#  id         | uuid                     | PRIMARY KEY
+#  stripe_id  | text                     | NOT NULL
+#  created_at | timestamp with time zone | NOT NULL DEFAULT now()
+# Indexes:
+#  billing_info_pkey          | PRIMARY KEY btree (id)
+#  billing_info_stripe_id_key | UNIQUE btree (stripe_id)
+# Referenced By:
+#  payment_method | payment_method_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
+#  project        | project_billing_info_id_fkey        | (billing_info_id) REFERENCES billing_info(id)

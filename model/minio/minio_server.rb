@@ -96,3 +96,18 @@ class MinioServer < Sequel::Model
     super + [:cert]
   end
 end
+
+# Table: minio_server
+# Columns:
+#  id                          | uuid                     | PRIMARY KEY
+#  index                       | integer                  | NOT NULL
+#  minio_pool_id               | uuid                     |
+#  vm_id                       | uuid                     | NOT NULL
+#  cert                        | text                     |
+#  cert_key                    | text                     |
+#  certificate_last_checked_at | timestamp with time zone | NOT NULL DEFAULT now()
+# Indexes:
+#  minio_server_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  minio_server_minio_pool_id_fkey | (minio_pool_id) REFERENCES minio_pool(id)
+#  minio_server_vm_id_fkey         | (vm_id) REFERENCES vm(id)

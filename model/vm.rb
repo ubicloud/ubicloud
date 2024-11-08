@@ -255,3 +255,40 @@ class Vm < Sequel::Model
     }.to_h
   end
 end
+
+# Table: vm
+# Columns:
+#  id             | uuid                     | PRIMARY KEY
+#  ephemeral_net6 | cidr                     |
+#  vm_host_id     | uuid                     |
+#  unix_user      | text                     | NOT NULL
+#  public_key     | text                     | NOT NULL
+#  display_state  | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
+#  name           | text                     | NOT NULL
+#  location       | text                     | NOT NULL
+#  boot_image     | text                     | NOT NULL
+#  local_vetho_ip | text                     |
+#  ip4_enabled    | boolean                  | NOT NULL DEFAULT false
+#  family         | text                     | NOT NULL
+#  cores          | integer                  | NOT NULL
+#  pool_id        | uuid                     |
+#  created_at     | timestamp with time zone | NOT NULL DEFAULT now()
+#  arch           | arch                     | NOT NULL DEFAULT 'x64'::arch
+#  allocated_at   | timestamp with time zone |
+#  provisioned_at | timestamp with time zone |
+# Indexes:
+#  vm_pkey               | PRIMARY KEY btree (id)
+#  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)
+# Foreign key constraints:
+#  vm_pool_id_fkey    | (pool_id) REFERENCES vm_pool(id)
+#  vm_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
+# Referenced By:
+#  assigned_vm_address        | assigned_vm_address_dst_vm_id_fkey    | (dst_vm_id) REFERENCES vm(id)
+#  dns_servers_vms            | dns_servers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
+#  inference_endpoint_replica | inference_endpoint_replica_vm_id_fkey | (vm_id) REFERENCES vm(id)
+#  load_balancers_vms         | load_balancers_vms_vm_id_fkey         | (vm_id) REFERENCES vm(id)
+#  minio_server               | minio_server_vm_id_fkey               | (vm_id) REFERENCES vm(id)
+#  nic                        | nic_vm_id_fkey                        | (vm_id) REFERENCES vm(id)
+#  pci_device                 | pci_device_vm_id_fkey                 | (vm_id) REFERENCES vm(id)
+#  postgres_server            | postgres_server_vm_id_fkey            | (vm_id) REFERENCES vm(id)
+#  vm_storage_volume          | vm_storage_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)

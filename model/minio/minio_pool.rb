@@ -34,3 +34,19 @@ class MinioPool < Sequel::Model
     (storage_size_gib / server_count).to_i
   end
 end
+
+# Table: minio_pool
+# Columns:
+#  id               | uuid    | PRIMARY KEY
+#  start_index      | integer | NOT NULL DEFAULT 0
+#  cluster_id       | uuid    | NOT NULL
+#  server_count     | integer |
+#  drive_count      | integer |
+#  storage_size_gib | bigint  |
+#  vm_size          | text    | NOT NULL
+# Indexes:
+#  minio_pool_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  minio_pool_cluster_id_fkey | (cluster_id) REFERENCES minio_cluster(id)
+# Referenced By:
+#  minio_server | minio_server_minio_pool_id_fkey | (minio_pool_id) REFERENCES minio_pool(id)

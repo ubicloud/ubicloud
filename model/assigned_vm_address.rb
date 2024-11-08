@@ -9,3 +9,16 @@ class AssignedVmAddress < Sequel::Model
 
   include ResourceMethods
 end
+
+# Table: assigned_vm_address
+# Columns:
+#  id         | uuid | PRIMARY KEY
+#  ip         | cidr | NOT NULL
+#  address_id | uuid | NOT NULL
+#  dst_vm_id  | uuid | NOT NULL
+# Indexes:
+#  assigned_vm_address_pkey   | PRIMARY KEY btree (id)
+#  assigned_vm_address_ip_key | UNIQUE btree (ip)
+# Foreign key constraints:
+#  assigned_vm_address_address_id_fkey | (address_id) REFERENCES address(id)
+#  assigned_vm_address_dst_vm_id_fkey  | (dst_vm_id) REFERENCES vm(id)

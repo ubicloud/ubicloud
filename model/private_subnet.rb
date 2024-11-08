@@ -134,3 +134,23 @@ class PrivateSubnet < Sequel::Model
     nics + connected_subnets.select { |subnet| !excluded_private_subnet_ids.include?(subnet.id) }.flat_map { _1.find_all_connected_nics(excluded_private_subnet_ids + [id]) }.uniq
   end
 end
+
+# Table: private_subnet
+# Columns:
+#  id            | uuid                     | PRIMARY KEY
+#  net6          | cidr                     | NOT NULL
+#  net4          | cidr                     | NOT NULL
+#  state         | text                     | NOT NULL DEFAULT 'creating'::text
+#  name          | text                     | NOT NULL
+#  location      | text                     | NOT NULL
+#  last_rekey_at | timestamp with time zone | NOT NULL DEFAULT now()
+# Indexes:
+#  vm_private_subnet_pkey | PRIMARY KEY btree (id)
+# Referenced By:
+#  connected_subnet          | connected_subnet_subnet_id_1_fkey                | (subnet_id_1) REFERENCES private_subnet(id)
+#  connected_subnet          | connected_subnet_subnet_id_2_fkey                | (subnet_id_2) REFERENCES private_subnet(id)
+#  firewalls_private_subnets | firewalls_private_subnets_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
+#  inference_endpoint        | inference_endpoint_private_subnet_id_fkey        | (private_subnet_id) REFERENCES private_subnet(id)
+#  load_balancer             | load_balancer_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
+#  minio_cluster             | minio_cluster_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
+#  nic                       | nic_private_subnet_id_fkey                       | (private_subnet_id) REFERENCES private_subnet(id)

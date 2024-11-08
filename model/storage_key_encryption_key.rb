@@ -22,3 +22,17 @@ class StorageKeyEncryptionKey < Sequel::Model
     }
   end
 end
+
+# Table: storage_key_encryption_key
+# Columns:
+#  id          | uuid                     | PRIMARY KEY
+#  algorithm   | text                     | NOT NULL
+#  key         | text                     | NOT NULL
+#  init_vector | text                     | NOT NULL
+#  auth_data   | text                     | NOT NULL
+#  created_at  | timestamp with time zone | NOT NULL DEFAULT now()
+# Indexes:
+#  storage_key_encryption_key_pkey | PRIMARY KEY btree (id)
+# Referenced By:
+#  vm_storage_volume | vm_storage_volume_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
+#  vm_storage_volume | vm_storage_volume_key_encryption_key_2_id_fkey | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)

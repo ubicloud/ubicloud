@@ -83,3 +83,24 @@ class MinioCluster < Sequel::Model
     super + [:root_cert_1, :root_cert_2]
   end
 end
+
+# Table: minio_cluster
+# Columns:
+#  id                          | uuid                        | PRIMARY KEY
+#  name                        | text                        | NOT NULL
+#  location                    | text                        | NOT NULL
+#  created_at                  | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  admin_user                  | text                        | NOT NULL
+#  admin_password              | text                        | NOT NULL
+#  private_subnet_id           | uuid                        |
+#  root_cert_1                 | text                        |
+#  root_cert_key_1             | text                        |
+#  root_cert_2                 | text                        |
+#  root_cert_key_2             | text                        |
+#  certificate_last_checked_at | timestamp with time zone    | NOT NULL DEFAULT now()
+# Indexes:
+#  minio_cluster_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  minio_cluster_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
+# Referenced By:
+#  minio_pool | minio_pool_cluster_id_fkey | (cluster_id) REFERENCES minio_cluster(id)

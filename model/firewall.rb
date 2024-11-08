@@ -78,3 +78,16 @@ class Firewall < Sequel::Model
     private_subnet.incr_update_firewall_rules if apply_firewalls
   end
 end
+
+# Table: firewall
+# Columns:
+#  id          | uuid                        | PRIMARY KEY
+#  name        | text                        | NOT NULL DEFAULT 'Default'::text
+#  description | text                        | NOT NULL DEFAULT 'Default firewall'::text
+#  created_at  | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  location    | text                        | NOT NULL
+# Indexes:
+#  firewall_pkey | PRIMARY KEY btree (id)
+# Referenced By:
+#  firewall_rule             | firewall_rule_firewall_id_fkey             | (firewall_id) REFERENCES firewall(id)
+#  firewalls_private_subnets | firewalls_private_subnets_firewall_id_fkey | (firewall_id) REFERENCES firewall(id)

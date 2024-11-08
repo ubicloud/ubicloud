@@ -56,3 +56,18 @@ class DnsZone < Sequel::Model
     (record_name[-1] == ".") ? record_name : record_name + "."
   end
 end
+
+# Table: dns_zone
+# Columns:
+#  id             | uuid                     | PRIMARY KEY
+#  created_at     | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id     | uuid                     | NOT NULL
+#  name           | text                     | NOT NULL
+#  last_purged_at | timestamp with time zone | NOT NULL DEFAULT now()
+# Indexes:
+#  dns_zone_pkey | PRIMARY KEY btree (id)
+# Referenced By:
+#  cert                  | cert_dns_zone_id_fkey                          | (dns_zone_id) REFERENCES dns_zone(id)
+#  dns_record            | dns_record_dns_zone_id_fkey                    | (dns_zone_id) REFERENCES dns_zone(id)
+#  dns_servers_dns_zones | dns_servers_dns_zones_dns_zone_id_fkey         | (dns_zone_id) REFERENCES dns_zone(id)
+#  load_balancer         | load_balancer_custom_hostname_dns_zone_id_fkey | (custom_hostname_dns_zone_id) REFERENCES dns_zone(id)

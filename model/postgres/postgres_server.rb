@@ -212,3 +212,21 @@ class PostgresServer < Sequel::Model
     self.class.run_query(vm, query)
   end
 end
+
+# Table: postgres_server
+# Columns:
+#  id                     | uuid                     | PRIMARY KEY
+#  created_at             | timestamp with time zone | NOT NULL DEFAULT now()
+#  updated_at             | timestamp with time zone | NOT NULL DEFAULT now()
+#  resource_id            | uuid                     | NOT NULL
+#  vm_id                  | uuid                     |
+#  timeline_id            | uuid                     | NOT NULL
+#  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
+#  representative_at      | timestamp with time zone |
+#  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
+# Indexes:
+#  postgres_server_pkey1             | PRIMARY KEY btree (id)
+#  postgres_server_resource_id_index | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
+# Foreign key constraints:
+#  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
+#  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)

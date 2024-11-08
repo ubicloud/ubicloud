@@ -12,3 +12,15 @@ class IpsecTunnel < Sequel::Model
     nic.vm.inhost_name.shellescape
   end
 end
+
+# Table: ipsec_tunnel
+# Columns:
+#  id         | uuid | PRIMARY KEY
+#  src_nic_id | uuid |
+#  dst_nic_id | uuid |
+# Indexes:
+#  ipsec_tunnel_pkey                      | PRIMARY KEY btree (id)
+#  ipsec_tunnel_src_nic_id_dst_nic_id_key | UNIQUE btree (src_nic_id, dst_nic_id)
+# Foreign key constraints:
+#  ipsec_tunnel_dst_nic_id_fkey | (dst_nic_id) REFERENCES nic(id)
+#  ipsec_tunnel_src_nic_id_fkey | (src_nic_id) REFERENCES nic(id)

@@ -62,3 +62,16 @@ class Page < Sequel::Model
     Page.active.where(tag: tag).first
   end
 end
+
+# Table: page
+# Columns:
+#  id          | uuid                     | PRIMARY KEY
+#  created_at  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  resolved_at | timestamp with time zone |
+#  summary     | text                     |
+#  tag         | text                     | NOT NULL
+#  details     | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  severity    | page_severity            | NOT NULL DEFAULT 'error'::page_severity
+# Indexes:
+#  page_pkey      | PRIMARY KEY btree (id)
+#  page_tag_index | UNIQUE btree (tag) WHERE resolved_at IS NULL

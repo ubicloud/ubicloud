@@ -58,10 +58,10 @@ SQL
 end
 
 desc "Migrate test database to latest version"
-task test_up: [:_test_up, :refresh_sequel_caches]
+task test_up: [:_test_up, :refresh_sequel_caches, :annotate]
 
 desc "Migrate test database down. If VERSION isn't given, migrates to all the way down."
-task test_down: [:_test_down, :refresh_sequel_caches]
+task test_down: [:_test_down, :refresh_sequel_caches, :annotate]
 
 # rubocop:disable Rake/Desc
 task :_test_up do
