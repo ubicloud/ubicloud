@@ -27,14 +27,14 @@ module SemaphoreMethods
 
   module ClassMethods
     def semaphore(*names)
-      names.map!(&:intern)
-      names.each do |name|
+      names.each do |sym|
+        name = sym.name
         define_method :"incr_#{name}" do
-          Semaphore.incr(id, name)
+          Semaphore.incr(id, sym)
         end
 
         define_method :"#{name}_set?" do
-          semaphores.any? { |s| s.name == name.to_s }
+          semaphores.any? { |s| s.name == name }
         end
       end
     end
