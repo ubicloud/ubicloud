@@ -44,14 +44,6 @@ class Clover < Roda
     def rodauth(name = scope.default_rodauth_name)
       super
     end
-
-    # Do not allow session access in api routes
-    def session
-      # :nocov:
-      raise(Roda::RodaError, "sessions are not used in api/runtime routes") unless scope.web?
-      # :nocov:
-      super
-    end
   end
 
   class RodaResponse
@@ -72,12 +64,6 @@ class Clover < Roda
 
     def default_headers
       json ? API_DEFAULT_HEADERS : WEB_DEFAULT_HEADERS
-    end
-
-    def set_default_headers
-      super
-      # XXX: When using Roda 3.86.0, set response.content_security_policy = false instead in route
-      headers.delete("content-security-policy") if json
     end
   end
 
