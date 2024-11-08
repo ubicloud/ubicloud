@@ -73,8 +73,7 @@ class Clover
           end
         end
 
-        # XXX: differing authorization between api and web routes!
-        Authorization.authorize(current_account.id, "PrivateSubnet:edit", private_subnet.id) unless api?
+        Authorization.authorize(current_account.id, "PrivateSubnet:edit", private_subnet.id)
 
         if action == "attach-subnet"
           firewall.associate_with_private_subnet(private_subnet)
