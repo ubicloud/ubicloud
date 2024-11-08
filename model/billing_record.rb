@@ -43,3 +43,18 @@ class BillingRecord < Sequel::Model
     @billing_rate ||= BillingRate.from_id(billing_rate_id)
   end
 end
+
+# Table: billing_record
+# Columns:
+#  id              | uuid      | PRIMARY KEY
+#  project_id      | uuid      | NOT NULL
+#  resource_id     | uuid      | NOT NULL
+#  resource_name   | text      | NOT NULL
+#  span            | tstzrange | NOT NULL DEFAULT tstzrange(now(), NULL::timestamp with time zone, '[)'::text)
+#  amount          | numeric   | NOT NULL
+#  billing_rate_id | uuid      | NOT NULL
+# Indexes:
+#  billing_record_pkey              | PRIMARY KEY btree (id)
+#  billing_record_project_id_index  | btree (project_id)
+#  billing_record_resource_id_index | btree (resource_id)
+#  billing_record_span_index        | gist (span)

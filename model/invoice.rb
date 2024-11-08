@@ -230,3 +230,17 @@ class Invoice < Sequel::Model
 end
 
 Invoice.unrestrict_primary_key
+
+# Table: invoice
+# Columns:
+#  id             | uuid                     | PRIMARY KEY
+#  project_id     | uuid                     | NOT NULL
+#  content        | jsonb                    | NOT NULL
+#  created_at     | timestamp with time zone | NOT NULL DEFAULT now()
+#  invoice_number | text                     | NOT NULL
+#  begin_time     | timestamp with time zone | NOT NULL
+#  end_time       | timestamp with time zone | NOT NULL
+#  status         | text                     | NOT NULL DEFAULT 'unpaid'::text
+# Indexes:
+#  invoice_pkey             | PRIMARY KEY btree (id)
+#  invoice_project_id_index | btree (project_id)

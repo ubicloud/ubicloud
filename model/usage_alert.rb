@@ -27,3 +27,18 @@ class UsageAlert < Sequel::Model
       button_link: "#{Config.base_url}#{project.path}/billing")
   end
 end
+
+# Table: usage_alert
+# Columns:
+#  id                | uuid                     | PRIMARY KEY
+#  project_id        | uuid                     | NOT NULL
+#  name              | text                     | NOT NULL
+#  limit             | integer                  | NOT NULL
+#  user_id           | uuid                     | NOT NULL
+#  last_triggered_at | timestamp with time zone | NOT NULL DEFAULT (now() - '42 days'::interval)
+# Indexes:
+#  usage_alert_pkey                    | PRIMARY KEY btree (id)
+#  usage_alert_last_triggered_at_index | btree (last_triggered_at)
+# Foreign key constraints:
+#  usage_alert_project_id_fkey | (project_id) REFERENCES project(id)
+#  usage_alert_user_id_fkey    | (user_id) REFERENCES accounts(id)

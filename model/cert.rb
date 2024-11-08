@@ -22,3 +22,21 @@ class Cert < Sequel::Model
     super + [:cert]
   end
 end
+
+# Table: cert
+# Columns:
+#  id          | uuid                        | PRIMARY KEY
+#  hostname    | text                        | NOT NULL
+#  dns_zone_id | uuid                        |
+#  created_at  | timestamp without time zone | NOT NULL DEFAULT now()
+#  cert        | text                        |
+#  account_key | text                        |
+#  kid         | text                        |
+#  order_url   | text                        |
+#  csr_key     | text                        |
+# Indexes:
+#  cert_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  cert_dns_zone_id_fkey | (dns_zone_id) REFERENCES dns_zone(id)
+# Referenced By:
+#  certs_load_balancers | certs_load_balancers_cert_id_fkey | (cert_id) REFERENCES cert(id)

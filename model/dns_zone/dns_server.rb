@@ -28,3 +28,16 @@ class DnsServer < Sequel::Model
     end
   end
 end
+
+# Table: dns_server
+# Columns:
+#  id         | uuid                     | PRIMARY KEY
+#  created_at | timestamp with time zone | NOT NULL DEFAULT now()
+#  name       | text                     | NOT NULL
+# Indexes:
+#  dns_server_pkey     | PRIMARY KEY btree (id)
+#  dns_server_name_key | UNIQUE btree (name)
+# Referenced By:
+#  dns_servers_dns_zones           | dns_servers_dns_zones_dns_server_id_fkey           | (dns_server_id) REFERENCES dns_server(id)
+#  dns_servers_vms                 | dns_servers_vms_dns_server_id_fkey                 | (dns_server_id) REFERENCES dns_server(id)
+#  seen_dns_records_by_dns_servers | seen_dns_records_by_dns_servers_dns_server_id_fkey | (dns_server_id) REFERENCES dns_server(id)

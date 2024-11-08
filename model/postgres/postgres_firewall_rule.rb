@@ -8,3 +8,14 @@ class PostgresFirewallRule < Sequel::Model
 
   include ResourceMethods
 end
+
+# Table: postgres_firewall_rule
+# Columns:
+#  id                   | uuid | PRIMARY KEY
+#  cidr                 | cidr | NOT NULL
+#  postgres_resource_id | uuid | NOT NULL
+# Indexes:
+#  postgres_firewall_rule_pkey                          | PRIMARY KEY btree (id)
+#  postgres_firewall_rule_postgres_resource_id_cidr_key | UNIQUE btree (postgres_resource_id, cidr)
+# Foreign key constraints:
+#  postgres_firewall_rule_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)

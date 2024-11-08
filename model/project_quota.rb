@@ -18,3 +18,12 @@ class ProjectQuota < Sequel::Model
 end
 
 ProjectQuota.unrestrict_primary_key
+
+# Table: project_quota
+# Primary Key: (project_id, quota_id)
+# Columns:
+#  project_id | uuid    |
+#  quota_id   | uuid    |
+#  value      | integer | NOT NULL
+# Indexes:
+#  project_quota_pkey | PRIMARY KEY btree (project_id, quota_id)

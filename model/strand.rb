@@ -180,3 +180,23 @@ end
 
 # We need to unrestrict primary key so strand.add_child works in Prog::Base.
 Strand.unrestrict_primary_key
+
+# Table: strand
+# Columns:
+#  id        | uuid                     | PRIMARY KEY
+#  parent_id | uuid                     |
+#  schedule  | timestamp with time zone | NOT NULL DEFAULT now()
+#  lease     | timestamp with time zone |
+#  prog      | text                     | NOT NULL
+#  label     | text                     | NOT NULL
+#  stack     | jsonb                    | NOT NULL DEFAULT '[{}]'::jsonb
+#  exitval   | jsonb                    |
+#  retval    | jsonb                    |
+#  try       | integer                  | NOT NULL DEFAULT 0
+# Indexes:
+#  strand_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  strand_parent_id_fkey | (parent_id) REFERENCES strand(id)
+# Referenced By:
+#  semaphore | semaphore_strand_id_fkey | (strand_id) REFERENCES strand(id)
+#  strand    | strand_parent_id_fkey    | (parent_id) REFERENCES strand(id)

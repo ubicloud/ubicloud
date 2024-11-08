@@ -69,3 +69,22 @@ class GithubRunner < Sequel::Model
     super + [:workflow_job]
   end
 end
+
+# Table: github_runner
+# Columns:
+#  id              | uuid                     | PRIMARY KEY
+#  installation_id | uuid                     |
+#  repository_name | text                     | NOT NULL
+#  label           | text                     | NOT NULL
+#  vm_id           | uuid                     |
+#  runner_id       | bigint                   |
+#  created_at      | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  ready_at        | timestamp with time zone |
+#  workflow_job    | jsonb                    |
+#  repository_id   | uuid                     |
+# Indexes:
+#  github_runner_pkey      | PRIMARY KEY btree (id)
+#  github_runner_vm_id_key | UNIQUE btree (vm_id)
+# Foreign key constraints:
+#  github_runner_installation_id_fkey | (installation_id) REFERENCES github_installation(id)
+#  github_runner_repository_id_fkey   | (repository_id) REFERENCES github_repository(id)

@@ -22,3 +22,18 @@ class GithubInstallation < Sequel::Model
     end
   end
 end
+
+# Table: github_installation
+# Columns:
+#  id              | uuid   | PRIMARY KEY
+#  installation_id | bigint | NOT NULL
+#  name            | text   | NOT NULL
+#  type            | text   | NOT NULL
+#  project_id      | uuid   |
+# Indexes:
+#  github_installation_pkey | PRIMARY KEY btree (id)
+# Foreign key constraints:
+#  github_installation_project_id_fkey | (project_id) REFERENCES project(id)
+# Referenced By:
+#  github_repository | github_repository_installation_id_fkey | (installation_id) REFERENCES github_installation(id)
+#  github_runner     | github_runner_installation_id_fkey     | (installation_id) REFERENCES github_installation(id)

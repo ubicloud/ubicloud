@@ -12,3 +12,14 @@ class Semaphore < Sequel::Model
     end
   end
 end
+
+# Table: semaphore
+# Columns:
+#  id        | uuid | PRIMARY KEY
+#  strand_id | uuid | NOT NULL
+#  name      | text | NOT NULL
+# Indexes:
+#  semaphore_pkey            | PRIMARY KEY btree (id)
+#  semaphore_strand_id_index | btree (strand_id)
+# Foreign key constraints:
+#  semaphore_strand_id_fkey | (strand_id) REFERENCES strand(id)

@@ -8,3 +8,16 @@ class AssignedHostAddress < Sequel::Model
 
   include ResourceMethods
 end
+
+# Table: assigned_host_address
+# Columns:
+#  id         | uuid | PRIMARY KEY
+#  ip         | cidr | NOT NULL
+#  address_id | uuid | NOT NULL
+#  host_id    | uuid | NOT NULL
+# Indexes:
+#  assigned_host_address_pkey   | PRIMARY KEY btree (id)
+#  assigned_host_address_ip_key | UNIQUE btree (ip)
+# Foreign key constraints:
+#  assigned_host_address_address_id_fkey | (address_id) REFERENCES address(id)
+#  assigned_host_address_host_id_fkey    | (host_id) REFERENCES vm_host(id)

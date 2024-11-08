@@ -97,3 +97,18 @@ PGHOST=/var/run/postgresql
     {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::#{ubid}*"]}]}
   end
 end
+
+# Table: postgres_timeline
+# Columns:
+#  id                       | uuid                     | PRIMARY KEY
+#  created_at               | timestamp with time zone | NOT NULL DEFAULT now()
+#  updated_at               | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                | uuid                     |
+#  access_key               | text                     |
+#  secret_key               | text                     |
+#  latest_backup_started_at | timestamp with time zone |
+#  blob_storage_id          | uuid                     |
+# Indexes:
+#  postgres_timeline_pkey | PRIMARY KEY btree (id)
+# Referenced By:
+#  postgres_server | postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)

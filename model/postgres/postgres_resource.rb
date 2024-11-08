@@ -118,3 +118,35 @@ class PostgresResource < Sequel::Model
     super + [:root_cert_1, :root_cert_2, :server_cert]
   end
 end
+
+# Table: postgres_resource
+# Columns:
+#  id                          | uuid                     | PRIMARY KEY
+#  created_at                  | timestamp with time zone | NOT NULL DEFAULT now()
+#  updated_at                  | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id                  | uuid                     | NOT NULL
+#  location                    | text                     | NOT NULL
+#  name                        | text                     | NOT NULL
+#  target_vm_size              | text                     | NOT NULL
+#  target_storage_size_gib     | bigint                   | NOT NULL
+#  superuser_password          | text                     | NOT NULL
+#  root_cert_1                 | text                     |
+#  root_cert_key_1             | text                     |
+#  server_cert                 | text                     |
+#  server_cert_key             | text                     |
+#  root_cert_2                 | text                     |
+#  root_cert_key_2             | text                     |
+#  certificate_last_checked_at | timestamp with time zone | NOT NULL DEFAULT now()
+#  parent_id                   | uuid                     |
+#  restore_target              | timestamp with time zone |
+#  ha_type                     | ha_type                  | NOT NULL DEFAULT 'none'::ha_type
+#  hostname_version            | hostname_version         | NOT NULL DEFAULT 'v1'::hostname_version
+#  private_subnet_id           | uuid                     |
+#  flavor                      | postgres_flavor          | NOT NULL DEFAULT 'standard'::postgres_flavor
+#  version                     | postgres_version         | NOT NULL DEFAULT '16'::postgres_version
+# Indexes:
+#  postgres_server_pkey            | PRIMARY KEY btree (id)
+#  postgres_server_server_name_key | UNIQUE btree (name)
+# Referenced By:
+#  postgres_firewall_rule      | postgres_firewall_rule_postgres_resource_id_fkey      | (postgres_resource_id) REFERENCES postgres_resource(id)
+#  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)

@@ -21,3 +21,21 @@ class PaymentMethod < Sequel::Model
     super
   end
 end
+
+# Table: payment_method
+# Columns:
+#  id                | uuid                     | PRIMARY KEY
+#  stripe_id         | text                     | NOT NULL
+#  order             | integer                  |
+#  billing_info_id   | uuid                     |
+#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
+#  card_fingerprint  | text                     |
+#  fraud             | boolean                  | NOT NULL DEFAULT false
+#  preauth_amount    | integer                  |
+#  preauth_intent_id | text                     |
+# Indexes:
+#  payment_method_pkey                  | PRIMARY KEY btree (id)
+#  payment_method_preauth_intent_id_key | UNIQUE btree (preauth_intent_id)
+#  payment_method_stripe_id_key         | UNIQUE btree (stripe_id)
+# Foreign key constraints:
+#  payment_method_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
