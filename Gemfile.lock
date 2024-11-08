@@ -246,7 +246,7 @@ GEM
     rexml (3.3.9)
     roda (3.86.0)
       rack
-    rodauth (2.36.0)
+    rodauth (2.37.0)
       roda (>= 2.6.0)
       sequel (>= 4)
     rotp (6.3.0)
@@ -411,7 +411,7 @@ DEPENDENCIES
   rake
   refrigerator (>= 1)
   roda (>= 3.86)
-  rodauth (>= 2.26.1)
+  rodauth (>= 2.37)
   rotp
   rqrcode
   rspec

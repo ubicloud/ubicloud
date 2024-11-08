@@ -27,12 +27,6 @@ class Clover < Roda
 
   NAME_OR_UBID = /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)|_([a-z0-9]{26})/
 
-  class RodaRequest
-    def rodauth(name = scope.default_rodauth_name)
-      super
-    end
-  end
-
   class RodaResponse
     API_DEFAULT_HEADERS = DEFAULT_HEADERS.merge("content-type" => "application/json").freeze
     WEB_DEFAULT_HEADERS = DEFAULT_HEADERS.merge(
@@ -141,9 +135,5 @@ class Clover < Roda
 
   def default_rodauth_name
     api? ? :api : nil
-  end
-
-  def rodauth(name = default_rodauth_name)
-    super
   end
 end
