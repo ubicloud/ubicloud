@@ -166,11 +166,6 @@ class Clover < Roda
       hash.to_json
     end
 
-    clear_session do
-      session.clear
-      set_jwt
-    end
-
     hmac_secret Config.clover_session_secret
     jwt_secret Config.clover_session_secret
     argon2_secret { Config.clover_session_secret }
