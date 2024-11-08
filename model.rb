@@ -16,6 +16,7 @@ Sequel::Model.plugin :column_encryption do |enc|
 end
 Sequel::Model.plugin :many_through_many
 Sequel::Model.plugin :insert_conflict
+Sequel::Model.plugin :inspect_pk
 
 module SemaphoreMethods
   def self.included(base)
@@ -51,11 +52,11 @@ module ResourceMethods
   end
 
   def to_s
-    "#{self.class.name}[\"#{ubid}\"]"
+    inspect_prefix
   end
 
-  def inspect
-    "#<#{self.class.name}#{"[\"#{ubid}\"]" if id} @values=#{inspect_values}>"
+  def inspect_pk
+    ubid if id
   end
 
   def inspect_values
