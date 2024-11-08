@@ -27,10 +27,12 @@ class Clover < Roda
   plugin :request_headers
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
-  plugin :sessions,
+  plugin :conditional_sessions,
     key: "_Clover.session",
     cookie_options: {secure: !(Config.development? || Config.test?)},
-    secret: Config.clover_session_secret
+    secret: Config.clover_session_secret do
+      scope.web?
+    end
 
   plugin :route_csrf do |token|
     flash["error"] = "An invalid security token submitted with this request, please try again"
@@ -452,6 +454,7 @@ class Clover < Roda
   route do |r|
     if api?
       response.json = true
+      response.skip_content_security_policy!
       # To make test and development easier
       # :nocov:
       unless Config.production?
@@ -472,6 +475,7 @@ class Clover < Roda
       r.on "runtime" do
         @is_runtime = true
         response.json = true
+        response.skip_content_security_policy!
 
         if (jwt_payload = get_runtime_jwt_payload).nil? || (@vm = Vm.from_ubid(jwt_payload["sub"])).nil?
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
