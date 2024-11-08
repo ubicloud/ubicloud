@@ -102,7 +102,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach to subnet" do
-      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location: "hetzner-fsn1").subject
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
@@ -124,7 +124,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "detach from subnet" do
-      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location: "hetzner-fsn1").subject
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps)
       expect(ps).to receive(:incr_update_firewall_rules)
 
@@ -144,7 +144,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "attach and detach" do
-      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location: "hetzner-fsn1").subject
       expect(PrivateSubnet).to receive(:from_ubid).and_return(ps).twice
       expect(ps).to receive(:incr_update_firewall_rules).twice
 
