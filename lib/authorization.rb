@@ -58,14 +58,17 @@ module Authorization
 
     DB[<<~SQL, {subject_id: subject_id, actions_filter: actions_filter, object_filter: object_filter}].all
       SELECT object_applied_tags.tagged_id, object_applied_tags.tagged_table, subjects, actions, objects
-      FROM applied_tag AS subject_applied_tags
-          JOIN access_tag AS subject_access_tags ON subject_applied_tags.access_tag_id = subject_access_tags.id
-          JOIN access_policy AS acl ON subject_access_tags.project_id = acl.project_id
-          JOIN jsonb_to_recordset(acl.body->'acls') as items(subjects JSONB, actions JSONB, objects JSONB) ON TRUE
-          JOIN access_tag AS object_access_tags ON subject_access_tags.project_id = object_access_tags.project_id
+      FROM access_policy AS acl
+          CROSS JOIN jsonb_to_recordset(acl.body->'acls') as items(subjects JSONB, actions JSONB, objects JSONB)
+          JOIN access_tag AS object_access_tags ON acl.project_id = object_access_tags.project_id
           JOIN applied_tag AS object_applied_tags ON object_access_tags.id = object_applied_tags.access_tag_id AND objects ? object_access_tags."name"
-      WHERE subject_applied_tags.tagged_id = :subject_id
-        AND subjects ? subject_access_tags."name"
+      WHERE acl.project_id IN (
+          SELECT access_tag.project_id
+          FROM access_tag
+          JOIN applied_tag ON access_tag.id = applied_tag.access_tag_id
+          WHERE applied_tag.tagged_id = :subject_id
+            AND subjects ? access_tag."name"
+        )
         :actions_filter
         :object_filter
     SQL
