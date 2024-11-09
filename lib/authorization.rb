@@ -35,7 +35,7 @@ module Authorization
     extended_actions.to_a
   end
 
-  def self.matched_policies(subject_id, actions = nil, object_id = nil)
+  def self.matched_policies_dataset(subject_id, actions = nil, object_id = nil)
     subject_dataset = DB[:access_tag]
       .select(:project_id)
       .join(:applied_tag, access_tag_id: :id)
@@ -66,7 +66,11 @@ module Authorization
       dataset = dataset.where(Sequel.pg_jsonb_op(:actions).contain_any(Sequel.pg_array(expand_actions(actions))))
     end
 
-    dataset.all
+    dataset
+  end
+
+  def self.matched_policies(subject_id, actions = nil, object_id = nil)
+    matched_policies_dataset(subject_id, actions, object_id).all
   end
 
   module ManagedPolicy
