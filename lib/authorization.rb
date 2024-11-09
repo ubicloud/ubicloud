@@ -21,6 +21,10 @@ module Authorization
     matched_policies(subject_id, nil, object_id).flat_map { _1[:actions] }
   end
 
+  def self.authorized_resources_dataset(subject_id, actions)
+    matched_policies_dataset(subject_id, actions).select(:tagged_id)
+  end
+
   def self.authorized_resources(subject_id, actions)
     matched_policies_dataset(subject_id, actions).select_map(:tagged_id)
   end
@@ -109,7 +113,7 @@ module Authorization
       # We need to determine table of id explicitly.
       # @opts is the hash of options for this dataset, and introduced at Sequel::Dataset.
       from = @opts[:from].first
-      where { {Sequel[from][:id] => Authorization.authorized_resources(subject_id, actions)} }
+      where { {Sequel[from][:id] => Authorization.authorized_resources_dataset(subject_id, actions)} }
     end
   end
 
