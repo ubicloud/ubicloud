@@ -18,7 +18,7 @@ module Authorization
   end
 
   def self.all_permissions(subject_id, object_id)
-    matched_policies(subject_id, nil, object_id).flat_map { _1[:actions] }
+    matched_policies_dataset(subject_id, nil, object_id).select_map(:actions).tap(&:flatten!)
   end
 
   def self.authorized_resources_dataset(subject_id, actions)
