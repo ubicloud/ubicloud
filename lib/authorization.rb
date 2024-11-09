@@ -8,7 +8,7 @@ module Authorization
   end
 
   def self.has_permission?(subject_id, actions, object_id)
-    !matched_policies(subject_id, actions, object_id).empty?
+    !matched_policies_dataset(subject_id, actions, object_id).empty?
   end
 
   def self.authorize(subject_id, actions, object_id)
