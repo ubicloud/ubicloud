@@ -36,7 +36,21 @@ module Authorization
   end
 
   def self.matched_policies(subject_id, actions = nil, object_id = nil)
-    object_filter = if object_id
+    subject_dataset = DB[:access_tag]
+      .select(:project_id)
+      .join(:applied_tag, access_tag_id: :id)
+      .where(tagged_id: subject_id)
+      .where(Sequel.pg_jsonb_op(:subjects).has_key?(Sequel[:access_tag][:name]))
+
+    dataset = DB.from { access_policy.as(:acl) }
+      .select(:tagged_id, :tagged_table, :subjects, :actions, :objects)
+      .cross_join(Sequel.pg_jsonb_op(Sequel[:acl][:body])["acls"].to_recordset.as(:items, [:subjects, :actions, :objects].map { |c| Sequel.lit("#{c} JSONB") }))
+      .join(:access_tag, project_id: Sequel[:acl][:project_id])
+      .join(:applied_tag, access_tag_id: :id)
+      .where(Sequel.pg_jsonb_op(:objects).has_key?(Sequel[:access_tag][:name]))
+      .where(Sequel[:acl][:project_id] => subject_dataset)
+
+    if object_id
       begin
         ubid = UBID.parse(object_id)
       rescue UBIDParseError
@@ -45,33 +59,14 @@ module Authorization
         object_id = ubid.to_uuid
       end
 
-      Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
-    else
-      Sequel.lit("")
+      dataset = dataset.where(Sequel[:applied_tag][:tagged_id] => object_id)
     end
 
-    actions_filter = if actions
-      Sequel.lit("AND actions ?| array[:actions]", {actions: Sequel.pg_array(expand_actions(actions))})
-    else
-      Sequel.lit("")
+    if actions
+      dataset = dataset.where(Sequel.pg_jsonb_op(:actions).contain_any(Sequel.pg_array(expand_actions(actions))))
     end
 
-    DB[<<~SQL, {subject_id: subject_id, actions_filter: actions_filter, object_filter: object_filter}].all
-      SELECT object_applied_tags.tagged_id, object_applied_tags.tagged_table, subjects, actions, objects
-      FROM access_policy AS acl
-          CROSS JOIN jsonb_to_recordset(acl.body->'acls') as items(subjects JSONB, actions JSONB, objects JSONB)
-          JOIN access_tag AS object_access_tags ON acl.project_id = object_access_tags.project_id
-          JOIN applied_tag AS object_applied_tags ON object_access_tags.id = object_applied_tags.access_tag_id AND objects ? object_access_tags."name"
-      WHERE acl.project_id IN (
-          SELECT access_tag.project_id
-          FROM access_tag
-          JOIN applied_tag ON access_tag.id = applied_tag.access_tag_id
-          WHERE applied_tag.tagged_id = :subject_id
-            AND subjects ? access_tag."name"
-        )
-        :actions_filter
-        :object_filter
-    SQL
+    dataset.all
   end
 
   module ManagedPolicy
