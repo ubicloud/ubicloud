@@ -22,7 +22,7 @@ module Authorization
   end
 
   def self.authorized_resources(subject_id, actions)
-    matched_policies(subject_id, actions).map { _1[:tagged_id] }
+    matched_policies_dataset(subject_id, actions).select_map(:tagged_id)
   end
 
   def self.expand_actions(actions)
