@@ -35,23 +35,6 @@ $(".sidebar-group-btn").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });
 
-$(".radio-stacked-cards input[type=radio]").on("change", function (event) {
-    let name = $(this).attr("name");
-    $(`#${name}-radios label`).removeClass("border-orange-600 ring-2 ring-orange-600");
-    $(`#${name}-radios label span.pointer-events-none`)
-        .removeClass("border-transparent")
-        .addClass("border-2");
-
-    $(this)
-        .parent()
-        .addClass("border-orange-600 ring-2 ring-orange-600");
-    $(this)
-        .parent()
-        .children("span.pointer-events-none")
-        .removeClass("border-2")
-        .addClass("border-transparent");
-});
-
 $(".delete-btn").on("click", function (event) {
     event.preventDefault();
     let url = $(this).data("url");
