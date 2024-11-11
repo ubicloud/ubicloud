@@ -4,31 +4,34 @@ options ||= {}
 selected = flash.dig("old", name) || selected
 error ||= flash.dig("errors", name)
 description ||= nil
-attributes ||= {} %>
+attributes ||= {}
+is_content_array = options[0][1].is_a?(Array) %>
 
 <div class="space-y-2">
   <label for="<%= name %>" class="text-sm font-medium leading-6 text-gray-900"><%= label %></label>
-  <fieldset class="radio-small-cards" id="<%= name %>-radios">
+  <fieldset class="radio-small-cards">
     <legend class="sr-only"><%= label %></legend>
-    <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-      <% options.each do |opt_val, opt_text, opt_details| %>
-        <label>
-          <input
-            type="radio"
-            name="<%= name %>"
-            value="<%= opt_val %>"
-            data-details="<%= opt_details %>"
-            class="peer sr-only"
-            <%= (opt_val == selected) ? "checked" : "" %>
-            <% attributes.each do |atr_key, atr_value| %>
-            <%= atr_key %>="<%= atr_value %>"
-            <% end%>
-          >
-          <span
-            class="flex items-center justify-center rounded-md py-3 px-3 text-sm font-semibold sm:flex-1 cursor-pointer focus:outline-none
-              ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
-          ><%= opt_text %></span>
+    <% grid_cols = is_content_array ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4" %>
+    <div class="grid gap-3 grid-cols-1 <%= grid_cols %>">
+      <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
+        <% checked = (opt_val == selected || (selected.nil? && idx == 0)) ? "checked" : "" %>
+        <% opt_attrs = attributes.merge(opt_attrs || {}).map { |atr_key, atr_value| "#{atr_key}=\"#{atr_value}\"" }.join(" ") %>
+        <label class="<%= opt_classes %>">
+          <input type="radio" name="<%= name %>" value="<%= opt_val %>" class="peer sr-only" <%== opt_attrs %> <%= checked %>>
+          <% if is_content_array %>
+            <span class="radio-small-card justify-between p-4">
+              <span class="flex flex-col">
+                <span class="text-md font-semibold"><%= opt_text[0] %></span>
+                <span class="text-sm opacity-80"><span class="block sm:inline"><%= opt_text[1] %></span></span>
+              </span>
+              <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
+                <span class="font-medium"><%= opt_text[2] %></span>
+                <span class="ml-1 opacity-50 sm:ml-0"><%= opt_text[3] %></span>
+              </span>
+            </span>
+          <% else %>
+            <span class="radio-small-card justify-center p-3 text-sm font-semibold"><%= opt_text %></span>
+          <% end %>
         </label>
       <% end %>
     </div>
