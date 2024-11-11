@@ -13,8 +13,8 @@
                 name: "Dashboard",
                 url: "#{@project_data[:path]}/dashboard",
                 is_active: request.path.start_with?("#{@project_data[:path]}/dashboard"),
-                icon: "hero-home"
-              }
+                icon: "hero-home",
+              },
             ) %>
             <%== render(
               "layouts/sidebar/item",
@@ -22,8 +22,8 @@
                 name: "Compute",
                 url: "#{@project_data[:path]}/vm",
                 is_active: request.path.start_with?("#{@project_data[:path]}/vm"),
-                icon: "hero-server-stack"
-              }
+                icon: "hero-server-stack",
+              },
             ) %>
             <%== render(
               "layouts/sidebar/item",
@@ -31,11 +31,10 @@
                 name: "Networking",
                 url: "#{@project_data[:path]}/private-subnet",
                 is_active:
-                  request.path.start_with?("#{@project_data[:path]}/private-subnet") ||
-                  request.path.start_with?("#{@project_data[:path]}/firewall") ||
-                  request.path.start_with?("#{@project_data[:path]}/load-balancer"),
-                icon: "hero-globe-alt"
-              }
+                  request.path.start_with?("#{@project_data[:path]}/private-subnet") || request.path.start_with?("#{@project_data[:path]}/firewall") ||
+                    request.path.start_with?("#{@project_data[:path]}/load-balancer"),
+                icon: "hero-globe-alt",
+              },
             ) %>
             <%== render(
               "layouts/sidebar/item",
@@ -43,37 +42,13 @@
                 name: "PostgreSQL",
                 url: "#{@project_data[:path]}/postgres",
                 is_active: request.path.start_with?("#{@project_data[:path]}/postgres"),
-                icon: "hero-circle-stack"
-              }
+                icon: "hero-circle-stack",
+              },
             ) %>
           <% else %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
-                name: "Dashboard",
-                url: "/dashboard",
-                is_active: request.path.start_with?("/dashboard"),
-                icon: "hero-home"
-              }
-            ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
-                name: "My Account",
-                url: "/account",
-                is_active: request.path.start_with?("/account"),
-                icon: "hero-user"
-              }
-            ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
-                name: "Projects",
-                url: "/project",
-                is_active: request.path.start_with?("/project"),
-                icon: "hero-folder-open"
-              }
-            ) %>
+            <%== render("layouts/sidebar/item", locals: { name: "Dashboard", url: "/dashboard", is_active: request.path.start_with?("/dashboard"), icon: "hero-home" }) %>
+            <%== render("layouts/sidebar/item", locals: { name: "My Account", url: "/account", is_active: request.path.start_with?("/account"), icon: "hero-user" }) %>
+            <%== render("layouts/sidebar/item", locals: { name: "Projects", url: "/project", is_active: request.path.start_with?("/project"), icon: "hero-folder-open" }) %>
           <% end %>
         </ul>
       </li>
@@ -88,8 +63,8 @@
                 url: "#{@project_data[:path]}/user",
                 is_active: request.path.start_with?("#{@project_data[:path]}/user"),
                 icon: "hero-users",
-                has_permission: has_project_permission("Project:user")
-              }
+                has_permission: has_project_permission("Project:user"),
+              },
             ) %>
             <% if Config.stripe_secret_key %>
               <%== render(
@@ -100,8 +75,8 @@
                   is_active: request.path.start_with?("#{@project_data[:path]}/billing"),
                   icon: "hero-banknotes",
                   html_id: "billing-icon",
-                  has_permission: has_project_permission("Project:billing")
-                }
+                  has_permission: has_project_permission("Project:billing"),
+                },
               ) %>
             <% end %>
             <%== render(
@@ -111,14 +86,14 @@
                 url: @project_data[:path],
                 is_active: request.path == @project_data[:path],
                 icon: "hero-cog-6-tooth",
-                has_permission: has_project_permission("Project:view")
-              }
+                has_permission: has_project_permission("Project:view"),
+              },
             ) %>
           </ul>
         </li>
       <% end %>
       <% if @project_data && has_project_permission("Project:github") %>
-              <li>
+        <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Integrations</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
             <% if Config.github_app_name %>
@@ -129,8 +104,8 @@
                   url: "#{@project_data[:path]}/github",
                   is_active: request.path.start_with?("#{@project_data[:path]}/github"),
                   icon: "github",
-                  has_permission: has_project_permission("Project:github")
-                }
+                  has_permission: has_project_permission("Project:github"),
+                },
               ) %>
             <% end %>
           </ul>

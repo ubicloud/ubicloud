@@ -13,17 +13,7 @@
       <div class="px-4 py-5 sm:p-6">
         <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
           <div class="sm:col-span-3">
-            <%== render(
-              "components/form/text",
-              locals: {
-                name: "name",
-                label: "Name",
-                attributes: {
-                  required: true,
-                  placeholder: "Enter name"
-                }
-              }
-            ) %>
+            <%== render("components/form/text", locals: { name: "name", label: "Name", attributes: { required: true, placeholder: "Enter name" } }) %>
           </div>
         </div>
 

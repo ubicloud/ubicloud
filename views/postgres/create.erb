@@ -1,12 +1,11 @@
-<%
-  @page_title, logo = if @flavor == PostgresResource::Flavor::PARADEDB
+<% @page_title, logo =
+  if @flavor == PostgresResource::Flavor::PARADEDB
     ["Create ParadeDB PostgreSQL Database", "logo-paradedb.png"]
   elsif @flavor == PostgresResource::Flavor::LANTERN
     ["Create Lantern PostgreSQL Database", "logo-lantern.png"]
   else
     ["Create PostgreSQL Database", nil]
-  end
-%>
+  end %>
 
 <%== render("components/billing_warning") %>
 
@@ -15,28 +14,17 @@
     "components/breadcrumb",
     locals: {
       back: "#{@project_data[:path]}/postgres",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-        %w[Create #]
-      ]
-    }
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"], %w[Create #]],
+    },
   ) %>
 
-  <%== render(
-    "components/page_header",
-    locals: {
-      title:  @page_title,
-      right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
-    }
-  ) %>
+  <%== render("components/page_header", locals: { title: @page_title, right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil] }) %>
 </div>
 
 <div class="grid gap-6">
   <form action="<%= "#{@project_data[:path]}/postgres" %>" method="POST">
     <%== csrf_tag("#{@project_data[:path]}/postgres") %>
-    <%== render("components/form/hidden", locals: {name: "flavor", value: @flavor}) %>
+    <%== render("components/form/hidden", locals: { name: "flavor", value: @flavor }) %>
     <!-- Create Card -->
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
@@ -44,23 +32,10 @@
           <div>
             <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
               <div class="sm:col-span-3">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name"
-                    }
-                  }
-                ) %>
+                <%== render("components/form/text", locals: { name: "name", label: "Name", attributes: { required: true, placeholder: "Enter name" } }) %>
               </div>
               <div class="col-span-full">
-                <% locations = Option
-                    .postgres_locations
-                    .map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] }
-                %>
+                <% locations = Option.postgres_locations.map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] } %>
                 <%== render(
                   "components/form/radio_small_cards",
                   locals: {
@@ -69,9 +44,9 @@
                     options: locations,
                     selected: locations.first[0],
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </div>
               <div class="col-span-full">
@@ -80,8 +55,7 @@
                   <fieldset class="radio-small-cards" id="size-radios">
                     <legend class="sr-only">Server size</legend>
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      <%
-                      selected_location = flash.dig("old", "location") || locations.first[0]
+                      <% selected_location = flash.dig("old", "location") || locations.first[0]
                       Option::PostgresSizes.select { _1.family == @flavor && _1.location == LocationNameConverter.to_internal_name(selected_location) }.each_with_index do |size, idx|
                         disabled = !@enabled_postgres_sizes.include?(size.name)
                         storage_size_options = JSON.generate(
@@ -89,8 +63,7 @@
                           .select { _1.family == @flavor && _1.name == size.name }
                           .map { [LocationNameConverter.to_display_name(_1.location), _1.storage_size_options] }
                           .to_h
-                          )
-                        %>
+                          ) %>
                         <label class="size-<%= size.name %>" title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>">
                           <input
                             type="radio"
@@ -107,10 +80,11 @@
                             <%= disabled ? "disabled" : "" %>
                           >
                           <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
-                                <%= disabled ? "opacity-50" : "" %>"
+                            class="
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700 <%= disabled ? "opacity-50" : "" %>
+                            "
                           >
                             <span class="flex flex-col">
                               <span class="text-md font-semibold"><%= size.display_name %></span>
@@ -139,14 +113,13 @@
                 <div class="space-y-2">
                   <label for="storage_size" class="text-sm font-medium leading-6 text-gray-900">Storage size</label>
                   <fieldset class="radio-small-cards" id="storage-size-radios">
-                  <legend class="sr-only">Storage size</legend>
+                    <legend class="sr-only">Storage size</legend>
                     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
                       <% size_name = flash.dig("old", "size") || Option::PostgresSizes[0].name
                       size = Option::PostgresSizes.find { _1.name == size_name }
                       size.storage_size_options.each_with_index do |storage_size, idx|
                         all_locations_with_storage_size = Option::PostgresSizes.select { _1.name == size_name && _1.family == @flavor && _1.storage_size_options.include?(storage_size) }.map { "#{LocationNameConverter.to_display_name(_1.location)}" }
-                        location_based_classes = ["location-based-option"] + all_locations_with_storage_size
-                      %>
+                        location_based_classes = ["location-based-option"] + all_locations_with_storage_size %>
                         <label class="storage-size storage-size-<%= storage_size %> <%= location_based_classes.join(" ") %>">
                           <input
                             type="radio"
@@ -157,9 +130,11 @@
                             <%= (flash.dig("old", "storage_size") == storage_size.to_s || flash.dig("old", "storage_size").nil? && idx == 0) ? "checked" : "" %>
                           >
                           <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
+                            class="
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700
+                            "
                           >
                             <span class="text-md font-semibold storage-size-label"><%= storage_size %>GB</span>
                             <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
@@ -184,9 +159,9 @@
                     options: versions.map { |v| [v, "Postgres #{v}"] },
                     selected: versions[0],
                     attributes: {
-                      required: true
-                    }
-                  }
+                      required: true,
+                    },
+                  },
                 ) %>
               </div>
 
@@ -208,9 +183,11 @@
                             <%= (flash.dig("old", "ha_type") == ha_type.name || flash.dig("old", "ha_type").nil? && idx == 0) ? "checked" : "" %>
                           >
                           <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
+                            class="
+                              flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
+                              peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white
+                              peer-checked:hover:bg-orange-700
+                            "
                           >
                             <span class="flex flex-col">
                               <span class="text-md font-semibold"><%= ha_type.title %></span>
@@ -238,27 +215,37 @@
                     <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
                     <div class="space-y-1 text-sm leading-6 text-gray-600">
                       <p>
-                        ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads.
+                        ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for
+                        search and analytics workloads.
                       </p>
                       <div>
                         <span class="font-semibold">Support:</span>
                         <ul class="list-disc list-inside ml-2">
-                          <li>Via email at <a href="mailto:support@paradedb.com" class="text-orange-600 font-semibold">support@paradedb.com</a></li>
-                          <li>Via Slack at <a href="https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ" target="_blank" class="text-orange-600 font-semibold">ParadeDB Community Slack</a></li>
+                          <li>Via email at
+                            <a href="mailto:support@paradedb.com" class="text-orange-600 font-semibold">support@paradedb.com</a></li>
+                          <li>Via Slack at
+                            <a href="https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ" target="_blank" class="text-orange-600 font-semibold">ParadeDB Community Slack</a></li>
                         </ul>
 
                       </div>
                       <p>
-                        By creating a ParadeDB PostgreSQL database on Ubicloud you accept the ParadeDB <a href="https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75" target="_blank" class="text-orange-600 font-semibold">Terms of Service</a> and consent to your email being shared with ParadeDB.
+                        By creating a ParadeDB PostgreSQL database on Ubicloud you accept the ParadeDB
+                        <a href="https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75" target="_blank" class="text-orange-600 font-semibold">Terms of Service</a>
+                        and consent to your email being shared with ParadeDB.
                       </p>
                     </div>
                     <%== render(
                       "components/form/checkbox",
                       locals: {
                         options: [
-                          ["1", "Accept <a href='https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://paradedb.notion.site/Privacy-Policy-a7ce333c45c8478fb03250dff7e573b7?pvs=4' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>", {}, {required: true}],
-                        ]
-                      }
+                          [
+                            "1",
+                            "Accept <a href='https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://paradedb.notion.site/Privacy-Policy-a7ce333c45c8478fb03250dff7e573b7?pvs=4' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>",
+                            {},
+                            { required: true },
+                          ],
+                        ],
+                      },
                     ) %>
                   </div>
                 </div>
@@ -270,10 +257,12 @@
                     <label class="text-sm font-medium leading-6 text-gray-900">Partnership Notice</label>
                     <div class="space-y-1 text-sm leading-6 text-gray-600">
                       <p>
-                        Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads.
+                        Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the
+                        Lantern team and are optimal for AI workloads.
                       </p>
                       <p>
-                        You can reach to Lantern team for support at <a href="mailto:support@lantern.dev" class="text-orange-600 font-semibold">support@lantern.dev</a>
+                        You can reach to Lantern team for support at
+                        <a href="mailto:support@lantern.dev" class="text-orange-600 font-semibold">support@lantern.dev</a>
                       </p>
                       <p>
                         By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information being shared with Lantern.
@@ -283,9 +272,14 @@
                       "components/form/checkbox",
                       locals: {
                         options: [
-                          ["1", "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>", {}, {required: true}],
-                        ]
-                      }
+                          [
+                            "1",
+                            "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>",
+                            {},
+                            { required: true },
+                          ],
+                        ],
+                      },
                     ) %>
                   </div>
                 </div>

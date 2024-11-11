@@ -1,13 +1,7 @@
 <% @page_title = @project_data[:name] %>
 
 <div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
-    }
-  ) %>
+  <%== render("components/breadcrumb", locals: { back: "/project", parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]] }) %>
   <%== render("components/page_header", locals: { title: "Project Settings" }) %>
 </div>
 
@@ -25,25 +19,15 @@
             if Authorization.has_permission?(current_account.id, "Project:edit", @project_data[:id])
               [
                 "Name",
-                render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    value: @project_data[:name],
-                    button_title: "Save",
-                    attributes: {
-                      required: true
-                    }
-                  }
-                ),
-                { escape: false }
+                render("components/form/text", locals: { name: "name", value: @project_data[:name], button_title: "Save", attributes: { required: true } }),
+                { escape: false },
               ]
             else
               ["Name", @project_data[:name]]
             end
-          )
-        ]
-      }
+          ),
+        ],
+      },
     ) %>
   </form>
   <!-- Quota Card -->
@@ -59,14 +43,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <% @quotas.each do |quota| %>
         <div class="p-6">
-          <%== render(
-            "components/progress_bar",
-            locals: {
-              title: quota[:resource_type],
-              numerator: quota[:current_resource_usage],
-              denominator: quota[:quota]
-            }
-          ) %>
+          <%== render("components/progress_bar", locals: { title: quota[:resource_type], numerator: quota[:current_resource_usage], denominator: quota[:quota] }) %>
         </div>
       <% end %>
     </div>

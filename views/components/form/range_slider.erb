@@ -19,7 +19,10 @@
       <% if value %>
       value="<%= value %>"
       <% end %>
-      class="w-full range-lg h-2 bg-gray-200 accent-orange-600 rounded-lg appearance-none cursor-pointer border-transparent <%=extra_class %> <%= error ? "text-red-900 ring-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 focus:ring-orange-600"%>"
+      class="
+        w-full range-lg h-2 bg-gray-200 accent-orange-600 rounded-lg appearance-none cursor-pointer border-transparent <%=extra_class %>
+        <%= error ? "text-red-900 ring-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 focus:ring-orange-600"%>
+      "
       <% attributes.each do |atr_key, atr_value| %>
       <%= atr_key %>="<%= atr_value %>"
       <% end%>

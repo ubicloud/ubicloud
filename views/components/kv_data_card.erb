@@ -6,14 +6,7 @@
           <dt class="text-sm font-medium text-gray-500"><%= name %></dt>
           <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
             <% if opts && opts[:copieble] && value %>
-              <%== render(
-                "components/copieble_content",
-                locals: {
-                  content: value,
-                  message: "Copied #{name}",
-                  revealable: opts[:revealable]
-                }
-              ) %>
+              <%== render("components/copieble_content", locals: { content: value, message: "Copied #{name}", revealable: opts[:revealable] }) %>
             <% elsif opts && opts[:revealable] && value %>
               <%== render("components/revealable_content", locals: { content: value }) %>
             <% elsif opts && opts[:escape] == false %>

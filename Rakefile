@@ -275,7 +275,7 @@ end
 
 begin
   namespace :linter do
-    # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
+    # "ubicloud/erb-formatter" can't be required without bundler setup because of custom repository.
     require "bundler/setup"
     Bundler.setup
 
@@ -294,8 +294,8 @@ begin
     task :erb_formatter do
       puts "Running ERB::Formatter..."
       require "erb/formatter/command_line"
-      files = Dir.glob("views/**/[!icon]*.erb").entries
-      ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
+      files = Dir.glob("views/**/*.erb").reject { _1.end_with?("icon.erb") }.entries
+      ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "160"]).run
     end
 
     desc "Validate, lint, format OpenAPI YAML file"
