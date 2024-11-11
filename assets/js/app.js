@@ -1,11 +1,8 @@
 $(function() {
   setupPolicyEditor();
-  setupLocationBasedPrices();
-  setupLocationBasedOptions();
-  setupInstanceSizeBasedOptions();
-  setupLocationBasedPostgresHaPrices();
   setupAutoRefresh();
   setupDatePicker();
+  setupFormOptionUpdates();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -168,107 +165,6 @@ function jsonHighlight(str) {
   });
 }
 
-$("input[name=location]").on("change", function (event) {
-  setupLocationBasedPrices();
-  setupLocationBasedOptions();
-  setupInstanceSizeBasedOptions();
-  setupLocationBasedPostgresHaPrices();
-});
-
-$("input[name=size]").on("change", function (event) {
-  setupInstanceSizeBasedOptions();
-  setupLocationBasedPostgresHaPrices();
-});
-
-$("input[name=storage_size]").on("change", function (event) {
-  setupLocationBasedPostgresHaPrices();
-});
-
-function setupLocationBasedPrices() {
-  let selectedLocation = $("input[name=location]:checked")
-  let prices = selectedLocation.length ? selectedLocation.data("details") : {};
-  let count = {}
-  $("input.location-based-price").each(function(i, obj) {
-    let name = $(this).attr("name");
-    let value = $(this).val();
-    let resource_type = Array.isArray($(this).data("resource-type")) ? $(this).data("resource-type") : [$(this).data("resource-type")];
-    let resource_family = Array.isArray($(this).data("resource-family")) ? $(this).data("resource-family") : [$(this).data("resource-family")];
-    let amount = Array.isArray($(this).data("amount")) ? $(this).data("amount") : [$(this).data("amount")];
-    let is_default = $(this).data("default");
-
-    let monthly = 0;
-    for(var i = 0; i < resource_type.length; i++) {
-      if (monthlyPrice = prices?.[resource_type[i]]?.[resource_family[i]]?.["monthly"]) {
-        monthly += monthlyPrice * amount[i];
-      } else {
-        $(`.${name}-${value}`).hide();
-        if (!is_default) {
-          $(this).prop('checked', false);
-        }
-
-        return;
-      }
-    }
-
-    $(this).data("monthly-price", monthly.toFixed(2));
-    $(`.${name}-${value}`).show();
-    $(`.${name}-${value}-monthly-price`).text(`$${monthly.toFixed(2)}`);
-    $(`.${name}-${value}-hourly-price`).text(`$${(monthly / 672).toFixed(3)}`);
-    count[name] = (count[name] || 0) + 1;
-  });
-}
-
-function setupLocationBasedPostgresHaPrices() {
-  $("input.location-based-postgres-ha-price").each(function(i, obj) {
-    let value = $(this).val();
-    let monthlyComputePrice = parseFloat($("input[name=size]:checked").data("monthly-price"))
-    let monthlyStoragePrice = parseFloat($("input[name=storage_size]:checked").data("monthly-price"))
-    let monthlyPrice = monthlyComputePrice + monthlyStoragePrice;
-    let standbyCount = $(this).data("standby-count");
-    $(`.ha-status-${value}`).show();
-    $(`.ha-status-${value}-monthly-price`).text(`+$${(standbyCount * monthlyPrice).toFixed(2)}`);
-    $(`.ha-status-${value}-hourly-price`).text(`+$${(standbyCount * monthlyPrice / 672).toFixed(3)}`);
-  });
-}
-
-function setupLocationBasedOptions() {
-  let selectedLocation = $("input[name=location]:checked").val();
-  $(".location-based-option").hide().prop('disabled', true).prop('checked', false).prop('selected', false);
-  if (selectedLocation) {
-    $(`.location-based-option.${selectedLocation}`).show().prop('disabled', false);
-    if($(`.location-based-option.${selectedLocation}:last input[type=radio]`).length > 0 && $(`.location-based-option.${selectedLocation} input[type=radio]:checked`).length == 0){
-      $(`.location-based-option.${selectedLocation}:last input[type=radio]`).get(0).checked = true;
-    }
-  }
-}
-
-function setupInstanceSizeBasedOptions() {
-  $(".instance-size-based-storage-sizes").each(function() {
-    let selectedLocation = $("input[name=location]:checked").val();
-    resource_family = $("input[name=size]:checked").data("resource-family");
-    storage_size_options = $("input[name=size]:checked").data("storage-size-options");
-    // Available storage sizes for postgres depend on location, but this is not
-    // the case for VM. If it's an array, location doesn't matter; otherwise, it does.
-    if (!Array.isArray(storage_size_options)) {
-      storage_size_options = storage_size_options[selectedLocation];
-    }
-    storage_resource_type = $("input[name=size]:checked").data("storage-resource-type");
-    storage_size_index = 0;
-
-    $(this).find(".storage-size").each(function() {
-      let storage_amount = storage_size_options[storage_size_index];
-      let monthlyPrice = storage_amount * $("input[name=location]:checked").data("details")[storage_resource_type][resource_family]["monthly"];
-
-      $(this).find("input[type=radio]").val(storage_amount);
-      $(this).find("input[type=radio]").data("monthly-price", monthlyPrice);
-      $(this).find(".storage-size-label").text(storage_amount + "GB (" + (storage_amount / storage_size_options[0]) + "x)");
-      $(this).find(".storage-size-monthly-price").text("+$" + (monthlyPrice).toFixed(2));
-      $(this).find(".storage-size-hourly-price").text("+$" + (monthlyPrice / 672).toFixed(3));
-      storage_size_index++;
-    });
-  });
-}
-
 function setupAutoRefresh() {
   $("div.auto-refresh").each(function() {
     const interval = $(this).data("interval");
@@ -310,4 +206,73 @@ function setupDatePicker() {
 
     $(this).flatpickr(options);
   });
+}
+
+function setupFormOptionUpdates() {
+  $('#creation-form').on('change', 'input', function() {
+    let name = $(this).attr('name');
+    option_dirty[name] = $(this).val();
+
+    if ($(this).attr('type') !== 'radio') {
+      return;
+    }
+    redrawChildOptions(name);
+  });
+}
+
+function redrawChildOptions(name){
+  if(option_children[name]) {
+    let value = $("input[name=" + name + "]:checked").val();
+    let classes = $("input[name=" + name + "]:checked").parent().attr('class');
+    classes = classes ? classes.split(" ") : [];
+    classes = "." + classes.concat("form_" + name, "form_" + name + "_" + value).join('.');
+
+    option_children[name].forEach(function(child_name){
+      let child_type = document.getElementsByName(child_name)[0].nodeName.toLowerCase();
+      if(child_type == "input"){
+        child_type = "input_" + document.getElementsByName(child_name)[0].type.toLowerCase();
+      }
+
+      let elements2select = [];
+      switch(child_type){
+        case "input_radio":
+          $("input[name=" + child_name + "]").parent().hide()
+          $("input[name=" + child_name + "]").prop('disabled', true).prop('checked', false).prop('selected', false);
+          $("input[name=" + child_name + "]").parent(classes).show()
+          $("input[name=" + child_name + "]").parent(classes).children("input[name=" + child_name + "]").prop('disabled', false);
+
+          if(option_dirty[child_name]){
+            elements2select = $("input[name=" + child_name + "][value=" + option_dirty[child_name] + "]").parent(classes);
+          }
+
+          if(elements2select.length == 0){
+            option_dirty[child_name] = null;
+            elements2select = $("input[name=" + child_name + "]").parent(classes);
+          }
+
+          elements2select[0].children[0].checked = true;
+          break;
+        case "input_checkbox":
+
+          break;
+        case "select":
+          $("select[name=" + child_name + "]").children().hide().prop('disabled', true).prop('checked', false).prop('selected', false);
+          $("select[name=" + child_name + "]").children(".always-visible, " + classes).show().prop('disabled', false);
+
+          if(option_dirty[child_name]){
+            elements2select = $("select[name=" + child_name + "]").children(classes + "[value=" + option_dirty[child_name] + "]");
+          }
+
+          if(elements2select.length == 0){
+            option_dirty[child_name] = null;
+            elements2select = $("select[name=" + child_name + "]").children(".always-visible, " + classes);
+          }
+
+          elements2select[0].selected = true;
+          break;
+      }
+
+      redrawChildOptions(child_name);
+    });
+  }
 }
