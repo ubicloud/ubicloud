@@ -51,6 +51,40 @@ class DnsZone < Sequel::Model
     incr_refresh_dns_servers
   end
 
+  def purge_obsolete_records
+    DB.transaction do
+      # These are the records that are obsoleted by a another record with the
+      # same fields but newer date. We can delete them even if they are not
+      # seen yet.
+      obsoleted_records = records_dataset
+        .join(
+          records_dataset
+            .select_group(:dns_zone_id, :name, :type, :data)
+            .select_append { max(created_at).as(:latest_created_at) }
+            .as(:latest_dns_record),
+          [:dns_zone_id, :name, :type, :data]
+        )
+        .where { dns_record[:created_at] < latest_dns_record[:latest_created_at] }.all
+
+      # These are the tombstoned records, we can only delete them if they are
+      # seen by all DNS servers. We join with seen_dns_records_by_dns_servers
+      # and count the number of DNS servers to ensure that they are seen by all
+      # DNS servers.
+      dns_server_ids = dns_servers.map(&:id)
+      seen_tombstoned_records = records_dataset
+        .select_group(:id)
+        .join(:seen_dns_records_by_dns_servers, dns_record_id: :id, dns_server_id: dns_server_ids)
+        .where(tombstoned: true)
+        .having { count.function.* =~ dns_server_ids.count }.all
+
+      records_to_purge = obsoleted_records + seen_tombstoned_records
+      DB[:seen_dns_records_by_dns_servers].where(dns_record_id: records_to_purge.map(&:id).uniq).delete(force: true)
+      records_to_purge.uniq(&:id).map(&:destroy)
+
+      update(last_purged_at: Time.now)
+    end
+  end
+
   def add_dot_if_missing(record_name)
     (record_name[-1] == ".") ? record_name : record_name + "."
   end
