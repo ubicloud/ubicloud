@@ -77,4 +77,36 @@ class Clover
       request.redirect "#{project.path}#{st.subject.path}"
     end
   end
+
+  def generate_vm_options
+    options = OptionTreeGenerator.new
+
+    options.add_option(name: "name")
+    options.add_option(name: "location", values: Option.locations.map(&:display_name))
+
+    subnets = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").map {
+      {
+        location: LocationNameConverter.to_display_name(_1.location),
+        value: _1.ubid,
+        display_name: _1.name
+      }
+    }
+    options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
+      private_subnet[:location] == location
+    end
+
+    options.add_option(name: "enable_ip4", values: ["1"], parent: "location")
+    options.add_option(name: "size", values: [2, 4, 8, 16, 30, 60].map { "standard-#{_1}" }, parent: "location")
+
+    options.add_option(name: "storage_size", values: ["40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, size, storage_size|
+      size = size.split("-").last.to_i
+      [size * 20, size * 40].include?(storage_size.to_i)
+    end
+
+    options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
+    options.add_option(name: "unix_user")
+    options.add_option(name: "public_key")
+
+    options.serialize
+  end
 end

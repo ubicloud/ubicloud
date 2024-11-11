@@ -68,7 +68,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         choose option: "eu-central-h1"
-        uncheck "Enable Public IPv4"
+        uncheck "enable_ip4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
@@ -91,7 +91,7 @@ RSpec.describe Clover, "vm" do
         name = "dummy-vm"
         fill_in "Name", with: name
         choose option: "eu-central-h1"
-        check "Enable Public IPv4"
+        check "enable_ip4"
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
