@@ -12,14 +12,14 @@ attributes ||= {} %>
   <fieldset>
     <div class="space-y-5">
       <% options.each do |opt_val, opt_text, opt_classes, opt_attrs| %>
-        <div class="relative flex items-start">
+        <div class="relative flex items-start <%= opt_classes %>">
           <div class="flex h-6 items-center">
             <input
               id="<%= name %>-<%= opt_val %>"
               name="<%= name %>"
               type="checkbox"
               value="<%= opt_val %>"
-              class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600 <%= opt_classes %>"
+              class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600"
               <% (opt_attrs || {}).each do |opt_atr_key, opt_atr_value| %>
                 <%= opt_atr_key %>="<%= opt_atr_value %>"
               <% end%>
