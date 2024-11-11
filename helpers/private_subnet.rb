@@ -54,4 +54,11 @@ class Clover
       request.redirect "#{@project.path}#{PrivateSubnet[st.id].path}"
     end
   end
+
+  def generate_private_subnet_options
+    options = OptionTreeGenerator.new
+    options.add_option(name: "name")
+    options.add_option(name: "location", values: Option.locations.map(&:display_name))
+    options.serialize
+  end
 end
