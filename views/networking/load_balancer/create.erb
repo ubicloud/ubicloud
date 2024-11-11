@@ -15,137 +15,20 @@
   <%== render("components/page_header") %>
 </div>
 
-<div class="grid gap-6">
-  <form action="<%= "#{@project_data[:path]}/load-balancer" %>" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/load-balancer") %>
-    <!-- Create Card -->
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="space-y-12">
-          <div>
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-4 xl:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name"
-                    }
-                  }
-                ) %>
-              </div>
-            </div>
-            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-4 xl:col-span-2">
-                <%== render(
-                  "components/form/select",
-                  locals: {
-                    name: "private_subnet_id",
-                    label: "Private Subnet",
-                    options: @subnets.map { |s| [s[:id], s[:name]] },
-                    placeholder: "Select private subnet"
-                  }
-                ) %>
-              </div>
-            </div>
-            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-4 xl:col-span-2">
-                <%== render(
-                  "components/form/select",
-                  locals: {
-                    name: "algorithm",
-                    label: "Load Balancing Algorithm",
-                    options: ["Round Robin", "Hash Based"].map { |a| [a.downcase.tr(" ", "_"), a] },
-                  }
-                ) %>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="px-4 py-5 mt-6 sm:p-6">
-        <div class="space-y-12">
-          <div>
-            <h2 class="text-base font-semibold leading-7 text-gray-900">Forwarding Rule</h2>
-            <p class="mt-1 text-sm leading-6 text-gray-600">Configures the routing of traffic from the load balancer to your virtual machines.</p>
-            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "src_port",
-                    label: "Load Balancer Port",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "80"
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "dst_port",
-                    label: "Application Port",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "80"
-                    }
-                  }
-                ) %>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="px-4 py-5 mt-6 sm:p-6">
-        <div class="space-y-12">
-          <div>
-            <h2 class="text-base font-semibold leading-7 text-gray-900">Monitoring</h2>
-            <p class="mt-1 text-sm leading-6 text-gray-600">The health check endpoint is used in combination with the Application Port. Make sure it returns 200.</p>
-            <div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "health_check_endpoint",
-                    label: "HTTP Health Check Endpoint",
-                    attributes: {
-                      placeholder: "/up"
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-6 md:col-span-2 xl:col-span-1">
-                <%== render(
-                  "components/form/select",
-                  locals: {
-                    name: "health_check_protocol",
-                    label: "Health Check Protocol",
-                    options: ["http", "https", "tcp"].map { |p| [p, p.upcase] },
-                    placeholder: "Select health check protocol",
-                    attributes: {
-                      required: true
-                    }
-                  }
-                ) %>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="px-4 py-5 sm:p-6">
-        <div class="flex items-center justify-end gap-x-6">
-          <a href="<%= @project_data[:path] %>/load-balancer" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
-        </div>
-      </div>
-    </div>
-  </form>
-</div>
+<%
+  form_elements = [
+    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
+    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Select private subnet", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
+    {name: "algorithm", type: "select", label: "Load Balancing Algorithm", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
+    {name: "forwarding_rule", type: "section", label: "Forwarding Rule", content: "Configures the routing of traffic from the load balancer to your virtual machines."},
+    {name: "src_port", type: "number", label: "Load Balancer Port", required: "required", placeholder: "80", opening_tag: "<div class='col-span-6 col-start-1 md:col-end-3 xl:col-end-2'>"},
+    {name: "dst_port", type: "number", label: "Application Port", required: "required", placeholder: "80", opening_tag: "<div class='col-span-6 col-start-1 md:col-start-3 md:col-end-5 xl:col-start-2 xl:col-end-3'>"},
+    {name: "monitoring", type: "section", label: "Monitoring", content: "The health check endpoint is used in combination with the Application Port. Make sure it returns 200."},
+    {name: "health_check_endpoint", type: "text", label: "HTTP Health Check Endpoint", placeholder: "/up", opening_tag: "<div class='col-span-6 col-start-1 md:col-end-3 xl:col-end-2'>"},
+    {name: "health_check_protocol", type: "select", label: "Health Check Protocol", required: "required", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-start-3 md:col-end-5 xl:col-start-2 xl:col-end-3'>"}
+  ]
+
+  action = "#{@project_data[:path]}/load-balancer"
+%>
+
+<%==render("components/form/resource_creation_form", locals: {action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents})%>

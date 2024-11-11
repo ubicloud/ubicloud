@@ -117,4 +117,10 @@ module ContentGenerator
       notice[flavor]
     end
   end
+
+  module LoadBalancer
+    def self.select_option(select_option)
+      select_option[:display_name]
+    end
+  end
 end
