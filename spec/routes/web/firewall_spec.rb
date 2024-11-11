@@ -89,7 +89,7 @@ RSpec.describe Clover, "firewall" do
         name = "dummy-fw-1"
         fill_in "Name", with: name
         fill_in "Description", with: name
-        select ps.name, from: "private-subnet-id"
+        select ps.name, from: "private_subnet_id"
 
         click_button "Create"
 
@@ -176,7 +176,7 @@ RSpec.describe Clover, "firewall" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
 
         visit "#{project.path}#{firewall.path}"
-        select ps.name, from: "private-subnet-id"
+        select ps.name, from: "private_subnet_id"
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
@@ -193,7 +193,7 @@ RSpec.describe Clover, "firewall" do
       it "can not attach subnet when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         visit "#{project.path}#{firewall.path}"
-        select "dummy-ps-1", from: "private-subnet-id"
+        select "dummy-ps-1", from: "private_subnet_id"
         ps.destroy
         click_button "Attach"
 
@@ -222,7 +222,7 @@ RSpec.describe Clover, "firewall" do
       it "can not detach subnet when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
         visit "#{project.path}#{firewall.path}"
-        select "dummy-ps-1", from: "private-subnet-id"
+        select "dummy-ps-1", from: "private_subnet_id"
         click_button "Attach"
         visit "#{project.path}#{firewall.path}"
 
