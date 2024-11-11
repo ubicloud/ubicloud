@@ -15,75 +15,15 @@
   <%== render("components/page_header") %>
 </div>
 
-<div class="grid gap-6">
-  <form action="<%= "#{@project_data[:path]}/firewall" %>" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/firewall") %>
-    <!-- Create Card -->
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="space-y-12">
-          <div>
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="sm:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name"
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="sm:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "description",
-                    label: "Description",
-                    attributes: {
-                      placeholder: "Enter description"
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-full">
-                <%== render(
-                  "components/form/radio_small_cards",
-                  locals: {
-                    name: "location",
-                    label: "Location",
-                    options: Option.locations.to_h { |l| [l.display_name, l.ui_name] },
-                    selected: Option.locations.detect { |l| l.name == @default_location }&.display_name,
-                    attributes: {
-                      required: true
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="sm:col-span-2">
-                <%== render(
-                  "components/form/select",
-                  locals: {
-                    name: "private_subnet_id",
-                    label: "Private Subnet",
-                    options: @subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] },
-                    placeholder: "Select private subnet"
-                  }
-                ) %>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="px-4 py-5 sm:p-6">
-        <div class="flex items-center justify-end gap-x-6">
-          <a href="<%= @project_data[:path] %>/firewall" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
-        </div>
-      </div>
-    </div>
-  </form>
-</div>
+<%
+  form_elements = [
+    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-2'>"},
+    {name: "description", type: "text", label: "Description", required: "required", placeholder: "Enter description", opening_tag: "<div class='sm:col-span-2'>"},
+    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
+    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Select private subnet", content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-2'>"},
+  ]
+
+  action = "#{@project_data[:path]}/firewall"
+%>
+
+<%==render("components/form/resource_creation_form", locals: {action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents})%>

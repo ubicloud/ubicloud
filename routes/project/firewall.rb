@@ -18,8 +18,7 @@ class Clover
     r.on web? do
       r.get "create" do
         authorize("Firewall:create", @project.id)
-        authorized_subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:edit").all
-        @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
+        @option_tree, @option_parents = generate_firewall_options
         @default_location = @project.default_location
         view "networking/firewall/create"
       end
