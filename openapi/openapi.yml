@@ -114,6 +114,8 @@ paths:
       tags:
         - Project
   '/project/{project_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
     delete:
       operationId: deleteProject
       summary: Delete a project
@@ -138,9 +140,9 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Project
+  '/project/{project_id}/firewall':
     parameters:
       - $ref: '#/components/parameters/project_id'
-  '/project/{project_id}/firewall':
     get:
       operationId: getFirewall
       summary: Return the list of firewalls in the project
@@ -166,8 +168,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-    parameters:
-      - $ref: '#/components/parameters/project_id'
     post:
       operationId: createFirewall
       summary: Create a new firewall
@@ -199,6 +199,9 @@ paths:
       tags:
         - Firewall
   '/project/{project_id}/firewall/{firewall_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
     delete:
       operationId: deleteFirewall
       summary: Delete a specific firewall
@@ -223,9 +226,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
   '/project/{project_id}/firewall/{firewall_name}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -265,6 +265,10 @@ paths:
       tags:
         - Firewall Rule
   '/project/{project_id}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteFirewallRule
       summary: Delete a specific firewall rule
@@ -289,10 +293,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
-      - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/load-balancer':
     get:
       operationId: listLoadBalancers
@@ -550,6 +550,11 @@ paths:
       tags:
         - Firewall Rule
   '/project/{project_id}/location/{location}/firewall/id/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteLocationFirewallFirewallRuleWithId
       summary: Delete a specific firewall rule
@@ -608,11 +613,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
-      - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/location/{location}/firewall/{firewall_name}':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -707,6 +707,11 @@ paths:
       tags:
         - Firewall Rule
   '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteLocationFirewallFirewallRule
       summary: Delete a specific firewall rule
@@ -765,11 +770,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_name'
-      - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/location/{location}/load-balancer':
     get:
       operationId: listLocationLoadBalancers
@@ -1118,6 +1118,10 @@ paths:
       tags:
         - Postgres Firewall Rule
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
     delete:
       operationId: deletePostgresDatabaseWithID
       summary: Delete a specific Postgres database with ID
@@ -1142,11 +1146,12 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule/{firewall_rule_id}':
     parameters:
-      - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_id'
-  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule/{firewall_rule_id}':
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteLocationPostgresFirewallRuleWithId
       summary: Delete a specific Postgres firewall rule
@@ -1198,11 +1203,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Firewall Rule
-    parameters:
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_id'
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_rule_id'
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password':
     post:
       operationId: resetSuperuserPasswordWithID
@@ -1269,6 +1269,10 @@ paths:
       tags:
         - Postgres
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
     delete:
       operationId: deletePostgresDatabase
       summary: Delete a specific Postgres database
@@ -1293,10 +1297,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/postgres_database_name'
     post:
       operationId: createPostgresDatabase
       summary: Create a new Postgres database in a specific location of a project
@@ -1535,6 +1535,10 @@ paths:
       tags:
         - Private Subnet
   '/project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_id'
     delete:
       operationId: deletePSWithId
       summary: Delete a specific Private Subnet with ID
@@ -1559,11 +1563,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_id'
-  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}':
+      - $ref: '#/components/parameters/private_subnet_name'
     delete:
       operationId: deletePrivateSubnet
       summary: Delete a specific Private Subnet
@@ -1588,10 +1592,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Private Subnet
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/private_subnet_name'
     post:
       operationId: createPrivateSubnet
       summary: Create a new Private Subnet in a specific location of a project
@@ -1649,6 +1649,10 @@ paths:
       tags:
         - Virtual Machine
   '/project/{project_id}/location/{location}/vm/id/{vm_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_id'
     delete:
       operationId: deleteVMWithId
       summary: Delete a specific VM with ID
@@ -1673,11 +1677,11 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_name}':
     parameters:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/vm_id'
-  '/project/{project_id}/location/{location}/vm/{vm_name}':
+      - $ref: '#/components/parameters/vm_name'
     delete:
       operationId: deleteVM
       summary: Delete a specific VM
@@ -1702,10 +1706,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/vm_name'
     post:
       operationId: createVM
       summary: Create a new VM in a specific location of a project
