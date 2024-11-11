@@ -112,7 +112,7 @@
           <tr>
             <form action="<%= "#{request.path}/detach-subnet" %>" role="form" method="POST">
               <%== csrf_tag("#{request.path}/detach-subnet") %>
-              <input type="hidden" name="private-subnet-id" value="<%= ps[:id] %>">
+              <input type="hidden" name="private_subnet_id" value="<%= ps[:id] %>">
               <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                 <a
                   href="<%= "#{@project_data[:path]}/location/#{ps[:location]}/private-subnet/#{ps[:name]}" %>"
@@ -133,7 +133,7 @@
                 <%== render(
                   "components/form/select",
                   locals: {
-                    name: "private-subnet-id",
+                    name: "private_subnet_id",
                     placeholder: "Select a subnet",
                     options: @attachable_subnets.map { |s| [s[:id], s[:name]] },
                     attributes: {

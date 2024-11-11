@@ -70,7 +70,7 @@
                 <%== render(
                   "components/form/select",
                   locals: {
-                    name: "private-subnet-id",
+                    name: "private_subnet_id",
                     label: "Private Subnet",
                     options: @subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] },
                     placeholder: "Select private subnet"
