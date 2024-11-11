@@ -14,10 +14,9 @@ is_content_array = options[0][1].is_a?(Array) %>
     <% grid_cols = is_content_array ? "md:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4" %>
     <div class="grid gap-3 grid-cols-1 <%= grid_cols %>">
       <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
-        <% checked = (opt_val == selected || (selected.nil? && idx == 0)) ? "checked" : "" %>
         <% opt_attrs = attributes.merge(opt_attrs || {}).map { |atr_key, atr_value| "#{atr_key}=\"#{atr_value}\"" }.join(" ") %>
         <label class="<%= opt_classes %>">
-          <input type="radio" name="<%= name %>" value="<%= opt_val %>" class="peer sr-only" <%== opt_attrs %> <%= checked %>>
+          <input type="radio" name="<%= name %>" value="<%= opt_val %>" class="peer sr-only" <%== opt_attrs %>>
           <% if is_content_array %>
             <span class="radio-small-card justify-between p-4">
               <span class="flex flex-col">
