@@ -21,11 +21,11 @@ class Clover
 
       r.get "create" do
         authorize("Vm:create", @project.id)
-        @subnets = Serializers::PrivateSubnet.serialize(dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").all)
         @prices = fetch_location_based_prices("VmCores", "VmStorage", "IPAddress")
         @has_valid_payment_method = @project.has_valid_payment_method?
         @default_location = @project.default_location
         @enabled_vm_sizes = Option::VmSizes.select { _1.visible && @project.quota_available?("VmCores", _1.vcpu / 2) }.map(&:name)
+        @option_tree, @option_parents = generate_vm_options
 
         view "vm/create"
       end
