@@ -1,7 +1,6 @@
 <% name ||= nil
 label ||= nil
 options ||= {}
-selected = flash.dig("old", name) || selected
 error ||= rodauth.field_error(name) || flash.dig("errors", name)
 description ||= nil
 attributes ||= {} %>
@@ -21,7 +20,6 @@ attributes ||= {} %>
               type="checkbox"
               value="<%= opt_val %>"
               class="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-600 <%= opt_classes %>"
-              <%= (opt_val == selected) ? "checked" : "" %>
               <% (opt_attrs || {}).each do |opt_atr_key, opt_atr_value| %>
                 <%= opt_atr_key %>="<%= opt_atr_value %>"
               <% end%>
