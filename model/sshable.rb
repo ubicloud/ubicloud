@@ -138,6 +138,13 @@ class Sshable < Sequel::Model
     Thread.current[:clover_ssh_cache]&.delete([host, unix_user])
   end
 
+  def available?
+    cmd("true")
+    true
+  rescue
+    false
+  end
+
   def self.reset_cache
     return [] unless (cache = Thread.current[:clover_ssh_cache])
 
