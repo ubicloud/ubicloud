@@ -73,6 +73,7 @@ class UBID
   TYPE_CERT = "ce"
   TYPE_INFERENCE_ENDPOINT = "1e"
   TYPE_INFERENCE_ENDPOINT_REPLICA = "1r"
+  TYPE_RESOURCE_GROUP = "rg"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
