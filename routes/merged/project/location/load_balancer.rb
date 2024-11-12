@@ -25,16 +25,9 @@ class Clover
         Authorization.authorize(current_account.id, "LoadBalancer:edit", lb.id)
         required_parameters = %w[vm_id]
         request_body_params = Validation.validate_request_body(json_params, required_parameters)
-        vm = Vm.from_ubid(request_body_params["vm_id"])
 
-        unless vm
-          response.status = 404
-          if api?
-            r.halt
-          else
-            flash["error"] = "VM not found"
-            r.redirect "#{@project.path}#{lb.path}"
-          end
+        unless (vm = Vm.from_ubid(request_body_params["vm_id"]))
+          fail Validation::ValidationFailed.new("vm_id" => "VM not found")
         end
 
         Authorization.authorize(current_account.id, "Vm:view", vm.id)
@@ -91,8 +84,7 @@ class Clover
         new_vms = request_body_params["vms"].map { Vm.from_ubid(_1.delete("\"")) }
         new_vms.each do |vm|
           unless vm
-            response.status = 404
-            r.halt
+            fail Validation::ValidationFailed.new("vms" => "VM not found")
           end
 
           Authorization.authorize(current_account.id, "Vm:view", vm.id)
