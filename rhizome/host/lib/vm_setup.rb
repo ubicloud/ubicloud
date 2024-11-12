@@ -440,6 +440,10 @@ DHCP
     address_mapping = boot_image.include?("github") ?
       "address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}" :
       ""
+
+    dhcp_range = boot_image.include?("github") ?
+      "" :
+      "dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}"
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
@@ -450,7 +454,7 @@ bogus-priv
 no-resolv
 #{raparams}
 #{interfaces}
-dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
+#{dhcp_range}
 #{private_ip_dhcp}
 server=149.112.112.112
 server=9.9.9.9
