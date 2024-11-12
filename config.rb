@@ -185,4 +185,7 @@ module Config
 
   # AI
   optional :inference_endpoint_service_project_id, string
+
+  # DNS
+  optional :dns_service_project_id, string
 end
