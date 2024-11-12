@@ -30,15 +30,8 @@ class Clover
     optional_parameters = %w[health_check_endpoint]
     request_body_params = Validation.validate_request_body(json_params, required_parameters, optional_parameters)
 
-    ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
-    unless ps
-      response.status = 404
-      if api?
-        request.halt
-      else
-        flash["error"] = "Private subnet not found"
-        request.redirect "#{@project.path}/load-balancer/create"
-      end
+    unless (ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"]))
+      fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
     end
     Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
 
