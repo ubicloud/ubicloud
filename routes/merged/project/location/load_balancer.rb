@@ -41,9 +41,7 @@ class Clover
 
         if action == "attach-vm"
           if vm.load_balancer
-            flash["error"] = "VM is already attached to a load balancer"
-            response.status = 400
-            r.redirect "#{@project.path}#{lb.path}"
+            fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
           end
           lb.add_vm(vm)
           actioned = "attached"
