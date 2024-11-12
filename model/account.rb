@@ -3,6 +3,10 @@
 require_relative "../model"
 
 class Account < Sequel::Model(:accounts)
+  one_to_many :usage_alerts, key: :user_id
+
+  plugin :association_dependencies, usage_alerts: :destroy
+
   include ResourceMethods
   include Authorization::HyperTagMethods
 

@@ -315,6 +315,9 @@ RSpec.describe Clover, "auth" do
     end
 
     it "can close account" do
+      account = Account[email: TEST_USER_EMAIL]
+      UsageAlert.create_with_id(project_id: account.projects.first.id, user_id: account.id, name: "test", limit: 100)
+
       visit "/account/close-account"
 
       click_button "Close Account"
