@@ -94,7 +94,12 @@ end
 
 desc "Refresh schema and index caches"
 task :refresh_sequel_caches do
-  sh({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "ruby", "-r", "./loader", "-e", <<~END)
+  %w[schema index].each do |type|
+    filename = "cache/#{type}.cache"
+    File.delete(filename) if File.file?(filename)
+  end
+
+  sh({"RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "ruby", "-r", "./loader", "-e", <<~END)
      DB.dump_schema_cache("cache/schema.cache")
      DB.dump_index_cache("cache/index.cache")
   END
