@@ -11,11 +11,11 @@ attributes ||= {} %>
   <% end %>
   <fieldset>
     <div class="space-y-5">
-      <% options.each do |opt_val, opt_text, opt_classes, opt_attrs| %>
+      <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
         <div class="relative flex items-start <%= opt_classes %>">
           <div class="flex h-6 items-center">
             <input
-              id="<%= name %>-<%= opt_val %>"
+              id="<%= name %>-<%= opt_val %>-<%= idx %>"
               name="<%= name %>"
               type="checkbox"
               value="<%= opt_val %>"
@@ -26,7 +26,7 @@ attributes ||= {} %>
             >
           </div>
           <div class="ml-3 text-sm leading-6">
-            <label for="<%= name %>-<%= opt_val %>" class="font-medium text-gray-900"><%== opt_text %></label>
+            <label for="<%= name %>-<%= opt_val %>-<%= idx %>" class="font-medium text-gray-900"><%== opt_text %></label>
           </div>
         </div>
       <% end %>
