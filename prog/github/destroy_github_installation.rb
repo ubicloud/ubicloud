@@ -13,6 +13,10 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
     )
   end
 
+  label def before_run
+    pop "github installation is destroyed" unless github_installation
+  end
+
   label def start
     register_deadline(nil, 10 * 60)
     hop_delete_installation
