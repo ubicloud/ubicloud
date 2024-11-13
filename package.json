@@ -8,9 +8,9 @@
     "tailwindcss": "^3.4.15"
   },
   "scripts": {
-    "dev": "npx tailwindcss -o assets/css/app.css",
-    "prod": "npx tailwindcss -o assets/css/app.css --minify",
-    "watch": "npx tailwindcss -o assets/css/app.css --watch"
+    "dev": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css",
+    "prod": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --minify",
+    "watch": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --watch"
   },
   "engines": {
     "node": "23.2.0",
