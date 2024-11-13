@@ -437,9 +437,14 @@ DHCP
     raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
     interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
     dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
-    address_mapping = boot_image.include?("github") ?
-      "address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}" :
+    address_mapping = if boot_image.include?("github")
+      <<~ADDRESSES
+      address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}
+      address=/.docker.io/::
+      ADDRESSES
+    else
       ""
+    end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
 leasefile-ro
