@@ -100,8 +100,14 @@ class ResourceGroup < Sequel::Model
 
   def from_cpu_bitmask(bitmask)
     cpuset = ResourceGroup.bitmask_to_cpuset(bitmask)
+    cpus = bitmask.reduce(&:+)
+    fail "Bitmask does not set any cpuset." if cpus == 0 || cpuset.empty?
 
-    update(allowed_cpus: cpuset)
+    # Get the proportion of cores to cpus from the host
+    # TODO: We may need some more validation here
+    threads_per_core = vm_host.total_cpus / vm_host.total_cores
+
+    update(allowed_cpus: cpuset, cores: cpus / threads_per_core, total_cpu_percent: cpus * 100)
   end
 
   # Returns the name as used by systemctl and cgroup

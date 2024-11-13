@@ -60,11 +60,17 @@ RSpec.describe ResourceGroup do
 
   describe "#from_cpu_bitmask" do
     it "converts a cpu bitmask to a correct allowed cpu set" do
+      allow(resource_group).to receive_messages(vm_host: vm_host)
+
       cpu_array = BitArray.new(8)
-      cpu_array[4] = 1
-      cpu_array[5] = 1
+      cpu_array[0] = 1
+      cpu_array[1] = 1
+      cpu_array[6] = 1
+      cpu_array[7] = 1
       resource_group.from_cpu_bitmask(cpu_array)
-      expect(resource_group.allowed_cpus).to eq("4-5")
+      expect(resource_group.allowed_cpus).to eq("0-1,6-7")
+      expect(resource_group.cores).to eq(2)
+      expect(resource_group.total_cpu_percent).to eq(400)
     end
   end
 
