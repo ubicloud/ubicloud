@@ -2,6 +2,9 @@
 
 require_relative "../spec_helper"
 
+css_file = File.expand_path("../../../assets/css/app.css", __dir__)
+File.write(css_file, "") unless File.file?(css_file)
+
 require "capybara"
 require "capybara/rspec"
 
