@@ -466,11 +466,7 @@ Rebuilding...
 Done in 767ms.
 ```
 
-`assets/css/app.css` should be updated. It will show up as modified
-in git, as an empty file is committed to git so all of the tests
-still run.  Update git to ignore changes to the file:
-
-    git update-index --skip-worktree assets/css/app.css
+`assets/css/app.css` should be updated.
 
 After that, start up the web server.
 
