@@ -109,7 +109,7 @@ end
 
 desc "Setup database"
 task :setup_database, [:env, :parallel] do |_, args|
-  raise "env must be test or dev" if !["test", "development"].include?(args[:env])
+  raise "env must be test or development" unless ["test", "development"].include?(args[:env])
   raise "parallel can only be used in test" if args[:parallel] && args[:env] != "test"
   File.binwrite(auto_parallel_tests_file, "1") if args[:parallel] && !File.file?(auto_parallel_tests_file)
 
