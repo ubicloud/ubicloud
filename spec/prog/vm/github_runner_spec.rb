@@ -476,7 +476,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
 
-      expect { nx.wait }.to nap(15)
+      expect { nx.wait }.to nap(60)
     end
 
     it "destroys runner if it does not pick a job in five minutes and not busy" do
@@ -496,7 +496,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(github_runner).not_to receive(:incr_destroy)
 
-      expect { nx.wait }.to nap(15)
+      expect { nx.wait }.to nap(60)
     end
 
     it "destroys the runner if the runner-script is succeeded" do
@@ -517,7 +517,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(github_runner).to receive(:workflow_job).and_return({"id" => 123})
       expect(sshable).to receive(:cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
 
-      expect { nx.wait }.to nap(15)
+      expect { nx.wait }.to nap(60)
     end
   end
 
