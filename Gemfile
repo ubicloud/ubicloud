@@ -60,7 +60,7 @@ group :test do
   gem "pdf-reader"
 end
 
-gem "webauthn", "~> 3.1"
+gem "webauthn", "~> 3.2"
 
 gem "aws-sdk-s3", "~> 1.170"
 
