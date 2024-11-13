@@ -119,9 +119,9 @@ task :setup_database, [:env, :parallel] do |_, args|
     threads << Thread.new do
       puts "Creating database #{i}..."
       database_name = "clover_#{args[:env]}#{args[:parallel] ? (i + 1) : ""}"
-      `dropdb --if-exists -U postgres #{database_name}`
-      `createdb -U postgres -O clover #{database_name}`
-      `psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}`
+      sh "dropdb --if-exists -U postgres #{database_name}"
+      sh "createdb -U postgres -O clover #{database_name}"
+      sh "psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}"
       db = Sequel.connect("postgres:///#{database_name}?user=clover")
       migrate.call(args[:env], nil, db: db)
     end
@@ -252,10 +252,8 @@ end
 
 desc "Emit assets before deploying"
 task "assets:precompile" do
-  `npm install`
-  fail unless $?.success?
-  `npm run prod`
-  fail unless $?.success?
+  sh("npm", "install")
+  sh("npm", "run", "prod")
 end
 
 desc "Open a new shell allowing use of by for speeding up tests"
