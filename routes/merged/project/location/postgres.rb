@@ -140,7 +140,31 @@ class Clover
       end
 
       request.post "restore" do
-        pg_endpoint_helper.restore
+        Authorization.authorize(current_account.id, "Postgres:create", @project.id)
+        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+
+        required_parameters = ["name", "restore_target"]
+        request_body_params = Validation.validate_request_body(json_params, required_parameters)
+
+        st = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: @project.id,
+          location: pg.location,
+          name: request_body_params["name"],
+          target_vm_size: pg.target_vm_size,
+          target_storage_size_gib: pg.target_storage_size_gib,
+          version: pg.version,
+          flavor: pg.flavor,
+          parent_id: pg.id,
+          restore_target: request_body_params["restore_target"]
+        )
+        send_notification_mail_to_partners(st.subject, current_account.email)
+
+        if api?
+          Serializers::Postgres.serialize(st.subject, {detailed: true})
+        else
+          flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
+          request.redirect "#{@project.path}#{st.subject.path}"
+        end
       end
 
       request.post "reset-superuser-password" do
