@@ -26,7 +26,7 @@ class Clover
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: @project.id,
       location: @location,
-      name: name,
+      name:,
       target_vm_size: parsed_size.vm_size,
       target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
       ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
