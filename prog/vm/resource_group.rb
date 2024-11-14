@@ -3,7 +3,7 @@
 class Prog::Vm::ResourceGroup < Prog::Base
   subject_is :resource_group
 
-  semaphore :destroy
+  semaphore :destroy, :start_after_host_reboot
   
   def self.assemble_with_host(name, vm_host, allowed_cpus:, memory_1g:, type: "dedicated")
     fail "Must provide a VmHost." if vm_host.nil?
@@ -64,8 +64,12 @@ class Prog::Vm::ResourceGroup < Prog::Base
 
   label def wait
     # TODO: add availabiltit checks
-    # TODO: add re-checking the values after reboot
-  
+
+    when_start_after_host_reboot_set? do
+      register_deadline(:wait, 5 * 60)
+      hop_start_after_host_reboot
+    end
+
     nap 30
   end
 
@@ -77,5 +81,12 @@ class Prog::Vm::ResourceGroup < Prog::Base
     resource_group.destroy
 
     pop "resource_group destroyed"
+  end
+
+  label def start_after_host_reboot
+    host.sshable.cmd("sudo host/bin/setup-rg recreate-unpersisted #{rg.inhost_name}")
+    decr_start_after_host_reboot
+
+    hop_wait
   end
 end

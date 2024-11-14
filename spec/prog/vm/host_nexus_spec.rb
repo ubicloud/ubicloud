@@ -17,7 +17,8 @@ RSpec.describe Prog::Vm::HostNexus do
   }
 
   let(:vms) { [instance_double(Vm, mem_gib: 1), instance_double(Vm, mem_gib: 2)] }
-  let(:vm_host) { instance_double(VmHost, vms: vms) }
+  let(:resource_groups) { [instance_double(ResourceGroup, name: "standard1"), instance_double(ResourceGroup, name: "standard2")] }
+  let(:vm_host) { instance_double(VmHost, vms: vms, resource_groups: resource_groups) }
   let(:sshable) { instance_double(Sshable) }
 
   before do
@@ -379,7 +380,14 @@ RSpec.describe Prog::Vm::HostNexus do
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 4")
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 5, used_hugepages_1g: 4)
-      expect { nx.verify_hugepages }.to hop("start_vms")
+      expect { nx.verify_hugepages }.to hop("start_resource_groups")
+    end
+  end
+
+  describe "#start_resource_groups" do
+    it "starts resource groups and hops" do
+      expect(resource_groups).to all receive(:incr_start_after_host_reboot)
+      expect { nx.start_resource_groups }.to hop("start_vms")
     end
   end
 

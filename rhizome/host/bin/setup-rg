@@ -27,8 +27,8 @@ when "prep"
   end
   rg_setup.prep(allowed_cpus)
 
-# when "recreate-unpersisted"
-#   rg_setup.recreate_unpersisted
+when "recreate-unpersisted"
+  rg_setup.start_systemd_unit
 
 when "reinstall-systemd-units"
   unless (allowed_cpus = ARGV.shift)

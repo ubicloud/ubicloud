@@ -10,7 +10,7 @@ class ResourceGroup < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   # TODO: include HealthMonitorMethods
-  semaphore :destroy
+  semaphore :destroy, :start_after_host_reboot
 
   # Converts AllowedCPUs format to a bitmask
   # We use cgroup format for storying AllowedCPUs list,

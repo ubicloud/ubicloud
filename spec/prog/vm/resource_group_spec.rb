@@ -145,6 +145,12 @@ RSpec.describe Prog::Vm::ResourceGroup do
     it "naps for 30 seconds" do
       expect { nx.wait }.to nap(30)
     end
+
+    it "hops to start_after_host_reboot when signaled" do
+      expect(nx).to receive(:when_start_after_host_reboot_set?).and_yield
+      expect(nx).to receive(:register_deadline).with(:wait, 5 * 60)
+      expect { nx.wait }.to hop("start_after_host_reboot")
+    end
   end
 
   describe "#destroy" do
@@ -155,6 +161,15 @@ RSpec.describe Prog::Vm::ResourceGroup do
       expect(resource_group).to receive(:inhost_name).and_return("standard.slice")
 
       expect { nx.destroy }.to exit({"msg" => "resource_group destroyed"})
+    end
+  end
+
+  describe "#start_after_host_reboot" do
+    it "starts resource group on the host and hops to wait" do
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-rg recreate-unpersisted standard.slice")
+      expect(resource_group).to receive(:inhost_name).and_return("standard.slice")
+
+      expect { nx.start_after_host_reboot }.to hop("wait")
     end
   end
 end

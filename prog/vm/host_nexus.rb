@@ -183,6 +183,14 @@ class Prog::Vm::HostNexus < Prog::Base
       used_hugepages_1g: total_hugepages - free_hugepages + total_vm_mem_gib
     )
 
+    hop_start_resource_groups
+  end
+
+  label def start_resource_groups
+    vm_host.resource_groups.each { |rg|
+      rg.incr_start_after_host_reboot
+    }
+
     hop_start_vms
   end
 
