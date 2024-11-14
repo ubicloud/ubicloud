@@ -38,7 +38,12 @@ class Clover
 
       if web?
         request.post "restart" do
-          pg_endpoint_helper.restart
+          Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
+          pg.servers.each do |s|
+            s.incr_restart
+          rescue Sequel::ForeignKeyConstraintViolation
+          end
+          request.redirect "#{@project.path}#{pg.path}"
         end
       end
 

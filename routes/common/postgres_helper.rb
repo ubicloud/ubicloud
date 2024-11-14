@@ -113,15 +113,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
   end
 
-  def restart
-    Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
-    @resource.servers.each do |s|
-      s.incr_restart
-    rescue Sequel::ForeignKeyConstraintViolation
-    end
-    @request.redirect "#{project.path}#{@resource.path}"
-  end
-
   def failover
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
