@@ -81,7 +81,16 @@ class Clover
 
         request.is String do |firewall_rule_ubid|
           request.delete true do
-            pg_endpoint_helper.delete_firewall_rule(firewall_rule_ubid)
+            Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
+
+            if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
+              DB.transaction do
+                fwr.destroy
+                pg.incr_update_firewall_rules
+              end
+            end
+            response.status = 204
+            request.halt
           end
         end
       end

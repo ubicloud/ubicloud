@@ -83,19 +83,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def delete_firewall_rule(firewall_rule_ubid)
-    Authorization.authorize(@user.id, "Postgres:Firewall:edit", @resource.id)
-
-    if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
-      DB.transaction do
-        fwr.destroy
-        @resource.incr_update_firewall_rules
-      end
-    end
-    response.status = 204
-    @request.halt
-  end
-
   def post_metric_destination
     Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
 
