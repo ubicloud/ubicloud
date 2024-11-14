@@ -97,7 +97,29 @@ class Clover
 
       request.on "metric-destination" do
         request.post true do
-          pg_endpoint_helper.post_metric_destination
+          Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
+
+          required_parameters = ["url", "username", "password"]
+          request_body_params = Validation.validate_request_body(json_params, required_parameters)
+
+          Validation.validate_url(request_body_params["url"])
+
+          DB.transaction do
+            PostgresMetricDestination.create_with_id(
+              postgres_resource_id: pg.id,
+              url: request_body_params["url"],
+              username: request_body_params["username"],
+              password: request_body_params["password"]
+            )
+            pg.servers.each(&:incr_configure_prometheus)
+          end
+
+          if api?
+            Serializers::Postgres.serialize(pg, {detailed: true})
+          else
+            flash["notice"] = "Metric destination is created"
+            request.redirect "#{@project.path}#{pg.path}"
+          end
         end
 
         request.is String do |metric_destination_ubid|

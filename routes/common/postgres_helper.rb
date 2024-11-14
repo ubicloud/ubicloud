@@ -83,32 +83,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def post_metric_destination
-    Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
-
-    required_parameters = ["url", "username", "password"]
-    request_body_params = Validation.validate_request_body(params, required_parameters)
-
-    Validation.validate_url(request_body_params["url"])
-
-    DB.transaction do
-      PostgresMetricDestination.create_with_id(
-        postgres_resource_id: @resource.id,
-        url: request_body_params["url"],
-        username: request_body_params["username"],
-        password: request_body_params["password"]
-      )
-      @resource.servers.each(&:incr_configure_prometheus)
-    end
-
-    if @mode == AppMode::API
-      Serializers::Postgres.serialize(@resource, {detailed: true})
-    else
-      flash["notice"] = "Metric destination is created"
-      @request.redirect "#{project.path}#{@resource.path}"
-    end
-  end
-
   def delete_metric_destination(metric_destination_ubid)
     Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
 
