@@ -113,25 +113,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
   end
 
-  def failover
-    Authorization.authorize(@user.id, "Postgres:create", project.id)
-    Authorization.authorize(@user.id, "Postgres:view", @resource.id)
-
-    unless @resource.representative_server.primary?
-      fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered during restore!")
-    end
-
-    unless project.get_ff_postgresql_base_image
-      fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered for this resource!")
-    end
-
-    unless @resource.representative_server.trigger_failover
-      fail CloverError.new(400, "InvalidRequest", "There is not a suitable standby server to failover!")
-    end
-
-    Serializers::Postgres.serialize(@resource, {detailed: true})
-  end
-
   def send_notification_mail_to_partners(resource, user_email)
     if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(resource.flavor) && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
       flavor_name = resource.flavor.capitalize
