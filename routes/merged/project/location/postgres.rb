@@ -41,7 +41,10 @@ class Clover
       end
 
       request.delete true do
-        pg_endpoint_helper.delete
+        Authorization.authorize(current_account.id, "Postgres:delete", pg.id)
+        pg.incr_destroy
+        response.status = 204
+        request.halt
       end
 
       if web?
