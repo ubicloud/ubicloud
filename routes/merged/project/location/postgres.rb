@@ -29,7 +29,15 @@ class Clover
       end
 
       request.get true do
-        pg_endpoint_helper.get
+        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+        response.headers["Cache-Control"] = "no-store"
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          @pg = Serializers::Postgres.serialize(pg, {detailed: true, include_path: true})
+          view "postgres/show"
+        end
       end
 
       request.delete true do
