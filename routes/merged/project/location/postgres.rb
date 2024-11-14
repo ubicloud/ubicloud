@@ -2,8 +2,6 @@
 
 class Clover
   branch = lambda do |r|
-    pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
-
     r.get api? do
       postgres_list
     end
@@ -11,7 +9,7 @@ class Clover
     r.on NAME_OR_UBID do |pg_name, pg_ubid|
       if pg_name
         r.post true do
-          pg_endpoint_helper.post(name: pg_name)
+          postgres_post(name: pg_name)
         end
 
         filter = {Sequel[:postgres_resource][:name] => pg_name}
@@ -21,7 +19,6 @@ class Clover
 
       filter[:location] = @location
       pg = @project.postgres_resources_dataset.first(filter)
-      pg_endpoint_helper.instance_variable_set(:@resource, pg)
 
       unless pg
         response.status = request.delete? ? 204 : 404
@@ -232,7 +229,7 @@ class Clover
     # 204 response for invalid names
     r.is String do |pg_name|
       r.post do
-        pg_endpoint_helper.post(name: pg_name)
+        postgres_post(name: pg_name)
       end
 
       r.delete do
