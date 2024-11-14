@@ -2,16 +2,14 @@
 
 class Clover
   branch = lambda do |r|
-    pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
-
     r.get true do
       postgres_list
     end
 
     r.on web? do
       r.post true do
-        pg_endpoint_helper.instance_variable_set(:@location, LocationNameConverter.to_internal_name(r.params["location"]))
-        pg_endpoint_helper.post(name: r.params["name"])
+        @location = LocationNameConverter.to_internal_name(r.params["location"])
+        postgres_post(name: r.params["name"])
       end
 
       r.on "create" do
