@@ -56,7 +56,26 @@ class Clover
         end
 
         request.post true do
-          pg_endpoint_helper.post_firewall_rule
+          Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
+
+          required_parameters = ["cidr"]
+          request_body_params = Validation.validate_request_body(json_params, required_parameters)
+          parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
+
+          DB.transaction do
+            PostgresFirewallRule.create_with_id(
+              postgres_resource_id: pg.id,
+              cidr: parsed_cidr.to_s
+            )
+            pg.incr_update_firewall_rules
+          end
+
+          if api?
+            Serializers::Postgres.serialize(pg, {detailed: true})
+          else
+            flash["notice"] = "Firewall rule is created"
+            r.redirect "#{@project.path}#{pg.path}"
+          end
         end
 
         request.is String do |firewall_rule_ubid|
