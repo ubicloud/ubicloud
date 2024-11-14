@@ -110,8 +110,16 @@ RSpec.describe Prog::Vm::ResourceGroup do
   end
 
   describe "#prep" do
-    it "starts prep" do
+    it "starts prep on NotStarted" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo host/bin/setup-rg prep standard.slice \"2-3\"' prep_standard")
+      expect(resource_group).to receive(:inhost_name).and_return("standard.slice")
+
+      expect { nx.prep }.to nap(1)
+    end
+
+    it "starts prep on Failed" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("Failed")
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo host/bin/setup-rg prep standard.slice \"2-3\"' prep_standard")
       expect(resource_group).to receive(:inhost_name).and_return("standard.slice")
 
@@ -124,6 +132,12 @@ RSpec.describe Prog::Vm::ResourceGroup do
       expect(resource_group).to receive(:update).with(allocation_state: "accepting")
 
       expect { nx.prep }.to hop("wait")
+    end
+
+    it "do nothing on random result" do
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("foobar")
+
+      expect { nx.prep }.to nap(1)
     end
   end
 

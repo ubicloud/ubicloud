@@ -72,6 +72,11 @@ RSpec.describe ResourceGroup do
       expect(resource_group.cores).to eq(2)
       expect(resource_group.total_cpu_percent).to eq(400)
     end
+
+    it "fails on empty bitmask" do
+      bitmask = BitArray.new(16)
+      expect{resource_group.from_cpu_bitmask(bitmask)}.to raise_error RuntimeError, "Bitmask does not set any cpuset."
+    end
   end
 
   describe "#cpuset_to_bitmask_and_back" do
@@ -109,6 +114,11 @@ RSpec.describe ResourceGroup do
     it "handles inverted order" do
       bitmask = ResourceGroup.cpuset_to_bitmask("6-7,2-3")
       expect(ResourceGroup.bitmask_to_cpuset(bitmask)).to eq("2-3,6-7")
+    end
+
+    it "handles all-zeros bitmask" do
+      bitmask = BitArray.new(8)
+      expect(ResourceGroup.bitmask_to_cpuset(bitmask)).to eq("")
     end
   end
 end
