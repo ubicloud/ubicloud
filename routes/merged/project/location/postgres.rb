@@ -22,7 +22,7 @@ class Clover
 
       unless pg
         response.status = request.delete? ? 204 : 404
-        request.halt
+        next
       end
 
       request.get true do
@@ -41,7 +41,7 @@ class Clover
         Authorization.authorize(current_account.id, "Postgres:delete", pg.id)
         pg.incr_destroy
         response.status = 204
-        request.halt
+        ""
       end
 
       if web?
@@ -118,7 +118,7 @@ class Clover
               end
             end
             response.status = 204
-            request.halt
+            ""
           end
         end
       end
@@ -162,7 +162,7 @@ class Clover
             end
 
             response.status = 204
-            request.halt
+            ""
           end
         end
       end
