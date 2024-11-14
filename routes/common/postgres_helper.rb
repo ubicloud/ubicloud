@@ -83,29 +83,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def post_firewall_rule
-    Authorization.authorize(@user.id, "Postgres:Firewall:edit", @resource.id)
-
-    required_parameters = ["cidr"]
-    request_body_params = Validation.validate_request_body(params, required_parameters)
-    parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
-
-    DB.transaction do
-      PostgresFirewallRule.create_with_id(
-        postgres_resource_id: @resource.id,
-        cidr: parsed_cidr.to_s
-      )
-      @resource.incr_update_firewall_rules
-    end
-
-    if @mode == AppMode::API
-      Serializers::Postgres.serialize(@resource, {detailed: true})
-    else
-      flash["notice"] = "Firewall rule is created"
-      @request.redirect "#{project.path}#{@resource.path}"
-    end
-  end
-
   def get_firewall_rule
     Authorization.authorize(@user.id, "Postgres:Firewall:view", @resource.id)
     Serializers::PostgresFirewallRule.serialize(@resource.firewall_rules)
