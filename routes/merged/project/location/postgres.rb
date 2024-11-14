@@ -51,7 +51,8 @@ class Clover
       request.on "firewall-rule" do
         if api?
           request.get true do
-            pg_endpoint_helper.get_firewall_rule
+            Authorization.authorize(current_account.id, "Postgres:Firewall:view", pg.id)
+            Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
           end
         end
 
