@@ -64,13 +64,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
   end
 
-  def delete
-    Authorization.authorize(@user.id, "Postgres:delete", @resource.id)
-    @resource.incr_destroy
-    response.status = 204
-    @request.halt
-  end
-
   def send_notification_mail_to_partners(resource, user_email)
     if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(resource.flavor) && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
       flavor_name = resource.flavor.capitalize
