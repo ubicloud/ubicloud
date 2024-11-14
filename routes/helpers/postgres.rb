@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def postgres_post(name:)
+  def postgres_post(name)
     Authorization.authorize(current_account.id, "Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
