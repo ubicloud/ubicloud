@@ -1,27 +1,6 @@
 # frozen_string_literal: true
 
 class Routes::Common::PostgresHelper < Routes::Common::Base
-  def list
-    if @mode == AppMode::API
-      dataset = project.postgres_resources_dataset
-      dataset = dataset.where(location: @location) if @location
-      result = dataset.authorized(@user.id, "Postgres:view").eager(:semaphores, :strand).paginated_result(
-        start_after: @request.params["start_after"],
-        page_size: @request.params["page_size"],
-        order_column: @request.params["order_column"]
-      )
-
-      {
-        items: Serializers::Postgres.serialize(result[:records]),
-        count: result[:count]
-      }
-    else
-      postgres_databases = Serializers::Postgres.serialize(project.postgres_resources_dataset.authorized(@user.id, "Postgres:view").eager(:semaphores, :strand, :representative_server, :timeline).all, {include_path: true})
-      @app.instance_variable_set(:@postgres_databases, postgres_databases)
-      @app.view "postgres/index"
-    end
-  end
-
   def post(name: nil)
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?

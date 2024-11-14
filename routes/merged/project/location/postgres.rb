@@ -5,7 +5,7 @@ class Clover
     pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: current_account, location: @location, resource: nil)
 
     r.get api? do
-      pg_endpoint_helper.list
+      postgres_list
     end
 
     r.on NAME_OR_UBID do |pg_name, pg_ubid|
