@@ -57,7 +57,6 @@ class Clover
 
       if api?
         r.post "failover" do
-          Authorization.authorize(current_account.id, "Postgres:create", @project.id)
           Authorization.authorize(current_account.id, "Postgres:view", pg.id)
 
           unless pg.representative_server.primary?
@@ -192,7 +191,6 @@ class Clover
       end
 
       r.post "reset-superuser-password" do
-        Authorization.authorize(current_account.id, "Postgres:create", @project.id)
         Authorization.authorize(current_account.id, "Postgres:view", pg.id)
 
         unless pg.representative_server.primary?
