@@ -148,20 +148,18 @@ class Clover
           end
         end
 
-        r.is String do |metric_destination_ubid|
-          r.delete true do
-            Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
+        r.delete String do |metric_destination_ubid|
+          Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
 
-            if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
-              DB.transaction do
-                md.destroy
-                pg.servers.each(&:incr_configure_prometheus)
-              end
+          if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
+            DB.transaction do
+              md.destroy
+              pg.servers.each(&:incr_configure_prometheus)
             end
-
-            response.status = 204
-            ""
           end
+
+          response.status = 204
+          ""
         end
       end
 
