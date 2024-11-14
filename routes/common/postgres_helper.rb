@@ -83,11 +83,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def get_firewall_rule
-    Authorization.authorize(@user.id, "Postgres:Firewall:view", @resource.id)
-    Serializers::PostgresFirewallRule.serialize(@resource.firewall_rules)
-  end
-
   def delete_firewall_rule(firewall_rule_ubid)
     Authorization.authorize(@user.id, "Postgres:Firewall:edit", @resource.id)
 
