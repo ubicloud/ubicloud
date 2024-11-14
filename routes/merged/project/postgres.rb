@@ -5,7 +5,7 @@ class Clover
     pg_endpoint_helper = Routes::Common::PostgresHelper.new(app: self, request: r, user: current_account, location: nil, resource: nil)
 
     r.get true do
-      pg_endpoint_helper.list
+      postgres_list
     end
 
     r.on web? do
