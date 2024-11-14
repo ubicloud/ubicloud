@@ -188,7 +188,33 @@ class Clover
       end
 
       request.post "reset-superuser-password" do
-        pg_endpoint_helper.reset_superuser_password
+        Authorization.authorize(current_account.id, "Postgres:create", @project.id)
+        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+
+        unless pg.representative_server.primary?
+          if api?
+            fail CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated during restore!")
+          else
+            flash["error"] = "Superuser password cannot be updated during restore!"
+            return redirect_back_with_inputs
+          end
+        end
+
+        required_parameters = api? ? ["password"] : ["password", "repeat_password"]
+        request_body_params = Validation.validate_request_body(json_params, required_parameters)
+        Validation.validate_postgres_superuser_password(request_body_params["password"], request_body_params["repeat_password"])
+
+        DB.transaction do
+          pg.update(superuser_password: request_body_params["password"])
+          pg.representative_server.incr_update_superuser_password
+        end
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "The superuser password will be updated in a few seconds"
+          request.redirect "#{@project.path}#{pg.path}"
+        end
       end
     end
 

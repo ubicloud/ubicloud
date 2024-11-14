@@ -83,36 +83,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def reset_superuser_password
-    Authorization.authorize(@user.id, "Postgres:create", project.id)
-    Authorization.authorize(@user.id, "Postgres:view", @resource.id)
-
-    unless @resource.representative_server.primary?
-      if @mode == AppMode::API
-        fail CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated during restore!")
-      else
-        flash["error"] = "Superuser password cannot be updated during restore!"
-        return @app.redirect_back_with_inputs
-      end
-    end
-
-    required_parameters = (@mode == AppMode::API) ? ["password"] : ["password", "repeat_password"]
-    request_body_params = Validation.validate_request_body(params, required_parameters)
-    Validation.validate_postgres_superuser_password(request_body_params["password"], request_body_params["repeat_password"])
-
-    DB.transaction do
-      @resource.update(superuser_password: request_body_params["password"])
-      @resource.representative_server.incr_update_superuser_password
-    end
-
-    if @mode == AppMode::API
-      Serializers::Postgres.serialize(@resource, {detailed: true})
-    else
-      flash["notice"] = "The superuser password will be updated in a few seconds"
-      @request.redirect "#{project.path}#{@resource.path}"
-    end
-  end
-
   def send_notification_mail_to_partners(resource, user_email)
     if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(resource.flavor) && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
       flavor_name = resource.flavor.capitalize
