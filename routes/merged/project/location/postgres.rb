@@ -9,7 +9,7 @@ class Clover
     r.on NAME_OR_UBID do |pg_name, pg_ubid|
       if pg_name
         r.post true do
-          postgres_post(name: pg_name)
+          postgres_post(pg_name)
         end
 
         filter = {Sequel[:postgres_resource][:name] => pg_name}
@@ -223,7 +223,7 @@ class Clover
     # 204 response for invalid names
     r.is String do |pg_name|
       r.post do
-        postgres_post(name: pg_name)
+        postgres_post(pg_name)
       end
 
       r.delete do

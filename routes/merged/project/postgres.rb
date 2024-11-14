@@ -9,7 +9,7 @@ class Clover
     r.on web? do
       r.post true do
         @location = LocationNameConverter.to_internal_name(r.params["location"])
-        postgres_post(name: r.params["name"])
+        postgres_post(r.params["name"])
       end
 
       r.get "create" do
