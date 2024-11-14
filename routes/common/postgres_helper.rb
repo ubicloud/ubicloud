@@ -231,17 +231,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.redirect "#{project.path}#{@resource.path}"
   end
 
-  def view_create_page
-    Authorization.authorize(@user.id, "Postgres:create", project.id)
-    flavor = @request.params["flavor"] || PostgresResource::Flavor::STANDARD
-    Validation.validate_postgres_flavor(flavor)
-    @app.instance_variable_set(:@flavor, flavor)
-    @app.instance_variable_set(:@prices, @app.fetch_location_based_prices("PostgresCores", "PostgresStorage"))
-    @app.instance_variable_set(:@has_valid_payment_method, project.has_valid_payment_method?)
-    @app.instance_variable_set(:@enabled_postgres_sizes, Option::VmSizes.select { project.quota_available?("PostgresCores", _1.vcpu / 2) }.map(&:name))
-    @app.view "postgres/create"
-  end
-
   def failover
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)

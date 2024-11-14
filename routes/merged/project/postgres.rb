@@ -16,7 +16,17 @@ class Clover
 
       r.on "create" do
         r.get true do
-          pg_endpoint_helper.view_create_page
+          Authorization.authorize(current_account.id, "Postgres:create", @project.id)
+
+          flavor = r.params["flavor"] || PostgresResource::Flavor::STANDARD
+          Validation.validate_postgres_flavor(flavor)
+
+          @flavor = flavor
+          @prices = fetch_location_based_prices("PostgresCores", "PostgresStorage")
+          @has_valid_payment_method = @project.has_valid_payment_method?
+          @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresCores", _1.vcpu / 2) }.map(&:name)
+
+          view "postgres/create"
         end
       end
     end
