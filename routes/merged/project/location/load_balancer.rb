@@ -37,16 +37,16 @@ class Clover
             fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
           end
           lb.add_vm(vm)
-          actioned = "attached"
+          actioned = "attached to"
         else
           lb.detach_vm(vm)
-          actioned = "detached"
+          actioned = "detached from"
         end
 
         if api?
           Serializers::LoadBalancer.serialize(lb, {detailed: true})
         else
-          flash["notice"] = "VM is #{actioned} from the load balancer"
+          flash["notice"] = "VM is #{actioned} the load balancer"
           r.redirect "#{@project.path}#{lb.path}"
         end
       end
