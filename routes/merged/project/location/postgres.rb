@@ -21,11 +21,11 @@ class Clover
       pg = @project.postgres_resources_dataset.first(filter)
 
       unless pg
-        response.status = request.delete? ? 204 : 404
+        response.status = r.delete? ? 204 : 404
         next
       end
 
-      request.get true do
+      r.get true do
         Authorization.authorize(current_account.id, "Postgres:view", pg.id)
         response.headers["Cache-Control"] = "no-store"
 
@@ -37,7 +37,7 @@ class Clover
         end
       end
 
-      request.delete true do
+      r.delete true do
         Authorization.authorize(current_account.id, "Postgres:delete", pg.id)
         pg.incr_destroy
         response.status = 204
@@ -45,18 +45,18 @@ class Clover
       end
 
       if web?
-        request.post "restart" do
+        r.post "restart" do
           Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
           pg.servers.each do |s|
             s.incr_restart
           rescue Sequel::ForeignKeyConstraintViolation
           end
-          request.redirect "#{@project.path}#{pg.path}"
+          r.redirect "#{@project.path}#{pg.path}"
         end
       end
 
       if api?
-        request.post "failover" do
+        r.post "failover" do
           Authorization.authorize(current_account.id, "Postgres:create", @project.id)
           Authorization.authorize(current_account.id, "Postgres:view", pg.id)
 
@@ -76,15 +76,15 @@ class Clover
         end
       end
 
-      request.on "firewall-rule" do
+      r.on "firewall-rule" do
         if api?
-          request.get true do
+          r.get true do
             Authorization.authorize(current_account.id, "Postgres:Firewall:view", pg.id)
             Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
           end
         end
 
-        request.post true do
+        r.post true do
           Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
 
           required_parameters = ["cidr"]
@@ -107,8 +107,8 @@ class Clover
           end
         end
 
-        request.is String do |firewall_rule_ubid|
-          request.delete true do
+        r.is String do |firewall_rule_ubid|
+          r.delete true do
             Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
 
             if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
@@ -123,8 +123,8 @@ class Clover
         end
       end
 
-      request.on "metric-destination" do
-        request.post true do
+      r.on "metric-destination" do
+        r.post true do
           Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
 
           required_parameters = ["url", "username", "password"]
@@ -146,12 +146,12 @@ class Clover
             Serializers::Postgres.serialize(pg, {detailed: true})
           else
             flash["notice"] = "Metric destination is created"
-            request.redirect "#{@project.path}#{pg.path}"
+            r.redirect "#{@project.path}#{pg.path}"
           end
         end
 
-        request.is String do |metric_destination_ubid|
-          request.delete true do
+        r.is String do |metric_destination_ubid|
+          r.delete true do
             Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
 
             if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
@@ -167,7 +167,7 @@ class Clover
         end
       end
 
-      request.post "restore" do
+      r.post "restore" do
         Authorization.authorize(current_account.id, "Postgres:create", @project.id)
         Authorization.authorize(current_account.id, "Postgres:view", pg.id)
 
@@ -191,11 +191,11 @@ class Clover
           Serializers::Postgres.serialize(st.subject, {detailed: true})
         else
           flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
-          request.redirect "#{@project.path}#{st.subject.path}"
+          r.redirect "#{@project.path}#{st.subject.path}"
         end
       end
 
-      request.post "reset-superuser-password" do
+      r.post "reset-superuser-password" do
         Authorization.authorize(current_account.id, "Postgres:create", @project.id)
         Authorization.authorize(current_account.id, "Postgres:view", pg.id)
 
@@ -221,7 +221,7 @@ class Clover
           Serializers::Postgres.serialize(pg, {detailed: true})
         else
           flash["notice"] = "The superuser password will be updated in a few seconds"
-          request.redirect "#{@project.path}#{pg.path}"
+          r.redirect "#{@project.path}#{pg.path}"
         end
       end
     end
