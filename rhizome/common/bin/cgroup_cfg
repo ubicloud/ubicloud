@@ -1,0 +1,26 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require_relative "../lib/util"
+
+# Outputs the content of several cgroup config files
+def output_config(cgroup_path)
+  config_files = ["cgroup.controllers", "cgroup.subtree_control", "cpuset.cpus", "cpuset.cpus.effective", "cpuset.cpus.partition", "cpu.max", "cpu.max.burst"]
+
+  config_files.each do |file|
+    full_file = File.join(cgroup_path, file)
+    if File.exist?(full_file)
+      puts "#{file}: #{File.read(full_file).chomp}"
+    end
+  end
+end
+
+path = "."
+if ARGV.count == 1
+  path = ARGV[0]
+elsif ARGV.count > 1
+  fail "Wrong number of arguments. Provide a single argument that is a path to cgroup folder."
+end
+
+output_config(path)

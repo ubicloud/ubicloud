@@ -48,14 +48,20 @@ module Option
     ["almalinux-9", "AlmaLinux 9"]
   ].map { |args| BootImage.new(*args) }.freeze
 
-  VmSize = Struct.new(:name, :family, :vcpu, :memory, :storage_size_options, :visible, :gpu) do
+  VmSize = Struct.new(:name, :family, :vcpu, :max_cpu, :max_cpu_burst, :memory, :storage_size_options, :visible, :gpu) do
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16, 30, 60].map {
     storage_size_options = [_1 * 20, _1 * 40]
-    VmSize.new("standard-#{_1}", "standard", _1, _1 * 4, storage_size_options, true, false)
+    VmSize.new("standard-#{_1}", "standard", _1, _1 * 100, 0, _1 * 4, storage_size_options, true, false)
   }.concat([6].map {
-    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, (_1 * 5.34).to_i, [_1 * 30], false, true)
+    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, _1 * 100, 0, (_1 * 5.34).to_i, [_1 * 30], false, true)
+  }).concat([50, 100].map {
+    storage_size_options = [_1 * 20 / 100, _1 * 40 / 100]
+    VmSize.new("shared-#{_1}", "shared", 2, _1, 0, _1 * 4 / 100, storage_size_options, true, false)
+  }).concat([50, 100].map {
+    storage_size_options = [_1 * 20 / 100, _1 * 40 / 100]
+    VmSize.new("burstable-#{_1}", "burstable", 2, _1, _1, _1 * 4 / 100, storage_size_options, true, false)
   }).freeze
 
   PostgresSize = Struct.new(:location, :name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do

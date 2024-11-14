@@ -52,6 +52,10 @@ begin
   pci_devices = params.fetch("pci_devices", [])
   boot_image = params.fetch("boot_image")
   dns_ipv4 = params.fetch("dns_ipv4")
+  slice_name = params.fetch("slice_name")
+  allowed_cpus = params.fetch("allowed_cpus")
+  cpu_limit = params.fetch("max_cpu") # in percent
+  cpu_burst_limit = params.fetch("max_cpu_burst") # in usec
 rescue KeyError => e
   puts "Needed #{e.key} in parameters json"
   exit 1
@@ -68,7 +72,8 @@ when "prep"
   vm_setup.prep(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
-    pci_devices, boot_image, dns_ipv4)
+    pci_devices, boot_image, dns_ipv4,
+    slice_name, allowed_cpus, cpu_limit, cpu_burst_limit)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])
@@ -76,14 +81,16 @@ when "recreate-unpersisted"
     exit 1
   end
 
+  vm_setup.install_systemd_slice(slice_name, allowed_cpus)
   vm_setup.recreate_unpersisted(
     gua, ip4, local_ip4, nics, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
     pci_devices, multiqueue: max_vcpus > 1
   )
+  vm_setup.enable_bursting(cpu_burst_limit)
 when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(
-    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics
+    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics, "", ""
   )
 when "reassign-ip6"
   secrets = JSON.parse($stdin.read)

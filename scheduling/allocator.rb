@@ -136,7 +136,7 @@ module Scheduling::Allocator
     def initialize(candidate_host, request)
       @candidate_host = candidate_host
       @request = request
-      @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
+      @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], 0), # HACK removed for now: request.cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
@@ -150,6 +150,13 @@ module Scheduling::Allocator
 
     def update(vm)
       vm_host = VmHost[@candidate_host[:vm_host_id]]
+
+      # HACK: For now we deal with the slice allocation here,
+      # as it has to be done once we know the host
+      slice = vm_host.allocate_slice(vm.family, vm.cores, vm_name: Vm.ubid_to_name(vm.ubid))
+      fail "Could not allocate a slice. Already allocated slices: #{vm_host.slices}" if slice.nil?
+      vm.add_to_slice(slice)
+
       DB.transaction do
         Allocation.update_vm(vm_host, vm)
         VmHost.dataset.where(id: @candidate_host[:vm_host_id]).update(@vm_host_allocations.map { _1.get_vm_host_update }.reduce(&:merge))
