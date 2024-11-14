@@ -107,19 +107,17 @@ class Clover
           end
         end
 
-        r.is String do |firewall_rule_ubid|
-          r.delete true do
-            Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
+        r.delete String do |firewall_rule_ubid|
+          Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
 
-            if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
-              DB.transaction do
-                fwr.destroy
-                pg.incr_update_firewall_rules
-              end
+          if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
+            DB.transaction do
+              fwr.destroy
+              pg.incr_update_firewall_rules
             end
-            response.status = 204
-            ""
           end
+          response.status = 204
+          ""
         end
       end
 
