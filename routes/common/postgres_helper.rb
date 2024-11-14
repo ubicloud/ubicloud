@@ -64,18 +64,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     end
   end
 
-  def get
-    Authorization.authorize(@user.id, "Postgres:view", @resource.id)
-    response.headers["Cache-Control"] = "no-store"
-
-    if @mode == AppMode::API
-      Serializers::Postgres.serialize(@resource, {detailed: true})
-    else
-      @app.instance_variable_set(:@pg, Serializers::Postgres.serialize(@resource, {detailed: true, include_path: true}))
-      @app.view "postgres/show"
-    end
-  end
-
   def delete
     Authorization.authorize(@user.id, "Postgres:delete", @resource.id)
     @resource.incr_destroy
