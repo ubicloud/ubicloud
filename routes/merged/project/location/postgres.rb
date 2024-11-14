@@ -124,7 +124,17 @@ class Clover
 
         request.is String do |metric_destination_ubid|
           request.delete true do
-            pg_endpoint_helper.delete_metric_destination(metric_destination_ubid)
+            Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
+
+            if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
+              DB.transaction do
+                md.destroy
+                pg.servers.each(&:incr_configure_prometheus)
+              end
+            end
+
+            response.status = 204
+            request.halt
           end
         end
       end

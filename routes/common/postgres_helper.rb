@@ -83,20 +83,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def delete_metric_destination(metric_destination_ubid)
-    Authorization.authorize(@user.id, "Postgres:edit", @resource.id)
-
-    if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
-      DB.transaction do
-        md.destroy
-        @resource.servers.each(&:incr_configure_prometheus)
-      end
-    end
-
-    response.status = 204
-    @request.halt
-  end
-
   def restore
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
