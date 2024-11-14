@@ -83,34 +83,6 @@ class Routes::Common::PostgresHelper < Routes::Common::Base
     @request.halt
   end
 
-  def restore
-    Authorization.authorize(@user.id, "Postgres:create", project.id)
-    Authorization.authorize(@user.id, "Postgres:view", @resource.id)
-
-    required_parameters = ["name", "restore_target"]
-    request_body_params = Validation.validate_request_body(params, required_parameters)
-
-    st = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: project.id,
-      location: @resource.location,
-      name: request_body_params["name"],
-      target_vm_size: @resource.target_vm_size,
-      target_storage_size_gib: @resource.target_storage_size_gib,
-      version: @resource.version,
-      flavor: @resource.flavor,
-      parent_id: @resource.id,
-      restore_target: request_body_params["restore_target"]
-    )
-    send_notification_mail_to_partners(st.subject, @user.email)
-
-    if @mode == AppMode::API
-      Serializers::Postgres.serialize(st.subject, {detailed: true})
-    else
-      flash["notice"] = "'#{request_body_params["name"]}' will be ready in a few minutes"
-      @request.redirect "#{project.path}#{st.subject.path}"
-    end
-  end
-
   def reset_superuser_password
     Authorization.authorize(@user.id, "Postgres:create", project.id)
     Authorization.authorize(@user.id, "Postgres:view", @resource.id)
