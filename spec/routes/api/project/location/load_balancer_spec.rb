@@ -8,7 +8,7 @@ RSpec.describe Clover, "load-balancer" do
   let(:project) { user.create_project_with_default_policy("project-1") }
 
   let(:lb) do
-    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-fsn1")
+    ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: LocationNameConverter.to_internal_name(TEST_LOCATION))
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "lb-1", src_port: 80, dst_port: 80).subject
@@ -20,12 +20,12 @@ RSpec.describe Clover, "load-balancer" do
     it "cannot perform authenticated operations" do
       [
         [:get, "/api/project/#{project.ubid}/load-balancer"],
-        [:post, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/lb-1"],
-        [:delete, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}"],
-        [:get, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}"],
-        [:post, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/attach-vm", {vm_id: "vm-1"}],
-        [:post, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/detach-vm", {vm_id: "vm-1"}],
-        [:get, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/_#{lb.ubid}"]
+        [:post, "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb-1"],
+        [:delete, "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"],
+        [:get, "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"],
+        [:post, "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: "vm-1"}],
+        [:post, "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/detach-vm", {vm_id: "vm-1"}],
+        [:get, "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/_#{lb.ubid}"]
       ].each do |method, path, body|
         send(method, path, body)
 
@@ -43,7 +43,7 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "list" do
       it "empty" do
-        get "/api/project/#{project.ubid}/location/eu-central-h1/load-balancer"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"]).to eq([])
@@ -52,7 +52,7 @@ RSpec.describe Clover, "load-balancer" do
       it "success single" do
         lb
 
-        get "/api/project/#{project.ubid}/location/eu-central-h1/load-balancer"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"].length).to eq(1)
@@ -62,7 +62,7 @@ RSpec.describe Clover, "load-balancer" do
         lb
         Prog::Vnet::LoadBalancerNexus.assemble(lb.private_subnet.id, name: "lb-2", src_port: 80, dst_port: 80).subject
 
-        get "/api/project/#{project.ubid}/location/eu-central-h1/load-balancer"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"].length).to eq(2)
@@ -71,14 +71,14 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "id" do
       it "success" do
-        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/_#{lb.ubid}"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/_#{lb.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("lb-1")
       end
 
       it "not found" do
-        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/_invalid"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/_invalid"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
@@ -124,13 +124,13 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "delete" do
       it "success" do
-        delete "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}"
+        delete "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"
 
         expect(last_response.status).to eq(204)
       end
 
       it "not found" do
-        delete "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid_name"
+        delete "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid_name"
 
         expect(last_response.status).to eq(204)
       end
@@ -138,14 +138,14 @@ RSpec.describe Clover, "load-balancer" do
 
     describe "get" do
       it "success" do
-        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("lb-1")
       end
 
       it "not found" do
-        get "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid"
+        get "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
@@ -161,7 +161,7 @@ RSpec.describe Clover, "load-balancer" do
       }
 
       it "success" do
-        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+        patch "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
           src_port: "80", dst_port: "80",
           health_check_endpoint: "/up", algorithm: "round_robin", vms: []
         }.to_json
@@ -171,7 +171,7 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "not found" do
-        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid", {
+        patch "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid", {
           src_port: "80", dst_port: "80",
           health_check_endpoint: "/up", algorithm: "round_robin", vms: []
         }.to_json
@@ -186,7 +186,7 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "updates vms" do
-        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+        patch "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
           src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
         }.to_json
 
@@ -197,7 +197,7 @@ RSpec.describe Clover, "load-balancer" do
       it "detaches vms" do
         lb.add_vm(vm)
 
-        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+        patch "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
           src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: []
         }.to_json
 
@@ -207,7 +207,7 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "invalid vm" do
-        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+        patch "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
           src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: ["invalid"]
         }.to_json
 
@@ -221,7 +221,7 @@ RSpec.describe Clover, "load-balancer" do
         lb2.add_cert(cert)
         lb2.add_vm(vm)
 
-        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+        patch "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
           src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
         }.to_json
 
@@ -231,7 +231,7 @@ RSpec.describe Clover, "load-balancer" do
       it "vm already attached to the same load balancer" do
         lb.add_vm(vm)
 
-        patch "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}", {
+        patch "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}", {
           src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: [vm.ubid]
         }.to_json
 
@@ -249,13 +249,13 @@ RSpec.describe Clover, "load-balancer" do
 
       it "success" do
         vm.associate_with_project(project)
-        post "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
 
         expect(last_response.status).to eq(200)
       end
 
       it "not existing vm" do
-        post "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/attach-vm", {vm_id: "invalid"}.to_json
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: "invalid"}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id")
       end
@@ -273,13 +273,13 @@ RSpec.describe Clover, "load-balancer" do
         vm.associate_with_project(project)
         lb.add_vm(vm)
 
-        post "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/detach-vm", {vm_id: vm.ubid}.to_json
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/detach-vm", {vm_id: vm.ubid}.to_json
 
         expect(last_response.status).to eq(200)
       end
 
       it "not existing vm" do
-        post "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/detach-vm", {vm_id: "invalid"}.to_json
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/detach-vm", {vm_id: "invalid"}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id")
       end
