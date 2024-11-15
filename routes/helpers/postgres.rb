@@ -44,7 +44,7 @@ class Clover
   end
 
   def postgres_list
-    dataset = @project.postgres_resources_dataset.authorized(current_account.id, "Postgres:view").eager(:semaphores, :strand, :representative_server, :timeline)
+    dataset = @project.postgres_resources_dataset.authorized(current_account.id, "Postgres:view").eager(:semaphores, :strand)
     if api?
       dataset = dataset.where(location: @location) if @location
       result = dataset.paginated_result(
@@ -58,6 +58,7 @@ class Clover
         count: result[:count]
       }
     else
+      dataset = dataset.eager(:representative_server, :timeline)
       @postgres_databases = Serializers::Postgres.serialize(dataset.all, {include_path: true})
       view "postgres/index"
     end
