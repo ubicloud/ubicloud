@@ -8,7 +8,7 @@ class Clover
 
     r.on NAME_OR_UBID do |pg_name, pg_ubid|
       if pg_name
-        r.post true do
+        r.post api? do
           postgres_post(pg_name)
         end
 
@@ -192,7 +192,7 @@ class Clover
             fail CloverError.new(400, "InvalidRequest", "Superuser password cannot be updated during restore!")
           else
             flash["error"] = "Superuser password cannot be updated during restore!"
-            return redirect_back_with_inputs
+            redirect_back_with_inputs
           end
         end
 
