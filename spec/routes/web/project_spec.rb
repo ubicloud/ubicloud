@@ -423,8 +423,7 @@ RSpec.describe Clover, "project" do
         btn = find ".delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "'#{project.name}' project is deleted."}.to_json)
-
+        expect(page.status_code).to eq(204)
         expect(Project[project.id].visible).to be_falsey
         expect(AccessTag.where(project_id: project.id).count).to eq(0)
         expect(AccessPolicy.where(project_id: project.id).count).to eq(0)

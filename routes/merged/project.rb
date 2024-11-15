@@ -79,13 +79,8 @@ class Clover
 
         @project.soft_delete
 
-        if api?
-          response.status = 204
-          r.halt
-        else
-          flash["notice"] = "'#{@project.name}' project is deleted."
-          return {message: "'#{@project.name}' project is deleted."}
-        end
+        response.status = 204
+        r.halt
       end
 
       r.on web? do
