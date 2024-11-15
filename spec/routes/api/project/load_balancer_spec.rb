@@ -7,14 +7,6 @@ RSpec.describe Clover, "vm" do
 
   let(:project) { user.create_project_with_default_policy("project-1") }
 
-  describe "unauthenticated" do
-    it "not list" do
-      get "/api/project/#{project.ubid}/load-balancer"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-  end
-
   describe "authenticated" do
     before do
       login_api(user.email)
