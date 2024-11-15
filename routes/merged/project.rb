@@ -3,8 +3,10 @@
 class Clover
   branch = lambda do |r|
     r.get true do
+      dataset = current_account.projects_dataset.where(visible: true)
+
       if api?
-        result = Project.authorized(current_account.id, "Project:view").where(visible: true).paginated_result(
+        result = dataset.paginated_result(
           start_after: r.params["start_after"],
           page_size: r.params["page_size"],
           order_column: r.params["order_column"]
@@ -15,7 +17,7 @@ class Clover
           count: result[:count]
         }
       else
-        @projects = Serializers::Project.serialize(current_account.projects.filter(&:visible), {include_path: true})
+        @projects = Serializers::Project.serialize(dataset.all, {include_path: true})
         view "project/index"
       end
     end
