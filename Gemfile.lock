@@ -42,10 +42,9 @@ GEM
     argon2-kdf (0.2.0)
     ast (2.4.2)
     awesome_print (1.9.2)
-    awrence (1.2.1)
     aws-eventstream (1.3.0)
-    aws-partitions (1.1001.0)
-    aws-sdk-core (3.212.0)
+    aws-partitions (1.1007.0)
+    aws-sdk-core (3.213.0)
       aws-eventstream (~> 1, >= 1.3.0)
       aws-partitions (~> 1, >= 1.992.0)
       aws-sigv4 (~> 1.9)
@@ -53,7 +52,7 @@ GEM
     aws-sdk-kms (1.95.0)
       aws-sdk-core (~> 3, >= 3.210.0)
       aws-sigv4 (~> 1.5)
-    aws-sdk-s3 (1.170.0)
+    aws-sdk-s3 (1.171.0)
       aws-sdk-core (~> 3, >= 3.210.0)
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.5)
@@ -110,13 +109,13 @@ GEM
     drb (2.2.1)
     ed25519 (1.3.0)
     erubi (1.13.0)
-    excon (1.1.1)
-    faraday (2.12.0)
-      faraday-net_http (>= 2.0, < 3.4)
+    excon (1.2.1)
+    faraday (2.12.1)
+      faraday-net_http (>= 2.0, < 3.5)
       json
       logger
-    faraday-net_http (3.3.0)
-      net-http
+    faraday-net_http (3.4.0)
+      net-http (>= 0.5.0)
     faraday-retry (2.2.1)
       faraday (~> 2.0)
     ferrum (0.15)
@@ -139,7 +138,7 @@ GEM
     i18n (1.14.6)
       concurrent-ruby (~> 1.0)
     jmespath (1.6.2)
-    json (2.8.1)
+    json (2.8.2)
     jwt (2.9.3)
       base64
     language_server-protocol (3.17.0.3)
@@ -157,9 +156,9 @@ GEM
     method_source (1.1.0)
     mini_mime (1.1.5)
     minitest (5.25.1)
-    net-http (0.4.1)
+    net-http (0.5.0)
       uri
-    net-imap (0.5.0)
+    net-imap (0.5.1)
       date
       net-protocol
     net-pop (0.1.2)
@@ -235,7 +234,7 @@ GEM
     refrigerator (1.7.0)
     regexp_parser (2.9.2)
     rexml (3.3.9)
-    roda (3.85.0)
+    roda (3.86.0)
       rack
     rodauth (2.36.0)
       roda (>= 2.6.0)
@@ -336,11 +335,10 @@ GEM
       concurrent-ruby (~> 1.0)
     unaccent (0.4.0)
     unicode-display_width (2.6.0)
-    uri (0.13.1)
+    uri (1.0.2)
     warning (1.4.0)
-    webauthn (3.1.0)
+    webauthn (3.2.2)
       android_key_attestation (~> 0.3.0)
-      awrence (~> 1.1)
       bindata (~> 2.4)
       cbor (~> 0.5.9)
       cose (~> 1.1)
@@ -374,7 +372,7 @@ DEPENDENCIES
   argon2
   argon2-kdf
   awesome_print
-  aws-sdk-s3 (~> 1.170)
+  aws-sdk-s3 (~> 1.171)
   bcrypt_pbkdf
   brakeman
   by (>= 1.1.0)
@@ -423,7 +421,7 @@ DEPENDENCIES
   tilt (>= 2.2)
   turbo_tests
   warning
-  webauthn (~> 3.1)
+  webauthn (~> 3.2)
   webmock
 
 RUBY VERSION
