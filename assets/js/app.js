@@ -87,8 +87,8 @@ $(".delete-btn").on("click", function (event) {
 
           let message = thrownError;
           try {
-            err = JSON.parse(xhr.responseText);
-            message = err.message
+            response = JSON.parse(xhr.responseText);
+            message = response.error?.message
           } catch {};
           alert(`Error: ${message}`);
         }
