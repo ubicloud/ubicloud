@@ -72,11 +72,9 @@ class Clover
       end
 
       r.on "firewall-rule" do
-        if api?
-          r.get true do
-            Authorization.authorize(current_account.id, "Postgres:Firewall:view", pg.id)
-            Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
-          end
+        r.get api?, true do
+          Authorization.authorize(current_account.id, "Postgres:Firewall:view", pg.id)
+          Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
         end
 
         r.post true do
