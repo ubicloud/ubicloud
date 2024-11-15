@@ -53,24 +53,22 @@ class Clover
         r.redirect "#{@project.path}#{pg.path}"
       end
 
-      if api?
-        r.post "failover" do
-          Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+      r.post api?, "failover" do
+        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
 
-          unless pg.representative_server.primary?
-            fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered during restore!")
-          end
-
-          unless @project.get_ff_postgresql_base_image
-            fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered for this resource!")
-          end
-
-          unless pg.representative_server.trigger_failover
-            fail CloverError.new(400, "InvalidRequest", "There is not a suitable standby server to failover!")
-          end
-
-          Serializers::Postgres.serialize(pg, {detailed: true})
+        unless pg.representative_server.primary?
+          fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered during restore!")
         end
+
+        unless @project.get_ff_postgresql_base_image
+          fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered for this resource!")
+        end
+
+        unless pg.representative_server.trigger_failover
+          fail CloverError.new(400, "InvalidRequest", "There is not a suitable standby server to failover!")
+        end
+
+        Serializers::Postgres.serialize(pg, {detailed: true})
       end
 
       r.on "firewall-rule" do
