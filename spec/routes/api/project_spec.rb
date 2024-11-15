@@ -8,22 +8,16 @@ RSpec.describe Clover, "vm" do
   let(:project) { user.create_project_with_default_policy("project-1") }
 
   describe "unauthenticated" do
-    it "not list" do
-      get "/api/project"
+    it "cannot perform authenticated operations" do
+      [
+        [:get, "/api/project"],
+        [:post, "/api/project", {name: "p-1"}],
+        [:delete, "/api/project/#{project.ubid}"]
+      ].each do |method, path, body|
+        send(method, path, body)
 
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not create" do
-      post "/api/project"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
-    end
-
-    it "not delete" do
-      delete "api/project/#{project.ubid}"
-
-      expect(last_response).to have_api_error(401, "Please login to continue")
+        expect(last_response).to have_api_error(401, "Please login to continue")
+      end
     end
   end
 
