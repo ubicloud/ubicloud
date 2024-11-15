@@ -112,6 +112,8 @@ class Clover
 
     # 204 response for invalid names
     r.is String do |lb_name|
+      r.post { load_balancer_post(lb_name) }
+
       r.delete do
         response.status = 204
         nil
