@@ -20,7 +20,7 @@ RSpec.describe Clover, "load-balancer" do
     it "cannot perform authenticated operations" do
       [
         [:get, "/api/project/#{project.ubid}/load-balancer"],
-        [:post, "/api/project/#{project.ubid}/load-balancer", {name: "lb-1"}],
+        [:post, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/lb-1"],
         [:delete, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}"],
         [:get, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}"],
         [:post, "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/attach-vm", {vm_id: "vm-1"}],
@@ -87,7 +87,7 @@ RSpec.describe Clover, "load-balancer" do
     describe "create" do
       it "success" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-fsn1").subject
-        post "/api/project/#{project.ubid}/load-balancer/lb1", {
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: ps.ubid,
           src_port: "80", dst_port: "80",
           health_check_endpoint: "/up", algorithm: "round_robin",
@@ -99,13 +99,13 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "missing required parameters" do
-        post "/api/project/#{project.ubid}/load-balancer/lb1", {}.to_json
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
       end
 
       it "invalid private_subnet_id" do
-        post "/api/project/#{project.ubid}/load-balancer/lb1", {
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: "invalid",
           src_port: "80", dst_port: "80",
           health_check_endpoint: "/up", algorithm: "round_robin",
