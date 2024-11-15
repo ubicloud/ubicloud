@@ -31,8 +31,7 @@ RSpec.describe Clover, "project" do
 
     describe "list" do
       it "can list no projects" do
-        expect(Account).to receive(:[]).and_return(user).twice
-        expect(user).to receive(:projects).and_return([]).at_least(1)
+        user.projects.each { user.dissociate_with_project(_1) }
 
         visit "/project"
 
