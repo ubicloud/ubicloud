@@ -114,6 +114,12 @@ RSpec.describe Clover, "load-balancer" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
       end
+
+      it "invalid name" do
+        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid_name", {}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
+      end
     end
 
     describe "delete" do
