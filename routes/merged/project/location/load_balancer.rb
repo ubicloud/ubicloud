@@ -7,10 +7,14 @@ class Clover
     end
 
     r.on NAME_OR_UBID do |lb_name, lb_id|
-      filter = if lb_name
-        {Sequel[:load_balancer][:name] => lb_name}
+      if lb_name
+        r.post api? do
+          load_balancer_post(lb_name)
+        end
+
+        filter = {Sequel[:load_balancer][:name] => lb_name}
       else
-        {Sequel[:load_balancer][:id] => UBID.to_uuid(lb_id)}
+        filter = {Sequel[:load_balancer][:id] => UBID.to_uuid(lb_id)}
       end
 
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location: @location).select(Sequel[:private_subnet][:id])

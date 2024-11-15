@@ -6,21 +6,17 @@ class Clover
       load_balancer_list
     end
 
-    r.on api? do
-      r.post String do |lb_name|
-        load_balancer_post(lb_name)
+    r.on web? do
+      r.post true do
+        load_balancer_post(r.params["name"])
       end
-    end
 
-    r.post true do
-      load_balancer_post(r.params["name"])
-    end
-
-    r.get "create" do
-      Authorization.authorize(current_account.id, "LoadBalancer:create", @project.id)
-      authorized_subnets = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").all
-      @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
-      view "networking/load_balancer/create"
+      r.get "create" do
+        Authorization.authorize(current_account.id, "LoadBalancer:create", @project.id)
+        authorized_subnets = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").all
+        @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
+        view "networking/load_balancer/create"
+      end
     end
   end
 
