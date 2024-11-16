@@ -184,6 +184,48 @@ RSpec.describe SpdkRpc do
     end
   end
 
+  describe "#bdev_set_qos_limit" do
+    it "can set qos limits" do
+      expect(sr).to receive(:call).with("bdev_set_qos_limit", {
+        name: "name",
+        rw_ios_per_sec: 100,
+        r_mbytes_per_sec: 300,
+        w_mbytes_per_sec: 400
+      })
+      sr.bdev_set_qos_limit("name", rw_ios_per_sec: 100, r_mbytes_per_sec: 300, w_mbytes_per_sec: 400)
+    end
+
+    it "can set qos limits with only rw_ios_per_sec" do
+      expect(sr).to receive(:call).with("bdev_set_qos_limit", {
+        name: "name",
+        rw_ios_per_sec: 100,
+        r_mbytes_per_sec: 0,
+        w_mbytes_per_sec: 0
+      })
+      sr.bdev_set_qos_limit("name", rw_ios_per_sec: 100)
+    end
+
+    it "can set qos limits with only r_mbytes_per_sec" do
+      expect(sr).to receive(:call).with("bdev_set_qos_limit", {
+        name: "name",
+        rw_ios_per_sec: 0,
+        r_mbytes_per_sec: 300,
+        w_mbytes_per_sec: 0
+      })
+      sr.bdev_set_qos_limit("name", r_mbytes_per_sec: 300)
+    end
+
+    it "can set qos limits with only w_mbytes_per_sec" do
+      expect(sr).to receive(:call).with("bdev_set_qos_limit", {
+        name: "name",
+        rw_ios_per_sec: 0,
+        r_mbytes_per_sec: 0,
+        w_mbytes_per_sec: 400
+      })
+      sr.bdev_set_qos_limit("name", w_mbytes_per_sec: 400)
+    end
+  end
+
   describe "#call" do
     let(:unix_socket) { instance_double(UNIXSocket) }
 
