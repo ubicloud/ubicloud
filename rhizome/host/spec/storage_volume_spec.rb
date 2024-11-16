@@ -94,18 +94,21 @@ RSpec.describe StorageVolume do
       key_wrapping_secrets = "key_wrapping_secrets"
       expect(encrypted_sv).to receive(:read_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
       expect(encrypted_sv).to receive(:setup_spdk_bdev).with(encryption_key)
+      expect(encrypted_sv).to receive(:set_qos_limits).with(no_args)
       expect(encrypted_sv).to receive(:setup_spdk_vhost).with(no_args)
       encrypted_sv.start(key_wrapping_secrets)
     end
 
     it "can start an uencrypted storage volume" do
       expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil)
+      expect(unencrypted_sv).to receive(:set_qos_limits).with(no_args)
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args)
       unencrypted_sv.start(nil)
     end
 
     it "retries after purging if spdk artifacts exist" do
       expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil).and_return(nil, nil)
+      expect(unencrypted_sv).to receive(:set_qos_limits).with(no_args).and_return(nil, nil)
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
         -> { raise SpdkExists.new("Device Exists", -17) },
         -> {}
@@ -116,6 +119,7 @@ RSpec.describe StorageVolume do
 
     it "doesn't retry more than once" do
       expect(unencrypted_sv).to receive(:setup_spdk_bdev).with(nil).and_return(nil, nil)
+      expect(unencrypted_sv).to receive(:set_qos_limits).with(no_args).and_return(nil, nil)
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
         -> { raise SpdkExists.new("Device Exists", -17) },
         -> { raise SpdkExists.new("Device Exists", -17) }
@@ -228,6 +232,33 @@ RSpec.describe StorageVolume do
       disk_file = "/var/storage/test/2/disk.raw"
       expect(rpc_client).to receive(:bdev_aio_create).with(bdev, disk_file, 512)
       unencrypted_sv.setup_spdk_bdev(nil)
+    end
+  end
+
+  describe "#set_qos_limits" do
+    it "can set qos limits" do
+      sv = described_class.new("test", {
+        "disk_index" => 1,
+        "device_id" => "xyz01",
+        "max_ios_per_sec" => 100,
+        "max_read_mbytes_per_sec" => 200,
+        "max_write_mbytes_per_sec" => 300
+      })
+      rpc_client = instance_double(SpdkRpc)
+      allow(sv).to receive(:rpc_client).and_return(rpc_client)
+      expect(rpc_client).to receive(:bdev_set_qos_limit).with(
+        "xyz01", rw_ios_per_sec: 100, r_mbytes_per_sec: 200, w_mbytes_per_sec: 300
+      )
+      sv.set_qos_limits
+    end
+
+    it "doesn't set qos limits if none are provided" do
+      sv = described_class.new("test", {
+        "disk_index" => 1,
+        "device_id" => "xyz01"
+      })
+      expect(sv).not_to receive(:rpc_client)
+      sv.set_qos_limits
     end
   end
 

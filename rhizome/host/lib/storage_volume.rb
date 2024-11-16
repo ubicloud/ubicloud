@@ -28,6 +28,9 @@ class StorageVolume
     @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
     @spdk_version = params["spdk_version"]
     @read_only = params["read_only"] || false
+    @max_ios_per_sec = params["max_ios_per_sec"]
+    @max_read_mbytes_per_sec = params["max_read_mbytes_per_sec"]
+    @max_write_mbytes_per_sec = params["max_write_mbytes_per_sec"]
   end
 
   def vp
@@ -70,6 +73,7 @@ class StorageVolume
     retries = 0
     begin
       setup_spdk_bdev(encryption_key)
+      set_qos_limits
       setup_spdk_vhost
     rescue SpdkExists
       # If some of SPDK artifacts exist, purge and retry. But retry only once
@@ -260,6 +264,17 @@ class StorageVolume
     if @use_bdev_ubi
       rpc_client.bdev_ubi_create(@device_id, non_ubi_bdev, @image_path, @skip_sync)
     end
+  end
+
+  def set_qos_limits
+    return unless @max_ios_per_sec || @max_read_mbytes_per_sec || @max_write_mbytes_per_sec
+
+    rpc_client.bdev_set_qos_limit(
+      @device_id,
+      rw_ios_per_sec: @max_ios_per_sec,
+      r_mbytes_per_sec: @max_read_mbytes_per_sec,
+      w_mbytes_per_sec: @max_write_mbytes_per_sec
+    )
   end
 
   def setup_spdk_vhost

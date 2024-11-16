@@ -93,6 +93,17 @@ class SpdkRpc
     raise unless if_exists
   end
 
+  def bdev_set_qos_limit(name, rw_ios_per_sec: nil, r_mbytes_per_sec: nil, w_mbytes_per_sec: nil)
+    # SPDK expects 0 to be passed if there is no limit.
+    params = {
+      name: name,
+      rw_ios_per_sec: rw_ios_per_sec || 0,
+      r_mbytes_per_sec: r_mbytes_per_sec || 0,
+      w_mbytes_per_sec: w_mbytes_per_sec || 0
+    }
+    call("bdev_set_qos_limit", params)
+  end
+
   def call(method, params = {})
     # id is used to correlate the context between request and response.
     # See https://www.jsonrpc.org/specification
