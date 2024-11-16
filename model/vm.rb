@@ -245,7 +245,10 @@ class Vm < Sequel::Model
         "use_bdev_ubi" => s.use_bdev_ubi,
         "skip_sync" => s.skip_sync,
         "storage_device" => s.storage_device.name,
-        "read_only" => s.size_gib == 0
+        "read_only" => s.size_gib == 0,
+        "max_ios_per_sec" => s.max_ios_per_sec,
+        "max_read_mbytes_per_sec" => s.max_read_mbytes_per_sec,
+        "max_write_mbytes_per_sec" => s.max_write_mbytes_per_sec
       }
     }
   end

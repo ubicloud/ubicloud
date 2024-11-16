@@ -177,4 +177,38 @@ RSpec.describe Vm do
     expect(vm).to receive(:incr_checkup)
     expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
+
+  it "returns storage volumes hash list" do
+    boot_image = instance_double(BootImage, name: "boot_image", version: "1")
+    storage_device = instance_double(StorageDevice, name: "default")
+    volumes = [
+      instance_double(VmStorageVolume, disk_index: 0, device_id: "dev1",
+        size_gib: 1, boot: true, boot_image: boot_image,
+        key_encryption_key_1: "key", spdk_version: "spdk1",
+        use_bdev_ubi: false, skip_sync: false,
+        storage_device: storage_device, max_ios_per_sec: nil,
+        max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil),
+      instance_double(VmStorageVolume, disk_index: 1, device_id: "dev2",
+        size_gib: 100, boot: false, boot_image: nil,
+        key_encryption_key_1: nil, spdk_version: "spdk2",
+        use_bdev_ubi: true, skip_sync: true,
+        storage_device: storage_device, max_ios_per_sec: 100,
+        max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 300)
+    ]
+    expect(vm).to receive(:vm_storage_volumes).and_return(volumes)
+    expect(vm.storage_volumes).to eq([
+      {"boot" => true, "image" => "boot_image", "image_version" => "1", "size_gib" => 1,
+       "device_id" => "dev1", "disk_index" => 0, "encrypted" => true,
+       "spdk_version" => "spdk1", "use_bdev_ubi" => false, "skip_sync" => false,
+       "storage_device" => "default", "read_only" => false,
+       "max_ios_per_sec" => nil, "max_read_mbytes_per_sec" => nil,
+       "max_write_mbytes_per_sec" => nil},
+      {"boot" => false, "image" => nil, "image_version" => nil, "size_gib" => 100,
+       "device_id" => "dev2", "disk_index" => 1, "encrypted" => false,
+       "spdk_version" => "spdk2", "use_bdev_ubi" => true, "skip_sync" => true,
+       "storage_device" => "default", "read_only" => false,
+       "max_ios_per_sec" => 100, "max_read_mbytes_per_sec" => 200,
+       "max_write_mbytes_per_sec" => 300}
+    ])
+  end
 end
