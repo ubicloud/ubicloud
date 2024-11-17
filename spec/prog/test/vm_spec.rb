@@ -80,21 +80,21 @@ RSpec.describe Prog::Test::Vm do
     it "installs packages for ubuntu images and hops to next step" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "ubuntu-jammy")).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo apt update")
-      expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential")
+      expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
     it "installs packages for debian images and hops to next step" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "debian-12")).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo apt update")
-      expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential")
+      expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
     it "installs packages for almalinux images and hops to next step" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "almalinux-9")).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo dnf check-update || [ $? -eq 100 ]")
-      expect(sshable).to receive(:cmd).with("sudo dnf install -y gcc gcc-c++ make")
+      expect(sshable).to receive(:cmd).with("sudo dnf install -y gcc gcc-c++ make fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
@@ -122,7 +122,93 @@ RSpec.describe Prog::Test::Vm do
   describe "#ping_google" do
     it "pings google and hops to next step" do
       expect(sshable).to receive(:cmd).with("ping -c 2 google.com")
-      expect { vm_test.ping_google }.to hop("ping_vms_in_subnet")
+      expect { vm_test.ping_google }.to hop("verify_io_rates")
+    end
+  end
+
+  describe "#get_iops" do
+    it "returns iops" do
+      output = {
+        "jobs" => [
+          {
+            "read" => {"iops" => 502},
+            "write" => {"iops" => 601}
+          }
+        ]
+      }
+      expect(sshable).to receive(:cmd).with(/sudo fio.*/).and_return output.to_json
+      expect(vm_test.get_iops).to eq 1103
+    end
+  end
+
+  describe "#get_read_bw_bytes" do
+    it "returns read bw in mbytes" do
+      output = {
+        "jobs" => [
+          {
+            "read" => {"bw_bytes" => 1048576}
+          }
+        ]
+      }
+      expect(sshable).to receive(:cmd).with(/sudo fio.*/).and_return output.to_json
+      expect(vm_test.get_read_bw_bytes).to eq 1048576
+    end
+  end
+
+  describe "#get_write_bw_bytes" do
+    it "returns write bw in bytes" do
+      output = {
+        "jobs" => [
+          {
+            "write" => {"bw_bytes" => 1048576}
+          }
+        ]
+      }
+      expect(sshable).to receive(:cmd).with(/sudo fio.*/).and_return output.to_json
+      expect(vm_test.get_write_bw_bytes).to eq 1048576
+    end
+  end
+
+  describe "#verify_io_rates" do
+    before {
+      vol = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0",
+        max_ios_per_sec: 100000, max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150)
+      allow(vm_test.vm).to receive(:vm_storage_volumes).and_return([vol])
+    }
+
+    it "skips if io rates are not set" do
+      vol = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0",
+        max_ios_per_sec: nil, max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil)
+      allow(vm_test.vm).to receive(:vm_storage_volumes).and_return([vol]).at_least(:once)
+      expect { vm_test.verify_io_rates }.to hop("ping_vms_in_subnet")
+    end
+
+    it "verifies io rates" do
+      expect(vm_test).to receive(:get_iops).and_return 99000
+      expect(vm_test).to receive(:get_read_bw_bytes).and_return 180 * 1024 * 1024
+      expect(vm_test).to receive(:get_write_bw_bytes).and_return 150 * 1024 * 1024
+      expect { vm_test.verify_io_rates }.to hop("ping_vms_in_subnet")
+    end
+
+    it "fails if iops exceeds the limit" do
+      expect(vm_test).to receive(:get_iops).and_return 140000
+      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "exceeded iops limit: 140000"})
+      expect { vm_test.verify_io_rates }.to hop("failed")
+    end
+
+    it "fails if read mbytes per sec exceeds the limit" do
+      expect(vm_test).to receive(:get_iops).and_return 100
+      expect(vm_test).to receive(:get_read_bw_bytes).and_return 280 * 1024 * 1024
+      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "exceeded read bw limit: 293601280"})
+      expect { vm_test.verify_io_rates }.to hop("failed")
+    end
+
+    it "fails if write mbytes per sec exceeds the limit" do
+      expect(vm_test).to receive(:get_iops).and_return 100
+      expect(vm_test).to receive(:get_read_bw_bytes).and_return 200 * 1024 * 1024
+      expect(vm_test).to receive(:get_write_bw_bytes).and_return 320 * 1024 * 1024
+      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "exceeded write bw limit: 335544320"})
+      expect { vm_test.verify_io_rates }.to hop("failed")
     end
   end
 

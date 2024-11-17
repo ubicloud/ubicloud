@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 class Prog::Test::Vm < Prog::Test::Base
   subject_is :vm, :sshable
 
@@ -24,10 +26,10 @@ class Prog::Test::Vm < Prog::Test::Base
   label def install_packages
     if /ubuntu|debian/.match?(vm.boot_image)
       sshable.cmd("sudo apt update")
-      sshable.cmd("sudo apt install -y build-essential")
+      sshable.cmd("sudo apt install -y build-essential fio")
     elsif vm.boot_image.start_with?("almalinux")
       sshable.cmd("sudo dnf check-update || [ $? -eq 100 ]")
-      sshable.cmd("sudo dnf install -y gcc gcc-c++ make")
+      sshable.cmd("sudo dnf install -y gcc gcc-c++ make fio")
     else
       fail_test "unexpected boot image: #{vm.boot_image}"
     end
@@ -51,6 +53,61 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def ping_google
     sshable.cmd("ping -c 2 google.com")
+    hop_verify_io_rates
+  end
+
+  def get_iops
+    fio_ios_cmd = <<~CMD
+      sudo fio --filename=./f --size=100M --direct=1 --rw=randrw --bs=4k --ioengine=libaio \\
+              --iodepth=256 --runtime=4 --numjobs=1 --time_based --group_reporting \\
+              --name=test-job --eta-newline=1 --output-format=json
+    CMD
+
+    fio_ios_output = JSON.parse(sshable.cmd(fio_ios_cmd))
+
+    fio_ios_output.dig("jobs", 0, "read", "iops") + fio_ios_output.dig("jobs", 0, "write", "iops")
+  end
+
+  def get_read_bw_bytes
+    fio_read_cmd = <<~CMD
+      sudo fio --filename=./f --size=100M --direct=1 --rw=randread --bs=1M --ioengine=libaio \\
+            --iodepth=256 --runtime=4 --numjobs=1 --time_based --group_reporting \\
+            --name=test-job --eta-newline=1 --output-format=json
+    CMD
+
+    fio_read_output = JSON.parse(sshable.cmd(fio_read_cmd))
+
+    fio_read_output.dig("jobs", 0, "read", "bw_bytes")
+  end
+
+  def get_write_bw_bytes
+    fio_write_cmd = <<~CMD
+      sudo fio --filename=./f --size=100M --direct=1 --rw=randwrite --bs=1M --ioengine=libaio \\
+            --iodepth=256 --runtime=4 --numjobs=1 --time_based --group_reporting \\
+            --name=test-job --eta-newline=1 --output-format=json
+    CMD
+
+    fio_write_output = JSON.parse(sshable.cmd(fio_write_cmd))
+
+    fio_write_output.dig("jobs", 0, "write", "bw_bytes")
+  end
+
+  label def verify_io_rates
+    vol = vm.vm_storage_volumes.first
+    hop_ping_vms_in_subnet if vol.max_ios_per_sec.nil?
+
+    # Verify that the max_ios_per_sec is working
+    iops = get_iops
+    fail_test "exceeded iops limit: #{iops}" if iops > vol.max_ios_per_sec * 1.2
+
+    # Verify that the max_read_mbytes_per_sec is working
+    read_bw_bytes = get_read_bw_bytes
+    fail_test "exceeded read bw limit: #{read_bw_bytes}" if read_bw_bytes > vol.max_read_mbytes_per_sec * 1.2 * 1024 * 1024
+
+    # Verify that the max_write_mbytes_per_sec is working
+    write_bw_bytes = get_write_bw_bytes
+    fail_test "exceeded write bw limit: #{write_bw_bytes}" if write_bw_bytes > vol.max_write_mbytes_per_sec * 1.2 * 1024 * 1024
+
     hop_ping_vms_in_subnet
   end
 
