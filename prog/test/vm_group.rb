@@ -47,7 +47,12 @@ class Prog::Test::VmGroup < Prog::Test::Base
     vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
       private_subnet_id: subnet1_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
+      storage_volumes: [{
+        encrypted: storage_encrypted, skip_sync: false,
+        max_read_mbytes_per_sec: 200,
+        max_write_mbytes_per_sec: 150,
+        max_ios_per_sec: 25600
+      }],
       boot_image: Option::BootImages.map { _1.name }.sample,
       enable_ip4: true
     )
