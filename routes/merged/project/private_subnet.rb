@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch(:project_prefix, "private-subnet") do |r|
     r.get true do
       private_subnet_list
     end
@@ -18,7 +18,4 @@ class Clover
       end
     end
   end
-
-  hash_branch(:api_project_prefix, "private-subnet", &branch)
-  hash_branch(:project_prefix, "private-subnet", &branch)
 end

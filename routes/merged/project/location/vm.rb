@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch(:project_location_prefix, "vm") do |r|
     r.get api? do
       vm_list_api_response(vm_list_dataset)
     end
@@ -49,7 +49,4 @@ class Clover
       end
     end
   end
-
-  hash_branch(:api_project_location_prefix, "vm", &branch)
-  hash_branch(:project_location_prefix, "vm", &branch)
 end

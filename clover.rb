@@ -427,14 +427,18 @@ class Clover < Roda
   end
 
   hash_branch("dashboard") do |r|
-    view "/dashboard"
+    r.get web? do
+      view "/dashboard"
+    end
   end
 
   hash_branch("after-login") do |r|
-    if (project = current_account.projects_dataset.order(:created_at, :name).first)
-      r.redirect "#{project.path}/dashboard"
-    else
-      r.redirect "/project"
+    r.get web? do
+      if (project = current_account.projects_dataset.order(:created_at, :name).first)
+        r.redirect "#{project.path}/dashboard"
+      else
+        r.redirect "/project"
+      end
     end
   end
 
@@ -446,8 +450,7 @@ class Clover < Roda
   end
   # :nocov:
 
-  autoload_routes("web")
-  autoload_routes("api", "api")
+  autoload_routes("merged")
   autoload_routes("runtime", "runtime")
 
   route do |r|
@@ -461,15 +464,12 @@ class Clover < Roda
           r.rodauth
           rodauth.check_active_session
           rodauth.require_authentication
-          r.hash_branches("api")
+          r.hash_branches("")
         end
       end
       # :nocov:
 
       r.rodauth
-      rodauth.check_active_session
-      rodauth.require_authentication
-      r.hash_branches("api")
     else
       r.on "runtime" do
         @is_runtime = true
@@ -494,14 +494,14 @@ class Clover < Roda
 
       check_csrf!
       rodauth.load_memory
-      rodauth.check_active_session
 
       r.root do
         r.redirect rodauth.login_route
       end
-      rodauth.require_authentication
-
-      r.hash_branches("")
     end
+
+    rodauth.check_active_session
+    rodauth.require_authentication
+    r.hash_branches("")
   end
 end

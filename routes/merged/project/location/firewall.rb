@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch(:project_location_prefix, "firewall") do |r|
     r.get api? do
       firewall_list_api_response(firewall_list_dataset)
     end
@@ -88,7 +88,7 @@ class Clover
 
       r.on api? do
         @firewall = firewall
-        r.hash_branches(:api_project_location_firewall_prefix)
+        r.hash_branches(:project_location_firewall_prefix)
       end
 
       r.on "firewall-rule" do
@@ -137,7 +137,4 @@ class Clover
       end
     end
   end
-
-  hash_branch(:api_project_location_prefix, "firewall", &branch)
-  hash_branch(:project_location_prefix, "firewall", &branch)
 end

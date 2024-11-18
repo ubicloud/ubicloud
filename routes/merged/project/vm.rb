@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch(:project_prefix, "vm") do |r|
     r.get true do
       dataset = vm_list_dataset
 
@@ -31,7 +31,4 @@ class Clover
       end
     end
   end
-
-  hash_branch(:project_prefix, "vm", &branch)
-  hash_branch(:api_project_prefix, "vm", &branch)
 end

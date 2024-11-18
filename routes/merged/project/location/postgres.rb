@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch(:project_location_prefix, "postgres") do |r|
     r.get api? do
       postgres_list
     end
@@ -226,7 +226,4 @@ class Clover
       end
     end
   end
-
-  hash_branch(:api_project_location_prefix, "postgres", &branch)
-  hash_branch(:project_location_prefix, "postgres", &branch)
 end
