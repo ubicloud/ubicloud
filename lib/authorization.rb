@@ -22,11 +22,11 @@ module Authorization
   end
 
   def self.authorized_resources_dataset(subject_id, actions)
-    matched_policies_dataset(subject_id, actions).select(:tagged_id)
+    matched_policies_dataset(subject_id, actions).select(Sequel[:applied_tag][:tagged_id])
   end
 
   def self.authorized_resources(subject_id, actions)
-    matched_policies_dataset(subject_id, actions).select_map(:tagged_id)
+    matched_policies_dataset(subject_id, actions).select_map(Sequel[:applied_tag][:tagged_id])
   end
 
   def self.expand_actions(actions)
@@ -40,19 +40,17 @@ module Authorization
   end
 
   def self.matched_policies_dataset(subject_id, actions = nil, object_id = nil)
-    subject_dataset = DB[:access_tag]
-      .select(:project_id)
-      .join(:applied_tag, access_tag_id: :id)
-      .where(tagged_id: subject_id)
-      .where(Sequel.pg_jsonb_op(:subjects).has_key?(Sequel[:access_tag][:name]))
-
     dataset = DB.from { access_policy.as(:acl) }
-      .select(:tagged_id, :tagged_table, :subjects, :actions, :objects)
+      .select(Sequel[:applied_tag][:tagged_id], Sequel[:applied_tag][:tagged_table], :subjects, :actions, :objects)
       .cross_join(Sequel.pg_jsonb_op(Sequel[:acl][:body])["acls"].to_recordset.as(:items, [:subjects, :actions, :objects].map { |c| Sequel.lit("#{c} JSONB") }))
-      .join(:access_tag, project_id: Sequel[:acl][:project_id])
+      .join(:access_tag, project_id: Sequel[:acl][:project_id]) do
+        Sequel.pg_jsonb_op(:objects).has_key?(Sequel[:access_tag][:name])
+      end
       .join(:applied_tag, access_tag_id: :id)
-      .where(Sequel.pg_jsonb_op(:objects).has_key?(Sequel[:access_tag][:name]))
-      .where(Sequel[:acl][:project_id] => subject_dataset)
+      .join(:access_tag, {project_id: Sequel[:acl][:project_id]}, table_alias: :subject_access_tag) do
+        Sequel.pg_jsonb_op(:subjects).has_key?(Sequel[:subject_access_tag][:name])
+      end
+      .join(:applied_tag, {access_tag_id: :id, tagged_id: subject_id}, table_alias: :subject_applied_tag)
 
     if object_id
       begin
