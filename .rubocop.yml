@@ -37,6 +37,9 @@ RSpec/DescribeMethod:
 Style/FrozenStringLiteralComment:
   Enabled: true
 
+Style/BlockComments:
+  Enabled: false
+
 Layout/HeredocIndentation:
   Enabled: false
 
