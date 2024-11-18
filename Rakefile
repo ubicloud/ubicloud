@@ -242,7 +242,7 @@ end
 
 desc "Regenerate screenshots for documentation site"
 task "screenshots" do
-  sh("bundle", "exec", "ruby", "bin/regen_screenshots")
+  sh("bundle", "exec", "ruby", "bin/regen-screenshots")
 end
 
 desc "Annotate Sequel models"
