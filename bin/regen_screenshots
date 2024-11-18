@@ -103,7 +103,7 @@ class RegenScreenshots
     click_button "Verify Account"
 
     visit "/"
-    screenshot "quickstart/managed-services-1-screenshot.png"
+    screenshot "quick-start/managed-services-1-screenshot.png"
 
     find("#billing-icon").hover
     screenshot "github-actions-integration/quickstart-1-screenshot.png"
@@ -118,7 +118,7 @@ class RegenScreenshots
 
     resize(1400)
     click_link "Create PostgreSQL Database"
-    screenshot "quickstart/using-kamal-with-ubicloud-3-screenshot.png"
+    screenshot "quick-start/using-kamal-with-ubicloud-3-screenshot.png"
 
     project = Project.first
     pg_resource = PostgresResource.create_with_id(
@@ -146,7 +146,7 @@ class RegenScreenshots
     resize(1800)
     click_link "Compute"
     click_link "New Virtual Machine"
-    screenshot "quickstart/managed-services-2-screenshot.png"
+    screenshot "quick-start/managed-services-2-screenshot.png"
 
     click_link "Networking"
     click_link "Load Balancers"
@@ -174,7 +174,7 @@ class RegenScreenshots
     fill_in "Application Port", with: "443"
     fill_in "HTTP Health Check Endpoint", with: "/up"
     select "HTTPS"
-    screenshot "quickstart/using-kamal-with-ubicloud-1-screenshot.png"
+    screenshot "quick-start/using-kamal-with-ubicloud-1-screenshot.png"
 
     vms = Array.new(2) do |i|
       Vm.create_with_id(
@@ -197,7 +197,7 @@ class RegenScreenshots
     resize(1100)
     click_button "Create"
     find("#vm_id").click
-    screenshot "quickstart/using-kamal-with-ubicloud-2-screenshot.png"
+    screenshot "quick-start/using-kamal-with-ubicloud-2-screenshot.png"
   end
 end
 
