@@ -12,11 +12,17 @@ RSpec.describe Clover do
     expect(page).to have_content("An invalid security token submitted with this request")
   end
 
-  it "handles unexpected errors" do
+  it "handles expected errors" do
     expect(Clog).to receive(:emit).with("route exception").and_call_original
 
     visit "/webhook/test-error"
 
     expect(page.title).to eq("Ubicloud - UnexceptedError")
+  end
+
+  it "raises unexpected errors in test environment" do
+    expect(Clog).not_to receive(:emit)
+
+    expect { visit "/webhook/test-error?message=treat+as+unexpected+error" }.to raise_error(RuntimeError)
   end
 end
