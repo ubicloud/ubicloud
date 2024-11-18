@@ -93,7 +93,10 @@ class Clover < Roda
   end
 
   plugin :error_handler do |e|
-    # raise e
+    if Config.test? && ENV["SHOW_ERRORS"]
+      raise e
+    end
+
     error = parse_error(e)
 
     if error[:code] == 204
