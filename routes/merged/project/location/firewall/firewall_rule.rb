@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 class Clover
-  hash_branch(:api_project_location_firewall_prefix, "firewall-rule") do |r|
+  hash_branch(:project_location_firewall_prefix, "firewall-rule") do |r|
+    # This is api-only, but is only called from an r.on api? branch, so no check is needed here
+
     r.post true do
       Authorization.authorize(current_account.id, "Firewall:edit", @firewall.id)
 

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch("project") do |r|
     r.get true do
       dataset = current_account.projects_dataset.where(visible: true)
 
@@ -83,7 +83,7 @@ class Clover
         r.halt
       end
 
-      r.on web? do
+      if web?
         r.get("dashboard") { view("project/dashboard") }
 
         r.post true do
@@ -94,14 +94,9 @@ class Clover
 
           r.redirect @project.path
         end
-
-        r.hash_branches(:project_prefix)
       end
 
-      r.hash_branches(:api_project_prefix)
+      r.hash_branches(:project_prefix)
     end
   end
-
-  hash_branch("project", &branch)
-  hash_branch("api", "project", &branch)
 end

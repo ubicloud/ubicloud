@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch("account") do |r|
-    r.get true do
+    r.get web? do
       r.redirect "/account/change-password"
     end
   end

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch(:project_prefix, "load-balancer") do |r|
     r.get true do
       load_balancer_list
     end
@@ -19,7 +19,4 @@ class Clover
       end
     end
   end
-
-  hash_branch(:api_project_prefix, "load-balancer", &branch)
-  hash_branch(:project_prefix, "load-balancer", &branch)
 end

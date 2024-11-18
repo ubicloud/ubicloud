@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  branch = lambda do |r|
+  hash_branch(:project_prefix, "firewall") do |r|
     r.get true do
       dataset = firewall_list_dataset
 
@@ -30,7 +30,4 @@ class Clover
       end
     end
   end
-
-  hash_branch(:project_prefix, "firewall", &branch)
-  hash_branch(:api_project_prefix, "firewall", &branch)
 end
