@@ -150,7 +150,6 @@ class RegenScreenshots
     click_link "New Virtual Machine"
     screenshot "quick-start/managed-services-2-screenshot.png"
 
-# rubocop:disable Style/BlockComments
 =begin
     click_link "Networking"
     click_link "Load Balancers"
@@ -203,7 +202,6 @@ class RegenScreenshots
     find("#vm_id").click
     screenshot "quick-start/using-kamal-with-ubicloud-2-screenshot.png"
 =end
-    # rubocop:enable Style/BlockComments
   end
 end
 
