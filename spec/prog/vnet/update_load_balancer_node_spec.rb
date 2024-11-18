@@ -100,8 +100,8 @@ ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new c
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0:8080
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
@@ -143,7 +143,7 @@ ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counte
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0:8080
 
 
     # Basic NAT for private IPv4 to public IPv4
@@ -187,8 +187,8 @@ ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new c
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0:8080
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
@@ -240,8 +240,8 @@ ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new c
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0:8080
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
@@ -283,7 +283,7 @@ ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new c
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
 
-ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
@@ -324,8 +324,8 @@ ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new c
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0:8080
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
@@ -366,8 +366,8 @@ ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new c
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
-ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0
-ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2
+ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counter snat to 192.168.1.0:8080
+ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
