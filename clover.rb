@@ -97,27 +97,48 @@ class Clover < Roda
       raise e
     end
 
-    error = parse_error(e)
+    case e
+    when Sequel::ValidationFailed
+      code = 400
+      type = "InvalidRequest"
+      message = e.to_s
+    when CloverError
+      code = e.code
+      type = e.type
+      message = e.message
+      details = e.details
+    else
+      raise e if Config.test? && e.message != "test error"
 
-    if error[:code] == 204
-      # nothing
-    elsif api? || runtime? || request.headers["Accept"] == "application/json"
-      {error: error}
+      Clog.emit("route exception") { Util.exception_to_hash(e) }
+
+      code = 500
+      type = "UnexceptedError"
+      message = "Sorry, we couldn’t process your request because of an unexpected error."
+    end
+
+    response.status = code
+    next if code == 204
+
+    error = {code:, type:, message:, details:}
+
+    if api? || runtime? || request.headers["Accept"] == "application/json"
+      {error:}
     else
       @error = error
 
       case e
       when Sequel::ValidationFailed, DependencyError
-        flash["error"] = @error[:message]
+        flash["error"] = message
         return redirect_back_with_inputs
       when Validation::ValidationFailed
-        flash["error"] = @error[:message]
-        flash["errors"] = (flash["errors"] || {}).merge(@error[:details])
+        flash["error"] = message
+        flash["errors"] = (flash["errors"] || {}).merge(details)
         return redirect_back_with_inputs
       end
 
       # :nocov:
-      next exception_page(e, assets: true) if Config.development? && @error[:code] == 500
+      next exception_page(e, assets: true) if Config.development? && code == 500
       # :nocov:
 
       view "/error"
@@ -448,7 +469,7 @@ class Clover < Roda
   # :nocov:
   if Config.test?
     hash_branch(:webhook_prefix, "test-error") do |r|
-      raise
+      raise(r.params["message"] || "test error")
     end
   end
   # :nocov:

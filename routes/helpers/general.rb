@@ -91,36 +91,6 @@ class Clover < Roda
     @params ||= api? ? request.body.read : request.params.reject { _1 == "_csrf" }.to_json
   end
 
-  # Assign some HTTP response codes to common exceptions.
-  def parse_error(e)
-    case e
-    when Sequel::ValidationFailed
-      code = 400
-      type = "InvalidRequest"
-      message = e.to_s
-    when CloverError
-      code = e.code
-      type = e.type
-      message = e.message
-      details = e.details
-    else
-      Clog.emit("route exception") { Util.exception_to_hash(e) }
-
-      code = 500
-      type = "UnexceptedError"
-      message = "Sorry, we couldn’t process your request because of an unexpected error."
-    end
-
-    response.status = code
-
-    {
-      code: code,
-      type: type,
-      message: message,
-      details: details
-    }
-  end
-
   def fetch_location_based_prices(*resource_types)
     # We use 1 month = 672 hours for conversion. Number of hours
     # in a month changes between 672 and 744, We are  also capping
