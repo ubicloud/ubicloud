@@ -469,6 +469,7 @@ dhcp-option=26,1400
 bind-interfaces
 #{address_mapping}
 dhcp-option=54,#{dns_ipv4}
+dns-forward-max=10000
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
