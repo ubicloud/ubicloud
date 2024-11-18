@@ -121,14 +121,16 @@ class RegenScreenshots
     screenshot "quick-start/using-kamal-with-ubicloud-3-screenshot.png"
 
     project = Project.first
-    pg_resource = PostgresResource.create_with_id(
+    pg_resource = PostgresResource.create(
       name: "postgresql-demo",
       location: "hetzner-fsn1",
       target_vm_size: "standard-2",
       target_storage_size_gib: 10,
       superuser_password: "1",
       project_id: project.id
-    )
+    ) do |pg|
+      pg.id = UBID.parse("pgmjy3v4ef1y7gdpzv6b3fchef").to_uuid
+    end
     Project.define_method(:postgres_resources_dataset) do |*a|
       super(*a).with_extend do
         define_method(:all) { [pg_resource] }
