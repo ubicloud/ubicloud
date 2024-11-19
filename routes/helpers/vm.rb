@@ -2,7 +2,7 @@
 
 class Clover
   def vm_list_dataset
-    @project.vms_dataset.authorized(current_account.id, "Vm:view")
+    dataset_authorize(@project.vms_dataset, "Vm:view")
   end
 
   def vm_list_api_response(dataset)

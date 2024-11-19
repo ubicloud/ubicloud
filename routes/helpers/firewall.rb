@@ -2,7 +2,7 @@
 
 class Clover
   def firewall_list_dataset
-    @project.firewalls_dataset.authorized(current_account.id, "Firewall:view")
+    dataset_authorize(@project.firewalls_dataset, "Firewall:view")
   end
 
   def firewall_list_api_response(dataset)

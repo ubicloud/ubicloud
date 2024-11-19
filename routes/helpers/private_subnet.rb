@@ -2,7 +2,7 @@
 
 class Clover
   def private_subnet_list
-    dataset = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view")
+    dataset = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view")
 
     if api?
       dataset = dataset.where(location: @location) if @location

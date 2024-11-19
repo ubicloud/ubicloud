@@ -44,7 +44,7 @@ class Clover
   end
 
   def postgres_list
-    dataset = @project.postgres_resources_dataset.authorized(current_account.id, "Postgres:view").eager(:semaphores, :strand)
+    dataset = dataset_authorize(@project.postgres_resources_dataset, "Postgres:view").eager(:semaphores, :strand)
     if api?
       dataset = dataset.where(location: @location) if @location
       result = dataset.paginated_result(
