@@ -2,8 +2,7 @@
 
 class Clover
   def load_balancer_list
-    dataset = @project.load_balancers_dataset
-    dataset = dataset.authorized(current_account.id, "LoadBalancer:view")
+    dataset = dataset_authorize(@project.load_balancers_dataset, "LoadBalancer:view")
     dataset = dataset.join(:private_subnet, id: Sequel[:load_balancer][:private_subnet_id]).where(location: @location).select_all(:load_balancer) if @location
     if api?
       result = dataset.paginated_result(

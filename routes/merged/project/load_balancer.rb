@@ -13,7 +13,7 @@ class Clover
 
       r.get "create" do
         authorize("LoadBalancer:create", @project.id)
-        authorized_subnets = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").all
+        authorized_subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").all
         @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
         view "networking/load_balancer/create"
       end
