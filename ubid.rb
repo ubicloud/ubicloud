@@ -214,6 +214,15 @@ class UBID
     "#<UBID:#{TYPE2CLASSNAME[to_s[..1]] || "Unknown"} @ubid=#{to_s.inspect} @uuid=#{to_uuid.inspect}>"
   end
 
+  CLASSNAME2YTPE = TYPE2CLASSNAME.invert.freeze
+  def self.type_number(klass)
+    to_base32_n(CLASSNAME2YTPE[klass.name.to_sym])
+  end
+
+  # def type_number
+  #  UBID.get_bits(@value, 64, 73)
+  # end
+
   #
   # Utility functions
   #
