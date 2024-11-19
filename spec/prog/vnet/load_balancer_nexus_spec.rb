@@ -148,9 +148,21 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait_cert_broadcast }.to nap(1)
     end
 
-    it "hops to wait if all children are done" do
+    it "hops to wait if all children are done and no certs to remove" do
       expect(nx).to receive(:reap)
       expect { nx.wait_cert_broadcast }.to hop("wait")
+    end
+
+    it "removes certs if all children are done and there are certs to remove" do
+      cert_to_remove = Prog::Vnet::CertNexus.assemble("cert-to-remove", dns_zone.id).subject
+      cert_to_remove.update(created_at: Time.now - 60 * 60 * 24 * 30 * 4)
+      nx.load_balancer.add_cert(cert_to_remove)
+
+      expect(nx).to receive(:reap)
+
+      expect { nx.wait_cert_broadcast }.to hop("wait")
+      expect(Semaphore[name: "destroy", strand_id: cert_to_remove.id]).not_to be_nil
+      expect(nx.load_balancer.reload.certs.count).to eq 1
     end
   end
 
