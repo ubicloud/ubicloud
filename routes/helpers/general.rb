@@ -80,6 +80,10 @@ class Clover < Roda
     Authorization.has_permission?(rodauth.session_value, actions, object_id)
   end
 
+  def all_permissions(actions)
+    Authorization.all_permissions(rodauth.session_value, actions)
+  end
+
   def has_project_permission(actions)
     @project_permissions.intersection(Authorization.expand_actions(actions)).any?
   end

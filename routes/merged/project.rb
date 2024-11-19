@@ -50,7 +50,7 @@ class Clover
       end
 
       @project_data = Serializers::Project.serialize(@project, {include_path: true})
-      @project_permissions = Authorization.all_permissions(current_account.id, @project.id)
+      @project_permissions = all_permissions(@project.id)
 
       r.get true do
         authorize("Project:view", @project.id)
