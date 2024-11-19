@@ -34,17 +34,17 @@ RSpec.describe SpdkSetup do
   describe "#package_url" do
     it "fails if arch is unexpected" do
       allow(Arch).to receive_messages(arm64?: false, x64?: false)
-      expect { spdk_setup.package_url }.to raise_error RuntimeError, "BUG: unexpected architecture"
+      expect { spdk_setup.package_url(os_version: "ubuntu-22.04") }.to raise_error RuntimeError, "BUG: unexpected architecture"
     end
 
     it "returns a valid url for x64" do
       allow(Arch).to receive_messages(arm64?: false, x64?: true)
-      expect(spdk_setup.package_url).to match(/https.*x64.*tar.gz/)
+      expect(spdk_setup.package_url(os_version: "ubuntu-22.04")).to match(/https.*x64.*tar.gz/)
     end
 
     it "returns a valid url for arm64" do
       allow(Arch).to receive_messages(arm64?: true, x64?: false)
-      expect(spdk_setup.package_url).to match(/https.*arm64.*tar.gz/)
+      expect(spdk_setup.package_url(os_version: "ubuntu-22.04")).to match(/https.*arm64.*tar.gz/)
     end
   end
 
@@ -55,7 +55,7 @@ RSpec.describe SpdkSetup do
       expect(spdk_setup).to receive(:r).with(/curl -L3 -o .* package_url/)
       expect(FileUtils).to receive(:mkdir_p).with("install_path")
       expect(FileUtils).to receive(:cd).with("install_path")
-      expect { spdk_setup.install_package }.not_to raise_error
+      expect { spdk_setup.install_package(os_version: "ubuntu-22.04") }.not_to raise_error
     end
   end
 
