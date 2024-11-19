@@ -27,18 +27,18 @@ class Clover
 
       if web?
         r.post "connect" do
-          Authorization.authorize(current_account.id, "PrivateSubnet:connect", ps.id)
+          authorize("PrivateSubnet:connect", ps.id)
           subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-ubid"])
-          Authorization.authorize(current_account.id, "PrivateSubnet:connect", subnet.id)
+          authorize("PrivateSubnet:connect", subnet.id)
           ps.connect_subnet(subnet)
           flash["notice"] = "#{subnet.name} will be connected in a few seconds"
           r.redirect "#{@project.path}#{ps.path}"
         end
 
         r.post "disconnect", String do |disconnecting_ps_ubid|
-          Authorization.authorize(current_account.id, "PrivateSubnet:disconnect", ps.id)
+          authorize("PrivateSubnet:disconnect", ps.id)
           subnet = PrivateSubnet.from_ubid(disconnecting_ps_ubid)
-          Authorization.authorize(current_account.id, "PrivateSubnet:disconnect", subnet.id)
+          authorize("PrivateSubnet:disconnect", subnet.id)
           ps.disconnect_subnet(subnet)
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
           ""
@@ -46,7 +46,7 @@ class Clover
       end
 
       request.get true do
-        Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
+        authorize("PrivateSubnet:view", ps.id)
         @ps = Serializers::PrivateSubnet.serialize(ps)
         if api?
           @ps
@@ -63,7 +63,7 @@ class Clover
       end
 
       request.delete true do
-        Authorization.authorize(current_account.id, "PrivateSubnet:delete", ps.id)
+        authorize("PrivateSubnet:delete", ps.id)
         unless ps.vms_dataset.empty?
           fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end

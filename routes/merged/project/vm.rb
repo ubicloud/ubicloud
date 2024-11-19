@@ -20,7 +20,7 @@ class Clover
       end
 
       r.get "create" do
-        Authorization.authorize(current_account.id, "Vm:create", @project.id)
+        authorize("Vm:create", @project.id)
         @subnets = Serializers::PrivateSubnet.serialize(@project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").all)
         @prices = fetch_location_based_prices("VmCores", "VmStorage", "IPAddress")
         @has_valid_payment_method = @project.has_valid_payment_method?

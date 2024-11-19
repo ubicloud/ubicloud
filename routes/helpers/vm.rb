@@ -21,7 +21,7 @@ class Clover
 
   def vm_post(name)
     project = @project
-    Authorization.authorize(current_account.id, "Vm:create", project.id)
+    authorize("Vm:create", project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
     required_parameters = ["public_key"]
@@ -55,7 +55,7 @@ class Clover
       if !ps || ps.location != @location
         fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params["private_subnet_id"]}\" is not found in the location \"#{LocationNameConverter.to_display_name(@location)}\""})
       end
-      Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
+      authorize("PrivateSubnet:view", ps.id)
     end
     assemble_params["private_subnet_id"] = ps&.id
 

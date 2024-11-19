@@ -23,7 +23,7 @@ class Clover
   end
 
   def private_subnet_post(name)
-    Authorization.authorize(current_account.id, "PrivateSubnet:create", @project.id)
+    authorize("PrivateSubnet:create", @project.id)
 
     params = json_params
     unless params.empty?
@@ -35,7 +35,7 @@ class Clover
         unless fw && fw.location == @location
           fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{request_body_params["firewall_id"]}\" and location \"#{@location}\" is not found")
         end
-        Authorization.authorize(current_account.id, "Firewall:view", fw.id)
+        authorize("Firewall:view", fw.id)
         fw.id
       end
     end

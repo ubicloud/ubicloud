@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_prefix, "user") do |r|
     r.on web? do
-      Authorization.authorize(current_account.id, "Project:user", @project.id)
+      authorize("Project:user", @project.id)
 
       r.get true do
         @user_policies = @project.access_policies_dataset.where(managed: true).flat_map do |policy|

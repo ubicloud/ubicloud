@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_prefix, "usage-alert") do |r|
     r.on web? do
-      Authorization.authorize(current_account.id, "Project:billing", @project.id)
+      authorize("Project:billing", @project.id)
 
       r.post true do
         name = r.params["alert_name"]

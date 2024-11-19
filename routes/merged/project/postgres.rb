@@ -13,7 +13,7 @@ class Clover
       end
 
       r.get "create" do
-        Authorization.authorize(current_account.id, "Postgres:create", @project.id)
+        authorize("Postgres:create", @project.id)
 
         flavor = r.params["flavor"] || PostgresResource::Flavor::STANDARD
         Validation.validate_postgres_flavor(flavor)

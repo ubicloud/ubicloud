@@ -5,7 +5,7 @@ class Clover
     # This is api-only, but is only called from an r.on api? branch, so no check is needed here
 
     r.post true do
-      Authorization.authorize(current_account.id, "Firewall:edit", @firewall.id)
+      authorize("Firewall:edit", @firewall.id)
 
       required_parameters = ["cidr"]
       allowed_optional_parameters = ["port_range"]
@@ -31,7 +31,7 @@ class Clover
 
       request.delete true do
         if firewall_rule
-          Authorization.authorize(current_account.id, "Firewall:edit", @firewall.id)
+          authorize("Firewall:edit", @firewall.id)
           @firewall.remove_firewall_rule(firewall_rule)
         end
 
@@ -41,7 +41,7 @@ class Clover
 
       request.get true do
         if firewall_rule
-          Authorization.authorize(current_account.id, "Firewall:view", @firewall.id)
+          authorize("Firewall:view", @firewall.id)
           Serializers::FirewallRule.serialize(firewall_rule)
         end
       end

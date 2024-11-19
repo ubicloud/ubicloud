@@ -72,6 +72,10 @@ class Clover < Roda
     @is_web = !api? && !runtime?
   end
 
+  def authorize(actions, object_id)
+    Authorization.authorize(rodauth.session_value, actions, object_id)
+  end
+
   def has_project_permission(actions)
     @project_permissions.intersection(Authorization.expand_actions(actions)).any?
   end
