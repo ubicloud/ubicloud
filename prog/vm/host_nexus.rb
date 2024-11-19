@@ -48,6 +48,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnNetwork unless vm_host.net6
     bud Prog::LearnMemory
     bud Prog::LearnArch
+    bud Prog::LearnOs
     bud Prog::LearnCores
     bud Prog::LearnStorage
     bud Prog::LearnPci
@@ -62,6 +63,8 @@ class Prog::Vm::HostNexus < Prog::Base
       case st.prog
       when "LearnArch"
         vm_host.update(arch: st.exitval.fetch("arch"))
+      when "LearnOs"
+        vm_host.update(os_version: st.exitval.fetch("os_version"))
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
