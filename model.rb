@@ -59,15 +59,28 @@ module ResourceMethods
     ubid if id
   end
 
+  INSPECT_CONVERTERS = {
+    "uuid" => lambda { |v| UBID.from_uuidish(v).to_s },
+    "cidr" => :to_s.to_proc,
+    "inet" => :to_s.to_proc
+  }.freeze
   def inspect_values
-    @values.except(*self.class.redacted_columns).map do |k, v|
-      case v
-      when NetAddr::IPv4Net, NetAddr::IPv6Net
-        [k, v.to_s]
+    inspect_values = {}
+    sch = db_schema
+    @values.except(*self.class.redacted_columns).each do |k, v|
+      next if k == :id
+
+      inspect_values[k] = if v
+        if (converter = INSPECT_CONVERTERS[sch[k][:db_type]])
+          converter.call(v)
+        else
+          v
+        end
       else
-        [k, v]
+        v
       end
-    end.to_h.inspect
+    end
+    inspect_values.inspect
   end
 
   NON_ARCHIVED_MODELS = ["DeletedRecord", "Semaphore"]

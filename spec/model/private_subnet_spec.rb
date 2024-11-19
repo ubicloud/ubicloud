@@ -78,8 +78,8 @@ RSpec.describe PrivateSubnet do
   describe "#inspect" do
     it "includes ubid if id is available" do
       ubid = described_class.generate_ubid
-      uuid = private_subnet.id = ubid.to_uuid.to_s
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{ubid}\"] @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location=>\"hetzner-fsn1\", :state=>\"waiting\", :name=>\"ps\", :id=>\"#{uuid}\"}>"
+      private_subnet.id = ubid.to_uuid.to_s
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{ubid}\"] @values={:net6=>\"fd1b:9793:dcef:cd0a::/64\", :net4=>\"10.9.39.0/26\", :location=>\"hetzner-fsn1\", :state=>\"waiting\", :name=>\"ps\"}>"
     end
 
     it "does not includes ubid if id is missing" do
