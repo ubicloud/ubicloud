@@ -72,20 +72,24 @@ class Clover < Roda
     @is_web = !api? && !runtime?
   end
 
+  def current_account_id
+    rodauth.session_value
+  end
+
   def authorize(actions, object_id)
-    Authorization.authorize(rodauth.session_value, actions, object_id)
+    Authorization.authorize(current_account_id, actions, object_id)
   end
 
   def has_permission?(actions, object_id)
-    Authorization.has_permission?(rodauth.session_value, actions, object_id)
+    Authorization.has_permission?(current_account_id, actions, object_id)
   end
 
   def all_permissions(actions)
-    Authorization.all_permissions(rodauth.session_value, actions)
+    Authorization.all_permissions(current_account_id, actions)
   end
 
   def dataset_authorize(ds, actions)
-    ds.authorized(rodauth.session_value, actions)
+    ds.authorized(current_account_id, actions)
   end
 
   def has_project_permission(actions)
