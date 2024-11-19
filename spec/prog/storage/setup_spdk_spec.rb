@@ -23,7 +23,8 @@ RSpec.describe Prog::Storage::SetupSpdk do
       arch: "x64",
       used_hugepages_1g: 0,
       total_hugepages_1g: 20,
-      total_cpus: 96
+      total_cpus: 96,
+      os_version: "ubuntu-24.04"
     ) { _1.id = "adec2977-74a9-8b71-8473-cf3940a45ac5" }
   }
 
@@ -55,7 +56,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
 
   describe "#install_spdk" do
     it "installs and hops to start_service" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk install #{spdk_version} 4")
+      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk install #{spdk_version} 4 ubuntu-24.04")
       expect { setup_spdk.install_spdk }.to hop("start_service")
     end
   end
