@@ -23,7 +23,7 @@ class Clover
   end
 
   def load_balancer_post(name)
-    Authorization.authorize(current_account.id, "LoadBalancer:create", @project.id)
+    authorize("LoadBalancer:create", @project.id)
 
     required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol]
     required_parameters << "name" if web?
@@ -33,7 +33,7 @@ class Clover
     unless (ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"]))
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
     end
-    Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
+    authorize("PrivateSubnet:view", ps.id)
 
     lb = Prog::Vnet::LoadBalancerNexus.assemble(
       ps.id,

@@ -26,7 +26,7 @@ class Clover
       end
 
       r.post %w[attach-vm detach-vm] do |action|
-        Authorization.authorize(current_account.id, "LoadBalancer:edit", lb.id)
+        authorize("LoadBalancer:edit", lb.id)
         required_parameters = %w[vm_id]
         request_body_params = Validation.validate_request_body(json_params, required_parameters)
 
@@ -34,7 +34,7 @@ class Clover
           fail Validation::ValidationFailed.new("vm_id" => "VM not found")
         end
 
-        Authorization.authorize(current_account.id, "Vm:view", vm.id)
+        authorize("Vm:view", vm.id)
 
         if action == "attach-vm"
           if vm.load_balancer
@@ -56,7 +56,7 @@ class Clover
       end
 
       r.get true do
-        Authorization.authorize(current_account.id, "LoadBalancer:view", lb.id)
+        authorize("LoadBalancer:view", lb.id)
         @lb = Serializers::LoadBalancer.serialize(lb, {detailed: true, vms_serialized: !api?})
         if api?
           @lb
@@ -69,14 +69,14 @@ class Clover
       end
 
       r.delete true do
-        Authorization.authorize(current_account.id, "LoadBalancer:delete", lb.id)
+        authorize("LoadBalancer:delete", lb.id)
         lb.incr_destroy
         response.status = 204
         r.halt
       end
 
       r.patch api? do
-        Authorization.authorize(current_account.id, "LoadBalancer:edit", lb.id)
+        authorize("LoadBalancer:edit", lb.id)
         request_body_params = Validation.validate_request_body(json_params, %w[algorithm src_port dst_port health_check_endpoint vms])
         lb.update(
           algorithm: request_body_params["algorithm"],
@@ -91,7 +91,7 @@ class Clover
             fail Validation::ValidationFailed.new("vms" => "VM not found")
           end
 
-          Authorization.authorize(current_account.id, "Vm:view", vm.id)
+          authorize("Vm:view", vm.id)
           if vm.load_balancer
             next if vm.load_balancer.id == lb.id
             fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")

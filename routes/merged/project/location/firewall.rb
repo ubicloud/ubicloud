@@ -26,8 +26,8 @@ class Clover
       end
 
       r.delete true do
-        Authorization.authorize(current_account.id, "Firewall:delete", firewall.id)
-        firewall.private_subnets.map { Authorization.authorize(current_account.id, "PrivateSubnet:edit", _1.id) }
+        authorize("Firewall:delete", firewall.id)
+        firewall.private_subnets.map { authorize("PrivateSubnet:edit", _1.id) }
         firewall.destroy
 
         if api?
@@ -39,7 +39,7 @@ class Clover
       end
 
       r.get true do
-        Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
+        authorize("Firewall:view", firewall.id)
         @firewall = Serializers::Firewall.serialize(firewall, {detailed: true})
 
         if api?
@@ -54,7 +54,7 @@ class Clover
       end
 
       r.post %w[attach-subnet detach-subnet] do |action|
-        Authorization.authorize(current_account.id, "Firewall:view", firewall.id)
+        authorize("Firewall:view", firewall.id)
 
         private_subnet_id = Validation.validate_request_body(json_params, ["private_subnet_id"])["private_subnet_id"]
         private_subnet = PrivateSubnet.from_ubid(private_subnet_id)
@@ -68,7 +68,7 @@ class Clover
           end
         end
 
-        Authorization.authorize(current_account.id, "PrivateSubnet:edit", private_subnet.id)
+        authorize("PrivateSubnet:edit", private_subnet.id)
 
         if action == "attach-subnet"
           firewall.associate_with_private_subnet(private_subnet)
@@ -93,7 +93,7 @@ class Clover
 
       r.on "firewall-rule" do
         r.post true do
-          Authorization.authorize(current_account.id, "Firewall:edit", firewall.id)
+          authorize("Firewall:edit", firewall.id)
 
           port_range = if r.params["port_range"].empty?
             [0, 65535]
@@ -111,7 +111,7 @@ class Clover
         end
 
         r.delete String do |firewall_rule_ubid|
-          Authorization.authorize(current_account.id, "Firewall:edit", firewall.id)
+          authorize("Firewall:edit", firewall.id)
           fwr = FirewallRule.from_ubid(firewall_rule_ubid)
           unless fwr
             response.status = 204

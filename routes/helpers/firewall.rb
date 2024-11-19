@@ -20,7 +20,7 @@ class Clover
   end
 
   def firewall_post(firewall_name)
-    Authorization.authorize(current_account.id, "Firewall:create", @project.id)
+    authorize("Firewall:create", @project.id)
     Validation.validate_name(firewall_name)
 
     optional_parameters = %w[description]

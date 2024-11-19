@@ -26,7 +26,7 @@ class Clover
       end
 
       r.get true do
-        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+        authorize("Postgres:view", pg.id)
         response.headers["Cache-Control"] = "no-store"
 
         if api?
@@ -38,14 +38,14 @@ class Clover
       end
 
       r.delete true do
-        Authorization.authorize(current_account.id, "Postgres:delete", pg.id)
+        authorize("Postgres:delete", pg.id)
         pg.incr_destroy
         response.status = 204
         ""
       end
 
       r.post web?, "restart" do
-        Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
+        authorize("Postgres:edit", pg.id)
         pg.servers.each do |s|
           s.incr_restart
         rescue Sequel::ForeignKeyConstraintViolation
@@ -54,7 +54,7 @@ class Clover
       end
 
       r.post api?, "failover" do
-        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+        authorize("Postgres:view", pg.id)
 
         unless pg.representative_server.primary?
           fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered during restore!")
@@ -73,12 +73,12 @@ class Clover
 
       r.on "firewall-rule" do
         r.get api?, true do
-          Authorization.authorize(current_account.id, "Postgres:Firewall:view", pg.id)
+          authorize("Postgres:Firewall:view", pg.id)
           Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
         end
 
         r.post true do
-          Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
+          authorize("Postgres:Firewall:edit", pg.id)
 
           required_parameters = ["cidr"]
           request_body_params = Validation.validate_request_body(json_params, required_parameters)
@@ -101,7 +101,7 @@ class Clover
         end
 
         r.delete String do |firewall_rule_ubid|
-          Authorization.authorize(current_account.id, "Postgres:Firewall:edit", pg.id)
+          authorize("Postgres:Firewall:edit", pg.id)
 
           if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
             DB.transaction do
@@ -116,7 +116,7 @@ class Clover
 
       r.on "metric-destination" do
         r.post true do
-          Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
+          authorize("Postgres:edit", pg.id)
 
           required_parameters = ["url", "username", "password"]
           request_body_params = Validation.validate_request_body(json_params, required_parameters)
@@ -142,7 +142,7 @@ class Clover
         end
 
         r.delete String do |metric_destination_ubid|
-          Authorization.authorize(current_account.id, "Postgres:edit", pg.id)
+          authorize("Postgres:edit", pg.id)
 
           if (md = PostgresMetricDestination.from_ubid(metric_destination_ubid))
             DB.transaction do
@@ -157,8 +157,8 @@ class Clover
       end
 
       r.post "restore" do
-        Authorization.authorize(current_account.id, "Postgres:create", @project.id)
-        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+        authorize("Postgres:create", @project.id)
+        authorize("Postgres:view", pg.id)
 
         required_parameters = ["name", "restore_target"]
         request_body_params = Validation.validate_request_body(json_params, required_parameters)
@@ -185,7 +185,7 @@ class Clover
       end
 
       r.post "reset-superuser-password" do
-        Authorization.authorize(current_account.id, "Postgres:view", pg.id)
+        authorize("Postgres:view", pg.id)
 
         unless pg.representative_server.primary?
           if api?
