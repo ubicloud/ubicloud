@@ -13,7 +13,8 @@ class PostgresResource < Sequel::Model
   one_to_many :firewall_rules, class: :PostgresFirewallRule, key: :postgres_resource_id
   one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
   many_to_one :private_subnet
-
+  many_to_many :certs, join_table: :certs_postgres, left_key: :postgres_resource_id, right_key: :cert_id
+  one_to_many :certs_postgres, key: :postgres_resource_id, class: :CertsPostgres
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
   dataset_module Authorization::Dataset
   dataset_module Pagination
