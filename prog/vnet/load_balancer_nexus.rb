@@ -104,6 +104,9 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     reap
     if strand.children.select { _1.prog == "Vnet::CertServer" }.all? { _1.exitval == "certificate is reshared" } || strand.children.empty?
       decr_refresh_cert
+      load_balancer.certs_dataset.exclude(id: load_balancer.active_cert.id).all do |cert|
+        CertsLoadBalancers[cert_id: cert.id].destroy
+      end
       hop_wait
     end
 
