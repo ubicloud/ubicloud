@@ -49,7 +49,7 @@ class Clover
             button_title: "Join Project",
             button_link: "#{Config.base_url}#{@project.path}/dashboard")
         else
-          @project.add_invitation(email: email, policy: policy, inviter_id: current_account.id, expires_at: Time.now + 7 * 24 * 60 * 60)
+          @project.add_invitation(email: email, policy: policy, inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
           Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
             greeting: "Hello,",
             body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",

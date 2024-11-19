@@ -45,7 +45,7 @@ class Clover
         r.halt
       end
 
-      if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account.id).empty?
+      if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
         fail Authorization::Unauthorized
       end
 

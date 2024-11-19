@@ -10,7 +10,7 @@ class Clover
         Validation.validate_short_text(name, "name")
         limit = Validation.validate_usage_limit(r.params["limit"])
 
-        UsageAlert.create_with_id(project_id: @project.id, user_id: current_account.id, name: name, limit: limit)
+        UsageAlert.create_with_id(project_id: @project.id, user_id: current_account_id, name: name, limit: limit)
 
         r.redirect "#{@project.path}/billing"
       end
