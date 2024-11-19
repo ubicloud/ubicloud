@@ -49,19 +49,21 @@ class SpdkSetup
     @rpc_sock ||= SpdkPath.rpc_sock(@spdk_version)
   end
 
-  def package_url
+  def package_url(os_version:)
     arch = if Arch.arm64?
-      :arm64
+      "arm64"
     elsif Arch.x64?
-      :x64
+      "x64"
     else
       fail "BUG: unexpected architecture"
     end
 
-    {
-      ["v23.09-ubi-0.2", :arm64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2-arm64/ubicloud-spdk-ubuntu-22.04-arm64.tar.gz",
-      ["v23.09-ubi-0.2", :x64] => "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2/ubicloud-spdk-ubuntu-22.04-x64.tar.gz"
-    }.fetch([@spdk_version, arch])
+    case @spdk_version
+    when "v23.09-ubi-0.2"
+      "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2b/ubicloud-spdk-#{os_version}-#{arch}.tar.gz"
+    else
+      fail "BUG: unsupported SPDK version"
+    end
   end
 
   def has_bdev_ubi?
@@ -72,9 +74,11 @@ class SpdkSetup
     @vhost_target ||= has_bdev_ubi? ? "vhost_ubi" : "vhost"
   end
 
-  def install_package
+  def install_package(os_version:)
     temp_tarball = "/tmp/spdk.tar.gz"
-    r "curl -L3 -o #{temp_tarball} #{package_url}"
+    url = package_url(os_version: os_version)
+    puts "Downloading SPDK package from #{url}"
+    r "curl -L3 -o #{temp_tarball} #{url}"
 
     FileUtils.mkdir_p(install_path)
     FileUtils.cd install_path do
