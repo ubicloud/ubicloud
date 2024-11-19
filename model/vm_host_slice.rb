@@ -3,7 +3,7 @@
 require "bitarray"
 require_relative "../model"
 
-class ResourceGroup < Sequel::Model
+class VmHostSlice < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
 
@@ -54,7 +54,7 @@ class ResourceGroup < Sequel::Model
   end
 
   def to_cpu_bitmask
-    bitmask = ResourceGroup.cpuset_to_bitmask(allowed_cpus)
+    bitmask = VmHostSlice.cpuset_to_bitmask(allowed_cpus)
 
     # if we know the number of cpus on the host,
     # resize the bitarray to that size
@@ -99,7 +99,7 @@ class ResourceGroup < Sequel::Model
   end
 
   def from_cpu_bitmask(bitmask)
-    cpuset = ResourceGroup.bitmask_to_cpuset(bitmask)
+    cpuset = VmHostSlice.bitmask_to_cpuset(bitmask)
     cpus = bitmask.reduce(&:+)
     fail "Bitmask does not set any cpuset." if cpus == 0 || cpuset.empty?
 
@@ -115,3 +115,28 @@ class ResourceGroup < Sequel::Model
     name + ".slice"
   end
 end
+
+# Table: vm_host_slice
+# Columns:
+#  id                | uuid                     | PRIMARY KEY
+#  name              | text                     | NOT NULL
+#  enabled           | boolean                  | NOT NULL DEFAULT false
+#  type              | vm_host_slice_type       | NOT NULL DEFAULT 'dedicated'::vm_host_slice_type
+#  allowed_cpus      | text                     | NOT NULL
+#  cores             | integer                  | NOT NULL
+#  total_cpu_percent | integer                  | NOT NULL
+#  used_cpu_percent  | integer                  | NOT NULL
+#  total_memory_1g   | integer                  | NOT NULL
+#  used_memory_1g    | integer                  | NOT NULL
+#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
+#  vm_host_id        | uuid                     |
+# Indexes:
+#  vm_host_slice_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  cores_not_negative       | (cores >= 0)
+#  cpu_allocation_limit     | (used_cpu_percent <= total_cpu_percent)
+#  memory_allocation_limit  | (used_memory_1g <= total_memory_1g)
+#  used_cpu_not_negative    | (used_cpu_percent >= 0)
+#  used_memory_not_negative | (used_memory_1g >= 0)
+# Foreign key constraints:
+#  vm_host_slice_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)

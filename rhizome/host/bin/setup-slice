@@ -1,23 +1,23 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-require_relative "../lib/rg_setup"
+require_relative "../lib/slice_setup"
 
 unless (action = ARGV.shift)
   puts "expected action as argument"
   exit 1
 end
 
-unless (rg_name = ARGV.shift)
-  puts "expected resource group (slice) name as argument"
+unless (slice_name = ARGV.shift)
+  puts "expected slice name as argument"
   exit 1
 end
 
-rg_setup = ResourceGroupSetup.new(rg_name)
+slice_setup = VmHostSliceSetup.new(slice_name)
 
 case action
 when "delete"
-  rg_setup.purge
+  slice_setup.purge
   exit 0
 
 when "prep"
@@ -25,17 +25,17 @@ when "prep"
     puts "expected list of allowed cpus as argument"
     exit 1
   end
-  rg_setup.prep(allowed_cpus)
+  slice_setup.prep(allowed_cpus)
 
 when "recreate-unpersisted"
-  rg_setup.start_systemd_unit
+  slice_setup.start_systemd_unit
 
 when "reinstall-systemd-units"
   unless (allowed_cpus = ARGV.shift)
     puts "expected list of allowed cpus as argument"
     exit 1
   end
-  rg_setup.install_systemd_unit(allowed_cpus)
+  slice_setup.install_systemd_unit(allowed_cpus)
 
 else
   puts "Invalid action #{action}"

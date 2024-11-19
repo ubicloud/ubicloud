@@ -3,13 +3,13 @@
 require_relative "../../common/lib/util"
 require "fileutils"
 
-class ResourceGroupSetup
-  def initialize(rg_name)
-    @rg_name = rg_name
+class VmHostSliceSetup
+  def initialize(slice_name)
+    @slice_name = slice_name
   end
 
   def systemd_service
-    @systemd_service ||= File.join("/etc/systemd/system", @rg_name)
+    @systemd_service ||= File.join("/etc/systemd/system", @slice_name)
   end
 
   def prep(allowed_cpus)
@@ -19,7 +19,7 @@ class ResourceGroupSetup
 
   def purge
     if File.exist? systemd_service
-      r "systemctl stop #{@rg_name}"
+      r "systemctl stop #{@slice_name}"
       FileUtils.rm_f(systemd_service)
 
       r "systemctl daemon-reload"
@@ -27,9 +27,9 @@ class ResourceGroupSetup
   end
 
   def install_systemd_unit(allowed_cpus)
-    fail "BUG: unit name must not be empty" if @rg_name.empty?
-    fail "BUG: we cannot create system units" if @rg_name == "system.slice" || @rg_name == "user.slice"
-    fail "BUG: unit name cannot contain a dash" if @rg_name.include?("-")
+    fail "BUG: unit name must not be empty" if @slice_name.empty?
+    fail "BUG: we cannot create system units" if @slice_name == "system.slice" || @slice_name == "user.slice"
+    fail "BUG: unit name cannot contain a dash" if @slice_name.include?("-")
 
     # Only proceed if the slice has not yet been setup
     unless File.exist? systemd_service
@@ -46,7 +46,7 @@ SLICE_CONFIG
   end
 
   def start_systemd_unit
-    r "systemctl start #{@rg_name}"
-    r "echo \"root\" > /sys/fs/cgroup/#{@rg_name}/cpuset.cpus.partition"
+    r "systemctl start #{@slice_name}"
+    r "echo \"root\" > /sys/fs/cgroup/#{@slice_name}/cpuset.cpus.partition"
   end
 end

@@ -2,13 +2,13 @@
 
 Sequel.migration do
   change do
-    create_enum(:resource_group_type, %w[dedicated shared])
+    create_enum(:vm_host_slice_type, %w[dedicated shared])
 
-    create_table(:resource_group) do
+    create_table(:vm_host_slice) do
       column :id, :uuid, primary_key: true
       column :name, :text, null: false
-      column :allocation_state, :allocation_state, default: "unprepared", null: false
-      column :type, :resource_group_type, default: "dedicated", null: false
+      column :enabled, :bool, null: false, default: false
+      column :type, :vm_host_slice_type, default: "dedicated", null: false
       column :allowed_cpus, :text, null: false
       column :cores, Integer, null: false
       column :total_cpu_percent, Integer, null: false
