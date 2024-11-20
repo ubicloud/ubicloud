@@ -20,7 +20,7 @@
     "components/page_header",
     locals: {
       title: @vm[:name],
-      right_items: [render("components/vm_state_label", locals: { state: @vm[:state], extra_class: "text-md" })]
+      left_items: [render("components/vm_state_label", locals: { state: @vm[:state], extra_class: "text-md" })]
     }
   ) %>
 </div>
