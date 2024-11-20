@@ -306,7 +306,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       end
     end
 
-    nap 15
+    nap 60
   end
 
   label def destroy

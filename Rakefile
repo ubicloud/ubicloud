@@ -69,9 +69,16 @@ task :_test_up do
   Rake::Task["setup_database"].invoke("test", true) if auto_parallel_tests.call
 end
 
+migrate_version = lambda do |env|
+  last_irreversible_migration = 20241011
+  unless (version = ENV["VERSION"].to_i) >= last_irreversible_migration
+    raise "Must provide VERSION environment variable >= #{last_irreversible_migration} to migrate down"
+  end
+  migrate.call(env, version)
+end
+
 task :_test_down do
-  version = ENV["VERSION"].to_i || 0
-  migrate.call("test", version)
+  migrate_version.call("test")
   Rake::Task["setup_database"].invoke("test", true) if auto_parallel_tests.call
 end
 # rubocop:enable Rake/Desc
@@ -83,8 +90,7 @@ end
 
 desc "Migrate development database down. If VERSION isn't given, migrates to all the way down."
 task :dev_down do
-  version = ENV["VERSION"].to_i || 0
-  migrate.call("development", version)
+  migrate_version.call("development")
 end
 
 desc "Migrate production database to latest version"
@@ -94,7 +100,12 @@ end
 
 desc "Refresh schema and index caches"
 task :refresh_sequel_caches do
-  sh({"FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "ruby", "-r", "./loader", "-e", <<~END)
+  %w[schema index].each do |type|
+    filename = "cache/#{type}.cache"
+    File.delete(filename) if File.file?(filename)
+  end
+
+  sh({"RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "ruby", "-r", "./loader", "-e", <<~END)
      DB.dump_schema_cache("cache/schema.cache")
      DB.dump_index_cache("cache/index.cache")
   END

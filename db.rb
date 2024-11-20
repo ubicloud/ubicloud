@@ -33,7 +33,7 @@ end
 DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_timestamptz, :pg_range
 Sequel.extension :pg_range_ops
 
-DB.extension :schema_caching
+DB.extension :pg_schema_caching
 DB.extension :index_caching
 DB.load_schema_cache?("cache/schema.cache")
 DB.load_index_cache?("cache/index.cache")

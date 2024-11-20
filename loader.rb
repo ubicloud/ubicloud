@@ -85,11 +85,9 @@ module Serializers; end
 
 module Routes; end
 
-module Routes::Common; end
-
 autoload_normal.call("model", flat: true)
 %w[lib clover.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
-%w[scheduling prog serializers routes/common].each { autoload_normal.call(_1, include_first: true) }
+%w[scheduling prog serializers].each { autoload_normal.call(_1, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
   files = %w[model lib scheduling prog serializers routes/common].flat_map { Dir["#{_1}/**/*.rb"] }
@@ -210,7 +208,6 @@ def clover_freeze
     ResourceMethods,
     ResourceMethods::ClassMethods,
     Routes,
-    Routes::Common::Base::AppMode,
     Scheduling,
     Scheduling::Allocator,
     Scheduling::Allocator::Allocation,

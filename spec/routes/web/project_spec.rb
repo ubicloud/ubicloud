@@ -31,8 +31,7 @@ RSpec.describe Clover, "project" do
 
     describe "list" do
       it "can list no projects" do
-        expect(Account).to receive(:[]).and_return(user).twice
-        expect(user).to receive(:projects).and_return([]).at_least(1)
+        user.projects.each { user.dissociate_with_project(_1) }
 
         visit "/project"
 
@@ -424,8 +423,7 @@ RSpec.describe Clover, "project" do
         btn = find ".delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "'#{project.name}' project is deleted."}.to_json)
-
+        expect(page.status_code).to eq(204)
         expect(Project[project.id].visible).to be_falsey
         expect(AccessTag.where(project_id: project.id).count).to eq(0)
         expect(AccessPolicy.where(project_id: project.id).count).to eq(0)
@@ -439,9 +437,9 @@ RSpec.describe Clover, "project" do
         # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
         # UI tests run without a JavaScript enginer.
         btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.body).to eq({message: "'#{project.name}' project has some resources. Delete all related resources first."}.to_json)
+        Capybara.current_session.driver.header "Accept", "application/json"
+        response = page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(response).to have_api_error(409, "'#{project.name}' project has some resources. Delete all related resources first.")
 
         visit "/project"
 

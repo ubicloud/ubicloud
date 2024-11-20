@@ -337,7 +337,7 @@ RSpec.describe Clover, "auth" do
 
       click_button "Close Account"
 
-      expect(page.title).to eq("Ubicloud - Projects")
+      expect(page.title).to eq("Ubicloud - Close Account")
       expect(page).to have_content("project has some resources. Delete all related resources first")
     end
   end

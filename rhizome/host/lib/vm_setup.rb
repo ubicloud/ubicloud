@@ -437,10 +437,10 @@ DHCP
     raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
     interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
     dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
-    address_mapping = if boot_image.include?("github")
+    runner_config = if boot_image.include?("github")
       <<~ADDRESSES
       address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}
-      address=/.docker.io/::
+      filter-AAAA
       ADDRESSES
     else
       ""
@@ -467,8 +467,9 @@ listen-address=#{dnsmasq_address_ip6}
 listen-address=#{dns_ipv4}
 dhcp-option=26,1400
 bind-interfaces
-#{address_mapping}
+#{runner_config}
 dhcp-option=54,#{dns_ipv4}
+dns-forward-max=10000
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|

@@ -112,7 +112,7 @@ RSpec.describe Clover, "load-balancer" do
           health_check_protocol: "http"
         }.to_json
 
-        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
       end
     end
 
@@ -124,7 +124,7 @@ RSpec.describe Clover, "load-balancer" do
       end
 
       it "not found" do
-        delete "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid"
+        delete "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/invalid_name"
 
         expect(last_response.status).to eq(204)
       end
@@ -205,7 +205,7 @@ RSpec.describe Clover, "load-balancer" do
           src_port: "80", dst_port: "80", health_check_endpoint: "/up", algorithm: "round_robin", vms: ["invalid"]
         }.to_json
 
-        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vms")
       end
 
       it "vm already attached to a different load balancer" do
@@ -248,10 +248,10 @@ RSpec.describe Clover, "load-balancer" do
         expect(last_response.status).to eq(200)
       end
 
-      it "not found" do
+      it "not existing vm" do
         post "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/attach-vm", {vm_id: "invalid"}.to_json
 
-        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id")
       end
     end
 
@@ -272,10 +272,10 @@ RSpec.describe Clover, "load-balancer" do
         expect(last_response.status).to eq(200)
       end
 
-      it "not found" do
+      it "not existing vm" do
         post "/api/project/#{project.ubid}/location/#{lb.private_subnet.display_location}/load-balancer/#{lb.name}/detach-vm", {vm_id: "invalid"}.to_json
 
-        expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id")
       end
     end
   end
