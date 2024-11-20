@@ -90,8 +90,8 @@ autoload_normal.call("model", flat: true)
 %w[scheduling prog serializers].each { autoload_normal.call(_1, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
-  files = %w[model lib scheduling prog serializers routes/common].flat_map { Dir["#{_1}/**/*.rb"] }
-  files.concat(%w[clover.rb clover_web.rb clover_api.rb clover_runtime.rb routes/clover_base.rb routes/clover_error.rb])
+  files = %w[model lib scheduling prog serializers].flat_map { Dir["#{_1}/**/*.rb"] }
+  files.concat(%w[clover.rb clover_error.rb])
   files.each do |file|
     pid = fork do
       require_relative file
