@@ -83,8 +83,6 @@ module Scheduling; end
 
 module Serializers; end
 
-module Routes; end
-
 autoload_normal.call("model", flat: true)
 %w[lib clover.rb clover_error.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers].each { autoload_normal.call(_1, include_first: true) }
@@ -207,7 +205,6 @@ def clover_freeze
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
-    Routes,
     Scheduling,
     Scheduling::Allocator,
     Scheduling::Allocator::Allocation,
