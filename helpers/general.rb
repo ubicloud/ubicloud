@@ -47,20 +47,10 @@ class Clover < Roda
     end
   end
 
-  # XXX: Temporary unless PR 2084 is merged
-  # :nocov:
-  if Config.production?
-    def api?
-      return @is_api if defined?(@is_api)
-      @is_api = env["HTTP_HOST"]&.start_with?("api.")
-    end
-  else
-    def api?
-      return @is_api if defined?(@is_api)
-      @is_api = env["HTTP_HOST"]&.start_with?("api.") || env["PATH_INFO"].start_with?("/api")
-    end
+  def api?
+    return @is_api if defined?(@is_api)
+    @is_api = env["HTTP_HOST"].to_s.start_with?("api.")
   end
-  # :nocov:
 
   def runtime?
     !!@is_runtime
