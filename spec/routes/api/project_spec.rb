@@ -10,9 +10,9 @@ RSpec.describe Clover, "project" do
   describe "unauthenticated" do
     it "cannot perform authenticated operations" do
       [
-        [:get, "/api/project"],
-        [:post, "/api/project", {name: "p-1"}],
-        [:delete, "/api/project/#{project.ubid}"]
+        [:get, "/project"],
+        [:post, "/project", {name: "p-1"}],
+        [:delete, "/project/#{project.ubid}"]
       ].each do |method, path, body|
         send(method, path, body)
 
@@ -29,16 +29,6 @@ RSpec.describe Clover, "project" do
     describe "list" do
       it "success" do
         project
-        get "/api/project"
-
-        expect(last_response.status).to eq(200)
-        parsed_body = JSON.parse(last_response.body)
-        expect(parsed_body["count"]).to eq(2)
-      end
-
-      it "success with api subdomain" do
-        project
-        header "Host", "api.ubicloud.com"
         get "/project"
 
         expect(last_response.status).to eq(200)
@@ -48,14 +38,14 @@ RSpec.describe Clover, "project" do
 
       it "invalid order column" do
         project
-        get "/api/project?order_column=name"
+        get "/project?order_column=name"
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: order_column")
       end
 
       it "invalid id" do
         project
-        get "/api/project?start_after=invalid_id"
+        get "/project?start_after=invalid_id"
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: start_after")
       end
@@ -63,7 +53,7 @@ RSpec.describe Clover, "project" do
 
     describe "create" do
       it "success" do
-        post "/api/project", {
+        post "/project", {
           name: "test-project"
         }.to_json
 
@@ -72,7 +62,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "missing parameter" do
-        post "/api/project", {}.to_json
+        post "/project", {}.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
       end
@@ -80,7 +70,7 @@ RSpec.describe Clover, "project" do
 
     describe "delete" do
       it "success" do
-        delete "api/project/#{project.ubid}"
+        delete "/project/#{project.ubid}"
 
         expect(last_response.status).to eq(204)
 
@@ -90,7 +80,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "success with non-existing project" do
-        delete "api/project/non_existing_id"
+        delete "/project/non_existing_id"
 
         expect(last_response.status).to eq(204)
       end
@@ -98,7 +88,7 @@ RSpec.describe Clover, "project" do
       it "can not delete project when it has resources" do
         Prog::Vm::Nexus.assemble("key", project.id, name: "vm1")
 
-        delete "api/project/#{project.ubid}"
+        delete "/project/#{project.ubid}"
 
         expect(last_response).to have_api_error(409, "'#{project.name}' project has some resources. Delete all related resources first.")
       end
@@ -106,7 +96,7 @@ RSpec.describe Clover, "project" do
       it "not authorized" do
         u = create_account("test@test.com")
         p = u.create_project_with_default_policy("project-1")
-        delete "api/project/#{p.ubid}"
+        delete "/project/#{p.ubid}"
 
         expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
       end
@@ -114,14 +104,14 @@ RSpec.describe Clover, "project" do
 
     describe "show" do
       it "success" do
-        get "/api/project/#{project.ubid}"
+        get "/project/#{project.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(project.name)
       end
 
       it "not found" do
-        get "/api/project/08s56d4kaj94xsmrnf5v5m3mav"
+        get "/project/08s56d4kaj94xsmrnf5v5m3mav"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
@@ -129,7 +119,7 @@ RSpec.describe Clover, "project" do
       it "not authorized" do
         u = create_account("test@test.com")
         p = u.create_project_with_default_policy("project-1")
-        get "/api/project/#{p.ubid}"
+        get "/project/#{p.ubid}"
 
         expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
       end

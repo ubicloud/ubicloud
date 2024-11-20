@@ -16,12 +16,12 @@ RSpec.describe Clover, "vm" do
   describe "unauthenticated" do
     it "cannot perform authenticated operations" do
       [
-        [:get, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm"],
-        [:post, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"],
-        [:delete, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
-        [:delete, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"],
-        [:get, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
-        [:get, "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"]
+        [:get, "/project/#{project.ubid}/location/#{vm.display_location}/vm"],
+        [:post, "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"],
+        [:delete, "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
+        [:delete, "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"],
+        [:get, "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"],
+        [:get, "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"]
       ].each do |method, path|
         send method, path
 
@@ -39,7 +39,7 @@ RSpec.describe Clover, "vm" do
       it "success multiple" do
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-2")
 
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm"
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm"
 
         expect(last_response.status).to eq(200)
         parsed_body = JSON.parse(last_response.body)
@@ -52,7 +52,7 @@ RSpec.describe Clover, "vm" do
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-3")
         Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-4", location: "leaseweb-wdc02")
 
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm", {
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm", {
           order_column: "name",
           start_after: "dummy-vm-1"
         }
@@ -64,7 +64,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "ubid not exist" do
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
@@ -72,7 +72,7 @@ RSpec.describe Clover, "vm" do
 
     describe "create" do
       it "success" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -87,7 +87,7 @@ RSpec.describe Clover, "vm" do
       it "success with private subnet" do
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").ubid
 
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -102,7 +102,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success with storage size" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -115,7 +115,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "boot image doesn't passed" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -126,7 +126,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid name" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/MyVM", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/MyVM", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -137,7 +137,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid boot image" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -149,7 +149,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid vm size" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-gpu-6",
@@ -160,7 +160,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "success without vm_size" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           boot_image: "ubuntu-jammy",
@@ -171,7 +171,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid ps id" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -185,7 +185,7 @@ RSpec.describe Clover, "vm" do
 
       it "invalid ps id in other location" do
         ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "leaseweb-wdc02").ubid
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           unix_user: "ubi",
           size: "standard-2",
@@ -198,13 +198,13 @@ RSpec.describe Clover, "vm" do
       end
 
       it "invalid body" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", "invalid_body"
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", "invalid_body"
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
       end
 
       it "missing required key" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           unix_user: "ubi"
         }.to_json
 
@@ -212,7 +212,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "non allowed key" do
-        post "/api/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
           public_key: "ssh key",
           foo_key: "foo_val"
         }.to_json
@@ -223,21 +223,21 @@ RSpec.describe Clover, "vm" do
 
     describe "show" do
       it "success" do
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
       end
 
       it "success ubid" do
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
       end
 
       it "not found" do
-        get "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/not-exists-vm"
+        get "/project/#{project.ubid}/location/#{vm.display_location}/vm/not-exists-vm"
 
         expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
       end
@@ -245,35 +245,35 @@ RSpec.describe Clover, "vm" do
 
     describe "delete" do
       it "success" do
-        delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end
 
       it "success ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/_#{vm.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end
 
       it "not exist" do
-        delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo_name"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
       it "not exist ubid" do
-        delete "/api/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/_foo_ubid"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 
       it "not exist ubid in location" do
-        delete "/api/project/#{project.ubid}/location/foo_location/vm/_#{vm.ubid}"
+        delete "/project/#{project.ubid}/location/foo_location/vm/_#{vm.ubid}"
 
         expect(last_response.status).to eq(204)
         expect(SemSnap.new(vm.id).set?("destroy")).to be false

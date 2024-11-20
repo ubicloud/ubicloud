@@ -15,6 +15,6 @@ RSpec.describe Clover do
   end
 
   it "supports SHOW_ERRORS environment variable when testing" do
-    expect { post "/api/project", {}.to_json }.to raise_error Validation::ValidationFailed
+    expect { post "/project", {}.to_json }.to raise_error Validation::ValidationFailed
   end
 end

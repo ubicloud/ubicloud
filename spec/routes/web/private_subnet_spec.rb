@@ -152,7 +152,7 @@ RSpec.describe Clover, "private subnet" do
     describe "connected subnets" do
       it "can show connected subnets" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-hel1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
         private_subnet.connect_subnet(ps2)
 
         visit "#{project.path}#{private_subnet.path}"
@@ -162,7 +162,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "can disconnect connected subnet" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-hel1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
         private_subnet.connect_subnet(ps2)
 
         visit "#{project.path}#{private_subnet.path}"
@@ -177,7 +177,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "can connect to a subnet" do
         private_subnet
-        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-hel1").subject
+        ps2 = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
         expect(private_subnet.connected_subnets.count).to eq(0)
         visit "#{project.path}#{private_subnet.path}"
 
