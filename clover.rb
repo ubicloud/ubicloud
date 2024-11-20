@@ -201,6 +201,7 @@ class Clover < Roda
       :otp, :webauthn, :recovery_codes
 
     title_instance_variable :@page_title
+    check_csrf? false
 
     # :nocov:
     unless Config.development?
@@ -476,7 +477,6 @@ class Clover < Roda
     if api?
       response.json = true
       response.skip_content_security_policy!
-      r.rodauth
     else
       r.on "runtime" do
         @is_runtime = true
@@ -497,8 +497,6 @@ class Clover < Roda
         r.hash_branches(:webhook_prefix)
       end
 
-      r.rodauth
-
       check_csrf!
       rodauth.load_memory
 
@@ -507,6 +505,7 @@ class Clover < Roda
       end
     end
 
+    r.rodauth
     rodauth.check_active_session
     rodauth.require_authentication
     r.hash_branches("")
