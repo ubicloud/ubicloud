@@ -17,10 +17,15 @@ class VmSetup
 
   def initialize(vm_name)
     @vm_name = vm_name
+    @slice_name = "system.slice"
   end
 
   def q_vm
     @q_vm ||= @vm_name.shellescape
+  end
+
+  def q_vm_service
+    q_vm + ".service"
   end
 
   # YAML quoting
@@ -43,7 +48,7 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
+  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4, cpu_percent_limit, cpu_burst_percent_limit)
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
@@ -54,16 +59,17 @@ class VmSetup
     [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
     prepare_pci_devices(pci_devices)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, cpu_percent_limit, cpu_burst_percent_limit)
     start_systemd_unit
   end
 
-  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, pci_devices, multiqueue:)
+  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, pci_devices, multiqueue:, cpu_burst_percent_limit: 0)
     setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: multiqueue)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     prepare_pci_devices(pci_devices)
     start_systemd_unit
+    enable_bursting(cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
@@ -575,7 +581,10 @@ EOS
     end
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, cpu_percent_limit, cpu_burst_percent_limit)
+    fail "Invalid value of cpu_percent_limit" if cpu_percent_limit < 0 || ((cpu_percent_limit / 100) > max_vcpus)
+    fail "Invalid value of cpu_burst_percent_limit" if cpu_burst_percent_limit < 0 || cpu_burst_percent_limit > cpu_percent_limit
+
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -586,6 +595,7 @@ Description=A lightweight DHCP and caching DNS server
 After=network.target
 
 [Service]
+Slice=#{@slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
 ExecStartPre=/usr/local/sbin/dnsmasq --test
@@ -633,6 +643,7 @@ After=#{@vm_name}-dnsmasq.service
 Wants=#{@vm_name}-dnsmasq.service
 
 [Service]
+Slice=#{@slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
@@ -655,11 +666,22 @@ Group=#{@vm_name}
 LimitNOFILE=500000
 #{limit_memlock}
 SERVICE
+    r "systemctl set-property #{q_vm_service} CPUQuota=#{cpu_percent_limit}%" unless cpu_percent_limit == 0
     r "systemctl daemon-reload"
+
+    enable_bursting(cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
   def start_systemd_unit
     r "systemctl start #{q_vm}"
+  end
+
+  def enable_bursting(cpu_burst_percent_limit)
+    # Convert cpu_burst_percent limit to a usec value
+    # For now we assume that 100% == 100,000 usec, but that needs to be verified
+    cpu_burst_limit = cpu_burst_percent_limit * 1000
+    
+     r "echo \"#{cpu_burst_limit}\" > /sys/fs/cgroup/#{@slice_name}/#{q_vm_service}/cpu.max.burst"
   end
 
   # Generate a MAC with the "local" (generated, non-manufacturer) bit

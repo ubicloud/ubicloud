@@ -52,6 +52,8 @@ begin
   pci_devices = params.fetch("pci_devices", [])
   boot_image = params.fetch("boot_image")
   dns_ipv4 = params.fetch("dns_ipv4")
+  cpu_percent_limit = params.fetch("cpu_percent_limit", "0").to_i
+  cpu_burst_percent_limit = params.fetch("cpu_burst_percent_limit", "0").to_i
 rescue KeyError => e
   puts "Needed #{e.key} in parameters json"
   exit 1
@@ -68,7 +70,7 @@ when "prep"
   vm_setup.prep(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
-    pci_devices, boot_image, dns_ipv4)
+    pci_devices, boot_image, dns_ipv4, cpu_percent_limit, cpu_burst_percent_limit)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])
@@ -79,7 +81,8 @@ when "recreate-unpersisted"
   vm_setup.recreate_unpersisted(
     gua, ip4, local_ip4, nics, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
-    pci_devices, multiqueue: max_vcpus > 1
+    pci_devices, multiqueue: max_vcpus > 1,
+    cpu_burst_percent_limit: cpu_burst_percent_limit
   )
 when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(
