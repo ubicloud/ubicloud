@@ -25,6 +25,7 @@ Open3.popen3({"RACK_ENV" => "production"}, "bundle", "exec", "puma") do |stdin, 
       case line
       when /\A\* Listening on /
         works = true
+        puts line
         queue.push(true)
         Process.kill(:TERM, pid)
         break
@@ -34,6 +35,8 @@ Open3.popen3({"RACK_ENV" => "production"}, "bundle", "exec", "puma") do |stdin, 
         queue.push(true)
         Process.kill(:TERM, pid)
         break
+      else
+        puts line
       end
     end
   end
