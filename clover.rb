@@ -525,8 +525,8 @@ class Clover < Roda
       end
     end
 
-    r.rodauth
     rodauth.check_active_session
+    r.rodauth
     rodauth.require_authentication
     r.hash_branches("")
   end
