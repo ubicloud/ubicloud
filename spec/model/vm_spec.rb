@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe Vm do
-  subject(:vm) { described_class.new(display_state: "creating") }
+  subject(:vm) { described_class.new(display_state: "creating", created_at: Time.now) }
 
   describe "#display_state" do
     it "returns deleting if destroy semaphore increased" do
@@ -14,6 +14,12 @@ RSpec.describe Vm do
     it "returns waiting for capacity if semaphore increased" do
       expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
       expect(vm.display_state).to eq("waiting for capacity")
+    end
+
+    it "returns no capacity available if it's waiting capacity more than 15 minutes" do
+      expect(vm).to receive(:created_at).and_return(Time.now - 16 * 60)
+      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm.display_state).to eq("no capacity available")
     end
 
     it "return same if semaphores not increased" do

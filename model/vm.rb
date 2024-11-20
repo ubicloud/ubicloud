@@ -60,7 +60,10 @@ class Vm < Sequel::Model
 
   def display_state
     return "deleting" if destroy_set? || strand&.label == "destroy"
-    return "waiting for capacity" if waiting_for_capacity_set?
+    if waiting_for_capacity_set?
+      return "no capacity available" if Time.now - created_at > 15 * 60
+      return "waiting for capacity"
+    end
     super
   end
 
