@@ -472,7 +472,7 @@ class Clover < Roda
   # :nocov:
 
   autoload_routes("routes/merged")
-  autoload_routes("runtime", "routes/runtime")
+  autoload_routes("runtime", "runtime-routes")
 
   route do |r|
     if api?
