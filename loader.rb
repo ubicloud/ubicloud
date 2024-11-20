@@ -86,7 +86,7 @@ module Serializers; end
 module Routes; end
 
 autoload_normal.call("model", flat: true)
-%w[lib clover.rb routes/clover_error.rb].each { autoload_normal.call(_1) }
+%w[lib clover.rb clover_error.rb].each { autoload_normal.call(_1) }
 %w[scheduling prog serializers].each { autoload_normal.call(_1, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
