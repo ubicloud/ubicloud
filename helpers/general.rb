@@ -2,9 +2,8 @@
 
 class Clover < Roda
   # rubocop:disable Style/OptionalArguments
-  def self.autoload_routes(namespace = "", route)
+  def self.autoload_routes(namespace = "", route_path)
     # rubocop:enable Style/OptionalArguments # different indents required by Rubocop
-    route_path = "routes/#{route}"
     if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
       Unreloader.require(route_path)
     else
