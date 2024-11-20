@@ -9,7 +9,7 @@ RSpec.describe Clover, "private_subnet" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ubid}/private-subnet"
+      get "/project/#{project.ubid}/private-subnet"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
@@ -24,7 +24,7 @@ RSpec.describe Clover, "private_subnet" do
       Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-2", location: "hetzner-fsn1")
       Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-3", location: "hetzner-fsn1")
 
-      get "/api/project/#{project.ubid}/private-subnet"
+      get "/project/#{project.ubid}/private-subnet"
 
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(2)

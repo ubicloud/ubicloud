@@ -476,18 +476,6 @@ class Clover < Roda
     if api?
       response.json = true
       response.skip_content_security_policy!
-      # To make test and development easier
-      # :nocov:
-      unless Config.production?
-        r.on("api") do
-          r.rodauth
-          rodauth.check_active_session
-          rodauth.require_authentication
-          r.hash_branches("")
-        end
-      end
-      # :nocov:
-
       r.rodauth
     else
       r.on "runtime" do

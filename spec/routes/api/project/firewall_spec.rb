@@ -11,13 +11,13 @@ RSpec.describe Clover, "firewall" do
 
   describe "unauthenticated" do
     it "not list" do
-      get "/api/project/#{project.ubid}/firewall"
+      get "/project/#{project.ubid}/firewall"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
 
     it "not create" do
-      post "/api/project/#{project.ubid}/firewall"
+      post "/project/#{project.ubid}/firewall"
 
       expect(last_response).to have_api_error(401, "Please login to continue")
     end
@@ -31,7 +31,7 @@ RSpec.describe Clover, "firewall" do
     it "success get all firewalls" do
       Firewall.create_with_id(name: "#{firewall.name}-2", location: "hetzner-fsn1").associate_with_project(project)
 
-      get "/api/project/#{project.ubid}/firewall"
+      get "/project/#{project.ubid}/firewall"
 
       expect(last_response.status).to eq(200)
       expect(JSON.parse(last_response.body)["items"].length).to eq(2)

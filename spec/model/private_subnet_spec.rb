@@ -164,18 +164,18 @@ RSpec.describe PrivateSubnet do
     }
 
     let(:ps1) {
-      Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location: "hetzner-hel1").subject
+      Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps1", location: "hetzner-fsn1").subject
     }
 
     it ".connected_subnets" do
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-hel1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-fsn1").subject
       expect(ps1.connected_subnets).to eq []
 
       ps1.connect_subnet(ps2)
       expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
       expect(ps2.connected_subnets.map(&:id)).to eq [ps1.id]
 
-      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location: "hetzner-hel1").subject
+      ps3 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps3", location: "hetzner-fsn1").subject
       ps2.connect_subnet(ps3)
       expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
       expect(ps2.connected_subnets.map(&:id).sort).to eq [ps1.id, ps3.id].sort
@@ -188,7 +188,7 @@ RSpec.describe PrivateSubnet do
     end
 
     it ".all_nics" do
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-hel1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-fsn1").subject
 
       ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
       ps2_nic = Prog::Vnet::NicNexus.assemble(ps2.id, name: "test-ps2-nic1").subject
@@ -206,7 +206,7 @@ RSpec.describe PrivateSubnet do
     end
 
     it "disconnect_subnet does not destroy in subnet tunnels" do
-      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-hel1").subject
+      ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps2", location: "hetzner-fsn1").subject
       ps1_nic = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic1").subject
       ps1_nic2 = Prog::Vnet::NicNexus.assemble(ps1.id, name: "test-ps1-nic2").subject
       ps1.create_tunnels([ps1_nic], ps1_nic2)
