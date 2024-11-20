@@ -10,7 +10,7 @@ class Clover < Roda
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
-  Unreloader.require("routes/helpers") {}
+  Unreloader.require("helpers") {}
 
   plugin :all_verbs
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
