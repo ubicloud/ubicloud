@@ -24,4 +24,12 @@ RSpec.describe ResourceMethods do
     expect(DeletedRecord).to receive(:create).with(hash_including(model_values: scrubbed_values_hash))
     sa.destroy
   end
+
+  it "inspect should show foreign keys as ubids, and exclude subseconds and timezones from times" do
+    access_tag = AccessTag.new(project_id: UBID.parse("pjhahqe5e90j3j6kfjtwtxpsps").to_uuid, created_at: Time.new(2024, 11, 13, 9, 16, 56.123456, 3600))
+    expect(access_tag.inspect).to eq "#<AccessTag @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :created_at=>\"2024-11-13 09:16:56\"}>"
+
+    access_tag.id = UBID.parse("tgx1y9wja1064pncxffe7aw4s4").to_uuid
+    expect(access_tag.inspect).to eq "#<AccessTag[\"tgx1y9wja1064pncxffe7aw4s4\"] @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :created_at=>\"2024-11-13 09:16:56\"}>"
+  end
 end

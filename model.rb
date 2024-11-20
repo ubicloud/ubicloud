@@ -62,7 +62,8 @@ module ResourceMethods
   INSPECT_CONVERTERS = {
     "uuid" => lambda { |v| UBID.from_uuidish(v).to_s },
     "cidr" => :to_s.to_proc,
-    "inet" => :to_s.to_proc
+    "inet" => :to_s.to_proc,
+    "timestamp with time zone" => lambda { |v| v.strftime("%F %T") }
   }.freeze
   def inspect_values
     inspect_values = {}
