@@ -92,13 +92,15 @@ class Clover < Roda
     # :nocov:
   end
 
+  plugin :invalid_request_body, :raise
+
   plugin :error_handler do |e|
     if Config.test? && ENV["SHOW_ERRORS"]
       raise e
     end
 
     case e
-    when Sequel::ValidationFailed
+    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
