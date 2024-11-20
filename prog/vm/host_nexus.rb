@@ -109,6 +109,7 @@ class Prog::Vm::HostNexus < Prog::Base
   label def download_boot_images
     register_deadline(:prep_reboot, 4 * 60 * 60)
     frame["default_boot_images"].each { |image_name|
+      next if vm_host.arch == "arm64" && image_name == "almalinux-8"
       bud Prog::DownloadBootImage, {
         "image_name" => image_name
       }
