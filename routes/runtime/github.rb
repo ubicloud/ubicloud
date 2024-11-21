@@ -35,7 +35,7 @@ class Clover
       if entry.nil?
         entry = repository.cache_entries_dataset
           .exclude(committed_at: nil)
-          .where { keys.map { |key| Sequel.like(:key, "#{key}%") }.reduce(:|) }
+          .where { keys.map { |key| Sequel.like(:key, "#{DB.dataset.escape_like(key)}%") }.reduce(:|) }
           .where(version: version, scope: scopes)
           .order(Sequel.desc(:created_at))
           .first

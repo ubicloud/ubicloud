@@ -247,6 +247,12 @@ RSpec.describe Clover, "github" do
         expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k123456", "v1", "main"])
         expect(GithubCacheEntry[key: "k123456", version: "v1", scope: "main"].last_accessed_by).to eq(runner.id)
       end
+
+      it "only does a prefix match on key, escapes LIKE metacharacters in submitted keys" do
+        GithubCacheEntry.create_with_id(key: "k123456", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+        get "/runtime/github/cache", {keys: "%6", version: "v1"}
+        expect(last_response.status).to eq(204)
+      end
     end
 
     describe "lists cache entries" do
