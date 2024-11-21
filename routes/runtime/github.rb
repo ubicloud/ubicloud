@@ -22,9 +22,14 @@ class Clover
       # caches by scope, pushing entries for later scopes to the end of the
       # list.
       scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
-      entry = repository.cache_entries_dataset
+
+      dataset = repository.cache_entries_dataset
         .exclude(committed_at: nil)
-        .where(key: keys, version: version, scope: scopes).all
+        .where(version: version, scope: scopes)
+
+      entry = dataset
+        .where(key: keys)
+        .all
         .min_by { keys.index(_1.key) + (scopes.index(_1.scope) * keys.size) }
 
       # GitHub cache supports prefix match if the key doesn't match exactly.
@@ -32,14 +37,10 @@ class Clover
       #   When a key doesn't match directly, the action searches for keys
       #   prefixed with the restore key. If there are multiple partial matches
       #   for a restore key, the action returns the most recently created cache.
-      if entry.nil?
-        entry = repository.cache_entries_dataset
-          .exclude(committed_at: nil)
-          .where { keys.map { |key| Sequel.like(:key, "#{DB.dataset.escape_like(key)}%") }.reduce(:|) }
-          .where(version: version, scope: scopes)
-          .order(Sequel.desc(:created_at))
-          .first
-      end
+      entry ||= dataset
+        .grep(:key, keys.map { |key| "#{DB.dataset.escape_like(key)}%" })
+        .reverse(:created_at)
+        .first
 
       fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
 
