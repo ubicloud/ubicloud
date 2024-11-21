@@ -387,7 +387,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Virtual Machine
+        - Load Balancer
   '/project/{project_id}/location/{location}/firewall':
     parameters:
       - $ref: '#/components/parameters/location'
