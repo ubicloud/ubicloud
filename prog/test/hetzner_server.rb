@@ -3,7 +3,7 @@
 require_relative "../../lib/util"
 
 class Prog::Test::HetznerServer < Prog::Test::Base
-  semaphore :destroy, :allow_slices, :disallow_slices
+  semaphore :verify_cleanup_and_destroy, :allow_slices, :disallow_slices
 
   def self.assemble(vm_host_id: nil, default_boot_images: [])
     frame = if vm_host_id
@@ -100,13 +100,14 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vm_host.sshable.cmd("sudo mkdir -p #{tmp_dir}")
     vm_host.sshable.cmd("sudo chmod a+rw #{tmp_dir}")
     vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
+    vm_host.sshable.cmd("sudo rm -rf #{tmp_dir}")
 
     hop_wait
   end
 
   label def wait
-    when_destroy_set? do
-      hop_destroy
+    when_verify_cleanup_and_destroy_set? do
+      hop_verify_cleanup
     end
 
     when_allow_slices_set? do
@@ -132,6 +133,44 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     Semaphore.where(strand_id: strand.id, name: "disallow_slices").destroy
 
     hop_wait
+  end
+
+  label def verify_cleanup
+    hop_verify_vm_dir_purged
+  end
+
+  label def verify_vm_dir_purged
+    sshable = vm_host.sshable
+    vm_dir_content = sshable.cmd("sudo ls -1 /vm").split("\n")
+    fail_test "VM directory not empty: #{vm_dir_content}" unless vm_dir_content.empty?
+    hop_verify_storage_files_purged
+  end
+
+  label def verify_storage_files_purged
+    sshable = vm_host.sshable
+
+    vm_disks = sshable.cmd("sudo ls -1 /var/storage").split("\n").reject { ["vhost", "images"].include? _1 }
+    fail_test "VM disks not empty: #{vm_disks}" unless vm_disks.empty?
+
+    vhost_dir_content = sshable.cmd("sudo ls -1 /var/storage/vhost").split("\n")
+    fail_test "vhost directory not empty: #{vhost_dir_content}" unless vhost_dir_content.empty?
+    hop_verify_spdk_artifacts_purged
+  end
+
+  label def verify_spdk_artifacts_purged
+    sshable = vm_host.sshable
+
+    spdk_version = vm_host.spdk_installations.first.version
+    rpc_py = "/opt/spdk-#{spdk_version}/scripts/rpc.py"
+    rpc_sock = "/home/spdk/spdk-#{spdk_version}.sock"
+
+    bdevs = JSON.parse(sshable.cmd("sudo #{rpc_py} -s #{rpc_sock} bdev_get_bdevs")).map { _1["name"] }
+    fail_test "SPDK bdevs not empty: #{bdevs}" unless bdevs.empty?
+
+    vhost_controllers = JSON.parse(sshable.cmd("sudo #{rpc_py} -s #{rpc_sock} vhost_get_controllers")).map { _1["ctrlr"] }
+    fail_test "SPDK vhost controllers not empty: #{vhost_controllers}" unless vhost_controllers.empty?
+
+    hop_destroy
   end
 
   label def destroy

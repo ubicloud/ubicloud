@@ -55,7 +55,7 @@ def main(options)
   # No need to make it parallel.
   tests_to_wait.each { |st| wait_until(st) }
 
-  Semaphore.incr(hetzner_server_st.id, "destroy")
+  Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
   wait_until(hetzner_server_st)
 end
 
