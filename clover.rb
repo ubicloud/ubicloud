@@ -483,8 +483,6 @@ class Clover < Roda
       segment = File.basename(filename, ".rb").tr("_", "-")
       namespace = if namespaces.empty?
         ""
-      elsif full_path.start_with?("routes/runtime/")
-        "runtime"
       else
         :"#{namespaces.join("_")}_prefix"
       end
@@ -509,7 +507,7 @@ class Clover < Roda
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
-        r.hash_branches("runtime")
+        r.hash_branches(:runtime_prefix)
       end
 
       r.public
