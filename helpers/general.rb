@@ -1,29 +1,6 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  # rubocop:disable Style/OptionalArguments
-  def self.autoload_routes(namespace = "", route_path)
-    # rubocop:enable Style/OptionalArguments # different indents required by Rubocop
-    if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
-      Unreloader.require(route_path)
-    else
-      # :nocov:
-      plugin :autoload_hash_branches
-      Dir["#{route_path}/**/*.rb"].each do |full_path|
-        parts = full_path.delete_prefix("#{route_path}/").split("/")
-        namespaces = parts[0...-1]
-        filename = parts.last
-        if namespaces.empty?
-          autoload_hash_branch(namespace, File.basename(filename, ".rb").tr("_", "-"), full_path)
-        else
-          autoload_hash_branch(:"#{namespace + "_" unless namespace.empty?}#{namespaces.join("_")}_prefix", File.basename(filename, ".rb").tr("_", "-"), full_path)
-        end
-      end
-      Unreloader.autoload(route_path, delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
-      # :nocov:
-    end
-  end
-
   NAME_OR_UBID = /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)|_([a-z0-9]{26})/
 
   class RodaResponse
