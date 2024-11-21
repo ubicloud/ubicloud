@@ -1,36 +1,74 @@
 <% @page_title = "#{@project_data[:name]} Dashboard" %>
 
 <div class="space-y-1">
-  <%== render("components/breadcrumb", locals: { parts: [%w[Projects /project], [@project_data[:name], ""]] }) %>
-  <%== render("components/page_header", locals: { title: "Getting Started with your Project" }) %>
+  <%== render("components/page_header", locals: { title: "Hi, #{current_account.name}" }) %>
 </div>
 
 <div class="grid gap-6">
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-10">
+  <div
+    class="mb-5 grid grid-cols-2 divide-x divide-y divide-gray-200 overflow-hidden rounded-lg bg-white shadow lg:grid-cols-3 xl:grid-cols-6 xl:divide-y-0"
+  >
+    <% [
+        ["Virtual Machines", @project.vms_dataset.count, "#{@project_data[:path]}/vm"],
+        ["Databases", @project.postgres_resources_dataset.count, "#{@project_data[:path]}/postgres"],
+        ["Load Balancers", @project.load_balancers_dataset.count, "#{@project_data[:path]}/load-balancer"],
+        ["Firewalls", @project.firewalls_dataset.count, "#{@project_data[:path]}/firewall"],
+        ["GitHub Runners", @project.github_runners_dataset.count, "#{@project_data[:path]}/github"],
+        ["Users", @project.accounts_dataset.count, "#{@project_data[:path]}/user"]
+      ].each do |title, count, link| %>
+      <a href="<%= link %>">
+        <div class="px-4 py-5 sm:p-6">
+          <dt class="truncate text-sm font-medium text-gray-900"><%= title %></dt>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-orange-600">
+            <%= count %></dd>
+        </div>
+      </a>
+    <% end %>
+  </div>
+
+  <h2 class="text-xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Getting Started with your Project</h2>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
     <% [
       [
-        "hero-folder-open", "bg-teal-50 text-teal-700", "Create Virtual Machine",
-        "Linux-based virtual machines that run on top of virtualized hardware. Comprehensive, cost-effective cloud computing.",
+        "hero-server-stack", "Create Virtual Machine",
+        "Linux-based virtual machines that run on top of virtualized hardware. Comprehensive, cost-effective computing.",
         "#{@project_data[:path]}/vm/create"
       ], [
-        "hero-users", "bg-purple-50 text-purple-700", "Add User to Project",
-        "Projects are the central point for working with others within Ubicloud. Get started by adding others to your project to be able to share access and collaborate.",
+        "github", "Use GitHub Runners",
+        "10x cost-effective managed GitHub Actions runners. Install our GitHub app and change one line in your workflow file.",
+        "#{@project_data[:path]}/github"
+      ], [
+        "hero-circle-stack", "Create Managed Database",
+        "Fully managed PostgreSQL databases. It handles backups, high availability, health monitoring, and many for you.",
+        "#{@project_data[:path]}/postgres"
+      ], [
+        "hero-users", "Add User to Project",
+        "Get started by adding other users to your project to be able to share resources and collaborate with them.",
         "#{@project_data[:path]}/user"
       ], [
-        "hero-key", "bg-sky-50 text-sky-700", "Update Access Policy",
-        "Access policies help to specify who can perform particular actions on your project's resources.",
-        "#{@project_data[:path]}/user/policy"
+        "hero-arrows-pointing-out", "Distribute Your Traffic",
+        "Create a load balancer to distribute your traffic across multiple VMs and ensures high availability for your apps.",
+        "#{@project_data[:path]}/load-balancer"
       ], [
-        "hero-envelope", "bg-yellow-50 text-yellow-700", "Get Support",
+        "hero-key", "Create Access Token",
+        "Create as many personal access tokens as you want and manage your resources programmatically.",
+        "#{@project_data[:path]}/user/token"
+      ], [
+        "hero-document-text", "Documentation",
+        "Learn more about our managed services and detailed architecture by exploring our documentation.",
+        "https://www.ubicloud.com/docs"
+      ], [
+        "hero-envelope", "Get Support",
         "If you need any help with Ubicloud, reach out to our support team for help at support@ubicloud.com.",
-        "mailto:support@ubicloud.com"
+        "https://www.ubicloud.com/docs/about/support"
       ]
-    ].each do |icon, color, title, description, link| %>
+    ].each do |icon, title, description, link| %>
       <div
         class="rounded-lg shadow group relative bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-orange-600"
       >
         <div>
-          <span class="inline-flex rounded-lg p-3 <%= color %> ring-4 ring-white">
+          <span class="inline-flex rounded-lg p-3 bg-orange-50 text-orange-700 ring-4 ring-white">
             <%== render("components/icon", locals: { name: icon }) %>
           </span>
         </div>
