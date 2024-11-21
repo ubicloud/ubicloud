@@ -471,8 +471,28 @@ class Clover < Roda
   end
   # :nocov:
 
-  autoload_routes("routes")
-  autoload_routes("runtime", "runtime-routes")
+  if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
+    Unreloader.require("routes")
+  # :nocov:
+  else
+    plugin :autoload_hash_branches
+    Dir["routes/**/*.rb"].each do |full_path|
+      parts = full_path.delete_prefix("routes/").split("/")
+      namespaces = parts[0...-1]
+      filename = parts.last
+      segment = File.basename(filename, ".rb").tr("_", "-")
+      namespace = if namespaces.empty?
+        ""
+      elsif full_path.start_with?("routes/runtime/")
+        "runtime"
+      else
+        :"#{namespaces.join("_")}_prefix"
+      end
+      autoload_hash_branch(namespace, segment, full_path)
+    end
+    Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
+  end
+  # :nocov:
 
   route do |r|
     if api?
