@@ -61,6 +61,11 @@ module Validation
     fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
   end
 
+  def self.validate_connected_subnet_location(location, subnet_id)
+    msg = "Given connected subnet is not a valid subnet for the location."
+    fail ValidationFailed.new({connect_to_subnet_id: msg}) unless PrivateSubnet[subnet_id].location == location
+  end
+
   def self.validate_vm_size(size, only_visible: false)
     available_vm_sizes = Option::VmSizes.select { !only_visible || _1.visible }
     unless (vm_size = available_vm_sizes.find { _1.name == size })

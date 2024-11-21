@@ -74,6 +74,21 @@
                   }
                 ) %>
               </div>
+              <% if @connectable_subnets.any? %>
+                <div class="col-span-full">
+                  <div class="space-y-2">
+                    <%== render(
+                      "components/form/select",
+                      locals: {
+                        name: "connect_to_subnet_id",
+                        label: "Connect to private subnet",
+                        placeholder: "Pick a subnet to connect",
+                        options: @connectable_subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] }
+                      }
+                    ) %>
+                  </div>
+                </div>
+              <% end %>
               <div class="col-span-full">
                 <div class="space-y-2">
                   <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size (Dedicated CPU)</label>

@@ -22,7 +22,7 @@ class Clover
         @prices = fetch_location_based_prices("PostgresCores", "PostgresStorage")
         @has_valid_payment_method = @project.has_valid_payment_method?
         @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresCores", _1.vcpu / 2) }.map(&:name)
-
+        @connectable_subnets = Serializers::PrivateSubnet.serialize(@project.private_subnets)
         view "postgres/create"
       end
     end

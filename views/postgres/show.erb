@@ -31,7 +31,7 @@
     ["Storage", "#{@pg[:storage_size_gib]} GB"],
     ["Version", "Postgres #{@pg[:version]}"]
   ]
-  
+
   case @pg[:ha_type]
   when PostgresResource::HaType::NONE
     data.push(["High Availability", "Inactive"])
@@ -40,11 +40,17 @@
   when PostgresResource::HaType::SYNC
     data.push(["High Availability", "Active (2 standbys with synchronous replication)"])
   end
-  
+
   if @pg[:connection_string] == ""
     data.push(["Connection String", "Waiting for host to be ready..."])
   else
     data.push(["Connection String", @pg[:connection_string], { copieble: true, revealable: true }])
+  end
+
+  if @pg[:private_connection_string] == ""
+    data.push(["Private Connection String", "Waiting for host to be ready..."])
+  elsif @pg[:private_connection_string]
+    data.push(["Private Connection String", @pg[:private_connection_string], { copieble: true, revealable: true }])
   end %>
 
   <div class="grid grid-cols-1 gap-6 md:grid-cols-6">

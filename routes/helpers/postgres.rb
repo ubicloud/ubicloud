@@ -4,12 +4,15 @@ class Clover
   def postgres_post(name)
     Authorization.authorize(current_account.id, "Postgres:create", @project.id)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
+    fail Validation::ValidationFailed.new({connect_to_subnet_id: "Given connected subnet is not a valid subnet for the location."}) unless request_body_params["connect_to_subnet_id"] && PrivateSubnet[request_body_params["connect_to_subnet_id"]]
+
+    Authorization.authorize(current_account.id, "PrivateSubnet:edit", PrivateSubnet[request_body_params["connect_to_subnet_id"]].projects.first.id) if request_body_params["connect_to_subnet_id"]
 
     Validation.validate_postgres_location(@location)
 
     required_parameters = ["size"]
     required_parameters << "name" << "location" if web?
-    allowed_optional_parameters = ["storage_size", "ha_type", "version", "flavor"]
+    allowed_optional_parameters = ["storage_size", "ha_type", "version", "flavor", "connect_to_subnet"]
     request_body_params = Validation.validate_request_body(json_params, required_parameters, allowed_optional_parameters)
     parsed_size = Validation.validate_postgres_size(@location, request_body_params["size"])
 
@@ -23,6 +26,8 @@ class Clover
     requested_postgres_core_count = (requested_standby_count + 1) * parsed_size.vcpu / 2
     Validation.validate_core_quota(@project, "PostgresCores", requested_postgres_core_count)
 
+    Validation.validate_connected_subnet_location(@location, request_body_params["connect_to_subnet_id"]) if request_body_params["connect_to_subnet_id"]
+
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: @project.id,
       location: @location,
@@ -31,7 +36,8 @@ class Clover
       target_storage_size_gib: request_body_params["storage_size"] || parsed_size.storage_size_options.first,
       ha_type: request_body_params["ha_type"] || PostgresResource::HaType::NONE,
       version: request_body_params["version"] || PostgresResource::DEFAULT_VERSION,
-      flavor: request_body_params["flavor"] || PostgresResource::Flavor::STANDARD
+      flavor: request_body_params["flavor"] || PostgresResource::Flavor::STANDARD,
+      connect_to_subnet_id: request_body_params["connect_to_subnet_id"]
     )
     send_notification_mail_to_partners(st.subject, current_account.email)
 
