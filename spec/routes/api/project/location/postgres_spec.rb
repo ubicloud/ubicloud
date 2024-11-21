@@ -147,7 +147,7 @@ RSpec.describe Clover, "postgres" do
 
       it "missing required key" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
-          unix_user: "ha_type"
+          ha_type: "sync"
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body must include required parameters: size"})
@@ -159,7 +159,7 @@ RSpec.describe Clover, "postgres" do
           foo_key: "foo_val"
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: size, storage_size, ha_type, version, flavor"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body contains unrecognized parameters: foo_key"})
       end
 
       it "firewall-rule" do
@@ -306,6 +306,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid payment" do
+        header "Content-Type", "application/json"
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
 
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
@@ -342,7 +343,7 @@ RSpec.describe Clover, "postgres" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)[0]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
       end
     end
 

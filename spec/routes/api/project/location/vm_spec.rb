@@ -217,7 +217,7 @@ RSpec.describe Clover, "vm" do
           foo_key: "foo_val"
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: public_key, size, storage_size, unix_user, boot_image, enable_ip4, private_subnet_id"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body contains unrecognized parameters: foo_key"})
       end
     end
 
