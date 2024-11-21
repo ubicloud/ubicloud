@@ -1,0 +1,54 @@
+<% headers ||= []
+rows ||= []
+empty_state ||= nil %>
+
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+  <table class="min-w-full divide-y divide-gray-300">
+    <% unless headers.empty? %>
+      <thead class="bg-gray-50">
+        <tr>
+          <% headers.each_with_index do |(name, opts), i| %>
+            <th
+              scope="col"
+              class="<% if i == 0 %> pl-4 pr-3 sm:pl-6 <% elsif i + 1 == headers.length %> pl-3 pr-4 sm:pr-6 <% else %> px-3 <% end %> py-3.5 text-left text-sm font-semibold text-gray-900 <%= opts&.dig(:classes)%>"
+            ><%= name %></th>
+          <% end %>
+        </tr>
+      </thead>
+    <% end %>
+    <tbody class="divide-y divide-gray-200 bg-white">
+      <% if rows.empty? %>
+        <tr>
+          <td colspan="<%= headers.length %>" class="text-center py-4 px-8 lg:px-32">
+            <%== empty_state %>
+          </td>
+        </tr>
+      <% else %>
+        <% rows.each do |columns| %>
+          <tr>
+            <% columns.each_with_index do |(value, opts), i| %>
+              <% opts ||= {} %>
+              <td
+                class="<% if i == 0 %> pl-4 pr-3 sm:pl-6 text-gray-900 font-medium <% elsif i + 1 == columns.length %> pl-3 pr-4 sm:pr-6 text-gray-500 <% else %> px-3 text-gray-500 <% end %> py-4 whitespace-nowrap text-sm <%= opts&.dig(:classes)%>"
+              >
+                <% if opts[:copieble] && value %>
+                  <%== render("components/copieble_content", locals: { content: value, message: "Copied", revealable: opts[:revealable] }) %>
+                <% elsif opts[:revealable] && value %>
+                  <%== render("components/revealable_content", locals: { content: value }) %>
+                <% elsif opts[:link] %>
+                  <a href="<%= opts[:link] %>" class="font-medium text-orange-600 hover:text-orange-700">
+                    <%= value %>
+                  </a>
+                <% elsif opts[:escape] == false %>
+                  <%== value %>
+                <% else %>
+                  <%= value || "-" %>
+                <% end %>
+              </td>
+            <% end %>
+          </tr>
+        <% end %>
+      <% end %>
+    </tbody>
+  </table>
+</div>
