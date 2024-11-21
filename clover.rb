@@ -10,7 +10,7 @@ require "tilt/erubi"
 class Clover < Roda
   OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true) unless const_defined?(:OPENAPI)
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI) unless const_defined?(:SCHEMA)
-  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true, prefix: "/api") unless const_defined?(:SCHEMA_ROUTER)
+  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true) unless const_defined?(:SCHEMA_ROUTER)
 
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
@@ -113,6 +113,36 @@ class Clover < Roda
       type = e.type
       message = e.message
       details = e.details
+    when Committee::BadRequest, Committee::InvalidRequest
+      code = 400
+      type = "BadRequest"
+      message = e.message
+
+      case e.original_error
+      when JSON::ParserError
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body isn't a valid JSON object."}
+      when OpenAPIParser::NotExistPropertyDefinition
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body contains unrecognized parameters: #{keys.join(", ")}"}
+      when OpenAPIParser::NotExistRequiredKey
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
+      else
+        raise e if Config.test?
+      end
+    when Committee::InvalidResponse
+      raise e if Config.test?
+      code = 500
+      type = "InternalServerError"
+      message = e.message
+    when Committee::NotFound
+      raise e if Config.test?
+      code = 404
+      type = "NotFound"
+      message = e.message
     else
       raise e if Config.test? && e.message != "test error"
 
@@ -487,23 +517,21 @@ class Clover < Roda
       # To make test and development easier
       # :nocov:
       unless Config.production?
-        r.on("api") do
-          r.rodauth
-          rodauth.check_active_session
-          rodauth.require_authentication
+        r.rodauth
+        rodauth.check_active_session
+        rodauth.require_authentication
 
-          # Validate request against OpenAPI schema
-          begin
-            schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
-            schema_validator.request_validate(r)
+        # Validate request against OpenAPI schema
+        begin
+          schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
+          schema_validator.request_validate(r)
 
-            raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
-          rescue JSON::ParserError => e
-            raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
-          end
-
-          r.hash_branches("api")
+          raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
+        rescue JSON::ParserError => e
+          raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
         end
+
+        r.hash_branches("api")
       end
       # :nocov:
 
