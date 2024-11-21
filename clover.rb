@@ -21,7 +21,8 @@ class Clover < Roda
   plugin :hash_branch_view_subdir
   plugin :Integer_matcher_max
   plugin :json
-  plugin :json_parser
+  plugin :invalid_request_body, :raise
+  plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
   plugin :public
   plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true}
   plugin :request_headers
@@ -91,8 +92,6 @@ class Clover < Roda
     end
     # :nocov:
   end
-
-  plugin :invalid_request_body, :raise
 
   plugin :error_handler do |e|
     if Config.test? && ENV["SHOW_ERRORS"]
