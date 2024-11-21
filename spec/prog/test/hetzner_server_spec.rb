@@ -15,6 +15,7 @@ RSpec.describe Prog::Test::HetznerServer do
                                                "server_id" => "1234",
                                                "additional_boot_images" => [],
                                                "setup_host" => true}, hetzner_api: hetzner_api, vm_host: vm_host)
+    SpdkInstallation.create(version: "1.0", vm_host_id: vm_host.id, allocation_weight: 100) { _1.id = vm_host.id }
   }
 
   describe "#assemble" do
@@ -135,14 +136,15 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with(
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo rm -rf #{tmp_dir}")
       expect { hs_test.run_integration_specs }.to hop("wait")
     end
   end
 
   describe "#wait" do
-    it "hops to destroy when needed" do
-      expect(hs_test).to receive(:when_destroy_set?).and_yield
-      expect { hs_test.wait }.to hop("destroy")
+    it "hops to verify_cleanup when needed" do
+      expect(hs_test).to receive(:when_verify_cleanup_and_destroy_set?).and_yield
+      expect { hs_test.wait }.to hop("verify_cleanup")
     end
 
     it "hops to allow_slices when signaled" do
@@ -171,6 +173,67 @@ RSpec.describe Prog::Test::HetznerServer do
     it "disallows slices" do
       expect(vm_host).to receive(:disallow_slices)
       expect { hs_test.disallow_slices }.to hop("wait")
+    end
+  end
+
+  describe "#verify_cleanup" do
+    it "hops to verify_vm_dir_purged" do
+      expect { hs_test.verify_cleanup }.to hop("verify_vm_dir_purged")
+    end
+  end
+
+  describe "#verify_vm_dir_purged" do
+    it "doesn't fail if /vm is empty" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /vm").and_return("")
+      expect { hs_test.verify_vm_dir_purged }.to hop("verify_storage_files_purged")
+    end
+
+    it "fails if /vm is not empty" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /vm").and_return("vm1\nvm2\n")
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "VM directory not empty: [\"vm1\", \"vm2\"]"})
+      expect { hs_test.verify_vm_dir_purged }.to hop("failed")
+    end
+  end
+
+  describe "#verify_storage_files_purged" do
+    it "succeeds if /var/storage and /var/storage/vhost are empty" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
+      expect { hs_test.verify_storage_files_purged }.to hop("verify_spdk_artifacts_purged")
+    end
+
+    it "fails if /var/storage has disks" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\ndisk1\ndisk2\n")
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "VM disks not empty: [\"disk1\", \"disk2\"]"})
+      expect { hs_test.verify_storage_files_purged }.to hop("failed")
+    end
+
+    it "fails if /var/storage/vhost has files" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "vhost directory not empty: [\"file1\", \"file2\"]"})
+      expect { hs_test.verify_storage_files_purged }.to hop("failed")
+    end
+  end
+
+  describe "#verify_spdk_artifacts_purged" do
+    it "doesn't fail if no bdevs or vhost controllers" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[]")
+      expect { hs_test.verify_spdk_artifacts_purged }.to hop("destroy")
+    end
+
+    it "fails if bdevs are present" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[{\"name\": \"bdev1\", \"size\": 100}]")
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "SPDK bdevs not empty: [\"bdev1\"]"})
+      expect { hs_test.verify_spdk_artifacts_purged }.to hop("failed")
+    end
+
+    it "fails if vhost controllers are present" do
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[{\"ctrlr\": \"ctrlr1\", \"scsi_target_num\": 0}]")
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "SPDK vhost controllers not empty: [\"ctrlr1\"]"})
+      expect { hs_test.verify_spdk_artifacts_purged }.to hop("failed")
     end
   end
 
