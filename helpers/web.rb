@@ -6,7 +6,28 @@ class Clover < Roda
   end
 
   def redirect_back_with_inputs
+    referrer = flash["referrer"] || env["HTTP_REFERER"]
+    uri = begin
+      Kernel.URI(referrer)
+    rescue URI::InvalidURIError, ArgumentError
+      nil
+    end
+
+    request.redirect "/" unless uri
+
     flash["old"] = request.params
-    request.redirect env["HTTP_REFERER"] || "/"
+
+    if uri && env["REQUEST_METHOD"] != "GET"
+      # Force flash rotation, so flash works correctly for internal redirects
+      _roda_after_40__flash(nil)
+
+      rack_response = Clover.call(env.merge("REQUEST_METHOD" => "GET", "PATH_INFO" => uri.path))
+      flash.discard
+      flash["referrer"] = referrer
+      rack_response[0] = response.status || 400
+      request.halt rack_response
+    else
+      request.redirect referrer
+    end
   end
 end
