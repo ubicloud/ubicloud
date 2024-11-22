@@ -231,6 +231,17 @@ class Prog::Vm::Nexus < Prog::Base
 
     host.sshable.cmd(command)
 
+    hop_wait_for_slice
+  end
+
+  label def hop_wait_for_slice
+    unless vm.vm_host_slice.nil?
+      if !vm.vm_host_slice.enabled
+        # Just wait here until the slice creation is completed
+        nap 1
+      end
+    end
+
     hop_prep
   end
 
@@ -431,9 +442,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     hop_wait_lb_expiry if vm.load_balancer
 
-    final_clean_up
-
-    pop "vm deleted"
+    hop_destroy_slice
   end
 
   label def wait_lb_expiry
@@ -447,7 +456,23 @@ class Prog::Vm::Nexus < Prog::Base
 
     vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
 
+    hop_destroy_slice
+  end
+
+  label def destroy_slice
+    slice = vm.vm_host_slice
+
+    # Remove the VM before we destroy the slice
     final_clean_up
+
+    # Trigger the slice deletion if this is a
+    # dedicated slice for this VM
+    # We do not need to wait for this to complete
+    unless slice.nil?
+      if slice.type == "dedicated" && slice.enabled
+        slice.incr_destroy
+      end
+    end
 
     pop "vm deleted"
   end

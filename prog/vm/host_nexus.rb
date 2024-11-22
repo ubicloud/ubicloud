@@ -96,8 +96,7 @@ class Prog::Vm::HostNexus < Prog::Base
   label def setup_spdk
     if retval&.dig("msg") == "SPDK was setup"
       spdk_installation = vm_host.spdk_installations.first
-      spdk_cores = (spdk_installation.cpu_count * vm_host.total_cores) / vm_host.total_cpus
-      vm_host.update(used_cores: spdk_cores)
+      vm_host.update_spdk_cpus(spdk_installation.cpu_count)
 
       hop_download_boot_images
     end

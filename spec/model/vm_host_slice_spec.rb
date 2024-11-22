@@ -121,4 +121,34 @@ RSpec.describe VmHostSlice do
       expect(VmHostSlice.bitmask_to_cpuset(bitmask)).to eq("")
     end
   end
+
+  describe "#bitmask_or" do
+    it "combines two bitmasks with binary OR operator" do
+      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
+      b = VmHostSlice.cpuset_to_bitmask("4-7", size: 8)
+
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-7")
+    end
+
+    it "combines two bitmasks - overlapping ranges" do
+      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
+      b = VmHostSlice.cpuset_to_bitmask("2-5", size: 8)
+
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-5")
+    end
+
+    it "combines two bitmasks - disjoint ranges" do
+      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
+      b = VmHostSlice.cpuset_to_bitmask("6-7", size: 8)
+
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-3,6-7")
+    end
+
+    it "combines two bitmasks - empty range" do
+      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
+      b = BitArray.new(8)
+
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-3")
+    end
+  end
 end

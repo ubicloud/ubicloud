@@ -6,6 +6,7 @@ require_relative "../model"
 class VmHostSlice < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
+  one_to_many :vms
 
   include ResourceMethods
   include SemaphoreMethods
@@ -20,7 +21,7 @@ class VmHostSlice < Sequel::Model
   #
   # Returns an array of size of #cpus at the host
   # with 1s in slots for allowed cpus and 0s elsewhere
-  def self.cpuset_to_bitmask(cpuset)
+  def self.cpuset_to_bitmask(cpuset, size: nil)
     fail "Cpuset cannot be empty." if cpuset.nil? || cpuset.empty?
     fail "Cpuset can only contains numbers, comma (,) , and hypen (-)." unless /^[[0-9]+-?*,?]+$/.match?(cpuset)
 
@@ -43,7 +44,11 @@ class VmHostSlice < Sequel::Model
     # we can convert to bitmask
     #
     # take the size of the bitmask to be just use the maximum of the range
-    bitmask_size = cpu_ranges.reduce(0) { |acc, n| (acc < n[1]) ? n[1] : acc } + 1
+    bitmask_size = if size.nil?
+      cpu_ranges.reduce(0) { |acc, n| (acc < n[1]) ? n[1] : acc } + 1
+    else
+      size
+    end
 
     bitmask = BitArray.new(bitmask_size)
     cpu_ranges.each do |range|
@@ -110,6 +115,15 @@ class VmHostSlice < Sequel::Model
     update(allowed_cpus: cpuset, cores: cpus / threads_per_core, total_cpu_percent: cpus * 100)
   end
 
+  def self.bitmask_or(a, b)
+    fail "Argument bitmasks must be of equal size" unless a.size == b.size
+
+    result = BitArray.new(a.size)
+    (0..a.size - 1).each { |i| result[i] = a[i] | b[i] }
+
+    result
+  end
+
   # Returns the name as used by systemctl and cgroup
   def inhost_name
     name + ".slice"
@@ -140,3 +154,5 @@ end
 #  used_memory_not_negative | (used_memory_1g >= 0)
 # Foreign key constraints:
 #  vm_host_slice_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
+# Referenced By:
+#  vm | vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
