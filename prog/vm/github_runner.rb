@@ -222,7 +222,7 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
     COMMAND
 
-    if github_runner.installation.project.get_ff_transparent_cache
+    if github_runner.installation.cache_enabled
       local_ip = vm.nics.first.private_ipv4.network.to_s
       command += <<~COMMAND
         echo "CUSTOM_ACTIONS_CACHE_URL=http://#{local_ip}:51123/random_token/" | sudo tee -a /etc/environment
