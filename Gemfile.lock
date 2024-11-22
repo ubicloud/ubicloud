@@ -82,6 +82,7 @@ GEM
       smart_properties
     bigdecimal (3.1.8)
     bindata (2.5.0)
+    bitarray (1.3.1)
     brakeman (6.2.2)
       racc
     builder (3.3.0)
@@ -383,6 +384,7 @@ DEPENDENCIES
   awesome_print
   aws-sdk-s3 (~> 1.170)
   bcrypt_pbkdf
+  bitarray
   brakeman
   by (>= 1.1.0)
   capybara

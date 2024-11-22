@@ -17,7 +17,8 @@ RSpec.describe Prog::Vm::HostNexus do
   }
 
   let(:vms) { [instance_double(Vm, mem_gib: 1), instance_double(Vm, mem_gib: 2)] }
-  let(:vm_host) { instance_double(VmHost, vms: vms) }
+  let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1"), instance_double(VmHostSlice, name: "standard2")] }
+  let(:vm_host) { instance_double(VmHost, vms: vms, vm_host_slices: vm_host_slices) }
   let(:sshable) { instance_double(Sshable) }
 
   before do
@@ -382,7 +383,14 @@ RSpec.describe Prog::Vm::HostNexus do
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 4")
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 5, used_hugepages_1g: 4)
-      expect { nx.verify_hugepages }.to hop("start_vms")
+      expect { nx.verify_hugepages }.to hop("start_vm_host_slices")
+    end
+  end
+
+  describe "#start_vm_host_slices" do
+    it "starts vm host slices and hops" do
+      expect(vm_host_slices).to all receive(:incr_start_after_host_reboot)
+      expect { nx.start_vm_host_slices }.to hop("start_vms")
     end
   end
 
