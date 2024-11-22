@@ -39,6 +39,22 @@ class Clover
 
           r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
         end
+
+        r.on String do |installation_id|
+          installation = GithubInstallation.from_ubid(installation_id)
+          unless installation
+            response.status = 404
+            r.halt
+          end
+
+          r.post true do
+            cache_enabled = r.params["cache_enabled"] == "true"
+            installation.update(cache_enabled: cache_enabled)
+            flash["notice"] = "Ubicloud cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{installation.name}."
+
+            r.redirect "#{@project.path}/github/setting"
+          end
+        end
       end
 
       r.on "cache" do
