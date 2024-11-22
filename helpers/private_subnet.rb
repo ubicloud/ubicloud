@@ -25,19 +25,16 @@ class Clover
   def private_subnet_post(name)
     authorize("PrivateSubnet:create", @project.id)
 
-    params = json_params
-    unless params.empty?
-      required_parameters = []
-      required_parameters << "name" << "location" if web?
-      request_body_params = Validation.validate_request_body(params, required_parameters, ["firewall_id"])
-      firewall_id = if request_body_params["firewall_id"]
-        fw = Firewall.from_ubid(request_body_params["firewall_id"])
-        unless fw && fw.location == @location
-          fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{request_body_params["firewall_id"]}\" and location \"#{@location}\" is not found")
-        end
-        authorize("Firewall:view", fw.id)
-        fw.id
+    required_parameters = []
+    required_parameters << "name" << "location" if web?
+    request_body_params = validate_request_params(required_parameters, ["firewall_id"])
+    firewall_id = if request_body_params["firewall_id"]
+      fw = Firewall.from_ubid(request_body_params["firewall_id"])
+      unless fw && fw.location == @location
+        fail Validation::ValidationFailed.new(firewall_id: "Firewall with id \"#{request_body_params["firewall_id"]}\" and location \"#{@location}\" is not found")
       end
+      authorize("Firewall:view", fw.id)
+      fw.id
     end
 
     st = Prog::Vnet::SubnetNexus.assemble(

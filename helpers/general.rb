@@ -67,8 +67,17 @@ class Clover < Roda
     @current_account = Account[rodauth.session_value]
   end
 
-  def json_params
-    @params ||= api? ? request.body.read : request.params.reject { _1 == "_csrf" }.to_json
+  def validate_request_params(required_keys, allowed_optional_keys = [])
+    params = if api?
+      begin
+        request.params
+      rescue Roda::RodaPlugins::InvalidRequestBody::Error
+        raise Validation::ValidationFailed.new({body: "Request body isn't a valid JSON object."})
+      end
+    else
+      request.params.reject { _1 == "_csrf" }
+    end
+    Validation.validate_request_params(params, required_keys, allowed_optional_keys)
   end
 
   def fetch_location_based_prices(*resource_types)

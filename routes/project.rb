@@ -24,7 +24,7 @@ class Clover
 
     r.post true do
       required_parameters = ["name"]
-      request_body_params = Validation.validate_request_body(json_params, required_parameters)
+      request_body_params = validate_request_params(required_parameters)
       project = current_account.create_project_with_default_policy(request_body_params["name"])
 
       if api?

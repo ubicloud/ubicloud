@@ -27,7 +27,7 @@ class Clover
     required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol]
     required_parameters << "name" if web?
     optional_parameters = %w[health_check_endpoint]
-    request_body_params = Validation.validate_request_body(json_params, required_parameters, optional_parameters)
+    request_body_params = validate_request_params(required_parameters, optional_parameters)
 
     unless (ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"]))
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")

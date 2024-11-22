@@ -27,7 +27,7 @@ class Clover
     required_parameters = ["public_key"]
     required_parameters << "name" << "location" if web?
     allowed_optional_parameters = ["size", "storage_size", "unix_user", "boot_image", "enable_ip4", "private_subnet_id"]
-    request_body_params = Validation.validate_request_body(json_params, required_parameters, allowed_optional_parameters)
+    request_body_params = validate_request_params(required_parameters, allowed_optional_parameters)
     assemble_params = request_body_params.slice(*allowed_optional_parameters).compact
 
     # Generally parameter validation is handled in progs while creating resources.
