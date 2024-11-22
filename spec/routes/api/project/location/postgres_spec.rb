@@ -167,6 +167,7 @@ RSpec.describe Clover, "postgres" do
           cidr: "0.0.0.0/24"
         }.to_json
 
+        expect(JSON.parse(last_response.body)["cidr"]).to eq("0.0.0.0/24")
         expect(last_response.status).to eq(200)
       end
 
