@@ -37,7 +37,7 @@ class Clover < Roda
 
   plugin :route_csrf do |token|
     flash["error"] = "An invalid security token submitted with this request, please try again"
-    return redirect_back_with_inputs
+    redirect_back_with_inputs
   end
 
   plugin :content_security_policy do |csp|
@@ -131,11 +131,11 @@ class Clover < Roda
       case e
       when Sequel::ValidationFailed, DependencyError
         flash["error"] = message
-        return redirect_back_with_inputs
+        redirect_back_with_inputs
       when Validation::ValidationFailed
         flash["error"] = message
         flash["errors"] = (flash["errors"] || {}).merge(details)
-        return redirect_back_with_inputs
+        redirect_back_with_inputs
       end
 
       # :nocov:
