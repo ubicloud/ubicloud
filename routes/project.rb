@@ -17,7 +17,7 @@ class Clover
           count: result[:count]
         }
       else
-        @projects = Serializers::Project.serialize(dataset.all, {include_path: true})
+        @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
         view "project/index"
       end
     end
@@ -49,7 +49,7 @@ class Clover
         fail Authorization::Unauthorized
       end
 
-      @project_data = Serializers::Project.serialize(@project, {include_path: true})
+      @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
       @project_permissions = all_permissions(@project.id)
 
       r.get true do
