@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
 class CloverError < StandardError
-  attr_reader :code, :type, :message, :details
+  attr_reader :code, :type, :details
   def initialize(code, type, message, details = nil)
     @code = code
     @type = type
-    @message = message
     @details = details
 
     super(message)
