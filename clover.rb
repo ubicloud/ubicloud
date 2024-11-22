@@ -37,6 +37,7 @@ class Clover < Roda
 
   plugin :route_csrf do |token|
     flash["error"] = "An invalid security token submitted with this request, please try again"
+    response.status = 400
     redirect_back_with_inputs
   end
 
@@ -134,7 +135,7 @@ class Clover < Roda
         redirect_back_with_inputs
       when Validation::ValidationFailed
         flash["error"] = message
-        flash["errors"] = (flash["errors"] || {}).merge(details)
+        flash["errors"] = (flash["errors"] || {}).merge(details).transform_keys(&:to_s)
         redirect_back_with_inputs
       end
 

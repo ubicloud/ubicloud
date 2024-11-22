@@ -8,7 +8,7 @@ RSpec.describe Clover do
     find("input[name=_csrf]", visible: false).set("")
     click_button "Sign in"
 
-    expect(page.status_code).to eq(200)
+    expect(page.status_code).to eq(400)
     expect(page).to have_content("An invalid security token submitted with this request")
   end
 
