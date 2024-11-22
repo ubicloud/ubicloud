@@ -140,14 +140,17 @@ module Scheduling::Allocator
       @request = request
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
+
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
-      @allocations = @vm_host_allocations + @device_allocations
 
       if request.use_slices
-        @slice_allocation = [VmHostSliceDedicatedAllocation.new(candidate_host, request)]
-        @allocations += @slice_allocation
+        # Wrap around and replace the host allocations. That way we can control that logic from the slice POV
+        @slice_allocation = VmHostSliceAllocation.new(candidate_host, request, @vm_host_allocations)
+        @vm_host_allocations = [@slice_allocation]
       end
+
+      @allocations = @vm_host_allocations + @device_allocations
 
       @score = calculate_score
     end
@@ -162,7 +165,7 @@ module Scheduling::Allocator
         Allocation.update_vm(vm_host, vm)
         VmHost.dataset.where(id: @candidate_host[:vm_host_id]).update(@vm_host_allocations.map { _1.get_vm_host_update }.reduce(&:merge))
         @device_allocations.each { _1.update(vm, vm_host) }
-        @slice_allocation.each { _1.update(vm, vm_host) } unless @slice_allocation.nil?
+        @slice_allocation&.update(vm, vm_host)
       end
     end
 
@@ -224,21 +227,40 @@ module Scheduling::Allocator
   # Dedicated slice needs to be always created for the VM
   # This finds a space for a new slice and sets is_valid if the cpuset can be created
   # Upon calling update the actual slice is created
-  class VmHostSliceDedicatedAllocation
+  #
+  # This is used for VMs that can be co-located inside a slice
+  # It first tries to find a slice that is already allocated but has room
+  # to accept new VMs. If successful it uses that slice. Otherwise it falls back
+  # to the default and creates a new slice
+  class VmHostSliceAllocation
     attr_reader :is_valid
-    def initialize(candidate_host, request)
+    def initialize(candidate_host, request, vm_host_allocations)
       @candidate_host = candidate_host
       @request = request
+      @vm_host_allocations = vm_host_allocations
+
       @is_valid = calculate_cpu_bitmask
     end
 
     def utilization
-      0
+      # TODO-MACIEK - change this logic for shared slices
+      # they should have lower utilization and therefore a better score
+      # and be preferred for a placement over hosts where we need to
+      # allocate a new slice
+
+      # Compute the score based on combined CPU and Memory utilization
+      util = @vm_host_allocations.map { _1.utilization }
+      util.sum.fdiv(util.size)
+    end
+
+    def get_vm_host_update
+      @vm_host_allocations.map { _1.get_vm_host_update }.reduce(&:merge)
     end
 
     def update(vm, vm_host)
       # create a new slice for the VM
       allowed_cpus = VmHostSlice.bitmask_to_cpuset(@cpu_bitmask)
+      # TODO-MACIEK - the @request.mem_gib will be incorrect for the shared slice
       st = Prog::Vm::VmHostSlice.assemble_with_host("#{vm.family}_#{vm.inhost_name}", vm_host, allowed_cpus: allowed_cpus, memory_1g: @request.mem_gib, type: "dedicated")
       slice_id = st.subject.id
 
@@ -249,7 +271,9 @@ module Scheduling::Allocator
     end
 
     def calculate_cpu_bitmask
-      return false if @candidate_host[:total_cores] - @candidate_host[:used_cores] < @request.cores
+      # TODO-MACIEK - this logic is for a dedicated slice. For shared one we
+      # need to make it less restrictive
+      return false unless @vm_host_allocations.all? { _1.is_valid }
 
       vm_host = VmHost[@candidate_host[:vm_host_id]]
 
@@ -275,28 +299,6 @@ module Scheduling::Allocator
 
       @cpu_bitmask = requested_cpu_bitmask
       true
-    end
-  end
-
-  # This is used for VMs that can be co-located inside a slice
-  # It first tries to find a slice that is already allocated but has room
-  # to accept new VMs. If successful it uses that slice. Otherwise it falls back
-  # to the VmHostSliceDedicatedAllocation and creates a new slice
-  class VmHostSliceSharedAllocation
-    def initialize(candidate_host, request)
-      @candidate_host = candidate_host
-      @request = request
-    end
-
-    def is_valid
-      true
-    end
-
-    def utilization
-      0
-    end
-
-    def update(vm, vm_host)
     end
   end
 

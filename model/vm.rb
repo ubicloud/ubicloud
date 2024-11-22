@@ -76,7 +76,8 @@ class Vm < Sequel::Model
   end
 
   def mem_gib
-    (cores * mem_gib_ratio).to_i
+    # TODO-MACIEK - reconcile this later
+    memory_gib
   end
 
   # cloud-hypervisor takes topology information in this format:
@@ -229,7 +230,9 @@ class Vm < Sequel::Model
       "storage_volumes" => storage_volumes,
       "swap_size_bytes" => swap_size_bytes,
       "pci_devices" => pci_devices.map { [_1.slot, _1.iommu_group] },
-      "slice_name" => vm_host_slice.nil? ? "system.slice" : vm_host_slice.inhost_name
+      "slice_name" => vm_host_slice.nil? ? "system.slice" : vm_host_slice.inhost_name,
+      "cpu_percent_limit" => cpu_percent_limit,
+      "cpu_burst_percent_limit" => cpu_burst_percent_limit
     })
   end
 
@@ -266,25 +269,28 @@ end
 
 # Table: vm
 # Columns:
-#  id               | uuid                     | PRIMARY KEY
-#  ephemeral_net6   | cidr                     |
-#  vm_host_id       | uuid                     |
-#  unix_user        | text                     | NOT NULL
-#  public_key       | text                     | NOT NULL
-#  display_state    | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
-#  name             | text                     | NOT NULL
-#  location         | text                     | NOT NULL
-#  boot_image       | text                     | NOT NULL
-#  local_vetho_ip   | text                     |
-#  ip4_enabled      | boolean                  | NOT NULL DEFAULT false
-#  family           | text                     | NOT NULL
-#  cores            | integer                  | NOT NULL
-#  pool_id          | uuid                     |
-#  created_at       | timestamp with time zone | NOT NULL DEFAULT now()
-#  arch             | arch                     | NOT NULL DEFAULT 'x64'::arch
-#  allocated_at     | timestamp with time zone |
-#  provisioned_at   | timestamp with time zone |
-#  vm_host_slice_id | uuid                     |
+#  id                      | uuid                     | PRIMARY KEY
+#  ephemeral_net6          | cidr                     |
+#  vm_host_id              | uuid                     |
+#  unix_user               | text                     | NOT NULL
+#  public_key              | text                     | NOT NULL
+#  display_state           | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
+#  name                    | text                     | NOT NULL
+#  location                | text                     | NOT NULL
+#  boot_image              | text                     | NOT NULL
+#  local_vetho_ip          | text                     |
+#  ip4_enabled             | boolean                  | NOT NULL DEFAULT false
+#  family                  | text                     | NOT NULL
+#  cores                   | integer                  | NOT NULL
+#  pool_id                 | uuid                     |
+#  created_at              | timestamp with time zone | NOT NULL DEFAULT now()
+#  arch                    | arch                     | NOT NULL DEFAULT 'x64'::arch
+#  allocated_at            | timestamp with time zone |
+#  provisioned_at          | timestamp with time zone |
+#  vm_host_slice_id        | uuid                     |
+#  memory_gib              | integer                  |
+#  cpu_percent_limit       | integer                  |
+#  cpu_burst_percent_limit | integer                  |
 # Indexes:
 #  vm_pkey               | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)

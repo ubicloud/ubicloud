@@ -4,7 +4,7 @@ class Prog::Vm::VmHostSlice < Prog::Base
   subject_is :vm_host_slice
 
   semaphore :destroy, :start_after_host_reboot
-  
+
   def self.assemble_with_host(name, vm_host, allowed_cpus:, memory_1g:, type: "dedicated")
     fail "Must provide a VmHost." if vm_host.nil?
     fail "Must provide slice name." if name.nil? || name.empty?
@@ -24,10 +24,10 @@ class Prog::Vm::VmHostSlice < Prog::Base
         total_memory_1g: memory_1g,
         used_memory_1g: 0,
         vm_host_id: vm_host.id
-        ) { _1.id = ubid.to_uuid }
+      ) { _1.id = ubid.to_uuid }
 
       # This validates the cpuset and updates or related values
-      vm_host_slice.from_cpu_bitmask(VmHostSlice.cpuset_to_bitmask(allowed_cpus))  
+      vm_host_slice.from_cpu_bitmask(VmHostSlice.cpuset_to_bitmask(allowed_cpus))
 
       Strand.create(prog: "Vm::VmHostSlice", label: "prep") { _1.id = vm_host_slice.id }
     end
@@ -73,7 +73,15 @@ class Prog::Vm::VmHostSlice < Prog::Base
     decr_destroy
 
     vm_host_slice.update(enabled: false)
-    host.sshable.cmd("sudo host/bin/setup-slice delete #{vm_host_slice.inhost_name}")
+
+    unless host.nil?
+      host.sshable.cmd("sudo host/bin/setup-slice delete #{vm_host_slice.inhost_name}")
+
+      VmHost.dataset.where(id: host.id).update(
+        used_cores: Sequel[:used_cores] - vm_host_slice.cores,
+        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_1g
+      )
+    end
     vm_host_slice.destroy
 
     pop "vm_host_slice destroyed"
