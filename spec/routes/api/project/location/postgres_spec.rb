@@ -342,7 +342,8 @@ RSpec.describe Clover, "postgres" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)[0]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["count"]).to eq(1)
       end
     end
 

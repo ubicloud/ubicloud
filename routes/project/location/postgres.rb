@@ -74,7 +74,10 @@ class Clover
       r.on "firewall-rule" do
         r.get api?, true do
           authorize("Postgres:Firewall:view", pg.id)
-          Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
+          {
+            items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
+            count: pg.firewall_rules.count
+          }
         end
 
         r.post true do
