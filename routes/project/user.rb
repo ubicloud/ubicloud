@@ -73,7 +73,7 @@ class Clover
             accounts = user_policies.select { _2 == policy.name }.keys.map { Account.from_ubid(_1) }
             if policy == Authorization::ManagedPolicy::Admin && accounts.empty?
               flash["error"] = "The project must have at least one admin."
-              return redirect_back_with_inputs
+              redirect_back_with_inputs
             end
             policy.apply(@project, accounts)
           end
@@ -93,7 +93,7 @@ class Clover
             fail JSON::ParserError unless JSON.parse(body).is_a?(Hash)
           rescue JSON::ParserError
             flash["error"] = "The policy isn't a valid JSON object."
-            return redirect_back_with_inputs
+            redirect_back_with_inputs
           end
 
           if (policy = @project.access_policies_dataset.where(managed: false).first)
