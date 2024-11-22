@@ -39,6 +39,21 @@ class Clover
 
           r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
         end
+
+        r.on String do |installation_id|
+          r.post "toggle_cache" do
+            installation = GithubInstallation.from_ubid(installation_id)
+            unless installation
+              response.status = 404
+              request.halt
+            end
+
+            new_cache_enabled_value = !installation.cache_enabled
+            installation.update(cache_enabled: new_cache_enabled_value)
+            flash["notice"] = "Transparent cache is #{new_cache_enabled_value ? "enabled" : "disabled"} for the installation #{installation.name}."
+            r.redirect "#{@project.path}/github/setting"
+          end
+        end
       end
 
       r.on "cache" do
