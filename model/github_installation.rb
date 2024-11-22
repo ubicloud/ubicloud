@@ -25,11 +25,12 @@ end
 
 # Table: github_installation
 # Columns:
-#  id              | uuid   | PRIMARY KEY
-#  installation_id | bigint | NOT NULL
-#  name            | text   | NOT NULL
-#  type            | text   | NOT NULL
-#  project_id      | uuid   |
+#  id              | uuid    | PRIMARY KEY
+#  installation_id | bigint  | NOT NULL
+#  name            | text    | NOT NULL
+#  type            | text    | NOT NULL
+#  project_id      | uuid    |
+#  cache_enabled   | boolean | NOT NULL DEFAULT false
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
