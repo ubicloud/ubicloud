@@ -15,7 +15,7 @@ class Clover < Roda
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
-  Unreloader.require("routes/helpers") {}
+  Unreloader.require("helpers") {}
 
   plugin :all_verbs
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
@@ -27,7 +27,8 @@ class Clover < Roda
   plugin :hooks
   plugin :Integer_matcher_max
   plugin :json
-  plugin :json_parser
+  plugin :invalid_request_body, :raise
+  plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
   plugin :public
   plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true}
   plugin :request_headers
@@ -104,7 +105,7 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed
+    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
@@ -506,29 +507,31 @@ class Clover < Roda
   end
   # :nocov:
 
-  autoload_routes("merged")
-  autoload_routes("runtime", "runtime")
+  if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
+    Unreloader.require("routes")
+  # :nocov:
+  else
+    plugin :autoload_hash_branches
+    Dir["routes/**/*.rb"].each do |full_path|
+      parts = full_path.delete_prefix("routes/").split("/")
+      namespaces = parts[0...-1]
+      filename = parts.last
+      segment = File.basename(filename, ".rb").tr("_", "-")
+      namespace = if namespaces.empty?
+        ""
+      else
+        :"#{namespaces.join("_")}_prefix"
+      end
+      autoload_hash_branch(namespace, segment, full_path)
+    end
+    Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
+  end
+  # :nocov:
 
   route do |r|
     if api?
       response.json = true
       response.skip_content_security_policy!
-
-      r.rodauth
-      rodauth.check_active_session
-      rodauth.require_authentication
-
-      # Validate request against OpenAPI schema
-      begin
-        schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
-        schema_validator.request_validate(r)
-
-        raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
-      rescue JSON::ParserError => e
-        raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
-      end
-
-      r.hash_branches("api")
     else
       r.on "runtime" do
         @is_runtime = true
@@ -539,7 +542,7 @@ class Clover < Roda
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
-        r.hash_branches("runtime")
+        r.hash_branches(:runtime_prefix)
       end
 
       r.public
@@ -560,6 +563,20 @@ class Clover < Roda
     rodauth.check_active_session
     r.rodauth
     rodauth.require_authentication
+
+    if api?
+      # Validate request against OpenAPI schema, after authenticating
+      # (which is thought to be cheaper)
+      begin
+        schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
+        schema_validator.request_validate(r)
+
+        raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
+      rescue JSON::ParserError => e
+        raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
+      end
+    end
+
     r.hash_branches("")
   end
 

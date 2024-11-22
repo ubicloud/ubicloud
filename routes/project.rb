@@ -45,15 +45,15 @@ class Clover
         r.halt
       end
 
-      if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account.id).empty?
+      if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
         fail Authorization::Unauthorized
       end
 
       @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
-      @project_permissions = Authorization.all_permissions(current_account.id, @project.id)
+      @project_permissions = all_permissions(@project.id)
 
       r.get true do
-        Authorization.authorize(current_account.id, "Project:view", @project.id)
+        authorize("Project:view", @project.id)
 
         if api?
           Serializers::Project.serialize(@project)
@@ -71,7 +71,7 @@ class Clover
       end
 
       r.delete true do
-        Authorization.authorize(current_account.id, "Project:delete", @project.id)
+        authorize("Project:delete", @project.id)
 
         if @project.has_resources
           fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
@@ -87,7 +87,7 @@ class Clover
         r.get("dashboard") { view("project/dashboard") }
 
         r.post true do
-          Authorization.authorize(current_account.id, "Project:edit", @project.id)
+          authorize("Project:edit", @project.id)
           @project.update(name: r.params["name"])
 
           flash["notice"] = "The project name is updated to '#{@project.name}'."

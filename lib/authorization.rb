@@ -8,7 +8,7 @@ module Authorization
   end
 
   def self.has_permission?(subject_id, actions, object_id)
-    !matched_policies(subject_id, actions, object_id).empty?
+    !matched_policies_dataset(subject_id, actions, object_id).empty?
   end
 
   def self.authorize(subject_id, actions, object_id)
@@ -18,11 +18,15 @@ module Authorization
   end
 
   def self.all_permissions(subject_id, object_id)
-    matched_policies(subject_id, nil, object_id).flat_map { _1[:actions] }
+    matched_policies_dataset(subject_id, nil, object_id).select_map(:actions).tap(&:flatten!)
+  end
+
+  def self.authorized_resources_dataset(subject_id, actions)
+    matched_policies_dataset(subject_id, actions).select(Sequel[:applied_tag][:tagged_id])
   end
 
   def self.authorized_resources(subject_id, actions)
-    matched_policies(subject_id, actions).map { _1[:tagged_id] }
+    matched_policies_dataset(subject_id, actions).select_map(Sequel[:applied_tag][:tagged_id])
   end
 
   def self.expand_actions(actions)
@@ -35,37 +39,40 @@ module Authorization
     extended_actions.to_a
   end
 
-  def self.matched_policies(subject_id, actions = nil, object_id = nil)
-    object_filter = if object_id
-      begin
-        Sequel.lit("AND object_applied_tags.tagged_id = ?", UBID.parse(object_id).to_uuid)
-      rescue UBIDParseError
-        Sequel.lit("AND object_applied_tags.tagged_id = ?", object_id)
+  def self.matched_policies_dataset(subject_id, actions = nil, object_id = nil)
+    dataset = DB.from { access_policy.as(:acl) }
+      .select(Sequel[:applied_tag][:tagged_id], Sequel[:applied_tag][:tagged_table], :subjects, :actions, :objects)
+      .cross_join(Sequel.pg_jsonb_op(Sequel[:acl][:body])["acls"].to_recordset.as(:items, [:subjects, :actions, :objects].map { |c| Sequel.lit("#{c} JSONB") }))
+      .join(:access_tag, project_id: Sequel[:acl][:project_id]) do
+        Sequel.pg_jsonb_op(:objects).has_key?(Sequel[:access_tag][:name])
       end
-    else
-      Sequel.lit("")
+      .join(:applied_tag, access_tag_id: :id)
+      .join(:access_tag, {project_id: Sequel[:acl][:project_id]}, table_alias: :subject_access_tag) do
+        Sequel.pg_jsonb_op(:subjects).has_key?(Sequel[:subject_access_tag][:name])
+      end
+      .join(:applied_tag, {access_tag_id: :id, tagged_id: subject_id}, table_alias: :subject_applied_tag)
+
+    if object_id
+      begin
+        ubid = UBID.parse(object_id)
+      rescue UBIDParseError
+        # nothing
+      else
+        object_id = ubid.to_uuid
+      end
+
+      dataset = dataset.where(Sequel[:applied_tag][:tagged_id] => object_id)
     end
 
-    actions_filter = if actions
-      Sequel.lit("AND actions ?| array[:actions]", {actions: Sequel.pg_array(expand_actions(actions))})
-    else
-      Sequel.lit("")
+    if actions
+      dataset = dataset.where(Sequel.pg_jsonb_op(:actions).contain_any(Sequel.pg_array(expand_actions(actions))))
     end
 
-    DB[<<~SQL, {subject_id: subject_id, actions_filter: actions_filter, object_filter: object_filter}].all
-      SELECT object_applied_tags.tagged_id, object_applied_tags.tagged_table, subjects, actions, objects
-      FROM accounts AS subject
-        JOIN applied_tag AS subject_applied_tags ON subject.id = subject_applied_tags.tagged_id
-          JOIN access_tag AS subject_access_tags ON subject_applied_tags.access_tag_id = subject_access_tags.id
-          JOIN access_policy AS acl ON subject_access_tags.project_id = acl.project_id
-          JOIN jsonb_to_recordset(acl.body->'acls') as items(subjects JSONB, actions JSONB, objects JSONB) ON TRUE
-          JOIN access_tag AS object_access_tags ON subject_access_tags.project_id = object_access_tags.project_id
-          JOIN applied_tag AS object_applied_tags ON object_access_tags.id = object_applied_tags.access_tag_id AND objects ? object_access_tags."name"
-      WHERE subject.id = :subject_id
-        AND subjects ? subject_access_tags."name"
-        :actions_filter
-        :object_filter
-    SQL
+    dataset
+  end
+
+  def self.matched_policies(subject_id, actions = nil, object_id = nil)
+    matched_policies_dataset(subject_id, actions, object_id).all
   end
 
   module ManagedPolicy
@@ -104,7 +111,7 @@ module Authorization
       # We need to determine table of id explicitly.
       # @opts is the hash of options for this dataset, and introduced at Sequel::Dataset.
       from = @opts[:from].first
-      where { {Sequel[from][:id] => Authorization.authorized_resources(subject_id, actions)} }
+      where { {Sequel[from][:id] => Authorization.authorized_resources_dataset(subject_id, actions)} }
     end
   end
 

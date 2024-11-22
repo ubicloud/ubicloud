@@ -305,6 +305,7 @@ end
 #  data_center        | text                     |
 #  arch               | arch                     |
 #  total_dies         | integer                  |
+#  os_version         | text                     |
 # Indexes:
 #  vm_host_pkey     | PRIMARY KEY btree (id)
 #  vm_host_ip6_key  | UNIQUE btree (ip6)

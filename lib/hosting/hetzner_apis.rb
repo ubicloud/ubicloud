@@ -6,7 +6,7 @@ class Hosting::HetznerApis
     @host = hetzner_host
   end
 
-  def reset(server_id, hetzner_ssh_key: Config.hetzner_ssh_key)
+  def reset(server_id, hetzner_ssh_key: Config.hetzner_ssh_key, dist: "Ubuntu 22.04.2 LTS base")
     unless hetzner_ssh_key
       raise "hetzner_ssh_key is not set"
     end
@@ -20,7 +20,7 @@ class Hosting::HetznerApis
       password: @host.password,
       headers: {"Content-Type" => "application/x-www-form-urlencoded"})
     connection.post(path: "/boot/#{server_id}/linux",
-      body: URI.encode_www_form(dist: "Ubuntu 22.04.2 LTS base", lang: "en", authorized_key: formatted_fingerprint),
+      body: URI.encode_www_form(dist: dist, lang: "en", authorized_key: formatted_fingerprint),
       expects: 200)
 
     connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)

@@ -1,30 +1,6 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  # rubocop:disable Style/OptionalArguments
-  def self.autoload_routes(namespace = "", route)
-    # rubocop:enable Style/OptionalArguments # different indents required by Rubocop
-    route_path = "routes/#{route}"
-    if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
-      Unreloader.require(route_path)
-    else
-      # :nocov:
-      plugin :autoload_hash_branches
-      Dir["#{route_path}/**/*.rb"].each do |full_path|
-        parts = full_path.delete_prefix("#{route_path}/").split("/")
-        namespaces = parts[0...-1]
-        filename = parts.last
-        if namespaces.empty?
-          autoload_hash_branch(namespace, File.basename(filename, ".rb").tr("_", "-"), full_path)
-        else
-          autoload_hash_branch(:"#{namespace + "_" unless namespace.empty?}#{namespaces.join("_")}_prefix", File.basename(filename, ".rb").tr("_", "-"), full_path)
-        end
-      end
-      Unreloader.autoload(route_path, delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
-      # :nocov:
-    end
-  end
-
   NAME_OR_UBID = /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)|_([a-z0-9]{26})/
 
   class RodaResponse
@@ -48,20 +24,10 @@ class Clover < Roda
     end
   end
 
-  # XXX: Temporary unless PR 2084 is merged
-  # :nocov:
-  if Config.production?
-    def api?
-      return @is_api if defined?(@is_api)
-      @is_api = env["HTTP_HOST"]&.start_with?("api.")
-    end
-  else
-    def api?
-      return @is_api if defined?(@is_api)
-      @is_api = env["HTTP_HOST"]&.start_with?("api.") || env["PATH_INFO"].start_with?("/api")
-    end
+  def api?
+    return @is_api if defined?(@is_api)
+    @is_api = env["HTTP_HOST"].to_s.start_with?("api.")
   end
-  # :nocov:
 
   def runtime?
     !!@is_runtime
@@ -70,6 +36,26 @@ class Clover < Roda
   def web?
     return @is_web if defined?(@is_web)
     @is_web = !api? && !runtime?
+  end
+
+  def current_account_id
+    rodauth.session_value
+  end
+
+  def authorize(actions, object_id)
+    Authorization.authorize(current_account_id, actions, object_id)
+  end
+
+  def has_permission?(actions, object_id)
+    Authorization.has_permission?(current_account_id, actions, object_id)
+  end
+
+  def all_permissions(actions)
+    Authorization.all_permissions(current_account_id, actions)
+  end
+
+  def dataset_authorize(ds, actions)
+    ds.authorized(current_account_id, actions)
   end
 
   def has_project_permission(actions)

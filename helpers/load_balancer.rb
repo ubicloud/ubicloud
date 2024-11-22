@@ -2,8 +2,7 @@
 
 class Clover
   def load_balancer_list
-    dataset = @project.load_balancers_dataset
-    dataset = dataset.authorized(current_account.id, "LoadBalancer:view")
+    dataset = dataset_authorize(@project.load_balancers_dataset, "LoadBalancer:view")
     dataset = dataset.join(:private_subnet, id: Sequel[:load_balancer][:private_subnet_id]).where(location: @location).select_all(:load_balancer) if @location
     if api?
       result = dataset.paginated_result(
@@ -23,7 +22,7 @@ class Clover
   end
 
   def load_balancer_post(name)
-    Authorization.authorize(current_account.id, "LoadBalancer:create", @project.id)
+    authorize("LoadBalancer:create", @project.id)
 
     required_parameters = %w[private_subnet_id algorithm src_port dst_port health_check_protocol]
     required_parameters << "name" if web?
@@ -33,7 +32,7 @@ class Clover
     unless (ps = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"]))
       fail Validation::ValidationFailed.new("private_subnet_id" => "Private subnet not found")
     end
-    Authorization.authorize(current_account.id, "PrivateSubnet:view", ps.id)
+    authorize("PrivateSubnet:view", ps.id)
 
     lb = Prog::Vnet::LoadBalancerNexus.assemble(
       ps.id,

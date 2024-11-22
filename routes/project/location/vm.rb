@@ -26,13 +26,13 @@ class Clover
       end
 
       r.get true do
-        Authorization.authorize(current_account.id, "Vm:view", vm.id)
+        authorize("Vm:view", vm.id)
         @vm = Serializers::Vm.serialize(vm, {detailed: true})
         api? ? @vm : view("vm/show")
       end
 
       r.delete true do
-        Authorization.authorize(current_account.id, "Vm:delete", vm.id)
+        authorize("Vm:delete", vm.id)
         vm.incr_destroy
         response.status = 204
         nil

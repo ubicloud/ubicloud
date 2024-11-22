@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  hash_branch("runtime", "github") do |r|
+  hash_branch(:runtime_prefix, "github") do |r|
     if (runner = GithubRunner[vm_id: @vm.id]).nil? || (repository = runner.repository).nil?
       fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
     end

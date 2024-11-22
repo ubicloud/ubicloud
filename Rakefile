@@ -218,6 +218,7 @@ task "coverage_pspec" do
     warn "SimpleCov failed with exit 2 due to a coverage related error"
     exit(2)
   end
+  exit(1) if command_output.include?("\nFailures:\n")
 ensure
   File.delete(output_file) if File.file?(output_file)
 end

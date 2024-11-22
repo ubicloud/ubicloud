@@ -49,7 +49,11 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def reset
-    hetzner_api.reset(frame["server_id"], hetzner_ssh_key: hetzner_ssh_keypair.public_key)
+    hetzner_api.reset(
+      frame["server_id"],
+      hetzner_ssh_key: hetzner_ssh_keypair.public_key,
+      dist: "Ubuntu 24.04 LTS base"
+    )
 
     hop_wait_reset
   end

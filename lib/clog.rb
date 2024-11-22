@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "sequel/model"
 
 class Clog
   MUTEX = Mutex.new

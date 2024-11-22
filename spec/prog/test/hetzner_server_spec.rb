@@ -58,7 +58,7 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#reset" do
     it "can reset" do
-      expect(hetzner_api).to receive(:reset).with("1234", hetzner_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
+      expect(hetzner_api).to receive(:reset).with("1234", dist: "Ubuntu 24.04 LTS base", hetzner_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
       expect { hs_test.reset }.to hop("wait_reset")
     end
   end
