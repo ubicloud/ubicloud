@@ -74,7 +74,10 @@ class Clover
       r.on "firewall-rule" do
         r.get api?, true do
           authorize("Postgres:Firewall:view", pg.id)
-          Serializers::PostgresFirewallRule.serialize(pg.firewall_rules)
+          {
+            items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
+            count: pg.firewall_rules.count
+          }
         end
 
         r.post true do
@@ -84,16 +87,15 @@ class Clover
           request_body_params = Validation.validate_request_body(json_params, required_parameters)
           parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
 
-          DB.transaction do
+          firewall_rule = DB.transaction do
             PostgresFirewallRule.create_with_id(
               postgres_resource_id: pg.id,
               cidr: parsed_cidr.to_s
-            )
-            pg.incr_update_firewall_rules
+            ).tap { pg.incr_update_firewall_rules }
           end
 
           if api?
-            Serializers::Postgres.serialize(pg, {detailed: true})
+            Serializers::PostgresFirewallRule.serialize(firewall_rule, {detailed: true})
           else
             flash["notice"] = "Firewall rule is created"
             r.redirect "#{@project.path}#{pg.path}"
