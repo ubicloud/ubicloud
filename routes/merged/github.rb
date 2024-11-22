@@ -41,9 +41,9 @@ class Clover
         r.redirect "#{project.path}/github"
       end
 
-      if current_account.suspended_at
-        flash["error"] = "GitHub runner integration is not allowed for suspended accounts."
-        Clog.emit("GitHub callback failed due to suspended account") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
+      unless project.active?
+        flash["error"] = "GitHub runner integration is not allowed for inactive projects"
+        Clog.emit("GitHub callback failed due to inactive project") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
         r.redirect "#{project.path}/dashboard"
       end
 
