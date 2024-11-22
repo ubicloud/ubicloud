@@ -1,0 +1,2407 @@
+openapi: 3.0.3
+info:
+  description: API for managing resources on Ubicloud
+  title: Clover API
+  version: 0.1.0
+  contact:
+    url: 'https://www.ubicloud.com/'
+    email: support@ubicloud.com
+  license:
+    name: GNU Affero General Public License v3.0 (AGPL-3.0)
+    url: 'https://www.gnu.org/licenses/agpl-3.0.en.html'
+servers:
+  - url: 'https://api.ubicloud.com'
+paths:
+  /login:
+    post:
+      operationId: login
+      summary: Login with user information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                login:
+                  type: string
+                  example: user@mail.com
+                password:
+                  type: string
+                  example: password
+              additionalProperties: false
+              required:
+                - login
+                - password
+      responses:
+        '200':
+          description: Logged in successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: string
+                    example: You have been logged in
+                additionalProperties: false
+                required:
+                  - success
+        default:
+          $ref: '#/components/responses/Error'
+      security: []
+      tags:
+        - Login
+  /project:
+    get:
+      operationId: listProjects
+      summary: List all projects visible to the logged in user.
+      parameters:
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: Return the list of all projects visible to the logged in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      security:
+        - BearerAuth: []
+      tags:
+        - Project
+    post:
+      operationId: createProject
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: my-project-name
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          description: Project is created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+      security:
+        - BearerAuth: []
+      tags:
+        - Project
+  '/project/{project_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    delete:
+      operationId: deleteProject
+      summary: Delete a project
+      responses:
+        '204':
+          description: Project deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Project
+    get:
+      operationId: getProject
+      summary: Retrieve a project
+      responses:
+        '200':
+          description: Retrieved project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Project
+  '/project/{project_id}/firewall':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getFirewall
+      summary: Return the list of firewalls in the project
+      responses:
+        '200':
+          description: Firewall list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Firewall'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    post:
+      operationId: createFirewall
+      summary: Create a new firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  description: Description of the firewall
+                  type: string
+                name:
+                  description: Name of the firewall
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+      responses:
+        '200':
+          description: Firewall created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/firewall/{firewall_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+    delete:
+      operationId: deleteFirewall
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          description: Firewall deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getFirewallDetails
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          description: Details of the firewall
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/firewall/{firewall_name}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+    post:
+      operationId: createFirewallRule
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
+    delete:
+      operationId: deleteFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getFirewallRuleDetails
+      summary: Get details of a firewall rule
+      responses:
+        '200':
+          description: Details of the firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/load-balancer':
+    get:
+      operationId: listLoadBalancers
+      summary: List Load Balancers in a specific project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Load Balancers in a specific project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoadBalancer'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/load-balancer/{load_balancer_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/load_balancer_name'
+    get:
+      operationId: getLoadBalancer
+      summary: Get details of a specific Load Balancer
+      responses:
+        '200':
+          description: A list of Load Balancers in a specific project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+    post:
+      operationId: createLoadBalancer
+      summary: Create a new Load Balancer in a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                algorithm:
+                  description: Algorithm of the Load Balancer
+                  type: string
+                dst_port:
+                  description: Destination port for the Load Balancer
+                  type: integer
+                health_check_endpoint:
+                  description: Health check endpoint URL
+                  type: string
+                health_check_protocol:
+                  description: Health check endpoint protocol
+                  type: string
+                private_subnet_id:
+                  description: ID of Private Subnet
+                  type: string
+                src_port:
+                  description: Source port for the Load Balancer
+                  type: integer
+              additionalProperties: false
+              required:
+                - algorithm
+                - dst_port
+                - health_check_protocol
+                - private_subnet_id
+                - src_port
+      responses:
+        '200':
+          description: Load Balancer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/firewall':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getLocationFirewall
+      summary: Return the list of firewalls in the project and location
+      responses:
+        '200':
+          description: Firewall list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Firewall'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/_{firewall_id}/attach-subnet':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    post:
+      operationId: actionLocationFirewallAttachSubnet
+      summary: Attach a subnet to firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                private_subnet_id:
+                  description: Private subnet id to attach
+                  type: string
+              additionalProperties: false
+              required:
+                - private_subnet_id
+      responses:
+        '200':
+          description: Subnet attached successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/_{firewall_id}/detach-subnet':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    post:
+      operationId: actionLocationFirewallDetachSubnet
+      summary: Detach a subnet from firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                private_subnet_id:
+                  description: Private subnet id to detach
+                  type: string
+              additionalProperties: false
+              required:
+                - private_subnet_id
+      responses:
+        '200':
+          description: Subnet detached successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_id'
+    delete:
+      operationId: deleteLocationFirewallWithId
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          description: Firewall deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getLocationFirewallDetailsWithId
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          description: Details of the firewall
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_name}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationFirewallRuleWithId
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/firewall/id/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
+    delete:
+      operationId: deleteLocationFirewallFirewallRuleWithId
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getLocationFirewallFirewallRuleDetailsWithId
+      summary: Get details of a firewall rule
+      responses:
+        '200':
+          description: Details of the firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    post:
+      operationId: createLocationFirewallFirewallRuleWithId
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+    delete:
+      operationId: deleteLocationFirewall
+      summary: Delete a specific firewall
+      responses:
+        '204':
+          description: Firewall deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    get:
+      operationId: getLocationFirewallDetails
+      summary: Get details of a specific firewall
+      responses:
+        '200':
+          description: Details of the firewall
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+    post:
+      operationId: createLocationFirewall
+      summary: Create a new firewall
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  description: Description of the firewall
+                  type: string
+              additionalProperties: false
+      responses:
+        '200':
+          description: Firewall created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Firewall'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationFirewallRule
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/firewall/{firewall_name}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
+    delete:
+      operationId: deleteLocationFirewallFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getLocationFirewallFirewallRuleDetails
+      summary: Get details of a firewall rule
+      responses:
+        '200':
+          description: Details of the firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    post:
+      operationId: createLocationFirewallFirewallRule
+      summary: Create a new firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+                firewall_id:
+                  type: string
+                port_range:
+                  description: Port range of the firewall rule
+                  type: string
+                project_id:
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/load-balancer':
+    get:
+      operationId: listLocationLoadBalancers
+      summary: List Load Balancers in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Load Balancers in a specific location of a project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LoadBalancer'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/id/{load_balancer_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_id'
+    delete:
+      operationId: deleteLoadBalancerWithID
+      summary: Delete a specific Load Balancer with ID
+      responses:
+        '204':
+          description: Load balancer is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+    get:
+      operationId: getLoadBalancerDetailsWithId
+      summary: Get details of a specific Load Balancer in a location with ID
+      responses:
+        '200':
+          description: Details of the Load Balancer in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_name'
+    delete:
+      operationId: deleteLoadBalancer
+      summary: Delete a specific Load Balancer
+      responses:
+        '204':
+          description: Load Balancer deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+    get:
+      operationId: getLoadBalancerDetails
+      summary: Get details of a specific Load Balancer in a location
+      responses:
+        '200':
+          description: Details of the LoadBalancer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+    patch:
+      operationId: patchLocationLoadBalancer
+      summary: Update a Load Balancer in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                algorithm:
+                  description: Algorithm of the Load Balancer
+                  type: string
+                dst_port:
+                  description: Destination port for the Load Balancer
+                  type: integer
+                health_check_endpoint:
+                  description: Health check endpoint URL
+                  type: string
+                src_port:
+                  description: Source port for the Load Balancer
+                  type: integer
+                vms:
+                  description: List of VM apids for the Load Balancer
+                  type: array
+                  items:
+                    type: string
+              additionalProperties: false
+      responses:
+        '200':
+          description: Load Balancer updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+    post:
+      operationId: createLocationLoadBalancer
+      summary: Create a new Load Balancer in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                algorithm:
+                  description: Algorithm of the Load Balancer
+                  type: string
+                dst_port:
+                  description: Destination port for the Load Balancer
+                  type: integer
+                health_check_endpoint:
+                  description: Health check endpoint URL
+                  type: string
+                health_check_protocol:
+                  description: Health check endpoint protocol
+                  type: string
+                private_subnet_id:
+                  description: ID of Private Subnet
+                  type: string
+                src_port:
+                  description: Source port for the Load Balancer
+                  type: integer
+              additionalProperties: false
+              required:
+                - algorithm
+                - dst_port
+                - health_check_protocol
+                - private_subnet_id
+                - src_port
+      responses:
+        '200':
+          description: Load Balancer created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/attach-vm':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_name'
+    post:
+      operationId: attachVmLocationLoadBalancer
+      summary: Attach a VM to a Load Balancer in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vm_id:
+                  description: Apid of VM to attach to Load Balancer
+                  type: string
+              additionalProperties: false
+              required:
+                - vm_id
+      responses:
+        '200':
+          description: VM attached to Load Balancer successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/load-balancer/{load_balancer_name}/detach-vm':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/load_balancer_name'
+    post:
+      operationId: detachVmLocationLoadBalancer
+      summary: Detach a VM from a Load Balancer in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vm_id:
+                  description: Apid of VM to detach from Load Balancer
+                  type: string
+              additionalProperties: false
+              required:
+                - vm_id
+      responses:
+        '200':
+          description: VM detached from Load Balancer successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadBalancerDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Load Balancer
+  '/project/{project_id}/location/{location}/postgres':
+    get:
+      operationId: listLocationPostgresDatabases
+      summary: List Postgres databases in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Postgres databases in a specific location of a project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Postgres'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/failover':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+    post:
+      operationId: failoverPostgresDatabaseWithID
+      summary: Failover a specific Postgres database with ID
+      responses:
+        '200':
+          description: Details of the failed over Postgres databases in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listLocationPostgresFirewallRules
+      summary: List location Postgres firewall rules
+      responses:
+        '200':
+          description: List of the location Postgres firewall rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PostgresFirewallRule'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
+    post:
+      operationId: createLocationPostgresFirewallRuleWithId
+      summary: Create a new Postgres firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Postgres firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+    delete:
+      operationId: deletePostgresDatabaseWithID
+      summary: Delete a specific Postgres database with ID
+      responses:
+        '204':
+          description: Postgres database is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    get:
+      operationId: getPostgresDetailsWithId
+      summary: Get details of a specific Postgres database in a location with ID
+      responses:
+        '200':
+          description: Details of the Postgres databases in a location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_id'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/firewall_rule_id'
+    delete:
+      operationId: deleteLocationPostgresFirewallRuleWithId
+      summary: Delete a specific Postgres firewall rule
+      responses:
+        '204':
+          description: Postgres firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+    get:
+      operationId: getLocationPostgresFirewallRuleDetailsWithId
+      summary: Get details of a Postgres firewall rule
+      responses:
+        '200':
+          description: Details of the Postgres firewall rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
+    post:
+      operationId: createLocationPostgresFirewallRuleWithIdWithId
+      summary: Create a new Postgres firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the Postgres firewall rule
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Postgres firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password':
+    post:
+      operationId: resetSuperuserPasswordWithID
+      summary: Reset super-user password of the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+      responses:
+        '200':
+          description: Superuser password is updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/restore':
+    post:
+      operationId: restorePostgresDatabaseWithID
+      summary: Restore a new Postgres database in a specific location of a project with ID
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+                - restore_target
+      responses:
+        '200':
+          description: Postgres database is restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Postgres'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+    delete:
+      operationId: deletePostgresDatabase
+      summary: Delete a specific Postgres database
+      responses:
+        '204':
+          description: Postgres database is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    get:
+      operationId: getPostgresDatabaseDetails
+      summary: Get details of a specific Postgres database in a location
+      responses:
+        '200':
+          description: Details of the Postgres database
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+    post:
+      operationId: createPostgresDatabase
+      summary: Create a new Postgres database in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                flavor:
+                  description: Kind of database
+                  type: string
+                ha_type:
+                  description: High availability type
+                  type: string
+                size:
+                  description: Requested size for the underlying VM
+                  type: string
+                storage_size:
+                  description: Requested storage size in GiB
+                  type: integer
+              additionalProperties: false
+              required:
+                - size
+      responses:
+        '200':
+          description: Postgres database is created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/firewall-rule':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationPostgresFirewallRule
+      summary: Create a new postgres firewall rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cidr:
+                  description: CIDR of the firewall rule
+                  type: string
+              additionalProperties: false
+              required:
+                - cidr
+      responses:
+        '200':
+          description: Firewall rule created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresFirewallRule'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/firewall-rule/{firewall_rule_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/firewall_rule_id'
+    delete:
+      operationId: deleteLocationPostgresFirewallRule
+      summary: Delete a specific firewall rule
+      responses:
+        '204':
+          description: Firewall rule deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationPostgresMetricDestination
+      summary: Create a new Postgres Metric Destination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  description: Password for the Metric Destination
+                  type: string
+                url:
+                  description: URL for the Metric Destination
+                  type: string
+                username:
+                  description: Username for the Metric Destination
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+                - url
+                - username
+      responses:
+        '200':
+          description: Postgres Metric Destiantion created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/metric-destination/{metric_destination_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/metric_destination_id'
+      - $ref: '#/components/parameters/postgres_database_name'
+      - $ref: '#/components/parameters/project_id'
+    delete:
+      operationId: deleteLocationPostgresMetricDestination
+      summary: Delete a specific Metric Destination
+      responses:
+        '204':
+          description: Metric Destination deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Metric Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/reset-superuser-password':
+    post:
+      operationId: resetSuperuserPassword
+      summary: Reset superuser password of the Postgres database
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+              additionalProperties: false
+              required:
+                - password
+      responses:
+        '200':
+          description: Superuser password is updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore':
+    post:
+      operationId: restorePostgresDatabase
+      summary: Restore a new Postgres database in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/postgres_database_name'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                restore_target:
+                  type: string
+              additionalProperties: false
+              required:
+                - name
+                - restore_target
+      responses:
+        '200':
+          description: Postgres database is restored successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostgresDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/location/{location}/private-subnet':
+    get:
+      operationId: listLocationPrivateSubnets
+      summary: List Private Subnets in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Private Subnets in a location
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateSubnet'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/location/{location}/private-subnet/id/{private_subnet_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_id'
+    delete:
+      operationId: deletePSWithId
+      summary: Delete a specific Private Subnet with ID
+      responses:
+        '204':
+          description: Private Subnet is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    get:
+      operationId: getPSDetailsWithId
+      summary: Get details of a specific Private Subnet in a location with ID
+      responses:
+        '200':
+          description: Details of the private subnet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/location/{location}/private-subnet/{private_subnet_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/private_subnet_name'
+    delete:
+      operationId: deletePrivateSubnet
+      summary: Delete a specific Private Subnet
+      responses:
+        '204':
+          description: Private Subnet is deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    get:
+      operationId: getPrivateSubnetDetails
+      summary: Get details of a specific Private Subnet in a location
+      responses:
+        '200':
+          description: Details of the private subnet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+    post:
+      operationId: createPrivateSubnet
+      summary: Create a new Private Subnet in a specific location of a project
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firewall_id:
+                  type: string
+              additionalProperties: false
+      responses:
+        '200':
+          description: Private subnet is created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateSubnet'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/location/{location}/vm':
+    get:
+      operationId: listLocationVMs
+      summary: List VMs in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of VMs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/id/{vm_id}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_id'
+    delete:
+      operationId: deleteVMWithId
+      summary: Delete a specific VM with ID
+      responses:
+        '204':
+          description: VM deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    get:
+      operationId: getVMDetailsWithId
+      summary: Get details of a specific VM in a location with ID
+      responses:
+        '200':
+          description: Details of the VM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_name}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_name'
+    delete:
+      operationId: deleteVM
+      summary: Delete a specific VM
+      responses:
+        '204':
+          description: VM deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    get:
+      operationId: getVMDetails
+      summary: Get details of a specific VM in a location
+      responses:
+        '200':
+          description: Details of the VM
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+    post:
+      operationId: createVM
+      summary: Create a new VM in a specific location of a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                boot_image:
+                  description: Boot image of the VM
+                  type: string
+                enable_ip4:
+                  description: Enable IPv4
+                  type: boolean
+                private_subnet_id:
+                  description: ID of the private subnet
+                  type: string
+                public_key:
+                  description: Public SSH key for the VM
+                  type: string
+                size:
+                  description: Size of the VM
+                  type: string
+                storage_size:
+                  description: Requested storage size in GiB
+                  type: integer
+                unix_user:
+                  description: Unix user of the VM
+                  type: string
+              additionalProperties: false
+              required:
+                - public_key
+      responses:
+        '200':
+          description: Virtual machine created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/postgres':
+    get:
+      operationId: listPostgresDatabases
+      summary: List visible Postgres databases
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Postgres databases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Postgres'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres
+  '/project/{project_id}/private-subnet':
+    get:
+      operationId: listPSs
+      summary: List visible Private Subnets
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of private subnets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateSubnet'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Private Subnet
+  '/project/{project_id}/vm':
+    get:
+      operationId: listProjectVMs
+      summary: List all VMs created under the given project ID and visible to logged in user
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: Return the list of all VMs visible created under the given project and visible to the logged in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+components:
+  parameters:
+    firewall_id:
+      description: ID of the firewall
+      in: path
+      name: firewall_id
+      required: true
+      schema:
+        type: string
+    firewall_name:
+      description: Name of the firewall
+      in: path
+      name: firewall_name
+      required: true
+      schema:
+        type: string
+    firewall_rule_id:
+      description: ID of the firewall rule
+      in: path
+      name: firewall_rule_id
+      required: true
+      schema:
+        type: string
+    load_balancer_id:
+      description: ID of the load balancer
+      in: path
+      name: load_balancer_id
+      required: true
+      schema:
+        type: string
+    load_balancer_name:
+      description: Name of the load balancer
+      in: path
+      name: load_balancer_name
+      required: true
+      schema:
+        type: string
+    location:
+      description: The Ubicloud location/region
+      in: path
+      name: location
+      required: true
+      schema:
+        type: string
+        example: eu-central-h1
+    metric_destination_id:
+      description: Postgres Metric Destination ID
+      in: path
+      name: metric_destination_id
+      required: true
+      schema:
+        type: string
+    order_column:
+      description: Pagination - Order column
+      in: query
+      name: order_column
+      required: false
+      schema:
+        type: string
+        default: id
+    page_size:
+      description: Pagination - Page size
+      in: query
+      name: page_size
+      required: false
+      schema:
+        type: integer
+        default: 10
+    postgres_database_id:
+      description: Postgres database ID
+      in: path
+      name: postgres_database_id
+      required: true
+      schema:
+        type: string
+    postgres_database_name:
+      description: Postgres database name
+      in: path
+      name: postgres_database_name
+      required: true
+      schema:
+        type: string
+    private_subnet_id:
+      description: Private subnet ID
+      in: path
+      name: private_subnet_id
+      required: true
+      schema:
+        type: string
+    private_subnet_name:
+      description: Private subnet name
+      in: path
+      name: private_subnet_name
+      required: true
+      schema:
+        type: string
+    project_id:
+      description: ID of the project
+      in: path
+      name: project_id
+      required: true
+      schema:
+        type: string
+    start_after:
+      description: Pagination - Start after
+      in: query
+      name: start_after
+      required: false
+      schema:
+        type: string
+    vm_id:
+      description: Virtual machine ID
+      in: path
+      name: vm_id
+      required: true
+      schema:
+        type: string
+    vm_name:
+      description: Virtual machine name
+      in: path
+      name: vm_name
+      required: true
+      schema:
+        type: string
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: integer
+              example: 401
+            message:
+              type: string
+              example: There was an error logging in
+            type:
+              type: string
+              example: InvalidCredentials
+            details:
+              type: object
+              nullable: true
+          required:
+            - code
+            - message
+            - type
+      additionalProperties: false
+      required:
+        - error
+    Firewall:
+      type: object
+      properties:
+        description:
+          description: Description of the firewall
+          type: string
+        firewall_rules:
+          description: List of firewall rules
+          type: array
+          items:
+            $ref: '#/components/schemas/FirewallRule'
+        id:
+          description: ID of the firewall
+          type: string
+        location:
+          description: Location of the the firewall
+          type: string
+        name:
+          description: Name of the firewall
+          type: string
+      additionalProperties: false
+      required:
+        - description
+        - firewall_rules
+        - id
+        - location
+        - name
+    FirewallDetailed:
+      type: object
+      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/Firewall'
+        - properties:
+            private_subnets:
+              description: List of private subnets
+              type: array
+              items:
+                type: string
+          additionalProperties: false
+          required:
+            - private_subnets
+    FirewallRule:
+      type: object
+      properties:
+        cidr:
+          description: CIDR of the firewall rule
+          type: string
+        id:
+          description: ID of the firewall rule
+          type: string
+        port_range:
+          description: Port range of the firewall rule
+          type: string
+      additionalProperties: false
+      required:
+        - cidr
+        - id
+        - port_range
+    LoadBalancer:
+      type: object
+      properties:
+        algorithm:
+          description: Algorithm of the Load Balancer
+          type: string
+        dst_port:
+          description: Destination port for the Load Balancer
+          type: integer
+        health_check_endpoint:
+          description: Health check endpoint URL
+          type: string
+        health_check_protocol:
+          description: Health check endpoint protocol
+          type: string
+        hostname:
+          description: Hostname of the Load Balancer
+          type: string
+        id:
+          description: ID of the Load Balancer
+          type: string
+        name:
+          description: Name of the Load Balancer
+          type: string
+        src_port:
+          description: Source port for the Load Balancer
+          type: integer
+      additionalProperties: false
+      required:
+        - algorithm
+        - dst_port
+        - health_check_endpoint
+        - health_check_protocol
+        - hostname
+        - id
+        - name
+        - src_port
+    LoadBalancerDetailed:
+      type: object
+      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/LoadBalancer'
+        - properties:
+            location:
+              description: Location of the Load Balancer
+              type: string
+            subnet:
+              description: Subnet of the Load Balancer
+              type: string
+            vms:
+              type: array
+              items:
+                $ref: '#/components/schemas/Vm'
+          additionalProperties: false
+          required:
+            - location
+            - subnet
+            - vms
+    Nic:
+      type: object
+      properties:
+        id:
+          description: ID of the NIC
+          type: string
+        name:
+          description: Name of the NIC
+          type: string
+        private_ipv4:
+          description: Private IPv4 address
+          type: string
+          format: ipv4
+        private_ipv6:
+          description: Private IPv6 address
+          type: string
+          format: ipv6
+        vm_name:
+          description: Name of the VM
+          type: string
+          nullable: true
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - private_ipv4
+        - private_ipv6
+        - vm_name
+    Postgres:
+      type: object
+      properties:
+        flavor:
+          description: Kind of Postgres database
+          type: string
+        ha_type:
+          description: High availability type
+          type: string
+        id:
+          description: ID of the Postgres database
+          type: string
+        location:
+          description: Location of the Postgres database
+          type: string
+        name:
+          description: Name of the Postgres database
+          type: string
+        state:
+          description: State of the Postgres database
+          type: string
+        storage_size_gib:
+          description: Storage size in GiB
+          type: integer
+        version:
+          description: Postgres version
+          type: string
+        vm_size:
+          description: Size of the underlying VM
+          type: string
+      additionalProperties: false
+      required:
+        - flavor
+        - ha_type
+        - id
+        - location
+        - name
+        - state
+        - storage_size_gib
+        - version
+        - vm_size
+    PostgresDetailed:
+      type: object
+      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/Postgres'
+        - additionalProperties: false
+          properties:
+            connection_string:
+              description: Connection string to the Postgres database
+              type: string
+              nullable: true
+            earliest_restore_time:
+              description: Earliest restore time (if primary)
+              type: string
+              nullable: true
+            firewall_rules:
+              description: List of Postgres firewall rules
+              type: array
+              items:
+                $ref: '#/components/schemas/PostgresFirewallRule'
+            latest_restore_time:
+              description: Latest restore time (if primary)"
+              type: string
+            primary:
+              description: Is the database primary
+              type: boolean
+          required:
+            - connection_string
+            - earliest_restore_time
+            - firewall_rules
+            - latest_restore_time
+            - primary
+    PostgresFirewallRule:
+      type: object
+      properties:
+        cidr:
+          description: CIDR of the Postgres firewall rule
+          type: string
+        id:
+          description: ID of the Postgres firewall rule
+          type: string
+      additionalProperties: false
+      required:
+        - cidr
+        - id
+    PrivateSubnet:
+      type: object
+      properties:
+        firewalls:
+          type: array
+          items:
+            $ref: '#/components/schemas/Firewall'
+        id:
+          description: ID of the subnet
+          type: string
+        location:
+          description: Location of the subnet
+          type: string
+        name:
+          description: Name of the subnet
+          type: string
+        net4:
+          description: IPv4 CIDR of the subnet
+          type: string
+        net6:
+          description: IPv6 CIDR of the subnet
+          type: string
+        nics:
+          description: List of NICs
+          type: array
+          items:
+            $ref: '#/components/schemas/Nic'
+        state:
+          description: State of the subnet
+          type: string
+      additionalProperties: false
+      required:
+        - firewalls
+        - id
+        - location
+        - name
+        - net4
+        - net6
+        - nics
+        - state
+    Project:
+      type: object
+      properties:
+        credit:
+          description: Remaining credit of the project in $
+          type: number
+          format: float
+          example: 25.4
+        discount:
+          description: Discount of the project as percentage
+          type: integer
+          example: 10
+        id:
+          type: string
+          example: pjw92xhhqjdy4g72xng1ubkda6
+        name:
+          description: Name of the project
+          type: string
+          example: my-project
+      additionalProperties: false
+      required:
+        - credit
+        - discount
+        - id
+        - name
+    Vm:
+      type: object
+      properties:
+        id:
+          description: ID of the VM
+          type: string
+          example: vmw12ouhqjdy4g72xng1ubkda6
+        ip4:
+          description: IPv4 address
+          type: string
+          format: ipv4
+          nullable: true
+        ip6:
+          description: IPv6 address
+          type: string
+          format: ipv6
+          nullable: true
+        location:
+          description: Location of the VM
+          type: string
+          example: eu-central-h1
+        name:
+          description: Name of the VM
+          type: string
+          example: my-vm-name
+        size:
+          description: Size of the underlying VM
+          type: string
+        state:
+          description: State of the VM
+          type: string
+        storage_size_gib:
+          description: Storage size in GiB
+          type: integer
+        unix_user:
+          description: Unix user of the VM
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - ip4
+        - ip6
+        - location
+        - name
+        - size
+        - state
+        - storage_size_gib
+        - unix_user
+    VmDetailed:
+      type: object
+      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/Vm'
+        - additionalProperties: false
+          properties:
+            firewalls:
+              description: List of firewalls
+              type: array
+              items:
+                $ref: '#/components/schemas/Firewall'
+            private_ipv4:
+              description: Private IPv4 address
+              type: string
+              format: ipv4
+            private_ipv6:
+              description: Private IPv6 address
+              type: string
+              format: ipv6
+            subnet:
+              description: Subnet of the VM
+              type: string
+            unix_user:
+              description: Unix user of the VM
+              type: string
+          required:
+            - firewalls
+            - private_ipv4
+            - private_ipv6
+            - subnet
+            - unix_user
+  responses:
+    Error:
+      description: an error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    BearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
+tags:
+  - description: Firewall Operations
+    name: Firewall
+  - description: Firewall Rule Operations
+    name: Firewall Rule
+  - description: Load Balancer Operations
+    name: Load Balancer
+  - description: Login Operations
+    name: Login
+  - description: Postgres Operations
+    name: Postgres
+  - description: Postgres Firewall Rule Operations
+    name: Postgres Firewall Rule
+  - description: Postgres Metric Destination
+    name: Postgres Metric Destination
+  - description: Private Subnet Operations
+    name: Private Subnet
+  - description: Project Operations
+    name: Project
+  - description: Virtual Machine Operations
+    name: Virtual Machine
+security:
+  - BearerAuth: []
