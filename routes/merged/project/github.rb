@@ -41,16 +41,17 @@ class Clover
         end
 
         r.on String do |installation_id|
-          r.post "toggle_cache" do
-            installation = GithubInstallation.from_ubid(installation_id)
-            unless installation
-              response.status = 404
-              request.halt
-            end
+          installation = GithubInstallation.from_ubid(installation_id)
+          unless installation
+            response.status = 404
+            request.halt
+          end
 
-            new_cache_enabled_value = !installation.cache_enabled
-            installation.update(cache_enabled: new_cache_enabled_value)
-            flash["notice"] = "Transparent cache is #{new_cache_enabled_value ? "enabled" : "disabled"} for the installation #{installation.name}."
+          r.post true do
+            cache_enabled = r.params["cache_enabled"] == "true"
+            installation.update(cache_enabled:)
+            flash["notice"] = "Transparent cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{installation.name}."
+
             r.redirect "#{@project.path}/github/setting"
           end
         end
