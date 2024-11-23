@@ -568,10 +568,10 @@ class Clover < Roda
       # Validate request against OpenAPI schema, after authenticating
       # (which is thought to be cheaper)
       begin
-        schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
-        schema_validator.request_validate(r)
+        @schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
+        @schema_validator.request_validate(r)
 
-        raise Committee::NotFound, "That request method and path combination isn't defined." if !schema_validator.link_exist?
+        raise Committee::NotFound, "That request method and path combination isn't defined." if !@schema_validator.link_exist?
       rescue JSON::ParserError => e
         raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
       end
@@ -584,8 +584,8 @@ class Clover < Roda
   after do |res|
     status, headers, body = res
     next unless api? && status && headers && body
-    schema_validator = SCHEMA_ROUTER.build_schema_validator(request)
-    schema_validator.response_validate(status, headers, body, true) if schema_validator.link_exist?
+    @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
+    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue Committee::InvalidResponse => e
     # FIXME: response validation has failed, and we have access to the request info, so now we can tie together/reveal
     # FIXME: puts("Invalid API Response: #{body}") unless Config.production?
