@@ -91,8 +91,7 @@ class Clover
             fr = PostgresFirewallRule.create_with_id(
               postgres_resource_id: pg.id,
               cidr: parsed_cidr.to_s
-            )
-            pg.incr_update_firewall_rules
+            ).tap { pg.incr_update_firewall_rules }
             fr
           end
 
