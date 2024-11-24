@@ -167,6 +167,7 @@ RSpec.describe Clover, "postgres" do
           cidr: "0.0.0.0/24"
         }.to_json
 
+        expect(JSON.parse(last_response.body)["cidr"]).to eq("0.0.0.0/24")
         expect(last_response.status).to eq(200)
       end
 
@@ -306,7 +307,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "invalid payment" do
-        header "Content-Type", "application/json"
         expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
 
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
@@ -344,6 +344,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["count"]).to eq(1)
       end
     end
 

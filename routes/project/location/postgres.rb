@@ -88,11 +88,11 @@ class Clover
           parsed_cidr = Validation.validate_cidr(request_body_params["cidr"])
 
           firewall_rule = DB.transaction do
-            fr = PostgresFirewallRule.create_with_id(
+            pg.incr_update_firewall_rules
+            PostgresFirewallRule.create_with_id(
               postgres_resource_id: pg.id,
               cidr: parsed_cidr.to_s
-            ).tap { pg.incr_update_firewall_rules }
-            fr
+            )
           end
 
           if api?
