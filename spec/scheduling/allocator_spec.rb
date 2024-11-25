@@ -24,8 +24,8 @@ RSpec.describe Al do
     allow(vm).to receive_messages(projects: [project])
   end
 
-  def create_vm_with_project(use_slices: nil)
-    vm = create_vm
+  def create_vm_with_project(use_slices: nil, **args)
+    vm = create_vm(**args)
     allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(use_slices)
     allow(project).to receive(:get_ff_vm_public_ssh_keys).and_return(nil)
     allow(vm).to receive_messages(projects: [project])
@@ -727,35 +727,6 @@ RSpec.describe Al do
       expect(vm).to receive(:ip4_enabled).and_return(true).at_least(:once)
       expect { Al::Allocation.update_vm(vmh, vm) }.to raise_error(RuntimeError, /no ip4 addresses left/)
     end
-
-    it "creates a vm with a slice" do
-      vm = create_vm_with_project(use_slices: true)
-      vmh = VmHost.first
-
-      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
-      al.update(vm)
-      vmh.reload
-
-      expected_slice_name = "#{vm.family}_#{vm.inhost_name}"
-
-      # Validate the slice got created
-      expect(vmh.vm_host_slices.size).to eq(1)
-      slice = vmh.vm_host_slices.first
-      expect(vm.vm_host_slice).not_to be_nil
-      expect(vm.vm_host_slice.id).to eq(slice.id)
-      # expect(vm.params_json("").fetch("slice_name")).to eq(expected_slice_name + ".slice")
-
-      # Validate the slice properties
-      expect(slice.name).to eq(expected_slice_name)
-      expect(slice.allowed_cpus).to eq("2-3")
-      expect(slice.type).to eq("dedicated")
-      expect(slice.cores).to eq(1)
-      expect(slice.total_cpu_percent).to eq(200)
-      expect(slice.used_cpu_percent).to eq(0)
-      expect(slice.total_memory_1g).to eq(8)
-      expect(slice.used_memory_1g).to eq(0)
-      expect(slice.vm_host_id).to eq(vmh.id)
-    end
   end
 
   describe "slice selection" do
@@ -805,11 +776,83 @@ RSpec.describe Al do
 
     it "slice allocation fails on overbooked host" do
       vh = VmHost.first
-      st_sl1 = Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-7", memory_1g: 24)
-      st_sl2 = Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "8-15", memory_1g: 32)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-7", memory_1g: 24)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "8-15", memory_1g: 32)
 
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       expect(al).to be_nil
+    end
+
+    it "creates a vm with a slice" do
+      vm = create_vm_with_project(use_slices: true)
+      vmh = VmHost.first
+
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al.update(vm)
+      vmh.reload
+
+      expected_slice_name = "#{vm.family}_#{vm.inhost_name}"
+
+      # Validate the slice got created
+      expect(vmh.vm_host_slices.size).to eq(1)
+      slice = vmh.vm_host_slices.first
+      expect(vm.vm_host_slice).not_to be_nil
+      expect(vm.vm_host_slice.id).to eq(slice.id)
+
+      # All this mocking is needed to generate params_json so we can check the slice_name
+      ps = PrivateSubnet.create_with_id(name: "test-ps", location: "hetzner-fsn1", net6: "2001:db8::/64", net4: "10.0.0.0/24")
+      nic = instance_double(Nic, id: "n2")
+      expect(nic).to receive(:private_subnet).and_return(ps)
+      expect(nic).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32"))
+      expect(nic).to receive(:private_ipv6).and_return(NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
+      expect(nic).to receive(:ubid_to_tap_name).and_return("")
+      expect(nic).to receive(:mac).and_return("")
+      expect(nic).to receive(:private_ipv4_gateway).and_return("")
+      expect(vm).to receive(:nics).and_return([nic]).at_least(1)
+      expect(JSON.parse(vm.params_json("")).fetch("slice_name")).to eq(expected_slice_name + ".slice")
+
+      # Validate the slice properties
+      expect(slice.name).to eq(expected_slice_name)
+      expect(slice.allowed_cpus).to eq("2-3")
+      expect(slice.type).to eq("dedicated")
+      expect(slice.cores).to eq(1)
+      expect(slice.total_cpu_percent).to eq(200)
+      expect(slice.used_cpu_percent).to eq(0)
+      expect(slice.total_memory_1g).to eq(8)
+      expect(slice.used_memory_1g).to eq(0)
+      expect(slice.vm_host_id).to eq(vmh.id)
+    end
+
+    it "allows concurrent allocations with slice" do
+      vmh = VmHost.first
+      used_cores = vmh.used_cores
+      used_hugepages_1g = vmh.used_hugepages_1g
+      available_storage = vmh.storage_devices.sum { _1.available_storage_gib }
+      vm1 = create_vm_with_project(use_slices: true)
+      vm2 = create_vm_with_project(use_slices: true)
+      al1 = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al2 = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al1.update(vm1)
+      al2.update(vm2)
+      vmh.reload
+      expect(used_cores + vm1.vm_host_slice.cores + vm2.vm_host_slice.cores).to eq(vmh.used_cores)
+      expect(used_hugepages_1g + vm1.vm_host_slice.total_memory_1g + vm2.vm_host_slice.total_memory_1g).to eq(vmh.used_hugepages_1g)
+      expect(available_storage - 10).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
+    end
+
+    it "finds a disjoined cpuset" do
+      vh = VmHost.first
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "8-11", memory_1g: 16)
+
+      vm = create_vm_with_project(use_slices: true, cores: 2, memory_gib: 16, cpu_percent_limit: 400)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al.update(vm)
+      vh.reload
+
+      slice = vm.vm_host_slice
+      expect(slice).not_to be_nil
+      expect(slice.allowed_cpus).to eq("6-7,12-13")
     end
   end
 
@@ -830,27 +873,6 @@ RSpec.describe Al do
       si_1 = SpdkInstallation.new(allocation_weight: 0) { _1.id = SpdkInstallation.generate_uuid }
       si_2 = SpdkInstallation.new(allocation_weight: 100) { _1.id = SpdkInstallation.generate_uuid }
       expect(Al::StorageAllocation.allocate_spdk_installation([si_1, si_2])).to eq(si_2.id)
-    end
-  end
-
-  describe "candidate_selection_with_slices" do
-    let(:req) {
-      Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
-        [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], true
-      )
-    }
-
-    it "finds correct host" do
-      vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "hetzner-fsn1", total_mem_gib: 32, total_sockets: 1, total_dies: 1, total_cpus: 8, total_cores: 4, used_cores: 1, total_hugepages_1g: 27, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
-      sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
-      sd2 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 12, total_storage_gib: 99)
-      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
-
-      expect(Al::Allocation.best_allocation(req)).not_to be_nil
     end
   end
 end
