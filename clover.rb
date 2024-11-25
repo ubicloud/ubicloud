@@ -182,11 +182,14 @@ class Clover < Roda
     end
   end
 
+  require "rodauth"
+  require_relative "rodauth/features/personal_access_token"
+
   plugin :rodauth, name: :api do
-    enable :argon2, :json, :jwt, :active_sessions, :login
+    enable :argon2, :json, :jwt, :active_sessions, :login, :personal_access_token
 
     only_json? true
-    use_jwt? true
+    use_jwt? { !use_pat? }
 
     # Converting rodauth error response to the common error format of the API
     json_response_body do |hash|
@@ -526,6 +529,7 @@ class Clover < Roda
     if api?
       response.json = true
       response.skip_content_security_policy!
+      rodauth.check_active_session unless rodauth.use_pat?
     else
       r.on "runtime" do
         @is_runtime = true
@@ -552,9 +556,10 @@ class Clover < Roda
       r.root do
         r.redirect rodauth.login_route
       end
+
+      rodauth.check_active_session
     end
 
-    rodauth.check_active_session
     r.rodauth
     rodauth.require_authentication
 
