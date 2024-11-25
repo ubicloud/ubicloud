@@ -4,6 +4,7 @@ require_relative "../model"
 
 class Account < Sequel::Model(:accounts)
   one_to_many :usage_alerts, key: :user_id
+  one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "accounts"}
 
   plugin :association_dependencies, usage_alerts: :destroy
 
