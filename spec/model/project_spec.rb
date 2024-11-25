@@ -32,6 +32,13 @@ RSpec.describe Project do
       expect(project.has_valid_payment_method?).to be true
     end
 
+    it "returns true when has some credits" do
+      expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      bi = BillingInfo.create_with_id(stripe_id: "cus")
+      project.update(billing_info_id: bi.id, credit: 100)
+      expect(project.has_valid_payment_method?).to be true
+    end
+
     it "sets and gets feature flags" do
       mod = Module.new
       described_class.feature_flag(:dummy_flag, into: mod)
