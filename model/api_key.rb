@@ -14,7 +14,7 @@ class ApiKey < Sequel::Model
   end
 
   def self.create_with_id(owner_table:, owner_id:, used_for:)
-    unless ["project", "inference_endpoint"].include?(owner_table.to_s)
+    unless %w[project inference_endpoint accounts].include?(owner_table.to_s)
       fail "Invalid owner_table: #{owner_table}"
     end
 
