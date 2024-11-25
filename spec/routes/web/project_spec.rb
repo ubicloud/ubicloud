@@ -142,7 +142,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "can update the project name" do
-        new_name = "New Project Name"
+        new_name = "New-Project-Name"
         visit project.path
 
         fill_in "name", with: new_name

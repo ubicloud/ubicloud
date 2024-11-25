@@ -6,6 +6,47 @@ require "octokit"
 RSpec.describe Project do
   subject(:project) { described_class.create_with_id(name: "test") }
 
+  describe "#validate" do
+    it "validates that name for new object is not empty and has correct format" do
+      project = described_class.new
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq(["is not present", "is invalid"])
+
+      project.name = "@"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq(["is invalid"])
+
+      project.name = "a"
+      expect(project.valid?).to be true
+
+      project.name = "a-"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq(["is invalid"])
+
+      project.name = "a-b"
+      expect(project.valid?).to be true
+
+      project.name = "a-#{"b" * 63}"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq(["is invalid"])
+    end
+
+    it "validates that name for existing object is valid if the name has changed" do
+      expect(project.valid?).to be true
+
+      project.name = "-"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq(["is invalid"])
+
+      project.name = "a"
+      expect(project.valid?).to be true
+
+      project.name = "@"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq(["is invalid"])
+    end
+  end
+
   describe ".has_valid_payment_method?" do
     it "returns true when Stripe not enabled" do
       expect(Config).to receive(:stripe_secret_key).and_return(nil)
