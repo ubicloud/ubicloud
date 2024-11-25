@@ -121,6 +121,13 @@ class Project < Sequel::Model
     ApiKey.create_with_id(owner_table: Project.table_name, owner_id: id, used_for: used_for)
   end
 
+  def validate
+    super
+    if new? || changed_columns.include?(:name)
+      validates_format(%r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}i, :name)
+    end
+  end
+
   def self.feature_flag(*flags, into: self)
     flags.map(&:to_s).each do |flag|
       into.module_eval do
