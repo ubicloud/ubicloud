@@ -8,9 +8,9 @@ require "tilt"
 require "tilt/erubi"
 
 class Clover < Roda
-  OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true) unless const_defined?(:OPENAPI)
-  SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI) unless const_defined?(:SCHEMA)
-  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true) unless const_defined?(:SCHEMA_ROUTER)
+  OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true)
+  SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
+  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
 
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
