@@ -19,7 +19,7 @@ class ApiKey < Sequel::Model
     end
 
     key = SecureRandom.alphanumeric(32)
-    super(owner_table: owner_table, owner_id: owner_id, key: key, used_for: used_for)
+    super(owner_table:, owner_id:, key:, used_for:)
   end
 
   def rotate
