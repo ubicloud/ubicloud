@@ -58,7 +58,7 @@ jobs:
 
     - name: Cache ngrok binary
       id: cache-ngrok
-      uses: ubicloud/cache@v4
+      uses: actions/cache@v4
       with:
         path: /usr/local/bin/ngrok
         key: ngrok-binary
