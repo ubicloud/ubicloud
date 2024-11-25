@@ -39,7 +39,7 @@ class Project < Sequel::Model
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
-    !!billing_info&.payment_methods&.any?
+    !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
   end
 
   def default_location
