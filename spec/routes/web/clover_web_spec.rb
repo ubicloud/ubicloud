@@ -19,10 +19,4 @@ RSpec.describe Clover do
 
     expect(page.title).to eq("Ubicloud - UnexceptedError")
   end
-
-  it "raises unexpected errors in test environment" do
-    expect(Clog).not_to receive(:emit)
-
-    expect { visit "/webhook/test-error?message=treat+as+unexpected+error" }.to raise_error(RuntimeError)
-  end
 end

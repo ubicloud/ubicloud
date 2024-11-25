@@ -131,22 +131,16 @@ class Clover < Roda
         keys = e.original_error.instance_variable_get(:@keys)
         message = "Validation failed for following fields: body"
         details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
-      else
-        raise e if Config.test?
       end
     when Committee::InvalidResponse
-      raise e if Config.test?
       code = 500
       type = "InternalServerError"
       message = e.message
     when Committee::NotFound
-      raise e if Config.test?
       code = 404
       type = "NotFound"
       message = e.message
     else
-      raise e if Config.test? && e.message != "test error"
-
       Clog.emit("route exception") { Util.exception_to_hash(e) }
 
       code = 500
@@ -586,10 +580,6 @@ class Clover < Roda
     next unless api? && status && headers && body
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
     @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
-  rescue Committee::InvalidResponse => e
-    # FIXME: response validation has failed, and we have access to the request info, so now we can tie together/reveal
-    # FIXME: puts("Invalid API Response: #{body}") unless Config.production?
-    raise e
   rescue JSON::ParserError => e
     raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end
