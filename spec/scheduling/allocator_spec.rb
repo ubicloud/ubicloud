@@ -8,7 +8,7 @@ TestAllocation = Struct.new(:score, :is_valid)
 TestResourceAllocation = Struct.new(:utilization, :is_valid)
 RSpec.describe Al do
   let(:vm) {
-    Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
+    Vm.new(family: "standard", cores: 1, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
     }
   }
@@ -24,9 +24,10 @@ RSpec.describe Al do
     allow(vm).to receive_messages(projects: [project])
   end
 
-  def create_vm_with_project
+  def create_vm_with_project(use_slices: nil)
     vm = create_vm
-    allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(nil)
+    allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(use_slices)
+    allow(project).to receive(:get_ff_vm_public_ssh_keys).and_return(nil)
     allow(vm).to receive_messages(projects: [project])
 
     vm
@@ -728,21 +729,24 @@ RSpec.describe Al do
     end
 
     it "creates a vm with a slice" do
-      vm = create_vm
+      vm = create_vm_with_project(use_slices: true)
       vmh = VmHost.first
 
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       al.update(vm)
       vmh.reload
 
+      expected_slice_name = "#{vm.family}_#{vm.inhost_name}"
+
       # Validate the slice got created
       expect(vmh.vm_host_slices.size).to eq(1)
       slice = vmh.vm_host_slices.first
       expect(vm.vm_host_slice).not_to be_nil
       expect(vm.vm_host_slice.id).to eq(slice.id)
+      # expect(vm.params_json("").fetch("slice_name")).to eq(expected_slice_name + ".slice")
 
       # Validate the slice properties
-      expect(slice.name).to eq("#{vm.family}_#{vm.inhost_name}")
+      expect(slice.name).to eq(expected_slice_name)
       expect(slice.allowed_cpus).to eq("2-3")
       expect(slice.type).to eq("dedicated")
       expect(slice.cores).to eq(1)
@@ -751,6 +755,61 @@ RSpec.describe Al do
       expect(slice.total_memory_1g).to eq(8)
       expect(slice.used_memory_1g).to eq(0)
       expect(slice.vm_host_id).to eq(vmh.id)
+    end
+  end
+
+  describe "slice selection" do
+    let(:vol) {
+      [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false, "boot" => false}]
+    }
+
+    before do
+      vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "hetzner-fsn1", total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fbb::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vmh.id, version: "v1", allocation_weight: 100) { _1.id = vmh.id }
+      Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+    end
+
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false)
+      Al::Request.new(
+        vm.id,
+        vm.cores,
+        vm.mem_gib,
+        storage_volumes.map { _1["size_gib"] }.sum,
+        storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
+        vm.boot_image,
+        distinct_storage_devices,
+        gpu_count,
+        true,
+        target_host_utilization,
+        vm.arch,
+        allocation_state_filter,
+        host_filter,
+        host_exclusion_filter,
+        location_filter,
+        location_preference,
+        use_slices
+      )
+    end
+
+    it "slice allocation fails on invalid host allocator" do
+      invalid_host_allocators = [Scheduling::Allocator::VmHostAllocation.new(:used_cores, 4, 4, 1)]
+
+      allocation = Scheduling::Allocator::VmHostSliceAllocation.new(nil, nil, invalid_host_allocators)
+      expect(allocation.is_valid).to be_falsy
+    end
+
+    it "slice allocation fails on overbooked host" do
+      vh = VmHost.first
+      st_sl1 = Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-7", memory_1g: 24)
+      st_sl2 = Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "8-15", memory_1g: 32)
+
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      expect(al).to be_nil
     end
   end
 

@@ -14,8 +14,8 @@ RSpec.describe VmHostSlice do
       used_cpu_percent: 0,
       total_memory_1g: 4,
       used_memory_1g: 0
-      ) { _1.id = "b231a172-8f56-8b10-bbed-8916ea4e5c28" }
-  end 
+    ) { _1.id = "b231a172-8f56-8b10-bbed-8916ea4e5c28" }
+  end
 
   let(:vm_host) {
     instance_double(
@@ -75,7 +75,7 @@ RSpec.describe VmHostSlice do
 
     it "fails on empty bitmask" do
       bitmask = BitArray.new(16)
-      expect{vm_host_slice.from_cpu_bitmask(bitmask)}.to raise_error RuntimeError, "Bitmask does not set any cpuset."
+      expect { vm_host_slice.from_cpu_bitmask(bitmask) }.to raise_error RuntimeError, "Bitmask does not set any cpuset."
     end
   end
 
@@ -86,14 +86,14 @@ RSpec.describe VmHostSlice do
     end
 
     it "handles nil or empty cpuset" do
-      expect{ VmHostSlice.cpuset_to_bitmask(nil) }.to raise_error RuntimeError, "Cpuset cannot be empty."
-      expect{ VmHostSlice.cpuset_to_bitmask("") }.to raise_error RuntimeError, "Cpuset cannot be empty."
+      expect { VmHostSlice.cpuset_to_bitmask(nil) }.to raise_error RuntimeError, "Cpuset cannot be empty."
+      expect { VmHostSlice.cpuset_to_bitmask("") }.to raise_error RuntimeError, "Cpuset cannot be empty."
     end
 
     it "handles invalid cpuset" do
-      expect{ VmHostSlice.cpuset_to_bitmask("1234 abcd") }.to raise_error RuntimeError, "Cpuset can only contains numbers, comma (,) , and hypen (-)."
-      expect{ VmHostSlice.cpuset_to_bitmask("1234-234%") }.to raise_error RuntimeError, "Cpuset can only contains numbers, comma (,) , and hypen (-)."
-      expect{ VmHostSlice.cpuset_to_bitmask("1234-234-456") }.to raise_error RuntimeError, "Unexpected list of cpus in the cpuset."
+      expect { VmHostSlice.cpuset_to_bitmask("1234 abcd") }.to raise_error RuntimeError, "Cpuset can only contains numbers, comma (,) , and hypen (-)."
+      expect { VmHostSlice.cpuset_to_bitmask("1234-234%") }.to raise_error RuntimeError, "Cpuset can only contains numbers, comma (,) , and hypen (-)."
+      expect { VmHostSlice.cpuset_to_bitmask("1234-234-456") }.to raise_error RuntimeError, "Unexpected list of cpus in the cpuset."
     end
 
     it "handles single cpu" do
@@ -108,7 +108,7 @@ RSpec.describe VmHostSlice do
     end
 
     it "handles incorrect cpu ranges" do
-      expect{ VmHostSlice.cpuset_to_bitmask("7-4") }.to raise_error RuntimeError, "Invalid list of cpus in the cpuset."
+      expect { VmHostSlice.cpuset_to_bitmask("7-4") }.to raise_error RuntimeError, "Invalid list of cpus in the cpuset."
     end
 
     it "handles inverted order" do
@@ -127,28 +127,35 @@ RSpec.describe VmHostSlice do
       a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
       b = VmHostSlice.cpuset_to_bitmask("4-7", size: 8)
 
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-7")
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-7")
     end
 
     it "combines two bitmasks - overlapping ranges" do
       a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
       b = VmHostSlice.cpuset_to_bitmask("2-5", size: 8)
 
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-5")
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-5")
     end
 
     it "combines two bitmasks - disjoint ranges" do
       a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
       b = VmHostSlice.cpuset_to_bitmask("6-7", size: 8)
 
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-3,6-7")
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-3,6-7")
     end
 
     it "combines two bitmasks - empty range" do
       a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
       b = BitArray.new(8)
 
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a,b))).to eq("2-3")
+      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-3")
+    end
+
+    it "fails on unequal bitmasks" do
+      a = BitArray.new(4)
+      b = BitArray.new(8)
+
+      expect { VmHostSlice.bitmask_or(a, b) }.to raise_error RuntimeError, "Argument bitmasks must be of equal size"
     end
   end
 end

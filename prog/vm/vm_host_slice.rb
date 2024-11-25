@@ -74,14 +74,13 @@ class Prog::Vm::VmHostSlice < Prog::Base
 
     vm_host_slice.update(enabled: false)
 
-    unless host.nil?
-      host.sshable.cmd("sudo host/bin/setup-slice delete #{vm_host_slice.inhost_name}")
+    host.sshable.cmd("sudo host/bin/setup-slice delete #{vm_host_slice.inhost_name}")
 
-      VmHost.dataset.where(id: host.id).update(
-        used_cores: Sequel[:used_cores] - vm_host_slice.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_1g
-      )
-    end
+    VmHost.dataset.where(id: host.id).update(
+      used_cores: Sequel[:used_cores] - vm_host_slice.cores,
+      used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_1g
+    )
+
     vm_host_slice.destroy
 
     pop "vm_host_slice destroyed"

@@ -23,7 +23,7 @@ class Prog::Vm::Nexus < Prog::Base
       fail "Cannot force and exclude the same host"
     end
     Validation.validate_location(location)
-    vm_size = Validation.validate_vm_size(size)
+    vm_size = Validation.validate_vm_size(size, arch)
 
     storage_volumes ||= [{
       size_gib: vm_size.storage_size_options.first,
@@ -102,7 +102,7 @@ class Prog::Vm::Nexus < Prog::Base
         cores: cores,
         cpu_percent_limit: vm_size.vcpu_percent_limit,
         cpu_burst_percent_limit: vm_size.vcpu_burst_percent_limit,
-        memory_gib: vm_size.memory_gib,
+        memory_gib: vm_size.memory,
         location: location,
         boot_image: boot_image,
         ip4_enabled: enable_ip4,
@@ -247,7 +247,7 @@ class Prog::Vm::Nexus < Prog::Base
     hop_wait_for_slice
   end
 
-  label def hop_wait_for_slice
+  label def wait_for_slice
     unless vm.vm_host_slice.nil?
       if !vm.vm_host_slice.enabled
         # Just wait here until the slice creation is completed

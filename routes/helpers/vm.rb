@@ -41,11 +41,11 @@ class Clover
     # Same as above, moved the size validation here to not allow users to
     # pass gpu instance while creating a VM.
     if assemble_params["size"]
-      parsed_size = Validation.validate_vm_size(assemble_params["size"], only_visible: true)
+      parsed_size = Validation.validate_vm_size(assemble_params["size"], "x64", only_visible: true)
     end
 
     if assemble_params["storage_size"]
-      storage_size = Validation.validate_vm_storage_size(assemble_params["size"], assemble_params["storage_size"])
+      storage_size = Validation.validate_vm_storage_size(assemble_params["size"], "x64", assemble_params["storage_size"])
       assemble_params["storage_volumes"] = [{size_gib: storage_size, encrypted: true}]
       assemble_params.delete("storage_size")
     end

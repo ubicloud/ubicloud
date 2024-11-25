@@ -184,7 +184,7 @@ RSpec.describe Prog::Vm::HostNexus do
         total_cpus: 96
       )
       allow(nx).to receive(:vm_host).and_return(vmh)
-      expect(vmh).to receive(:update).with({used_cores: 2})
+      expect(vmh).to receive(:update_spdk_cpus).with(4)
       expect { nx.setup_spdk }.to hop("download_boot_images")
     end
   end
