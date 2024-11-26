@@ -4,9 +4,15 @@ require_relative "../model"
 
 class ApiKey < Sequel::Model
   include ResourceMethods
+  include Authorization::TaggableMethods
+  include Authorization::HyperTagMethods
 
   plugin :column_encryption do |enc|
     enc.column :key
+  end
+
+  def hyper_tag_name(project = nil)
+    "api-key/#{ubid}"
   end
 
   def self.ubid_type
