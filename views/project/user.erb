@@ -176,7 +176,7 @@
                   <pre class="bg-gray-50 rounded-lg p-3 h-[50vh] overflow-scroll" contenteditable="true">
                     <%= flash.dig("old", "body") || @policy[:body] %>
                   </pre>
-                  <textarea name="body" class="hidden" required></textarea>
+                  <textarea id="acl-body" name="body" class="hidden" required></textarea>
                 </div>
               </div>
               <div class="col-span-3 sm:col-span-6">
