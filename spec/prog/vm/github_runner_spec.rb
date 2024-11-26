@@ -385,6 +385,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to register_runner" do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
+      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_subnet: instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("10.0.0.0/26")))]).at_least(:once)
+      expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10b:1a5f:3444::/79")).at_least(:once)
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(github_runner.installation).to receive(:cache_enabled).and_return(false)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
@@ -394,6 +396,8 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+        echo #{JSON.generate({"ipv6" => true, "fixed-cidr-v6" => "2a01:4f8:10b:1a5f:3444::2:dc/124", "experimental" => false, "dns" => ["10.0.0.2", "fd00:0b1c:100d:53::"], "dns-opts" => ["single-request-reopen"]}).shellescape} | sudo tee /etc/docker/daemon.json
+        sudo systemctl restart docker
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -402,9 +406,10 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to register_runner with after enabling transparent cache" do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
+      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), private_subnet: instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("10.0.0.0/26")))]).at_least(:once)
+      expect(vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10b:1a5f:3444::/79")).at_least(:once)
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(github_runner.installation).to receive(:cache_enabled).and_return(true)
-      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))])
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
@@ -412,6 +417,8 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+        echo #{JSON.generate({"ipv6" => true, "fixed-cidr-v6" => "2a01:4f8:10b:1a5f:3444::2:dc/124", "experimental" => false, "dns" => ["10.0.0.2", "fd00:0b1c:100d:53::"], "dns-opts" => ["single-request-reopen"]}).shellescape} | sudo tee /etc/docker/daemon.json
+        sudo systemctl restart docker
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment
       COMMAND
 
