@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe Clover, "vm" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   describe "unauthenticated" do
     it "not list" do
