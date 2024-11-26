@@ -42,20 +42,43 @@ class Clover < Roda
     rodauth.session_value
   end
 
+  def current_personal_access_token_id
+    rodauth.session["pat_id"]
+  end
+
+  private def each_authorization_id
+    return to_enum(:each_authorization_id) unless block_given?
+
+    yield current_account_id
+    if (pat_id = current_personal_access_token_id)
+      yield pat_id
+    end
+    nil
+  end
+
   def authorize(actions, object_id)
-    Authorization.authorize(current_account_id, actions, object_id)
+    each_authorization_id do |id|
+      Authorization.authorize(id, actions, object_id)
+    end
   end
 
   def has_permission?(actions, object_id)
-    Authorization.has_permission?(current_account_id, actions, object_id)
+    each_authorization_id.all? do |id|
+      Authorization.has_permission?(id, actions, object_id)
+    end
   end
 
   def all_permissions(actions)
-    Authorization.all_permissions(current_account_id, actions)
+    each_authorization_id.map do |id|
+      Authorization.all_permissions(id, actions)
+    end.reduce(:&)
   end
 
   def dataset_authorize(ds, actions)
-    ds.authorized(current_account_id, actions)
+    each_authorization_id do |id|
+      ds = ds.authorized(current_account_id, actions)
+    end
+    ds
   end
 
   def has_project_permission(actions)
