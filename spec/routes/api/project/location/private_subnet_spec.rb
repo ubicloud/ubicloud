@@ -5,7 +5,7 @@ require_relative "../../spec_helper"
 RSpec.describe Clover, "private_subnet" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 

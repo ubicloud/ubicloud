@@ -5,7 +5,7 @@ require_relative "../../spec_helper"
 RSpec.describe Clover, "vm" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:vm) do
     vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject

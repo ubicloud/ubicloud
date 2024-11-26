@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe Clover, "firewall" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:firewall) { Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(project) } }
 

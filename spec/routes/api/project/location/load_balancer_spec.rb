@@ -5,7 +5,7 @@ require_relative "../../spec_helper"
 RSpec.describe Clover, "load-balancer" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:lb) do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: LocationNameConverter.to_internal_name(TEST_LOCATION))
