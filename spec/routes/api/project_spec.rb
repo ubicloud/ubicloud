@@ -90,13 +90,20 @@ RSpec.describe Clover, "project" do
       end
 
       describe "delete" do
-        it "success" do
-          delete "/project/#{project.ubid}"
+        # You cannot currently delete a project using a personal access token,
+        # because the access/applied tags are considered dependencies, so an
+        # authorized request will return 409, and an unauthorized request will
+        # return 403.
+        unless use_pat
+          it "success" do
+            delete "/project/#{project.ubid}"
 
-          expect(last_response.status).to eq(204)
-          expect(Project[project.id].visible).to be_falsey
-          expect(AccessTag.where(project_id: project.id).count).to eq(0)
-          expect(AccessPolicy.where(project_id: project.id).count).to eq(0)
+            expect(last_response.status).to eq(204)
+
+            expect(Project[project.id].visible).to be_falsey
+            expect(AccessTag.where(project_id: project.id).count).to eq(0)
+            expect(AccessPolicy.where(project_id: project.id).count).to eq(0)
+          end
         end
 
         it "success with non-existing project" do
@@ -128,6 +135,28 @@ RSpec.describe Clover, "project" do
 
           expect(last_response.status).to eq(200)
           expect(JSON.parse(last_response.body)["name"]).to eq(project.name)
+        end
+
+        if use_pat
+          it "success with authorized personal access token" do
+            project = user.create_project_with_default_policy("project-1")
+            @pat.associate_with_project(project)
+            Authorization::ManagedPolicy::ManagedPolicyClass.new("pat-1", ["Project:view"]).apply(project, [@pat])
+
+            get "/project/#{project.ubid}"
+
+            expect(last_response.status).to eq(200)
+            expect(JSON.parse(last_response.body)["name"]).to eq(project.name)
+          end
+
+          it "failure with unauthorized personal access token" do
+            project = user.create_project_with_default_policy("project-1")
+            @pat.associate_with_project(project)
+            Authorization::ManagedPolicy::ManagedPolicyClass.new("pat-1", ["Project:edit"]).apply(project, [@pat])
+
+            get "/project/#{project.ubid}"
+            expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
+          end
         end
 
         it "not found" do

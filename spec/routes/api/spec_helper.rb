@@ -9,6 +9,7 @@ RSpec.configure do |config|
       unless (pat = account.api_keys.first)
         pat = ApiKey.create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api")
       end
+      @pat = pat
       header "Authorization", "Bearer pat-#{pat.ubid}-#{pat.key}"
     else
       post "/login", JSON.generate(login: email, password: password), {"CONTENT_TYPE" => "application/json"}
@@ -18,7 +19,14 @@ RSpec.configure do |config|
   end
 
   def project_with_default_policy(account, name: "project-1")
-    account.create_project_with_default_policy(name)
+    project = account.create_project_with_default_policy(name)
+
+    if @pat
+      @pat.associate_with_project(project)
+      Authorization::ManagedPolicy::Admin.apply(project, [@pat], append: true)
+    end
+
+    project
   end
 
   config.define_derived_metadata(file_path: %r{\A\./spec/routes/api/}) do |metadata|
