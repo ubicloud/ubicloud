@@ -17,7 +17,7 @@ class Clover
       # We prioritize scope over key, returning the cache for the first matching
       # key in the head branch scope, followed by the first matching key in
       # default branch scope.
-      scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch]
+      scopes = [runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]), repository.default_branch]
       scopes.compact!
       scopes.uniq!
 
@@ -90,8 +90,7 @@ class Clover
         size = r.params["cacheSize"]&.to_i
         fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if key.nil? || version.nil?
 
-        unless (scope = runner.workflow_job&.dig("head_branch"))
-          # YYYY: If the webhook not delivered yet, we can try to get the branch from the API
+        unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]))
           Clog.emit("The runner does not have a workflow job") { {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}} }
           fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
         end
