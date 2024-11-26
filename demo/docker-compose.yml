@@ -23,7 +23,7 @@ services:
       postgres:
         condition: service_healthy
     env_file: .env
-    command: rake dev_up
+    command: bundle exec rake dev_up
 
   app:
     image: ubicloud/ubicloud:latest
