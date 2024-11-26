@@ -275,6 +275,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       # Route ephemeral address to tap.
       r "ip -n #{q_vm} link set dev #{nic.tap} up"
       r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
+      r "ip -n #{q_vm} route del #{guest_ephemeral.to_s.shellescape} dev #{nic.tap}"
 
       # Route private subnet addresses to tap.
       ip6 = NetAddr::IPv6Net.parse(nic.net6)
