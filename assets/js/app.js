@@ -1,5 +1,6 @@
 $(function() {
   setupPolicyEditor();
+  setupPersonalAccessTokenValueDisplay();
   setupLocationBasedPrices();
   setupLocationBasedOptions();
   setupInstanceSizeBasedOptions();
@@ -140,6 +141,16 @@ function notification(message) {
     setTimeout(function () {
         newNotification.remove();
     }, 2000);
+}
+
+function setupPersonalAccessTokenValueDisplay() {
+  $("#show-token-values").on("click", function(event) {
+    if (event.target.checked) {
+      $('.token-value').removeClass("hidden");
+    } else {
+      $('.token-value').addClass("hidden");
+    }
+  });
 }
 
 function setupPolicyEditor() {
