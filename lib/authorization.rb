@@ -77,10 +77,21 @@ module Authorization
         {acls: [{subjects: Array(subjects), actions: actions, objects: Array(objects)}]}
       end
 
-      def apply(project, accounts, append: false)
+      def apply(project, accounts, append: false, remove_subjects: nil)
         subjects = accounts.map { _1&.hyper_tag(project) }.compact.map { _1.name }
-        if append && (existing_body = project.access_policies_dataset.where(name: name).select_map(:body).first)
-          subjects = (subjects + existing_body["acls"].first["subjects"]).uniq
+        if append || remove_subjects
+          if (existing_body = project.access_policies_dataset.where(name: name).select_map(:body).first)
+            existing_subjects = existing_body["acls"].first["subjects"]
+
+            case remove_subjects
+            when Array
+              existing_subjects = existing_subjects.reject { remove_subjects.include?(_1) }
+            when String
+              existing_subjects = existing_subjects.reject { _1.start_with?(remove_subjects) }
+            end
+            subjects = existing_subjects + subjects
+            subjects.uniq!
+          end
         end
         object = project.hyper_tag_name(project)
         acls = self.acls(subjects, object).to_json
