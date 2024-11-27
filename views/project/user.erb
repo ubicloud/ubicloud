@@ -157,7 +157,14 @@
           Personal Access Tokens
         </h3>
       </div>
+      <div class="mb-2 md:mb-0">
+        <form id="create-pat" action="<%= "#{@project_data[:path]}/user/token" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}/user/token") %>
+          <%== render("components/form/submit_button", locals: { text: "Create Token" }) %>
+        </form>
+      </div>
     </div>
+
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <% unless @tokens.empty? %>
         <form id="managed-token" action="<%= "#{@project_data[:path]}/user/token/update-policies" %>" role="form" method="POST">
@@ -208,12 +215,6 @@
           </div>
         </form>
       <% end %>
-      <div class="px-4 py-5 sm:p-6">
-        <form id="create-pat" action="<%= "#{@project_data[:path]}/user/token" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}/user/token") %>
-          <%== render("components/form/submit_button", locals: { text: "Create Personal Access Token" }) %>
-        </form>
-      </div>
     </div>
   </div>
   <!-- Advanced Policy Editor -->
