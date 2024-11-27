@@ -19,6 +19,10 @@ class ApiKey < Sequel::Model
     UBID::TYPE_ETC
   end
 
+  def self.create_personal_access_token(account, project: nil)
+    create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api")
+  end
+
   def self.create_with_id(owner_table:, owner_id:, used_for:)
     unless %w[project inference_endpoint accounts].include?(owner_table.to_s)
       fail "Invalid owner_table: #{owner_table}"
