@@ -131,6 +131,13 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       nx.cleanup_cache
     end
 
+    it "excludes uncommitted cache entries" do
+      twelve_gib_cache = create_cache_entry(created_at: Time.now - 10 * 60, size: 12 * 1024 * 1024 * 1024)
+      create_cache_entry(created_at: Time.now - 13 * 60, size: nil)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: twelve_gib_cache.blob_key)
+      nx.cleanup_cache
+    end
+
     it "deletes oldest cache entries if the total usage exceeds the custom limit" do
       github_repository.installation.project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerCacheStorage"]["id"], value: 20)
       nine_gib_cache = create_cache_entry(created_at: Time.now - 10 * 60, size: 19 * 1024 * 1024 * 1024)
