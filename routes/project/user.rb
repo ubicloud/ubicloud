@@ -117,31 +117,28 @@ class Clover
         end
       end
 
-      r.is String do |user_ubid|
-        user = Account.from_ubid(user_ubid)
+      r.delete String do |user_ubid|
+        next unless (user = Account.from_ubid(user_ubid))
 
-        unless user
-          response.status = 404
-          r.halt
+        unless @project.accounts.count > 1
+          response.status = 400
+          next {error: {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}}
         end
 
-        r.delete true do
-          unless @project.accounts.count > 1
-            response.status = 400
-            return {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}
+        hyper_tag = user.hyper_tag_name(@project)
+        @project.access_policies_dataset.where(managed: true).each do |policy|
+          if policy.body["acls"].first["subjects"].include?(hyper_tag)
+            policy.body["acls"].first["subjects"].delete(hyper_tag)
+            policy.modified!(:body)
+            policy.save_changes
           end
-          hyper_tag = user.hyper_tag_name(@project)
-          @project.access_policies_dataset.where(managed: true).each do |policy|
-            if policy.body["acls"].first["subjects"].include?(hyper_tag)
-              policy.body["acls"].first["subjects"].delete(hyper_tag)
-              policy.modified!(:body)
-              policy.save_changes
-            end
-          end
-          user.dissociate_with_project(@project)
-
-          return {message: "Removing #{user.email} from #{@project.name}"}
         end
+        user.dissociate_with_project(@project)
+
+        # Javascript refreshes page
+        flash["notice"] = "Removed #{user.email} from #{@project.name}"
+        response.status = 204
+        nil
       end
     end
   end

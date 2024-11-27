@@ -244,7 +244,11 @@ RSpec.describe Clover, "project" do
         btn = find "#user-#{user2.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Removing #{user2.email} from #{project.name}"}.to_json)
+        expect(page.body).to be_empty
+
+        visit "#{project.path}/user"
+        expect(page).to have_content user.email
+        expect(page.find_by_id("flash-notice").text).to eq("Removed #{user2.email} from #{project.name}")
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
@@ -335,8 +339,8 @@ RSpec.describe Clover, "project" do
         # UI tests run without a JavaScript enginer.
         btn = find "#user-#{user.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.body).to eq({message: "You can't remove the last user from '#{project.name}' project. Delete project instead."}.to_json)
+        expect(page.status_code).to eq(400)
+        expect(page.body).to eq({error: {message: "You can't remove the last user from '#{project.name}' project. Delete project instead."}}.to_json)
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
