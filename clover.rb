@@ -74,7 +74,7 @@ class Clover < Roda
       message: "Sorry, we couldn’t find the resource you’re looking for."
     }
 
-    if api?
+    if api? || request.headers["Accept"] == "application/json"
       {error: @error}.to_json
     else
       view "/error"
