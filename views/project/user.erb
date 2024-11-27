@@ -165,7 +165,8 @@
           <table class="min-w-full divide-y divide-gray-300">
             <thead class="bg-gray-50">
               <tr>
-                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Token ID</th>
+                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">ID</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Token</th>
                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Access Policy</th>
                 <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
               </tr>
@@ -174,7 +175,10 @@
               <% @tokens.each do |token| %>
                 <tr id="token-<%= token.ubid %>">
                   <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                    <span class="token-value hidden">pat-</span><%= token.ubid %><span class="token-value hidden">-<%= token.key %></span>
+                    <%= token.ubid %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <%== render("components/revealable_content", locals: { content: "pat-#{token.ubid}-#{token.key}" }) %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     <%== render(
@@ -201,8 +205,6 @@
           </table>
           <div class="px-4 py-5 sm:p-6">
             <%== render("components/form/submit_button", locals: { text: "Update Personal Access Token Policies" }) %>
-            <label class="ml-10">Show Personal Access Token Values
-              <input type="checkbox" id="show-token-values"/></label>
           </div>
         </form>
       <% end %>
