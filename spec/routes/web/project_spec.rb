@@ -246,6 +246,14 @@ RSpec.describe Clover, "project" do
 
         expect(page.body).to be_empty
 
+        DB.transaction(rollback: :always) do
+          DB[:account_password_hashes].where(id: user2.id).delete(force: true)
+          user2.destroy
+          page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}, "HTTP_ACCEPT" => "application/json"
+          expect(page.status_code).to eq(404)
+          expect(JSON.parse(page.body).dig("error", "code")).to eq(404)
+        end
+
         visit "#{project.path}/user"
         expect(page).to have_content user.email
         expect(page.find_by_id("flash-notice").text).to eq("Removed #{user2.email} from #{project.name}")
