@@ -6,17 +6,23 @@ class Clover
       authorize("Project:user", @project.id)
 
       r.get true do
-        @user_policies = @project.access_policies_dataset.where(managed: true).flat_map do |policy|
-          policy.body["acls"].first["subjects"].map do |subject|
+        @user_policies = {}
+        @token_policies = {}
+        @tokens = current_account.api_keys
+        @project.access_policies_dataset.where(managed: true).each do |policy|
+          policy.body["acls"].first["subjects"].each do |subject|
             # We plan to convert tags to UBIDs in our access policies while
             # persisting them. Until this change is implemented, we must locate
             # the access tag by its name. I opted for Ruby's 'find' method over
             # 'dataset' to repeatedly use cached data.
             if (account = Account[@project.access_tags.find { _1.name == subject }&.hyper_tag_id])
-              [account.ubid, policy.name]
+              @user_policies[account.ubid] = policy.name
+            end
+            if (token = @tokens.find { _1.hyper_tag_name == subject })
+              @token_policies[token.ubid] = policy.name
             end
           end
-        end.compact.to_h
+        end
         @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
         @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
         @policy = Serializers::AccessPolicy.serialize(@project.access_policies_dataset.where(managed: false).first) || {body: {acls: []}.to_json}
@@ -64,6 +70,34 @@ class Clover
         r.redirect "#{@project.path}/user"
       end
 
+      r.on "token" do
+        r.post true do
+          pat = DB.transaction { ApiKey.create_personal_access_token(current_account, project: @project) }
+          flash["notice"] = "Created personal access token with id #{pat.ubid}"
+          r.redirect "#{@project.path}/user"
+        end
+
+        r.post "update-policies" do
+          token_policies = r.params["token_policies"] || {}
+          existing_tokens = current_account.api_keys.map(&:hyper_tag_name)
+          [Authorization::ManagedPolicy::Admin, Authorization::ManagedPolicy::Member].each do |policy|
+            tokens = token_policies.select { _2 == policy.name }.keys.map { ApiKey[owner_id: current_account_id, id: UBID.to_uuid(_1)] }
+            # Do not modify existing user subjects or api_key subjects for other accounts
+            policy.apply(@project, tokens, remove_subjects: existing_tokens) unless tokens.empty?
+          end
+
+          flash["notice"] = "Personal access token policies updated successfully."
+
+          r.redirect "#{@project.path}/user"
+        end
+
+        r.delete String do |ubid|
+          current_account.api_keys_dataset.with_pk(UBID.to_uuid(ubid))&.destroy
+          response.status = 204
+          nil
+        end
+      end
+
       r.on "policy" do
         r.post "managed" do
           user_policies = r.params["user_policies"] || {}
@@ -75,7 +109,8 @@ class Clover
               flash["error"] = "The project must have at least one admin."
               redirect_back_with_inputs
             end
-            policy.apply(@project, accounts)
+            # Do not modify existing api_token subjects
+            policy.apply(@project, accounts, remove_subjects: "user/")
           end
           invitation_policies = r.params["invitation_policies"] || {}
           invitation_policies.each do |email, policy|
