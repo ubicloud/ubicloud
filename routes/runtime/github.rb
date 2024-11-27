@@ -39,8 +39,7 @@ class Clover
       #   for a restore key, the action returns the most recently created cache.
       entry ||= dataset
         .grep(:key, keys.map { |key| "#{DB.dataset.escape_like(key)}%" })
-        .reverse(:created_at)
-        .first
+        .min_by { |e| keys.find_index { |k| e.key.start_with?(k) } + (scopes.index(e.scope) * keys.size) }
 
       fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
 
