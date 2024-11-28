@@ -17,7 +17,9 @@ class Clover
       # We prioritize scope over key, returning the cache for the first matching
       # key in the head branch scope, followed by the first matching key in
       # default branch scope.
-      scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
+      scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch]
+      scopes.compact!
+      scopes.uniq!
 
       dataset = repository.cache_entries_dataset
         .exclude(committed_at: nil)
