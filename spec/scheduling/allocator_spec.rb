@@ -860,11 +860,11 @@ RSpec.describe Al do
       expect(slice.allowed_cpus).to eq("6-7,12-13")
     end
 
-    it "places a burstable vm in an existing slice" do
+    it "places a burstable vm in an new slice" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16)
-      vh.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
-      vh.update(total_cores: 4, total_cpus: 8, used_cores: 3, total_hugepages_1g: 27, used_hugepages_1g: 18)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-3", memory_1g: 8, type: "shared")
+      vh.vm_host_slices[0].update(used_cpu_percent: 200, used_memory_1g: 8, enabled: true)
+      vh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
       vh.reload
 
       vm = create_vm_with_project(family: "burstable", use_slices: true, cores: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
@@ -877,13 +877,13 @@ RSpec.describe Al do
       slice = vm.vm_host_slice
       expect(slice).not_to be_nil
       expect(slice.id).not_to eq(vh.vm_host_slices[0].id)
-      expect(slice.allowed_cpus).to eq("6-7")
+      expect(slice.allowed_cpus).to eq("4-5")
       expect(vh.vm_host_slices.size).to eq(2)
     end
 
     it "places a burstable vm in an existing slice" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
       Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "6-7", memory_1g: 8, type: "shared")
       vh.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
       vh.vm_host_slices[1].update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)
@@ -905,6 +905,36 @@ RSpec.describe Al do
       slice = vm.vm_host_slice
       expect(slice).not_to be_nil
       expect(slice.id).to eq(vh.vm_host_slices[1].id)
+    end
+
+    it "prefers a host with available slice for burstables" do
+      vh1 = VmHost.first
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh1, allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh1, allowed_cpus: "6-7", memory_1g: 8, type: "shared")
+      vh1.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true) # Full
+      vh1.vm_host_slices[1].update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)  # Partially filled in
+      vh1.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
+      vh1.reload
+
+      # Create a second host
+      vh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "hetzner-fsn1", total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fcc::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vh2.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vh2.id, version: "v1", allocation_weight: 100) { _1.id = vh2.id }
+      Address.create_with_id(cidr: "1.1.2.0/30", routed_to_host_id: vh2.id)
+      PciDevice.create_with_id(vm_host_id: vh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      vh2.update(used_cores: 4, used_hugepages_1g: 26)
+      vh2.reload
+
+      # Expect the first host to be picked, to fill in the available slice
+      vm = create_vm_with_project(family: "burstable", use_slices: true, cores: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, can_share_slice: vm.can_share_slice?))
+      expect(al).not_to be_nil
+
+      al.update(vm)
+      expect(vm.vm_host.id).to eq(vh1.id)
     end
   end
 

@@ -242,6 +242,11 @@ module Scheduling::Allocator
       # penalty for ongoing vm provisionings on the host
       score += @candidate_host[:vm_provisioning_count] * 0.5
 
+      # penalty if we are trying to allocate into an shared slice but host has none
+      if @request.can_share_slice
+        score += 0.5 if @candidate_host[:slice_cpu_available] == 0 || @candidate_host[:slice_memory_available] == 0
+      end
+
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32
 
@@ -301,10 +306,11 @@ module Scheduling::Allocator
     end
 
     def utilization
-      # if we found an existing slice, set utilization to 0 to help select this host
-      return 0 unless @existing_slice.nil?
+      # if we found an existing slice, return the desired utilization
+      # to make this a preferred choice
+      return @request.target_host_utilization unless @existing_slice.nil?
 
-      # otherwise, compute the score based on combined CPU and Memory utilization
+      # otherwise, compute the score based on combined CPU and Memory utilization, as usual
       util = @vm_host_allocations.map { _1.utilization }
       util.sum.fdiv(util.size)
     end
