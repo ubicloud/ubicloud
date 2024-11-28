@@ -34,7 +34,7 @@
         ["Name", @vm[:name]],
         ["Location", @vm[:location]],
         ["Size", @vm[:size]],
-        ["Storage", "#{@vm[:storage_size_gib]}GB"],
+        ["Storage", (@vm[:storage_size_gib] > 0) ? "#{@vm[:storage_size_gib]} GB" : nil],
         ["IPv4", @vm[:ip4], { copieble: true }],
         ["IPv6", @vm[:ip6], { copieble: true }],
         [
