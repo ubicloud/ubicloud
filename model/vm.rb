@@ -80,6 +80,26 @@ class Vm < Sequel::Model
     memory_gib
   end
 
+  def use_slices_for_allocation?
+    projects.first.get_ff_use_slices_for_allocation || false
+  end
+
+  # TODO-MACIEK - reconcile all cpus/cores logic in one place, maybe with VmSize
+  def can_share_slice?
+    can = false
+
+    # only return true if use_slices_for_allocation is enabled
+    if use_slices_for_allocation?
+      if arch == "arm64"
+        can = cores * 100 > cpu_percent_limit
+      elsif arch == "x64"
+        can = cores * 200 > cpu_percent_limit
+      end
+    end
+
+    can
+  end
+
   # cloud-hypervisor takes topology information in this format:
   #
   # topology=<threads_per_core>:<cores_per_die>:<dies_per_package>:<packages>
@@ -155,6 +175,8 @@ class Vm < Sequel::Model
     # in description of non-SMT processors, is having "standard-2"
     # be the smallest unit of product is also noisier than
     # "standard-1".
+    #
+    # TODO-MACIEK - change that for burstable
     "#{family}-#{cores * 2}"
   end
 

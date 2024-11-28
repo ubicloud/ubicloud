@@ -497,10 +497,10 @@ class Prog::Vm::Nexus < Prog::Base
     # Trigger the slice deletion if this is a
     # dedicated slice for this VM
     # We do not need to wait for this to complete
-    #
-    # TODO-MACIEK - update here for shared slices - the last VM deletes the slice
     unless slice.nil?
-      if slice.type == "dedicated" && slice.enabled
+      slice.reload
+      if slice.enabled &&
+          (slice.type == "dedicated" || (slice.type == "shared" && slice.vms.count == 0))
         slice.incr_destroy
       end
     end

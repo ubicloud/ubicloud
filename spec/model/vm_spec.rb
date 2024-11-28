@@ -44,6 +44,38 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#can_share_slice?" do
+    let(:project) {
+      instance_double(
+        Project
+      )
+    }
+
+    before do
+      allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(true)
+      allow(vm).to receive_messages(projects: [project])
+    end
+
+    it "handles x64 arch" do
+      vm.arch = "x64"
+      vm.cpu_percent_limit = 200
+      vm.cores = 1
+      expect(vm.can_share_slice?).to be_falsey
+    end
+
+    it "handles arm64 arch" do
+      vm.arch = "arm64"
+      vm.cpu_percent_limit = 50
+      vm.cores = 1
+      expect(vm.can_share_slice?).to be_truthy
+    end
+
+    it "handles random arch" do
+      vm.arch = "foo"
+      expect(vm.can_share_slice?).to be_falsey
+    end
+  end
+
   describe "#cloud_hypervisor_cpu_topology" do
     it "scales a single-socket hyperthreaded system" do
       vm.family = "standard"

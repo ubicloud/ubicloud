@@ -59,6 +59,12 @@ module Option
     VmSize.new("standard-#{_1}", "standard", _1, _1 * 100, 0, (_1 * 3.2).to_i, storage_size_options, false, false, "arm64")
   }).concat([6].map {
     VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, _1 * 100, _1, (_1 * 5.34).to_i, [_1 * 30], false, true, "x64")
+  }).concat([[2, 50], [2, 100]].map {
+    storage_size_options = [_1[1] * 20 / 100, _1[1] * 40 / 100]
+    VmSize.new("burstable-#{_1[0]}-#{_1[1]}", "burstable", _1[0], _1[1], _1[1], _1[1] * 4 / 100, storage_size_options, false, false, "x64")
+  }).concat([[2, 50], [2, 100]].map {
+    storage_size_options = [_1[1] * 20 / 100, _1[1] * 40 / 100]
+    VmSize.new("burstable-#{_1[0]}-#{_1[1]}", "burstable", _1[0], _1[1], _1[1], (_1[1] * 3.2 / 100).to_i, storage_size_options, false, false, "arm64")
   }).freeze
 
   PostgresSize = Struct.new(:location, :name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do

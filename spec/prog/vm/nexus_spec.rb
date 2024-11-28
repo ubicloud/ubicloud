@@ -860,6 +860,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "destroys slice with a slice" do
       vm_host_slice = instance_double(VmHostSlice)
       expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice)
+      expect(vm_host_slice).to receive(:reload)
       expect(vm_host_slice).to receive(:enabled).and_return(true)
       expect(vm_host_slice).to receive(:type).and_return("dedicated")
       expect(vm_host_slice).to receive(:incr_destroy)
@@ -872,8 +873,8 @@ RSpec.describe Prog::Vm::Nexus do
     it "skips destroy slice when slice already disabled" do
       vm_host_slice = instance_double(VmHostSlice)
       expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice)
+      expect(vm_host_slice).to receive(:reload)
       expect(vm_host_slice).to receive(:enabled).and_return(false)
-      expect(vm_host_slice).to receive(:type).and_return("dedicated")
 
       expect(vm).to receive(:destroy).and_return(true)
 

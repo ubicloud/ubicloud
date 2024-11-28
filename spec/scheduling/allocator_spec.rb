@@ -57,10 +57,10 @@ RSpec.describe Al do
       al = instance_double(Al::Allocation)
       expect(Al::Allocation).to receive(:best_allocation)
         .with(Al::Request.new(
-          "2464de61-7501-8374-9ab0-416caebe31da", 1, 8, 33,
+          "2464de61-7501-8374-9ab0-416caebe31da", 1, 200, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-          "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [], false
+          "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [], false, false
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -71,10 +71,10 @@ RSpec.describe Al do
   describe "candidate_selection" do
     let(:req) {
       Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
+        "2464de61-7501-8374-9ab0-416caebe31da", 2, 400, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false
+        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false, false
       )
     }
 
@@ -286,10 +286,10 @@ RSpec.describe Al do
   describe "Allocation" do
     let(:req) {
       Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
+        "2464de61-7501-8374-9ab0-416caebe31da", 2, 400, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false
+        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false, false
       )
     }
     let(:vmhds) {
@@ -426,10 +426,10 @@ RSpec.describe Al do
   describe "StorageAllocation" do
     let(:req) {
       Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 2, 8, 33,
+        "2464de61-7501-8374-9ab0-416caebe31da", 2, 400, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], [], false
+        "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], [], false, false
       )
     }
     let(:vmhds) {
@@ -506,10 +506,11 @@ RSpec.describe Al do
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
     end
 
-    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false)
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false)
       Al::Request.new(
         vm.id,
         vm.cores,
+        vm.cpu_percent_limit,
         vm.mem_gib,
         storage_volumes.map { _1["size_gib"] }.sum,
         storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
@@ -524,7 +525,8 @@ RSpec.describe Al do
         host_exclusion_filter,
         location_filter,
         location_preference,
-        use_slices
+        use_slices,
+        can_share_slice
       )
     end
 
@@ -745,10 +747,11 @@ RSpec.describe Al do
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
     end
 
-    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false)
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false)
       Al::Request.new(
         vm.id,
         vm.cores,
+        vm.cpu_percent_limit,
         vm.mem_gib,
         storage_volumes.map { _1["size_gib"] }.sum,
         storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
@@ -763,7 +766,8 @@ RSpec.describe Al do
         host_exclusion_filter,
         location_filter,
         location_preference,
-        use_slices
+        use_slices,
+        can_share_slice
       )
     end
 
@@ -772,6 +776,7 @@ RSpec.describe Al do
 
       allocation = Scheduling::Allocator::VmHostSliceAllocation.new(nil, nil, invalid_host_allocators)
       expect(allocation.is_valid).to be_falsy
+      expect { allocation.update(nil, nil) }.to raise_error RuntimeError, "BUGBUG: must have an allocated cpuset at this point"
     end
 
     it "slice allocation fails on overbooked host" do
@@ -853,6 +858,53 @@ RSpec.describe Al do
       slice = vm.vm_host_slice
       expect(slice).not_to be_nil
       expect(slice.allowed_cpus).to eq("6-7,12-13")
+    end
+
+    it "places a burstable vm in an existing slice" do
+      vh = VmHost.first
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16)
+      vh.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
+      vh.update(total_cores: 4, total_cpus: 8, used_cores: 3, total_hugepages_1g: 27, used_hugepages_1g: 18)
+      vh.reload
+
+      vm = create_vm_with_project(family: "burstable", use_slices: true, cores: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, can_share_slice: vm.can_share_slice?))
+      expect(al).not_to be_nil
+
+      al.update(vm)
+      vh.reload
+
+      slice = vm.vm_host_slice
+      expect(slice).not_to be_nil
+      expect(slice.id).not_to eq(vh.vm_host_slices[0].id)
+      expect(slice.allowed_cpus).to eq("6-7")
+      expect(vh.vm_host_slices.size).to eq(2)
+    end
+
+    it "places a burstable vm in an existing slice" do
+      vh = VmHost.first
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "6-7", memory_1g: 8, type: "shared")
+      vh.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
+      vh.vm_host_slices[1].update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)
+      vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
+      vh.reload
+
+      vm = create_vm_with_project(family: "burstable", use_slices: true, cores: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      req = create_req(vm, vol, use_slices: true, can_share_slice: vm.can_share_slice?)
+
+      candidates = Al::Allocation.candidate_hosts(req)
+      expect(candidates.size).to eq(1)
+
+      al = Al::Allocation.new(candidates[0], req)
+      expect(al.is_valid).to be_truthy
+
+      al.update(vm)
+      vh.reload
+
+      slice = vm.vm_host_slice
+      expect(slice).not_to be_nil
+      expect(slice.id).to eq(vh.vm_host_slices[1].id)
     end
   end
 
