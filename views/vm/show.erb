@@ -35,7 +35,7 @@
         ["Location", @vm[:location]],
         ["Size", @vm[:size]],
         ["Storage", (@vm[:storage_size_gib] > 0) ? "#{@vm[:storage_size_gib]} GB" : nil],
-        ["IPv4", @vm[:ip4], { copieble: true }],
+        ["IPv4", @vm[:ip4_enabled] ? @vm[:ip4] : "Not enabled", { copieble: @vm[:ip4_enabled] }],
         ["IPv6", @vm[:ip6], { copieble: true }],
         [
           "SSH Command",
