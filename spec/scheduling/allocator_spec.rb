@@ -57,7 +57,7 @@ RSpec.describe Al do
       al = instance_double(Al::Allocation)
       expect(Al::Allocation).to receive(:best_allocation)
         .with(Al::Request.new(
-          "2464de61-7501-8374-9ab0-416caebe31da", 1, 200, 8, 33,
+          "2464de61-7501-8374-9ab0-416caebe31da", "standard", 1, 200, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
           "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [], false, false
@@ -71,7 +71,7 @@ RSpec.describe Al do
   describe "candidate_selection" do
     let(:req) {
       Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 2, 400, 8, 33,
+        "2464de61-7501-8374-9ab0-416caebe31da", "standard", 2, 400, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false, false
@@ -286,7 +286,7 @@ RSpec.describe Al do
   describe "Allocation" do
     let(:req) {
       Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 2, 400, 8, 33,
+        "2464de61-7501-8374-9ab0-416caebe31da", "standard", 2, 400, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false, false
@@ -426,7 +426,7 @@ RSpec.describe Al do
   describe "StorageAllocation" do
     let(:req) {
       Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", 2, 400, 8, 33,
+        "2464de61-7501-8374-9ab0-416caebe31da", "standard", 2, 400, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], [], false, false
@@ -509,6 +509,7 @@ RSpec.describe Al do
     def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false)
       Al::Request.new(
         vm.id,
+        vm.family,
         vm.cores,
         vm.cpu_percent_limit,
         vm.mem_gib,
@@ -750,6 +751,7 @@ RSpec.describe Al do
     def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false)
       Al::Request.new(
         vm.id,
+        vm.family,
         vm.cores,
         vm.cpu_percent_limit,
         vm.mem_gib,
@@ -781,8 +783,8 @@ RSpec.describe Al do
 
     it "slice allocation fails on overbooked host" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-7", memory_1g: 24)
-      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "8-15", memory_1g: 32)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-7", memory_1g: 24)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: "8-15", memory_1g: 32)
 
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       expect(al).to be_nil
@@ -847,8 +849,8 @@ RSpec.describe Al do
 
     it "finds a disjoined cpuset" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16)
-      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "8-11", memory_1g: 16)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_1g: 16)
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: "8-11", memory_1g: 16)
 
       vm = create_vm_with_project(use_slices: true, cores: 2, memory_gib: 16, cpu_percent_limit: 400)
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
@@ -862,7 +864,7 @@ RSpec.describe Al do
 
     it "places a burstable vm in an new slice" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-3", memory_1g: 8, type: "shared")
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "burstable", allowed_cpus: "2-3", memory_1g: 8, type: "shared")
       vh.vm_host_slices[0].update(used_cpu_percent: 200, used_memory_1g: 8, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
       vh.reload
@@ -883,8 +885,8 @@ RSpec.describe Al do
 
     it "places a burstable vm in an existing slice" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
-      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, allowed_cpus: "6-7", memory_1g: 8, type: "shared")
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, family: "burstable", allowed_cpus: "6-7", memory_1g: 8, type: "shared")
       vh.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
       vh.vm_host_slices[1].update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
@@ -909,8 +911,8 @@ RSpec.describe Al do
 
     it "prefers a host with available slice for burstables" do
       vh1 = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh1, allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
-      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh1, allowed_cpus: "6-7", memory_1g: 8, type: "shared")
+      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh1, family: "standard", allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
+      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh1, family: "burstable", allowed_cpus: "6-7", memory_1g: 8, type: "shared")
       vh1.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true) # Full
       vh1.vm_host_slices[1].update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)  # Partially filled in
       vh1.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)

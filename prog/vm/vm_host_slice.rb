@@ -5,9 +5,10 @@ class Prog::Vm::VmHostSlice < Prog::Base
 
   semaphore :destroy, :start_after_host_reboot
 
-  def self.assemble_with_host(name, vm_host, allowed_cpus:, memory_1g:, type: "dedicated")
+  def self.assemble_with_host(name, vm_host, family:, allowed_cpus:, memory_1g:, type: "dedicated")
     fail "Must provide a VmHost." if vm_host.nil?
     fail "Must provide slice name." if name.nil? || name.empty?
+    fail "Must provide family name." if family.nil? || family.empty?
     fail "Slice name cannot be 'user' or 'system'." if name == "user" || name == "system"
     fail "Slice name cannot contain a hyphen (-)." if name.include?("-")
 
@@ -17,6 +18,7 @@ class Prog::Vm::VmHostSlice < Prog::Base
       vm_host_slice = VmHostSlice.create(
         name: name,
         type: type,
+        family: family,
         allowed_cpus: 0,
         cores: 0,
         total_cpu_percent: 0,

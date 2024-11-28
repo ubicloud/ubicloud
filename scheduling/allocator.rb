@@ -15,6 +15,7 @@ module Scheduling::Allocator
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
+      vm.family,
       vm.cores,
       vm.cpu_percent_limit,
       vm.mem_gib,
@@ -41,7 +42,7 @@ module Scheduling::Allocator
     Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
   end
 
-  Request = Struct.new(:vm_id, :cores, :cpu_percent_limit, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
+  Request = Struct.new(:vm_id, :family, :cores, :cpu_percent_limit, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
     :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference,
     :use_slices, :can_share_slice)
 
@@ -324,6 +325,7 @@ module Scheduling::Allocator
         st = Prog::Vm::VmHostSlice.assemble_with_host(
           "#{vm.family}_#{vm.inhost_name}",
           vm_host,
+          family: vm.family,
           allowed_cpus: @new_slice_allowed_cpus,
           memory_1g: vm.mem_gib_ratio * @request.cores,
           type: vm.can_share_slice? ? "shared" : "dedicated"
@@ -351,7 +353,8 @@ module Scheduling::Allocator
           .select {
             (_1.used_cpu_percent + @request.cpu_percent_limit <= _1.total_cpu_percent) &&
               (_1.used_memory_1g + @request.mem_gib <= _1.total_memory_1g) &&
-              (_1.cores == @request.cores)
+              (_1.cores == @request.cores) &&
+              (_1.family == @request.family)
           }
           .min_by { _1.used_cpu_percent }
       end
