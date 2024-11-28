@@ -22,6 +22,13 @@ $(".toggle-mobile-menu").on("click", function (event) {
     }
 });
 
+$(".cache-group-row").on("click", function (event) {
+  let repository = $(this).data("repository");
+  $(this).toggleClass("active");
+  $(".cache-group-" + repository).toggleClass("hidden");
+});
+
+
 $(document).click(function(){
   $(".dropdown").removeClass("active");
 });

@@ -44,9 +44,9 @@ class Clover
       r.on "cache" do
         r.get true do
           repository_id_q = @project.github_installations_dataset.join(:github_repository, installation_id: :id).select(Sequel[:github_repository][:id])
-          @entries = Serializers::GithubCacheEntry.serialize(GithubCacheEntry.where(repository_id: repository_id_q).exclude(committed_at: nil).eager(:repository).order(Sequel.desc(:created_at)).all)
-          @total_usage = Serializers::GithubCacheEntry.humanize_size(@entries.filter_map { _1[:size] }.sum)
-          @total_quota = "#{@project.effective_quota_value("GithubRunnerCacheStorage")} GB"
+          entries = GithubCacheEntry.where(repository_id: repository_id_q).exclude(committed_at: nil).eager(:repository).reverse(:created_at).all
+          @entries_by_repo = Serializers::GithubCacheEntry.serialize(entries).group_by { _1[:repository][:id] }
+          @quota_per_repo = "#{@project.effective_quota_value("GithubRunnerCacheStorage")} GB"
 
           view "github/cache"
         end
