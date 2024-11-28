@@ -84,20 +84,8 @@ class Vm < Sequel::Model
     projects.first.get_ff_use_slices_for_allocation || false
   end
 
-  # TODO-MACIEK - reconcile all cpus/cores logic in one place, maybe with VmSize
   def can_share_slice?
-    can = false
-
-    # only return true if use_slices_for_allocation is enabled
-    if use_slices_for_allocation?
-      if arch == "arm64"
-        can = cores * 100 > cpu_percent_limit
-      elsif arch == "x64"
-        can = cores * 200 > cpu_percent_limit
-      end
-    end
-
-    can
+    use_slices_for_allocation? && (cpus * 100) > cpu_percent_limit
   end
 
   # cloud-hypervisor takes topology information in this format:
@@ -313,6 +301,7 @@ end
 #  memory_gib              | integer                  |
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
+#  cpus                    | integer                  |
 # Indexes:
 #  vm_pkey               | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)

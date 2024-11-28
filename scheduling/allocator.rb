@@ -346,9 +346,8 @@ module Scheduling::Allocator
     def calculate_cpu_bitmask
       if @request&.can_share_slice
         vm_host = VmHost[@candidate_host[:vm_host_id]]
-        # Try to find an existing slice with some room
-        # TODO-MACIEK make sure family matches here
 
+        # Try to find an existing slice with some room
         @existing_slice = vm_host.vm_host_slices
           .select {
             (_1.used_cpu_percent + @request.cpu_percent_limit <= _1.total_cpu_percent) &&

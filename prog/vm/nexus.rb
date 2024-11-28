@@ -87,19 +87,13 @@ class Prog::Vm::Nexus < Prog::Base
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
 
-      cores = if arch == "arm64"
-        vm_size.vcpu
-      else
-        # TODO-MACIEK: Is it OK that this is hardcoded like this?
-        vm_size.vcpu / 2
-      end
-
       vm = Vm.create(
         public_key: public_key,
         unix_user: unix_user,
         name: name,
         family: vm_size.family,
-        cores: cores,
+        cores: vm_size.cores,
+        cpus: vm_size.vcpu,
         cpu_percent_limit: vm_size.vcpu_percent_limit,
         cpu_burst_percent_limit: vm_size.vcpu_burst_percent_limit,
         memory_gib: vm_size.memory,
