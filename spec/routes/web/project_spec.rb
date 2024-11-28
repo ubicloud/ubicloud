@@ -306,6 +306,10 @@ RSpec.describe Clover, "project" do
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         visit "#{project.path}/user"
+        expect(page.find_by_id("flash-notice").text).to eq("Invitation for '#{invited_email}' is removed successfully.")
+
+        visit "#{project.path}/user"
+        expect(page).to have_no_content invited_email
         expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
