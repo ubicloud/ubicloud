@@ -107,14 +107,12 @@ class Clover
         end
       end
 
-      r.on "invitation" do
-        r.is String do |email|
-          r.delete true do
-            @project.invitations_dataset.where(email: email).destroy
-            flash["notice"] = "Invitation for '#{email}' is removed successfully."
-            r.halt
-          end
-        end
+      r.delete "invitation", String do |email|
+        @project.invitations_dataset.where(email: email).destroy
+        # Javascript handles redirect
+        flash["notice"] = "Invitation for '#{email}' is removed successfully."
+        response.status = 204
+        nil
       end
 
       r.delete String do |user_ubid|
