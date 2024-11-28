@@ -27,6 +27,35 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#display_size" do
+    let(:project) {
+      instance_double(
+        Project
+      )
+    }
+
+    before do
+      allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(true)
+      allow(vm).to receive_messages(projects: [project])
+    end
+
+    it "handles standard family" do
+      vm.arch = "x64"
+      vm.family = "standard"
+      vm.cpus = 2
+      vm.cpu_percent_limit = 200
+      expect(vm.display_size).to eq("standard-2")
+    end
+
+    it "handles burstable family" do
+      vm.arch = "arm64"
+      vm.family = "burstable"
+      vm.cpus = 2
+      vm.cpu_percent_limit = 50
+      expect(vm.display_size).to eq("burstable-2-50")
+    end
+  end
+
   describe "#mem_gib_ratio" do
     it "handles standard family" do
       vm.family = "standard"
