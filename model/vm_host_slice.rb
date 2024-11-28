@@ -144,6 +144,7 @@ end
 #  used_memory_1g    | integer                  | NOT NULL
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  vm_host_id        | uuid                     |
+#  family            | text                     |
 # Indexes:
 #  vm_host_slice_pkey | PRIMARY KEY btree (id)
 # Check constraints:
