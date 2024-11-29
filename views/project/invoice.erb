@@ -1,4 +1,4 @@
-<% @page_title = "#{@invoice_data[:name]} - Invoice" %>
+<% @page_title = "#{@invoice_data[:name]} Invoice" %>
 
 <div class="space-y-1">
   <%== render(
@@ -15,7 +15,6 @@
   <%== render(
     "components/page_header",
     locals: {
-      title: "#{@invoice_data[:name]} Invoice",
       right_items: [
         render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"} })
       ]

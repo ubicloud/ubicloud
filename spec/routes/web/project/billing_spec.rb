@@ -260,7 +260,7 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing/invoice/#{invoice.ubid}"
 
         expect(page.status_code).to eq(200)
-        expect(page.title).to eq("Ubicloud - #{invoice.name} - Invoice")
+        expect(page.title).to eq("Ubicloud - #{invoice.name} Invoice")
         expect(page).to have_content invoice.name
         expect(page).to have_content "Aggregated"
       end
