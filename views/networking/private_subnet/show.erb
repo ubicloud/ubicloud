@@ -15,7 +15,6 @@
   <%== render(
     "components/page_header",
     locals: {
-      title: @ps[:name],
       right_items: [render("components/ps_state_label", locals: { state: @ps[:state], extra_class: "text-md" })]
     }
   ) %>

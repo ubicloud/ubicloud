@@ -13,7 +13,6 @@
     <%== render(
       "components/page_header",
       locals: {
-        title: "Virtual Machines",
         right_items: has_project_permission("Vm:create") ? [
           render("components/button", locals: { text: "Create Virtual Machine", link: "vm/create" })
         ] : []

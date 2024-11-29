@@ -7,7 +7,7 @@
       parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["GitHub Runners", "#{@project_data[:path]}/github"], ["Caches", "#"]]
     }
   ) %>
-  <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
+  <%== render("components/page_header") %>
 </div>
 
 <%== render("github/tabbar") %>
