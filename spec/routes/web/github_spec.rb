@@ -43,7 +43,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123&installation_id=345"
 
-    expect(page.title).to eq("Ubicloud - Dashboard")
+    expect(page.title).to eq("Ubicloud - Projects")
     expect(page).to have_content("You should initiate the GitHub App installation request from the project's GitHub runner integration page.")
   end
 
