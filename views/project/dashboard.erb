@@ -1,13 +1,7 @@
 <% @page_title = "#{@project_data[:name]} Dashboard" %>
 
 <div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], ""]]
-    }
-  ) %>
+  <%== render("components/breadcrumb", locals: { parts: [%w[Projects /project], [@project_data[:name], ""]] }) %>
   <%== render("components/page_header", locals: { title: "Getting Started with your Project" }) %>
 </div>
 

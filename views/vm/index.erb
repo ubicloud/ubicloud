@@ -6,7 +6,6 @@
     <%== render(
       "components/breadcrumb",
       locals: {
-        back: @project_data[:path],
         parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]]
       }
     ) %>
