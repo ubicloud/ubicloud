@@ -447,12 +447,6 @@ class Clover < Roda
     recovery_auth_view { view "auth/recovery_auth", "Recovery Codes" }
   end
 
-  hash_branch("dashboard") do |r|
-    r.get web? do
-      view "/dashboard"
-    end
-  end
-
   hash_branch("after-login") do |r|
     r.get web? do
       if (project = current_account.projects_dataset.order(:created_at, :name).first)

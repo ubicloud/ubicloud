@@ -50,15 +50,6 @@
             <%== render(
               "layouts/sidebar/item",
               locals: {
-                name: "Dashboard",
-                url: "/dashboard",
-                is_active: request.path.start_with?("/dashboard"),
-                icon: "hero-home"
-              }
-            ) %>
-            <%== render(
-              "layouts/sidebar/item",
-              locals: {
                 name: "My Account",
                 url: "/account",
                 is_active: request.path.start_with?("/account"),
