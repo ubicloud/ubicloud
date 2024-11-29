@@ -13,7 +13,6 @@
     <%== render(
       "components/breadcrumb",
       locals: {
-        back: @project_data[:path],
         parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
       }
     ) %>
@@ -84,12 +83,7 @@
   <%== render(
     "components/breadcrumb",
     locals: {
-      back: "#{@project_data[:path]}/postgres",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"]
-      ]
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
     }
   ) %>
 

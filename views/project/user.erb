@@ -4,7 +4,6 @@
   <%== render(
     "components/breadcrumb",
     locals: {
-      back: "/project",
       parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]]
     }
   ) %>

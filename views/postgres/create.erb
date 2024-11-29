@@ -14,7 +14,6 @@
   <%== render(
     "components/breadcrumb",
     locals: {
-      back: "#{@project_data[:path]}/postgres",
       parts: [
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
