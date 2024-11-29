@@ -2,20 +2,17 @@
 
 <%== render("components/billing_warning") %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Virtual Machines", "#{@project_data[:path]}/vm"],
-        %w[Create #]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header") %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Virtual Machines", "#{@project_data[:path]}/vm"],
+      %w[Create #]
+    ]
+  }
+) %>
 
 <div class="grid gap-6">
   <form action="<%= "#{@project_data[:path]}/vm" %>" method="POST">

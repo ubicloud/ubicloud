@@ -2,23 +2,15 @@
 <div class="auto-refresh hidden" data-interval="10"></div>
 
 <% if @vms.count > 0 %>
-  <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]]
-      }
-    ) %>
-
-    <%== render(
-      "components/page_header",
-      locals: {
-        right_items: has_project_permission("Vm:create") ? [
-          render("components/button", locals: { text: "Create Virtual Machine", link: "vm/create" })
-        ] : []
-      }
-    ) %>
-  </div>
+  <%== render(
+    "components/page_header",
+    locals: {
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]],
+      right_items: has_project_permission("Vm:create") ? [
+        render("components/button", locals: { text: "Create Virtual Machine", link: "vm/create" })
+      ] : []
+    }
+  ) %>
 
   <div class="grid gap-6">
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">

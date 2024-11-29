@@ -10,26 +10,18 @@
 
 <%== render("components/billing_warning") %>
 
-<div class="space-y-1 sticky -mx-10 px-10 top-[2.9rem] bg-gray-50 z-30">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-        %w[Create #]
-      ]
-    }
-  ) %>
-
-  <%== render(
-    "components/page_header",
-    locals: {
-      right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
-    }
-  ) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
+      %w[Create #]
+    ],
+    right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
+  }
+) %>
 
 <div class="grid gap-6">
   <form action="<%= "#{@project_data[:path]}/postgres" %>" method="POST">

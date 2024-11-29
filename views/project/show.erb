@@ -1,15 +1,13 @@
 <% @page_title = @project_data[:name] %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: "Project Settings" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    title: "Project Settings",
+    back: "/project",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
+  }
+) %>
 
 <div class="grid gap-6">
   <!-- Detail Card -->

@@ -1,14 +1,11 @@
 <% @page_title = "GitHub Runners" %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["GitHub Runners", "#{@project_data[:path]}/github"], ["Caches", "#"]]
-    }
-  ) %>
-  <%== render("components/page_header") %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["GitHub Runners", "#{@project_data[:path]}/github"], ["Caches", "#"]]
+  }
+) %>
 
 <%== render("github/tabbar") %>
 
