@@ -1,6 +1,8 @@
 <div class="flex grow flex-col gap-y-5 overflow-y-auto bg-orange-600 px-6">
   <div class="flex h-16 shrink-0 items-center">
-    <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
+    <a href="<%= @project_data ? "#{@project_data[:path]}/dashboard" : "/project" %>">
+      <img class="h-6 w-auto" src="/logo-white.png" alt="Ubicloud">
+    </a>
   </div>
   <nav class="flex flex-1 flex-col">
     <ul role="list" class="flex flex-1 flex-col gap-y-7">
