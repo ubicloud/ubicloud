@@ -61,7 +61,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       custom_hostname_prefix = if custom_dns_zone
         name + (is_public ? "" : "-#{ubid.to_s[-5...]}")
       end
-      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/up", health_check_protocol: "https",
+      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/health", health_check_protocol: "https",
         custom_hostname_prefix: custom_hostname_prefix, custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: "ipv4")
 
       inference_endpoint = InferenceEndpoint.create(
