@@ -7,15 +7,25 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   subject(:nx) { described_class.new(Strand.create(id: "5943c405-0165-471e-93d5-20203e585aaf", prog: "Prog::Ai::InferenceEndpointReplicaNexus", label: "start")) }
 
   let(:inference_endpoint) {
-    instance_double(InferenceEndpoint, id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77", replica_count: 2, model_name: "test-model")
+    instance_double(InferenceEndpoint,
+      id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77",
+      replica_count: 2,
+      model_name: "test-model",
+      ubid: "ie-ubid",
+      is_public: true,
+      location: "hetzner-ai",
+      name: "ie-name",
+      load_balancer: instance_double(LoadBalancer, id: "lb-id", ubid: "lb-ubid", dst_port: 8443, private_subnet: instance_double(PrivateSubnet, ubid: "subnet-ubid")))
   }
 
   let(:vm) {
     instance_double(
       Vm,
       id: "fe4478f9-9454-466f-be7b-3cff302a4716",
+      ubid: "vm-ubid",
       sshable: sshable,
       ephemeral_net4: "1.2.3.4",
+      vm_host: instance_double(VmHost, ubid: "host-ubid", sshable: instance_double(Sshable, host: "2.3.4.5")),
       private_subnets: [instance_double(PrivateSubnet)]
     )
   }
@@ -30,7 +40,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     )
   }
 
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { instance_double(Sshable, host: "3.4.5.6") }
 
   before do
     allow(nx).to receive_messages(vm: vm, inference_endpoint: inference_endpoint, inference_endpoint_replica: replica)
@@ -173,8 +183,44 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#wait" do
     it "pings the inference gateway and naps" do
+      expect(nx).to receive(:available?).and_return(true)
       expect(nx).to receive(:ping_gateway)
       expect { nx.wait }.to nap(60)
+    end
+
+    it "hops to unavailable if the replica is not available" do
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+    end
+  end
+
+  describe "#unavailable" do
+    it "creates a page if replica is unavailable" do
+      expect(Prog::PageNexus).to receive(:assemble)
+      expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "does not create a page if replica is in maintenance mode" do
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect(inference_endpoint).to receive(:maintenance_set?).and_return(true)
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "resolves the page if replica is available" do
+      pg = instance_double(Page)
+      expect(pg).to receive(:incr_resolve)
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(pg)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "does not resolves the page if there is none" do
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(nil)
+      expect { nx.unavailable }.to hop("wait")
     end
   end
 
