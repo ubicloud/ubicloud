@@ -19,7 +19,7 @@ class InferenceEndpoint < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy
+  semaphore :destroy, :maintenance
 
   def display_location
     LocationNameConverter.to_display_name(location)
