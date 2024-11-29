@@ -1,19 +1,17 @@
 <% @page_title = @lb[:name] %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
-        [@lb[:name], "#"]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header") %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
+      [@lb[:name], "#"]
+    ]
+  }
+) %>
+
 <div class="grid gap-6">
   <!-- Detail Card -->
   <%== render(

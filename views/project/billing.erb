@@ -1,15 +1,12 @@
 <% @page_title = "Project Billing" %>
 
 <% if @billing_info_data %>
-  <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
-      }
-    ) %>
-    <%== render("components/page_header") %>
-  </div>
+  <%== render(
+    "components/page_header",
+    locals: {
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
+    }
+  ) %>
 
   <div class="grid gap-6">
     <!-- Summary -->

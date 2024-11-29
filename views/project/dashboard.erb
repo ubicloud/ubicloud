@@ -1,8 +1,6 @@
 <% @page_title = "#{@project_data[:name]} Dashboard" %>
 
-<div class="space-y-1">
-  <%== render("components/page_header", locals: { title: "Hi, #{current_account.name}" }) %>
-</div>
+<%== render("components/page_header", locals: { title: "Hi, #{current_account.name}" }) %>
 
 <div class="grid gap-6">
   <div

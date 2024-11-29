@@ -79,16 +79,13 @@
   </div>
 <% else %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
-    }
-  ) %>
-
-  <%== render("components/page_header", locals: { title: "Create PostgreSQL Database" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    title: "Create PostgreSQL Database",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
+  }
+) %>
 
 <div class="grid gap-6">
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
