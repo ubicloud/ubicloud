@@ -1,19 +1,16 @@
 <% @page_title = "Create Firewall" %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Firewalls", "#{@project_data[:path]}/firewall"],
-        %w[Create #]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header") %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Firewalls", "#{@project_data[:path]}/firewall"],
+      %w[Create #]
+    ]
+  }
+) %>
 
 <%
   form_elements = [

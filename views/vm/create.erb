@@ -2,20 +2,17 @@
 
 <%== render("components/billing_warning") %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Virtual Machines", "#{@project_data[:path]}/vm"],
-        %w[Create #]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header") %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Virtual Machines", "#{@project_data[:path]}/vm"],
+      %w[Create #]
+    ]
+  }
+) %>
 
 <%
   ps_description = "<p class='mt-1 text-sm leading-6 text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600 hover:text-orange-700'>Private Subnets</a> page.</p>"

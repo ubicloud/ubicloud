@@ -1,26 +1,20 @@
 <% @page_title = "#{@invoice_data[:name]} Invoice" %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Billing", "#{@project_data[:path]}/billing"],
-        ["#{@invoice_data[:name]} Invoice", "#"]
-      ]
-    }
-  ) %>
-  <%== render(
-    "components/page_header",
-    locals: {
-      right_items: [
-        render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"} })
-      ]
-    }
-  ) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Billing", "#{@project_data[:path]}/billing"],
+      ["#{@invoice_data[:name]} Invoice", "#"]
+    ],
+    right_items: [
+      render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"} })
+    ]
+  }
+) %>
+
 <div class="grid gap-6">
   <!-- Invoice Card -->
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
