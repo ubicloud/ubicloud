@@ -9,37 +9,30 @@
 %>
 
 <% if @postgres_databases.count > 0 %>
-  <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]]
-      }
-    ) %>
-
-    <div class="md:flex md:items-center md:justify-between pb-4 lg:pb-8">
-      <div class="min-w-0 flex-1">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">PostgreSQL Databases</h2>
-      </div>
-      <div class="mt-4 flex md:ml-4 md:mt-0">
+  <%== render(
+    "components/page_header",
+    locals: {
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["PostgreSQL Databases", "#"]],
+      right_items: [<<-DROPDOWN]
         <div class="group dropdown relative inline-block text-left">
-          <div>
-            <%== render("components/button", locals: { text: "Create PostgreSQL Database", right_icon: "hero-chevron-down" }) %>
+          <div>#{render("components/button", locals: { text: "Create PostgreSQL Database", right_icon: "hero-chevron-down" })}
           </div>
           <div class="hidden opacity-0 scale-95 group-[.active]:block group-[.active]:opacity-100 group-[.active]:scale-100 transition ease-out duration-100 absolute -right-2 z-10 mt-2 w-72 origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" tabindex="-1">
-            <% flavors.each do |flavor, (_, title, description)| %>
+            #{flavors.map do |flavor, (_, title, description)|
+              <<-ITEM
               <div class="py-1 hover:bg-gray-50" role="none">
-                  <a href="<%= @project_data[:path] %>/postgres/create?flavor=<%= flavor %>" class="block px-4 py-3 focus:outline-none">
-                    <h3 class="text-base font-semibold leading-6 text-gray-900"><%= title %></h3>
-                    <p class="mt-1 text-sm text-gray-500"><%= description %></p>
-                  </a>
+                <a href="#{@project_data[:path]}/postgres/create?flavor=#{flavor}" class="block px-4 py-3 focus:outline-none">
+                  <h3 class="text-base font-semibold leading-6 text-gray-900">#{title}</h3>
+                  <p class="mt-1 text-sm text-gray-500">#{description}</p>
+                </a>
               </div>
-            <% end %>
+              ITEM
+            end.join}
           </div>
         </div>
-        </div>
-    </div>
-  </div>
+      DROPDOWN
+    }
+  ) %>
 
   <div class="grid gap-6">
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
