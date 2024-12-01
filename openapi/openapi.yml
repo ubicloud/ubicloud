@@ -2302,6 +2302,9 @@ components:
           type: string
           format: ipv4
           nullable: true
+        ip4_enabled:
+          description: Whether IPv4 is enabled
+          type: boolean
         ip6:
           description: IPv6 address
           type: string
@@ -2331,6 +2334,7 @@ components:
       required:
         - id
         - ip4
+        - ip4_enabled
         - ip6
         - location
         - name
