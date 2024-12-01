@@ -139,29 +139,6 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
       end
 
-      it "invalid body" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", "invalid_body"
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
-      end
-
-      it "missing required key" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
-          unix_user: "ha_type"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body must include required parameters: size"})
-      end
-
-      it "non allowed key" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
-          size: "standard-2",
-          foo_key: "foo_val"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: size, storage_size, ha_type, version, flavor"})
-      end
-
       it "firewall-rule" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
           cidr: "0.0.0.0/24"

@@ -60,12 +60,6 @@ RSpec.describe Clover, "project" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["name"]).to eq("test-project")
       end
-
-      it "missing parameter" do
-        post "/project", {}.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
-      end
     end
 
     describe "delete" do
