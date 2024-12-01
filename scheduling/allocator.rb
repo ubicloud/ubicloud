@@ -367,18 +367,18 @@ module Scheduling::Allocator
         vm_host = VmHost[@candidate_host[:vm_host_id]]
 
         # Build a map of used cpus
-        used_cpus = vm_host.host_cpuset
+        used_cpus = VmHostSlice.cpuset_to_bitmask(vm_host.cpuset)
         vm_host.vm_host_slices.map do |slice|
-          used_cpus = VmHostSlice.bitmask_or(used_cpus, slice.to_cpu_bitmask)
+          used_cpus |= slice.to_cpu_bitmask
         end
 
-        # Now find required number of cpus
-        requested_cpu_bitmask = BitArray.new(vm_host.total_cpus)
+        # Now find required number o(f cpus
+        requested_cpu_bitmask = 0
         requested_cpus = (vm_host.total_cpus / vm_host.total_cores) * @request.cores
         i = 0
-        while requested_cpus > 0 && i < used_cpus.size
-          if used_cpus[i] == 0
-            requested_cpu_bitmask[i] = 1
+        while requested_cpus > 0 && i < vm_host.total_cpus
+          if (used_cpus & (1 << i)) == 0
+            requested_cpu_bitmask |= (1 << i)
             requested_cpus -= 1
           end
           i += 1

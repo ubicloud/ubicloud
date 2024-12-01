@@ -335,10 +335,6 @@ RSpec.describe VmHost do
     expect(vh).to receive(:total_cores).and_return(4).at_least(1)
     expect(vh).to receive(:total_cpus).and_return(8).at_least(1)
     vh.update_spdk_cpus(2)
-    cpuset = vh.host_cpuset
-    expect(cpuset[0]).to eq(1)
-    expect(cpuset[1]).to eq(1)
-    expect(cpuset[2]).to eq(0)
   end
 
   it "initiates a new health monitor session" do

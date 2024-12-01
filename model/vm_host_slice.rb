@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "bitarray"
 require_relative "../model"
 
 class VmHostSlice < Sequel::Model
@@ -42,36 +41,16 @@ class VmHostSlice < Sequel::Model
     fail "Invalid list of cpus in the cpuset." unless cpu_ranges.reduce(false) { |acc, n| n[0] <= n[1] }
 
     # we can convert to bitmask
-    #
-    # take the size of the bitmask to be just use the maximum of the range
-    bitmask_size = if size.nil?
-      cpu_ranges.reduce(0) { |acc, n| (acc < n[1]) ? n[1] : acc } + 1
-    else
-      size
-    end
-
-    bitmask = BitArray.new(bitmask_size)
+    bitmask = 0
     cpu_ranges.each do |range|
-      (range[0]..range[1]).to_a.each { |i| bitmask[i] = 1 }
+      (range[0]..range[1]).to_a.each { |i| bitmask += (1 << i) }
     end
 
     bitmask
   end
 
   def to_cpu_bitmask
-    bitmask = VmHostSlice.cpuset_to_bitmask(allowed_cpus)
-
-    # if we know the number of cpus on the host,
-    # resize the bitarray to that size
-    if !vm_host.nil? && bitmask.size < vm_host.total_cpus
-      expanded_bitmask = BitArray.new(vm_host.total_cpus)
-
-      # TODO: there might be a better way to do it
-      (0..bitmask.size).each { |i| expanded_bitmask[i] = bitmask[i] }
-      bitmask = expanded_bitmask
-    end
-
-    bitmask
+    VmHostSlice.cpuset_to_bitmask(allowed_cpus)
   end
 
   # converts the bitmask array returned by the
@@ -83,13 +62,13 @@ class VmHostSlice < Sequel::Model
     idx_e = -1
 
     # specifically iterate until bitmask.size, to ensure we close the last range
-    (0..bitmask.size).each do |i|
-      if idx_b == -1 && idx_e == -1 && bitmask[i] == 1
+    (0..bitmask.to_s(2).size).each do |i|
+      if idx_b == -1 && idx_e == -1 && (bitmask & (1 << i)) != 0
         # first positive bit set
         idx_b = i
       end
 
-      if idx_b != -1 && idx_e == -1 && bitmask[i] == 0
+      if idx_b != -1 && idx_e == -1 && (bitmask & (1 << i)) == 0
         # first negative bit set, after some poisitve ones
         idx_e = i - 1
 
@@ -105,23 +84,22 @@ class VmHostSlice < Sequel::Model
 
   def from_cpu_bitmask(bitmask)
     cpuset = VmHostSlice.bitmask_to_cpuset(bitmask)
-    cpus = bitmask.reduce(&:+)
+    cpus = VmHostSlice.count_set_bits(bitmask)
     fail "Bitmask does not set any cpuset." if cpus == 0 || cpuset.empty?
 
     # Get the proportion of cores to cpus from the host
-    # TODO: We may need some more validation here
     threads_per_core = vm_host.total_cpus / vm_host.total_cores
 
     update(allowed_cpus: cpuset, cores: cpus / threads_per_core, total_cpu_percent: cpus * 100)
   end
 
-  def self.bitmask_or(a, b)
-    fail "Argument bitmasks must be of equal size" unless a.size == b.size
-
-    result = BitArray.new(a.size)
-    (0..a.size - 1).each { |i| result[i] = a[i] | b[i] }
-
-    result
+  def self.count_set_bits(bitmask)
+    count = 0
+    while bitmask > 0
+      bitmask &= (bitmask - 1) # Turn off the rightmost set bit
+      count += 1
+    end
+    count
   end
 
   # Returns the name as used by systemctl and cgroup

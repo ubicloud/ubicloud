@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "bitarray"
 require_relative "../model"
 require_relative "../lib/hosting/apis"
 
@@ -275,27 +274,21 @@ class VmHost < Sequel::Model
     storage_devices.sum { _1.total_storage_gib }
   end
 
-  def update_spdk_cpus(spdk_cpus)
+  def update_spdk_cpus(spdk_cpus, only_cpuset: false)
     # Mark cpus used by the SDK as taken on the host
-    @host_cpuset = allocate_host_cpuset(spdk_cpus)
-
     spdk_cores = (spdk_cpus * total_cores) / total_cpus
     update(used_cores: spdk_cores)
   end
 
   def allocate_host_cpuset(spdk_cpus)
-    cpuset = BitArray.new(total_cpus)
-    (0..spdk_cpus - 1).each { |i| cpuset[i] = 1 }
+    cpuset = 0
+    (0..spdk_cpus - 1).each { |i| cpuset |= (1 << i) }
 
-    cpuset
+    VmHostSlice.bitmask_to_cpuset(cpuset)
   end
 
-  def host_cpuset
-    if @host_cpuset.nil?
-      spdk_cpus = (used_cores * total_cpus) / total_cores
-      @host_cpuset = allocate_host_cpuset(spdk_cpus)
-    end
-    @host_cpuset
+  def cpuset
+    @cpuset ||= allocate_host_cpuset(spdk_installations.first.cpu_count)
   end
 
   def render_arch(arm64:, x64:)

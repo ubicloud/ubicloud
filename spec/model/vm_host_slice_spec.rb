@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "bitarray"
 require_relative "../spec_helper"
 
 RSpec.describe VmHostSlice do
@@ -49,12 +48,7 @@ RSpec.describe VmHostSlice do
 
   describe "#to_cpu_bitmask" do
     it "returns the correct bitmask" do
-      expect(vm_host_slice.to_cpu_bitmask.to_s).to eq("0011")
-    end
-
-    it "resizes the bitmask to the number of cpus on the host" do
-      allow(vm_host_slice).to receive_messages(vm_host: vm_host)
-      expect(vm_host_slice.to_cpu_bitmask.to_s).to eq("00110000")
+      expect(vm_host_slice.to_cpu_bitmask.to_s(2)).to eq("1100")
     end
   end
 
@@ -62,19 +56,19 @@ RSpec.describe VmHostSlice do
     it "converts a cpu bitmask to a correct allowed cpu set" do
       allow(vm_host_slice).to receive_messages(vm_host: vm_host)
 
-      cpu_array = BitArray.new(8)
-      cpu_array[0] = 1
-      cpu_array[1] = 1
-      cpu_array[6] = 1
-      cpu_array[7] = 1
-      vm_host_slice.from_cpu_bitmask(cpu_array)
+      cpu_bitmask = 0
+      cpu_bitmask |= 1 << 0
+      cpu_bitmask |= 1 << 1
+      cpu_bitmask |= 1 << 6
+      cpu_bitmask |= 1 << 7
+      vm_host_slice.from_cpu_bitmask(cpu_bitmask)
       expect(vm_host_slice.allowed_cpus).to eq("0-1,6-7")
       expect(vm_host_slice.cores).to eq(2)
       expect(vm_host_slice.total_cpu_percent).to eq(400)
     end
 
     it "fails on empty bitmask" do
-      bitmask = BitArray.new(16)
+      bitmask = 0
       expect { vm_host_slice.from_cpu_bitmask(bitmask) }.to raise_error RuntimeError, "Bitmask does not set any cpuset."
     end
   end
@@ -117,45 +111,25 @@ RSpec.describe VmHostSlice do
     end
 
     it "handles all-zeros bitmask" do
-      bitmask = BitArray.new(8)
+      bitmask = 0
       expect(VmHostSlice.bitmask_to_cpuset(bitmask)).to eq("")
+    end
+
+    it "handles large-size cpuset" do
+      bitmask = VmHostSlice.cpuset_to_bitmask("0-1,1022-1023")
+      expect(VmHostSlice.bitmask_to_cpuset(bitmask)).to eq("0-1,1022-1023")
     end
   end
 
-  describe "#bitmask_or" do
-    it "combines two bitmasks with binary OR operator" do
-      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
-      b = VmHostSlice.cpuset_to_bitmask("4-7", size: 8)
-
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-7")
+  describe "#count_set_bits" do
+    it "counts the bits correctly" do
+      a = VmHostSlice.cpuset_to_bitmask("2-3")
+      expect(VmHostSlice.count_set_bits(a)).to eq(2)
     end
 
-    it "combines two bitmasks - overlapping ranges" do
-      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
-      b = VmHostSlice.cpuset_to_bitmask("2-5", size: 8)
-
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-5")
-    end
-
-    it "combines two bitmasks - disjoint ranges" do
-      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
-      b = VmHostSlice.cpuset_to_bitmask("6-7", size: 8)
-
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-3,6-7")
-    end
-
-    it "combines two bitmasks - empty range" do
-      a = VmHostSlice.cpuset_to_bitmask("2-3", size: 8)
-      b = BitArray.new(8)
-
-      expect(VmHostSlice.bitmask_to_cpuset(VmHostSlice.bitmask_or(a, b))).to eq("2-3")
-    end
-
-    it "fails on unequal bitmasks" do
-      a = BitArray.new(4)
-      b = BitArray.new(8)
-
-      expect { VmHostSlice.bitmask_or(a, b) }.to raise_error RuntimeError, "Argument bitmasks must be of equal size"
+    it "counts the bits correctly - disjoined ranges" do
+      a = VmHostSlice.cpuset_to_bitmask("2-3,6-7")
+      expect(VmHostSlice.count_set_bits(a)).to eq(4)
     end
   end
 end

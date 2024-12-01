@@ -31,7 +31,6 @@ gem "stripe"
 gem "countries"
 gem "octokit"
 gem "argon2-kdf"
-gem "bitarray"
 
 group :development do
   gem "awesome_print"

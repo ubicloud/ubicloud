@@ -864,8 +864,8 @@ RSpec.describe Al do
 
     it "places a burstable vm in an new slice" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "burstable", allowed_cpus: "2-3", memory_1g: 8, type: "shared")
-      vh.vm_host_slices[0].update(used_cpu_percent: 200, used_memory_1g: 8, enabled: true)
+      first_slice = Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "burstable", allowed_cpus: "2-3", memory_1g: 8, type: "shared").subject
+      first_slice.update(used_cpu_percent: 200, used_memory_1g: 8, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
       vh.reload
 
@@ -878,17 +878,17 @@ RSpec.describe Al do
 
       slice = vm.vm_host_slice
       expect(slice).not_to be_nil
-      expect(slice.id).not_to eq(vh.vm_host_slices[0].id)
+      expect(slice.id).not_to eq(first_slice.id)
       expect(slice.allowed_cpus).to eq("4-5")
       expect(vh.vm_host_slices.size).to eq(2)
     end
 
     it "places a burstable vm in an existing slice" do
       vh = VmHost.first
-      Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
-      Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, family: "burstable", allowed_cpus: "6-7", memory_1g: 8, type: "shared")
-      vh.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
-      vh.vm_host_slices[1].update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)
+      slice1 = Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_1g: 16, type: "dedicated").subject
+      slice2 = Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh, family: "burstable", allowed_cpus: "6-7", memory_1g: 8, type: "shared").subject
+      slice1.update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
+      slice2.update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
       vh.reload
 
@@ -906,15 +906,17 @@ RSpec.describe Al do
 
       slice = vm.vm_host_slice
       expect(slice).not_to be_nil
-      expect(slice.id).to eq(vh.vm_host_slices[1].id)
+      expect(slice.id).to eq(slice2.id)
     end
 
     it "prefers a host with available slice for burstables" do
       vh1 = VmHost.first
       Prog::Vm::VmHostSlice.assemble_with_host("sl1", vh1, family: "standard", allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
+        .subject
+        .update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true) # Full
       Prog::Vm::VmHostSlice.assemble_with_host("sl2", vh1, family: "burstable", allowed_cpus: "6-7", memory_1g: 8, type: "shared")
-      vh1.vm_host_slices[0].update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true) # Full
-      vh1.vm_host_slices[1].update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)  # Partially filled in
+        .subject
+        .update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)  # Partially filled in
       vh1.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
       vh1.reload
 
