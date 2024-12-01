@@ -69,11 +69,7 @@ class Clover < Roda
 
   def validate_request_params(required_keys, allowed_optional_keys = [])
     params = if api?
-      begin
-        request.params
-      rescue Roda::RodaPlugins::InvalidRequestBody::Error
-        raise Validation::ValidationFailed.new({body: "Request body isn't a valid JSON object."})
-      end
+      request.params
     else
       request.params.reject { _1 == "_csrf" }
     end
