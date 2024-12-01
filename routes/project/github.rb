@@ -39,14 +39,30 @@ class Clover
 
           r.redirect "https://github.com/apps/#{Config.github_app_name}/installations/new", 302
         end
+
+        r.on String do |installation_id|
+          installation = GithubInstallation.from_ubid(installation_id)
+          unless installation
+            response.status = 404
+            r.halt
+          end
+
+          r.post true do
+            cache_enabled = r.params["cache_enabled"] == "true"
+            installation.update(cache_enabled: cache_enabled)
+            flash["notice"] = "Ubicloud cache is #{cache_enabled ? "enabled" : "disabled"} for the installation #{installation.name}."
+
+            r.redirect "#{@project.path}/github/setting"
+          end
+        end
       end
 
       r.on "cache" do
         r.get true do
           repository_id_q = @project.github_installations_dataset.join(:github_repository, installation_id: :id).select(Sequel[:github_repository][:id])
-          @entries = Serializers::GithubCacheEntry.serialize(GithubCacheEntry.where(repository_id: repository_id_q).exclude(committed_at: nil).eager(:repository).order(Sequel.desc(:created_at)).all)
-          @total_usage = Serializers::GithubCacheEntry.humanize_size(@entries.filter_map { _1[:size] }.sum)
-          @total_quota = "#{@project.effective_quota_value("GithubRunnerCacheStorage")} GB"
+          entries = GithubCacheEntry.where(repository_id: repository_id_q).exclude(committed_at: nil).eager(:repository).reverse(:created_at).all
+          @entries_by_repo = Serializers::GithubCacheEntry.serialize(entries).group_by { _1[:repository][:id] }
+          @quota_per_repo = "#{@project.effective_quota_value("GithubRunnerCacheStorage")} GB"
 
           view "github/cache"
         end

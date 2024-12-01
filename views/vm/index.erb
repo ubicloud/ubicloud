@@ -45,16 +45,19 @@
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:location] %></td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:size] %></td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:storage_size_gib] %>
-                GB</td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%= (vm[:storage_size_gib] > 0) ? "#{vm[:storage_size_gib]} GB" : "-" %>
+              </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <%== render("components/vm_state_label", locals: { state: vm[:state] }) %>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <% if vm[:ip4] %>
                   <%== render("components/copieble_content", locals: { content: vm[:ip4], message: "Copied IPv4" }) %>
-                <% else %>
+                <% elsif vm[:ip6] %>
                   <%== render("components/copieble_content", locals: { content: vm[:ip6], message: "Copied IPv6" }) %>
+                <% else %>
+                  Not assigned yet
                 <% end %>
               </td>
             </tr>

@@ -4,7 +4,7 @@ require_relative "spec_helper"
 require "octokit"
 
 RSpec.describe Project do
-  subject(:project) { described_class.new }
+  subject(:project) { described_class.create_with_id(name: "test") }
 
   describe ".has_valid_payment_method?" do
     it "returns true when Stripe not enabled" do
@@ -14,22 +14,28 @@ RSpec.describe Project do
 
     it "returns false when no billing info" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      expect(project).to receive(:billing_info).and_return(nil)
       expect(project.has_valid_payment_method?).to be false
     end
 
     it "returns false when no payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      bi = instance_double(BillingInfo, payment_methods: [])
-      expect(project).to receive(:billing_info).and_return(bi)
+      bi = BillingInfo.create_with_id(stripe_id: "cus")
+      project.update(billing_info_id: bi.id)
       expect(project.has_valid_payment_method?).to be false
     end
 
     it "returns true when has valid payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      pm = instance_double(PaymentMethod)
-      bi = instance_double(BillingInfo, payment_methods: [pm])
-      expect(project).to receive(:billing_info).and_return(bi)
+      bi = BillingInfo.create_with_id(stripe_id: "cus123")
+      PaymentMethod.create_with_id(billing_info_id: bi.id, stripe_id: "pm123")
+      project.update(billing_info_id: bi.id)
+      expect(project.has_valid_payment_method?).to be true
+    end
+
+    it "returns true when has some credits" do
+      expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      bi = BillingInfo.create_with_id(stripe_id: "cus")
+      project.update(billing_info_id: bi.id, credit: 100)
       expect(project.has_valid_payment_method?).to be true
     end
 

@@ -86,6 +86,36 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "test-org"
       expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins2.installation_id}/
     end
+
+    it "enables cache for installation" do
+      installation.update(cache_enabled: false)
+
+      visit "#{project.path}/github/setting"
+      csrf_token = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+
+      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: true, _csrf: csrf_token}
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_enabled).to be true
+    end
+
+    it "disables cache for installation" do
+      installation.update(cache_enabled: true)
+
+      visit "#{project.path}/github/setting"
+      csrf_token = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+
+      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: false, _csrf: csrf_token}
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_enabled).to be false
+    end
+
+    it "raises not found when installation doesn't exist" do
+      visit "#{project.path}/github/installation/invalid_id"
+
+      expect(page.status_code).to eq(404)
+    end
   end
 
   describe "runner" do

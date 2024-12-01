@@ -89,10 +89,11 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       .destroy
 
     # Destroy oldest cache entries if the total usage exceeds the limit.
-    total_usage = github_repository.cache_entries_dataset.sum(:size).to_i
+    dataset = github_repository.cache_entries_dataset.exclude(size: nil)
+    total_usage = dataset.sum(:size).to_i
     storage_limit = github_repository.installation.project.effective_quota_value("GithubRunnerCacheStorage") * 1024 * 1024 * 1024
     if total_usage > storage_limit
-      github_repository.cache_entries_dataset.order(:created_at).each do |oldest_entry|
+      dataset.order(:created_at).each do |oldest_entry|
         break if total_usage <= storage_limit
         oldest_entry.destroy
         total_usage -= oldest_entry.size

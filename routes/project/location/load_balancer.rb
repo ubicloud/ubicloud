@@ -28,7 +28,7 @@ class Clover
       r.post %w[attach-vm detach-vm] do |action|
         authorize("LoadBalancer:edit", lb.id)
         required_parameters = %w[vm_id]
-        request_body_params = Validation.validate_request_body(json_params, required_parameters)
+        request_body_params = validate_request_params(required_parameters)
 
         unless (vm = Vm.from_ubid(request_body_params["vm_id"]))
           fail Validation::ValidationFailed.new("vm_id" => "VM not found")
@@ -77,7 +77,7 @@ class Clover
 
       r.patch api? do
         authorize("LoadBalancer:edit", lb.id)
-        request_body_params = Validation.validate_request_body(json_params, %w[algorithm src_port dst_port health_check_endpoint vms])
+        request_body_params = validate_request_params(%w[algorithm src_port dst_port health_check_endpoint vms])
         lb.update(
           algorithm: request_body_params["algorithm"],
           src_port: Validation.validate_port(:src_port, request_body_params["src_port"]),

@@ -5,7 +5,10 @@ class Serializers::GithubCacheEntry < Serializers::Base
     {
       id: entry.ubid,
       key: entry.key,
-      repository_name: entry.repository.name,
+      repository: {
+        id: entry.repository.ubid,
+        name: entry.repository.name
+      },
       scope: entry.scope,
       created_at: entry.created_at.strftime("%Y-%m-%d %H:%M UTC"),
       created_at_human: humanize_time(entry.created_at),

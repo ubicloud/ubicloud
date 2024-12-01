@@ -48,7 +48,25 @@
                   <%= ins[:name] %>
                 </td>
                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                  <a href="<%= ins[:installation_url] %>" class="text-orange-600 hover:text-orange-700" target="_blank">Configure</a>
+                  <div class="flex items-center justify-end space-x-4">
+                    <form action="<%= "#{@project_data[:path]}/github/installation/#{ins[:ubid]}" %>" role="form" method="POST">
+                      <%== csrf_tag("#{@project_data[:path]}/github/installation/#{ins[:ubid]}") %>
+                      <%== render("components/form/hidden", locals: { name: "cache_enabled", value: !ins[:cache_enabled] }) %>
+                      <%== render(
+                        "components/button",
+                        locals:
+                          (
+                            if ins[:cache_enabled]
+                              { text: "Disable Ubicloud Cache", type: "danger" }
+                            else
+                              { text: "Enable Ubicloud Cache", type: "primary" }
+                            end
+                          )
+                      ) %>
+                    </form>
+
+                    <%== render("components/button", locals: { text: "Configure", link: ins[:installation_url] }) %>
+                  </div>
                 </td>
               </tr>
             <% end %>

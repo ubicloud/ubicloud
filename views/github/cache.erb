@@ -16,49 +16,56 @@
 <div class="grid gap-6">
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <table class="min-w-full divide-y divide-gray-300">
-      <% if @total_usage %>
-        <thead class="bg-gray-50 whitespace-nowrap">
-          <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6" colspan="2"><%= @entries.count %> cache entries</th>
-            <th scope="col" class="relative py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 sm:pr-6" colspan="3"><%= @total_usage %> used of <%= @total_quota %></th>
-          </tr>
-        </thead>
-      <% end %>
       <tbody class="divide-y divide-gray-200 bg-white">
-        <% if @entries.count > 0 %>
-          <% @entries.each do |entry| %>
-            <tr id="entry-<%= entry[:id]%>">
-              <td class="py-3 pl-4 pr-3 text-sm sm:pl-6" scope="row">
-                <div class="font-medium text-gray-900"><%= entry[:key] %></div>
-                <div class="mt-1 text-gray-500 text-xs ">created <span title="<%= entry[:created_at] %>"><%= entry[:created_at_human] %></span></div>
-              </td>
-              <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                <div><%= entry[:scope] %></div>
-                <div class="mt-1 text-gray-500 text-xs"><%= entry[:repository_name] %></div>
-              </td>
-              <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                <div class="inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800" title="<%= entry[:size] %> bytes">
-                  <%= entry[:size_human] %>
+        <% if @entries_by_repo.count > 0 %>
+          <% @entries_by_repo.each do |repository_id, entries| %>
+            <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository_id %>">
+              <th scope="colgroup" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50">
+                <div class="flex">
+                  <%== render("components/icon", locals: { name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90" }) %>
+                  <%= entries.first[:repository][:name] %>
                 </div>
-              </td>
-              <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
-                <% if entry[:last_accessed_at] %>
-                  <div>Last used</div>
-                  <div title="<%= entry[:last_accessed_at] %>"> <%= entry[:last_accessed_at_human] %></div>
-                <% else %>
-                  <div>Never used</div>
-                <% end %>
-              </td>
-              <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
-                <%== render(
-                  "components/delete_button",
-                  locals: {
-                    url: "#{@project_data[:path]}/github/cache/#{entry[:id]}",
-                    text: ""
-                  }
-                ) %>
-              </td>
+              </th>
+              <th scope="colgroup" class="py-3.5 pl-3 pr-3 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
+                <%= entries.count %> cache entries
+              </th>
+              <th scope="colgroup" class="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-gray-900 whitespace-nowrap group-[.active]:bg-gray-50" colspan="2">
+                <%= Serializers::GithubCacheEntry.humanize_size(entries.sum { _1[:size].to_i }) %> used of <%= @quota_per_repo %>
+              </th>
             </tr>
+            <% entries.each do |entry| %>
+              <tr id="entry-<%= entry[:id]%>" class="hidden cache-group-<%= repository_id %>">
+                <td class="py-3 pl-4 pr-3 text-sm sm:pl-6 w-full" scope="row">
+                  <div class="font-medium text-gray-900"><%= entry[:key] %></div>
+                  <div class="mt-1 text-gray-500 text-xs ">created <span title="<%= entry[:created_at] %>"><%= entry[:created_at_human] %></span></div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
+                  <div><%= entry[:scope] %></div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
+                  <div class="inline-flex items-baseline rounded-md px-2 text-xs font-medium leading-5 bg-slate-100 text-slate-800" title="<%= entry[:size] %> bytes">
+                    <%= entry[:size_human] %>
+                  </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">
+                  <% if entry[:last_accessed_at] %>
+                    <div>Last used</div>
+                    <div title="<%= entry[:last_accessed_at] %>"> <%= entry[:last_accessed_at_human] %></div>
+                  <% else %>
+                    <div>Never used</div>
+                  <% end %>
+                </td>
+                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
+                  <%== render(
+                    "components/delete_button",
+                    locals: {
+                      url: "#{@project_data[:path]}/github/cache/#{entry[:id]}",
+                      text: ""
+                    }
+                  ) %>
+                </td>
+              </tr>
+            <% end %>
           <% end %>
         <% else %>
           <tr>
