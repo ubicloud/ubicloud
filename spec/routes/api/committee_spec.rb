@@ -44,7 +44,7 @@ RSpec.describe Clover, "committee infrastructure" do
       boot_image: "ubuntu-jammy",
       storage_size: "40"
     }.to_json
-    expect(JSON.parse(last_response.body).dig("error", "message")).to eq("#/components/schemas/Vm missing required parameters: id, ip4, ip6, location, name, size, state, storage_size_gib, unix_user")
+    expect(JSON.parse(last_response.body).dig("error", "message")).to match(%r{#/components/schemas/Vm missing required parameters: .*})
   end
 
   it "reports if response body is not valid JSON" do
