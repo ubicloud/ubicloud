@@ -47,6 +47,9 @@ Layout/SpaceInsideHashLiteralBraces:
   Exclude:
     - 'views/**/*.erb'
 
+RSpec/AnyInstance:
+  Enabled: false
+
 RSpec/ExampleLength:
   Enabled: false
 

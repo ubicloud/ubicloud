@@ -2,11 +2,16 @@
 
 require_relative "model"
 
+require "committee"
 require "roda"
 require "tilt"
 require "tilt/erubi"
 
 class Clover < Roda
+  OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true)
+  SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
+  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
+
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
@@ -19,6 +24,7 @@ class Clover < Roda
   plugin :h
   plugin :hash_branches
   plugin :hash_branch_view_subdir
+  plugin :hooks
   plugin :Integer_matcher_max
   plugin :json
   plugin :invalid_request_body, :raise
@@ -115,15 +121,38 @@ class Clover < Roda
       type = e.type
       message = e.message
       details = e.details
+    when Committee::BadRequest, Committee::InvalidRequest
+      code = 400
+      type = "BadRequest"
+      message = e.message
+
+      case e.original_error
+      when JSON::ParserError
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body isn't a valid JSON object."}
+      when OpenAPIParser::NotExistPropertyDefinition
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body contains unrecognized parameters: #{keys.join(", ")}"}
+      when OpenAPIParser::NotExistRequiredKey
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
+      end
+    when Committee::InvalidResponse
+      code = 500
+      type = "InternalServerError"
+      message = e.message
     else
       raise e if Config.test? && e.message != "test error"
-
       Clog.emit("route exception") { Util.exception_to_hash(e) }
 
       code = 500
       type = "UnexceptedError"
       message = "Sorry, we couldn’t process your request because of an unexpected error."
     end
+
+    raise e if Config.test? && e.is_a?(Committee::Error)
 
     response.status = code
     next if code == 204
@@ -528,6 +557,30 @@ class Clover < Roda
     rodauth.check_active_session
     r.rodauth
     rodauth.require_authentication
+
+    if api?
+      # Validate request against OpenAPI schema, after authenticating
+      # (which is thought to be cheaper)
+      begin
+        @schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
+        @schema_validator.request_validate(r)
+
+        next unless @schema_validator.link_exist?
+      rescue JSON::ParserError => e
+        raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
+      end
+    end
+
     r.hash_branches("")
+  end
+
+  # Validate response against OpenAPI schema
+  after do |res|
+    status, headers, body = res
+    next unless api? && status && headers && body
+    @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
+    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
+  rescue JSON::ParserError => e
+    raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end
 end
