@@ -282,8 +282,8 @@ end
 #  arch           | arch                     | NOT NULL DEFAULT 'x64'::arch
 #  allocated_at   | timestamp with time zone |
 #  provisioned_at | timestamp with time zone |
-#  vcpus          | integer                  |
-#  memory_gib     | integer                  |
+#  vcpus          | integer                  | NOT NULL
+#  memory_gib     | integer                  | NOT NULL
 # Indexes:
 #  vm_pkey               | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)
