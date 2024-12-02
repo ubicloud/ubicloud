@@ -8,7 +8,7 @@ class Clover
     r.on web? do
       unless (Stripe.api_key = Config.stripe_secret_key)
         response.status = 501
-        return "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
+        next "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
       end
 
       authorize("Project:billing", @project.id)
@@ -44,7 +44,7 @@ class Clover
             }
           })
 
-          return r.redirect @project.path + "/billing"
+          r.redirect @project.path + "/billing"
         end
 
         checkout = Stripe::Checkout::Session.create(
@@ -134,12 +134,12 @@ class Clover
           r.delete true do
             unless payment_method.billing_info.payment_methods.count > 1
               response.status = 400
-              return {message: "You can't delete the last payment method of a project."}
+              next {message: "You can't delete the last payment method of a project."}
             end
 
             payment_method.destroy
 
-            return {message: "Deleting #{payment_method.ubid}"}
+            {message: "Deleting #{payment_method.ubid}"}
           end
         end
       end
@@ -156,7 +156,7 @@ class Clover
             if r.params["pdf"] == "1"
               response["Content-Type"] = "application/pdf"
               response["Content-Disposition"] = "filename=\"#{@invoice_data[:filename]}.pdf\""
-              return invoice.generate_pdf(@invoice_data)
+              next invoice.generate_pdf(@invoice_data)
             end
 
             view "project/invoice"
