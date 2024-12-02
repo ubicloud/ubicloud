@@ -21,8 +21,7 @@ class Clover
       firewall = @project.firewalls_dataset.first(filter)
 
       unless firewall
-        response.status = r.delete? ? 204 : 404
-        next
+        next (r.delete? ? 204 : 404)
       end
 
       r.delete true do
@@ -31,8 +30,7 @@ class Clover
         firewall.destroy
 
         if api?
-          response.status = 204
-          nil
+          204
         else
           {message: "Deleting #{firewall.name}"}
         end
@@ -112,11 +110,7 @@ class Clover
 
         r.delete String do |firewall_rule_ubid|
           authorize("Firewall:edit", firewall.id)
-          fwr = FirewallRule.from_ubid(firewall_rule_ubid)
-          unless fwr
-            response.status = 204
-            next
-          end
+          next 204 unless (fwr = FirewallRule.from_ubid(firewall_rule_ubid))
 
           firewall.remove_firewall_rule(fwr)
 
@@ -132,8 +126,7 @@ class Clover
       end
 
       r.delete do
-        response.status = 204
-        nil
+        204
       end
     end
   end

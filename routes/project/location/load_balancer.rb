@@ -21,8 +21,7 @@ class Clover
       lb = LoadBalancer.first(filter)
 
       unless lb
-        response.status = request.delete? ? 204 : 404
-        request.halt
+        next (r.delete? ? 204 : 404)
       end
 
       r.post %w[attach-vm detach-vm] do |action|
@@ -71,8 +70,7 @@ class Clover
       r.delete true do
         authorize("LoadBalancer:delete", lb.id)
         lb.incr_destroy
-        response.status = 204
-        r.halt
+        204
       end
 
       r.patch api? do
@@ -115,8 +113,7 @@ class Clover
       r.post { load_balancer_post(lb_name) }
 
       r.delete do
-        response.status = 204
-        nil
+        204
       end
     end
   end

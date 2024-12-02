@@ -115,10 +115,7 @@ class Clover
 
       r.on "payment-method" do
         r.get "create" do
-          unless (billing_info = @project.billing_info)
-            response.status = 404
-            r.halt
-          end
+          next unless (billing_info = @project.billing_info)
 
           checkout = Stripe::Checkout::Session.create(
             payment_method_types: ["card"],
@@ -132,12 +129,7 @@ class Clover
         end
 
         r.is String do |pm_ubid|
-          payment_method = PaymentMethod.from_ubid(pm_ubid)
-
-          unless payment_method
-            response.status = 404
-            r.halt
-          end
+          next unless (payment_method = PaymentMethod.from_ubid(pm_ubid))
 
           r.delete true do
             unless payment_method.billing_info.payment_methods.count > 1
@@ -156,10 +148,7 @@ class Clover
         r.is String do |invoice_ubid|
           invoice = (invoice_ubid == "current") ? @project.current_invoice : Invoice.from_ubid(invoice_ubid)
 
-          unless invoice
-            response.status = 404
-            r.halt
-          end
+          next unless invoice
 
           r.get true do
             @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})

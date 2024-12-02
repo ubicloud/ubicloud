@@ -111,8 +111,7 @@ class Clover
         @project.invitations_dataset.where(email: email).destroy
         # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."
-        response.status = 204
-        nil
+        204
       end
 
       r.delete String do |user_ubid|
@@ -135,8 +134,7 @@ class Clover
 
         # Javascript refreshes page
         flash["notice"] = "Removed #{user.email} from #{@project.name}"
-        response.status = 204
-        nil
+        204
       end
     end
   end

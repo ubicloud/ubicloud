@@ -21,8 +21,7 @@ class Clover
       pg = @project.postgres_resources_dataset.first(filter)
 
       unless pg
-        response.status = r.delete? ? 204 : 404
-        next
+        next (r.delete? ? 204 : 404)
       end
 
       r.get true do
@@ -40,8 +39,7 @@ class Clover
       r.delete true do
         authorize("Postgres:delete", pg.id)
         pg.incr_destroy
-        response.status = 204
-        ""
+        204
       end
 
       r.post web?, "restart" do
@@ -112,8 +110,7 @@ class Clover
               pg.incr_update_firewall_rules
             end
           end
-          response.status = 204
-          ""
+          204
         end
       end
 
@@ -154,8 +151,7 @@ class Clover
             end
           end
 
-          response.status = 204
-          ""
+          204
         end
       end
 
@@ -224,8 +220,7 @@ class Clover
       end
 
       r.delete do
-        response.status = 204
-        nil
+        204
       end
     end
   end
