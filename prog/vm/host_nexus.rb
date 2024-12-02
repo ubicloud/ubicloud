@@ -177,7 +177,7 @@ class Prog::Vm::HostNexus < Prog::Base
     total_hugepages = Integer(total_hugepages_match.captures.first)
     free_hugepages = Integer(free_hugepages_match.captures.first)
 
-    total_vm_mem_gib = vm_host.vms.sum { |vm| vm.mem_gib }
+    total_vm_mem_gib = vm_host.vms.sum { |vm| vm.memory_gib }
     fail "Not enough hugepages for VMs" unless free_hugepages >= total_vm_mem_gib
 
     vm_host.update(

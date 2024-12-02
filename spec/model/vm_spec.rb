@@ -27,19 +27,21 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#mem_gib" do
-    it "handles standard family" do
-      vm.family = "standard"
-      [1, 2, 4, 8, 15, 30].each do |cores|
-        expect(vm).to receive(:cores).and_return(cores)
-        expect(vm.mem_gib).to eq cores * 8
-      end
+  describe "#mem_gib_ratio" do
+    it "returns the correct ratio for arm64" do
+      expect(vm).to receive(:arch).and_return("arm64")
+      expect(vm.mem_gib_ratio).to eq(3.2)
     end
 
-    it "handles standard-6" do
-      vm.family = "standard-gpu"
-      vm.cores = 3
-      expect(vm.mem_gib).to eq 32
+    it "returns the correct ratio for x64" do
+      expect(vm).to receive(:arch).and_return("x64")
+      expect(vm.mem_gib_ratio).to eq(8)
+    end
+
+    it "returns correct ratio for standard-gpu" do
+      expect(vm).to receive(:arch).and_return("x64")
+      expect(vm).to receive(:family).and_return("standard-gpu")
+      expect(vm.mem_gib_ratio).to eq(10.68)
     end
   end
 
@@ -130,6 +132,13 @@ RSpec.describe Vm do
 
     it "fails if spdk installation not found" do
       expect { vm.update_spdk_version("b") }.to raise_error RuntimeError, "SPDK version b not found on host"
+    end
+  end
+
+  describe "#params_json" do
+    it "fails if topology does not match vcpu count" do
+      expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
+      expect { vm.params_json(0) }.to raise_error RuntimeError, "BUG: topology does not match vcpu count"
     end
   end
 
