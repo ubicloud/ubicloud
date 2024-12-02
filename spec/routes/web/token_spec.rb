@@ -9,7 +9,7 @@ RSpec.describe Clover, "personal access token management" do
 
   before do
     login(user.email)
-    visit "#{project.path}/user"
+    visit "#{project.path}/user/token"
     expect(ApiKey.all).to be_empty
     click_button "Create Token"
     @api_key = ApiKey.first

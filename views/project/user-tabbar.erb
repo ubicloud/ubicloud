@@ -1,0 +1,10 @@
+<%== render(
+  "components/tabbar",
+  locals: {
+    tabs: [
+      ["User Management", @project_data[:path] + "/user"],
+      ["Personal Access Tokens", @project_data[:path] + "/user/token"],
+      ["Advanced Policy Editor", @project_data[:path] + "/user/policy"]
+    ]
+  }
+) %>
