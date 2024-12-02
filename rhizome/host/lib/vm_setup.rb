@@ -441,7 +441,7 @@ DHCP
     runner_config = if boot_image.include?("github")
       <<~ADDRESSES
       address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}
-      address=/.docker.io/::
+      filter-AAAA
       ADDRESSES
     else
       ""
