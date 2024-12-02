@@ -441,10 +441,13 @@ DHCP
     runner_config = if boot_image.include?("github")
       <<~ADDRESSES
       address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}
-      filter-AAAA
+      address=/.docker.io/::
       ADDRESSES
     else
-      ""
+      <<~ADDRESSES
+      dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+      listen-address=#{dnsmasq_address_ip6}
+      ADDRESSES
     end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
@@ -462,9 +465,7 @@ server=149.112.112.112
 server=9.9.9.9
 server=2620:fe::fe
 server=2620:fe::9
-dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
 dhcp-option=6,#{dns_ipv4}
-listen-address=#{dnsmasq_address_ip6}
 listen-address=#{dns_ipv4}
 dhcp-option=26,1400
 bind-interfaces
