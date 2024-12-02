@@ -103,7 +103,7 @@
                             class="peer sr-only location-based-price"
                             data-resource-type="VmCores"
                             data-resource-family="<%= size.family %>"
-                            data-amount="<%= size.vcpu / 2 %>"
+                            data-amount="<%= size.cores %>"
                             data-storage-resource-type="VmStorage"
                             data-storage-size-options="<%= size.storage_size_options %>"
                             required
@@ -120,9 +120,9 @@
                               <span class="text-md font-semibold"><%= size.display_name %></span>
                               <span class="text-sm opacity-80">
                                 <span class="block sm:inline">
-                                  <%= size.vcpu %>
+                                  <%= size.vcpus %>
                                   vCPUs /
-                                  <%= size.memory %>
+                                  <%= size.memory_gib %>
                                   GB RAM
                                 </span>
                               </span>

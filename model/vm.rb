@@ -74,10 +74,6 @@ class Vm < Sequel::Model
     8
   end
 
-  def mem_gib
-    (cores * mem_gib_ratio).to_i
-  end
-
   # cloud-hypervisor takes topology information in this format:
   #
   # topology=<threads_per_core>:<cores_per_die>:<dies_per_package>:<packages>
@@ -206,6 +202,7 @@ class Vm < Sequel::Model
 
   def params_json(swap_size_bytes)
     topo = cloud_hypervisor_cpu_topology
+    fail "BUG: topology does not match vcpu count" unless topo.max_vcpus == vcpus
 
     project_public_keys = projects.first.get_ff_vm_public_ssh_keys || []
 
@@ -223,7 +220,7 @@ class Vm < Sequel::Model
       "boot_image" => boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
-      "mem_gib" => mem_gib,
+      "mem_gib" => memory_gib,
       "ndp_needed" => vm_host.ndp_needed,
       "storage_volumes" => storage_volumes,
       "swap_size_bytes" => swap_size_bytes,
