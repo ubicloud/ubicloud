@@ -318,6 +318,6 @@ begin
 
   desc "Run all linters"
   task linter: ["rubocop", "brakeman", "erb_formatter", "openapi"].map { "linter:#{_1}" }
-rescue LoadError
-  puts "Could not load dev dependencies"
+rescue LoadError => e
+  puts "Could not load dev dependencies: #{e.class}: #{e.message}"
 end
