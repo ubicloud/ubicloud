@@ -7,8 +7,6 @@ class Clover
 
       r.get true do
         @user_policies = {}
-        @token_policies = {}
-        @tokens = current_account.api_keys
         @project.access_policies_dataset.where(managed: true).each do |policy|
           policy.body["acls"].first["subjects"].each do |subject|
             # We plan to convert tags to UBIDs in our access policies while
@@ -18,16 +16,32 @@ class Clover
             if (account = Account[@project.access_tags.find { _1.name == subject }&.hyper_tag_id])
               @user_policies[account.ubid] = policy.name
             end
+          end
+        end
+        @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
+        @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
+
+        view "project/user"
+      end
+
+      r.get "token" do
+        @token_policies = {}
+        @tokens = current_account.api_keys
+        @project.access_policies_dataset.where(managed: true).each do |policy|
+          policy.body["acls"].first["subjects"].each do |subject|
             if (token = @tokens.find { _1.hyper_tag_name == subject })
               @token_policies[token.ubid] = policy.name
             end
           end
         end
-        @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
-        @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
+
+        view "project/token"
+      end
+
+      r.get "policy" do
         @policy = Serializers::AccessPolicy.serialize(@project.access_policies_dataset.where(managed: false).first) || {body: {acls: []}.to_json}
 
-        view "project/user"
+        view "project/policy"
       end
 
       r.post true do
@@ -74,7 +88,7 @@ class Clover
         r.post true do
           pat = DB.transaction { ApiKey.create_personal_access_token(current_account, project: @project) }
           flash["notice"] = "Created personal access token with id #{pat.ubid}"
-          r.redirect "#{@project.path}/user"
+          r.redirect "#{@project.path}/user/token"
         end
 
         r.post "update-policies" do
@@ -88,7 +102,7 @@ class Clover
 
           flash["notice"] = "Personal access token policies updated successfully."
 
-          r.redirect "#{@project.path}/user"
+          r.redirect "#{@project.path}/user/token"
         end
 
         r.delete String do |ubid|
@@ -138,7 +152,7 @@ class Clover
           end
 
           flash["notice"] = "Advanced policy updated for '#{@project.name}'"
-          r.redirect "#{@project.path}/user"
+          r.redirect "#{@project.path}/user/policy"
         end
       end
 

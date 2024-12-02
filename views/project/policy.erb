@@ -1,0 +1,48 @@
+<% @page_title = "#{@project_data[:name]} - Policy" %>
+<%== render("project/user-tabbar") %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/breadcrumb",
+    locals: {
+      back: "/project",
+      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Policy #]]
+    }
+  ) %>
+  <%== render("components/page_header", locals: { title: "Advanced Policy Editor" }) %>
+</div>
+
+<div class="grid gap-6">
+  <div id="policy-editor">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <form id="advanced-policy" action="<%= "#{@project_data[:path]}/user/policy/advanced" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}/user/policy/advanced") %>
+          <div class="space-y-4">
+            <div>
+              <p class="mt-1 text-sm text-gray-500">
+                If our predefined policies do not meet your needs, you can give more granular permissions by editing
+                the policy below. Any permissions given through the access policy editor will be combined with the
+                user's default access policy. You can learn more about our access policy language in
+                <a href="" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">our documentation</a>.
+              </p>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-full">
+                <div class="policy-editor text-sm">
+                  <pre class="bg-gray-50 rounded-lg p-3 h-[50vh] overflow-scroll" contenteditable="true">
+                    <%= flash.dig("old", "body") || @policy[:body] %>
+                  </pre>
+                  <textarea id="acl-body" name="body" class="hidden" required></textarea>
+                </div>
+              </div>
+              <div class="col-span-3 sm:col-span-6">
+                <%== render("components/form/submit_button", locals: { text: "Update" }) %>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

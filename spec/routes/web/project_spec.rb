@@ -375,7 +375,7 @@ RSpec.describe Clover, "project" do
           ]
         }
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         within "form#advanced-policy" do
           fill_in "body", with: new_policy.to_json
           click_button "Update"
@@ -392,7 +392,7 @@ RSpec.describe Clover, "project" do
           ]
         }
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         expect(page).to have_content current_policy.to_json
         within "form#advanced-policy" do
           fill_in "body", with: new_policy.to_json
@@ -401,10 +401,10 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content new_policy.to_json
       end
 
-      it "can not update policy when it is not valid JSON" do
+      it "cannot update policy when it is not valid JSON" do
         current_policy = project.access_policies.first.body
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         within "form#advanced-policy" do
           fill_in "body", with: "{'invalid': 'json',}"
           click_button "Update"
@@ -415,10 +415,10 @@ RSpec.describe Clover, "project" do
         expect(current_policy).to eq(project.access_policies.first.body)
       end
 
-      it "can not update policy when its root is not JSON object" do
+      it "cannot update policy when its root is not JSON object" do
         current_policy = project.access_policies.first.body
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         within "form#advanced-policy" do
           fill_in "body", with: "[{}, {}]"
           click_button "Update"
