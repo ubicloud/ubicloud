@@ -108,7 +108,7 @@ $(".restart-btn").on("click", function (event) {
   }
 });
 
-$(".copieble-content").on("click", ".copy-button", function (event) {
+$(".copyable-content").on("click", ".copy-button", function (event) {
   let parent = $(this).parent();
   let content = parent.data("content");
   let message = parent.data("message");

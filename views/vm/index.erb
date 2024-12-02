@@ -53,9 +53,9 @@
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <% if vm[:ip4] %>
-                  <%== render("components/copieble_content", locals: { content: vm[:ip4], message: "Copied IPv4" }) %>
+                  <%== render("components/copyable_content", locals: { content: vm[:ip4], message: "Copied IPv4" }) %>
                 <% elsif vm[:ip6] %>
-                  <%== render("components/copieble_content", locals: { content: vm[:ip6], message: "Copied IPv6" }) %>
+                  <%== render("components/copyable_content", locals: { content: vm[:ip6], message: "Copied IPv6" }) %>
                 <% else %>
                   Not assigned yet
                 <% end %>

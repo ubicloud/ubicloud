@@ -65,10 +65,10 @@
               <% end %>
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <%== render("components/copieble_content", locals: { content: nic[:private_ipv4], message: "Copied Private IPv4" }) %>
+              <%== render("components/copyable_content", locals: { content: nic[:private_ipv4], message: "Copied Private IPv4" }) %>
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <%== render("components/copieble_content", locals: { content: nic[:private_ipv6], message: "Copied Private IPv6" }) %>
+              <%== render("components/copyable_content", locals: { content: nic[:private_ipv6], message: "Copied Private IPv6" }) %>
             </td>
           </tr>
         <% end %>

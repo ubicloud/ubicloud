@@ -1,6 +1,6 @@
 <% revealable ||= false %>
 
-<span class="copieble-content inline-flex items-center" data-content="<%= content %>" data-message="<%= message %>">
+<span class="copyable-content inline-flex items-center" data-content="<%= content %>" data-message="<%= message %>">
   <% if revealable %>
     <%== render("components/revealable_content", locals: { content: content }) %>
   <% else %>

@@ -19,7 +19,7 @@
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
             <% if lb[:hostname] %>
-              <%== render("components/copieble_content", locals: { content: lb[:hostname], message: "Copied hostname" }) %>
+              <%== render("components/copyable_content", locals: { content: lb[:hostname], message: "Copied hostname" }) %>
             <% else %>
               Waiting for hostname to be ready
             <% end %>
