@@ -44,7 +44,7 @@
   if @pg[:connection_string] == ""
     data.push(["Connection String", "Waiting for host to be ready..."])
   else
-    data.push(["Connection String", @pg[:connection_string], { copieble: true, revealable: true }])
+    data.push(["Connection String", @pg[:connection_string], { copyable: true, revealable: true }])
   end %>
 
   <div class="grid grid-cols-1 gap-6 md:grid-cols-6">

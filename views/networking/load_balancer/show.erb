@@ -23,7 +23,7 @@
       data: [
         ["ID", @lb[:id]],
         ["Name", @lb[:name]],
-        ["Connection String", @lb[:hostname], { copieble: true }],
+        ["Connection String", @lb[:hostname], { copyable: true }],
         [
           "Private Subnet",
           "<a href='#{@project_data[:path]}/location/#{@lb[:location]}/private-subnet/#{@lb[:subnet]}' class='text-rose-500 hover:underline'>#{@lb[:subnet]}</a>",
