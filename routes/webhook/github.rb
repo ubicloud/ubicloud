@@ -4,10 +4,7 @@ class Clover
   hash_branch(:webhook_prefix, "github") do |r|
     r.post true do
       body = r.body.read
-      unless check_signature(r.headers["x-hub-signature-256"], body)
-        response.status = 401
-        r.halt
-      end
+      next 401 unless check_signature(r.headers["x-hub-signature-256"], body)
 
       response.headers["Content-Type"] = "application/json"
 

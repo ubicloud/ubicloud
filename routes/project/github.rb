@@ -41,11 +41,7 @@ class Clover
         end
 
         r.on String do |installation_id|
-          installation = GithubInstallation.from_ubid(installation_id)
-          unless installation
-            response.status = 404
-            r.halt
-          end
+          next unless (installation = GithubInstallation.from_ubid(installation_id))
 
           r.post true do
             cache_enabled = r.params["cache_enabled"] == "true"
@@ -68,18 +64,12 @@ class Clover
         end
 
         r.is String do |entry_ubid|
-          entry = GithubCacheEntry.from_ubid(entry_ubid)
-
-          unless entry
-            response.status = 404
-            r.halt
-          end
+          next unless (entry = GithubCacheEntry.from_ubid(entry_ubid))
 
           r.delete true do
             entry.destroy
             flash["notice"] = "Cache '#{entry.key}' deleted."
-            response.status = 204
-            request.halt
+            204
           end
         end
       end

@@ -35,6 +35,12 @@ class Clover < Roda
       scope.web?
     end
 
+  plugin :custom_block_results
+  handle_block_result Integer do |status_code|
+    response.status = status_code
+    nil
+  end
+
   plugin :route_csrf do |token|
     flash["error"] = "An invalid security token submitted with this request, please try again"
     response.status = 400

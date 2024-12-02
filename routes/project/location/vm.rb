@@ -21,8 +21,7 @@ class Clover
       vm = @project.vms_dataset.first(filter)
 
       unless vm
-        response.status = r.delete? ? 204 : 404
-        r.halt
+        next(r.delete? ? 204 : 404)
       end
 
       r.get true do
@@ -34,8 +33,7 @@ class Clover
       r.delete true do
         authorize("Vm:delete", vm.id)
         vm.incr_destroy
-        response.status = 204
-        nil
+        204
       end
     end
 
@@ -44,8 +42,7 @@ class Clover
       r.post { vm_post(vm_name) }
 
       r.delete do
-        response.status = 204
-        nil
+        204
       end
     end
   end

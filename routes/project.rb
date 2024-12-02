@@ -41,8 +41,7 @@ class Clover
       @project = nil unless @project&.visible
 
       unless @project
-        response.status = r.delete? ? 204 : 404
-        r.halt
+        next(r.delete? ? 204 : 404)
       end
 
       if @project.accounts_dataset.where(Sequel[:accounts][:id] => current_account_id).empty?
@@ -79,8 +78,7 @@ class Clover
 
         @project.soft_delete
 
-        response.status = 204
-        r.halt
+        204
       end
 
       if web?

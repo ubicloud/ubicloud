@@ -21,8 +21,7 @@ class Clover
       ps = @project.private_subnets_dataset.first(filter)
 
       unless ps
-        response.status = request.delete? ? 204 : 404
-        next
+        next (r.delete? ? 204 : 404)
       end
 
       if web?
@@ -69,8 +68,7 @@ class Clover
         end
 
         ps.incr_destroy
-        response.status = 204
-        nil
+        204
       end
     end
 
@@ -81,8 +79,7 @@ class Clover
       end
 
       r.delete do
-        response.status = 204
-        nil
+        204
       end
     end
   end
