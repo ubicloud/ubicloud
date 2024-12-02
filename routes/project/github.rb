@@ -5,7 +5,7 @@ class Clover
     r.on web? do
       unless Config.github_app_name
         response.status = 501
-        return "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
+        next "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
       end
 
       authorize("Project:github", @project.id)

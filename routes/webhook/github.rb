@@ -11,12 +11,12 @@ class Clover
       data = JSON.parse(body)
       case r.headers["x-github-event"]
       when "installation"
-        return handle_installation(data)
+        handle_installation(data)
       when "workflow_job"
-        return handle_workflow_job(data)
+        handle_workflow_job(data)
+      else
+        error("Unhandled event")
       end
-
-      return error("Unhandled event")
     end
   end
 
