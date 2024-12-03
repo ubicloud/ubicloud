@@ -201,6 +201,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def setup_environment
+    docker_daemon_json = JSON.generate({
+      "experimental" => false,
+      "dns-opts" => ["timeout:2", "attempts:3"]
+    })
     command = <<~COMMAND
       # To make sure the script errors out if any command fails
       set -ueo pipefail
@@ -220,6 +224,10 @@ class Prog::Vm::GithubRunner < Prog::Base
       # ubicloud/cache package which forked from the official actions/cache package, sends requests to UBICLOUD_CACHE_URL using this token.
       echo "UBICLOUD_RUNTIME_TOKEN=#{vm.runtime_token}
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
+
+      # We need to configure Docker to work with IPv6 properly. If the docker daemon config file exists, we append the new configuration to it.
+      ([ -f "/etc/docker/daemon.json" ] && sudo cat /etc/docker/daemon.json || echo '{}') | jq '. += #{docker_daemon_json}' | sudo tee /etc/docker/daemon.json
+      sudo systemctl restart docker
     COMMAND
 
     if github_runner.installation.cache_enabled
