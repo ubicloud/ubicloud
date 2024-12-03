@@ -218,7 +218,7 @@ RSpec.describe VmSetup do
       }
       expect(vs).to receive(:setup_taps_6).with(gua, [], "10.0.0.2")
       expect(vs).to receive(:routes4).with(ip4, "local_ip4", [])
-      expect(vs).to receive(:write_nftables_conf).with(ip4, gua, [])
+      expect(vs).to receive(:write_nftables_conf).with(ip4, gua, [], "10.0.0.2")
       expect(vs).to receive(:forwarding)
 
       expect(vps).to receive(:write_guest_ephemeral).with(guest_ephemeral.to_s)
@@ -287,12 +287,14 @@ table ip6 nat_metadata_endpoint {
 table ip nat {
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
+    ip daddr 123.123.123.123 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 10.0.0.2
     ip daddr 123.123.123.123 dnat to 192.168.5.50
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
     ip saddr 192.168.5.50 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 123.123.123.123
+    ip saddr 10.0.0.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 123.123.123.123
     ip saddr 192.168.5.50 ip daddr 192.168.5.50 snat to 123.123.123.123
   }
 }
@@ -306,7 +308,7 @@ table inet fw_table {
 }
 NFTABLES_CONF
       expect(vs).to receive(:apply_nftables)
-      vs.write_nftables_conf(ip4, gua, nics)
+      vs.write_nftables_conf(ip4, gua, nics, "10.0.0.2")
     end
   end
 

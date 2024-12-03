@@ -96,7 +96,7 @@ class VmSetup
     setup_veths_6(guest_ephemeral, clover_ephemeral, gua, ndp_needed)
     setup_taps_6(gua, nics, dns_ipv4)
     routes4(ip4, local_ip4, nics)
-    write_nftables_conf(ip4, gua, nics)
+    write_nftables_conf(ip4, gua, nics, dns_ipv4)
     forwarding
   end
 
@@ -321,13 +321,13 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     end
   end
 
-  def write_nftables_conf(ip4, gua, nics)
-    config = build_nftables_config(gua, nics, ip4)
+  def write_nftables_conf(ip4, gua, nics, dns_ipv4)
+    config = build_nftables_config(gua, nics, ip4, dns_ipv4)
     vp.write_nftables_conf(config)
     apply_nftables
   end
 
-  def generate_nat4_rules(ip4, private_ip)
+  def generate_nat4_rules(ip4, private_ip, dns_ipv4)
     return unless ip4
 
     public_ipv4 = NetAddr::IPv4Net.parse(ip4).network.to_s
@@ -337,12 +337,14 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     table ip nat {
       chain prerouting {
         type nat hook prerouting priority dstnat; policy accept;
+        ip daddr #{public_ipv4} ip saddr == {9.9.9.9, 149.112.112.112} dnat to #{dns_ipv4}
         ip daddr #{public_ipv4} dnat to #{private_ipv4}
       }
 
       chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
         ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
+        ip saddr #{dns_ipv4} ip daddr == {9.9.9.9, 149.112.112.112} snat to #{public_ipv4}
         ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
       }
     }
@@ -367,7 +369,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     nics.map { "ether saddr #{_1.mac} ip6 saddr != #{_1.net6} drop" }.join("\n")
   end
 
-  def build_nftables_config(gua, nics, ip4)
+  def build_nftables_config(gua, nics, ip4, dns_ipv4)
     guest_ephemeral = subdivide_network(NetAddr.parse_net(gua)).first
     <<~NFTABLES_CONF
       table ip raw {
@@ -403,7 +405,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       }
 
       # NAT4 rules
-      #{generate_nat4_rules(ip4, nics.first.net4)}
+      #{generate_nat4_rules(ip4, nics.first.net4, dns_ipv4)}
       table inet fw_table {
         chain forward_ingress {
           type filter hook forward priority filter; policy drop;
@@ -444,10 +446,7 @@ DHCP
       address=/.docker.io/::
       ADDRESSES
     else
-      <<~ADDRESSES
-      dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
-      listen-address=#{dnsmasq_address_ip6}
-      ADDRESSES
+      ""
     end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
@@ -461,8 +460,8 @@ no-resolv
 #{interfaces}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
-server=149.112.112.112
-server=9.9.9.9
+server=9.9.9.9@#{dns_ipv4}
+server=149.112.112.112@#{dns_ipv4}
 server=2620:fe::fe
 server=2620:fe::9
 dhcp-option=6,#{dns_ipv4}
@@ -472,6 +471,8 @@ bind-interfaces
 #{runner_config}
 dhcp-option=54,#{dns_ipv4}
 dns-forward-max=10000
+dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+listen-address=#{dnsmasq_address_ip6}
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|

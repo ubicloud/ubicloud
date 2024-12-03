@@ -57,6 +57,8 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
 
     ipv4_postrouting_rule = load_balancer.ipv4_enabled? ? "ip daddr @neighbor_ips_v4 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv4}:#{load_balancer.dst_port}" : ""
     ipv6_postrouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr @neighbor_ips_v6 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv6}:#{load_balancer.dst_port}" : ""
+
+    dns_ipv4 = vm.nics.first.private_subnet.net4.nth(2).to_s
     <<TEMPLATE
 table ip nat;
 delete table ip nat;
@@ -79,6 +81,7 @@ table inet nat {
 #{ipv6_prerouting_rule}
 
     # Basic NAT for public IPv4 to private IPv4
+    ip daddr #{public_ipv4} ip saddr == {9.9.9.9, 149.112.112.112} dnat to #{dns_ipv4}
     ip daddr #{public_ipv4} dnat to #{private_ipv4}
   }
 
@@ -88,6 +91,7 @@ table inet nat {
 #{ipv6_postrouting_rule}
 
     # Basic NAT for private IPv4 to public IPv4
+    ip saddr #{dns_ipv4} ip daddr == {9.9.9.9, 149.112.112.112} snat to #{public_ipv4}
     ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
     ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
   }
