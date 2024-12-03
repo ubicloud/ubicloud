@@ -121,7 +121,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:leaf?).and_return(true)
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
       expect(vm_host).to receive(:update).with(arch: "arm64")
-      expect(vm_host).to receive(:update).with(os_version: "ubuntu-22.04")
+      expect(vm_host).to receive(:update).with(os_version: "ubuntu-22.04", accepts_slices: false)
       expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),

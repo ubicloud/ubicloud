@@ -170,6 +170,8 @@ module Scheduling::Allocator
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
+      # Match the slice allocation to the hosts that can accept it
+      ds = ds.where(accepts_slices: request.use_slices)
 
       # For debugging purposes, dump the full SQL query text to a file, so it can be run directly against the DB server
       # TODO-MACIEK - turn this into something more managable
