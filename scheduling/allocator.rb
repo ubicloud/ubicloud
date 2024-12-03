@@ -33,7 +33,8 @@ module Scheduling::Allocator
       location_filter,
       location_preference,
       vm.use_slices_for_allocation?,
-      vm.can_share_slice?
+      vm.can_share_slice?,
+      vm.enable_diagnostics?
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -44,7 +45,7 @@ module Scheduling::Allocator
 
   Request = Struct.new(:vm_id, :family, :cores, :cpu_percent_limit, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
     :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference,
-    :use_slices, :can_share_slice)
+    :use_slices, :can_share_slice, :enable_diagnostics)
 
   class Allocation
     attr_reader :score
@@ -173,9 +174,11 @@ module Scheduling::Allocator
       # Match the slice allocation to the hosts that can accept it
       ds = ds.where(accepts_slices: request.use_slices)
 
-      # For debugging purposes, dump the full SQL query text to a file, so it can be run directly against the DB server
-      # TODO-MACIEK - turn this into something more managable
-      # File.write("./allocator.sql", ds.prepare(:select, :allocator_query).sql) if request.can_share_slice
+      # For debugging purposes, write the full SQL query, with expanded parameters, to a file,
+      # so it can be run directly against the DB server
+      # :nocov:
+      File.write(File.expand_path("~/allocator.sql"), ds.prepare(:select, :allocator_query).sql) if request.enable_diagnostics
+      # :nocov:
 
       ds.all
     end

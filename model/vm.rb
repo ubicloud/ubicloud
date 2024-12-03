@@ -88,6 +88,10 @@ class Vm < Sequel::Model
     use_slices_for_allocation? && (cpus * 100) > cpu_percent_limit
   end
 
+  def enable_diagnostics?
+    projects.first.get_ff_enable_diagnostics || false
+  end
+
   # cloud-hypervisor takes topology information in this format:
   #
   # topology=<threads_per_core>:<cores_per_die>:<dies_per_package>:<packages>

@@ -21,15 +21,15 @@ RSpec.describe Al do
 
   before do
     allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(nil)
+    allow(project).to receive(:get_ff_enable_diagnostics).and_return(nil)
+    allow(project).to receive(:get_ff_vm_public_ssh_keys).and_return(nil)
     allow(vm).to receive_messages(projects: [project])
   end
 
   def create_vm_with_project(use_slices: nil, **args)
     vm = create_vm(**args)
-    allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(use_slices)
-    allow(project).to receive(:get_ff_vm_public_ssh_keys).and_return(nil)
     allow(vm).to receive_messages(projects: [project])
-
+    allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(use_slices)
     vm
   end
 
@@ -60,7 +60,7 @@ RSpec.describe Al do
           "2464de61-7501-8374-9ab0-416caebe31da", "standard", 1, 200, 8, 33,
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-          "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [], false, false
+          "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [], false, false, false
         )).and_return(al)
       expect(al).to receive(:update)
 
@@ -74,7 +74,7 @@ RSpec.describe Al do
         "2464de61-7501-8374-9ab0-416caebe31da", "standard", 2, 400, 8, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
-        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false, false
+        "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false, false, false
       )
     }
 
@@ -506,7 +506,7 @@ RSpec.describe Al do
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
     end
 
-    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false)
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false, enable_diagnostics: false)
       Al::Request.new(
         vm.id,
         vm.family,
@@ -527,7 +527,8 @@ RSpec.describe Al do
         location_filter,
         location_preference,
         use_slices,
-        can_share_slice
+        can_share_slice,
+        enable_diagnostics
       )
     end
 
@@ -748,7 +749,7 @@ RSpec.describe Al do
       PciDevice.create_with_id(vm_host_id: vmh.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
     end
 
-    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false)
+    def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, can_share_slice: false, enable_diagnostics: false)
       Al::Request.new(
         vm.id,
         vm.family,
@@ -769,7 +770,8 @@ RSpec.describe Al do
         location_filter,
         location_preference,
         use_slices,
-        can_share_slice
+        can_share_slice,
+        enable_diagnostics
       )
     end
 
