@@ -26,12 +26,7 @@ class Clover
         authorize("Firewall:delete", firewall.id)
         firewall.private_subnets.map { authorize("PrivateSubnet:edit", _1.id) }
         firewall.destroy
-
-        if api?
-          204
-        else
-          {message: "Deleting #{firewall.name}"}
-        end
+        204
       end
 
       r.get true do

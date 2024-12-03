@@ -139,7 +139,7 @@ class Clover
 
             payment_method.destroy
 
-            {message: "Deleting #{payment_method.ubid}"}
+            204
           end
         end
       end
