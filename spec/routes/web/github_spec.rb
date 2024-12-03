@@ -23,7 +23,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123&installation_id=#{installation.installation_id}"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - Active Runners")
     expect(page).to have_content("GitHub runner integration is already enabled for #{project.name} project.")
   end
 
@@ -75,7 +75,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=invalid"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
     expect(page).to have_content("GitHub App installation failed.")
   end
 
@@ -86,7 +86,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
     expect(page).to have_content("GitHub App installation failed.")
   end
 
@@ -109,7 +109,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123&installation_id=345"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - Active Runners")
     expect(page).to have_content("GitHub runner integration is enabled for #{project.name} project.")
     installation = GithubInstallation[installation_id: 345]
     expect(installation.name).to eq("test-user")

@@ -1,11 +1,4 @@
-<% @page_title = "GitHub Runners" %>
-
-<%== render(
-  "components/page_header",
-  locals: {
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["GitHub Runners", "#{@project_data[:path]}/github"], ["Caches", "#"]]
-  }
-) %>
+<% @page_title = "Caches" %>
 
 <%== render("github/tabbar") %>
 

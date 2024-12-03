@@ -1,18 +1,7 @@
-<% @page_title = "GitHub Runners" %>
+<% @page_title = "GitHub Runner Settings" %>
 
 <% if @installations.count > 0 %>
   <div class="auto-refresh hidden" data-interval="10"></div>
-  <%== render(
-    "components/page_header",
-    locals: {
-      breadcrumbs: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["GitHub Runners", "#{@project_data[:path]}/github"],
-        %w[Settings #]
-      ]
-    }
-  ) %>
 
   <%== render("github/tabbar") %>
 
