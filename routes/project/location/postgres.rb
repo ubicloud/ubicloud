@@ -20,9 +20,7 @@ class Clover
       filter[:location] = @location
       pg = @project.postgres_resources_dataset.first(filter)
 
-      unless pg
-        next (r.delete? ? 204 : 404)
-      end
+      next (r.delete? ? 204 : 404) unless pg
 
       r.get true do
         authorize("Postgres:view", pg.id)

@@ -20,9 +20,7 @@ class Clover
       filter[:location] = @location
       firewall = @project.firewalls_dataset.first(filter)
 
-      unless firewall
-        next (r.delete? ? 204 : 404)
-      end
+      next (r.delete? ? 204 : 404) unless firewall
 
       r.delete true do
         authorize("Firewall:delete", firewall.id)

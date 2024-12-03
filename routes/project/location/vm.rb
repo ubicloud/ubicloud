@@ -20,9 +20,7 @@ class Clover
       filter[:location] = @location
       vm = @project.vms_dataset.first(filter)
 
-      unless vm
-        next(r.delete? ? 204 : 404)
-      end
+      next(r.delete? ? 204 : 404) unless vm
 
       r.get true do
         authorize("Vm:view", vm.id)
