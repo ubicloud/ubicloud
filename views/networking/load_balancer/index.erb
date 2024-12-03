@@ -1,5 +1,10 @@
-<% @page_title = "Load Balancers" %>
+<% @page_title = "Load Balancers"
+@right_items = has_project_permission("LoadBalancer:create") ? [
+  render("components/button", locals: { text: "Create Load Balancer", link: "#{@project_data[:path]}/load-balancer/create" })
+] : [] %>
+
 <%== render("networking/tabbar") %>
+
 <% if @lbs.count > 0 %>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <table class="min-w-full divide-y divide-gray-300">
@@ -28,13 +33,6 @@
         <% end %>
       </tbody>
     </table>
-  </div>
-  <div class="flex justify-end space-y-1 mt-6">
-    <% if has_project_permission("LoadBalancer:create")%>
-      <%== render(
-        "components/button", locals: { text: "Create Load Balancer", link: "load-balancer/create" })
-      %>
-    <% end %>
   </div>
 <% else %>
 <div class="mt-6">

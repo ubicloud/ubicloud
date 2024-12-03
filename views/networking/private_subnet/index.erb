@@ -1,5 +1,10 @@
-<% @page_title = "Private Subnets" %>
+<% @page_title = "Private Subnets"
+@right_items = has_project_permission("PrivateSubnet:create") ? [
+  render("components/button", locals: { text: "Create Private Subnet", link: "#{@project_data[:path]}/private-subnet/create" })
+] : [] %>
+
 <%== render("networking/tabbar") %>
+
 <% if @pss.count > 0 %>
   <div class="grid gap-6">
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -28,13 +33,6 @@
         </tbody>
       </table>
     </div>
-  </div>
-  <div class="flex justify-end space-y-1 mt-6">
-    <% if has_project_permission("PrivateSubnet:create")%>
-    <%== render(
-      "components/button", locals: { text: "Create Private Subnet", link: "private-subnet/create" })
-    %>
-    <% end %>
   </div>
 <% else %>
   <div class="mt-6">
