@@ -1,4 +1,17 @@
 <%== render(
+  "components/page_header",
+  locals: {
+    title: "GitHub Runners Integration",
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["GitHub Runners", "#{@project_data[:path]}/github"],
+      [@page_title, "#"]
+    ]
+  }
+) %>
+
+<%== render(
   "components/tabbar",
   locals: {
     tabs: [

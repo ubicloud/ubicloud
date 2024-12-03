@@ -55,7 +55,7 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/installation/create"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
       expect(page).to have_content "Project doesn't have valid billing information"
     end
 
@@ -80,7 +80,7 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/setting"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
       expect(page).to have_content "test-user"
       expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins1.installation_id}/
       expect(page).to have_content "test-org"
@@ -135,7 +135,7 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/runner"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page.title).to eq("Ubicloud - Active Runners")
       expect(page).to have_content runner_deleted.ubid
       expect(page).to have_content "deleted"
       expect(page).to have_content "Runner doesn't have a job yet"
