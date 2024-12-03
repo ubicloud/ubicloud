@@ -92,15 +92,15 @@ RSpec.describe Authorization do
     end
   end
 
-  describe "#authorized_resources" do
+  describe "#authorized_resources_dataset" do
     it "returns resource ids when has matched policies" do
       ids = [vms[0].id, vms[1].id, projects[0].id, users[0].id, vms[0].private_subnets[0].id, vms[1].private_subnets[0].id, vms[0].firewalls[0].id, vms[1].firewalls[0].id]
-      expect(described_class.authorized_resources(users[0].id, "Vm:view").sort).to eq(ids.sort)
+      expect(described_class.authorized_resources_dataset(users[0].id, "Vm:view").map(:tagged_id).sort).to eq(ids.sort)
     end
 
     it "returns no resource ids when has no matched policies" do
       access_policy.update(body: [])
-      expect(described_class.authorized_resources(users[0].id, "Vm:view")).to eq([])
+      expect(described_class.authorized_resources_dataset(users[0].id, "Vm:view")).to be_empty
     end
   end
 
