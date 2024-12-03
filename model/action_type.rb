@@ -4,6 +4,10 @@ require_relative "../model"
 
 class ActionType < Sequel::Model
   plugin :static_cache
+
+  NAME_MAP = {}
+  each { |t| NAME_MAP[t.name] = t.id }
+  NAME_MAP.freeze
 end
 
 # Table: action_type
