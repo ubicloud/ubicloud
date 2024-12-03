@@ -1,4 +1,13 @@
 <%== render(
+  "components/page_header",
+  locals: {
+    title: "Networking",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [@page_title, "#"]],
+    right_items: @right_items
+  }
+) %>
+
+<%== render(
   "components/tabbar",
   locals: {
     tabs: [
