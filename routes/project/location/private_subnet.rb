@@ -20,9 +20,7 @@ class Clover
       filter[:location] = @location
       ps = @project.private_subnets_dataset.first(filter)
 
-      unless ps
-        next (r.delete? ? 204 : 404)
-      end
+      next (r.delete? ? 204 : 404) unless ps
 
       if web?
         r.post "connect" do
