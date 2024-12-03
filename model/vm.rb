@@ -181,12 +181,34 @@ class Vm < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       session[:ssh_session].exec!("systemctl is-active #{inhost_name} #{inhost_name}-dnsmasq").split("\n").all?("active") ? "up" : "down"
+      if load_balancer&.active_cert && (vm_state = load_balancer.load_balancers_vms_dataset.where(vm_id: id).get(:state)) && ["up", "down"].include?(vm_state)
+        cmd = if load_balancer.health_check_protocol == "tcp"
+          "sudo ip netns exec #{inhost_name} nc -z -w #{load_balancer.health_check_timeout} #{nics.first.private_ipv4.network} #{load_balancer.dst_port} && echo 200 || echo 400"
+        else
+          "sudo ip netns exec #{inhost_name} curl --insecure --resolve #{load_balancer.hostname}:#{load_balancer.dst_port}:#{nics.first.private_ipv4.network} --max-time #{load_balancer.health_check_timeout} --silent --output /dev/null --write-out '%{http_code}' #{load_balancer.health_check_protocol}://#{load_balancer.hostname}:#{load_balancer.dst_port}#{load_balancer.health_check_endpoint}"
+        end
+
+        vm_host.sshable.cmd(cmd)
+      end
     rescue
       "down"
     end
     pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
 
+    if load_balancer&.active_cert && (vm_state, vm_state_counter = load_balancer.load_balancers_vms_dataset.where(vm_id: id).get([:state, :state_counter])) && ["up", "down"].include?(vm_state)
+      threshold, health_check = (reading == "down") ?
+        [load_balancer.health_check_down_threshold, "down"] :
+        [load_balancer.health_check_up_threshold, "up"]
+      counter = (vm_state == health_check) ? vm_state_counter + 1 : 1
+
+      load_balancer.load_balancers_vms_dataset.where(vm_id: id).update(state: health_check, state_counter: counter)
+      if counter == threshold
+        load_balancer.incr_update_load_balancer
+      end
+    end
+
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
+      load_balancer&.incr_
       incr_checkup
     end
 
