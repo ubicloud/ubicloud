@@ -17,6 +17,7 @@ end
 Sequel::Model.plugin :many_through_many
 Sequel::Model.plugin :insert_conflict
 Sequel::Model.plugin :inspect_pk
+Sequel::Model.plugin :static_cache_cache, "cache/static_cache.cache"
 
 module SemaphoreMethods
   def self.included(base)
