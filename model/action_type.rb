@@ -3,6 +3,7 @@
 require_relative "../model"
 
 class ActionType < Sequel::Model
+  plugin :static_cache
 end
 
 # Table: action_type
