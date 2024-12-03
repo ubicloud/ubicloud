@@ -25,10 +25,6 @@ module Authorization
     matched_policies_dataset(subject_id, actions).select(Sequel[:applied_tag][:tagged_id])
   end
 
-  def self.authorized_resources(subject_id, actions)
-    matched_policies_dataset(subject_id, actions).select_map(Sequel[:applied_tag][:tagged_id])
-  end
-
   def self.expand_actions(actions)
     extended_actions = Set["*"]
     Array(actions).each do |action|
