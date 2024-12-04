@@ -15,8 +15,6 @@ class Account < Sequel::Model(:accounts)
     "user/#{email}"
   end
 
-  include Authorization::TaggableMethods
-
   def create_project_with_default_policy(name, default_policy: true)
     project = Project.create_with_id(name: name)
     project.associate_with_project(project)
