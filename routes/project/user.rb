@@ -16,12 +16,6 @@ class Clover
         view "project/token"
       end
 
-      r.get "policy" do
-        @policy = Serializers::AccessPolicy.serialize(@project.access_policies_dataset.where(managed: false).first) || {body: {acls: []}.to_json}
-
-        view "project/policy"
-      end
-
       r.post true do
         email = r.params["email"]
         policy = r.params["policy"]
@@ -88,24 +82,11 @@ class Clover
 
           r.redirect "#{@project.path}/user"
         end
+      end
 
-        r.post "advanced" do
-          body = r.params["body"]
-          begin
-            fail JSON::ParserError unless JSON.parse(body).is_a?(Hash)
-          rescue JSON::ParserError
-            flash["error"] = "The policy isn't a valid JSON object."
-            redirect_back_with_inputs
-          end
-
-          if (policy = @project.access_policies_dataset.where(managed: false).first)
-            policy.update(body: body)
-          else
-            AccessPolicy.create_with_id(project_id: @project.id, name: "advanced", managed: false, body: body)
-          end
-
-          flash["notice"] = "Advanced policy updated for '#{@project.name}'"
-          r.redirect "#{@project.path}/user/policy"
+      r.on "access-control" do
+        r.get true do
+          view "project/access-control"
         end
       end
 
