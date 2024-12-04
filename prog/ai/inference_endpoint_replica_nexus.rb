@@ -8,7 +8,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   subject_is :inference_endpoint_replica
 
   extend Forwardable
-  def_delegators :inference_endpoint_replica, :vm, :inference_endpoint
+  def_delegators :inference_endpoint_replica, :vm, :inference_endpoint, :load_balancers_vm
 
   semaphore :destroy
 
@@ -128,12 +128,12 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       hop_wait
     end
 
-    create_page unless inference_endpoint.maintenance_set?
+    create_page unless inference_endpoint.maintenance_set? || load_balancers_vm.state_counter <= inference_endpoint.load_balancer.health_check_down_threshold
     nap 30
   end
 
   def available?
-    inference_endpoint.load_balancer.reload.active_vms.map { _1.id }.include? vm.id
+    load_balancers_vm.reload.state == "up"
   end
 
   def create_page
