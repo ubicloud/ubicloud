@@ -4,7 +4,6 @@ require_relative "../model"
 
 class ApiKey < Sequel::Model
   include ResourceMethods
-  include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
 
   one_to_many :access_tags, key: :hyper_tag_id
