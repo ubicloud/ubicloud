@@ -96,12 +96,15 @@ RSpec.describe Project do
 
   describe ".soft_delete" do
     it "deletes github installations" do
-      expect(project).to receive(:access_tags_dataset).and_return(instance_double(AccessTag, destroy: nil))
-      expect(project).to receive(:access_policies_dataset).and_return(instance_double(AccessPolicy, destroy: nil))
+      SubjectTag.create_with_id(project_id: project.id, name: "test").add_subject(project.id)
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: project.id)
+      expect(project).to receive(:access_tags_dataset).and_return(instance_double(AccessTag.dataset.class, destroy: nil))
       expect(project).to receive(:github_installations).and_return([instance_double(GithubInstallation)])
       expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble)
       expect(project).to receive(:update).with(visible: false)
       project.soft_delete
+      expect(SubjectTag.all).to be_empty
+      expect(AccessControlEntry.all).to be_empty
     end
   end
 

@@ -77,6 +77,9 @@ class Project < Sequel::Model
     DB.transaction do
       access_tags_dataset.destroy
       access_policies_dataset.destroy
+      access_control_entries_dataset.destroy
+      DB[:applied_subject_tag].where(tag_id: subject_tags_dataset.select(:id)).delete
+      subject_tags_dataset.destroy
       github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(_1) }
 
       # We still keep the project object for billing purposes.
