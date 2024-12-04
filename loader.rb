@@ -74,6 +74,8 @@ module Prog::Minio; end
 
 module Prog::Postgres; end
 
+module Prog::Kubernetes; end
+
 module Prog::Storage; end
 
 module Prog::Vm; end
@@ -200,6 +202,7 @@ def clover_freeze
     Prog::Github,
     Prog::Minio,
     Prog::Postgres,
+    Prog::Kubernetes,
     Prog::Storage,
     Prog::Vm,
     Prog::Vnet,

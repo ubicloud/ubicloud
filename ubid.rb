@@ -73,6 +73,8 @@ class UBID
   TYPE_CERT = "ce"
   TYPE_INFERENCE_ENDPOINT = "1e"
   TYPE_INFERENCE_ENDPOINT_REPLICA = "1r"
+  TYPE_KUBERNETES_CLUSTER = "kc"
+  TYPE_KUBERNETES_NODEPOOL = "kn"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
