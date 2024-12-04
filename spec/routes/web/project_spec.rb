@@ -186,25 +186,33 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content user.email
         expect(page).to have_no_content user2.email
 
+        subject_tag = project.subject_tags.first
+        expect(ProjectInvitation.count).to eq 0
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
+
         fill_in "Email", with: user2.email
         select "Admin", from: "policy"
         click_button "Invite"
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
-        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Admin")
+        expect(ProjectInvitation.count).to eq 0
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).not_to be_nil
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
       it "can invite existing user to project without a default policy" do
         visit "#{project.path}/user"
 
+        subject_tag = project.subject_tags.first
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
+
         fill_in "Email", with: user2.email
-        select "No policy", from: "policy"
+        select "No access", from: "policy"
         click_button "Invite"
 
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
         expect(page).to have_content user2.email
-        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: nil)
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -318,8 +326,10 @@ RSpec.describe Clover, "project" do
 
       it "can update default policy of invited user" do
         invited_email = "invited@example.com"
-        project.add_invitation(email: invited_email, policy: "member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
-        inv2 = project.add_invitation(email: "invited2@example.com", policy: "member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        SubjectTag.create_with_id(project_id: project.id, name: "Member")
+
+        project.add_invitation(email: invited_email, policy: "Member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        inv2 = project.add_invitation(email: "invited2@example.com", policy: "Member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
         visit "#{project.path}/user"
 
