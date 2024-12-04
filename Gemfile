@@ -64,6 +64,7 @@ group :test do
   gem "pdf-reader"
   gem "turbo_tests"
   gem "simplecov"
+  gem "text-table"
 end
 
 group :test, :development do

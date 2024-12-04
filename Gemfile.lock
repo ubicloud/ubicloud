@@ -328,6 +328,7 @@ GEM
     stripe (12.6.0)
     syntax_tree (6.2.0)
       prettier_print (>= 1.2.0)
+    text-table (1.2.4)
     tilt (2.4.0)
     timeout (0.4.2)
     tpm-key_attestation (0.12.1)
@@ -429,6 +430,7 @@ DEPENDENCIES
   simplecov
   standard (>= 1.24.3)
   stripe
+  text-table
   tilt (>= 2.2)
   turbo_tests
   warning

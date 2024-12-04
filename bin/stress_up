@@ -1,0 +1,206 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../loader"
+require "text-table"
+
+STRESSNG_REPORT_YAML = "report.yml"
+STRESSNG_LOAD_COMMAND = "stress-ng --cpu 1 --cpu-load 75 --cpu-load-slice 80 --iomix 1 --timeout 60s --metrics --yaml #{STRESSNG_REPORT_YAML}"
+STRESSNG_ITERATIONS = 3
+
+def open_host_session_to(host)
+  ip = host.sshable_address.ip.network.to_s
+  user = "root"
+
+  puts "Connecting to #{user}@#{ip} (host) ..."
+  session = Net::SSH.start(ip, user)
+
+  yield session if block_given?
+end
+
+def open_vm_session_to(vm)
+  ip = vm.assigned_vm_address.ip.network.to_s
+  user = vm.unix_user
+
+  puts "Connecting to #{user}@#{ip} (#{vm.name}) ..."
+  session = Net::SSH.start(ip, user)
+
+  yield session if block_given?
+end
+
+def run(session, command)
+  session.open_channel do |channel|
+    channel.on_data do |ch, data|
+      yield data.chomp if block_given?
+    end
+
+    channel.on_extended_data do |ch, type, data|
+      yield data.chomp if block_given?
+    end
+
+    channel.exec command
+  end
+  session.loop
+end
+
+def run_stress_once(session)
+  # run the stress load command on the VM
+  run session, STRESSNG_LOAD_COMMAND do |output|
+    fail "stress-ng is not installed" if output.include? "not found"
+    # puts output
+    print(".")
+  end
+
+  # get back the results and extract the number of operations
+  report_str = StringIO.new
+  run session, "cat #{STRESSNG_REPORT_YAML}" do |output|
+    report_str.write(output)
+  end
+
+  report = YAML.load(report_str.string.freeze)
+  cpu_ops = report["metrics"][0]["bogo-ops"]
+  io_ops = report["metrics"][1]["bogo-ops"]
+
+  [cpu_ops, io_ops]
+end
+
+def run_stress(session)
+  ops_total = [0, 0]
+
+  STRESSNG_ITERATIONS.times do
+    ops = run_stress_once session
+    ops_total[0] += ops[0]
+    ops_total[1] += ops[1]
+
+    # Cool off time
+    sleep 1
+  end
+
+  # return the total number of operations
+  {total_cpu_ops: ops_total[0], total_io_ops: ops_total[1]}
+end
+
+def get_path_to_host_cgroup(vm)
+  "/sys/fs/cgroup/#{vm.vm_host_slice.inhost_name}/#{vm.inhost_name}.service"
+end
+
+def capture_stats(session, vm)
+  relevant = ["usage_usec", "nr_periods", "nr_throttled", "throttled_usec", "nr_bursts", "burst_usec"]
+  path = get_path_to_host_cgroup vm
+
+  stats_str = StringIO.new
+  run session, "cat #{path}/cpu.stat" do |output|
+    stats_str.write(output)
+  end
+
+  # process the stats output
+  stats = {}
+  stats_lines = stats_str.string.split("\n")
+  stats_lines.each do |line|
+    pair = line.split(" ")
+    if pair.length == 2 && relevant.include?(pair[0])
+      stats.store(pair[0].to_sym, pair[1].to_i)
+    end
+  end
+
+  stats
+end
+
+def diff_stats(stats_begin, stats_end)
+  fail "Make sure the begin and end stats have the same number of elements" if stats_begin.length != stats_end.length
+
+  diff_usage = 0
+  diff_throttled = 0
+  diff_burst = 0
+
+  stats_diff = {}
+  stats_begin.each do |k, v|
+    case k
+    when :usage_usec
+      diff_usage = stats_end[k] - v
+      stats_diff.store(:usage_msec, diff_usage / 1000)
+    when :throttled_usec
+      diff_throttled = stats_end[k] - v
+      stats_diff.store(:throttled_msec, diff_throttled / 1000)
+    when :burst_usec
+      diff_burst = stats_end[k] - v
+      stats_diff.store(:burst_msec, diff_burst / 1000)
+    else
+      stats_diff.store(k, stats_end[k] - v)
+    end
+  end
+
+  stats_diff.store(:percent_throttled, (diff_throttled * 100) / (diff_usage + diff_throttled))
+  stats_diff.store(:percent_bursts, ((diff_burst * 100) / (diff_usage - diff_burst)))
+
+  stats_diff
+end
+
+# ################################################################################################################
+# MAIN
+#
+puts "start time           : #{Time.now}"
+
+vm_list = []
+
+while (vm_name = ARGV.shift)
+  vm = Vm.all.find { |vm| vm.name == vm_name }
+  vm_list << vm unless vm.nil?
+end
+
+# If no arguments given, run the load on each VM
+if vm_list.empty?
+  vm_list += Vm.all
+end
+
+if vm_list.empty?
+  fail "No VMs are available to run the load test"
+end
+
+# Make sure we have all VMs on the same host
+vm_host = vm_list.first.vm_host
+vm_list.each do |vm|
+  fail "All VMs must reside on the same host" if vm.vm_host.id != vm_host.id
+end
+
+total_stats = {}
+threads = vm_list.map do |vm|
+  Thread.new do
+    open_host_session_to(vm.vm_host) do |host_ssh|
+      open_vm_session_to vm do |vm_ssh|
+        # Get the statistics before the test
+        stats_begin = capture_stats host_ssh, vm
+
+        # Run the actual load test
+        final_stats = run_stress vm_ssh
+
+        # Get the statistics after the test
+        stats_end = capture_stats host_ssh, vm
+
+        final_stats.merge!(diff_stats(stats_begin, stats_end))
+        total_stats.store("#{vm.name} (#{vm.display_size})", final_stats)
+      end
+    end
+  end
+end
+
+puts "threads started      : #{threads.length}"
+puts "stress run command   : #{STRESSNG_LOAD_COMMAND}"
+puts "stress run iterations: #{STRESSNG_ITERATIONS}"
+puts ""
+threads.each(&:join)
+puts ""
+
+# Output all stats for all the runs
+total_stats.each do |vm_name, final_stats|
+  table = Text::Table.new
+  table.head = ["metric", "result"]
+  final_stats.each do |k, v|
+    table.rows << [k.to_s, v.to_s]
+  end
+  puts "\nStatistics for #{vm_name}"
+  puts table
+end
+
+puts ""
+puts "end time             : #{Time.now}"
