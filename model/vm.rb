@@ -33,8 +33,6 @@ class Vm < Sequel::Model
     "project/#{project.ubid}/location/#{display_location}/vm/#{name}"
   end
 
-  include Authorization::TaggableMethods
-
   def firewalls
     private_subnets.flat_map(&:firewalls)
   end
