@@ -125,22 +125,7 @@ paths:
       summary: Return the list of firewalls in the project
       responses:
         '200':
-          description: Firewall list retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Firewall'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/Firewalls'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -166,11 +151,7 @@ paths:
                 - name
       responses:
         '200':
-          description: Firewall created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Firewall'
+          $ref: '#/components/responses/Firewall'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -194,11 +175,7 @@ paths:
       summary: Get details of a specific firewall
       responses:
         '200':
-          description: Details of the firewall
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Firewall'
+          $ref: '#/components/responses/Firewall'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -374,22 +351,7 @@ paths:
       summary: Return the list of firewalls in the project and location
       responses:
         '200':
-          description: Firewall list retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Firewall'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/Firewalls'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -478,11 +440,7 @@ paths:
       summary: Get details of a specific firewall
       responses:
         '200':
-          description: Details of the firewall
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Firewall'
+          $ref: '#/components/responses/Firewall'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -635,11 +593,7 @@ paths:
               additionalProperties: false
       responses:
         '200':
-          description: Firewall created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Firewall'
+          $ref: '#/components/responses/Firewall'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2360,6 +2314,29 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Firewall:
+      description: A Firewall
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Firewall'
+    Firewalls:
+      description: A list of Firewalls
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Firewall'
+            additionalProperties: false
+            required:
+              - count
+              - items
     Project:
       description: A Project
       content:
