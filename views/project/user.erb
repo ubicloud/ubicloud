@@ -81,15 +81,7 @@
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%= user[:email] %>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%== render(
-                    "components/form/policy_select",
-                    locals: {
-                      name: "user_policies[#{user[:ubid]}]",
-                      selected: @user_policies[user[:ubid]]
-                    }
-                  ) %>
-                </td>
+                <td></td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== render(
                     "components/delete_button",
