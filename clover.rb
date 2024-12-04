@@ -349,11 +349,9 @@ class Clover < Roda
     after_create_account do
       account = Account[account_id]
       account.create_project_with_default_policy("Default")
-      ProjectInvitation.where(email: account.email).each do |inv|
+      ProjectInvitation.where(email: account.email).all do |inv|
         account.associate_with_project(inv.project)
-        if (managed_policy = Authorization::ManagedPolicy.from_name(inv.policy))
-          managed_policy.apply(inv.project, [account], append: true)
-        end
+        inv.project.subject_tags_dataset.first(name: inv.policy)&.add_subject(account_id)
         inv.destroy
       end
     end
