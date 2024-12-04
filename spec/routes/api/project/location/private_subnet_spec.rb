@@ -192,6 +192,26 @@ RSpec.describe Clover, "private_subnet" do
         expect(last_response).to have_api_error(409, "Private subnet 'dummy-ps-1' has VMs attached, first, delete them.")
       end
 
+      it "if all dependent vms are marked for deletion the subnet can be deleted" do
+        st = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
+        st.subject.incr_destroy
+
+        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(ps.id).set?("destroy")).to be true
+      end
+
+      it "if all dependent vms are being deleted the subnet can be deleted" do
+        st = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
+        st.update(label: "destroy")
+
+        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(ps.id).set?("destroy")).to be true
+      end
+
       it "not exist" do
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/foo_name"
 

@@ -61,7 +61,7 @@ class Clover
 
       request.delete true do
         authorize("PrivateSubnet:delete", ps.id)
-        unless ps.vms_dataset.empty?
+        unless ps.vms.all? { _1.destroy_set? || _1.strand.nil? || _1.strand.label == "destroy" }
           fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
