@@ -250,22 +250,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of Load Balancers in a specific project
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/LoadBalancer'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/LoadBalancers'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -279,11 +264,7 @@ paths:
       summary: Get details of a specific Load Balancer
       responses:
         '200':
-          description: A list of Load Balancers in a specific project
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -325,11 +306,7 @@ paths:
                 - src_port
       responses:
         '200':
-          description: Load Balancer created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -681,22 +658,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of Load Balancers in a specific location of a project
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/LoadBalancer'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/LoadBalancers'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -711,7 +673,7 @@ paths:
       summary: Delete a specific Load Balancer with ID
       responses:
         '204':
-          description: Load balancer is deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -721,11 +683,7 @@ paths:
       summary: Get details of a specific Load Balancer in a location with ID
       responses:
         '200':
-          description: Details of the Load Balancer in a location
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -740,7 +698,7 @@ paths:
       summary: Delete a specific Load Balancer
       responses:
         '204':
-          description: Load Balancer deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -750,11 +708,7 @@ paths:
       summary: Get details of a specific Load Balancer in a location
       responses:
         '200':
-          description: Details of the LoadBalancer
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -789,11 +743,7 @@ paths:
               additionalProperties: false
       responses:
         '200':
-          description: Load Balancer updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -835,11 +785,7 @@ paths:
                 - src_port
       responses:
         '200':
-          description: Load Balancer created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -867,11 +813,7 @@ paths:
                 - vm_id
       responses:
         '200':
-          description: VM attached to Load Balancer successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -899,11 +841,7 @@ paths:
                 - vm_id
       responses:
         '200':
-          description: VM detached from Load Balancer successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LoadBalancerDetailed'
+          $ref: '#/components/responses/LoadBalancer'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1989,27 +1927,6 @@ components:
         - id
         - name
         - src_port
-    LoadBalancerDetailed:
-      type: object
-      additionalProperties: false
-      allOf:
-        - $ref: '#/components/schemas/LoadBalancer'
-        - properties:
-            location:
-              description: Location of the Load Balancer
-              type: string
-            subnet:
-              description: Subnet of the Load Balancer
-              type: string
-            vms:
-              type: array
-              items:
-                $ref: '#/components/schemas/Vm'
-          additionalProperties: false
-          required:
-            - location
-            - subnet
-            - vms
     Nic:
       type: object
       properties:
@@ -2311,6 +2228,48 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/FirewallRule'
+    LoadBalancer:
+      description: A Load Balancer
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            allOf:
+              - $ref: '#/components/schemas/LoadBalancer'
+              - properties:
+                  location:
+                    description: Location of the Load Balancer
+                    type: string
+                  subnet:
+                    description: Subnet of the Load Balancer
+                    type: string
+                  vms:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vm'
+                additionalProperties: false
+                required:
+                  - location
+                  - subnet
+                  - vms
+    LoadBalancers:
+      description: A list of Load Balancers
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoadBalancer'
+            additionalProperties: false
+            required:
+              - count
+              - items
     Project:
       description: A Project
       content:
