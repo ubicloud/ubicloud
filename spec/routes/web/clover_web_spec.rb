@@ -33,20 +33,22 @@ RSpec.describe Clover do
     visited = {"" => true}
     failures = []
     queue = Queue.new
-    queue.push("/")
+    queue.push([nil, "/"])
 
     pop = lambda do
       queue.pop(true)
     rescue ThreadError
     end
 
-    while (path = pop.call)
+    while (tuple = pop.call)
+      from, path = tuple
+
       next if visited[path]
       visited[path] = true
       visit path
 
       if page.status_code == 404
-        failures << path
+        failures << [from, path]
       end
 
       if page.response_headers["content-type"].include?("text/html")
@@ -59,7 +61,7 @@ RSpec.describe Clover do
         end
 
         links.each do |path|
-          queue.push path
+          queue.push [page.current_path, path]
         end
       end
     end
