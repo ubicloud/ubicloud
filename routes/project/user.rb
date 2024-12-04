@@ -58,9 +58,7 @@ class Clover
 
         if (user = Account.exclude(status_id: 3)[email: email])
           user.associate_with_project(@project)
-          if (managed_policy = Authorization::ManagedPolicy.from_name(policy))
-            managed_policy.apply(@project, [user], append: true)
-          end
+          @project.subject_tags_dataset.first(name: policy)&.add_subject(user.id)
           Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
             greeting: "Hello,",
             body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
