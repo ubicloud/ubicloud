@@ -81,7 +81,7 @@
           <% end %>
         </ul>
       </li>
-      <% if @project_data && has_project_permission(["Project:user", "Project:policy", "Project:billing", "Project:view"]) %>
+      <% if @project_data && has_project_permission(["Project:user", "Project:billing", "Project:view"]) %>
         <li>
           <div class="text-xs font-semibold leading-6 text-orange-200">Project Details</div>
           <ul role="list" class="-mx-2 mt-2 space-y-1">
