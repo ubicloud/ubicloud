@@ -3,6 +3,7 @@
 require_relative "../model"
 
 class AccessControlEntry < Sequel::Model
+  include ResourceMethods
 end
 
 # Table: access_control_entry

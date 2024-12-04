@@ -29,12 +29,16 @@ RSpec.describe Clover, "personal access token management" do
   it "user page allows removing personal access tokens" do
     access_tag_ds = DB[:access_tag].where(hyper_tag_id: @api_key.id)
     expect(access_tag_ds.all).not_to be_empty
+    project.subject_tags_dataset.first(name: "Admin").add_subject(@api_key.id)
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
 
     btn = find("#managed-token .delete-btn")
     page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
     expect(page.status_code).to eq(204)
     expect(ApiKey.all).to be_empty
     expect(access_tag_ds.all).to be_empty
+    expect(DB[:applied_subject_tag].where(tag_id: project.subject_tags_dataset.first(name: "Admin").id, subject_id: @api_key.id).all).to be_empty
+    expect(AccessControlEntry.where(project_id: project.id, subject_id: @api_key.id).all).to be_empty
 
     page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
     expect(page.status_code).to eq(204)
