@@ -8,6 +8,7 @@ class Project < Sequel::Model
   one_to_one :billing_info, key: :id, primary_key: :billing_info_id
   one_to_many :usage_alerts
   one_to_many :github_installations
+  many_through_many :github_runners, [[:github_installation, :project_id, :id], [:github_runner, :installation_id, :id]]
 
   many_to_many :accounts, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :vms, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id

@@ -121,19 +121,13 @@ RSpec.describe Clover, "github" do
   describe "runner" do
     it "can list active runners" do
       runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
-      runner_with_job = GithubRunner.create_with_id(
-        installation_id: installation.id,
-        label: "ubicloud",
-        repository_name: "my-repo",
-        runner_id: 2,
-        workflow_job: {
-          "id" => 123,
-          "name" => "test-job",
-          "run_id" => 456,
-          "workflow_name" => "test-workflow"
-        },
-        vm_id: Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").id
-      )
+      runner_with_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait").subject
+      runner_with_job.update(runner_id: 2, vm_id: Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").id, workflow_job: {
+        "id" => 123,
+        "name" => "test-job",
+        "run_id" => 456,
+        "workflow_name" => "test-workflow"
+      })
       runner_not_created = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
       runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_concurrency_limit")
       runner_wo_strand = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo")
