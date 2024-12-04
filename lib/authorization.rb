@@ -59,47 +59,6 @@ module Authorization
     matched_policies_dataset(project_id, subject_id, actions, object_id).all
   end
 
-  module ManagedPolicy
-    ManagedPolicyClass = Struct.new(:name, :actions) do
-      def acls(subjects, objects)
-        {acls: [{subjects: Array(subjects), actions: actions, objects: Array(objects)}]}
-      end
-
-      def apply(project, accounts, append: false, remove_subjects: nil)
-        subjects = accounts.map { _1&.hyper_tag(project) }.compact.map { _1.name }
-        if append || remove_subjects
-          if (existing_body = project.access_policies_dataset.where(name: name).select_map(:body).first)
-            existing_subjects = existing_body["acls"].first["subjects"]
-
-            case remove_subjects
-            when Array
-              existing_subjects = existing_subjects.reject { remove_subjects.include?(_1) }
-            when String
-              existing_subjects = existing_subjects.reject { _1.start_with?(remove_subjects) }
-            end
-            subjects = existing_subjects + subjects
-            subjects.uniq!
-          end
-        end
-        object = project.hyper_tag_name(project)
-        acls = self.acls(subjects, object).to_json
-        policy = AccessPolicy.new_with_id(project_id: project.id, name: name, managed: true, body: acls)
-        policy.skip_auto_validations(:unique) do
-          policy.insert_conflict(target: [:project_id, :name], update: {body: acls}).save_changes
-        end
-      end
-    end
-
-    Admin = ManagedPolicyClass.new("admin", ["*"])
-    Member = ManagedPolicyClass.new("member", ["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github", "InferenceEndpoint:view"])
-
-    def self.from_name(name)
-      ManagedPolicy.const_get(name.to_s.capitalize)
-    rescue NameError
-      nil
-    end
-  end
-
   module Dataset
     def authorized(project_id, subject_id, actions)
       # We can't use "id" column directly, because it's ambiguous in big joined queries.
