@@ -2282,6 +2282,7 @@ components:
           example: pjw92xhhqjdy4g72xng1ubkda6
         name:
           description: Name of the project
+          pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$'
           type: string
           example: my-project
       additionalProperties: false
