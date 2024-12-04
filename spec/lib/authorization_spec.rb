@@ -204,55 +204,28 @@ RSpec.describe Authorization do
       project = Project.create_with_id(name: "test")
       expect(project.hyper_tag(project)).to be_nil
 
-      tag = project.associate_with_project(project)
+      project.associate_with_project(project)
       expect(project.hyper_tag(project)).to exist
-
-      vms.each { _1.tag(tag) }
-      expect(AppliedTag.where(access_tag_id: tag.id).count).to eq(5)
 
       project.dissociate_with_project(project)
       expect(project.hyper_tag(project)).to be_nil
-      expect(AppliedTag.where(access_tag_id: tag.id).count).to eq(0)
     end
 
     it "associate/dissociate with project" do
       project = Project.create_with_id(name: "test")
-      project.associate_with_project(project)
+      expect(users[0].hyper_tag(project)).to be_nil
       users[0].associate_with_project(project)
-
-      expect(project.applied_access_tags.count).to eq(1)
-      expect(users[0].applied_access_tags.count).to eq(4)
-
+      expect(users[0].hyper_tag(project)).to exist
       users[0].dissociate_with_project(project)
-      project.dissociate_with_project(project)
-
-      expect(project.reload.applied_access_tags.count).to eq(0)
-      expect(users[0].reload.applied_access_tags.count).to eq(2)
+      expect(users[0].hyper_tag(project)).to be_nil
     end
 
     it "does not associate/dissociate with nil project" do
       project = Project.create_with_id(name: "test")
       expect(project.associate_with_project(nil)).to be_nil
-      expect(project.applied_access_tags.count).to eq(0)
-
+      expect(users[0].hyper_tag(project)).to be_nil
       expect(project.dissociate_with_project(nil)).to be_nil
-      expect(project.applied_access_tags.count).to eq(0)
-    end
-  end
-
-  describe "#TaggableMethods" do
-    it "can tag" do
-      tag = projects[1].hyper_tag(projects[1])
-      expect(vms[0].applied_access_tags.include?(tag)).to be(false)
-      vms[0].tag(tag)
-      expect(vms[0].reload.applied_access_tags.include?(tag)).to be(true)
-    end
-
-    it "can untag" do
-      tag = projects[0].hyper_tag(projects[0])
-      expect(vms[0].applied_access_tags.include?(tag)).to be(true)
-      vms[0].untag(tag)
-      expect(vms[0].reload.applied_access_tags.include?(tag)).to be(false)
+      expect(users[0].hyper_tag(project)).to be_nil
     end
   end
 end
