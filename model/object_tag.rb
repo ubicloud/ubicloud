@@ -3,6 +3,11 @@
 require_relative "../model"
 
 class ObjectTag < Sequel::Model
+  include ResourceMethods
+
+  def add_object(object_id)
+    DB[:applied_object_tag].insert(tag_id: id, object_id:)
+  end
 end
 
 # Table: object_tag

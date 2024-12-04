@@ -3,6 +3,11 @@
 require_relative "../model"
 
 class SubjectTag < Sequel::Model
+  include ResourceMethods
+
+  def add_subject(subject_id)
+    DB[:applied_subject_tag].insert(tag_id: id, subject_id:)
+  end
 end
 
 # Table: subject_tag

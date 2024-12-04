@@ -70,8 +70,8 @@ RSpec.describe Clover, "project" do
 
         project = Project[name: name]
         expect(project.access_tags.count).to be 2
-        expect(project.access_policies.count).to be 1
-        expect(project.applied_access_tags.count).to be 1
+        expect(project.access_control_entries.count).to be 1
+        expect(project.subject_tags.count).to be 1
         expect(user.hyper_tag(project)).to exist
       end
     end
@@ -232,7 +232,8 @@ RSpec.describe Clover, "project" do
 
       it "can remove user from project" do
         user2.associate_with_project(project)
-        Authorization::ManagedPolicy::Member.apply(project, [user2])
+        project.subject_tags_dataset.first(name: "Admin").add_subject(user2.id)
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user2.id)
 
         visit "#{project.path}/user"
 
@@ -261,6 +262,8 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
         expect(page).to have_content user.email
         expect(page).to have_no_content user2.email
+        expect(DB[:applied_subject_tag].where(tag_id: project.subject_tags_dataset.first(name: "Admin").id, subject_id: user2.id).all).to be_empty
+        expect(AccessControlEntry.where(project_id: project.id, subject_id: user2.id).all).to be_empty
       end
 
       it "can update default policy of an user" do
