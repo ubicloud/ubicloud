@@ -849,7 +849,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases
-      summary: List Postgres databases in a specific location of a project
+      summary: List Postgres Databases in a specific location of a project
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -858,7 +858,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of Postgres databases in a specific location of a project
+          description: A list of Postgres Databases in a specific location of a project
           content:
             application/json:
               schema:
@@ -869,7 +869,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Postgres'
+                      $ref: '#/components/schemas/PostgresDatabase'
                 additionalProperties: false
                 required:
                   - count
@@ -877,7 +877,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/failover':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -885,18 +885,18 @@ paths:
       - $ref: '#/components/parameters/postgres_database_id'
     post:
       operationId: failoverPostgresDatabaseWithID
-      summary: Failover a specific Postgres database with ID
+      summary: Failover a specific Postgres Database with ID
       responses:
         '200':
-          description: Details of the failed over Postgres databases in a location
+          description: Details of the failed over Postgres Databases in a location
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/_{postgres_database_id}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -961,28 +961,28 @@ paths:
       - $ref: '#/components/parameters/postgres_database_id'
     delete:
       operationId: deletePostgresDatabaseWithID
-      summary: Delete a specific Postgres database with ID
+      summary: Delete a specific Postgres Database with ID
       responses:
         '204':
-          description: Postgres database is deleted successfully
+          description: Postgres Database is deleted successfully
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
     get:
       operationId: getPostgresDetailsWithId
-      summary: Get details of a specific Postgres database in a location with ID
+      summary: Get details of a specific Postgres Database in a location with ID
       responses:
         '200':
-          description: Details of the Postgres databases in a location
+          description: Details of the Postgres Databases in a location
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/firewall-rule/{firewall_rule_id}':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -1043,7 +1043,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/reset-superuser-password':
     post:
       operationId: resetSuperuserPasswordWithID
-      summary: Reset super-user password of the Postgres database
+      summary: Reset super-user password of the Postgres Database
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1066,15 +1066,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/id/{postgres_database_id}/restore':
     post:
       operationId: restorePostgresDatabaseWithID
-      summary: Restore a new Postgres database in a specific location of a project with ID
+      summary: Restore a new Postgres Database in a specific location of a project with ID
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1096,15 +1096,15 @@ paths:
                 - restore_target
       responses:
         '200':
-          description: Postgres database is restored successfully
+          description: Postgres Database is restored successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Postgres'
+                $ref: '#/components/schemas/PostgresDatabase'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -1112,31 +1112,31 @@ paths:
       - $ref: '#/components/parameters/postgres_database_name'
     delete:
       operationId: deletePostgresDatabase
-      summary: Delete a specific Postgres database
+      summary: Delete a specific Postgres Database
       responses:
         '204':
           description: Postgres database is deleted successfully
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
     get:
       operationId: getPostgresDatabaseDetails
       summary: Get details of a specific Postgres database in a location
       responses:
         '200':
-          description: Details of the Postgres database
+          description: Details of the Postgres Database
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
     post:
       operationId: createPostgresDatabase
-      summary: Create a new Postgres database in a specific location of a project
+      summary: Create a new Postgres Database in a specific location of a project
       requestBody:
         required: true
         content:
@@ -1161,15 +1161,15 @@ paths:
                 - size
       responses:
         '200':
-          description: Postgres database is created successfully
+          description: Postgres Database is created successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/firewall-rule':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -1253,7 +1253,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1300,11 +1300,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_name}/restore':
     post:
       operationId: restorePostgresDatabase
@@ -1334,11 +1334,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PostgresDetailed'
+                $ref: '#/components/schemas/PostgresDatabaseDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/location/{location}/private-subnet':
     get:
       operationId: listLocationPrivateSubnets
@@ -1591,7 +1591,7 @@ paths:
   '/project/{project_id}/postgres':
     get:
       operationId: listPostgresDatabases
-      summary: List visible Postgres databases
+      summary: List visible Postgres Databases
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/start_after'
@@ -1599,7 +1599,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of Postgres databases
+          description: A list of Postgres Databases
           content:
             application/json:
               schema:
@@ -1610,7 +1610,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Postgres'
+                      $ref: '#/components/schemas/PostgresDatabase'
                 additionalProperties: false
                 required:
                   - count
@@ -1618,7 +1618,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Postgres
+        - Postgres Database
   '/project/{project_id}/private-subnet':
     get:
       operationId: listPSs
@@ -1955,7 +1955,7 @@ components:
         - private_ipv4
         - private_ipv6
         - vm_name
-    Postgres:
+    PostgresDatabase:
       type: object
       properties:
         flavor:
@@ -1996,11 +1996,11 @@ components:
         - storage_size_gib
         - version
         - vm_size
-    PostgresDetailed:
+    PostgresDatabaseDetailed:
       type: object
       additionalProperties: false
       allOf:
-        - $ref: '#/components/schemas/Postgres'
+        - $ref: '#/components/schemas/PostgresDatabase'
         - additionalProperties: false
           properties:
             connection_string:
@@ -2307,8 +2307,8 @@ tags:
     name: Load Balancer
   - description: Login Operations
     name: Login
-  - description: Postgres Operations
-    name: Postgres
+  - description: Postgres Database Operations
+    name: Postgres Database
   - description: Postgres Firewall Rule Operations
     name: Postgres Firewall Rule
   - description: Postgres Metric Destination
