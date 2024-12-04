@@ -1,0 +1,12 @@
+<% @page_title = "#{@project_data[:name]} - Policy" %>
+<%== render("project/user-tabbar") %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/page_header",
+    locals: {
+      title: "Access Control",
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Access Control", "#"]]
+    }
+  ) %>
+</div>
