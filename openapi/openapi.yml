@@ -209,11 +209,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -228,7 +224,7 @@ paths:
       summary: Delete a specific firewall rule
       responses:
         '204':
-          description: Firewall rule deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -238,11 +234,7 @@ paths:
       summary: Get details of a firewall rule
       responses:
         '200':
-          description: Details of the firewall rule
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -430,7 +422,7 @@ paths:
       summary: Delete a specific firewall
       responses:
         '204':
-          description: Firewall deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -475,11 +467,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -495,7 +483,7 @@ paths:
       summary: Delete a specific firewall rule
       responses:
         '204':
-          description: Firewall rule deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -505,11 +493,7 @@ paths:
       summary: Get details of a firewall rule
       responses:
         '200':
-          description: Details of the firewall rule
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -539,11 +523,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -628,11 +608,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -648,7 +624,7 @@ paths:
       summary: Delete a specific firewall rule
       responses:
         '204':
-          description: Firewall rule deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -658,11 +634,7 @@ paths:
       summary: Get details of a firewall rule
       responses:
         '200':
-          description: Details of the firewall rule
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -692,11 +664,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallRule'
+          $ref: '#/components/responses/FirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1307,7 +1275,7 @@ paths:
       summary: Delete a specific firewall rule
       responses:
         '204':
-          description: Firewall rule deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2337,6 +2305,12 @@ components:
             required:
               - count
               - items
+    FirewallRule:
+      description: A Firewall Rule
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FirewallRule'
     Project:
       description: A Project
       content:
