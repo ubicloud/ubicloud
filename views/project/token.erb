@@ -1,16 +1,19 @@
 <% @page_title = "#{@project_data[:name]} - Personal Access Tokens" %>
 <%== render("project/user-tabbar") %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Personal Access Tokens", "#"]]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: "Personal Access Tokens" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    title: "Personal Access Tokens",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Personal Access Tokens", "#"]],
+    right_items: [<<-CREATE]
+      <form id="create-pat" action="#{@project_data[:path]}/user/token" role="form" method="POST">
+        #{csrf_tag("#{@project_data[:path]}/user/token")}
+        #{render("components/form/submit_button", locals: { text: "Create Token" })}
+      </form>
+    CREATE
+  }
+) %>
 
 <div class="grid gap-6">
   <div>
@@ -20,12 +23,6 @@
         project-specific. You can use a separate access policy for each token, but be aware that regardless of the
         access permissions of the token, requests made using the token cannot exceed the access permissions of your
         account.
-      </div>
-      <div class="mb-2 md:mb-0">
-        <form id="create-pat" action="<%= "#{@project_data[:path]}/user/token" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}/user/token") %>
-          <%== render("components/form/submit_button", locals: { text: "Create Token" }) %>
-        </form>
       </div>
     </div>
 
