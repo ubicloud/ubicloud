@@ -26,10 +26,7 @@
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
-                You can invite a new user to your project using one of the preconfigured access policies below. If
-                you'd like to further customize permissions, you can use the
-                <a href="<%= @project_data[:path] %>/user/policy" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">
-                  advanced policy editor</a>.
+                You can invite a new user to your project, adding them to the given subject tag (role).
               </p>
             </div>
             <div class="grid grid-cols-12 gap-3">
@@ -47,7 +44,7 @@
                 ) %>
               </div>
               <div class="col-span-12 sm:col-span-3">
-                <%== render("components/form/policy_select", locals: { name: "policy", selected: "member" }) %>
+                <%== render("components/form/policy_select", locals: { name: "policy" }) %>
               </div>
               <div class="col-span-3 sm:col-span-2">
                 <%== render("components/form/submit_button", locals: { text: "Invite" }) %>
@@ -74,7 +71,7 @@
           <thead class="bg-gray-50">
             <tr>
               <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Email</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Default Policy</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Subject Tag</th>
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
