@@ -32,7 +32,7 @@ RSpec.describe Clover, "personal access token management" do
     project.subject_tags_dataset.first(name: "Admin").add_subject(@api_key.id)
     AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
 
-    btn = find("#managed-token .delete-btn")
+    btn = find(".delete-btn")
     data_url = btn["data-url"]
     _csrf = btn["data-csrf"]
     page.driver.delete data_url, {_csrf:}
@@ -49,16 +49,5 @@ RSpec.describe Clover, "personal access token management" do
     expect(page.status_code).to eq(204)
     visit "#{project.path}/user/token"
     expect(page.html).not_to include("Personal access token deleted successfully")
-  end
-
-  it "user page allows setting policies for personal access tokens" do
-    expect(Authorization.has_permission?(project.id, @api_key.id, "Project:user", project.id)).to be(false)
-    expect(page).to have_no_select("token_policies[#{@api_key.ubid}]", selected: "Admin")
-    within "form#managed-token" do
-      select "Admin", from: "token_policies[#{@api_key.ubid}]"
-      click_button "Update Personal Access Token Policies"
-    end
-    expect(find_by_id("flash-notice").text).to eq("Personal access token policies updated successfully.")
-    expect(page).to have_select("token_policies[#{@api_key.ubid}]", selected: "Admin")
   end
 end

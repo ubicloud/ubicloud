@@ -274,36 +274,6 @@ RSpec.describe Clover, "project" do
         expect(AccessControlEntry.where(project_id: project.id, subject_id: user2.id).all).to be_empty
       end
 
-      it "can update default policy of an user" do
-        user2.associate_with_project(project)
-        Authorization::ManagedPolicy::Member.apply(project, [user2])
-        # Just add a nonexistent subject to it to test edge case
-        policy = project.access_policies_dataset.where(name: "member").first
-        policy.body["acls"].first["subjects"] << "user/new@test.com"
-        policy.modified!(:body)
-        policy.save_changes
-
-        visit "#{project.path}/user"
-
-        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Member")
-        within "form#managed-policy" do
-          select "Admin", from: "user_policies[#{user2.ubid}]"
-          click_button "Update"
-        end
-        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "Admin")
-      end
-
-      it "raises bad request when it's the last admin" do
-        visit "#{project.path}/user"
-
-        within "form#managed-policy" do
-          select "Member", from: "user_policies[#{user.ubid}]"
-          click_button "Update"
-        end
-        expect(page).to have_content "The project must have at least one admin"
-        expect(page).to have_select("user_policies[#{user.ubid}]", selected: "Admin")
-      end
-
       it "can remove invited user from project" do
         invited_email = "invited@example.com"
         project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
