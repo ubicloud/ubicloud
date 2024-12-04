@@ -100,44 +100,17 @@ module Authorization
     def associate_with_project(project)
       return if project.nil?
 
-      DB.transaction do
-        self_tag = AccessTag.create_with_id(
-          project_id: project.id,
-          name: hyper_tag_name(project),
-          hyper_tag_id: id,
-          hyper_tag_table: self.class.table_name
-        )
-        project_tag = project.hyper_tag(project)
-        tag(self_tag)
-        tag(project_tag) if self_tag.id != project_tag.id
-        self_tag
-      end
+      AccessTag.create_with_id(
+        project_id: project.id,
+        name: hyper_tag_name(project),
+        hyper_tag_id: id,
+        hyper_tag_table: self.class.table_name
+      )
     end
 
     def dissociate_with_project(project)
       return if project.nil?
-
-      DB.transaction do
-        project_tag = project.hyper_tag(project)
-        untag(project_tag)
-        hyper_tag(project).destroy
-      end
-    end
-  end
-
-  module TaggableMethods
-    def self.included(base)
-      base.class_eval do
-        many_to_many :applied_access_tags, class: :AccessTag, join_table: :applied_tag, left_key: :tagged_id, right_key: :access_tag_id
-      end
-    end
-
-    def tag(access_tag)
-      AppliedTag.create(access_tag_id: access_tag.id, tagged_id: id, tagged_table: self.class.table_name)
-    end
-
-    def untag(access_tag)
-      AppliedTag.where(access_tag_id: access_tag.id, tagged_id: id).destroy
+      hyper_tag(project).destroy
     end
   end
 end

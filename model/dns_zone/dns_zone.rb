@@ -12,7 +12,6 @@ class DnsZone < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include Authorization::HyperTagMethods
-  include Authorization::TaggableMethods
 
   semaphore :refresh_dns_servers
 
