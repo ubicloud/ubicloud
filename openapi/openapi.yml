@@ -62,22 +62,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: Return the list of all projects visible to the logged in user
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Project'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/Projects'
         default:
           $ref: '#/components/responses/Error'
       security:
@@ -102,11 +87,7 @@ paths:
                 - name
       responses:
         '200':
-          description: Project is created successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Project'
+          $ref: '#/components/responses/Project'
         default:
           $ref: '#/components/responses/Error'
       security:
@@ -121,7 +102,7 @@ paths:
       summary: Delete a project
       responses:
         '204':
-          description: Project deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -131,11 +112,7 @@ paths:
       summary: Retrieve a project
       responses:
         '200':
-          description: Retrieved project
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Project'
+          $ref: '#/components/responses/Project'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2375,12 +2352,37 @@ components:
             - subnet
             - unix_user
   responses:
+    Delete:
+      description: An empty response after successful resource delete
     Error:
-      description: an error response
+      description: An error response
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    Project:
+      description: A Project
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Project'
+    Projects:
+      description: A list of Projects
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+            additionalProperties: false
+            required:
+              - count
+              - items
   securitySchemes:
     BearerAuth:
       bearerFormat: JWT
