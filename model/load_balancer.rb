@@ -18,7 +18,6 @@ class LoadBalancer < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
   dataset_module Authorization::Dataset
   dataset_module Pagination
