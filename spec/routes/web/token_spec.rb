@@ -31,13 +31,19 @@ RSpec.describe Clover, "personal access token management" do
     expect(access_tag_ds.all).not_to be_empty
 
     btn = find("#managed-token .delete-btn")
-    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+    data_url = btn["data-url"]
+    _csrf = btn["data-csrf"]
+    page.driver.delete data_url, {_csrf:}
     expect(page.status_code).to eq(204)
     expect(ApiKey.all).to be_empty
     expect(access_tag_ds.all).to be_empty
+    visit "#{project.path}/user/token"
+    expect(find_by_id("flash-notice").text).to eq("Personal access token deleted successfully")
 
-    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+    page.driver.delete data_url, {_csrf:}
     expect(page.status_code).to eq(204)
+    visit "#{project.path}/user/token"
+    expect(page.html).not_to include("Personal access token deleted successfully")
   end
 
   it "user page allows setting policies for personal access tokens" do
