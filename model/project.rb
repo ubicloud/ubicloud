@@ -38,8 +38,6 @@ class Project < Sequel::Model
     "project/#{ubid}"
   end
 
-  include Authorization::TaggableMethods
-
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
     !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
