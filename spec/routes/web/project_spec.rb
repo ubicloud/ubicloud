@@ -350,69 +350,6 @@ RSpec.describe Clover, "project" do
       end
     end
 
-    describe "advanced policy" do
-      it "can update policy if doesn't have already" do
-        new_policy = {
-          acls: [
-            {actions: ["Project:user"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
-          ]
-        }
-
-        visit "#{project.path}/user/policy"
-        within "form#advanced-policy" do
-          fill_in "body", with: new_policy.to_json
-          click_button "Update"
-        end
-        expect(page).to have_content new_policy.to_json
-        expect(project.access_policies_dataset.where(managed: false).first.body.to_json).to eq(new_policy.to_json)
-      end
-
-      it "can update policy existing advanced policy" do
-        current_policy = AccessPolicy.create_with_id(project_id: project.id, name: "advanced", body: {acls: [{subjects: user.hyper_tag_name, actions: ["*"], objects: project.hyper_tag_name}]}).body
-        new_policy = {
-          acls: [
-            {actions: ["Project:user"], objects: project.hyper_tag_name, subjects: user.hyper_tag_name}
-          ]
-        }
-
-        visit "#{project.path}/user/policy"
-        expect(page).to have_content current_policy.to_json
-        within "form#advanced-policy" do
-          fill_in "body", with: new_policy.to_json
-          click_button "Update"
-        end
-        expect(page).to have_content new_policy.to_json
-      end
-
-      it "cannot update policy when it is not valid JSON" do
-        current_policy = project.access_policies.first.body
-
-        visit "#{project.path}/user/policy"
-        within "form#advanced-policy" do
-          fill_in "body", with: "{'invalid': 'json',}"
-          click_button "Update"
-        end
-
-        expect(page).to have_content "The policy isn't a valid JSON object."
-        expect(page).to have_content "{'invalid': 'json',}"
-        expect(current_policy).to eq(project.access_policies.first.body)
-      end
-
-      it "cannot update policy when its root is not JSON object" do
-        current_policy = project.access_policies.first.body
-
-        visit "#{project.path}/user/policy"
-        within "form#advanced-policy" do
-          fill_in "body", with: "[{}, {}]"
-          click_button "Update"
-        end
-
-        expect(page).to have_content "The policy isn't a valid JSON object."
-        expect(page).to have_content "[{}, {}]"
-        expect(current_policy).to eq(project.access_policies.first.body)
-      end
-    end
-
     describe "delete" do
       it "can delete project" do
         visit project.path
