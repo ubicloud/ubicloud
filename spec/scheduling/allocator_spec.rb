@@ -942,6 +942,57 @@ RSpec.describe Al do
       al.update(vm)
       expect(vm.vm_host.id).to eq(vh1.id)
     end
+
+    it "creates a basic vm with a slice" do
+      vm = create_vm_with_project(family: "basic", use_slices: true, cores: 2, vcpus: 1, memory_gib: 2, cpu_percent_limit: 100, cpu_burst_percent_limit: 0)
+      vmh = VmHost.first
+
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      al.update(vm)
+      vmh.reload
+
+      # Validate the slice got created
+      slice = vmh.vm_host_slices.first
+      expect(vm.vm_host_slice).not_to be_nil
+      expect(vm.vm_host_slice.id).to eq(slice.id)
+
+      # Validate the slice properties
+      expect(slice.allowed_cpus).to eq("2-5")
+      expect(slice.type).to eq("shared")
+      expect(slice.cores).to eq(2)
+      expect(slice.total_cpu_percent).to eq(800) # overbooking allowed on basic
+      expect(slice.total_memory_1g).to eq(16)
+    end
+
+    it "adds a basic vm to an existing slice" do
+      vmh = VmHost.first
+      slice = Prog::Vm::VmHostSlice.assemble_with_host("sl1", vmh, family: "basic", allowed_cpus: "2-5", memory_1g: 16, type: "shared").subject
+      slice.update(used_cpu_percent: 200, used_memory_1g: 4, enabled: true) # Partially filled in
+      vmh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
+      vmh.reload
+
+      vm = create_vm_with_project(family: "basic", use_slices: true, cores: 2, vcpus: 1, memory_gib: 2, cpu_percent_limit: 100, cpu_burst_percent_limit: 0)
+
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, can_share_slice: true))
+      expect(al).not_to be_nil
+      al.update(vm)
+      expect(vm.vm_host_slice_id).to eq(slice.id)
+    end
+
+    it "allows to overcommit a basic slice" do
+      vmh = VmHost.first
+      slice = Prog::Vm::VmHostSlice.assemble_with_host("sl1", vmh, family: "basic", allowed_cpus: "2-5", memory_1g: 16, type: "shared").subject
+      slice.update(used_cpu_percent: 400, used_memory_1g: 8, enabled: true) # Without an overcommit, 400% would be a full slice
+      vmh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
+      vmh.reload
+
+      vm = create_vm_with_project(family: "basic", use_slices: true, cores: 2, vcpus: 1, memory_gib: 2, cpu_percent_limit: 100, cpu_burst_percent_limit: 0)
+
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, can_share_slice: true))
+      expect(al).not_to be_nil
+      al.update(vm)
+      expect(vm.vm_host_slice_id).to eq(slice.id)
+    end
   end
 
   describe "#allocate_spdk_installation" do

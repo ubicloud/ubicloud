@@ -6,6 +6,7 @@ RSpec.describe VmHostSlice do
   subject(:vm_host_slice) do
     described_class.new(
       name: "standard",
+      family: "standard",
       type: "dedicated",
       allowed_cpus: "2-3",
       cores: 1,

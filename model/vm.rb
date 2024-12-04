@@ -82,7 +82,7 @@ class Vm < Sequel::Model
   end
 
   def can_share_slice?
-    use_slices_for_allocation? && (vcpus * 100) > cpu_percent_limit
+    use_slices_for_allocation? && Option::VmFamilies.find { _1.name == family }.can_share_slice
   end
 
   def enable_diagnostics?
@@ -120,11 +120,16 @@ class Vm < Sequel::Model
     total_packages = vm_host.total_sockets
 
     # Computed all-system statistics, now scale it down to meet VM needs.
-    proportion = Rational(cores) / vm_host.total_cores
+    cores_from_cpus = Rational(vcpus) / threads_per_core
+    proportion = cores_from_cpus / vm_host.total_cores
     packages = (total_packages * proportion).ceil
     dies_per_package = (total_dies_per_package * proportion).ceil
-    cores_per_die = Rational(cores) / (packages * dies_per_package)
-    fail "BUG: need uniform number of cores allocated per die" unless cores_per_die.denominator == 1
+    cores_per_die = cores_from_cpus / (packages * dies_per_package)
+
+    if cores_per_die.denominator > 1
+      threads_per_core = (threads_per_core * cores_per_die).ceil
+      cores_per_die = 1
+    end
 
     topo = [threads_per_core, cores_per_die, dies_per_package, packages].map { |num|
       # :nocov:
@@ -134,7 +139,7 @@ class Vm < Sequel::Model
     }
 
     # :nocov:
-    unless topo.reduce(&:*) == threads_per_core * cores
+    unless topo.reduce(&:*) == vcpus
       fail "BUG: arithmetic does not result in the correct number of vcpus"
     end
     # :nocov:

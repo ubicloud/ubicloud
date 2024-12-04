@@ -48,6 +48,14 @@ module Option
     ["almalinux-9", "AlmaLinux 9"]
   ].map { |args| BootImage.new(*args) }.freeze
 
+  VmFamily = Struct.new(:name, :can_share_slice, :slice_overcommit_factor)
+  VmFamilies = [
+    ["standard", false, 1],
+    ["standard-gpu", false, 1],
+    ["burstable", true, 1],
+    ["basic", true, 2]
+  ].map { |args| VmFamily.new(*args) }.freeze
+
   IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
   NO_IO_LIMITS = IoLimits.new(nil, nil, nil).freeze
 
@@ -68,6 +76,12 @@ module Option
   }).concat([[2, 50], [2, 100]].map {
     storage_size_options = [_1[1] * 20 / 100, _1[1] * 40 / 100]
     VmSize.new("burstable-#{_1[0]}-#{_1[1]}", "burstable", _1[0], _1[0], _1[1], _1[1], (_1[1] * 3.2 / 100).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
+  }).concat([1, 2].map {
+    storage_size_options = [_1 * 20, _1 * 40]
+    VmSize.new("basic-#{_1}", "basic", 2, _1, _1 * 100, 0, _1 * 2, storage_size_options, NO_IO_LIMITS, false, false, "x64")
+  }).concat([1, 2].map {
+    storage_size_options = [_1 * 20, _1 * 40]
+    VmSize.new("basic-#{_1}", "basic", 4, _1, _1 * 100, 0, (_1 * 1.6).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
   }).freeze
 
   PostgresSize = Struct.new(:location, :name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do
