@@ -888,22 +888,7 @@ paths:
       summary: List location Postgres firewall rules
       responses:
         '200':
-          description: List of the location Postgres firewall rules
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/PostgresFirewallRule'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/PostgresFirewallRules'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -926,11 +911,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Postgres firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PostgresFirewallRule'
+          $ref: '#/components/responses/PostgresFirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -971,7 +952,7 @@ paths:
       summary: Delete a specific Postgres firewall rule
       responses:
         '204':
-          description: Postgres firewall rule deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -981,11 +962,7 @@ paths:
       summary: Get details of a Postgres firewall rule
       responses:
         '200':
-          description: Details of the Postgres firewall rule
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PostgresFirewallRule'
+          $ref: '#/components/responses/PostgresFirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1008,11 +985,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Postgres firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PostgresFirewallRule'
+          $ref: '#/components/responses/PostgresFirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1154,11 +1127,7 @@ paths:
                 - cidr
       responses:
         '200':
-          description: Firewall rule created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PostgresFirewallRule'
+          $ref: '#/components/responses/PostgresFirewallRule'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2221,6 +2190,29 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresDatabase'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    PostgresFirewallRule:
+      description: A Postgres Firewall Rule
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresFirewallRule'
+    PostgresFirewallRules:
+      description: A list of Postgres Firewall Rules
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresFirewallRule'
             additionalProperties: false
             required:
               - count
