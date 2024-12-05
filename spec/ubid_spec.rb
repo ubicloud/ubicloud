@@ -200,9 +200,6 @@ RSpec.describe UBID do
     prj = account.create_project_with_default_policy("x")
     expect(prj.ubid).to start_with UBID::TYPE_PROJECT
 
-    policy = AccessPolicy.create_with_id(project_id: prj.id, name: "Any", body: "[]")
-    expect(policy.ubid).to start_with UBID::TYPE_ACCESS_POLICY
-
     st = SubjectTag.create_with_id(project_id: prj.id, name: "T")
     expect(st.ubid).to start_with UBID::TYPE_SUBJECT_TAG
 
@@ -269,7 +266,6 @@ RSpec.describe UBID do
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
-    policy = AccessPolicy.create_with_id(project_id: project.id, name: "Any", body: "[]")
     st = SubjectTag.create_with_id(project_id: project.id, name: "T")
     at = ActionTag.create_with_id(project_id: project.id, name: "T")
     ot = ObjectTag.create_with_id(project_id: project.id, name: "T")
@@ -291,7 +287,6 @@ RSpec.describe UBID do
     expect(described_class.decode(kek.ubid)).to eq(kek)
     expect(described_class.decode(account.ubid)).to eq(account)
     expect(described_class.decode(project.ubid)).to eq(project)
-    expect(described_class.decode(policy.ubid)).to eq(policy)
     expect(described_class.decode(st.ubid)).to eq(st)
     expect(described_class.decode(at.ubid)).to eq(at)
     expect(described_class.decode(ot.ubid)).to eq(ot)
