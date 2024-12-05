@@ -80,7 +80,9 @@ class Prog::Vm::GithubRunner < Prog::Base
     begin
       begin_time = Time.now.to_date.to_time
       end_time = begin_time + 24 * 60 * 60
-      used_amount = ((Time.now - github_runner.ready_at) / 60).ceil
+      duration = Time.now - github_runner.ready_at
+      used_amount = (duration / 60).ceil
+      github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
         .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
         .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
