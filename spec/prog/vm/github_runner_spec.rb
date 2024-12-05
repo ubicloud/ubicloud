@@ -72,6 +72,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "provisions a VM if the pool is not existing" do
       expect(VmPool).to receive(:where).and_return([])
+      expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm

@@ -41,6 +41,12 @@ class Prog::Vm::GithubRunner < Prog::Base
       return picked_vm
     end
 
+    ps = Prog::Vnet::SubnetNexus.assemble(
+      Config.github_runner_service_project_id,
+      location: label_data["location"],
+      allow_only_ssh: true
+    ).subject
+
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "runneradmin",
       Config.github_runner_service_project_id,
@@ -52,7 +58,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       enable_ip4: true,
       arch: label_data["arch"],
       allow_only_ssh: true,
-      swap_size_bytes: 4294963200 # ~4096MB, the same value with GitHub hosted runners
+      swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
+      private_subnet_id: ps.id
     )
 
     vm_st.subject

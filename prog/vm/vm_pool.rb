@@ -38,6 +38,12 @@ class Prog::Vm::VmPool < Prog::Base
       encrypted: vm_pool.storage_encrypted,
       skip_sync: vm_pool.storage_skip_sync
     }
+    ps = Prog::Vnet::SubnetNexus.assemble(
+      Config.vm_pool_project_id,
+      location: vm_pool.location,
+      allow_only_ssh: true
+    ).subject
+
     Prog::Vm::Nexus.assemble_with_sshable(
       "runneradmin",
       Config.vm_pool_project_id,
@@ -49,7 +55,8 @@ class Prog::Vm::VmPool < Prog::Base
       pool_id: vm_pool.id,
       arch: vm_pool.arch,
       allow_only_ssh: true,
-      swap_size_bytes: 4294963200
+      swap_size_bytes: 4294963200,
+      private_subnet_id: ps.id
     )
 
     hop_wait
