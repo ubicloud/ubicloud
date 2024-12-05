@@ -441,15 +441,12 @@ DHCP
     interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
     dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
     runner_config = if boot_image.include?("github")
-      <<~ADDITIONAL_RUNNER_CONFIG
+      <<~ADDRESSES
       address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}
       address=/.docker.io/::
-      dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},6h
-      ADDITIONAL_RUNNER_CONFIG
+      ADDRESSES
     else
-      <<~ADDITIONAL_CONFIG
-      dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
-      ADDITIONAL_CONFIG
+      ""
     end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
@@ -461,6 +458,7 @@ bogus-priv
 no-resolv
 #{raparams}
 #{interfaces}
+dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
 server=9.9.9.9@#{dns_ipv4}
 server=149.112.112.112@#{dns_ipv4}
