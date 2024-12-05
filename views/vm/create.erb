@@ -67,10 +67,18 @@
                   locals: {
                     name: "private_subnet_id",
                     label: "Private Subnet",
-                    placeholder: "Create new subnet",
+                    placeholder: "Default",
                     options: @subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] }
                   }
                 ) %>
+                <p class="mt-1 text-sm leading-6 text-gray-600">
+                  We recommend using the default subnet for most use-cases. If
+                  you'd like to learn more about private subnets, please visit
+                  <a href="<%=
+                  "https://www.ubicloud.com/docs/networking/private-subnet" %>"
+                  class="text-orange-600 hover:text-orange-700">Private
+                  Subnets</a> page.
+                </p>
               </div>
               <div class="col-span-full">
                 <%== render(
