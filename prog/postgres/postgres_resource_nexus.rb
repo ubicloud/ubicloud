@@ -22,7 +22,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     Validation.validate_location(location)
     Validation.validate_name(name)
-    Validation.validate_vm_size(target_vm_size)
+    Validation.validate_vm_size(target_vm_size, "x64")
     Validation.validate_postgres_ha_type(ha_type)
 
     DB.transaction do

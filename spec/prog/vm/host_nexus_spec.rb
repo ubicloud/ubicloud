@@ -16,7 +16,7 @@ RSpec.describe Prog::Vm::HostNexus do
     }
   }
 
-  let(:vms) { [instance_double(Vm, mem_gib: 1), instance_double(Vm, mem_gib: 2)] }
+  let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
   let(:vm_host) { instance_double(VmHost, vms: vms) }
   let(:sshable) { instance_double(Sshable) }
 
