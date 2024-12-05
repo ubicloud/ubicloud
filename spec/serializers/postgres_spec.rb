@@ -14,6 +14,16 @@ RSpec.describe Serializers::Postgres do
     expect(data[:latest_restore_time]).to be_nil
   end
 
+  it "can serialize when earliest_restore_time calculation raises an exception" do
+    expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start")).at_least(:once)
+    expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, latest_restore_time: nil)).exactly(4)
+    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil)).at_least(:once)
+    expect(pg.timeline).to receive(:earliest_restore_time).and_raise("error")
+    data = described_class.serialize(pg, {detailed: true})
+    expect(data[:earliest_restore_time]).to be_nil
+    expect(data[:latest_restore_time]).to be_nil
+  end
+
   it "can serialize when have earliest/latest restore times" do
     time = Time.now
     expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start")).at_least(:once)
