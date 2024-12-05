@@ -47,7 +47,7 @@ class Clover
       end
 
       @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
-      @project_permissions = all_permissions(@project.id)
+      @project_permissions = all_permissions(@project.id) if web?
 
       r.get true do
         authorize("Project:view", @project.id)
