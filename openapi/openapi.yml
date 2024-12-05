@@ -1344,22 +1344,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of VMs
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Vm'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/Vms'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1374,7 +1359,7 @@ paths:
       summary: Delete a specific VM with ID
       responses:
         '204':
-          description: VM deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1384,11 +1369,7 @@ paths:
       summary: Get details of a specific VM in a location with ID
       responses:
         '200':
-          description: Details of the VM
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmDetailed'
+          $ref: '#/components/responses/Vm'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1403,7 +1384,7 @@ paths:
       summary: Delete a specific VM
       responses:
         '204':
-          description: VM deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1413,11 +1394,7 @@ paths:
       summary: Get details of a specific VM in a location
       responses:
         '200':
-          description: Details of the VM
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmDetailed'
+          $ref: '#/components/responses/Vm'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1458,11 +1435,7 @@ paths:
                 - public_key
       responses:
         '200':
-          description: Virtual machine created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmDetailed'
+          $ref: '#/components/responses/Vm'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1510,22 +1483,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: Return the list of all VMs visible created under the given project and visible to the logged in user
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Vm'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/Vms'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1961,38 +1919,6 @@ components:
         - state
         - storage_size_gib
         - unix_user
-    VmDetailed:
-      type: object
-      additionalProperties: false
-      allOf:
-        - $ref: '#/components/schemas/Vm'
-        - additionalProperties: false
-          properties:
-            firewalls:
-              description: List of firewalls
-              type: array
-              items:
-                $ref: '#/components/schemas/Firewall'
-            private_ipv4:
-              description: Private IPv4 address
-              type: string
-              format: ipv4
-            private_ipv6:
-              description: Private IPv6 address
-              type: string
-              format: ipv6
-            subnet:
-              description: Subnet of the VM
-              type: string
-            unix_user:
-              description: Unix user of the VM
-              type: string
-          required:
-            - firewalls
-            - private_ipv4
-            - private_ipv6
-            - subnet
-            - unix_user
   responses:
     Delete:
       description: An empty response after successful resource delete
@@ -2209,6 +2135,59 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/Project'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    Vm:
+      description: A VM
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            allOf:
+              - $ref: '#/components/schemas/Vm'
+              - additionalProperties: false
+                properties:
+                  firewalls:
+                    description: List of firewalls
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Firewall'
+                  private_ipv4:
+                    description: Private IPv4 address
+                    type: string
+                    format: ipv4
+                  private_ipv6:
+                    description: Private IPv6 address
+                    type: string
+                    format: ipv6
+                  subnet:
+                    description: Subnet of the VM
+                    type: string
+                  unix_user:
+                    description: Unix user of the VM
+                    type: string
+                required:
+                  - firewalls
+                  - private_ipv4
+                  - private_ipv6
+                  - subnet
+                  - unix_user
+    Vms:
+      description: A list of VMs
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vm'
             additionalProperties: false
             required:
               - count
