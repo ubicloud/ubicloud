@@ -18,26 +18,55 @@ module Authorization
   end
 
   def self.all_permissions(project_id, subject_id, object_id)
-    # XXX: Need to use recursive CTEs for nested tag inclusion
     DB[:action_type]
       .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
-      .where(Sequel.or([DB[:action_ids], DB[:applied_action_tag].select(:action_id).where(tag_id: DB[:action_ids])].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists)
+      .with_recursive(:rec_action_ids,
+        DB[:applied_action_tag].select(:action_id, 0).where(tag_id: DB[:action_ids]),
+        DB[:applied_action_tag].join(:rec_action_ids, action_id: :tag_id)
+          .select(Sequel[:applied_action_tag][:action_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:action_id, :level])
+      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists)
       .select_order_map(:name)
   end
 
+  # Used to avoid dynamic symbol creation at runtime
+  RECURSIVE_TAG_QUERY_MAP = {
+    subject: [:applied_subject_tag, :subject_id],
+    action: [:applied_action_tag, :action_id],
+    object: [:applied_object_tag, :object_id]
+  }.freeze
+  private_class_method def self.recursive_tag_query(type, values, project_id: nil)
+    table, column = RECURSIVE_TAG_QUERY_MAP.fetch(type, values)
+
+    base_ds = DB[table]
+      .select(:tag_id, 0)
+      .where(column => values)
+
+    if project_id
+      # We only look for applied_action_tag entries with an action_tag for the project.
+      # This is done for actions and not subjects and objects because actions are shared
+      # across projects, unlike subjects and objects.
+      base_ds = base_ds.where(tag_id: DB[:action_tag].where(project_id:).select(:id))
+    end
+
+    DB[:tag]
+      .with_recursive(:tag,
+        base_ds,
+        DB[table].join(:tag, tag_id: column)
+          .select(Sequel[table][:tag_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:tag_id, :level]).select(:tag_id)
+  end
+
   def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
-    # XXX: Need to use recursive CTEs for nested tag inclusion
     dataset = DB[:access_control_entry]
       .where(project_id:)
-      .where(Sequel.or([subject_id, DB[:applied_subject_tag].select(:tag_id).where(subject_id:)].map { [:subject_id, _1] }))
+      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, _1] }))
 
     if actions
-      cond = Sequel.expr(action_id: nil)
-      Array(actions).each do |action|
-        action_id = ActionType::NAME_MAP.fetch(action)
-        cond |= Sequel.or([action_id, DB[:applied_action_tag].select(:tag_id).where(action_id:)].map { [:action_id, _1] })
-      end
-      dataset = dataset.where(cond)
+      actions = Array(actions).map { ActionType::NAME_MAP.fetch(_1) }
+      dataset = dataset.where(Sequel.or([nil, actions, recursive_tag_query(:action, actions, project_id:)].map { [:action_id, _1] }))
     end
 
     if object_id
@@ -49,7 +78,7 @@ module Authorization
         object_id = ubid.to_uuid
       end
 
-      dataset = dataset.where(Sequel.or([nil, object_id, DB[:applied_object_tag].select(:tag_id).where(object_id:)].map { [:object_id, _1] }))
+      dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }))
     end
 
     dataset
@@ -66,10 +95,13 @@ module Authorization
       # @opts is the hash of options for this dataset, and introduced at Sequel::Dataset.
       from = @opts[:from].first
 
-      # XXX: Need to use recursive CTEs for nested tag inclusion
       ds = DB[:object_ids]
-        .union(DB[:applied_object_tag].select(:object_id).where(tag_id: DB[:object_ids]))
-        .with(:object_ids, Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id))
+        .with_recursive(:object_ids,
+          Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
+          DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
+            .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
+            .where { level < Config.recursive_tag_limit },
+          args: [:object_id, :level]).select(:object_id)
 
       where(Sequel.|(
         # Allow where there is a specific entry for the object,

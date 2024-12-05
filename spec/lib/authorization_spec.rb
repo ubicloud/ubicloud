@@ -30,49 +30,62 @@ RSpec.describe Authorization do
     allow(Config).to receive(:postgres_service_project_id).and_return(projects[0].id)
   end
 
-  describe "#matched_policies" do
-    def add_separate_aces(policies)
-      project_id = projects[0].id
-      ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
-      Array(ace_subjects).each do |subject_id|
-        Array(ace_actions).each do |action|
-          action_id = ActionType::NAME_MAP[action] if action
-          Array(ace_objects).each do |object_id|
-            AccessControlEntry.create_with_id(project_id:, subject_id:, action_id:, object_id:)
-          end
-        end
-      end
-    end
-
-    def add_single_ace(policies)
-      project_id = projects[0].id
-      ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
-
-      subject_tag = SubjectTag.create_with_id(project_id:, name: "S")
-      Array(ace_subjects).each do |subject_id|
-        subject_tag.add_subject(subject_id)
-      end
-
-      action_id = unless ace_actions == [nil]
-        action_tag = ActionTag.create_with_id(project_id:, name: "A")
-        Array(ace_actions).each_with_index do |action_id, i|
-          action_id = ActionType::NAME_MAP[action_id] if i > 0
-          action_tag.add_action(action_id)
-        end
-        action_tag.id
-      end
-
-      object_id = unless ace_objects == [nil]
-        object_tag = ObjectTag.create_with_id(project_id:, name: "A")
+  def add_separate_aces(policies, project_id: projects[0].id)
+    ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
+    Array(ace_subjects).each do |subject_id|
+      Array(ace_actions).each do |action|
+        action_id = ActionType::NAME_MAP[action] if action
         Array(ace_objects).each do |object_id|
-          object_tag.add_object(object_id)
+          AccessControlEntry.create_with_id(project_id:, subject_id:, action_id:, object_id:)
         end
-        object_tag.id
       end
+    end
+  end
 
-      AccessControlEntry.create_with_id(project_id:, subject_id: subject_tag.id, action_id:, object_id:)
+  def add_single_ace(policies, project_id: projects[0].id)
+    ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
+
+    subject_tag = SubjectTag.create_with_id(project_id:, name: "S")
+    Array(ace_subjects).each do |subject_id|
+      subject_tag.add_subject(subject_id)
+    end
+    subject_tag = yield subject_tag if block_given?
+
+    action_id = unless ace_actions == [nil]
+      action_tag = ActionTag.create_with_id(project_id:, name: "A")
+      Array(ace_actions).each_with_index do |action_id, i|
+        action_id = ActionType::NAME_MAP[action_id] if i > 0
+        action_tag.add_action(action_id)
+      end
+      action_tag = yield action_tag if block_given?
+      action_tag.id
     end
 
+    object_id = unless ace_objects == [nil]
+      object_tag = ObjectTag.create_with_id(project_id:, name: "A")
+      Array(ace_objects).each do |object_id|
+        object_tag.add_object(object_id)
+      end
+      object_tag = yield object_tag if block_given?
+      object_tag.id
+    end
+
+    AccessControlEntry.create_with_id(project_id:, subject_id: subject_tag.id, action_id:, object_id:)
+  end
+
+  def add_single_ace_with_nested_tags(policies, project_id: projects[0].id)
+    add_single_ace(policies, project_id:) do |tag|
+      3.times do |i|
+        old_tag = tag
+        tag = tag.class.create_with_id(project_id: tag.project_id, name: i.to_s)
+        tag.send(:"add_#{tag.class.name.delete_suffix("Tag").downcase}", old_tag.id)
+      end
+      tag
+    end
+  end
+
+  # rubocop:disable RSpec/MissingExpectationTargetMethod
+  describe "#matched_policies" do
     it "without specific object" do
       AccessControlEntry.dataset.destroy
       project_id = projects[0].id
@@ -98,14 +111,20 @@ RSpec.describe Authorization do
         DB.transaction(rollback: :always) do
           add_separate_aces(policies)
           expect(described_class.matched_policies(project_id, subject_id, actions).count).to eq(matched_count)
+          expect(described_class.all_permissions(project_id, subject_id, nil) & Array(actions)).send((matched_count == 0) ? :to : :not_to, be_empty)
         end
 
         DB.transaction(rollback: :always) do
           add_single_ace(policies)
           expect(described_class.matched_policies(project_id, subject_id, actions).count).to eq((matched_count == 0) ? 0 : 1)
+          expect(described_class.all_permissions(project_id, subject_id, nil) & Array(actions)).send((matched_count == 0) ? :to : :not_to, be_empty)
         end
 
-        # XXX: Add test for nested tag inclusion
+        DB.transaction(rollback: :always) do
+          add_single_ace_with_nested_tags(policies)
+          expect(described_class.matched_policies(project_id, subject_id, actions).count).to eq((matched_count == 0) ? 0 : 1)
+          expect(described_class.all_permissions(project_id, subject_id, nil) & Array(actions)).send((matched_count == 0) ? :to : :not_to, be_empty)
+        end
       end
     end
 
@@ -139,17 +158,24 @@ RSpec.describe Authorization do
         DB.transaction(rollback: :always) do
           add_separate_aces(policies)
           expect(described_class.matched_policies(project_id, subject_id, actions, object_id).count).to eq(matched_count)
+          expect(described_class.all_permissions(project_id, subject_id, object_id) & Array(actions)).send((matched_count == 0) ? :to : :not_to, be_empty)
         end
 
         DB.transaction(rollback: :always) do
           add_single_ace(policies)
           expect(described_class.matched_policies(project_id, subject_id, actions, object_id).count).to eq((matched_count == 0) ? 0 : 1)
+          expect(described_class.all_permissions(project_id, subject_id, object_id) & Array(actions)).send((matched_count == 0) ? :to : :not_to, be_empty)
         end
 
-        # XXX: Add test for nested tag inclusion
+        DB.transaction(rollback: :always) do
+          add_single_ace_with_nested_tags(policies)
+          expect(described_class.matched_policies(project_id, subject_id, actions, object_id).count).to eq((matched_count == 0) ? 0 : 1)
+          expect(described_class.all_permissions(project_id, subject_id, object_id) & Array(actions)).send((matched_count == 0) ? :to : :not_to, be_empty)
+        end
       end
     end
   end
+  # rubocop:enable RSpec/MissingExpectationTargetMethod
 
   describe "#has_permission?" do
     it "returns true when has matched policies" do
@@ -174,12 +200,30 @@ RSpec.describe Authorization do
   end
 
   describe "#Dataset" do
-    it "returns authorized resources for user and project" do
+    it "returns authorized resources for user and project and action when user has full permissions" do
       vms
       expect(Vm.authorized(projects[0].id, users[0].id, "Vm:view").select_map(:id).sort).to eq([vms[0].id, vms[1].id].sort)
       expect(Vm.authorized(projects[0].id, users[1].id, "Vm:view").select_map(:id)).to be_empty
       expect(Vm.authorized(projects[1].id, users[0].id, "Vm:view").select_map(:id)).to be_empty
       expect(Vm.authorized(projects[1].id, users[1].id, "Vm:view").select_map(:id).sort).to eq([vms[2].id, vms[3].id].sort)
+    end
+
+    {
+      add_separate_aces: "direct permissions",
+      add_single_ace: "indirect permissions via tag",
+      add_single_ace_with_nested_tags: "indirect permissions via nested tag"
+    }.each do |method, desc|
+      it "returns authorized resources for user and project and action when user has #{desc}" do
+        vms
+        AccessControlEntry.dataset.destroy
+        send(method, {subjects: users[0].id, actions: "Vm:view", objects: vms[0].id})
+        send(method, {subjects: users[1].id, actions: "Vm:view", objects: vms[3].id}, project_id: projects[1].id)
+
+        expect(Vm.authorized(projects[0].id, users[0].id, "Vm:view").select_map(:id)).to eq([vms[0].id])
+        expect(Vm.authorized(projects[0].id, users[1].id, "Vm:view").select_map(:id)).to be_empty
+        expect(Vm.authorized(projects[1].id, users[0].id, "Vm:view").select_map(:id)).to be_empty
+        expect(Vm.authorized(projects[1].id, users[1].id, "Vm:view").select_map(:id)).to eq([vms[3].id])
+      end
     end
   end
 
