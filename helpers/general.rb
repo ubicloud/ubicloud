@@ -82,7 +82,11 @@ class Clover < Roda
   end
 
   def has_project_permission(actions)
-    Authorization.has_permission?(@project.id, current_account_id, actions, nil)
+    if actions.is_a?(Array)
+      !@project_permissions.intersection(actions).empty?
+    else
+      @project_permissions.include?(actions)
+    end
   end
 
   def current_account
