@@ -165,7 +165,7 @@ paths:
       summary: Delete a specific firewall
       responses:
         '204':
-          description: Firewall deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -348,11 +348,7 @@ paths:
                 - private_subnet_id
       responses:
         '200':
-          description: Subnet attached successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallDetailed'
+          $ref: '#/components/responses/FirewallDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -380,11 +376,7 @@ paths:
                 - private_subnet_id
       responses:
         '200':
-          description: Subnet detached successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallDetailed'
+          $ref: '#/components/responses/FirewallDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -515,7 +507,7 @@ paths:
       summary: Delete a specific firewall
       responses:
         '204':
-          description: Firewall deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -525,11 +517,7 @@ paths:
       summary: Get details of a specific firewall
       responses:
         '200':
-          description: Details of the firewall
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/FirewallDetailed'
+          $ref: '#/components/responses/FirewallDetailed'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1762,20 +1750,6 @@ components:
         - id
         - location
         - name
-    FirewallDetailed:
-      type: object
-      additionalProperties: false
-      allOf:
-        - $ref: '#/components/schemas/Firewall'
-        - properties:
-            private_subnets:
-              description: List of private subnets
-              type: array
-              items:
-                type: string
-          additionalProperties: false
-          required:
-            - private_subnets
     FirewallRule:
       type: object
       properties:
@@ -2076,6 +2050,24 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Firewall'
+    FirewallDetailed:
+      description: A Firewall (detailed)
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            allOf:
+              - $ref: '#/components/schemas/Firewall'
+              - properties:
+                  private_subnets:
+                    description: List of private subnets
+                    type: array
+                    items:
+                      type: string
+                additionalProperties: false
+                required:
+                  - private_subnets
     Firewalls:
       description: A list of Firewalls
       content:
