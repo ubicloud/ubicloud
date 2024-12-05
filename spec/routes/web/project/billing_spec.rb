@@ -2,6 +2,7 @@
 
 require_relative "../spec_helper"
 require "pdf-reader"
+require "stripe"
 
 RSpec.describe Clover, "billing" do
   let(:user) { create_account }
