@@ -232,13 +232,10 @@ RSpec.describe Clover, "private subnet" do
 
       it "can not delete private subnet when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessPolicy.create_with_id(
-          project_id: project_wo_permissions.id,
-          name: "only-view-private-subnet",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["PrivateSubnet:view"], objects: project_wo_permissions.hyper_tag_name}]}
-        )
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
 
         visit "#{project_wo_permissions.path}#{ps_wo_permission.path}"
+        expect(page.title).to eq "Ubicloud - dummy-ps-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end

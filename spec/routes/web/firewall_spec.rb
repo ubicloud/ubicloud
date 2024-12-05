@@ -327,13 +327,10 @@ RSpec.describe Clover, "firewall" do
 
       it "can not delete firewall when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessPolicy.create_with_id(
-          project_id: project_wo_permissions.id,
-          name: "only-view-firewall",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Firewall:view"], objects: project_wo_permissions.hyper_tag_name}]}
-        )
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
 
         visit "#{project_wo_permissions.path}#{fw_wo_permission.path}"
+        expect(page.title).to eq "Ubicloud - dummy-fw-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
