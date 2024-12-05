@@ -3,6 +3,13 @@
 require_relative "../model"
 
 class ActionType < Sequel::Model
+  include ResourceMethods
+
+  def freeze
+    ubid
+    super
+  end
+
   plugin :static_cache
 
   NAME_MAP = {}
