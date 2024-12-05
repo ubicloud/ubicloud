@@ -8,6 +8,30 @@ require "tilt"
 require "tilt/erubi"
 
 class Clover < Roda
+  # :nocov:
+  linting = Config.test? && !defined?(SimpleCov)
+  use Rack::Lint if linting
+  if linting || Config.development? # Assume Rack::Lint added automatically in development
+    require "rack/rewindable_input"
+
+    # Switch to use Rack::RewindableInputMiddleware after Rack 3.2
+    class RewindableInputMiddleware
+      def initialize(app)
+        @app = app
+      end
+
+      def call(env)
+        if (input = env["rack.input"])
+          env["rack.input"] = Rack::RewindableInput.new(input)
+        end
+
+        @app.call(env)
+      end
+    end
+    use RewindableInputMiddleware
+  end
+  # :nocov:
+
   OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true)
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
