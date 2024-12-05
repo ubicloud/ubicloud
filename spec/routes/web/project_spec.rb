@@ -362,7 +362,8 @@ RSpec.describe Clover, "project" do
         expect(page.status_code).to eq(204)
         expect(Project[project.id].visible).to be_falsey
         expect(AccessTag.where(project_id: project.id).count).to eq(0)
-        expect(AccessPolicy.where(project_id: project.id).count).to eq(0)
+        expect(AccessControlEntry.where(project_id: project.id).count).to eq(0)
+        expect(SubjectTag.where(project_id: project.id).count).to eq(0)
       end
 
       it "can not delete project when it has resources" do
@@ -384,13 +385,10 @@ RSpec.describe Clover, "project" do
 
       it "can not delete project when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessPolicy.create_with_id(
-          project_id: project_wo_permissions.id,
-          name: "only-view",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Project:view"], objects: project_wo_permissions.hyper_tag_name}]}
-        )
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
 
         visit project_wo_permissions.path
+        expect(page.title).to eq "Ubicloud - project-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end

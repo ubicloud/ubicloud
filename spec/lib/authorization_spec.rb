@@ -21,7 +21,6 @@ RSpec.describe Authorization do
       project_id: projects[0].id, location: "hetzner-fsn1", name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128
     ).subject
   }
-  let(:access_policy) { projects[0].access_policies.first }
 
   after do
     users.each(&:destroy)
@@ -86,9 +85,9 @@ RSpec.describe Authorization do
         [{}, users[0].id, ["Vm:view"], 0],
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, "Vm:view", 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], 1],
-        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], 1],
+        [{subjects: users[0].id, actions: ["Vm:view", "Vm:delete"], objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: vms[0].id}, users[0].id, "Vm:view", 1],
-        [{subjects: users[0].id, actions: "Vm:view", objects: vms.map { _1.id }}, users[0].id, "Vm:view", 4],
+        [{subjects: users[0].id, actions: "Vm:view", objects: [vms[0].id, vms[1].id]}, users[0].id, "Vm:view", 2],
         [{subjects: users[0].id, actions: "Vm:delete", objects: vms[0].id}, users[0].id, "Vm:view", 0],
         [{subjects: users[0].id, actions: %w[Vm:view Vm:delete], objects: vms[0].id}, users[0].id, "Vm:view", 1],
         [{subjects: users[0].id, actions: [nil], objects: vms[0].id}, users[0].id, "Vm:view", 1],
@@ -122,18 +121,18 @@ RSpec.describe Authorization do
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
-        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
+        [{subjects: users[0].id, actions: ["Vm:view", "Vm:delete"], objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
         [{subjects: users[0].id, actions: "Vm:delete", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 0],
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: [vms[0].id, vms[1].id]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 1],
-        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: vms[0].id}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
+        [{subjects: users[0].id, actions: ["Vm:view", "Vm:delete"], objects: vms[0].id}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
         [{subjects: users[0].id, actions: "Vm:delete", objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 0],
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
-        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: vms[1].id}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 0],
+        [{subjects: users[0].id, actions: ["Vm:view", "Vm:delete"], objects: vms[1].id}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 0],
         [{subjects: users[0].id, actions: "Vm:delete", objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0]
       ].each do |policies, subject_id, actions, object_id, matched_count|
