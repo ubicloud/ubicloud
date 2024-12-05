@@ -57,7 +57,6 @@ class Prog::Vm::GithubRunner < Prog::Base
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: skip_sync}],
       enable_ip4: true,
       arch: label_data["arch"],
-      allow_only_ssh: true,
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id
     )
