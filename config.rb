@@ -75,6 +75,7 @@ module Config
   override :puma_min_threads, 1, int
   override :puma_workers, 3, int
   override :raise_errors, false, bool
+  override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
   override :timeout, 10, int
   override :versioning, false, bool
