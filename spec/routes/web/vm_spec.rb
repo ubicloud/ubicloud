@@ -112,7 +112,7 @@ RSpec.describe Clover, "vm" do
         visit "#{project.path}/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
-        expect(page).to have_content "Create new subnet"
+        expect(page).to have_content ps.name
         name = "dummy-vm"
         fill_in "Name", with: name
         choose option: "eu-central-h1"
@@ -127,6 +127,45 @@ RSpec.describe Clover, "vm" do
         expect(Vm.count).to eq(1)
         expect(Vm.first.projects.first.id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).to eq(ps.id)
+      end
+
+      it "can create new virtual machine in default location subnet" do
+        project
+        ps_id = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1").id
+        ps = PrivateSubnet[ps_id]
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_content "Default"
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        choose option: "eu-central-h1"
+        select match: :prefer_exact, text: "Default"
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_content "'#{name}' will be ready in a few minutes"
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.projects.first.id).to eq(project.id)
+        expect(Vm.first.private_subnets.first.id).not_to eq(ps.id)
+        expect(Vm.first.private_subnets.first.name).to eq("default-#{LocationNameConverter.to_display_name(ps.location)}")
+
+        # can create a second vm in the same location and it will use the same subnet
+        visit "#{project.path}/vm/create"
+        fill_in "Name", with: "dummy-vm-2"
+        choose option: "eu-central-h1"
+        select match: :prefer_exact, text: "Default"
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - dummy-vm-2")
+        expect(Vm.count).to eq(2)
+        expect(Vm.find(name: "dummy-vm-2").private_subnets.first.id).to eq(Vm.find(name: "dummy-vm").private_subnets.first.id)
       end
 
       it "can not create virtual machine with invalid name" do

@@ -128,6 +128,12 @@ class Project < Sequel::Model
     end
   end
 
+  def default_private_subnet(location)
+    name = "default-#{LocationNameConverter.to_display_name(location)}"
+    ps = private_subnets_dataset.first(:location => location, Sequel[:private_subnet][:name] => name)
+    ps || Prog::Vnet::SubnetNexus.assemble(id, name: name, location: location).subject
+  end
+
   def self.feature_flag(*flags, into: self)
     flags.map(&:to_s).each do |flag|
       into.module_eval do
