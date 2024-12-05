@@ -13,7 +13,7 @@ RSpec.describe GithubRunner do
 
   before do
     allow(github_runner).to receive_messages(installation: instance_double(GithubInstallation), vm: instance_double(Vm, arch: "x64", cores: 2, ubid: "vm-ubid", pool_id: "pool-id"))
-    allow(github_runner.vm).to receive_messages(sshable: instance_double(Sshable), vm_host: instance_double(VmHost, ubid: "host-ubid"))
+    allow(github_runner.vm).to receive_messages(sshable: instance_double(Sshable), vm_host: instance_double(VmHost, ubid: "host-ubid", data_center: "FSN1-DC1"))
   end
 
   it "can log duration when it's from a vm pool" do
