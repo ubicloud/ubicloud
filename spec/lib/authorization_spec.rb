@@ -10,7 +10,12 @@ RSpec.describe Authorization do
     ]
   }
   let(:projects) { (0..1).map { users[_1].create_project_with_default_policy("project-#{_1}") } }
-  let(:vms) { (0..3).map { Prog::Vm::Nexus.assemble("key", projects[_1 / 2].id, name: "vm#{_1}") }.map(&:subject) }
+  let(:vms) {
+    (0..3).map do |index|
+      ps = Prog::Vnet::SubnetNexus.assemble(projects[index / 2].id, name: "vm#{index}-ps", location: "hetzner-fsn1").subject
+      Prog::Vm::Nexus.assemble("key", projects[index / 2].id, name: "vm#{index}", private_subnet_id: ps.id)
+    end.map(&:subject)
+  }
   let(:pg) {
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: projects[0].id, location: "hetzner-fsn1", name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128

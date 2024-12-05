@@ -81,8 +81,7 @@ class Prog::Vm::Nexus < Prog::Base
           raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
           subnet
         else
-          subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location, allow_only_ssh: allow_only_ssh).subject
-          PrivateSubnet[subnet.id]
+          project.default_private_subnet(location)
         end
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
