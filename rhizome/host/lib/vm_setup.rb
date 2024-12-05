@@ -432,7 +432,7 @@ EOS
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
       vm_sub_4 = NetAddr::IPv4Net.parse(nic.net4)
       <<DHCP
-dhcp-range=#{nic.tap},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},#{vm_sub_4.netmask.prefix_len}
+dhcp-range=#{nic.tap},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},6h
 dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
 DHCP
     end.join("\n")
