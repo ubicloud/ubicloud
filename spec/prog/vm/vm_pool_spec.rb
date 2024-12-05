@@ -33,7 +33,7 @@ RSpec.describe Prog::Vm::VmPool do
     }
 
     it "creates a new vm and hops to wait" do
-      expect(Config).to receive(:vm_pool_project_id).and_return(prj.id)
+      expect(Config).to receive(:vm_pool_project_id).and_return(prj.id).at_least(:once)
       st = described_class.assemble(
         size: 3, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1",
         storage_size_gib: 86, storage_encrypted: true,
