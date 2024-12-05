@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   before do
     allow(Github).to receive(:installation_client).and_return(client)
     allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123))
-    allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94"))
+    allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", data_center: "FSN1-DC1"))
   end
 
   describe ".assemble" do

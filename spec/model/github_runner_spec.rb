@@ -10,7 +10,7 @@ RSpec.describe GithubRunner do
   }
 
   let(:vm) {
-    instance_double(Vm, sshable: instance_double(Sshable), cores: 2, arch: "x64", ubid: "vm-ubid", pool_id: "pool-id", vm_host: instance_double(VmHost, ubid: "host-ubid"), inhost_name: "vminhost")
+    instance_double(Vm, sshable: instance_double(Sshable), cores: 2, arch: "x64", ubid: "vm-ubid", pool_id: "pool-id", vm_host: instance_double(VmHost, ubid: "host-ubid", data_center: "FSN1-DC1"), inhost_name: "vminhost")
   }
 
   before do
