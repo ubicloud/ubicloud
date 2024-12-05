@@ -21,7 +21,6 @@ RSpec.describe Authorization do
       project_id: projects[0].id, location: "hetzner-fsn1", name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128
     ).subject
   }
-  let(:access_policy) { projects[0].access_policies.first }
 
   after do
     users.each(&:destroy)

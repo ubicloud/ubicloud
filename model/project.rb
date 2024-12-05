@@ -4,7 +4,6 @@ require_relative "../model"
 
 class Project < Sequel::Model
   one_to_many :access_tags
-  one_to_many :access_policies
   one_to_many :access_control_entries
   one_to_many :subject_tags, order: :name
   one_to_one :billing_info, key: :id, primary_key: :billing_info_id
@@ -29,7 +28,7 @@ class Project < Sequel::Model
   dataset_module Authorization::Dataset
   dataset_module Pagination
 
-  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy
+  plugin :association_dependencies, access_tags: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy
 
   include ResourceMethods
   include Authorization::HyperTagMethods
@@ -74,7 +73,6 @@ class Project < Sequel::Model
   def soft_delete
     DB.transaction do
       access_tags_dataset.destroy
-      access_policies_dataset.destroy
       access_control_entries_dataset.destroy
       DB[:applied_subject_tag].where(tag_id: subject_tags_dataset.select(:id)).delete
       subject_tags_dataset.destroy

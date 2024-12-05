@@ -200,8 +200,19 @@ RSpec.describe UBID do
     prj = account.create_project_with_default_policy("x")
     expect(prj.ubid).to start_with UBID::TYPE_PROJECT
 
-    policy = AccessPolicy.create_with_id(project_id: prj.id, name: "Any", body: "[]")
-    expect(policy.ubid).to start_with UBID::TYPE_ACCESS_POLICY
+    ace = AccessControlEntry.create_with_id(project_id: prj.id, subject_id: prj.id)
+    expect(ace.ubid).to start_with UBID::TYPE_ACCESS_CONTROL_ENTRY
+
+    st = SubjectTag.create_with_id(project_id: prj.id, name: "T")
+    expect(st.ubid).to start_with UBID::TYPE_SUBJECT_TAG
+
+    at = ActionTag.create_with_id(project_id: prj.id, name: "T")
+    expect(at.ubid).to start_with UBID::TYPE_ACTION_TAG
+
+    ot = ObjectTag.create_with_id(project_id: prj.id, name: "T")
+    expect(ot.ubid).to start_with UBID::TYPE_OBJECT_TAG
+
+    expect(ActionType.first.ubid).to start_with UBID::TYPE_ACTION_TYPE
 
     atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
     expect(atag.ubid).to start_with UBID::TYPE_ACCESS_TAG
@@ -255,7 +266,11 @@ RSpec.describe UBID do
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
-    policy = AccessPolicy.create_with_id(project_id: project.id, name: "Any", body: "[]")
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: project.id)
+    st = SubjectTag.create_with_id(project_id: project.id, name: "T")
+    at = ActionTag.create_with_id(project_id: project.id, name: "T")
+    ot = ObjectTag.create_with_id(project_id: project.id, name: "T")
+    a_type = ActionType.first
     atag = AccessTag.create_with_id(project_id: project.id, hyper_tag_table: "x", name: "x")
     subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x")
     nic = Nic.create_with_id(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
@@ -272,7 +287,11 @@ RSpec.describe UBID do
     expect(described_class.decode(kek.ubid)).to eq(kek)
     expect(described_class.decode(account.ubid)).to eq(account)
     expect(described_class.decode(project.ubid)).to eq(project)
-    expect(described_class.decode(policy.ubid)).to eq(policy)
+    expect(described_class.decode(ace.ubid)).to eq(ace)
+    expect(described_class.decode(st.ubid)).to eq(st)
+    expect(described_class.decode(at.ubid)).to eq(at)
+    expect(described_class.decode(ot.ubid)).to eq(ot)
+    expect(described_class.decode(a_type.ubid)).to eq(a_type)
     expect(described_class.decode(atag.ubid)).to eq(atag)
     expect(described_class.decode(tun.ubid)).to eq(tun)
     expect(string_kv(described_class.decode(subnet.ubid))).to eq(string_kv(subnet))
