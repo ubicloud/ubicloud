@@ -38,7 +38,6 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         boot_image: postgres_resource.project.get_ff_postgresql_base_image || boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
-        allow_only_ssh: true,
         exclude_host_ids: exclude_host_ids
       )
 
