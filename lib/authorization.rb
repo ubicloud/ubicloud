@@ -21,7 +21,7 @@ module Authorization
     # XXX: Need to use recursive CTEs for nested tag inclusion
     DB[:action_type]
       .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
-      .where(Sequel.or([DB[:action_ids], DB[:applied_action_tag].select(:action_id).where(tag_id: DB[:action_ids])].map { [:id, _1] }))
+      .where(Sequel.or([DB[:action_ids], DB[:applied_action_tag].select(:action_id).where(tag_id: DB[:action_ids])].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists)
       .select_order_map(:name)
   end
 
