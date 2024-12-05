@@ -1257,22 +1257,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of Private Subnets in a location
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/PrivateSubnet'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/PrivateSubnets'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1287,7 +1272,7 @@ paths:
       summary: Delete a specific Private Subnet with ID
       responses:
         '204':
-          description: Private Subnet is deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1297,11 +1282,7 @@ paths:
       summary: Get details of a specific Private Subnet in a location with ID
       responses:
         '200':
-          description: Details of the private subnet
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PrivateSubnet'
+          $ref: '#/components/responses/PrivateSubnet'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1316,7 +1297,7 @@ paths:
       summary: Delete a specific Private Subnet
       responses:
         '204':
-          description: Private Subnet is deleted successfully
+          $ref: '#/components/responses/Delete'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1326,11 +1307,7 @@ paths:
       summary: Get details of a specific Private Subnet in a location
       responses:
         '200':
-          description: Details of the private subnet
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PrivateSubnet'
+          $ref: '#/components/responses/PrivateSubnet'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1350,11 +1327,7 @@ paths:
               additionalProperties: false
       responses:
         '200':
-          description: Private subnet is created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PrivateSubnet'
+          $ref: '#/components/responses/PrivateSubnet'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -1521,22 +1494,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of private subnets
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/PrivateSubnet'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
+          $ref: '#/components/responses/PrivateSubnets'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2205,6 +2163,29 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresFirewallRule'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    PrivateSubnet:
+      description: A Private Subnet
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PrivateSubnet'
+    PrivateSubnets:
+      description: A list of Private Subnets
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PrivateSubnet'
             additionalProperties: false
             required:
               - count
