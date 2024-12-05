@@ -19,7 +19,7 @@ class Clover
   def kubernetes_list
     if api?
       {}
-      # dataset = dataset_authorize(@project.kuberentes_clusters_dataset, "KubernetesCluster:view")
+      # dataset = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view")
       # dataset = dataset.where(location: @location) if @location
       # result = dataset.paginated_result(
       #   start_after: request.params["start_after"],
