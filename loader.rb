@@ -179,8 +179,6 @@ def clover_freeze
     Authorization,
     Authorization::Dataset,
     Authorization::HyperTagMethods,
-    Authorization::ManagedPolicy,
-    Authorization::TaggableMethods,
     Authorization::Unauthorized,
     HealthMonitorMethods,
     Hosting,
