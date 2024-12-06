@@ -5,6 +5,7 @@ class Serializers::KubernetesCluster < Serializers::Base
     {
       id: kc.ubid,
       name: kc.name,
+      replica: kc.replica,
       subnet: kc.subnet,
       kubernetes_version: kc.kubernetes_version,
       location: kc.location

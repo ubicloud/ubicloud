@@ -22,16 +22,11 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   def curl(method, url, token, data = nil)
-    command = ["curl", "-s", "-X", method]
-    command += ["-H", "Authorization: Bearer #{token}", "-H", "Content-Type: application/json"]
+    command = ["curl", "-s", "-X#{method}"]
+    command += ["-H", "\"Authorization: Bearer #{token}\"", "-H", "\"Content-Type: application/json\""]
     command += ["-k", url.to_s]
-    command += ["-d", data.to_json] if data
+    command += ["-d", "'#{data.to_json}'"] if data
     JSON.parse(`#{command.join(" ")}`, symbolize_names: true)
-  end
-
-  def render_template(template, context)
-    puts template, context
-    ERB.new(template).result_with_hash(context)
   end
 
   def specs_match?(desired, current)
@@ -42,39 +37,28 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def start
-    context = {
-      name: kubernetes_cluster.name,
-      namespace: "default",
-      location: kubernetes_cluster.location,
-      project_id: kubernetes_cluster.projects.first.ubid,
-      subnet: kubernetes_cluster.subnet,
-      replica: kubernetes_cluster.replica,
-      version: kubernetes_cluster.kubernetes_version,
-      server_size: "standard-4",
-      storage_size_gb: 40
-    }
     manifests = [
       {
         file: <<~YAML,
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: UbicloudCluster
 metadata:
-  name: <%= name %>
-  namespace: <%= namespace %>
+  name: #{kubernetes_cluster.name}
+  namespace: default
 spec:
-  location: <%= location %>
-  projectID: <%= project_id %>
-  subnet: <%= subnet %>
+  location: #{kubernetes_cluster.location}
+  projectID: #{kubernetes_cluster.projects.first.ubid}
+  subnet: #{kubernetes_cluster.subnet}
         YAML
-        url: "/apis/infrastructure.cluster.x-k8s.io/v1beta1/namespaces/#{context[:namespace]}/ubicloudclusters/#{context[:name]}"
+        url: "/apis/infrastructure.cluster.x-k8s.io/v1beta1/namespaces/default/ubicloudclusters/#{kubernetes_cluster.name}"
       },
       {
         file: <<~YAML,
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
-  name: <%= name %>
-  namespace: <%= namespace %>
+  name: #{kubernetes_cluster.name}
+  namespace: default
 spec:
   clusterNetwork:
     pods:
@@ -84,29 +68,29 @@ spec:
   controlPlaneRef:
     apiVersion: controlplane.cluster.x-k8s.io/v1beta1
     kind: KubeadmControlPlane
-    name: <%= name %>
+    name: #{kubernetes_cluster.name}
   infrastructureRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
     kind: UbicloudCluster
-    name: <%= name %>
+    name: #{kubernetes_cluster.name}
         YAML
-        url: "/apis/cluster.x-k8s.io/v1beta1/namespaces/#{context[:namespace]}/clusters/#{context[:name]}"
+        url: "/apis/cluster.x-k8s.io/v1beta1/namespaces/default/clusters/#{kubernetes_cluster.name}"
       },
       {
         file: <<~YAML,
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: KubeadmControlPlane
 metadata:
-  name: <%= name %>
-  namespace: <%= namespace %>
+  name: #{kubernetes_cluster.name}
+  namespace: default
 spec:
-  replicas: <%= replica %>
-  version: <%= version %>
+  replicas: #{kubernetes_cluster.replica}
+  version: #{kubernetes_cluster.kubernetes_version}
   machineTemplate:
     infrastructureRef:
       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
       kind: UbicloudMachineTemplate
-      name: <%= name %>-control-plane
+      name: #{kubernetes_cluster.name}-control-plane
   kubeadmConfigSpec:
     clusterConfiguration:
       apiServer:
@@ -120,55 +104,58 @@ spec:
     initConfiguration: {}
     joinConfiguration: {}
         YAML
-        url: "/apis/controlplane.cluster.x-k8s.io/v1beta1/namespaces/#{context[:namespace]}/kubeadmcontrolplanes/#{context[:name]}"
+        url: "/apis/controlplane.cluster.x-k8s.io/v1beta1/namespaces/default/kubeadmcontrolplanes/#{kubernetes_cluster.name}"
       },
       {
         file: <<~YAML,
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: UbicloudMachineTemplate
 metadata:
-  name: <%= name %>-control-plane
-  namespace: <%= namespace %>
+  name: #{kubernetes_cluster.name}-control-plane
+  namespace: default
 spec:
   template:
     spec:
-      serverSize: "<%= server_size %>"
-      storageSizeGB: <%= storage_size_gb %>
+      serverSize: "standard-4"
+      storageSizeGB: 40
         YAML
-        url: "/apis/infrastructure.cluster.x-k8s.io/v1beta1/namespaces/#{context[:namespace]}/ubicloudmachinetemplates/#{context[:name]}-control-plane"
+        url: "/apis/infrastructure.cluster.x-k8s.io/v1beta1/namespaces/default/ubicloudmachinetemplates/#{kubernetes_cluster.name}-control-plane"
       }
     ]
     manifests.each do |manifest|
-      yaml_content = render_template(manifest[:file], context)
-      resource = YAML.safe_load(yaml_content, symbolize_names: true)
+      resource = YAML.safe_load(manifest[:file], symbolize_names: true)
       resource_url = "#{Config.management_k8s_url}#{manifest[:url]}"
 
-      existing_resource = begin
-        curl("GET", resource_url, config.management_k8s_token)
-      rescue
-        nil
+      response = begin
+        curl("GET", resource_url, Config.management_k8s_token)
+      rescue => ex
+        Clog.emit("could not execute curl command: #{ex}")
+        next
       end
 
-      if existing_resource
-        current_spec = existing_resource[:spec] || {}
+      if !response.key?(:code) # meaning 200 status code
+        current_spec = response[:spec] || {}
         desired_spec = resource[:spec] || {}
         if specs_match?(desired_spec, current_spec)
-          puts "Resource already up-to-date: #{resource[:kind]} #{resource[:metadata][:name]}"
+          Clog.emit("Resource already up-to-date: #{resource[:kind]} #{resource[:metadata][:name]}")
         else
-          puts "Updating resource: #{resource[:kind]} #{resource[:metadata][:name]}"
-          curl("PUT", resource_url, config.management_k8s_token, resource)
+          Clog.emit("Updating resource: #{resource[:kind]} #{resource[:metadata][:name]}")
+          resource[:metadata][:resourceVersion] = response[:metadata][:resourceVersion]
+          curl("PUT", resource_url, Config.management_k8s_token, resource)
         end
+      elsif response[:code] == 404
+        Clog.emit("Creating resource: #{resource[:kind]} #{resource[:metadata][:name]}")
+        curl("POST", resource_url.gsub(%r{/[^/]+$}, ""), Config.management_k8s_token, resource)
       else
-        puts "Creating resource: #{resource[:kind]} #{resource[:metadata][:name]}"
-        curl("POST", resource_url.gsub(%r{/[^/]+$}, ""), config.management_k8s_token, resource)
+        Clog.emit("Got response code other than 200 and 404. Response: #{response}")
       end
     end
 
-    hop_wait
+    nap 30
   end
 
   label def wait
-    nap 30
+    hop_start
   end
 
   label def destroy

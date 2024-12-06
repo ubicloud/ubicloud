@@ -6,9 +6,12 @@ class Clover
       kubernetes_list
     end
 
-    r.post true do
-      post_kubernetes
-      {}
+    r.post do
+      r.on NAME_OR_UBID do |lb_name, lb_id|
+        if lb_name
+          post_kubernetes(lb_name)
+        end
+      end
     end
   end
 end

@@ -1488,6 +1488,73 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/location/{location}/kubernetes':
+    get:
+      operationId: listLocationKubernetesClusters
+      summary: List kubernetes clusters in a specific location of a project
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          description: A list of Kubernetes clusters in a location
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KubernetesCluster'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - KubernetesCluster
+  '/project/{project_id}/location/{location}/kubernetes/{kubernetes_cluster_name}':
+    parameters:
+    - $ref: '#/components/parameters/project_id'
+    - $ref: '#/components/parameters/location'
+    - $ref: '#/components/parameters/kubernetes_cluster_name'
+    post:
+      summary: Create Kubernetes Cluster in a specific location of a project
+      operationId: createLocationKubernetesClusters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subnet:
+                  description: Name of subnet
+                  type: string
+                kubernetes_version:
+                  description: Version of the kubernetes cluster
+                  type: string
+              required:
+                - subnet
+                - kubernetes_version
+      responses:
+        '200':
+          description: Kubernetes cluster created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KubernetesCluster'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - KubernetesCluster
 components:
   parameters:
     firewall_id:
@@ -1634,6 +1701,13 @@ components:
       description: Virtual machine name
       in: path
       name: vm_name
+      required: true
+      schema:
+        type: string
+    kubernetes_cluster_name:
+      description: Kubernetes cluster name
+      in: path
+      name: kubernetes_cluster_name
       required: true
       schema:
         type: string
@@ -1958,6 +2032,69 @@ components:
         - state
         - storage_size_gib
         - unix_user
+    VmDetailed:
+      type: object
+      additionalProperties: false
+      allOf:
+        - $ref: '#/components/schemas/Vm'
+        - additionalProperties: false
+          properties:
+            firewalls:
+              description: List of firewalls
+              type: array
+              items:
+                $ref: '#/components/schemas/Firewall'
+            private_ipv4:
+              description: Private IPv4 address
+              type: string
+              format: ipv4
+            private_ipv6:
+              description: Private IPv6 address
+              type: string
+              format: ipv6
+            subnet:
+              description: Subnet of the VM
+              type: string
+            unix_user:
+              description: Unix user of the VM
+              type: string
+          required:
+            - firewalls
+            - private_ipv4
+            - private_ipv6
+            - subnet
+            - unix_user
+    KubernetesCluster:
+      type: object
+      properties:
+        id:
+          description: ID of the kubernetes cluster
+          type: string
+          example: kcji8uuhqjdy4g72xng1ubq23r
+        name:
+          description: Name of the kubernetes cluster
+          type: string
+        replica:
+          description: Number of control plane replicas
+          type: integer
+        kubernetes_version:
+          description: Version of the kubernetes cluster
+          type: string
+        subnet:
+          description: Name of the kubernetes cluster's subnet
+          type: string
+        location:
+          description: Location of the kubernetes cluster
+          type: string
+          example: eu-central-h1
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - replica
+        - kubernetes_version
+        - subnet
+        - location
   responses:
     Delete:
       description: An empty response after successful resource delete
