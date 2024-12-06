@@ -12,9 +12,16 @@ unicode_normalize/tables
 enc/trans/single_byte
 enc/trans/utf_16_32
 enc/utf_16be
+enc/utf_16le
 rubygems/openssl
 rubygems/package
 rubygems/security
+ripper
+coderay/scanners
+coderay/scanners/ruby
+coderay/scanners/ruby/patterns
+coderay/scanners/ruby/string_state
+diff/lcs
 webmock/rspec
 tilt/erubi
 tilt/string
@@ -22,10 +29,12 @@ sequel/adapters/postgres
 sequel/connection_pool/timed_queue
 capybara/dsl
 capybara/rspec
+mail/network/delivery_methods/logger_delivery
 mail/network/delivery_methods/test_mailer
 mail/smtp_envelope
 rack/head
 rack/files
+rack/multipart
 rack/body_proxy
 rspec/mocks
 rspec/expectations
@@ -74,6 +83,9 @@ rspec/matchers/built_in/yield
 rspec/mocks/matchers/receive_message_chain
 rspec/mocks/matchers/receive_messages
 rspec/mocks/message_chain
+rspec/support/differ
+rspec/support/hunk_generator
+rspec/support/source
 mail/elements/address
 mail/elements/address_list
 mail/elements/content_disposition_element
@@ -146,10 +158,11 @@ index_caching
 pg_array
 pg_auto_parameterize
 pg_json
+pg_json_ops
 pg_range
 pg_range_ops
+pg_schema_caching
 pg_timestamptz
-schema_caching
 END
 
 <<END.split.each { |f| require "sequel/plugins/#{f}" }
@@ -158,10 +171,13 @@ auto_validations
 column_encryption
 defaults_setter
 insert_conflict
+inspect_pk
 many_through_many
 require_valid_schema
 serialization
 singular_table_names
+static_cache
+static_cache_cache
 subclasses
 validation_helpers
 END
@@ -177,6 +193,7 @@ autoload_hash_branches
 caching
 common_logger
 content_security_policy
+conditional_sessions
 custom_block_results
 default_headers
 direct_call
@@ -186,6 +203,8 @@ flash
 h
 hash_branch_view_subdir
 hash_branches
+hooks
+invalid_request_body
 json
 json_parser
 not_found
