@@ -307,6 +307,7 @@ namespace :linter do
     puts "Running ERB::Formatter..."
     require "erb/formatter/command_line"
     files = Dir.glob("views/**/[!icon]*.erb").entries
+    files.delete("views/components/form/select.erb")
     ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
   end
 
