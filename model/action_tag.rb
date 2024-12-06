@@ -10,6 +10,15 @@ class ActionTag < Sequel::Model
     action_id = ActionType::NAME_MAP.fetch(action_id) unless action_id.include?("-")
     DB[:applied_action_tag].insert(tag_id: id, action_id:)
   end
+
+  def self.valid_member?(project_id, action)
+    case action
+    when ActionTag
+      action.project_id == project_id
+    when ActionType
+      true
+    end
+  end
 end
 
 # Table: action_tag
