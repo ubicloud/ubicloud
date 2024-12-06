@@ -51,4 +51,17 @@ class Clover
       request.redirect "#{@project.path}#{lb.path}"
     end
   end
+
+  def generate_load_balancer_options
+    options = OptionTreeGenerator.new
+    options.add_option(name: "name")
+    options.add_option(name: "description")
+    options.add_option(name: "private_subnet_id", values: @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").map { {value: _1.ubid, display_name: _1.name} })
+    options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: _1.downcase.tr(" ", "_"), display_name: _1} })
+    options.add_option(name: "src_port")
+    options.add_option(name: "dst_port")
+    options.add_option(name: "health_check_endpoint")
+    options.add_option(name: "health_check_protocol", values: ["http", "https", "tcp"].map { {value: _1, display_name: _1.upcase} })
+    options.serialize
+  end
 end
