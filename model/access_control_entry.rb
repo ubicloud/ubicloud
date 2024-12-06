@@ -6,6 +6,9 @@ class AccessControlEntry < Sequel::Model
   many_to_one :project
 
   include ResourceMethods
+
+  # use __id__ if you want the internal object id
+  def_column_alias :object_id, :object_id
 end
 
 # Table: access_control_entry
