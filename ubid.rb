@@ -189,6 +189,18 @@ class UBID
   rescue UBIDParseError
   end
 
+  def self.uuid_type_match?(uuid, type)
+    from_uuidish(uuid).type_match?(type)
+  end
+
+  def self.type_match?(ubid, type)
+    ubid[..1] == type
+  end
+
+  def type_match?(type)
+    to_s[..1] == type
+  end
+
   def to_uuid
     # 8-4-4-4-12 format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     a = UBID.extract_bits_as_hex(@value, 24, 8)

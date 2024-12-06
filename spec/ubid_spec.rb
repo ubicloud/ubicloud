@@ -304,4 +304,22 @@ RSpec.describe UBID do
     expect(hash[page.id]).to eq page
     expect(hash[a_type.id]).to eq a_type
   end
+
+  it ".type_match? checks whether given ubid has given type" do
+    ubid = ActionType.first.ubid
+    expect(described_class.type_match?(ubid, described_class::TYPE_ACTION_TYPE)).to be true
+    expect(described_class.type_match?(ubid, described_class::TYPE_ETC)).to be false
+  end
+
+  it ".uuid_type_match? checks whether given uuid has given type" do
+    uuid = ActionType.first.id
+    expect(described_class.uuid_type_match?(uuid, described_class::TYPE_ACTION_TYPE)).to be true
+    expect(described_class.uuid_type_match?(uuid, described_class::TYPE_ETC)).to be false
+  end
+
+  it "#type_match? checks whether receiver has given type" do
+    ubid = described_class.from_uuidish(ActionType.first.id)
+    expect(ubid.type_match?(described_class::TYPE_ACTION_TYPE)).to be true
+    expect(ubid.type_match?(described_class::TYPE_ETC)).to be false
+  end
 end
