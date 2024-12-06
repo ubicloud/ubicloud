@@ -1,0 +1,70 @@
+<% page_action = "#{@ace.new? ? "Create" : "Update"} Access Control Entry" %>
+<% @page_title = "#{@project_data[:name]} - #{page_action}" %>
+<%== render("project/user-tabbar") %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/page_header",
+    locals: {
+      title: page_action,
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Access Control", "#{@project_data[:path]}/user/access-control"], [page_action, "#"]]
+    }
+  ) %>
+</div>
+
+<div class="grid gap-6">
+  <form id="access-control-entry" role="form" method="POST">
+    <%== csrf_tag(request.path_info) %>
+
+    <%== render(
+      "components/form/select",
+      locals: {
+        label: "Subject",
+        name: "subject",
+        selected: @ace.subject_ubid,
+        options:
+          {
+            nil => [["", "Choose a Subject"]],
+            "Tag" => @project.subject_tags.reject { _1.name == "Admin" },
+            "Account" => @project.accounts
+          }.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }
+      }
+    ) %>
+
+    <%== render(
+      "components/form/select",
+      locals: {
+        label: "Action",
+        name: "action",
+        selected: @ace.action_ubid,
+        options:
+          { nil => [["", "All Actions"]], "Tag" => @project.action_tags, "Action" => ActionType }.to_h do |k, v|
+            [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v]
+          end
+      }
+    ) %>
+
+    <%== render(
+      "components/form/select",
+      locals: {
+        label: "Object",
+        name: "object",
+        selected: @ace.object_ubid,
+        options:
+          {
+            nil => [["", "All Objects"]],
+            "Tag" => @project.object_tags,
+            "Vm" => @project.vms,
+            "PostgresSQL Server" => @project.postgres_resources,
+            "Private Subnet" => @project.private_subnets,
+            "Firewall" => @project.firewalls,
+            "LoadBalancer" => @project.load_balancers
+          }.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }
+      }
+    ) %>
+
+    <div class="px-4 py-5 sm:p-6">
+      <%== render("components/form/submit_button", locals: { text: page_action }) %>
+    </div>
+  </form>
+</div>

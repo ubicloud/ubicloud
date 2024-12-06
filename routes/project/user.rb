@@ -86,7 +86,53 @@ class Clover
 
       r.on "access-control" do
         r.get true do
+          uuids = {}
+          @project.access_control_entries.each do |ace|
+            # Omit personal action token subjects
+            uuids[ace.subject_id] = nil unless UBID.uuid_class_match?(ace.subject_id, ApiKey)
+            uuids[ace.action_id] = nil if ace.action_id
+            uuids[ace.object_id] = nil if ace.object_id
+          end
+          UBID.resolve_map(uuids)
+          @aces = @project.access_control_entries.map do |ace|
+            next unless (subject = uuids[ace.subject_id])
+            editable = !(subject.is_a?(SubjectTag) && subject.name == "Admin")
+            [ace.ubid, [subject, uuids[ace.action_id], uuids[ace.object_id]], editable]
+          end
+          @aces.compact!
+          sort_aces!(@aces)
+
           view "project/access-control"
+        end
+
+        r.is "entry", String do |ubid|
+          if ubid == "new"
+            @ace = AccessControlEntry.new_with_id(project_id: @project.id)
+          else
+            next unless (@ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+            check_ace_subject(@ace.subject_id)
+          end
+
+          r.get do
+            view "project/access-control-entry"
+          end
+
+          r.post do
+            was_new = @ace.new?
+
+            subject, action, object = typecast_params.nonempty_str(%w[subject action object])
+            check_ace_subject(UBID.to_uuid(subject))
+            @ace.from_ubids(subject, action, object).save_changes
+
+            flash["notice"] = "Access control entry #{was_new ? "created" : "updated"} successfully"
+            r.redirect "#{@project_data[:path]}/user/access-control"
+          end
+
+          r.delete(!@ace.new?) do
+            @ace.destroy
+            flash["notice"] = "Access control entry deleted successfully"
+            204
+          end
         end
       end
 
