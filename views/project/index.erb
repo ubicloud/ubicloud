@@ -1,14 +1,12 @@
 <% @page_title = "Projects" %>
 
 <% if @projects.count > 0 %>
-  <div class="space-y-1">
-    <%== render(
-      "components/page_header",
-      locals: {
-        right_items: [render("components/button", locals: { text: "Create Project", link: "/project/create" })]
-      }
-    ) %>
-  </div>
+  <%== render(
+    "components/page_header",
+    locals: {
+      right_items: [render("components/button", locals: { text: "Create Project", link: "/project/create" })]
+    }
+  ) %>
 
   <div class="grid gap-6">
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">

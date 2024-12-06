@@ -1,9 +1,12 @@
 <% @page_title = "#{@project_data[:name]} Dashboard" %>
 
-<div class="space-y-1">
-  <%== render("components/breadcrumb", locals: { parts: [%w[Projects /project], [@project_data[:name], ""]] }) %>
-  <%== render("components/page_header", locals: { title: "Getting Started with your Project" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    title: "Getting Started with your Project",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], ""]]
+  }
+) %>
 
 <div class="grid gap-6">
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-10">

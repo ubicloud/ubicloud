@@ -1,9 +1,6 @@
 <% @page_title = "Create Project" %>
 
-<div class="space-y-1">
-  <%== render("components/breadcrumb", locals: { parts: [%w[Projects /project], %w[Create #]] }) %>
-  <%== render("components/page_header") %>
-</div>
+<%== render("components/page_header", locals: { parts: [%w[Projects /project], %w[Create #]] }) %>
 
 <div class="grid gap-6">
   <form action="/project" method="POST">

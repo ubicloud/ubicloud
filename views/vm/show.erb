@@ -3,25 +3,19 @@
   <div class="auto-refresh hidden" data-interval="10"></div>
 <% end %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Virtual Machines", "#{@project_data[:path]}/vm"],
-        [@vm[:name], "#"]
-      ]
-    }
-  ) %>
-  <%== render(
-    "components/page_header",
-    locals: {
-      left_items: [render("components/vm_state_label", locals: { state: @vm[:state], extra_class: "text-md" })]
-    }
-  ) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Virtual Machines", "#{@project_data[:path]}/vm"],
+      [@vm[:name], "#"]
+    ],
+    left_items: [render("components/vm_state_label", locals: { state: @vm[:state], extra_class: "text-md" })]
+  }
+) %>
+
 <div class="grid gap-6">
   <!-- Detail Card -->
   <%== render(

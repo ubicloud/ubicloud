@@ -1,15 +1,13 @@
 <% @page_title = "#{@project_data[:name]} - Users" %>
 <%== render("project/user-tabbar") %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: "User Management" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    title: "User Management",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]]
+  }
+) %>
 
 <div class="grid gap-6">
   <!-- Invite user -->
