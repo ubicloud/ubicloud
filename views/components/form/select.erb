@@ -24,17 +24,32 @@ attributes ||= {} %>
         <%= placeholder %>
       </option>
     <% end %>
-    <% options.each do |opt_val, opt_text, opt_classes, opt_attrs| %>
-      <option
-        value="<%= opt_val %>"
-        class="<%= opt_classes %>"
-        <%= (opt_val == selected) ? "selected" : "" %>
-        <% (opt_attrs || {}).each do |opt_atr_key, opt_atr_value| %>
-        <%= opt_atr_key %>="<%= opt_atr_value %>"
-        <% end%>
-      >
-        <%= opt_text %>
-      </option>
+    <% options = {nil => options} unless options.is_a?(Hash) %>
+    <% options.each do |group_name, opts| %>
+      <% next if opts.empty? %>
+      <% if group_name %>
+        <% opt_group_attributes = group_name.is_a?(Hash) ? group_name : {"label" => group_name}  %>
+        <optgroup
+          <% opt_group_attributes.each do |opt_atr_key, opt_atr_value| %>
+            <%= opt_atr_key %>="<%= opt_atr_value %>"
+          <% end %>
+        >
+      <% end %>
+      <% opts.each do |opt_val, opt_text, opt_classes, opt_attrs| %>
+        <option
+          value="<%= opt_val %>"
+          class="<%= opt_classes %>"
+          <%= (opt_val == selected) ? "selected" : "" %>
+          <% (opt_attrs || {}).each do |opt_atr_key, opt_atr_value| %>
+          <%= opt_atr_key %>="<%= opt_atr_value %>"
+          <% end%>
+        >
+          <%= opt_text %>
+        </option>
+      <% end %>
+      <% if group_name %>
+        </optgroup>
+      <% end %>
     <% end %>
   </select>
   <% if error %>

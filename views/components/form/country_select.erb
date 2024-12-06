@@ -17,7 +17,7 @@ attributes ||= {} %>
         .reject { Config.sanctioned_countries.include?(_1.alpha2) }
         .sort_by(&:common_name)
         .map { |c| [c.alpha2, c.common_name] }
-        .to_h,
+        .to_h.to_a,
     description: description,
     attributes: attributes
   }
