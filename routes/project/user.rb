@@ -86,7 +86,71 @@ class Clover
 
       r.on "access-control" do
         r.get true do
+          uuids = {}
+          @project.access_control_entries.each do |ace|
+            # Omit personal action token subjects
+            uuids[ace.subject_id] = nil unless UBID.uuid_class_match?(ace.subject_id, ApiKey)
+            uuids[ace.action_id] = nil if ace.action_id
+            uuids[ace.object_id] = nil if ace.object_id
+          end
+          UBID.resolve_map(uuids)
+          @aces = @project.access_control_entries.map do |ace|
+            next unless (subject = uuids[ace.subject_id])
+            editable = !(subject.is_a?(SubjectTag) && subject.name == "Admin")
+            [ace.ubid, [subject, uuids[ace.action_id], uuids[ace.object_id]], editable]
+          end
+          @aces.compact!
+          @aces.sort! do |a, b|
+            # :nocov:
+            # Admin tag at the top (one of these branches will be hit, but
+            # cannot force which)
+            next -1 unless a.last
+            next 1 unless b.last
+            # :nocov:
+            # Label sorting by subject, action, object for remaining ACEs
+            a_tags = a[1]
+            b_tags = b[1]
+            x = nil
+            3.times do |i|
+              x = ace_label(a_tags[i]) <=> ace_label(b_tags[i])
+              break unless x.nil? || x.zero?
+            end
+            next x unless x.nil? || x.zero?
+            # Tie break using ubid
+            a[0] <=> b[0]
+          end
+
           view "project/access-control"
+        end
+
+        r.is "entry", String do |ubid|
+          if ubid == "new"
+            @ace = AccessControlEntry.new_with_id(project_id: @project.id)
+          else
+            next unless (@ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+            check_ace_subject(@ace.subject_id)
+          end
+
+          r.get do
+            view "project/access-control-entry"
+          end
+
+          r.post do
+            was_new = @ace.new?
+
+            subject, action, object = typecast_params.nonempty_str(%w[subject action object])
+            check_ace_subject(UBID.to_uuid(subject))
+            @ace.from_ubids(subject, action, object).save_changes
+
+            flash["notice"] = "Access control entry #{was_new ? "created" : "updated"} successfully"
+            r.redirect "#{@project_data[:path]}/user/access-control"
+          end
+
+          r.delete(!@ace.new?) do
+            @ace.destroy
+            flash["notice"] = "Access control entry deleted successfully"
+            204
+          end
         end
       end
 
