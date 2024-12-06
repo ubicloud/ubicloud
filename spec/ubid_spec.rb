@@ -341,4 +341,22 @@ RSpec.describe UBID do
     expect(ubid.type_match?(described_class::TYPE_ACTION_TYPE)).to be true
     expect(ubid.type_match?(described_class::TYPE_ETC)).to be false
   end
+
+  it ".class_match? checks whether given ubid has given class" do
+    ubid = ActionType.first.ubid
+    expect(described_class.class_match?(ubid, ActionType)).to be true
+    expect(described_class.class_match?(ubid, ApiKey)).to be false
+  end
+
+  it ".uuid_class_match? checks whether given uuid has given class" do
+    uuid = ActionType.first.id
+    expect(described_class.uuid_class_match?(uuid, ActionType)).to be true
+    expect(described_class.uuid_class_match?(uuid, ApiKey)).to be false
+  end
+
+  it "#class_match? checks whether receiver has given class" do
+    ubid = described_class.from_uuidish(ActionType.first.id)
+    expect(ubid.class_match?(ActionType)).to be true
+    expect(ubid.class_match?(ApiKey)).to be false
+  end
 end
