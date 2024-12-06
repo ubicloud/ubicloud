@@ -103,7 +103,7 @@ module Authorization
     end
 
     Admin = ManagedPolicyClass.new("admin", ["*"])
-    Member = ManagedPolicyClass.new("member", ["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github"])
+    Member = ManagedPolicyClass.new("member", ["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github", "InferenceEndpoint:view"])
 
     def self.from_name(name)
       ManagedPolicy.const_get(name.to_s.capitalize)

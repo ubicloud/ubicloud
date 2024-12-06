@@ -128,7 +128,7 @@ RSpec.describe Authorization do
       described_class::ManagedPolicy::Member.apply(projects[0], [users[0], nil, users[1]])
       acl = AccessPolicy[project_id: projects[0].id, name: "member", managed: true].body["acls"].first
       expect(acl["subjects"]).to contain_exactly(users[0].hyper_tag_name)
-      expect(acl["actions"]).to eq(["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github"])
+      expect(acl["actions"]).to eq(["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github", "InferenceEndpoint:view"])
       expect(acl["objects"]).to eq(["project/#{projects[0].ubid}"])
       users[1].associate_with_project(projects[0])
       described_class::ManagedPolicy::Member.apply(projects[0], [users[1]], append: true)
