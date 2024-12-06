@@ -295,4 +295,13 @@ RSpec.describe UBID do
   it "can be inspected" do
     expect(described_class.parse("vmqsknkzw5164hkfnt6z6zgjps").inspect).to eq("#<UBID:Vm @ubid=\"vmqsknkzw5164hkfnt6z6zgjps\" @uuid=\"be6759ff-8509-8b74-8cdf-5d1be6fc256c\">")
   end
+
+  it ".resolve_map populates hash with uuid keys" do
+    page = Page.create_with_id(summary: "x", tag: "y")
+    a_type = ActionType.first
+    hash = {page.id => nil, a_type.id => nil}
+    described_class.resolve_map(hash)
+    expect(hash[page.id]).to eq page
+    expect(hash[a_type.id]).to eq a_type
+  end
 end
