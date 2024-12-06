@@ -1,0 +1,8 @@
+<%== render(
+  "components/tabbar",
+  locals: {
+    tabs: [
+      ["Inference Endpoints", @project_data[:path] + "/inference-endpoint"]
+    ]
+  }
+) %>
