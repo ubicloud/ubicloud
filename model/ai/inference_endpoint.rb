@@ -8,9 +8,7 @@ class InferenceEndpoint < Sequel::Model
   one_to_many :replicas, class: :InferenceEndpointReplica, key: :inference_endpoint_id
   one_to_one :load_balancer, key: :id, primary_key: :load_balancer_id
   one_to_one :private_subnet, key: :id, primary_key: :private_subnet_id
-  one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "inference_endpoint", used_for: "inference_endpoint"}
 
-  plugin :association_dependencies, api_keys: :destroy
   dataset_module Authorization::Dataset
   dataset_module Pagination
 
