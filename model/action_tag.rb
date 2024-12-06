@@ -3,6 +3,16 @@
 require_relative "../model"
 
 class ActionTag < Sequel::Model
+  include ResourceMethods
+
+  def self.valid_member?(project_id, action)
+    case action
+    when ActionTag
+      action.project_id == project_id
+    when ActionType
+      true
+    end
+  end
 end
 
 # Table: action_tag
