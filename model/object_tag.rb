@@ -3,6 +3,18 @@
 require_relative "../model"
 
 class ObjectTag < Sequel::Model
+  include ResourceMethods
+
+  def self.valid_member?(project_id, object)
+    case object
+    when ObjectTag, SubjectTag, ActionTag
+      object.project_id == project_id
+    when Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
+      !AccessTag.where(project_id:, hyper_tag_id: object.id).empty?
+    when Project
+      object.id == project_id
+    end
+  end
 end
 
 # Table: object_tag
