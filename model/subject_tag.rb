@@ -8,6 +8,18 @@ class SubjectTag < Sequel::Model
   def add_subject(subject_id)
     DB[:applied_subject_tag].insert(tag_id: id, subject_id:)
   end
+
+  def self.valid_member?(project_id, subject)
+    case subject
+    when SubjectTag
+      subject.project_id == project_id
+    when Account
+      !AccessTag.where(project_id:, hyper_tag_id: subject.id).empty?
+    when ApiKey
+      subject.owner_table == "accounts" &&
+        !AccessTag.where(project_id:, hyper_tag_id: subject.owner_id).empty?
+    end
+  end
 end
 
 # Table: subject_tag
