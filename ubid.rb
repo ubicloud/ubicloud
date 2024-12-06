@@ -189,12 +189,24 @@ class UBID
   rescue UBIDParseError
   end
 
+  def self.uuid_class_match?(uuid, klass)
+    uuid_type_match?(uuid, klass.ubid_type)
+  end
+
   def self.uuid_type_match?(uuid, type)
     from_uuidish(uuid).type_match?(type)
   end
 
+  def self.class_match?(ubid, klass)
+    type_match?(ubid, klass.ubid_type)
+  end
+
   def self.type_match?(ubid, type)
     ubid[..1] == type
+  end
+
+  def class_match?(klass)
+    type_match?(klass.ubid_type)
   end
 
   def type_match?(type)
