@@ -161,6 +161,15 @@ class UBID
     # :nocov:
   end
 
+  def self.resolve_map(uuids)
+    uuids.keys.group_by { class_for_ubid(from_uuidish(_1).to_s) }.each do |model, model_uuids|
+      model.where(id: model_uuids).each do
+        uuids[_1.id] = _1
+      end
+    end
+    uuids
+  end
+
   def self.decode(ubid)
     ubid_str = ubid.to_s
     uuid = UBID.parse(ubid_str).to_uuid
