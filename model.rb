@@ -133,7 +133,7 @@ module ResourceMethods
     end
 
     def ubid_type
-      Object.const_get("UBID::TYPE_#{ClassMethods.uppercase_underscore(name)}")
+      UBID.const_get("TYPE_#{ClassMethods.uppercase_underscore(name)}")
     end
 
     def generate_ubid
