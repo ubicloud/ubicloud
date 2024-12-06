@@ -36,7 +36,7 @@ RSpec.describe Authorization do
       Array(ace_actions).each do |action|
         action_id = ActionType::NAME_MAP[action] if action
         Array(ace_objects).each do |object_id|
-          AccessControlEntry.create_with_id(project_id:, subject_id:, action_id:, object_id:)
+          AccessControlEntry.new_with_id(project_id:, subject_id:, action_id:, object_id:).save_changes(validate: false)
         end
       end
     end
@@ -70,7 +70,7 @@ RSpec.describe Authorization do
       object_tag.id
     end
 
-    AccessControlEntry.create_with_id(project_id:, subject_id: subject_tag.id, action_id:, object_id:)
+    AccessControlEntry.new_with_id(project_id:, subject_id: subject_tag.id, action_id:, object_id:).save_changes(validate: false)
   end
 
   def add_single_ace_with_nested_tags(policies, project_id: projects[0].id)
