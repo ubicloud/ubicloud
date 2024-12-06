@@ -6,6 +6,8 @@ class Project < Sequel::Model
   one_to_many :access_tags
   one_to_many :access_control_entries
   one_to_many :subject_tags, order: :name
+  one_to_many :action_tags, order: :name
+  one_to_many :object_tags, order: :name
   one_to_one :billing_info, key: :id, primary_key: :billing_info_id
   one_to_many :usage_alerts
   one_to_many :github_installations
@@ -28,7 +30,7 @@ class Project < Sequel::Model
   dataset_module Authorization::Dataset
   dataset_module Pagination
 
-  plugin :association_dependencies, access_tags: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy
+  plugin :association_dependencies, access_tags: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy
 
   include ResourceMethods
   include Authorization::HyperTagMethods
