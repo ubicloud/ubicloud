@@ -135,6 +135,46 @@ class Prog::Test::VmGroup < Prog::Test::Base
       nap 5
     end
 
+    hop_verify_purge
+  end
+
+  def verify_vm_dir_purged
+    sshable = vm_host.sshable
+    vm_dir_content = sshable.cmd("sudo ls -1 /vm").split("\n")
+    fail_test "VM directory not empty: #{vm_dir_content}" unless vm_dir_content.empty?
+  end
+
+  def verify_storage_files_purged
+    sshable = vm_host.sshable
+
+    vm_disks = sshable.cmd("sudo ls -1 /var/storage").split("\n").reject { ["vhost", "images"].include? _1 }
+    fail_test "VM disks not empty: #{vm_disks}" unless vm_disks.empty?
+
+    vhost_dir_content = sshable.cmd("sudo ls -1 /var/storage/vhost").split("\n")
+    fail_test "vhost directory not empty: #{vhost_dir_content}" unless vhost_dir_content.empty?
+  end
+
+  def verify_spdk_artifacts_purged
+    sshable = vm_host.sshable
+
+    spdk_version = vm_host.spdk_installations.first.version
+    rpc_py = "/opt/spdk-#{spdk_version}/scripts/rpc.py"
+    rpc_sock = "/home/spdk/spdk-#{spdk_version}.sock"
+
+    bdevs = JSON.parse(sshable.cmd("sudo #{rpc_py} -s #{rpc_sock} bdev_get_bdevs")).map { _1["name"] }
+    fail_test "SPDK bdevs not empty: #{bdevs}" unless bdevs.empty?
+
+    vhost_controllers = JSON.parse(sshable.cmd("sudo #{rpc_py} -s #{rpc_sock} vhost_get_controllers")).map { _1["ctrlr"] }
+    fail_test "SPDK vhost controllers not empty: #{vhost_controllers}" unless vhost_controllers.empty?
+  end
+
+  label def verify_purge
+    verify_vm_dir_purged
+    verify_storage_files_purged
+    verify_spdk_artifacts_purged
+
+    # YYY: Verify network resources are purged
+
     hop_finish
   end
 
@@ -148,6 +188,6 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   def vm_host
-    @vm_host ||= Vm[frame["vms"].first].vm_host
+    @vm_host ||= VmHost.first
   end
 end
