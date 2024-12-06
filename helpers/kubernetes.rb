@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def post_kubernetes(name)
+  def post_kubernetes_cluster(name)
     authorize("KubernetesCluster:create", @project.id)
 
     st = Prog::Kubernetes::KubernetesClusterNexus.assemble(
@@ -33,5 +33,27 @@ class Clover
     else
       view "kubernetes/index"
     end
+  end
+
+  def post_kubernetes_vm(name)
+    authorize("KubernetesCluster:create", @project.id)
+
+    vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+      request.params["unix_user"],
+      @project.id,
+      location: @location,
+      name: name,
+      size: request.params["size"],
+      storage_volumes: [
+        {encrypted: true, size_gib: request.params["storage_size"]}
+      ],
+      boot_image: request.params["boot_image"],
+      private_subnet_id: request.params["private_subnet_id"],
+      enable_ip4: request.params["enable_ip4"],
+      allow_only_ssh: true
+    )
+
+    kubernetes_vm_st = Prog::Kubernetes::KubernetesVmNexus.assemble(vm_st.subject, request.params["commands"])
+    Serializers::Vm.serialize(kubernetes_vm_st.subject, {detailed: true})
   end
 end

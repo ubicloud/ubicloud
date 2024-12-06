@@ -1488,7 +1488,7 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/location/{location}/kubernetes':
+  '/project/{project_id}/location/{location}/kubernetes-cluster':
     get:
       operationId: listLocationKubernetesClusters
       summary: List kubernetes clusters in a specific location of a project
@@ -1520,14 +1520,14 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - KubernetesCluster
-  '/project/{project_id}/location/{location}/kubernetes/{kubernetes_cluster_name}':
+  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_name}':
     parameters:
     - $ref: '#/components/parameters/project_id'
     - $ref: '#/components/parameters/location'
     - $ref: '#/components/parameters/kubernetes_cluster_name'
     post:
       summary: Create Kubernetes Cluster in a specific location of a project
-      operationId: createLocationKubernetesClusters
+      operationId: createLocationKubernetesCluster
       requestBody:
         required: true
         content:
@@ -1555,6 +1555,63 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - KubernetesCluster
+  '/project/{project_id}/location/{location}/kubernetes-vm/{kubernetes_vm_name}':
+    parameters:
+    - $ref: '#/components/parameters/project_id'
+    - $ref: '#/components/parameters/location'
+    - $ref: '#/components/parameters/kubernetes_vm_name'
+    post:
+      summary: Create Kubernetes VM in a specific location of a project
+      operationId: createLocationKubernetesVM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                boot_image:
+                  description: Boot image of the VM
+                  type: string
+                enable_ip4:
+                  description: Enable IPv4
+                  type: boolean
+                private_subnet_id:
+                  description: ID of the private subnet
+                  type: string
+                size:
+                  description: Size of the VM
+                  type: string
+                storage_size:
+                  description: Requested storage size in GiB
+                  type: integer
+                unix_user:
+                  description: Unix user of the VM
+                  type: string
+                commands:
+                  description: List of commands for the Kubernetes VM
+                  type: array
+                  items:
+                    type: string
+              required:
+                - unix_user
+                - size
+                - storage_size
+                - boot_image
+                - private_subnet_id
+                - enable_ip4
+                - commands
+      responses:
+        '200':
+          description: Kubernetes cluster created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VmDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - KubernetesVM
 components:
   parameters:
     firewall_id:
@@ -1708,6 +1765,13 @@ components:
       description: Kubernetes cluster name
       in: path
       name: kubernetes_cluster_name
+      required: true
+      schema:
+        type: string
+    kubernetes_vm_name:
+      description: Kubernetes vm name
+      in: path
+      name: kubernetes_vm_name
       required: true
       schema:
         type: string
