@@ -31,4 +31,26 @@ class Clover < Roda
       request.redirect referrer
     end
   end
+
+  ACE_CLASS_LABEL_MAP = {
+    SubjectTag => "Tag",
+    ActionTag => "Tag",
+    ObjectTag => "Tag",
+    ActionType => ""
+  }.freeze
+  def ace_label(obj)
+    return "All" unless obj
+    prefix = ACE_CLASS_LABEL_MAP[obj.class] || obj.class.name
+    "#{prefix}#{": " unless prefix.empty?}#{obj.name}"
+  end
+
+  def check_ace_subject(subject)
+    # Do not allow personal access tokens as subjects
+    # Do not allow modifiction or addition of an ace entry with the Admin subject,
+    # which is reserved for full access.
+    if UBID.uuid_class_match?(subject, ApiKey) ||
+        UBID.uuid_class_match?(subject, SubjectTag) && SubjectTag[subject].name == "Admin"
+      raise Authorization::Unauthorized
+    end
+  end
 end
