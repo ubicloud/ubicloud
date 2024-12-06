@@ -10,6 +10,22 @@ class AccessControlEntry < Sequel::Model
   # use __id__ if you want the internal object id
   def_column_alias :object_id, :object_id
 
+  %I[subject action object].each do |type|
+    method = :"#{type}_id"
+    define_method(:"#{type}_ubid") do
+      if (value = send(method))
+        UBID.from_uuidish(value).to_s
+      end
+    end
+  end
+
+  def from_ubids(subject, action, object)
+    self.subject_id, self.action_id, self.object_id = [subject, action, object].map! do
+      UBID.to_uuid(_1) if _1
+    end
+    self
+  end
+
   def validate
     if project_id
       {subject_id:, action_id:, object_id:}.each do |field, value|

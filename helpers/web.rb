@@ -40,4 +40,48 @@ class Clover < Roda
       # :nocov:
     ].compact
   end
+
+  def sort_aces!(aces)
+    @aces.sort! do |a, b|
+      # :nocov:
+      # Admin tag at the top (one of these branches will be hit, but
+      # cannot force which)
+      next -1 unless a.last
+      next 1 unless b.last
+      # :nocov:
+      # Label sorting by subject, action, object for remaining ACEs
+      a_tags = a[1]
+      b_tags = b[1]
+      x = nil
+      a_tags.each_with_index do |v, i|
+        x = ace_label(v) <=> ace_label(b_tags[i])
+        break unless x.nil? || x.zero?
+      end
+      next x unless x.nil? || x.zero?
+      # Tie break using ubid
+      a[0] <=> b[0]
+    end
+  end
+
+  ACE_CLASS_LABEL_MAP = {
+    SubjectTag => "Tag",
+    ActionTag => "Tag",
+    ObjectTag => "Tag",
+    ActionType => ""
+  }.freeze
+  def ace_label(obj)
+    return "All" unless obj
+    prefix = ACE_CLASS_LABEL_MAP[obj.class] || obj.class.name
+    "#{prefix}#{": " unless prefix.empty?}#{obj.name}"
+  end
+
+  def check_ace_subject(subject)
+    # Do not allow personal access tokens as subjects
+    # Do not allow modifiction or addition of an ace entry with the Admin subject,
+    # which is reserved for full access.
+    if UBID.uuid_class_match?(subject, ApiKey) ||
+        UBID.uuid_class_match?(subject, SubjectTag) && SubjectTag[subject].name == "Admin"
+      raise Authorization::Unauthorized
+    end
+  end
 end
