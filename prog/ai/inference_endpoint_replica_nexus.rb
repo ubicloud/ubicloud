@@ -163,33 +163,31 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
   # pushes latest config to inference gateway and collects billing information
   def ping_gateway
-    projects = if inference_endpoint.is_public
-      Project.where(DB[:api_key]
+    api_key_ds = DB[:api_key]
       .where(owner_table: "project")
       .where(used_for: "inference_endpoint")
       .where(is_valid: true)
-      .where(owner_id: Sequel[:project][:id]).exists)
-        .reject { |pj| pj.accounts.any? { |ac| !ac.suspended_at.nil? } }
-        .map do
-        {
-          ubid: _1.ubid,
-          api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
-          quota_rps: 50.0,
-          quota_tps: 5000.0
-        }
-      end
-    else
-      [{
-        ubid: inference_endpoint.project.ubid,
-        api_keys: inference_endpoint.api_keys.select(&:is_valid).map { |k| Digest::SHA2.hexdigest(k.key) },
-        quota_rps: 100.0,
-        quota_tps: 1000000.0
-      }]
+      .where(owner_id: Sequel[:project][:id])
+      .exists
+
+    eligible_projects_ds = Project.where(api_key_ds)
+    eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
+
+    eligible_projects = eligible_projects_ds
+      .reject { |pj| pj.accounts.any? { |ac| !ac.suspended_at.nil? } }
+      .map do
+      {
+        ubid: _1.ubid,
+        api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
+        quota_rps: 50.0,
+        quota_tps: 5000.0
+      }
     end
+
     body = {
       replica_ubid: inference_endpoint_replica.ubid,
       public_endpoint: inference_endpoint.is_public,
-      projects: projects
+      projects: eligible_projects
     }
 
     resp = vm.sshable.cmd("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
