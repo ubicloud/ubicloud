@@ -3,6 +3,8 @@
 require_relative "../model"
 
 class AccessControlEntry < Sequel::Model
+  many_to_one :project
+
   include ResourceMethods
 end
 
