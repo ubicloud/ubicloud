@@ -62,7 +62,9 @@ class Project < Sequel::Model
   end
 
   def has_resources
-    access_tags_dataset.exclude(hyper_tag_table: [Account.table_name.to_s, Project.table_name.to_s, AccessTag.table_name.to_s]).count > 0 || github_installations.flat_map(&:runners).count > 0
+    hyper_tag_type_number = (Sequel.join(["0x", Sequel.function(:substr, Sequel[:hyper_tag_id].cast(String), 16, 3)]).cast(Float).cast_numeric % 0x400)
+    allowed_hyper_tag_type_numbers = [Account, Project, AccessTag].map { UBID.type_number(_1) }
+    access_tags_dataset.exclude(hyper_tag_type_number => allowed_hyper_tag_type_numbers).count > 0 || github_installations.flat_map(&:runners).count > 0
   end
 
   def soft_delete
