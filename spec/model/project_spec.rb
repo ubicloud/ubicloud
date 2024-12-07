@@ -7,28 +7,30 @@ RSpec.describe Project do
   subject(:project) { described_class.create_with_id(name: "test") }
 
   describe "#validate" do
+    invalid_name = "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
+
     it "validates that name for new object is not empty and has correct format" do
       project = described_class.new
       expect(project.valid?).to be false
-      expect(project.errors[:name]).to eq(["is not present", "is invalid"])
+      expect(project.errors[:name]).to eq(["is not present", invalid_name])
 
       project.name = "@"
       expect(project.valid?).to be false
-      expect(project.errors[:name]).to eq(["is invalid"])
+      expect(project.errors[:name]).to eq([invalid_name])
 
       project.name = "a"
       expect(project.valid?).to be true
 
       project.name = "a-"
       expect(project.valid?).to be false
-      expect(project.errors[:name]).to eq(["is invalid"])
+      expect(project.errors[:name]).to eq([invalid_name])
 
       project.name = "a-b"
       expect(project.valid?).to be true
 
       project.name = "a-#{"b" * 63}"
       expect(project.valid?).to be false
-      expect(project.errors[:name]).to eq(["is invalid"])
+      expect(project.errors[:name]).to eq([invalid_name])
     end
 
     it "validates that name for existing object is valid if the name has changed" do
@@ -36,14 +38,14 @@ RSpec.describe Project do
 
       project.name = "-"
       expect(project.valid?).to be false
-      expect(project.errors[:name]).to eq(["is invalid"])
+      expect(project.errors[:name]).to eq([invalid_name])
 
       project.name = "a"
       expect(project.valid?).to be true
 
       project.name = "@"
       expect(project.valid?).to be false
-      expect(project.errors[:name]).to eq(["is invalid"])
+      expect(project.errors[:name]).to eq([invalid_name])
     end
   end
 
