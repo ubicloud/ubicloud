@@ -250,25 +250,38 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#ping_gateway" do
+    let(:projects) { [Project.create_with_id(name: "p1").tap { _1.associate_with_project(_1) }, Project.create_with_id(name: "p2").tap { _1.associate_with_project(_1) }] }
+
+    before do
+      ApiKey.create_inference_token(projects.first)
+      ApiKey.create_inference_token(projects.last)
+    end
+
     it "for private endpoints" do
+      expect(inference_endpoint).to receive(:project).and_return(projects.first)
       expect(inference_endpoint).to receive(:is_public).and_return(false).twice
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
-      pj = instance_double(Project)
-      expect(inference_endpoint).to receive(:project).and_return(pj)
-      expect(pj).to receive(:ubid).and_return("theubid")
-      expect(inference_endpoint).to receive(:api_keys).and_return([instance_double(ApiKey, key: "key", is_valid: true)])
       expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
-      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"theubid\",\"api_keys\":[\"2c70e12b7a0646f92279f427c7b38e7334d8e5389cff167a1dc30e73f826b683\"],\"quota_rps\":100.0,\"quota_tps\":1000000.0}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":50.0,\"quota_tps\":5000.0}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       nx.ping_gateway
     end
 
     it "for public endpoints" do
-      pj = Project.create_with_id(name: "test-project")
-      pj.create_api_key
       expect(inference_endpoint).to receive(:is_public).and_return(true).twice
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
+
+      expected_projects = [
+        {"ubid" => projects.first.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.first.api_keys.first.key)], "quota_rps" => 50.0, "quota_tps" => 5000.0},
+        {"ubid" => projects.last.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.last.api_keys.first.key)], "quota_rps" => 50.0, "quota_tps" => 5000.0}
+      ].sort_by { |p| p["ubid"] }
+
+      expect(sshable).to receive(:cmd) do |command, options|
+        json_sent = JSON.parse(options[:stdin])
+        projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
+        expect(projects_sent).to eq(expected_projects)
+      end.and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
-      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":true,\"projects\":[{\"ubid\":\"#{pj.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(pj.api_keys.first.key)}\"],\"quota_rps\":50.0,\"quota_tps\":5000.0}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+
       nx.ping_gateway
     end
   end

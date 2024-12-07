@@ -10,6 +10,8 @@ class ApiKey < Sequel::Model
   one_to_many :access_tags, key: :hyper_tag_id
   plugin :association_dependencies, access_tags: :destroy
 
+  dataset_module Authorization::Dataset
+
   plugin :column_encryption do |enc|
     enc.column :key
   end
@@ -26,6 +28,12 @@ class ApiKey < Sequel::Model
     pat = create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api")
     pat.associate_with_project(project) if project
     pat
+  end
+
+  def self.create_inference_token(project)
+    token = ApiKey.create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint")
+    token.associate_with_project(project)
+    token
   end
 
   def self.create_with_id(owner_table:, owner_id:, used_for:)
