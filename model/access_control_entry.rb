@@ -34,29 +34,11 @@ class AccessControlEntry < Sequel::Model
 
         valid = case field
         when :subject_id
-          case (subject = ubid.start_with?("et") ? ApiKey[value] : UBID.decode(ubid))
-          when SubjectTag
-            subject.project_id == project_id
-          when Account
-            !AccessTag.where(project_id: project_id, hyper_tag_id: value).empty?
-          when ApiKey
-            subject.owner_table == "accounts" &&
-              !AccessTag.where(project_id: project_id, hyper_tag_id: subject.owner_id).empty?
-          end
+          SubjectTag.valid_member?(project_id, ubid.start_with?("et") ? ApiKey[value] : UBID.decode(ubid))
         when :action_id
-          case (action = UBID.decode(ubid))
-          when ActionTag
-            action.project_id == project_id
-          when ActionType
-            true
-          end
+          ActionTag.valid_member?(project_id, UBID.decode(ubid))
         else
-          case (object = UBID.decode(ubid))
-          when ObjectTag, SubjectTag, ActionTag
-            object.project_id == project_id
-          when Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
-            !AccessTag.where(project_id: project_id, hyper_tag_id: value).empty?
-          end
+          ObjectTag.valid_member?(project_id, UBID.decode(ubid))
         end
 
         unless valid

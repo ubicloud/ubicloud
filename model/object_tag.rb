@@ -8,6 +8,15 @@ class ObjectTag < Sequel::Model
   def add_object(object_id)
     DB[:applied_object_tag].insert(tag_id: id, object_id:)
   end
+
+  def self.valid_member?(project_id, object)
+    case object
+    when ObjectTag, SubjectTag, ActionTag
+      object.project_id == project_id
+    when Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
+      !AccessTag.where(project_id:, hyper_tag_id: object.id).empty?
+    end
+  end
 end
 
 # Table: object_tag
