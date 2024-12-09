@@ -75,6 +75,7 @@ class UBID
   TYPE_INFERENCE_ENDPOINT_REPLICA = "1r"
   TYPE_KUBERNETES_CLUSTER = "kc"
   TYPE_KUBERNETES_NODEPOOL = "kn"
+  TYPE_KUBERNETES_VM = "kv"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
