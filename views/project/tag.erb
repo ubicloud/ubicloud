@@ -1,0 +1,39 @@
+<% page_action = @tag.new? ? "Create" : "Update"
+page_title = "#{page_action} #{@display_tag_type} Tag"
+@page_title = "#{@project_data[:name]} - #{page_title}" %>
+<%== render("project/user-tabbar") %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/page_header",
+    locals: {
+      title: page_title,
+      breadcrumbs: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["Access Control", "#{@project_data[:path]}/user/access-control"],
+        ["#{@display_tag_type} Tags", "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"],
+        [page_title, "#"]
+      ]
+    }
+  ) %>
+</div>
+
+<div class="grid gap-6">
+  <form method="POST">
+    <%== csrf_tag(request.path_info) %>
+
+    <%== render(
+      "components/form/text",
+      locals: {
+        name: "name",
+        label: "Name",
+        value: @tag.name,
+        button_title: page_action,
+        attributes: {
+          required: true
+        }
+      }
+    ) %>
+  </form>
+</div>
