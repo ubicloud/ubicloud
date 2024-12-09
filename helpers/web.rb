@@ -24,6 +24,7 @@ class Clover < Roda
       rack_response = Clover.call(env.merge("REQUEST_METHOD" => "GET", "PATH_INFO" => uri.path))
       flash.discard
       flash["referrer"] = referrer
+      env.delete("roda.session.serialized")
       rack_response[0] = response.status || 400
       request.halt rack_response
     else
