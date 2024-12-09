@@ -90,8 +90,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     nap 5 unless representative_server.vm.strand.label == "wait"
 
     postgres_resource.incr_initial_provisioning
-    register_deadline(:wait, 10 * 60)
-    bud self.class, frame, :trigger_pg_current_xact_id_on_parent if postgres_resource.parent
+    if postgres_resource.parent
+      bud self.class, frame, :trigger_pg_current_xact_id_on_parent
+      register_deadline(:wait, 120 * 60)
+    else
+      register_deadline(:wait, 10 * 60)
+    end
     hop_refresh_dns_record
   end
 
