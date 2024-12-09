@@ -303,7 +303,12 @@ SQL
   end
 
   label def wait_recovery_completion
-    is_in_recovery = postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
+    is_in_recovery = begin
+      postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
+    rescue => ex
+      raise ex unless ex.stderr.include?("Consistent recovery state has not been yet reached.")
+      nap 5
+    end
 
     if is_in_recovery
       is_wal_replay_paused = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state()").chomp == "paused"
