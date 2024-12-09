@@ -53,7 +53,7 @@ module Option
     ["standard", false, 1],
     ["standard-gpu", false, 1],
     ["burstable", true, 1],
-    ["basic", true, 2]
+    ["basic", true, 4]
   ].map { |args| VmFamily.new(*args) }.freeze
 
   IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
@@ -72,16 +72,16 @@ module Option
     VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1 / 2, _1, _1 * 100, _1, (_1 * 5.34).to_i, [_1 * 30], NO_IO_LIMITS, false, true, "x64")
   }).concat([[2, 50], [2, 100]].map {
     storage_size_options = [_1[1] * 20 / 100, _1[1] * 40 / 100]
-    VmSize.new("burstable-#{_1[0]}-#{_1[1]}", "burstable", _1[0] / 2, _1[0], _1[1], _1[1], _1[1] * 4 / 100, storage_size_options, NO_IO_LIMITS, false, false, "x64")
+    VmSize.new("burstable-#{_1[0]}x#{_1[1] * 4 / 100}", "burstable", _1[0] / 2, _1[0], _1[1], _1[1], _1[1] * 4 / 100, storage_size_options, NO_IO_LIMITS, false, false, "x64")
   }).concat([[2, 50], [2, 100]].map {
     storage_size_options = [_1[1] * 20 / 100, _1[1] * 40 / 100]
-    VmSize.new("burstable-#{_1[0]}-#{_1[1]}", "burstable", _1[0], _1[0], _1[1], _1[1], (_1[1] * 3.2 / 100).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
-  }).concat([1, 2].map {
-    storage_size_options = [_1 * 20, _1 * 40]
-    VmSize.new("basic-#{_1}", "basic", 2, _1, _1 * 100, 0, _1 * 2, storage_size_options, NO_IO_LIMITS, false, false, "x64")
-  }).concat([1, 2].map {
-    storage_size_options = [_1 * 20, _1 * 40]
-    VmSize.new("basic-#{_1}", "basic", 4, _1, _1 * 100, 0, (_1 * 1.6).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
+    VmSize.new("burstable-#{_1[0]}x#{_1[1] * 4 / 100}", "burstable", _1[0], _1[0], _1[1], _1[1], (_1[1] * 3.2 / 100).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
+  }).concat([[2, 100], [2, 200]].map {
+    storage_size_options = [_1[1] * 10 / 100, _1[1] * 20 / 100]
+    VmSize.new("basic-#{_1[0]}x#{_1[1] / 100}", "basic", _1[0], _1[0], _1[1], 0, _1[1] / 100, storage_size_options, NO_IO_LIMITS, false, false, "x64")
+  }).concat([[2, 100], [2, 200]].map {
+    storage_size_options = [_1[1] * 10 / 100, _1[1] * 20 / 100]
+    VmSize.new("basic-#{_1[0]}x#{_1[1] / 100}", "basic", _1[0] * 2, _1[0], _1[1], 0, (_1[1] * 0.8 / 100).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
   }).freeze
 
   PostgresSize = Struct.new(:location, :name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do

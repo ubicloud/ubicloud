@@ -6,14 +6,20 @@ require "text-table"
 
 STRESSNG_REPORT_YAML = "report.yml"
 STRESSNG_LOAD_COMMAND = "stress-ng --cpu 1 --cpu-load 75 --cpu-load-slice 80 --iomix 1 --timeout 60s --metrics --yaml #{STRESSNG_REPORT_YAML}"
+STRESSNG_INSTALL_COMMAND = "sudo apt update && sudo apt -y install stress-ng"
 STRESSNG_ITERATIONS = 3
+
+COMMON_SSH_ARGS = {non_interactive: true, timeout: 10,
+                   user_known_hosts_file: [], global_known_hosts_file: [],
+                   verify_host_key: :accept_new, use_agent: false,
+                   keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5}
 
 def open_host_session_to(host)
   ip = host.sshable_address.ip.network.to_s
   user = "root"
 
   puts "Connecting to #{user}@#{ip} (host) ..."
-  session = Net::SSH.start(ip, user)
+  session = Net::SSH.start(ip, user, **COMMON_SSH_ARGS)
 
   yield session if block_given?
 end
@@ -23,7 +29,7 @@ def open_vm_session_to(vm)
   user = vm.unix_user
 
   puts "Connecting to #{user}@#{ip} (#{vm.name}) ..."
-  session = Net::SSH.start(ip, user)
+  session = Net::SSH.start(ip, user, **COMMON_SSH_ARGS)
 
   yield session if block_given?
 end
@@ -41,6 +47,12 @@ def run(session, command)
     channel.exec command
   end
   session.loop
+end
+
+def install_stress_ng(session)
+  run session, STRESSNG_INSTALL_COMMAND do |output|
+    print(">")
+  end
 end
 
 def run_stress_once(session)
@@ -142,8 +154,14 @@ end
 puts "start time           : #{Time.now}"
 
 vm_list = []
+install_required = false
 
 while (vm_name = ARGV.shift)
+  if vm_name == "--install"
+    install_required = true
+    next
+  end
+
   vm = Vm.all.find { |vm| vm.name == vm_name }
   vm_list << vm unless vm.nil?
 end
@@ -163,43 +181,82 @@ vm_list.each do |vm|
   fail "All VMs must reside on the same host" if vm.vm_host.id != vm_host.id
 end
 
-total_stats = {}
-threads = vm_list.map do |vm|
-  Thread.new do
-    open_host_session_to(vm.vm_host) do |host_ssh|
+if install_required
+  threads = vm_list.map do |vm|
+    Thread.new do
       open_vm_session_to vm do |vm_ssh|
-        # Get the statistics before the test
-        stats_begin = capture_stats host_ssh, vm
-
         # Run the actual load test
-        final_stats = run_stress vm_ssh
-
-        # Get the statistics after the test
-        stats_end = capture_stats host_ssh, vm
-
-        final_stats.merge!(diff_stats(stats_begin, stats_end))
-        total_stats.store("#{vm.name} (#{vm.display_size})", final_stats)
+        install_stress_ng vm_ssh
       end
     end
   end
-end
 
-puts "threads started      : #{threads.length}"
-puts "stress run command   : #{STRESSNG_LOAD_COMMAND}"
-puts "stress run iterations: #{STRESSNG_ITERATIONS}"
-puts ""
-threads.each(&:join)
-puts ""
+  puts "threads started      : #{threads.length}"
+  puts "install command      : #{STRESSNG_INSTALL_COMMAND}"
+  puts ""
+  threads.each(&:join)
+  puts ""
+else
+  total_stats = {}
+  threads = vm_list.map do |vm|
+    Thread.new do
+      open_host_session_to(vm.vm_host) do |host_ssh|
+        open_vm_session_to vm do |vm_ssh|
+          # Get the statistics before the test
+          stats_begin = capture_stats host_ssh, vm
 
-# Output all stats for all the runs
-total_stats.each do |vm_name, final_stats|
-  table = Text::Table.new
-  table.head = ["metric", "result"]
-  final_stats.each do |k, v|
-    table.rows << [k.to_s, v.to_s]
+          # Run the actual load test
+          final_stats = run_stress vm_ssh
+
+          # Get the statistics after the test
+          stats_end = capture_stats host_ssh, vm
+
+          final_stats.merge!(diff_stats(stats_begin, stats_end))
+          total_stats.store("#{vm.name} (#{vm.display_size})", final_stats)
+        end
+      end
+    end
   end
-  puts "\nStatistics for #{vm_name}"
-  puts table
+
+  puts "threads started      : #{threads.length}"
+  puts "stress run command   : #{STRESSNG_LOAD_COMMAND}"
+  puts "stress run iterations: #{STRESSNG_ITERATIONS}"
+  puts ""
+  threads.each(&:join)
+  puts ""
+
+  # Output all stats for all the runs
+  total_stats.each do |vm_name, final_stats|
+    table = Text::Table.new
+    table.head = ["metric", "result"]
+    final_stats.each do |k, v|
+      table.rows << [k.to_s, v.to_s]
+    end
+    puts "\nStatistics for #{vm_name}"
+    puts table
+  end
+
+  # Compute averages
+  avg_stats = {}
+  total_stats.values.each do |stats|
+    stats.each do |k, v|
+      if avg_stats[k].nil?
+        avg_stats.store(k, v)
+      else
+        avg_stats[k] += v
+      end
+    end
+  end
+  avg_stats.each { |k, _| avg_stats[k] /= vm_list.size }
+
+  # Output the averages
+  table_avg = Text::Table.new
+  table_avg.head = ["metric", "result"]
+  avg_stats.each do |k, v|
+    table_avg.rows << [k.to_s, v.to_s]
+  end
+  puts "\nAVERAGES"
+  puts table_avg
 end
 
 puts ""
