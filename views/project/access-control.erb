@@ -21,6 +21,7 @@
         recommended way to handle access control in Ubicloud is to create appropriate tags, add the subjects, actions,
         and objects to the tags, and create the minimum number of access control entries you need to enforce the access
         you want. However, you can create access control entries referencing specific subjects, actions, or objects.
+        You can click on the Subject, Action, and Object buttons below to manage the related tags.
       </div>
       <div class="mb-2 md:mb-0">
         <%== render(
@@ -40,7 +41,13 @@
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
             <% %w[Subject Action Object].each do |type| %>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                <%= type %>
+                <%== render(
+                  "components/button",
+                  locals: {
+                    text: type,
+                    link: "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}"
+                  }
+                ) %>
               </th>
             <% end %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
