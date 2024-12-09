@@ -4,10 +4,7 @@ require_relative "../model"
 
 class ObjectTag < Sequel::Model
   include ResourceMethods
-
-  def add_object(object_id)
-    DB[:applied_object_tag].insert(tag_id: id, object_id:)
-  end
+  include AccessControlModelTag
 
   def self.valid_member?(project_id, object)
     case object
