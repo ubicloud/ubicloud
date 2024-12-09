@@ -182,7 +182,7 @@ class Clover < Roda
         message = "Validation failed for following fields: body"
         details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
       end
-    when Committee::InvalidResponse
+    when Committee::InvalidResponse, Sequel::SerializationFailure
       code = 500
       type = "InternalServerError"
       message = e.message
@@ -212,6 +212,9 @@ class Clover < Roda
       case e
       when Sequel::ValidationFailed, DependencyError
         flash["error"] = message
+        redirect_back_with_inputs
+      when Sequel::SerializationFailure
+        flash["error"] = "There was a temporary error attempting to make this change, please try again."
         redirect_back_with_inputs
       when Validation::ValidationFailed
         flash["error"] = message
