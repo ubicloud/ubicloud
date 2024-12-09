@@ -4,10 +4,7 @@ require_relative "../model"
 
 class SubjectTag < Sequel::Model
   include ResourceMethods
-
-  def add_subject(subject_id)
-    DB[:applied_subject_tag].insert(tag_id: id, subject_id:)
-  end
+  include AccessControlModelTag
 
   def self.valid_member?(project_id, subject)
     case subject
