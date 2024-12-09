@@ -1,0 +1,105 @@
+<% page_title = "#{@display_tag_type} Tags" %>
+<% @page_title = "#{@project_data[:name]} - #{page_title}" %>
+<%== render("project/user-tabbar") %>
+
+<div class="space-y-1">
+  <%== render(
+    "components/page_header",
+    locals: {
+      title: page_title,
+      breadcrumbs: [
+        %w[Projects /project],
+        [@project_data[:name], @project_data[:path]],
+        ["Access Control", "#{@project_data[:path]}/user/access-control"],
+        [page_title, "#"]
+      ]
+    }
+  ) %>
+</div>
+
+<div class="grid gap-6">
+  <div>
+    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+      <div class="min-w-0 flex-1">
+        <% case @tag_type
+           when "subject" %>
+          Subject tags in Ubicloud are similar to roles or user groups. Instead of creating separate access control
+          entries for each user, you can create a single access control entry for the subject tag, and add the
+          appropriate users to the tag.
+        <% when "action" %>
+          Action tags in Ubicloud are groups of actions. Instead of creating separate access control entries for each
+          action, you can create a single access control entry for the action tag, and add the appropriate actions to
+          the tag.
+        <% else %>
+          Objects tags in Ubicloud are groups of related objects. Instead of creating separate access control entries
+          for each object, you can create a single access control entry for the object tag, and add the appropriate
+          objects to the tag.
+        <% end %>
+        <%= @display_tag_type %>
+        tags can contain other
+        <%= @tag_type %>
+        tags, recursively, to allow for easier management.
+      </div>
+      <div class="mb-2 md:mb-0">
+        <%== render(
+          "components/button",
+          locals: {
+            text: "Create #{@display_tag_type} Tag",
+            link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/new"
+          }
+        ) %>
+      </div>
+    </div>
+
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <table id="tag-list" class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @tags.each do |tag| %>
+            <% editable = !(@tag_type == "subject" && tag.name == "Admin") %>
+            <tr id="<%= tag.ubid %>">
+              <td
+                id="<%= tag.ubid %>-edit"
+                class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"
+                scope="row"
+              >
+                <%== render(
+                  "components/button",
+                  locals: {
+                    text: "Edit Membership",
+                    link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}/membership"
+                  }
+                ) %>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <% if editable %>
+                  <a href="<%= @project_data[:path] %>/user/access-control/tag/<%= @tag_type %>/<%= tag.ubid %>"><%= tag.name %></a>
+                <% else %>
+                  <%= tag.name %>
+                <% end %>
+              </td>
+              <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                <% if editable %>
+                  <%== render(
+                    "components/delete_button",
+                    locals: {
+                      text: "Remove",
+                      url: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
+                      confirmation: "delete tag"
+                    }
+                  ) %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
