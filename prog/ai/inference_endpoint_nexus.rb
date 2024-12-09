@@ -70,7 +70,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count: gpu_count
       ) { _1.id = ubid.to_uuid }
       inference_endpoint.associate_with_project(project)
-      ApiKey.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint", used_for: "inference_endpoint")
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { _1.id = inference_endpoint.id }
     end
