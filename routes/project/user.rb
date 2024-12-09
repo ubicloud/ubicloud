@@ -134,6 +134,113 @@ class Clover
             204
           end
         end
+
+        r.on "tag", %w[subject action object] do |tag_type|
+          @tag_type = tag_type
+          @display_tag_type = tag_type.capitalize
+          @tag_model = Object.const_get(:"#{@display_tag_type}Tag")
+
+          r.get true do
+            @tags = @tag_model.where(project_id: @project.id).order(:name).all
+            view "project/tag-list"
+          end
+
+          r.on String do |ubid|
+            if ubid == "new"
+              @tag = @tag_model.new_with_id(project_id: @project.id)
+              new = true
+            else
+              @tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)]
+            end
+
+            r.is do
+              if @tag_type == "subject" && @tag.name == "Admin"
+                flash["error"] = "Cannot modify Admin subject tag"
+                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+              end
+
+              r.get do
+                view "project/tag"
+              end
+
+              r.post do
+                @tag.update(name: typecast_params.nonempty_str("name"))
+                flash["notice"] = "#{@display_tag_type} tag #{new ? "created" : "name updated"} successfully"
+                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+              end
+
+              r.delete(!new) do
+                @tag.destroy
+                flash["notice"] = "#{@display_tag_type} tag deleted successfully"
+                204
+              end
+            end
+
+            r.on !new do
+              r.get "membership" do
+                members = @current_members = {}
+                @tag.member_ids.each do
+                  next if @tag_type == "subject" && UBID.uuid_class_match?(_1, ApiKey)
+                  members[_1] = nil
+                end
+                UBID.resolve_map(members)
+                view "project/tag-membership"
+              end
+
+              r.post "associate" do
+                # Use serializable isolation to try to prevent concurrent changes
+                # from introducing loops
+                changes_made = to_add = issues = nil
+                DB.transaction(isolation: :serializable) do
+                  to_add = typecast_params.array(:nonempty_str, "add") || []
+                  to_add.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
+                  to_add.map! { UBID.to_uuid(_1) }
+                  to_add, issues = @tag.check_members_to_add(to_add)
+                  issues = "#{": " unless issues.empty?}#{issues.join(", ")}"
+                  unless to_add.empty?
+                    @tag.add_members(to_add)
+                    changes_made = true
+                  end
+                end
+
+                if changes_made
+                  flash["notice"] = "#{to_add.length} members added to #{@tag_type} tag#{issues}"
+                else
+                  flash["error"] = "No change in membership#{issues}"
+                end
+
+                r.redirect "membership"
+              end
+
+              r.post "disassociate" do
+                to_remove = typecast_params.array(:nonempty_str, "remove") || []
+                to_remove.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
+                to_remove.map! { UBID.to_uuid(_1) }
+
+                error = false
+                num_removed = nil
+                # No need for serializable isolation here, as we are removing
+                # entries and that will not introduce loops
+                DB.transaction do
+                  num_removed = @tag.remove_members(to_remove)
+
+                  if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(_1, Account) }
+                    error = "must keep at least one account in Admin subject tag"
+                    DB.rollback_on_exit
+                  end
+                end
+
+                if error
+                  flash["error"] = "Members not removed from tag: #{error}"
+                else
+                  flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
+                end
+
+                r.redirect "membership"
+              end
+            end
+          end
+        end
       end
 
       r.delete "invitation", String do |email|
