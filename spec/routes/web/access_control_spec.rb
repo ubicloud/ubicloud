@@ -105,6 +105,20 @@ RSpec.describe Clover, "access control" do
         "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
         "Edit", "Tag: STest", "All", "All", "Remove"
       ]
+
+      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: ot2.id)
+      page.refresh
+      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+        "", "Tag: Admin", "All", "All", "",
+        "Edit", "Account: Tname", "All", "All", "Remove",
+        "Edit", "Account: Tname", "Global Tag: Member", "Tag: OTest2", "Remove",
+        "Edit", "Account: Tname", "Project:view", "All", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest1", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
+        "Edit", "Tag: STest", "All", "All", "Remove"
+      ]
     end
 
     it "does not show access control entries for tokens" do
@@ -143,6 +157,19 @@ RSpec.describe Clover, "access control" do
       expect(page.all("table#access-control-entries td").map(&:text)).to eq [
         "", "Tag: Admin", "All", "All", "",
         "Edit", "Account: Tname", "All", "All", "Remove",
+        "Edit", "Tag: STest", "Tag: ATest", "Tag: OTest", "Remove"
+      ]
+
+      click_link "Create Access Control Entry"
+      select "STest"
+      select "Member"
+      select "OTest"
+      click_button "Create Access Control Entry"
+
+      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+        "", "Tag: Admin", "All", "All", "",
+        "Edit", "Account: Tname", "All", "All", "Remove",
+        "Edit", "Tag: STest", "Global Tag: Member", "Tag: OTest", "Remove",
         "Edit", "Tag: STest", "Tag: ATest", "Tag: OTest", "Remove"
       ]
     end
@@ -295,12 +322,16 @@ RSpec.describe Clover, "access control" do
 
         expect(page.title).to eq "Ubicloud - project-1 - Update #{cap_type} Tag Membership"
         expect(page.html).not_to include "Current Members of #{cap_type} Tag"
+        global_tags = ActionTag.where(project_id: nil).select_order_map(:name)
+        action_types = ActionType.map(&:name).sort
         default = lambda do
           case type
           when "subject"
+            expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Account"]
             expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["test-account", ""]
           when "action"
-            expect(page.all("table#tag-membership-add td").map(&:text)).to eq ActionType.map(&:name).sort.flat_map { [_1, ""] }
+            expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Action"]
+            expect(page.all("table#tag-membership-add td").map(&:text)).to eq (global_tags + action_types).flat_map { [_1, ""] }
           else
             expect(page.html).not_to include "Add Members to #{cap_type} Tag"
           end
@@ -312,10 +343,13 @@ RSpec.describe Clover, "access control" do
         expect(page.html).not_to include "Current Members of #{cap_type} Tag"
         case type
         when "subject"
+          expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag", "Account"]
           expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-subject", "", "test-account", ""]
         when "action"
-          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-action", ""].concat ActionType.map(&:name).sort.flat_map { [_1, ""] }
+          expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Tag", "Action"]
+          expect(page.all("table#tag-membership-add td").map(&:text)).to eq [*global_tags, "other-action", *action_types].flat_map { [_1, ""] }
         else
+          expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag"]
           expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", ""]
         end
 
@@ -363,6 +397,18 @@ RSpec.describe Clover, "access control" do
         expect(page.title).to eq "Ubicloud - project-1 - Update #{cap_type} Tag Membership"
         expect(find_by_id("flash-notice").text).to eq "1 members removed from #{type} tag"
       end
+    end
+
+    it "can add global action tag members to action tag" do
+      tag = ActionTag.create_with_id(project_id: project.id, name: "test-action")
+      visit "#{project.path}/user/access-control/tag/action/#{tag.ubid}/membership"
+
+      member_global_tag = ActionTag[project_id: nil, name: "Member"]
+      find("##{member_global_tag.ubid} input").check
+      click_button "Add Members"
+      expect(tag.member_ids).to include member_global_tag.id
+      expect(page.title).to eq "Ubicloud - project-1 - Update Action Tag Membership"
+      expect(find_by_id("flash-notice").text).to eq "1 members added to action tag"
     end
 
     it "does not show ApiKeys on subject tag membership page" do
