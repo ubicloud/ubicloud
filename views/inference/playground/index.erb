@@ -1,0 +1,69 @@
+<% @page_title = "Playground" %>
+<%== render("inference/tabbar") %>
+
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+
+<div class="flex space-x-4">
+  <div class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+    <%== render(
+      "components/form/select",
+      locals: {
+        name: "ai-model",
+        label: "Inference Model",
+        placeholder: "Pick a model",
+        options: @inference_endpoints.map { |ie| [ie[:url], ie[:name]] }
+      }
+    ) %>
+  </div>
+  <div class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+    <%== render(
+      "components/form/select",
+      locals: {
+        name: "ai-token",
+        label: "Inference Token",
+        placeholder: "Pick a token",
+        options: @inference_tokens.map { |it| [it[:key], it[:id]] }
+      }
+    ) %>
+  </div>
+</div>
+<div class="shadow-md rounded-lg p-2 ml-2 mr-2 mb-2 bg-gray-50">
+  <div class="space-y-2 text-gray-900">
+    <div class="flex gap-x-2">
+      <input
+        id="ai-prompt"
+        type="text"
+        name="ai-prompt"
+        placeholder="Ask a question here"
+        class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"
+      >
+      <%== render(
+        "components/button",
+        locals: {
+          text: "Submit",
+          attributes: {
+            "name" => "ai-submit",
+            "id" => "ai-submit",
+            "type" => "button"
+          }
+        }
+      ) %>
+      <%== render(
+        "components/button",
+        locals: {
+          text: "Stop",
+          attributes: {
+            "name" => "ai-stop",
+            "id" => "ai-stop",
+            "type" => "button"
+          }
+        }
+      ) %>
+    </div>
+  </div>
+  <div id="ai-response" class="mt-4 h-48 overflow-y-auto">
+      <p class="text-gray-500 text-sm mb-2"></p>
+      <p id="resultText" class="whitespace-pre-line"></p>
+  </div>
+</div>
+</div>

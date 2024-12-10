@@ -8,9 +8,7 @@ class Clover
     end
 
     r.get true do
-      dataset = dataset_authorize(@project.api_keys_dataset.where(used_for: "inference_endpoint"), "InferenceToken:view")
-      dataset = dataset.where(is_valid: true)
-      @inference_tokens = Serializers::InferenceToken.serialize(dataset.all)
+      @inference_tokens = inference_token_list
       view "inference/token/index"
     end
 

@@ -60,7 +60,7 @@ class Clover < Roda
     csp.form_action :self, "https://checkout.stripe.com"
     csp.script_src :self, "https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js", "https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js", "https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js", "https://challenges.cloudflare.com/turnstile/v0/api.js"
     csp.frame_src :self, "https://challenges.cloudflare.com"
-    csp.connect_src :self
+    csp.connect_src :self, "https://*.ubicloud.com", "http://136.243.129.214:8000"
     csp.base_uri :none
     csp.frame_ancestors :none
   end

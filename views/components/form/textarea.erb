@@ -1,6 +1,8 @@
 <% name ||= nil
 value = flash.dig("old", name) || value
 label ||= nil
+placeholder ||= nil
+readonly ||= false
 error ||= flash.dig("errors", name)
 description ||= nil
 attributes ||= {} %>
@@ -12,6 +14,12 @@ attributes ||= {} %>
   <textarea
     id="<%= name %>"
     name="<%= name %>"
+  <% if placeholder %>
+    placeholder="<%= placeholder %>"
+  <% end %>
+  <% if readonly %>
+    readonly
+  <% end %>
     class="block w-full rounded-md border-0 sm:py-1.5 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%>"
     <% attributes.each do |atr_key, atr_value| %>
     <%= atr_key %>="<%= atr_value %>"
