@@ -38,9 +38,12 @@
         name: "action",
         selected: @ace.action_ubid,
         options:
-          { nil => [["", "All Actions"]], "Tag" => @project.action_tags, "Action" => ActionType }.to_h do |k, v|
-            [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v]
-          end
+          {
+            nil => [["", "All Actions"]],
+            "Global Tag" => ActionTag.where(project_id: nil).order(:name).all,
+            "Tag" => @project.action_tags,
+            "Action" => ActionType
+          }.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }
       }
     ) %>
 
