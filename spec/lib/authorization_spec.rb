@@ -197,8 +197,16 @@ RSpec.describe Authorization do
   end
 
   describe "#authorize" do
-    it "not raises error when has matched policies" do
+    it "not raises error when has matched policies when using UUID object_id" do
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].id) }.not_to raise_error
+    end
+
+    it "not raises error when has matched policies when using UBID object_id" do
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].ubid) }.not_to raise_error
+    end
+
+    it "raises error when non-UBID/non-UUID is used" do
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", "some-garbage") }.to raise_error UBIDParseError
     end
 
     it "raises error when has no matched policies" do
