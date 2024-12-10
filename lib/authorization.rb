@@ -70,12 +70,10 @@ module Authorization
     end
 
     if object_id
-      begin
-        ubid = UBID.parse(object_id)
-      rescue UBIDParseError
-        # nothing
-      else
-        object_id = ubid.to_uuid
+      # Recognize UUID format
+      unless /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+        # Otherwise, should be valid UBID, raise error if not
+        object_id = UBID.parse(object_id).to_uuid
       end
 
       dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }))
