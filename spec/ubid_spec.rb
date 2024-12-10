@@ -3,6 +3,21 @@
 RSpec.describe UBID do
   let(:all_types) { described_class.constants.select { _1.start_with?("TYPE_") }.map { described_class.const_get(_1) } }
 
+  it ".generate_vanity_action_type supports creating vanity ubids for action types" do
+    expect(described_class.generate_vanity_action_type("Project:view").to_s).to eq "ttzzzzzzzz021gzzz0pj0v1ew0"
+    expect(described_class.generate_vanity_action_type("ObjectTag:add").to_s).to eq "ttzzzzzzzz021gzzzz0t00add0"
+  end
+
+  it ".generate_vanity_action_tag supports creating vanity ubids for action tags" do
+    expect(described_class.generate_vanity_action_tag("Vm:all").to_s).to eq "tazzzzzzzz021gzzzz0vm0a111"
+    expect(described_class.generate_vanity_action_tag("Member").to_s).to eq "tazzzzzzzz021gzzzz0member0"
+  end
+
+  it ".generate_vanity raises if prefix or suffix is too long" do
+    expect { described_class.generate_vanity("tt", "foo", "bar") }.to raise_error(RuntimeError)
+    expect { described_class.generate_vanity("tt", "fo", "barbazqu") }.to raise_error(RuntimeError)
+  end
+
   it "can set_bits" do
     expect(described_class.set_bits(0, 0, 7, 0xab)).to eq(0xab)
     expect(described_class.set_bits(0xab, 8, 12, 0xc)).to eq(0xcab)
