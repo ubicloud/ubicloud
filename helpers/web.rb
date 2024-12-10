@@ -54,16 +54,19 @@ class Clover < Roda
     end
   end
 
-  ACE_CLASS_LABEL_MAP = {
-    SubjectTag => "Tag",
-    ActionTag => "Tag",
-    ObjectTag => "Tag",
-    ActionType => ""
-  }.freeze
   def ace_label(obj)
-    return "All" unless obj
-    prefix = ACE_CLASS_LABEL_MAP[obj.class] || obj.class.name
-    "#{prefix}#{": " unless prefix.empty?}#{obj.name}"
+    case obj
+    when nil
+      "All"
+    when ActionType
+      obj.name
+    when ActionTag
+      "#{"Global " unless obj.project_id}Tag: #{obj.name}"
+    when ObjectTag, SubjectTag
+      "Tag: #{obj.name}"
+    else
+      "#{obj.class.name}: #{obj.name}"
+    end
   end
 
   def check_ace_subject(subject)

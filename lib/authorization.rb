@@ -44,10 +44,10 @@ module Authorization
       .where(column => values)
 
     if project_id
-      # We only look for applied_action_tag entries with an action_tag for the project.
+      # We only look for applied_action_tag entries with an action_tag for the project or global action_tags.
       # This is done for actions and not subjects and objects because actions are shared
       # across projects, unlike subjects and objects.
-      base_ds = base_ds.where(tag_id: DB[:action_tag].where(project_id:).select(:id))
+      base_ds = base_ds.where(tag_id: DB[:action_tag].where(project_id:).or(project_id: nil).select(:id))
     end
 
     DB[:tag]
