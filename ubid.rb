@@ -99,6 +99,39 @@ class UBID
     from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
   end
 
+  ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").map! { _1.split(": ") }.to_h.freeze
+    Project: pr
+    Vm: vm
+    PrivateSubnet: ps
+    Firewall: fw
+    LoadBalancer: lb
+    Postgres: pg
+    Postgres:Firewall: pf
+    SubjectTag: st
+    ActionTag: at
+    ObjectTag: ot
+  TYPES
+  def self.generate_vanity_action_type(action)
+    *prefix, suffix = action.split(":")
+    prefix = ACTION_TYPE_PREFIX_MAP[prefix.join(":")]
+    generate_vanity("tt", prefix, suffix[0...7].tr("u", "v"))
+  end
+
+  def self.generate_vanity_action_tag(name)
+    *prefix, suffix = name.split(":")
+    prefix = prefix.join(":")
+    prefix = ACTION_TYPE_PREFIX_MAP[prefix] || prefix
+    generate_vanity("ta", prefix, suffix[0...7].tr("u", "v"))
+  end
+
+  def self.generate_vanity(type, prefix, suffix)
+    raise "prefix over length 2" unless prefix.length <= 2
+    raise "suffix over length 7" unless suffix.length <= 7
+    full = "#{prefix}0#{suffix}"
+    full = full.rjust(10, "1") if full.start_with?("o")
+    from_parts(UBID.to_base32_n("zzzzzzzz") * 256, type, 0, UBID.to_base32_n(full) * 16)
+  end
+
   def self.camelize(s)
     s.delete_prefix("TYPE").split("_").map(&:capitalize).join
   end
