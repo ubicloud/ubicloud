@@ -11,6 +11,8 @@ component =
       v.map! { [_1.name, _1.ubid] }
       v.sort_by! { _1 }
     end
+    hash.reject! { _2.empty? }
+    hash
   end
 
 input_hash =
