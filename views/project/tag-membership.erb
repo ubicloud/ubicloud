@@ -20,7 +20,11 @@ input_hash =
   when "subject"
     { "Tag" => @project.subject_tags.reject { _1.name == "Admin" }, "Account" => @project.accounts }
   when "action"
-    { "Tag" => @project.action_tags, "Action" => ActionType }
+    {
+      "Global Tag" => ActionTag.where(project_id: nil).order(:name).all,
+      "Tag" => @project.action_tags,
+      "Action" => ActionType
+    }
   else
     {
       "Tag" => @project.object_tags,
