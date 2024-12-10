@@ -57,7 +57,7 @@ RSpec.describe Vm do
       vm.family = "burstable"
       vm.vcpus = 2
       vm.cpu_percent_limit = 50
-      expect(vm.display_size).to eq("burstable-2-50")
+      expect(vm.display_size).to eq("burstable-2x2")
     end
   end
 

@@ -599,6 +599,14 @@ RSpec.describe Prog::Vm::Nexus do
       expect(BillingRecord).not_to receive(:create_with_id)
       expect { nx.create_billing_record }.to hop("wait")
     end
+
+    it "creates billing records for burstable family" do
+      expect(vm).to receive(:family).and_return("burstable").at_least(1)
+      expect(vm).to receive(:ip4_enabled).and_return(false)
+      expect(BillingRecord).to receive(:create_with_id).exactly(3).times
+      expect(vm).to receive(:projects).and_return([prj]).at_least(:once)
+      expect { nx.create_billing_record }.to hop("wait")
+    end
   end
 
   describe "#before_run" do

@@ -28,6 +28,8 @@ class BillingRate
     case resource_type
     when "VmCores"
       "#{resource_family}-#{(amount * 2).to_i} Virtual Machine"
+    when "VmCpuPercent"
+      "#{(amount * 100).to_i}% of CPU for #{resource_family} Virtual Machine"
     when "VmStorage"
       "#{amount.to_i} GiB Storage for Virtual Machine"
     when "IPAddress"

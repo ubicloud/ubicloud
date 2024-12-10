@@ -960,7 +960,7 @@ RSpec.describe Al do
       expect(slice.allowed_cpus).to eq("2-5")
       expect(slice.type).to eq("shared")
       expect(slice.cores).to eq(2)
-      expect(slice.total_cpu_percent).to eq(800) # overbooking allowed on basic
+      expect(slice.total_cpu_percent).to eq(1600) # overbooking allowed on basic
       expect(slice.total_memory_1g).to eq(16)
     end
 
