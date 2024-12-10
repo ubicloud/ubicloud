@@ -213,8 +213,6 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait" do
     it "naps" do
-      expect(vm_host).to receive(:values).and_return({location: "hetzner-fsn1", arch: "x64", total_cores: 4})
-      expect(vm_host).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, count: 2))
       expect { nx.wait }.to nap(30)
     end
 
@@ -228,8 +226,6 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.wait }.to hop("unavailable")
 
-      expect(vm_host).to receive(:values).and_return({location: "hetzner-fsn1", arch: "x64", total_cores: 4})
-      expect(vm_host).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, count: 2))
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(30)
