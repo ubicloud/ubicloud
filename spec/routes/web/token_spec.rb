@@ -24,12 +24,12 @@ RSpec.describe Clover, "personal access token management" do
     expect(@api_key.projects).to eq([project])
     expect(@api_key.used_for).to eq("api")
     expect(@api_key.is_valid).to be(true)
+    expect(SubjectTag[project_id: project.id, name: "Admin"].member_ids).to include @api_key.id
   end
 
   it "user page allows removing personal access tokens" do
     access_tag_ds = DB[:access_tag].where(hyper_tag_id: @api_key.id)
     expect(access_tag_ds.all).not_to be_empty
-    project.subject_tags_dataset.first(name: "Admin").add_subject(@api_key.id)
     AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
 
     btn = find(".delete-btn")

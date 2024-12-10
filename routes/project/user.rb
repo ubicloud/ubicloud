@@ -56,7 +56,11 @@ class Clover
 
       r.on "token" do
         r.post true do
-          pat = DB.transaction { ApiKey.create_personal_access_token(current_account, project: @project) }
+          pat = nil
+          DB.transaction do
+            pat = ApiKey.create_personal_access_token(current_account, project: @project)
+            SubjectTag[project_id: @project.id, name: "Admin"].add_subject(pat.id)
+          end
           flash["notice"] = "Created personal access token with id #{pat.ubid}"
           r.redirect "#{@project.path}/user/token"
         end
