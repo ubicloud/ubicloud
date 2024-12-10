@@ -14,11 +14,6 @@ class ActionTag < Sequel::Model
       true
     end
   end
-
-  def add_member(action_id)
-    action_id = ActionType::NAME_MAP.fetch(action_id) unless action_id.include?("-")
-    super
-  end
 end
 
 # Table: action_tag
