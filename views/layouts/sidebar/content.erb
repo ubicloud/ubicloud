@@ -59,6 +59,15 @@
                 }
               ) %>
             <% end %>
+            <%== render(
+              "layouts/sidebar/item",
+              locals: {
+                name: "KubernetesCluster",
+                url: "#{@project_data[:path]}/kubernetes-cluster",
+                is_active: request.path.start_with?("#{@project_data[:path]}/kubernetes-cluster"),
+                icon: "hero-server-stack"
+              }
+            ) %>
           <% else %>
             <%== render(
               "layouts/sidebar/item",

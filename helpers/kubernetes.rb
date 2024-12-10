@@ -12,7 +12,12 @@ class Clover
       location: @location,
       replica: 3
     )
-    Serializers::KubernetesCluster.serialize(st.subject)
+    if api?
+      Serializers::KubernetesCluster.serialize(st.subject)
+    else
+      flash["notice"] = "'#{name}' will be ready in a few minutes"
+      request.redirect "#{@project.path}#{KubernetesCluster[st.id].path}"
+    end
   end
 
   def kubernetes_cluster_list
@@ -31,7 +36,8 @@ class Clover
         count: result[:count]
       }
     else
-      view "kubernetes/index"
+      @kcs = Serializers::KubernetesCluster.serialize(dataset.all, {include_path: true})
+      view "kubernetes-cluster/index"
     end
   end
 

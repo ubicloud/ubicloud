@@ -14,11 +14,12 @@ class Clover
 
         filter = {Sequel[:vm][:name] => kv_name}
         filter[:location] = @location
-        kv = @project.kubernetes_vms_dataset.join(:vm, id: :vm_id).first(filter)
+        vm = @project.vms_dataset.first(filter)
+        filter = {Sequel[:kubernetes_vm][:vm_id] => vm.id}
       else
         filter = {Sequel[:kubernetes_vm][:id] => UBID.to_uuid(kv_id)}
-        kv = @project.kubernetes_vms_dataset.first(filter)
       end
+      kv = @project.kubernetes_vms_dataset.first(filter)
 
       request.get true do
         authorize("KubernetesVm:view", kv.id)

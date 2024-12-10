@@ -1488,6 +1488,68 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/kubernetes-cluster':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getKubernetesCluster
+      summary: Return the list of kubernetes clusters in the project
+      responses:
+        '200':
+          description: Kubernetes Cluster list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KubernetesCluster'
+                additionalProperties: false
+                required:
+                  - count
+                  - items
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
+    post:
+      operationId: createKubernetesCluster
+      summary: Create a new kubernetes cluster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subnet:
+                  description: Name of subnet
+                  type: string
+                location:
+                  description: Location of the kubernetes cluster
+                  type: string
+                kubernetes_version:
+                  description: Version of the kubernetes cluster
+                  type: string
+              required:
+                - subnet
+                - location
+                - kubernetes_version
+      responses:
+        '200':
+          description: Firewall created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KubernetesCluster'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   '/project/{project_id}/location/{location}/kubernetes-cluster':
     get:
       operationId: listLocationKubernetesClusters
@@ -1519,7 +1581,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - KubernetesCluster
+        - Kubernetes Cluster
   '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_name}':
     parameters:
     - $ref: '#/components/parameters/project_id'
@@ -1554,7 +1616,21 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - KubernetesCluster
+        - Kubernetes Cluster
+    get:
+      operationId: getKubernetesClusterDetails
+      summary: Get details of a specific Kubernetes Cluster in a location
+      responses:
+        '200':
+          description: Details of the kubernetes Cluster
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KubernetesCluster'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   '/project/{project_id}/location/{location}/kubernetes-vm/{kubernetes_vm_name}':
     parameters:
     - $ref: '#/components/parameters/project_id'
@@ -1611,7 +1687,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - KubernetesVM
+        - Kubernetes VM
     get:
       operationId: getKubernetesVMDetails
       summary: Get details of a specific Kubernetes VM in a location
@@ -1625,7 +1701,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - KubernetesVM
+        - Kubernetes VM
   '/project/{project_id}/location/{location}/kubernetes-vm':
     get:
       operationId: listLocationKubernetesVMs
@@ -1638,7 +1714,7 @@ paths:
         - $ref: '#/components/parameters/order_column'
       responses:
         '200':
-          description: A list of Kuberentes VMs
+          description: A list of Kubernetes VMs
           content:
             application/json:
               schema:
@@ -1649,7 +1725,7 @@ paths:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Vm'
+                      $ref: '#/components/schemas/VmDetailed'
                 additionalProperties: false
                 required:
                   - count
@@ -1657,7 +1733,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - KubernetesVM
+        - Kubernetes VM
 components:
   parameters:
     firewall_id:
@@ -2525,5 +2601,9 @@ tags:
     name: Project
   - description: Virtual Machine Operations
     name: Virtual Machine
+  - description:
+    name: Kubernetes VM
+  - description:
+    name: Kubernetes Cluster
 security:
   - BearerAuth: []

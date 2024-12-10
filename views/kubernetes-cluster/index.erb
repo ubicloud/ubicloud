@@ -1,0 +1,62 @@
+<% @page_title = "Kubernetes Clusters" %>
+
+<% if @kcs.count > 0 %>
+    <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Kubernetes Version</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @kcs.each do |kc| %>
+            <tr>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <a href="<%= @project_data[:path] %><%= kc[:path] %>" class="text-orange-600 hover:text-orange-700">
+                  <%= kc[:name] %>
+                </a>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= kc[:kubernetes_version] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= kc[:location] %></td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%== render("components/kc_state_label", locals: { state: kc[:state] }) %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="flex justify-end space-y-1 mt-6">
+    <% if has_project_permission("KubernetesCluster:create")%>
+    <%== render(
+      "components/button", locals: { text: "Create Kubernetes Cluster", link: "kubernetes-cluster/create" })
+    %>
+    <% end %>
+  </div>
+<% else %>
+<div class="mt-6">
+  <%== render(
+    "components/empty_state",
+    locals: {
+      icon: "hero-arrows-pointing-out",
+      title: "No Kubernetes Clusters",
+      description: "You don't have permission to create Kubernetes Clusters."
+    }.merge(has_project_permission("KubernetesCluster:create") ? {
+      description: "Get started by creating a new Kuberentes Cluster.",
+      button_link: "#{@project_data[:path]}/kubernetes-cluster/create",
+      button_title: "New Kubernetes Cluster"
+    } : {})
+  ) %>
+</div>
+
+
+<div class="grid gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-10">
+  </div>
+</div>
+<% end %>

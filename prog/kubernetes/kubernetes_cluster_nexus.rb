@@ -17,7 +17,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         location: location
       )
       kc.associate_with_project(project)
-      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = kc.id }
+      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy") { _1.id = kc.id }
     end
   end
 
