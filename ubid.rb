@@ -99,6 +99,44 @@ class UBID
     from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
   end
 
+  # InferenceToken does not have a type, and using et (TYPE_ETC) seems like a bad idea
+  ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").map! { _1.split(": ") }.to_h.freeze
+    Project: pj
+    Vm: vm
+    PrivateSubnet: ps
+    Firewall: fw
+    LoadBalancer: 1b
+    InferenceEndpoint: 1e
+    InferenceToken: 1t
+    Postgres: pg
+    SubjectTag: ts
+    ActionTag: ta
+    ObjectTag: t0
+  TYPES
+  def self.generate_vanity_action_type(action)
+    prefix, suffix = action.split(":")
+    prefix = ACTION_TYPE_PREFIX_MAP.fetch(prefix)
+    generate_vanity("tt", prefix, suffix[0...7].tr("u", "v"))
+  end
+
+  def self.generate_vanity_action_tag(name)
+    prefix, suffix = name.split(":")
+    if suffix
+      prefix = ACTION_TYPE_PREFIX_MAP.fetch(prefix)
+    else
+      prefix = nil
+      suffix = name
+    end
+    generate_vanity("ta", prefix, suffix[0...7].tr("u", "v"))
+  end
+
+  def self.generate_vanity(type, prefix, suffix)
+    raise "prefix over length 2" if prefix && prefix.length != 2
+    raise "suffix over length 7" unless suffix.length <= 7
+    full = "#{"0" if prefix}#{prefix}0#{suffix}".rjust(11, "z")
+    from_parts(UBID.to_base32_n("zzzzzzzz") * 256, type, 0, UBID.to_base32_n(full) * 16)
+  end
+
   def self.camelize(s)
     s.delete_prefix("TYPE").split("_").map(&:capitalize).join
   end
