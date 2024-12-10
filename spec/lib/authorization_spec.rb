@@ -34,7 +34,7 @@ RSpec.describe Authorization do
     ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
     Array(ace_subjects).each do |subject_id|
       Array(ace_actions).each do |action|
-        action_id = ActionType::NAME_MAP[action] if action
+        action_id = ActionType::NAME_MAP[action] || ActionTag[project_id: nil, name: action].id if action
         Array(ace_objects).each do |object_id|
           AccessControlEntry.create_with_id(project_id:, subject_id:, action_id:, object_id:)
         end
@@ -54,7 +54,7 @@ RSpec.describe Authorization do
     action_id = unless ace_actions == [nil]
       action_tag = ActionTag.create_with_id(project_id:, name: "A")
       Array(ace_actions).each_with_index do |action_id, i|
-        action_id = ActionType::NAME_MAP[action_id] if i > 0
+        action_id = ActionType::NAME_MAP[action_id] || ActionTag[project_id: nil, name: action_id].id
         action_tag.add_action(action_id)
       end
       action_tag = yield action_tag if block_given?
@@ -96,6 +96,10 @@ RSpec.describe Authorization do
         [{}, SecureRandom.uuid, ["Vm:view"], 0],
         [{}, users[0].id, "Vm:view", 0],
         [{}, users[0].id, ["Vm:view"], 0],
+        [{subjects: users[0].id, actions: "Vm:all", objects: [nil]}, users[0].id, "Vm:view", 1],
+        [{subjects: users[0].id, actions: "Vm:all", objects: [nil]}, users[0].id, "Postgres:view", 0],
+        [{subjects: users[0].id, actions: "Member", objects: [nil]}, users[0].id, "Vm:view", 1],
+        [{subjects: users[0].id, actions: "Member", objects: [nil]}, users[0].id, "Project:edit", 0],
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, "Vm:view", 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], 1],
         [{subjects: users[0].id, actions: ["Vm:view", "Vm:delete"], objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], 1],
@@ -137,6 +141,10 @@ RSpec.describe Authorization do
         [{}, SecureRandom.uuid, ["Vm:view"], SecureRandom.uuid, 0],
         [{}, SecureRandom.uuid, ["Vm:view"], vms[0].id, 0],
         [{}, users[0].id, ["Vm:view"], vms[0].id, 0],
+        [{subjects: users[0].id, actions: "Vm:all", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Vm:all", objects: [nil]}, users[0].id, "Postgres:view", vms[0].id, 0],
+        [{subjects: users[0].id, actions: "Member", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Member", objects: [nil]}, users[0].id, "Project:edit", vms[0].id, 0],
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
         [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
