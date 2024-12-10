@@ -12,6 +12,8 @@ class ObjectTag < Sequel::Model
       object.project_id == project_id
     when Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
       !AccessTag.where(project_id:, hyper_tag_id: object.id).empty?
+    when Project
+      object.id == project_id
     end
   end
 end

@@ -56,6 +56,13 @@ RSpec.describe AccessControlEntry do
     expect(ace.valid?).to be false
     expect(ace.errors).to eq(object_id: ["is not related to this project"])
 
+    ace.object_id = project2.id
+    expect(ace.valid?).to be false
+    expect(ace.errors).to eq(object_id: ["is not related to this project"])
+
+    ace.object_id = project.id
+    expect(ace.valid?).to be true
+
     firewall = Firewall.create_with_id(location: "F")
     ace.object_id = firewall.id
     expect(ace.valid?).to be false
