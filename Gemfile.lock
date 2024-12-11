@@ -14,13 +14,13 @@ GEM
       base64 (~> 0.2.0)
       faraday (>= 1.0, < 3.0.0)
       faraday-retry (>= 1.0, < 3.0.0)
-    actionview (8.0.0)
-      activesupport (= 8.0.0)
+    actionview (8.0.0.1)
+      activesupport (= 8.0.0.1)
       builder (~> 3.1)
       erubi (~> 1.11)
       rails-dom-testing (~> 2.2)
       rails-html-sanitizer (~> 1.6)
-    activesupport (8.0.0)
+    activesupport (8.0.0.1)
       base64
       benchmark (>= 0.3)
       bigdecimal
