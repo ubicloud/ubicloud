@@ -71,8 +71,10 @@ class Clover
 
         r.delete String do |ubid|
           if (token = current_account.api_keys_dataset.with_pk(UBID.to_uuid(ubid)))
-            token.destroy
-            @project.disassociate_subject(token.id)
+            DB.transaction do
+              token.destroy
+              @project.disassociate_subject(token.id)
+            end
             flash["notice"] = "Personal access token deleted successfully"
           end
           204
