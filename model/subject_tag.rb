@@ -5,6 +5,7 @@ require_relative "../model"
 class SubjectTag < Sequel::Model
   include ResourceMethods
   include AccessControlModelTag
+  dataset_module Authorization::Dataset
 
   def self.valid_member?(project_id, subject)
     case subject
