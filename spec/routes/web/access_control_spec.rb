@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe Clover, "access control" do
   let(:user) { create_account }
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { user.projects.first }
 
   describe "unauthenticated" do
     it "cannot access without login" do
@@ -25,7 +25,7 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       project_id = project.id
 
-      expect(page.title).to eq("Ubicloud - project-1 - Access Control")
+      expect(page.title).to eq("Ubicloud - Default - Access Control")
 
       expect(page.all("table#access-control-entries td").map(&:text)).to eq [
         "", "Tag: Admin", "All", "All", ""
@@ -134,7 +134,7 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       user.update(name: "Tname")
       click_link "Create Access Control Entry"
-      expect(page.title).to eq "Ubicloud - project-1 - Create Access Control Entry"
+      expect(page.title).to eq "Ubicloud - Default - Create Access Control Entry"
       select "Tname"
       click_button "Create Access Control Entry"
       expect(find_by_id("flash-notice").text).to include("Access control entry created successfully")
@@ -179,7 +179,7 @@ RSpec.describe Clover, "access control" do
       SubjectTag.create_with_id(project_id: project.id, name: "STest")
       visit "#{project.path}/user/access-control"
       click_link "Edit"
-      expect(page.title).to eq "Ubicloud - project-1 - Update Access Control Entry"
+      expect(page.title).to eq "Ubicloud - Default - Update Access Control Entry"
       select "STest"
       click_button "Update Access Control Entry"
       expect(find_by_id("flash-notice").text).to include("Access control entry updated successfully")
@@ -238,7 +238,7 @@ RSpec.describe Clover, "access control" do
       it "can view #{type} tags" do
         visit "#{project.path}/user/access-control"
         click_link cap_type
-        expect(page.title).to eq "Ubicloud - project-1 - #{cap_type} Tags"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
         tds = page.all("table#tag-list td").map(&:text)
 
         if type == "subject"
@@ -264,7 +264,7 @@ RSpec.describe Clover, "access control" do
       it "can create #{type} tag" do
         visit "#{project.path}/user/access-control/tag/#{type}"
         click_link "Create #{cap_type} Tag"
-        expect(page.title).to eq "Ubicloud - project-1 - Create #{cap_type} Tag"
+        expect(page.title).to eq "Ubicloud - Default - Create #{cap_type} Tag"
         fill_in "Name", with: "-"
         click_button "Create"
         expect(find_by_id("flash-error").text).to eq "name must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
@@ -274,7 +274,7 @@ RSpec.describe Clover, "access control" do
         click_button "Create"
         expect(model[project_id: project.id, name:]).not_to be_nil
         expect(find_by_id("flash-notice").text).to eq "#{cap_type} tag created successfully"
-        expect(page.title).to eq "Ubicloud - project-1 - #{cap_type} Tags"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
         expect(page.html).to include name
       end
 
@@ -284,7 +284,7 @@ RSpec.describe Clover, "access control" do
         visit "#{project.path}/user/access-control/tag/#{type}"
         click_link name
 
-        expect(page.title).to eq "Ubicloud - project-1 - Update #{cap_type} Tag"
+        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag"
         fill_in "Name", with: "-"
         click_button "Update"
         expect(find_by_id("flash-error").text).to eq "name must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
@@ -296,7 +296,7 @@ RSpec.describe Clover, "access control" do
         expect(model[project_id: project.id, name: old_name]).to be_nil
         expect(model[project_id: project.id, name:]).not_to be_nil
         expect(find_by_id("flash-notice").text).to eq "#{cap_type} tag name updated successfully"
-        expect(page.title).to eq "Ubicloud - project-1 - #{cap_type} Tags"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
         expect(page.html).to include name
         expect(page.html).not_to include old_name
       end
@@ -320,7 +320,7 @@ RSpec.describe Clover, "access control" do
         visit "#{project.path}/user/access-control/tag/#{type}"
         page.find("##{tag1.ubid}-edit a").click
 
-        expect(page.title).to eq "Ubicloud - project-1 - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
         expect(page.html).not_to include "Current Members of #{cap_type} Tag"
         global_tags = ActionTag.where(project_id: nil).select_order_map(:name)
         action_types = ActionType.map(&:name).sort
@@ -368,7 +368,7 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Add Members"
         expect(tag1.member_ids).to include tag2.id
-        expect(page.title).to eq "Ubicloud - project-1 - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
         expect(find_by_id("flash-notice").text).to eq "1 members added to #{type} tag"
       end
 
@@ -381,7 +381,7 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Add Members"
         expect(tag1.member_ids).to include tag2.id
-        expect(page.title).to eq "Ubicloud - project-1 - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
         expect(find_by_id("flash-error").text).to eq "No change in membership: 1 members already in tag"
       end
 
@@ -394,7 +394,7 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Remove Members"
         expect(tag1.member_ids).to be_empty
-        expect(page.title).to eq "Ubicloud - project-1 - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
         expect(find_by_id("flash-notice").text).to eq "1 members removed from #{type} tag"
       end
     end
@@ -407,7 +407,7 @@ RSpec.describe Clover, "access control" do
       find("##{member_global_tag.ubid} input").check
       click_button "Add Members"
       expect(tag.member_ids).to include member_global_tag.id
-      expect(page.title).to eq "Ubicloud - project-1 - Update Action Tag Membership"
+      expect(page.title).to eq "Ubicloud - Default - Update Action Tag Membership"
       expect(find_by_id("flash-notice").text).to eq "1 members added to action tag"
     end
 
@@ -480,7 +480,7 @@ RSpec.describe Clover, "access control" do
       expect(UBID).to receive(:class_match?).and_return(false)
       click_button "Add Members"
       expect(tag1.member_ids).to include tag2.id
-      expect(page.title).to eq "Ubicloud - project-1 - Update Subject Tag Membership"
+      expect(page.title).to eq "Ubicloud - Default - Update Subject Tag Membership"
       expect(find_by_id("flash-notice").text).to eq "1 members added to subject tag"
     end
   end
