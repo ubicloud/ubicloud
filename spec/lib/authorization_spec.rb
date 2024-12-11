@@ -93,7 +93,6 @@ RSpec.describe Authorization do
       [
         [{}, SecureRandom.uuid, "Vm:view", 0],
         [{}, SecureRandom.uuid, ["Vm:view"], 0],
-        [{}, SecureRandom.uuid, ["Vm:view"], 0],
         [{}, users[0].id, "Vm:view", 0],
         [{}, users[0].id, ["Vm:view"], 0],
         [{subjects: users[0].id, actions: "Vm:all", objects: [nil]}, users[0].id, "Vm:view", 1],
