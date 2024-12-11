@@ -298,5 +298,16 @@ RSpec.describe Clover, "vm" do
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end
     end
+
+    describe "restart" do
+      it "can restart vm" do
+        visit "#{project.path}#{vm.path}"
+        expect(page).to have_content "Restart"
+        click_button "Restart"
+
+        expect(page.status_code).to eq(200)
+        expect(vm.restart_set?).to be true
+      end
+    end
   end
 end
