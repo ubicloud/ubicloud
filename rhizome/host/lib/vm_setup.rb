@@ -444,10 +444,7 @@ DHCP
       address=/.docker.io/::
       ADDRESSES
     else
-      <<~ADDRESSES
-      dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
-      listen-address=#{dnsmasq_address_ip6}
-      ADDRESSES
+      ""
     end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
 pid-file=
@@ -461,10 +458,8 @@ no-resolv
 #{interfaces}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
-server=149.112.112.112
-server=9.9.9.9
-server=2620:fe::fe
-server=2620:fe::9
+server=2606:4700:4700::1111
+server=2001:4860:4860::8888
 dhcp-option=6,#{dns_ipv4}
 listen-address=#{dns_ipv4}
 dhcp-option=26,1400
@@ -472,6 +467,9 @@ bind-interfaces
 #{runner_config}
 dhcp-option=54,#{dns_ipv4}
 dns-forward-max=10000
+dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+listen-address=#{dnsmasq_address_ip6}
+all-servers
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
