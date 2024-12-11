@@ -1,7 +1,7 @@
 <% case state %>
 <% when "running" %>
   <% color = "bg-green-100 text-green-800" %>
-<% when "creating", "rebooting", "starting", "waiting for capacity" %>
+<% when "creating", "rebooting", "starting", "waiting for capacity", "restarting" %>
   <% color = "bg-yellow-100 text-yellow-800" %>
 <% when "deleting", "deleted" %>
   <% color = "bg-red-100 text-red-800" %>

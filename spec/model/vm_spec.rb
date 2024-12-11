@@ -7,18 +7,23 @@ RSpec.describe Vm do
 
   describe "#display_state" do
     it "returns deleting if destroy semaphore increased" do
-      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "destroy")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "destroy")]).at_least(:once)
       expect(vm.display_state).to eq("deleting")
     end
 
+    it "returns restarting if restart semaphore increased" do
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "restart")]).at_least(:once)
+      expect(vm.display_state).to eq("restarting")
+    end
+
     it "returns waiting for capacity if semaphore increased" do
-      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "waiting_for_capacity")]).at_least(:once)
       expect(vm.display_state).to eq("waiting for capacity")
     end
 
     it "returns no capacity available if it's waiting capacity more than 15 minutes" do
       expect(vm).to receive(:created_at).and_return(Time.now - 16 * 60)
-      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "waiting_for_capacity")]).at_least(:once)
       expect(vm.display_state).to eq("no capacity available")
     end
 
