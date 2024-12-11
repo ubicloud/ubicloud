@@ -136,8 +136,8 @@ RSpec.describe Authorization do
       project_id = projects[0].id
 
       [
-        [{}, SecureRandom.uuid, "Vm:view", SecureRandom.uuid, 0],
-        [{}, SecureRandom.uuid, ["Vm:view"], SecureRandom.uuid, 0],
+        [{}, SecureRandom.uuid, "Vm:view", UBID.from_uuidish(SecureRandom.uuid).to_s.sub(/\A../, "00"), 0],
+        [{}, SecureRandom.uuid, ["Vm:view"], UBID.from_uuidish(SecureRandom.uuid).to_s.sub(/\A../, "00"), 0],
         [{}, SecureRandom.uuid, ["Vm:view"], vms[0].id, 0],
         [{}, users[0].id, ["Vm:view"], vms[0].id, 0],
         [{subjects: users[0].id, actions: "Vm:all", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
@@ -196,12 +196,26 @@ RSpec.describe Authorization do
   end
 
   describe "#authorize" do
-    it "not raises error when has matched policies when using UUID object_id" do
+    it "does not raise error when there existed a matching access control entry when using UUID object_id" do
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].id) }.not_to raise_error
     end
 
-    it "not raises error when has matched policies when using UBID object_id" do
+    it "does not raise error when there existed a matching access control entry when using UBID object_id" do
       expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].ubid) }.not_to raise_error
+    end
+
+    it "does not raise error when there existed a matching access control entry when object_id in in project" do
+      st = SubjectTag.create_with_id(project_id: projects[0].id, name: "test")
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", projects[0].id) }.not_to raise_error
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].id) }.not_to raise_error
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", st.id) }.not_to raise_error
+    end
+
+    it "raises error when has matched policies when object is in project" do
+      st = SubjectTag.create_with_id(project_id: projects[1].id, name: "test")
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", projects[1].id) }.to raise_error Authorization::Unauthorized
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[3].id) }.to raise_error Authorization::Unauthorized
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", st.id) }.to raise_error Authorization::Unauthorized
     end
 
     it "raises error when non-UBID/non-UUID is used" do
