@@ -934,7 +934,7 @@ paths:
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_id'
       - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/firewall_rule_id'
+      - $ref: '#/components/parameters/postgres_firewall_rule_id'
     delete:
       operationId: deleteLocationPostgresFirewallRuleWithId
       summary: Delete a specific Postgres firewall rule
@@ -1125,7 +1125,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
       - $ref: '#/components/parameters/location'
       - $ref: '#/components/parameters/postgres_database_name'
-      - $ref: '#/components/parameters/firewall_rule_id'
+      - $ref: '#/components/parameters/postgres_firewall_rule_id'
     delete:
       operationId: deleteLocationPostgresFirewallRule
       summary: Delete a specific firewall rule
@@ -1497,6 +1497,8 @@ components:
       required: true
       schema:
         type: string
+        example: fwfg7td83em22qfw9pq5xyfqb7
+        pattern: '^fw[0-9a-hj-km-np-tv-z]{24}$'
     firewall_name:
       description: Name of the firewall
       in: path
@@ -1511,6 +1513,8 @@ components:
       required: true
       schema:
         type: string
+        example: fraz0q3vbrpa7pkg7zbmah9csn
+        pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
     load_balancer_id:
       description: ID of the load balancer
       in: path
@@ -1518,6 +1522,8 @@ components:
       required: true
       schema:
         type: string
+        example: 1bhw8r4pn73t1m5f7rn7a5pej2
+        pattern: '^1b[0-9a-hj-km-np-tv-z]{24}$'
     load_balancer_name:
       description: Name of the load balancer
       in: path
@@ -1540,6 +1546,8 @@ components:
       required: true
       schema:
         type: string
+        example: et7ekmf54nae5nya9s6vebg43f
+        pattern: '^et[0-9a-hj-km-np-tv-z]{24}$'
     order_column:
       description: Pagination - Order column
       in: query
@@ -1563,6 +1571,8 @@ components:
       required: true
       schema:
         type: string
+        example: pgn30gjk1d1e2jj34v9x0dq4rp
+        pattern: '^pg[0-9a-hj-km-np-tv-z]{24}$'
     postgres_database_name:
       description: Postgres database name
       in: path
@@ -1570,6 +1580,15 @@ components:
       required: true
       schema:
         type: string
+    postgres_firewall_rule_id:
+      description: ID of the postgres firewall rule
+      in: path
+      name: firewall_rule_id
+      required: true
+      schema:
+        type: string
+        example: pfmjgkgbktw62k53005jpx8tt7
+        pattern: '^pf[0-9a-hj-km-np-tv-z]{24}$'
     private_subnet_id:
       description: Private subnet ID
       in: path
@@ -1577,6 +1596,8 @@ components:
       required: true
       schema:
         type: string
+        example: ps3dngttwvje2kmr2sn8x12x4r
+        pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
     private_subnet_name:
       description: Private subnet name
       in: path
@@ -1591,6 +1612,8 @@ components:
       required: true
       schema:
         type: string
+        example: pjkkmx0f2vke4h36nk9cm8v8q0
+        pattern: '^pj[0-9a-hj-km-np-tv-z]{24}$'
     start_after:
       description: Pagination - Start after
       in: query
@@ -1605,6 +1628,8 @@ components:
       required: true
       schema:
         type: string
+        example: vmhfy8gff8c67hasb0eez2k1pd
+        pattern: '^vm[0-9a-hj-km-np-tv-z]{24}$'
     vm_name:
       description: Virtual machine name
       in: path
@@ -1653,6 +1678,8 @@ components:
         id:
           description: ID of the firewall
           type: string
+          example: fwfg7td83em22qfw9pq5xyfqb7
+          pattern: '^fw[0-9a-hj-km-np-tv-z]{24}$'
         location:
           description: Location of the the firewall
           type: string
@@ -1675,6 +1702,8 @@ components:
         id:
           description: ID of the firewall rule
           type: string
+          example: fraz0q3vbrpa7pkg7zbmah9csn
+          pattern: '^fr[0-9a-hj-km-np-tv-z]{24}$'
         port_range:
           description: Port range of the firewall rule
           type: string
@@ -1704,6 +1733,8 @@ components:
         id:
           description: ID of the Load Balancer
           type: string
+          example: 1bhw8r4pn73t1m5f7rn7a5pej2
+          pattern: '^1b[0-9a-hj-km-np-tv-z]{24}$'
         name:
           description: Name of the Load Balancer
           type: string
@@ -1760,6 +1791,8 @@ components:
         id:
           description: ID of the Postgres database
           type: string
+          example: pgn30gjk1d1e2jj34v9x0dq4rp
+          pattern: '^pg[0-9a-hj-km-np-tv-z]{24}$'
         location:
           description: Location of the Postgres database
           type: string
@@ -1798,6 +1831,8 @@ components:
         id:
           description: ID of the Postgres firewall rule
           type: string
+          example: pfmjgkgbktw62k53005jpx8tt7
+          pattern: '^pf[0-9a-hj-km-np-tv-z]{24}$'
       additionalProperties: false
       required:
         - cidr
@@ -1812,6 +1847,8 @@ components:
         id:
           description: ID of the subnet
           type: string
+          example: ps3dngttwvje2kmr2sn8x12x4r
+          pattern: '^ps[0-9a-hj-km-np-tv-z]{24}$'
         location:
           description: Location of the subnet
           type: string
@@ -1856,7 +1893,8 @@ components:
           example: 10
         id:
           type: string
-          example: pjw92xhhqjdy4g72xng1ubkda6
+          example: pjkkmx0f2vke4h36nk9cm8v8q0
+          pattern: '^pj[0-9a-hj-km-np-tv-z]{24}$'
         name:
           description: Name of the project
           type: string
@@ -1873,7 +1911,8 @@ components:
         id:
           description: ID of the VM
           type: string
-          example: vmw12ouhqjdy4g72xng1ubkda6
+          example: vmhfy8gff8c67hasb0eez2k1pd
+          pattern: '^vm[0-9a-hj-km-np-tv-z]{24}$'
         ip4:
           description: IPv4 address
           type: string

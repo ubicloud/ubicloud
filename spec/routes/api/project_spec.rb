@@ -107,7 +107,7 @@ RSpec.describe Clover, "project" do
         end
 
         it "success with non-existing project" do
-          delete "/project/non_existing_id"
+          delete "/project/pj000000000000000000000000"
 
           expect(last_response.status).to eq(204)
         end
@@ -160,7 +160,7 @@ RSpec.describe Clover, "project" do
         end
 
         it "not found" do
-          get "/project/08s56d4kaj94xsmrnf5v5m3mav"
+          get "/project/pj000000000000000000000000"
 
           expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
         end
