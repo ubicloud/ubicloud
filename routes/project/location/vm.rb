@@ -24,7 +24,7 @@ class Clover
 
       r.get true do
         authorize("Vm:view", vm.id)
-        @vm = Serializers::Vm.serialize(vm, {detailed: true})
+        @vm = Serializers::Vm.serialize(vm, {detailed: true, include_path: web?})
         api? ? @vm : view("vm/show")
       end
 
@@ -32,6 +32,13 @@ class Clover
         authorize("Vm:delete", vm.id)
         vm.incr_destroy
         204
+      end
+
+      r.post web?, "restart" do
+        authorize("Vm:edit", vm.id)
+        vm.incr_restart
+        flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
+        r.redirect "#{@project.path}#{vm.path}"
       end
     end
 
