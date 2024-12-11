@@ -272,7 +272,7 @@ RSpec.describe Clover, "postgres" do
         AccessPolicy.create_with_id(
           project_id: project_wo_permissions.id,
           name: "only-view",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}]}
+          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:view"], objects: project_wo_permissions.hyper_tag_name}]}
         )
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
@@ -285,7 +285,7 @@ RSpec.describe Clover, "postgres" do
         AccessPolicy.create_with_id(
           project_id: project_wo_permissions.id,
           name: "only-view",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:Firewall:view"], objects: project_wo_permissions.hyper_tag_name}]}
+          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:view"], objects: project_wo_permissions.hyper_tag_name}]}
         )
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
