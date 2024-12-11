@@ -1636,6 +1636,16 @@ paths:
     - $ref: '#/components/parameters/project_id'
     - $ref: '#/components/parameters/location'
     - $ref: '#/components/parameters/kubernetes_vm_name'
+    delete:
+      operationId: deleteLocationKubernetesVMWithName
+      summary: Delete a specific Kubernetes VM with name
+      responses:
+        '204':
+          description: Kubernetes VM deleted successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes VM
     post:
       summary: Create Kubernetes VM in a specific location of a project
       operationId: createLocationKubernetesVM
@@ -1689,7 +1699,7 @@ paths:
       tags:
         - Kubernetes VM
     get:
-      operationId: getKubernetesVMDetails
+      operationId: getLocationKubernetesVMDetails
       summary: Get details of a specific Kubernetes VM in a location
       responses:
         '200':

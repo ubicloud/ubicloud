@@ -15,11 +15,13 @@ class Clover
         filter = {Sequel[:vm][:name] => kv_name}
         filter[:location] = @location
         vm = @project.vms_dataset.first(filter)
+        next (r.delete? ? 204 : 404) unless vm
         filter = {Sequel[:kubernetes_vm][:vm_id] => vm.id}
       else
         filter = {Sequel[:kubernetes_vm][:id] => UBID.to_uuid(kv_id)}
       end
       kv = @project.kubernetes_vms_dataset.first(filter)
+      next (r.delete? ? 204 : 404) unless kv
 
       request.get true do
         authorize("KubernetesVm:view", kv.id)
@@ -29,6 +31,12 @@ class Clover
         else
           view "kubernetes/vm/show"
         end
+      end
+
+      r.delete true do
+        authorize("KubernetesVm:delete", kv.id)
+        kv.destroy
+        204
       end
     end
   end

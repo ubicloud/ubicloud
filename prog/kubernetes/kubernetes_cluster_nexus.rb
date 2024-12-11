@@ -2,6 +2,7 @@
 
 class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   subject_is :kubernetes_cluster
+  semaphore :destroy
 
   def self.assemble(name:, kubernetes_version:, subnet:, project_id:, location:, replica: 3)
     DB.transaction do
@@ -16,27 +17,16 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         subnet: subnet,
         location: location
       )
+
       kc.associate_with_project(project)
-      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy") { _1.id = kc.id }
-    end
-  end
-
-  def curl(method, url, token, data = nil)
-    command = ["curl", "-s", "-X#{method}"]
-    command += ["-H", "\"Authorization: Bearer #{token}\"", "-H", "\"Content-Type: application/json\""]
-    command += ["-k", url.to_s]
-    command += ["-d", "'#{data.to_json}'"] if data
-    JSON.parse(`#{command.join(" ")}`, symbolize_names: true)
-  end
-
-  def specs_match?(desired, current)
-    desired.all? do |key, value|
-      current_value = current[key]
-      value.is_a?(Hash) ? specs_match?(value, current_value || {}) : value == current_value
+      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = kc.id }
     end
   end
 
   label def start
+    when_destroy_set? do
+      hop_destroy
+    end
     manifests = [
       {
         file: <<~YAML,
@@ -46,7 +36,7 @@ metadata:
   name: #{kubernetes_cluster.name}
   namespace: default
 spec:
-  location: #{kubernetes_cluster.location}
+  location: #{LocationNameConverter.to_display_name(kubernetes_cluster.location)}
   projectID: #{kubernetes_cluster.projects.first.ubid}
   subnet: #{kubernetes_cluster.subnet}
         YAML
@@ -127,7 +117,7 @@ spec:
       resource_url = "#{Config.management_k8s_url}#{manifest[:url]}"
 
       response = begin
-        curl("GET", resource_url, Config.management_k8s_token)
+        Clover.kubernetes_curl("GET", resource_url, Config.management_k8s_token)
       rescue => ex
         Clog.emit("could not execute curl command: #{ex}")
         next
@@ -141,11 +131,11 @@ spec:
         else
           Clog.emit("Updating resource: #{resource[:kind]} #{resource[:metadata][:name]}")
           resource[:metadata][:resourceVersion] = response[:metadata][:resourceVersion]
-          curl("PUT", resource_url, Config.management_k8s_token, resource)
+          Clover.kubernetes_curl("PUT", resource_url, Config.management_k8s_token, resource)
         end
       elsif response[:code] == 404
         Clog.emit("Creating resource: #{resource[:kind]} #{resource[:metadata][:name]}")
-        curl("POST", resource_url.gsub(%r{/[^/]+$}, ""), Config.management_k8s_token, resource)
+        Clover.kubernetes_curl("POST", resource_url.gsub(%r{/[^/]+$}, ""), Config.management_k8s_token, resource)
       else
         Clog.emit("Got response code other than 200 and 404. Response: #{response}")
       end
@@ -159,6 +149,10 @@ spec:
   end
 
   label def destroy
-    pop "done"
+    decr_destory
+
+    Clover.kubernetes_curl("DELETE", "/apis/cluster.x-k8s.io/v1beta1/namespaces/default/clusters/#{kubernetes_cluster.name}", Config.management_k8s_token)
+    strand.destroy
+    pop "kubernetes cluster is deleted"
   end
 end

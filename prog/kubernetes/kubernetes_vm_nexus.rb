@@ -2,6 +2,7 @@
 
 class Prog::Kubernetes::KubernetesVmNexus < Prog::Base
   subject_is :kubernetes_vm
+  semaphore :destroy
 
   def self.assemble(unix_user:, project_id:, location:, name:, size:, storage_size:, boot_image:, private_subnet_id:, enable_ip4:, commands:)
     DB.transaction do
@@ -32,8 +33,11 @@ class Prog::Kubernetes::KubernetesVmNexus < Prog::Base
   end
 
   label def start
+    when_destroy_set? do
+      hop_destroy
+    end
     frame["commands"].map { |command| kubernetes_vm.vm.sshable.cmd command }
-    hop_destroy
+    hop_sleep
   end
 
   label def wait
@@ -43,7 +47,14 @@ class Prog::Kubernetes::KubernetesVmNexus < Prog::Base
     hop_start
   end
 
+  label def sleep
+    nap 30
+  end
+
   label def destroy
-    pop "done"
+    decr_destroy
+
+    kubernetes_vm.vm.incr_destroy unless kubernetes_vm.vm.nil?
+    pop "kubernetes vm is deleted"
   end
 end

@@ -77,4 +77,19 @@ class Clover
       view "kubernetes/vm/index"
     end
   end
+
+  def kubernetes_curl(method, url, token, data = nil)
+    command = ["curl", "-s", "-X#{method}"]
+    command += ["-H", "\"Authorization: Bearer #{token}\"", "-H", "\"Content-Type: application/json\""]
+    command += ["-k", url.to_s]
+    command += ["-d", "'#{data.to_json}'"] if data
+    JSON.parse(`#{command.join(" ")}`, symbolize_names: true)
+  end
+
+  def specs_match?(desired, current)
+    desired.all? do |key, value|
+      current_value = current[key]
+      value.is_a?(Hash) ? specs_match?(value, current_value || {}) : value == current_value
+    end
+  end
 end
