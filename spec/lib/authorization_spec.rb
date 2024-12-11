@@ -48,8 +48,8 @@ RSpec.describe Authorization do
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 0],
         [[{subjects: users[0].hyper_tag_name, actions: "Vm:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
         [[{subjects: users[0].hyper_tag_name, actions: "*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:Firewall:view", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:Firewall:delete", 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:Firewall:edit", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:Firewall:view", 0]
+        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:view", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:edit", 0],
+        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:edit", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:view", 0]
       ].each do |policies, subject_id, actions, matched_count|
         access_policy.update(body: {acls: policies})
         expect(described_class.matched_policies(subject_id, actions).count).to eq(matched_count)
