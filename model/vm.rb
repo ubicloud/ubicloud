@@ -125,11 +125,7 @@ class Vm < Sequel::Model
     packages = (total_packages * proportion).ceil
     dies_per_package = (total_dies_per_package * proportion).ceil
     cores_per_die = cores_from_cpus / (packages * dies_per_package)
-
-    if cores_per_die.denominator > 1
-      threads_per_core = (threads_per_core * cores_per_die).ceil
-      cores_per_die = 1
-    end
+    fail "BUG: need uniform number of cores allocated per die" unless cores_per_die.denominator == 1
 
     topo = [threads_per_core, cores_per_die, dies_per_package, packages].map { |num|
       # :nocov:

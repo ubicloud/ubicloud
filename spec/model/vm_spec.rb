@@ -166,7 +166,7 @@ RSpec.describe Vm do
         total_sockets: 1
       )).at_least(:once)
 
-      expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: arithmetic does not result in the correct number of vcpus"
+      expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
     end
 
     it "scales a single-socket non-hyperthreaded system" do
