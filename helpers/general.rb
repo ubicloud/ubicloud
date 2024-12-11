@@ -76,7 +76,7 @@ class Clover < Roda
 
   def dataset_authorize(ds, actions)
     each_authorization_id do |id|
-      ds = ds.authorized(current_account_id, actions)
+      ds = ds.authorized(id, actions)
     end
     ds
   end
