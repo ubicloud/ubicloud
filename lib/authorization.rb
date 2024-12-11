@@ -112,13 +112,20 @@ module Authorization
             .where { level < Config.recursive_tag_limit },
           args: [:object_id, :level]).select(:object_id)
 
+      project_id_match = if model.columns.include?(:project_id)
+        Sequel[from][:project_id]
+      else
+        DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])
+      end
+
       where(Sequel.|(
         # Allow where there is a specific entry for the object,
         {Sequel[from][:id] => ds},
         # or where the action is allowed for all objects in the project,
         (ds.where(object_id: nil).exists &
-          # and the object is in the project via a hypertag.
-          {project_id => DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])})
+          # and the object is related to the project (either with a matching project_id,
+          # or where there is a hyper tag from the object to the project.
+          {project_id => project_id_match})
       ))
     end
   end

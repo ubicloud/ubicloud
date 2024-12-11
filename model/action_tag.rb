@@ -5,6 +5,7 @@ require_relative "../model"
 class ActionTag < Sequel::Model
   include ResourceMethods
   include AccessControlModelTag
+  dataset_module Authorization::Dataset
 
   def add_member(action)
     action = ActionType::NAME_MAP[action] unless action.include?("-")
