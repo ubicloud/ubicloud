@@ -71,9 +71,20 @@ module Authorization
 
     if object_id
       # Recognize UUID format
-      unless /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+      if /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+        ubid = UBID.from_uuidish(object_id).to_s
+      else
+        ubid = object_id
         # Otherwise, should be valid UBID, raise error if not
         object_id = UBID.parse(object_id).to_uuid
+      end
+
+      if (klass = UBID.class_for_ubid(ubid))
+        # This checks that the object being authorized is actually related to the project.
+        # This is probably a redundant check, but I think it helps to have defense in depth
+        # here.  This makes it so if a project-level restriction is missed before the
+        # authorization call, this will make authorization fail.
+        dataset = klass.filter_authorize_dataset(dataset, object_id)
       end
 
       dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }))
@@ -113,8 +124,15 @@ module Authorization
   end
 
   module HyperTagMethods
+    module ClassMethods
+      def filter_authorize_dataset(dataset, object_id)
+        dataset.where(project_id: DB[:access_tag].where(hyper_tag_id: object_id).select(:project_id))
+      end
+    end
+
     def self.included(base)
       base.class_eval do
+        extend ClassMethods
         many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
       end
     end
