@@ -9,6 +9,7 @@ require "base64"
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
+  semaphore :restart
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-fsn1", boot_image: Config.default_boot_image_name,
@@ -323,6 +324,11 @@ class Prog::Vm::Nexus < Prog::Base
       hop_update_spdk_dependency
     end
 
+    when_restart_set? do
+      register_deadline(:wait, 5 * 60)
+      hop_restart
+    end
+
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
@@ -348,6 +354,12 @@ class Prog::Vm::Nexus < Prog::Base
     decr_update_spdk_dependency
     write_params_json
     host.sshable.cmd("sudo host/bin/setup-vm reinstall-systemd-units #{q_vm}")
+    hop_wait
+  end
+
+  label def restart
+    decr_restart
+    host.sshable.cmd("sudo systemctl restart #{vm.inhost_name}")
     hop_wait
   end
 

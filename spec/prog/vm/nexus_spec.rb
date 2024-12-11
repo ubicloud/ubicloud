@@ -623,6 +623,11 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.wait }.to hop("update_firewall_rules")
     end
 
+    it "hops to restart when needed" do
+      expect(nx).to receive(:when_restart_set?).and_yield
+      expect { nx.wait }.to hop("restart")
+    end
+
     it "hops to unavailable based on the vm's available status" do
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(false)
@@ -661,6 +666,16 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:write_params_json)
       expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
       expect { nx.update_spdk_dependency }.to hop("wait")
+    end
+  end
+
+  describe "#restart" do
+    it "hops to wait after restarting the vm" do
+      sshable = instance_double(Sshable)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
+      expect(nx).to receive(:decr_restart)
+      expect(sshable).to receive(:cmd).with("sudo systemctl restart #{vm.inhost_name}")
+      expect { nx.restart }.to hop("wait")
     end
   end
 
