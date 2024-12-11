@@ -34,6 +34,10 @@ class Project < Sequel::Model
   include ResourceMethods
   include Authorization::HyperTagMethods
 
+  def self.filter_authorize_dataset(dataset, object_id)
+    dataset.where(project_id: object_id)
+  end
+
   def hyper_tag_name(project = nil)
     "project/#{ubid}"
   end
