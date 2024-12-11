@@ -5,7 +5,7 @@ require_relative "spec_helper"
 RSpec.describe Clover, "personal access token management" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { user.projects.first }
 
   before do
     login(user.email)
