@@ -65,6 +65,17 @@ class GithubRunner < Sequel::Model
     aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {available_memory: available_memory})
   end
 
+  def generate_cf_google_dns_dnsmasq_config
+    <<~COMMAND
+      sudo sed -i 's/^server=9.9.9.9@.*/server=2606:4700:4700::1111/' /vm/#{vm.inhost_name}/dnsmasq.conf
+      sudo sed -i 's/^server=149.112.112.112@.*//' /vm/#{vm.inhost_name}/dnsmasq.conf
+      sudo sed -i 's/^server=2620:fe::fe//' /vm/#{vm.inhost_name}/dnsmasq.conf
+      sudo sed -i 's/^server=2620:fe::9/server=2001:4860:4860::8888/' /vm/#{vm.inhost_name}/dnsmasq.conf
+      echo "all-servers" | sudo tee -a /vm/#{vm.inhost_name}/dnsmasq.conf
+      sudo systemctl restart #{vm.inhost_name}-dnsmasq
+    COMMAND
+  end
+
   def self.redacted_columns
     super + [:workflow_job]
   end

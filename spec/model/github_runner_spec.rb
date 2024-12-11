@@ -10,7 +10,7 @@ RSpec.describe GithubRunner do
   }
 
   let(:vm) {
-    instance_double(Vm, sshable: instance_double(Sshable), cores: 2, arch: "x64", ubid: "vm-ubid", pool_id: "pool-id", vm_host: instance_double(VmHost, ubid: "host-ubid"))
+    instance_double(Vm, sshable: instance_double(Sshable), cores: 2, arch: "x64", ubid: "vm-ubid", pool_id: "pool-id", vm_host: instance_double(VmHost, ubid: "host-ubid"), inhost_name: "vminhost")
   }
 
   before do
@@ -55,5 +55,16 @@ RSpec.describe GithubRunner do
 
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
     github_runner.check_pulse(session: session, previous_pulse: pulse)
+  end
+
+  it "generates a dnsmasq config for Cloudflare and Google DNS servers" do
+    expect(github_runner.generate_cf_google_dns_dnsmasq_config).to eq(<<~COMMAND)
+      sudo sed -i 's/^server=9.9.9.9@.*/server=2606:4700:4700::1111/' /vm/vminhost/dnsmasq.conf
+      sudo sed -i 's/^server=149.112.112.112@.*//' /vm/vminhost/dnsmasq.conf
+      sudo sed -i 's/^server=2620:fe::fe//' /vm/vminhost/dnsmasq.conf
+      sudo sed -i 's/^server=2620:fe::9/server=2001:4860:4860::8888/' /vm/vminhost/dnsmasq.conf
+      echo "all-servers" | sudo tee -a /vm/vminhost/dnsmasq.conf
+      sudo systemctl restart vminhost-dnsmasq
+    COMMAND
   end
 end
