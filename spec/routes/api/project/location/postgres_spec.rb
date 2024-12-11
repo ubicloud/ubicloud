@@ -374,7 +374,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule not exist" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/pf000000000000000000000000"
 
         expect(last_response.status).to eq(204)
       end
@@ -392,7 +392,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination not exist" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/foo_ubid"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/et000000000000000000000000"
 
         expect(last_response.status).to eq(204)
       end
