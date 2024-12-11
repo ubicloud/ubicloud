@@ -152,54 +152,6 @@
       </div>
     </div>
   <% end %>
-  <!-- Reset password -->
-  <% if @pg[:primary] %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password") %>
-          <div class="space-y-4">
-            <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Reset superuser password</h2>
-            </div>
-            <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    label: "New password",
-                    name: "password",
-                    type: "password",
-                    attributes: {
-                      required: true
-                    },
-                    extra_class: "reset-superuser-password-new-password"
-                  }
-                ) %>
-              </div>
-              <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    label: "New password (repeat)",
-                    name: "repeat_password",
-                    type: "password",
-                    attributes: {
-                      required: true
-                    },
-                    extra_class: "reset-superuser-password-new-password-repeat"
-                  }
-                ) %>
-              </div>
-              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== render("components/form/submit_button", locals: { text: "Reset" }) %>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  <% end %>
   <!-- Firewall Rules Card -->
   <% if has_permission?("Postgres:Firewall:view", @pg[:id]) %>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -336,46 +288,102 @@
       </table>
     </div>
   <% end %>
-  <% if has_permission?(["Postgres:edit", "Postgres:delete"], @pg[:id]) %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <!-- Restart Card -->
-      <% if has_permission?("Postgres:edit", @pg[:id]) %>
-        <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restart" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restart") %>
+  <!-- Danger Zone -->
+  <% if has_permission?(["Postgres:view", "Postgres:edit", "Postgres:delete"], @pg[:id]) || @pg[:primary] %>
+    <div>
+      <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Danger Zone
+          </h3>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <!-- Reset password -->
+        <% if @pg[:primary] %>
+          <div class="px-4 py-5 sm:p-6">
+            <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password" %>" role="form" method="POST">
+              <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password") %>
+              <div class="space-y-4">
+                <div>
+                  <h3 class="text-base font-semibold leading-6 text-gray-900">Reset superuser password</h3>
+                </div>
+                <div class="grid grid-cols-12 gap-6">
+                  <div class="col-span-12 sm:col-span-5">
+                    <%== render(
+                      "components/form/text",
+                      locals: {
+                        label: "New password",
+                        name: "password",
+                        type: "password",
+                        attributes: {
+                          required: true
+                        },
+                        extra_class: "reset-superuser-password-new-password"
+                      }
+                    ) %>
+                  </div>
+                  <div class="col-span-12 sm:col-span-5">
+                    <%== render(
+                      "components/form/text",
+                      locals: {
+                        label: "New password (repeat)",
+                        name: "repeat_password",
+                        type: "password",
+                        attributes: {
+                          required: true
+                        },
+                        extra_class: "reset-superuser-password-new-password-repeat"
+                      }
+                    ) %>
+                  </div>
+                  <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                    <%== render("components/form/submit_button", locals: { text: "Reset" }) %>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        <% end %>
+        <!-- Restart Card -->
+        <% if has_permission?("Postgres:edit", @pg[:id]) %>
+          <div class="px-4 py-5 sm:p-6">
+            <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restart" %>" role="form" method="POST">
+              <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restart") %>
+              <div class="sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="text-base font-semibold leading-6 text-gray-900">Restart PostgreSQL database</h3>
+                  <div class="mt-2 text-sm text-gray-500">
+                    <p>This action will restart the PostgreSQL database. The database will be offline momentarily, and
+                      all connections will be dropped.</p>
+                  </div>
+                </div>
+                <div id="postgres-restart-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                  <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                    <%== render("components/form/submit_button", locals: { text: "Restart", extra_class: "restart-btn" }) %>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        <% end %>
+        <!-- Delete Card -->
+        <% if has_permission?("Postgres:delete", @pg[:id]) %>
+          <div class="px-4 py-5 sm:p-6">
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
-                <h3 class="text-base font-semibold leading-6 text-gray-900">Restart PostgreSQL database</h3>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Delete PostgreSQL database</h3>
                 <div class="mt-2 text-sm text-gray-500">
-                  <p>This action will restart the PostgreSQL database. The database will be offline momentarily, and all
-                    connections will be dropped.</p>
+                  <p>This action will permanently delete this PostgreSQL database.</p>
                 </div>
               </div>
-              <div id="postgres-restart-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                  <%== render("components/form/submit_button", locals: { text: "Restart", extra_class: "restart-btn" }) %>
-                </div>
+              <div id="postgres-delete-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <%== render("components/delete_button", locals: { confirmation: @pg[:name], redirect: "#{@project_data[:path]}/postgres" }) %>
               </div>
-            </div>
-          </form>
-        </div>
-      <% end %>
-      <!-- Delete Card -->
-      <% if has_permission?("Postgres:delete", @pg[:id]) %>
-        <div class="px-4 py-5 sm:p-6">
-          <div class="sm:flex sm:items-center sm:justify-between">
-            <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Delete PostgreSQL database</h3>
-              <div class="mt-2 text-sm text-gray-500">
-                <p>This action will permanently delete this PostgreSQL database.</p>
-              </div>
-            </div>
-            <div id="postgres-delete-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== render("components/delete_button", locals: { confirmation: @pg[:name], redirect: "#{@project_data[:path]}/postgres" }) %>
             </div>
           </div>
-        </div>
-      <% end %>
+        <% end %>
+      </div>
     </div>
   <% end %>
 </div>
