@@ -9,13 +9,31 @@ class ObjectTag < Sequel::Model
 
   def self.valid_member?(project_id, object)
     case object
-    when ObjectTag, SubjectTag, ActionTag
+    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag
       object.project_id == project_id
     when Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
       !AccessTag.where(project_id:, hyper_tag_id: object.id).empty?
     when Project
       object.id == project_id
     end
+  end
+
+  def metatag
+    ObjectMetatag.new(self)
+  end
+
+  def metatag_ubid
+    ObjectMetatag.to_meta(ubid)
+  end
+
+  def metatag_uuid
+    UBID.to_uuid(metatag_ubid)
+  end
+
+  def before_destroy
+    applied_dataset.where(object_id: metatag_uuid).delete
+    AccessControlEntry.where(object_id: metatag_uuid).destroy
+    super
   end
 end
 
