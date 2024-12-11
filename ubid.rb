@@ -78,6 +78,7 @@ class UBID
   TYPE_SUBJECT_TAG = "ts"
   TYPE_ACTION_TAG = "ta"
   TYPE_OBJECT_TAG = "t0"
+  TYPE_OBJECT_METATAG = "t2"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
