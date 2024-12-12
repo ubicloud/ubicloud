@@ -121,6 +121,27 @@ RSpec.describe Clover, "access control" do
       ]
     end
 
+    it "requires Project:viewaccess permissions to view access control entries" do
+      project
+      AccessControlEntry.dataset.destroy
+      visit "#{project.path}/user/access-control"
+      expect(page.status_code).to eq 403
+
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      visit "#{project.path}/user/access-control"
+      expect(page.title).to eq "Ubicloud - Default - Access Control"
+      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+        "", "Account:", "Project:viewaccess", "All", ""
+      ]
+
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      page.refresh
+      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+        "Edit", "Account:", "Project:editaccess", "All", "Remove",
+        "Edit", "Account:", "Project:viewaccess", "All", "Remove"
+      ]
+    end
+
     it "does not show access control entries for tokens" do
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: ApiKey.create_personal_access_token(user).id)
 
@@ -203,6 +224,58 @@ RSpec.describe Clover, "access control" do
       ]
     end
 
+    it "requires Project:editaccess permissions to create access control entries" do
+      user.update(name: "Tname")
+      project
+      AccessControlEntry.dataset.destroy
+      visit "#{project.path}/user/access-control/entry/new"
+      expect(page.status_code).to eq 403
+
+      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      visit "#{project.path}/user/access-control/entry/new"
+      expect(page.title).to eq "Ubicloud - Default - Create Access Control Entry"
+
+      ace.destroy
+      select("Tname")
+      click_button "Create Access Control Entry"
+      expect(page.status_code).to eq 403
+      expect(AccessControlEntry.all).to be_empty
+    end
+
+    it "requires Project:editaccess permissions to update access control entries" do
+      user.update(name: "Tname")
+      project
+      AccessControlEntry.dataset.destroy
+      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      visit "#{project.path}/user/access-control/entry/#{AccessControlEntry.first.ubid}"
+      expect(page.status_code).to eq 403
+
+      ace.update(action_id: ActionType::NAME_MAP["Project:editaccess"])
+      page.refresh
+      expect(page.title).to eq "Ubicloud - Default - Update Access Control Entry"
+
+      ace.update(action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      select("Project:edit")
+      click_button "Update Access Control Entry"
+      expect(page.status_code).to eq 403
+      expect(ace.refresh.action_id).to eq ActionType::NAME_MAP["Project:viewaccess"]
+    end
+
+    it "requires Project:editaccess permissions to delete access control entries" do
+      user.update(name: "Tname")
+      project
+      AccessControlEntry.dataset.destroy
+      ace1 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      visit "#{project.path}/user/access-control"
+      ace2.destroy
+      page.within("#ace-#{ace1.ubid}") do
+        btn = find ".delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      end
+      expect(page.status_code).to eq 403
+    end
+
     it "shows not found page for invalid access control entries" do
       ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
       visit "#{project.path}/user/access-control"
@@ -234,6 +307,7 @@ RSpec.describe Clover, "access control" do
     %w[subject action object].each do |type|
       cap_type = type.capitalize
       model = Object.const_get(:"#{cap_type}Tag")
+      perm_type = "Project:#{cap_type.sub(/(ect|ion)\z/, "").downcase}tag"
 
       it "can view #{type} tags" do
         visit "#{project.path}/user/access-control"
@@ -242,7 +316,7 @@ RSpec.describe Clover, "access control" do
         tds = page.all("table#tag-list td").map(&:text)
 
         if type == "subject"
-          expect(tds).to eq ["Edit Membership", "Admin", ""]
+          expect(tds).to eq ["View Membership", "Admin", ""]
         else
           expect(tds).to eq []
         end
@@ -253,12 +327,59 @@ RSpec.describe Clover, "access control" do
 
         if type == "subject"
           expect(tds).to eq [
-            "Edit Membership", "Admin", "",
-            "Edit Membership", "test-subject", "Remove"
+            "View Membership", "Admin", "",
+            "View Membership", "test-subject", "Remove"
           ]
         else
-          expect(tds).to eq ["Edit Membership", "test-#{type}", "Remove"]
+          expect(tds).to eq ["View Membership", "test-#{type}", "Remove"]
         end
+      end
+
+      it "requires Project:viewaccess permissions to view #{type} tags, #{perm_type} to see create/remove links, and only display tags with #{cap_type}Tag:view permissions" do
+        project
+        AccessControlEntry.dataset.destroy
+        visit "#{project.path}/user/access-control/tag/#{type}"
+        expect(page.status_code).to eq 403
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+        page.refresh
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
+
+        expect(page.html).to include("No managable tags to display.")
+
+        tag = model.create_with_id(project_id: project.id, name: "test-#{type}1")
+        model.create_with_id(project_id: project.id, name: "test-#{type}2")
+
+        if type == "object"
+          # Access to object tag does not imply ability to manage tag, only members of tag
+          # Must grant access to metatag to manage tag itself
+          AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: tag.id)
+          page.refresh
+          expect(page.html).to include("No managable tags to display.")
+        end
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        page.refresh
+        expect(page.html).not_to include("Create #{cap_type} Tag")
+        expect(page.all("table#tag-list td").map(&:text)).to eq [
+          "View Membership", "test-#{type}1", ""
+        ]
+        expect(page.all("table#tag-list td a").map(&:text)).to eq [
+          "View Membership"
+        ]
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        page.refresh
+        expect(page.html).to include("Create #{cap_type} Tag")
+        expect(page.all("table#tag-list td").map(&:text)).to eq [
+          "View Membership", "test-#{type}1", "Remove"
+        ]
+        expect(page.all("table#tag-list td a").map(&:text)).to eq [
+          "View Membership", "test-#{type}1"
+        ]
+
+        click_link "View Membership"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag.name}"
       end
 
       it "can create #{type} tag" do
@@ -276,6 +397,36 @@ RSpec.describe Clover, "access control" do
         expect(find_by_id("flash-notice").text).to eq "#{cap_type} tag created successfully"
         expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
         expect(page.html).to include name
+      end
+
+      it "requires #{perm_type} permissions to create #{type} tag" do
+        project
+        AccessControlEntry.dataset.destroy
+        visit "#{project.path}/user/access-control/tag/#{type}"
+        expect(page.status_code).to eq 403
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+        page.refresh
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
+        expect(page.html).not_to include("Create #{cap_type} Tag")
+
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        page.refresh
+
+        ace.destroy
+        click_link "Create #{cap_type} Tag"
+        expect(page.status_code).to eq 403
+
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        page.refresh
+        expect(page.title).to eq "Ubicloud - Default - Create #{cap_type} Tag"
+
+        ace.destroy
+        name = "test-#{type}"
+        fill_in "Name", with: name
+        click_button "Create"
+        expect(page.status_code).to eq 403
+        expect(model.where(name:).all).to be_empty
       end
 
       it "can rename #{type} tag" do
@@ -301,6 +452,26 @@ RSpec.describe Clover, "access control" do
         expect(page.html).not_to include old_name
       end
 
+      it "requires #{perm_type} permissions to rename #{type} tag" do
+        project
+        AccessControlEntry.dataset.destroy
+        name = "test-#{type}"
+        tag = model.create_with_id(project_id: project.id, name:)
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag.ubid}"
+        expect(page.status_code).to eq 403
+
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        page.refresh
+        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag"
+
+        ace.destroy
+        name = "test2-#{type}"
+        fill_in "Name", with: name
+        click_button "Update"
+        expect(page.status_code).to eq 403
+        expect(model.where(name:).all).to be_empty
+      end
+
       it "can delete #{type} tag" do
         name = "test-#{type}"
         model.create_with_id(project_id: project.id, name:)
@@ -314,13 +485,35 @@ RSpec.describe Clover, "access control" do
         expect(find_by_id("flash-notice").text).to eq "#{cap_type} tag deleted successfully"
       end
 
+      it "requires #{perm_type} permissions to delete #{type} tag" do
+        project
+        AccessControlEntry.dataset.destroy
+        name = "test-#{type}"
+        tag = model.create_with_id(project_id: project.id, name:)
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        visit "#{project.path}/user/access-control/tag/#{type}"
+
+        ace.destroy
+        btn = find ".delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq 403
+        expect(tag.exists?).to be true
+      end
+
+      it "shows not found page for invalid #{type} tag ubid" do
+        visit "#{project.path}/user/access-control/tag/#{type}/#{model.generate_uuid}"
+        expect(page.status_code).to eq 404
+      end
+
       it "can view members of #{type} tag" do
         Account.first.update(name: "test-account") if type == "subject"
         tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
         visit "#{project.path}/user/access-control/tag/#{type}"
         page.find("##{tag1.ubid}-edit a").click
 
-        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
         expect(page.html).not_to include "Current Members of #{cap_type} Tag"
         global_tags = ActionTag.where(project_id: nil).select_order_map(:name)
         action_types = ActionType.map(&:name).sort
@@ -349,8 +542,8 @@ RSpec.describe Clover, "access control" do
           expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Tag", "Action"]
           expect(page.all("table#tag-membership-add td").map(&:text)).to eq [*global_tags, "other-action", *action_types].flat_map { [_1, ""] }
         else
-          expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag"]
-          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", ""]
+          expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag (grants access to objects contained in tag)", "SubjectTag", "ObjectTag (grants access to tag itself)"]
+          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", "", "Admin", "", "other-object", "", "test-object", ""]
         end
 
         tag1.add_member(tag2.id)
@@ -358,6 +551,70 @@ RSpec.describe Clover, "access control" do
         expect(page.html).to match(/Current\s*Members\s+of\s+#{cap_type}\s+Tag/)
         expect(page.all("table#tag-membership-remove td").map(&:text)).to eq ["Tag: other-#{type}", ""]
         default.call
+      end
+
+      it "requires #{cap_type}:view permissions to view members of #{type} tag, and #{cap_type}:{add,remove} to show options" do
+        project
+        AccessControlEntry.dataset.destroy
+        name = "test-#{type}"
+        tag = model.create_with_id(project_id: project.id, name:)
+        tag2 = model.create_with_id(project_id: project.id, name: "test2-#{type}")
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag.ubid}/membership"
+        expect(page.status_code).to eq 403
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        page.refresh
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{name}"
+        expect(page.html).to match(/No current members of\s+#{type}\s+tag\./m)
+        expect(page.all("table#tag-membership-add td").map(&:text)).to be_empty
+        expect(page.html).not_to include("Add Members")
+        expect(page.html).not_to include("Remove Members")
+
+        tag.add_member(tag2.id)
+        page.refresh
+        expect(page.all("table#tag-membership-remove td").map(&:text)).to eq ["Tag: test2-#{type}"]
+        expect(page.all("table#tag-membership-add td").map(&:text)).to be_empty
+        expect(page.html).not_to include("Add Members")
+        expect(page.html).not_to include("Remove Members")
+
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:remove"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+        page.refresh
+        expect(page.all("table#tag-membership-remove td").map(&:text)).to eq ["Tag: test2-#{type}", ""]
+        expect(page.all("table#tag-membership-add td").map(&:text)).to be_empty
+        expect(page.html).not_to include("Add Members")
+        expect(page.html).to include("Remove Members")
+
+        ace.update(action_id: ActionType::NAME_MAP["#{cap_type}Tag:add"])
+        model.create_with_id(project_id: project.id, name: "test3-#{type}")
+        page.refresh
+        expect(page.all("table#tag-membership-remove td").map(&:text)).to eq ["Tag: test2-#{type}"]
+        tds = page.all("table#tag-membership-add td, table#tag-membership-add tbody th").map(&:text)
+        expected = case type
+        when "subject"
+          ["Tag",
+            "test3-subject", "",
+            "Account",
+            "", ""]
+        when "action"
+          ["Global Tag",
+            *ActionTag.where(project_id: nil).select_order_map(:name).flat_map { [_1, ""] },
+            "Tag",
+            "test3-action", "",
+            "Action",
+            *ActionType.map(&:name).sort.flat_map { [_1, ""] }]
+        else
+          ["Tag (grants access to objects contained in tag)",
+            "test3-object", "",
+            "SubjectTag",
+            "Admin", "",
+            "ObjectTag (grants access to tag itself)",
+            "test-object", "",
+            "test2-object", "",
+            "test3-object", ""]
+        end
+        expect(tds).to eq expected
+        expect(page.html).to include("Add Members")
+        expect(page.html).not_to include("Remove Members")
       end
 
       it "can add members to #{type} tag" do
@@ -368,7 +625,7 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Add Members"
         expect(tag1.member_ids).to include tag2.id
-        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
         expect(find_by_id("flash-notice").text).to eq "1 members added to #{type} tag"
       end
 
@@ -381,8 +638,24 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Add Members"
         expect(tag1.member_ids).to include tag2.id
-        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
         expect(find_by_id("flash-error").text).to eq "No change in membership: 1 members already in tag"
+      end
+
+      it "requires #{cap_type}:add permissions to add members to #{type} tag" do
+        project
+        AccessControlEntry.dataset.destroy
+        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
+        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:add"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}/membership"
+
+        ace.destroy
+        find("##{tag2.ubid} input").check
+        click_button "Add Members"
+        expect(page.status_code).to eq 403
+        expect(tag1.member_ids).to be_empty
       end
 
       it "can remove members from #{type} tag" do
@@ -394,8 +667,25 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Remove Members"
         expect(tag1.member_ids).to be_empty
-        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag Membership"
+        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
         expect(find_by_id("flash-notice").text).to eq "1 members removed from #{type} tag"
+      end
+
+      it "requires #{cap_type}:remove permissions to remove members from #{type} tag" do
+        project
+        AccessControlEntry.dataset.destroy
+        tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
+        tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
+        tag1.add_member(tag2.id)
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:remove"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}/membership"
+
+        ace.destroy
+        find("##{tag2.ubid} input").check
+        click_button "Remove Members"
+        expect(page.status_code).to eq 403
+        expect(tag1.member_ids).to eq [tag2.id]
       end
     end
 
@@ -407,7 +697,7 @@ RSpec.describe Clover, "access control" do
       find("##{member_global_tag.ubid} input").check
       click_button "Add Members"
       expect(tag.member_ids).to include member_global_tag.id
-      expect(page.title).to eq "Ubicloud - Default - Update Action Tag Membership"
+      expect(page.title).to eq "Ubicloud - Default - Action Tag Members: test-action"
       expect(find_by_id("flash-notice").text).to eq "1 members added to action tag"
     end
 
@@ -457,6 +747,47 @@ RSpec.describe Clover, "access control" do
       expect(find_by_id("flash-error").text).to eq "No change in membership: cannot include Admin subject tag in another tag, 1 members not valid"
     end
 
+    it "supports adding ObjectTag to ObjectTag, both as regular tag and metatag" do
+      tag1 = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
+      tag2 = ObjectTag.create_with_id(project_id: project.id, name: "other-obj")
+      visit "#{project.path}/user/access-control/tag/object/#{tag1.ubid}/membership"
+      find("##{tag1.metatag_ubid} input").check
+      find("##{tag2.ubid} input").check
+      find("##{tag2.metatag_ubid} input").check
+      click_button "Add Members"
+      expect(find_by_id("flash-notice").text).to eq "3 members added to object tag"
+      expect(page.all("table#tag-membership-remove td").map(&:text)).to eq [
+        "ObjectTag: other-obj", "",
+        "ObjectTag: test-obj", "",
+        "Tag: other-obj", ""
+      ]
+    end
+
+    it "supports display of SubjectTag/ActionTag in ObjectTag membership page" do
+      st = SubjectTag.create_with_id(project_id: project.id, name: "st")
+      at = ActionTag.create_with_id(project_id: project.id, name: "at")
+      tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
+      visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}/membership"
+      find("##{st.ubid} input").check
+      find("##{at.ubid} input").check
+      click_button "Add Members"
+      expect(find_by_id("flash-notice").text).to eq "2 members added to object tag"
+      expect(page.all("table#tag-membership-remove td").map(&:text)).to eq [
+        "ActionTag: at", "",
+        "SubjectTag: st", ""
+      ]
+    end
+
+    it "shows object metatag with ObjectTag prefix when viewing access control entries" do
+      tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, object_id: tag.metatag_uuid)
+      visit "#{project.path}/user/access-control"
+      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+        "", "Tag: Admin", "All", "All", "",
+        "Edit", "Account:", "All", "ObjectTag: test-obj", "Remove"
+      ]
+    end
+
     it "cannot remove all accounts from Admin subject tag" do
       admin = SubjectTag[project_id: project.id, name: "Admin"]
       visit "#{project.path}/user/access-control/tag/subject/#{admin.ubid}/membership"
@@ -480,7 +811,7 @@ RSpec.describe Clover, "access control" do
       expect(UBID).to receive(:class_match?).and_return(false)
       click_button "Add Members"
       expect(tag1.member_ids).to include tag2.id
-      expect(page.title).to eq "Ubicloud - Default - Update Subject Tag Membership"
+      expect(page.title).to eq "Ubicloud - Default - Subject Tag Members: #{tag1.name}"
       expect(find_by_id("flash-notice").text).to eq "1 members added to subject tag"
     end
   end

@@ -171,13 +171,40 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content user.email
       end
 
-      it "raises forbidden when does not have permissions" do
+      it "raises forbidden when does not have Project:user permissions" do
         project_wo_permissions
         visit "#{project_wo_permissions.path}/user"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
         expect(page.status_code).to eq(403)
         expect(page).to have_content "Forbidden"
+
+        project
+        AccessControlEntry.dataset.destroy
+        visit "#{project.path}/user"
+        expect(page.status_code).to eq(403)
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        page.refresh
+        expect(page.title).to eq("Ubicloud - project-1 - Users")
+      end
+
+      it "requires Project:user permissions to invite users" do
+        visit "#{project.path}/user"
+        AccessControlEntry.dataset.destroy
+        fill_in "Email", with: user2.email
+        select "Admin", from: "policy"
+        click_button "Invite"
+        expect(page.status_code).to eq(403)
+        expect(Mail::TestMailer.deliveries.length).to eq 0
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        visit "#{project.path}/user"
+        fill_in "Email", with: user2.email
+        select "Admin", from: "policy"
+        click_button "Invite"
+        expect(ProjectInvitation.count).to eq 0
+        expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
       it "can invite existing user to project with a default policy" do
@@ -238,6 +265,21 @@ RSpec.describe Clover, "project" do
         expect(page).to have_flash_error("'#{new_email.downcase}' already invited to join the project.")
       end
 
+      it "requires Project:user permissions to remove users from project" do
+        user2.associate_with_project(project)
+        visit "#{project.path}/user"
+        AccessControlEntry.dataset.destroy
+        btn = find "#user-#{user2.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq 403
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        visit "#{project.path}/user"
+        btn = find "#user-#{user2.ubid} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq 204
+      end
+
       it "can remove user from project" do
         user2.associate_with_project(project)
         project.subject_tags_dataset.first(name: "Admin").add_subject(user2.id)
@@ -274,6 +316,22 @@ RSpec.describe Clover, "project" do
         expect(AccessControlEntry.where(project_id: project.id, subject_id: user2.id).all).to be_empty
       end
 
+      it "requires Project:user permissions to remove invited users from project" do
+        invited_email = "invited@example.com"
+        project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        visit "#{project.path}/user"
+        AccessControlEntry.dataset.destroy
+        btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq 403
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        visit "#{project.path}/user"
+        btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
+        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        expect(page.status_code).to eq 204
+      end
+
       it "can remove invited user from project" do
         invited_email = "invited@example.com"
         project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
@@ -292,6 +350,26 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
         expect(page).to have_no_content invited_email
         expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
+      end
+
+      it "requires Project:user permissions to update default policy of invited user" do
+        invited_email = "invited@example.com"
+        project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        visit "#{project.path}/user"
+        AccessControlEntry.dataset.destroy
+        within "form#managed-policy" do
+          select "Admin", from: "invitation_policies[#{invited_email}]"
+          click_button "Update"
+        end
+        expect(page.status_code).to eq 403
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        visit "#{project.path}/user"
+        within "form#managed-policy" do
+          select "Admin", from: "invitation_policies[#{invited_email}]"
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-notice").text).to eq("Subject tags for invited users updated successfully.")
       end
 
       it "can update default policy of invited user" do

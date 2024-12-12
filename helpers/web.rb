@@ -73,6 +73,19 @@ class Clover < Roda
       "#{"Global " unless obj.project_id}Tag: #{obj.name}"
     when ObjectTag, SubjectTag
       "Tag: #{obj.name}"
+    when ObjectMetatag
+      "ObjectTag: #{obj.name}"
+    else
+      "#{obj.class.name}: #{obj.name}"
+    end
+  end
+
+  def object_tag_membership_label(obj)
+    case obj
+    when ObjectTag
+      "Tag: #{obj.name}"
+    when ObjectMetatag
+      "ObjectTag: #{obj.name}"
     else
       "#{obj.class.name}: #{obj.name}"
     end
