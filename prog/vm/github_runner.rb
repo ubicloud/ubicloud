@@ -245,8 +245,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     # Remove comments and empty lines before sending them to the machine
     vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
 
-    vm.vm_host.sshable.cmd(github_runner.generate_cf_google_dns_dnsmasq_config) if github_runner.installation.project.get_ff_all_servers_dnsmasq
-
     hop_register_runner
   end
 
