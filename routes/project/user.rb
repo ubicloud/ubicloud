@@ -1,11 +1,17 @@
 # frozen_string_literal: true
 
 class Clover
+  tag_perm_map = {
+    "subject" => "Project:subjtag",
+    "action" => "Project:acttag",
+    "object" => "Project:objtag"
+  }.freeze
+
   hash_branch(:project_prefix, "user") do |r|
     r.web do
-      authorize("Project:user", @project.id)
-
       r.is do
+        authorize("Project:user", @project.id)
+
         r.get do
           @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
           @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
@@ -52,6 +58,8 @@ class Clover
       end
 
       r.on "token" do
+        authorize("Project:token", @project.id)
+
         r.is do
           r.get do
             @tokens = current_account.api_keys
@@ -82,6 +90,8 @@ class Clover
       end
 
       r.post "policy/managed" do
+        authorize("Project:user", @project.id)
+
         invitation_policies = r.params["invitation_policies"] || {}
         invitation_policies.each do |email, policy|
           @project.invitations.find { _1.email == email }&.update(policy: policy)
@@ -94,6 +104,8 @@ class Clover
 
       r.on "access-control" do
         r.get true do
+          authorize("Project:viewaccess", @project.id)
+
           uuids = {}
           @project.access_control_entries.each do |ace|
             # Omit personal action token subjects
@@ -114,6 +126,8 @@ class Clover
         end
 
         r.is "entry", String do |ubid|
+          authorize("Project:editaccess", @project.id)
+
           if ubid == "new"
             @ace = AccessControlEntry.new_with_id(project_id: @project.id)
           else
@@ -149,7 +163,8 @@ class Clover
           @tag_model = Object.const_get(:"#{@display_tag_type}Tag")
 
           r.get true do
-            @tags = @tag_model.where(project_id: @project.id).order(:name).all
+            authorize("Project:viewaccess", @project.id)
+            @tags = dataset_authorize(@tag_model.where(project_id: @project.id).order(:name), "#{@tag_model}:view").all
             view "project/tag-list"
           end
 
@@ -158,10 +173,12 @@ class Clover
               @tag = @tag_model.new_with_id(project_id: @project.id)
               new = true
             else
-              @tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)]
+              next unless (@tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)])
             end
 
             r.is do
+              authorize(tag_perm_map[tag_type], @project.id)
+
               if @tag_type == "subject" && @tag.name == "Admin"
                 flash["error"] = "Cannot modify Admin subject tag"
                 r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
@@ -185,7 +202,14 @@ class Clover
             end
 
             r.on !new do
+              # Metatag uuid is used to differentiate being allowed to manage
+              # tag itself, compared to being able to manage things contained in
+              # the tag.
+              @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
+
               r.get "membership" do
+                authorize("#{@tag.class}:view", @authorize_id)
+
                 members = @current_members = {}
                 @tag.member_ids.each do
                   next if @tag_type == "subject" && UBID.uuid_class_match?(_1, ApiKey)
@@ -196,6 +220,8 @@ class Clover
               end
 
               r.post "associate" do
+                authorize("#{@tag.class}:add", @authorize_id)
+
                 # Use serializable isolation to try to prevent concurrent changes
                 # from introducing loops
                 changes_made = to_add = issues = nil
@@ -221,6 +247,8 @@ class Clover
               end
 
               r.post "disassociate" do
+                authorize("#{@tag.class}:remove", @authorize_id)
+
                 to_remove = typecast_params.array(:nonempty_str, "remove") || []
                 to_remove.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
                 to_remove.map! { UBID.to_uuid(_1) }
@@ -252,6 +280,8 @@ class Clover
       end
 
       r.delete "invitation", String do |email|
+        authorize("Project:user", @project.id)
+
         @project.invitations_dataset.where(email: email).destroy
         # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."
@@ -259,6 +289,8 @@ class Clover
       end
 
       r.delete String do |user_ubid|
+        authorize("Project:user", @project.id)
+
         next unless (user = Account.from_ubid(user_ubid))
 
         unless @project.accounts.count > 1

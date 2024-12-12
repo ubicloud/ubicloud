@@ -1,10 +1,7 @@
-<%== render(
-  "components/tabbar",
-  locals: {
-    tabs: [
-      ["User Management", @project_data[:path] + "/user"],
-      ["Personal Access Tokens", @project_data[:path] + "/user/token"],
-      ["Access Control", @project_data[:path] + "/user/access-control"]
-    ]
-  }
-) %>
+<% tabs = [
+  (["User Management", @project_data[:path] + "/user"] if has_project_permission("Project:user")),
+  (["Personal Access Tokens", @project_data[:path] + "/user/token"] if has_project_permission("Project:token")),
+  (["Access Control", @project_data[:path] + "/user/access-control"] if has_project_permission("Project:viewaccess"))
+]
+tabs.compact! %>
+<%== render("components/tabbar", locals: { tabs: tabs }) if tabs.length >= 2 %>
