@@ -1631,119 +1631,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
-  '/project/{project_id}/location/{location}/kubernetes-vm/{kubernetes_vm_name}':
-    parameters:
-    - $ref: '#/components/parameters/project_id'
-    - $ref: '#/components/parameters/location'
-    - $ref: '#/components/parameters/kubernetes_vm_name'
-    delete:
-      operationId: deleteLocationKubernetesVMWithName
-      summary: Delete a specific Kubernetes VM with name
-      responses:
-        '204':
-          description: Kubernetes VM deleted successfully
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Kubernetes VM
-    post:
-      summary: Create Kubernetes VM in a specific location of a project
-      operationId: createLocationKubernetesVM
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                boot_image:
-                  description: Boot image of the VM
-                  type: string
-                enable_ip4:
-                  description: Enable IPv4
-                  type: boolean
-                private_subnet_id:
-                  description: ID of the private subnet
-                  type: string
-                size:
-                  description: Size of the VM
-                  type: string
-                storage_size:
-                  description: Requested storage size in GiB
-                  type: integer
-                unix_user:
-                  description: Unix user of the VM
-                  type: string
-                commands:
-                  description: List of commands for the Kubernetes VM
-                  type: array
-                  items:
-                    type: string
-              required:
-                - unix_user
-                - size
-                - storage_size
-                - boot_image
-                - private_subnet_id
-                - enable_ip4
-                - commands
-      responses:
-        '200':
-          description: Kubernetes cluster created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmDetailed'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Kubernetes VM
-    get:
-      operationId: getLocationKubernetesVMDetails
-      summary: Get details of a specific Kubernetes VM in a location
-      responses:
-        '200':
-          description: Details of the kubernetes VM
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VmDetailed'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Kubernetes VM
-  '/project/{project_id}/location/{location}/kubernetes-vm':
-    get:
-      operationId: listLocationKubernetesVMs
-      summary: List Kubernetes VMs in a specific location of a project
-      parameters:
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/project_id'
-        - $ref: '#/components/parameters/start_after'
-        - $ref: '#/components/parameters/page_size'
-        - $ref: '#/components/parameters/order_column'
-      responses:
-        '200':
-          description: A list of Kubernetes VMs
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/VmDetailed'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Kubernetes VM
 components:
   parameters:
     firewall_id:
@@ -1897,13 +1784,6 @@ components:
       description: Kubernetes cluster name
       in: path
       name: kubernetes_cluster_name
-      required: true
-      schema:
-        type: string
-    kubernetes_vm_name:
-      description: Kubernetes vm name
-      in: path
-      name: kubernetes_vm_name
       required: true
       schema:
         type: string
@@ -2611,8 +2491,6 @@ tags:
     name: Project
   - description: Virtual Machine Operations
     name: Virtual Machine
-  - description:
-    name: Kubernetes VM
   - description:
     name: Kubernetes Cluster
 security:
