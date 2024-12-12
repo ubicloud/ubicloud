@@ -160,7 +160,7 @@ RSpec.describe Clover, "personal access token management" do
     ObjectTag.create_with_id(project_id: project.id, name: "OTest")
     click_link "Create Token Access Control Entry"
     select "ActionTag:view"
-    select "OTest"
+    within("#object #object-tag-group") { select "OTest" }
     click_button "Create Token Access Control Entry"
     expect(page.all("table#access-control-entries td").map(&:text)).to eq [
       "Edit", "ActionTag:view", "Tag: OTest", "Remove",
@@ -176,7 +176,7 @@ RSpec.describe Clover, "personal access token management" do
     click_link "Edit"
     expect(page.title).to eq "Ubicloud - Default - Update Token Access Control Entry"
     select "ActionTag:view"
-    select "OTest"
+    within("#object #object-tag-group") { select "OTest" }
     click_button "Update Token Access Control Entry"
     expect(find_by_id("flash-notice").text).to eq "Token access control entry updated successfully"
     expect(page.all("table#access-control-entries td").map(&:text)).to eq [
