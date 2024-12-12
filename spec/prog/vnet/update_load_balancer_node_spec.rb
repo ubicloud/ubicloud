@@ -73,7 +73,6 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
         expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
         expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
         expect(vm.nics.first).to receive(:private_ipv6).and_return(NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64")).at_least(:once)
-        expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("192.168.1.0/26"), net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))).at_least(:once)
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -96,7 +95,6 @@ ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counte
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 192.168.1.2
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -106,7 +104,6 @@ ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counte
 ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -119,7 +116,6 @@ LOAD_BALANCER
         expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
         lb.update(stack: "ipv4")
         expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
-        expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("192.168.1.0/26"), net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))).at_least(:once)
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -142,7 +138,6 @@ ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counte
 
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 192.168.1.2
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -152,7 +147,6 @@ ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counte
 
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -166,7 +160,6 @@ LOAD_BALANCER
         expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
         expect(vm.nics.first).to receive(:private_ipv4).and_return(NetAddr::IPv4Net.parse("192.168.1.0/32")).at_least(:once)
         expect(vm.nics.first).to receive(:private_ipv6).and_return(NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64")).at_least(:once)
-        expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("192.168.1.0/26"))).at_least(:once)
         expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -189,7 +182,6 @@ ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counte
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 192.168.1.2
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -199,7 +191,6 @@ ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counte
 ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -219,7 +210,6 @@ LOAD_BALANCER
         allow(vm).to receive(:vm_host).and_return(vmh)
         allow(vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("192.168.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"))
         allow(neighbor_vm.nics.first).to receive_messages(private_ipv4: NetAddr::IPv4Net.parse("172.10.1.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:aaa::2/64"))
-        allow(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("192.168.1.0/26")))
       end
 
       it "creates load balancing with multiple vms if all active" do
@@ -245,7 +235,6 @@ ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counte
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 8080 }
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 192.168.1.2
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -255,7 +244,6 @@ ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counte
 ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -267,7 +255,6 @@ LOAD_BALANCER
 
       it "creates load balancing with multiple vms if all active ipv6 only" do
         lb.update(stack: "ipv6")
-        expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("192.168.1.0/26"))).at_least(:once)
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -290,7 +277,6 @@ elements = {fd10:9b0b:6b4b:aaa::2}
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 2 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080, 1 : fd10:9b0b:6b4b:aaa::2 . 8080 }
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 192.168.1.2
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -300,7 +286,6 @@ ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new c
 ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -312,7 +297,6 @@ LOAD_BALANCER
 
       it "creates load balancing with multiple vms if the vm we work on is down" do
         expect(lb).to receive(:active_vms).and_return([neighbor_vm]).at_least(:once)
-        expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("192.168.1.0/26"))).at_least(:once)
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -335,7 +319,6 @@ ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counte
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:aaa::2 . 8080 }
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 192.168.1.2
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -345,7 +328,6 @@ ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counte
 ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
@@ -357,7 +339,6 @@ LOAD_BALANCER
 
       it "creates load balancing with multiple vms if the vm we work on is up but the neighbor is down" do
         expect(lb).to receive(:active_vms).and_return([vm]).at_least(:once)
-        expect(vm.nics.first).to receive(:private_subnet).and_return(instance_double(PrivateSubnet, net4: NetAddr::IPv4Net.parse("192.168.1.0/26"))).at_least(:once)
         expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
@@ -380,7 +361,6 @@ ip daddr 100.100.100.100/32 tcp dport 80 ct state established,related,new counte
 ip6 daddr 2a02:a464:deb2:a000::2 tcp dport 80 ct state established,related,new counter dnat to numgen inc mod 1 map { 0 : fd10:9b0b:6b4b:8fbb::2 . 8080 }
 
     # Basic NAT for public IPv4 to private IPv4
-    ip daddr 100.100.100.100/32 ip saddr == {9.9.9.9, 149.112.112.112} dnat to 192.168.1.2
     ip daddr 100.100.100.100/32 dnat to 192.168.1.0
   }
 
@@ -390,7 +370,6 @@ ip daddr @neighbor_ips_v4 tcp dport 8080 ct state established,related,new counte
 ip6 daddr @neighbor_ips_v6 tcp dport 8080 ct state established,related,new counter snat to fd10:9b0b:6b4b:8fbb::2:8080
 
     # Basic NAT for private IPv4 to public IPv4
-    ip saddr 192.168.1.2 ip daddr == {9.9.9.9, 149.112.112.112} snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to 100.100.100.100/32
     ip saddr 192.168.1.0 ip daddr 192.168.1.0 snat to 100.100.100.100/32
   }
