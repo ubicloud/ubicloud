@@ -24,6 +24,7 @@ class PrivateSubnet < Sequel::Model
   dataset_module Pagination
   dataset_module Authorization::Dataset
   include Authorization::HyperTagMethods
+  include ObjectTag::Cleanup
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{display_location}/private-subnet/#{name}"
   end

@@ -10,6 +10,7 @@ class Firewall < Sequel::Model
 
   include ResourceMethods
   include Authorization::HyperTagMethods
+  include ObjectTag::Cleanup
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{display_location}/firewall/#{name}"
   end
