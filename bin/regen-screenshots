@@ -112,6 +112,17 @@ class RegenScreenshots
     click_link "GitHub Runners"
     screenshot "github-actions-integration/quickstart-2-screenshot.png"
 
+    project = Project.first
+    GithubInstallation.create_with_id(
+      name: "github-actions-integration",
+      project_id: project.id,
+      installation_id: 1234567890,
+      type: "user"
+    )
+    click_link "GitHub Runners"
+    click_link "Settings", href: "#{project.path}/github/setting"
+    screenshot "github-actions-integration/transparent-cache-enable-screenshot.png"
+
     resize(650)
     click_link "PostgreSQL"
     screenshot "managed-postgresql/overview-1-screenshot.png"
@@ -120,7 +131,6 @@ class RegenScreenshots
     click_link "Create PostgreSQL Database"
     screenshot "quick-start/using-kamal-with-ubicloud-3-screenshot.png"
 
-    project = Project.first
     pg_resource = PostgresResource.create(
       name: "postgresql-demo",
       location: "hetzner-fsn1",
