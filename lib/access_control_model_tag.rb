@@ -101,8 +101,10 @@ module AccessControlModelTag
   end
 
   def before_destroy
+    meta_cond = {object_id: respond_to?(:metatag_uuid) ? metatag_uuid : id}
     applied_dataset.where(tag_id: id).or(applied_column => id).delete
-    AccessControlEntry.where(applied_column => id).destroy
+    DB[:applied_object_tag].where(meta_cond).delete
+    AccessControlEntry.where(applied_column => id).or(meta_cond).destroy
     super
   end
 
