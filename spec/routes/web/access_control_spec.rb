@@ -170,9 +170,9 @@ RSpec.describe Clover, "access control" do
       ActionTag.create_with_id(project_id:, name: "ATest")
       ObjectTag.create_with_id(project_id:, name: "OTest")
       click_link "Create Access Control Entry"
-      select "STest"
-      select "ATest"
-      select "OTest"
+      within("#subject") { select "STest" }
+      within("#action") { select "ATest" }
+      within("#object #object-tag-group") { select "OTest" }
       click_button "Create Access Control Entry"
 
       expect(page.all("table#access-control-entries td").map(&:text)).to eq [
@@ -182,9 +182,9 @@ RSpec.describe Clover, "access control" do
       ]
 
       click_link "Create Access Control Entry"
-      select "STest"
-      select "Member"
-      select "OTest"
+      within("#subject") { select "STest" }
+      within("#action") { select "Member" }
+      within("#object #object-tag-group") { select "OTest" }
       click_button "Create Access Control Entry"
 
       expect(page.all("table#access-control-entries td").map(&:text)).to eq [
@@ -201,7 +201,7 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       click_link "Edit"
       expect(page.title).to eq "Ubicloud - Default - Update Access Control Entry"
-      select "STest"
+      within("#subject") { select "STest" }
       click_button "Update Access Control Entry"
       expect(find_by_id("flash-notice").text).to include("Access control entry updated successfully")
 
@@ -289,7 +289,7 @@ RSpec.describe Clover, "access control" do
       SubjectTag.create(project_id: project.id, name: "STest") { |st| st.id = ApiKey.create_personal_access_token(user).id }
       visit "#{project.path}/user/access-control"
       click_link "Create Access Control Entry"
-      select "STest"
+      within("#subject") { select "STest" }
       click_button "Create Access Control Entry"
       expect(page.status_code).to eq 403
     end
@@ -298,7 +298,7 @@ RSpec.describe Clover, "access control" do
       SubjectTag.where(project_id: project.id, name: "Admin").update(name: "Temp")
       visit "#{project.path}/user/access-control"
       click_link "Create Access Control Entry"
-      select "Temp"
+      within("#subject") { select "Temp" }
       SubjectTag.where(project_id: project.id, name: "Temp").update(name: "Admin")
       click_button "Create Access Control Entry"
       expect(page.status_code).to eq 403
