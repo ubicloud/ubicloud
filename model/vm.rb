@@ -202,7 +202,6 @@ class Vm < Sequel::Model
 
   def params_json(swap_size_bytes)
     topo = cloud_hypervisor_cpu_topology
-    fail "BUG: topology does not match vcpu count" unless topo.max_vcpus == vcpus
 
     project_public_keys = projects.first.get_ff_vm_public_ssh_keys || []
 
