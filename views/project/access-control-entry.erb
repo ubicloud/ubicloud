@@ -38,11 +38,9 @@ breadcrumb_parts =
           name: "subject",
           selected: @ace.subject_ubid,
           options:
-            {
-              nil => [["", "Choose a Subject"]],
-              "Tag" => @project.subject_tags.reject { _1.name == "Admin" },
-              "Account" => @project.accounts
-            }.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }
+            { nil => [["", "Choose a Subject"]], **SubjectTag.options_for_project(@project) }.to_h do |k, v|
+              [k, k ? v.map { [_1.ubid, _1.name] } : v]
+            end
         }
       ) %>
     <% end %>
@@ -54,12 +52,9 @@ breadcrumb_parts =
         name: "action",
         selected: @ace.action_ubid,
         options:
-          {
-            nil => [["", "All Actions"]],
-            "Global Tag" => ActionTag.where(project_id: nil).order(:name).all,
-            "Tag" => @project.action_tags,
-            "Action" => ActionType
-          }.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }
+          { nil => [["", "All Actions"]], **ActionTag.options_for_project(@project) }.to_h do |k, v|
+            [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v]
+          end
       }
     ) %>
 
@@ -70,15 +65,9 @@ breadcrumb_parts =
         name: "object",
         selected: @ace.object_ubid,
         options:
-          {
-            nil => [["", "All Objects"]],
-            "Tag" => @project.object_tags,
-            "Vm" => @project.vms,
-            "PostgresSQL Server" => @project.postgres_resources,
-            "Private Subnet" => @project.private_subnets,
-            "Firewall" => @project.firewalls,
-            "LoadBalancer" => @project.load_balancers
-          }.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }
+          { nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project) }.to_h do |k, v|
+            [k, k ? v.map { [_1.ubid, _1.name] } : v]
+          end
       }
     ) %>
 
