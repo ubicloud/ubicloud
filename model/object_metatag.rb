@@ -16,6 +16,10 @@ class ObjectMetatag < DelegateClass(ObjectTag)
     UBID.to_uuid(from_meta(UBID.from_uuidish(uuid).to_s))
   end
 
+  def self.to_meta_uuid(uuid)
+    UBID.to_uuid(to_meta(UBID.from_uuidish(uuid).to_s))
+  end
+
   # Designed solely for use with UBID.resolve_map
   def self.where(id:)
     ObjectTag.where(id: id.map { from_meta_uuid(_1) }).map(&:metatag)
