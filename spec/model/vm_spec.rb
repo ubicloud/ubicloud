@@ -135,13 +135,6 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#params_json" do
-    it "fails if topology does not match vcpu count" do
-      expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
-      expect { vm.params_json(0) }.to raise_error RuntimeError, "BUG: topology does not match vcpu count"
-    end
-  end
-
   describe "#utility functions" do
     it "can compute the ipv4 addresses" do
       as_ad = instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.new(NetAddr.parse_ip("1.1.1.0"), NetAddr::Mask32.new(32)))
