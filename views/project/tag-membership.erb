@@ -1,5 +1,7 @@
-<% page_action = "Update #{@display_tag_type} Tag Membership"
+<% page_action = "#{@display_tag_type} Tag Members: #{@tag.name}"
 @page_title = "#{@project_data[:name]} - #{page_action}"
+addition_allowed = has_permission?("#{@tag_model}:add", @authorize_id)
+removal_allowed = has_permission?("#{@tag_model}:remove", @authorize_id)
 
 component =
   lambda do |hash|
@@ -27,19 +29,29 @@ input_hash =
     }
   else
     {
-      "Tag" => @project.object_tags,
+      "Tag (grants access to objects contained in tag)" => (object_tags = @project.object_tags),
       "Vm" => @project.vms,
       "PostgresSQL Server" => @project.postgres_resources,
       "Private Subnet" => @project.private_subnets,
       "Firewall" => @project.firewalls,
-      "LoadBalancer" => @project.load_balancers
+      "LoadBalancer" => @project.load_balancers,
+      "SubjectTag" => @project.subject_tags,
+      "ActionTag" => @project.action_tags,
+      "ObjectTag (grants access to tag itself)" => object_tags.map(&:metatag)
     }
   end
 
 add_groups = component.call(input_hash)
 base_path = "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
 associate_path = "#{base_path}/associate"
-disassociate_path = "#{base_path}/disassociate" %>
+disassociate_path = "#{base_path}/disassociate"
+current_members =
+  if @tag_type == "object"
+    @current_members.map { [object_tag_membership_label(_2), _2.ubid] }
+  else
+    @current_members.map { [ace_label(_2), _2.ubid] }
+  end
+current_members.sort! %>
 <%== render("project/user-tabbar") %>
 
 <div class="space-y-1">
@@ -59,7 +71,13 @@ disassociate_path = "#{base_path}/disassociate" %>
 </div>
 
 <div class="grid gap-6">
-  <% unless @current_members.empty? %>
+  <% if current_members.empty? %>
+    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+      No current members of
+      <%= @tag_type %>
+      tag.
+    </div>
+  <% else %>
     <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -77,36 +95,42 @@ disassociate_path = "#{base_path}/disassociate" %>
           <thead class="bg-gray-50">
             <tr>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Remove?</th>
+              <% if removal_allowed %>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Remove?</th>
+              <% end %>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
-            <% @current_members.map { [ace_label(_2), _2.ubid] }.sort.each do |label, ubid| %>
+            <% current_members.each do |label, ubid| %>
               <tr id="<%= ubid %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%== label %>
                 </td>
-                <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                  <%== render(
-                    "components/form/checkbox",
-                    locals: {
-                      name: "remove[]",
-                      options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["remove"]&.include?(ubid))]]
-                    }
-                  ) %>
-                </td>
+                <% if removal_allowed %>
+                  <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                    <%== render(
+                      "components/form/checkbox",
+                      locals: {
+                        name: "remove[]",
+                        options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["remove"]&.include?(ubid))]]
+                      }
+                    ) %>
+                  </td>
+                <% end %>
               </tr>
             <% end %>
           </tbody>
         </table>
       </div>
-      <div class="px-4 py-5 sm:p-6">
-        <%== render("components/form/submit_button", locals: { text: "Remove Members" }) %>
-      </div>
+      <% if removal_allowed %>
+        <div class="px-4 py-5 sm:p-6">
+          <%== render("components/form/submit_button", locals: { text: "Remove Members" }) %>
+        </div>
+      <% end %>
     </form>
   <% end %>
 
-  <% unless add_groups.all? { _2.empty? } %>
+  <% if addition_allowed && !add_groups.all? { _2.empty? } %>
     <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
