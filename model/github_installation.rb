@@ -13,7 +13,7 @@ class GithubInstallation < Sequel::Model
     runner_labels = runners_dataset.left_join(:strand, id: :id).exclude(Sequel[:strand][:label] => "start").exclude(Sequel[:strand][:label] => "wait_concurrency_limit").select_map(Sequel[:github_runner][:label])
     label_record_data_set = runner_labels.map { |label| Github.runner_labels[label] }
     label_record_data_set.sum do |label_record|
-      vcpu = Validation.validate_vm_size(label_record["vm_size"], "x64").vcpus
+      vcpu = Validation.validate_vm_size(label_record["vm_size"], label_record["arch"]).vcpus
       if label_record["arch"] == "arm64"
         vcpu
       else
