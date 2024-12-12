@@ -30,10 +30,13 @@ RSpec.describe ObjectMetatag do
   end
 
   it "works correctly with UBID.resolve_map" do
-    map = {metatag.id => nil}
+    ot = ObjectTag.create_with_id(project_id: project.id, name: "S")
+    map = {metatag.id => nil, ot.metatag_uuid => nil}
+    ot.destroy
     UBID.resolve_map(map)
-    expect(map.length).to eq 1
+    expect(map.length).to eq 2
     expect(map[metatag.id]).to be_a(described_class)
+    expect(map[ot.metatag_uuid]).to be_nil
   end
 
   it "works with Authorization.has_permission?" do
@@ -44,6 +47,31 @@ RSpec.describe ObjectMetatag do
     expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", tag.metatag_uuid)).to be false
     ace.update(object_id: tag.metatag_uuid)
     expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", tag.metatag_uuid)).to be true
+
+    ot = ObjectTag.create_with_id(project_id: project.id, name: "S")
+    ot.destroy
+    expect(Authorization.has_permission?(project.id, account.id, "ObjectTag:view", ot.metatag_uuid)).to be false
+  end
+
+  it "supports only valid metatag when creating AccessControlEntry" do
+    account = Account.create_with_id(email: "test@example.com", status_id: 2)
+    project = account.create_project_with_default_policy("Default", default_policy: false)
+    ot = ObjectTag.create_with_id(project_id: project.id, name: "S")
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: ot.metatag_uuid)
+    ot.destroy
+    expect {
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: ot.metatag_uuid)
+    }.to raise_error Sequel::ValidationFailed
+  end
+
+  it "ObjectTag Dataset#authorized only grants access for matching metatag" do
+    account = Account.create_with_id(email: "test@example.com", status_id: 2)
+    project = account.create_project_with_default_policy("Default", default_policy: false)
+    tag = ObjectTag.create_with_id(project_id: project.id, name: "S")
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: tag.id)
+    expect(ObjectTag.authorized(project.id, account.id, "ObjectTag:view").all).to be_empty
+    ace.update(object_id: tag.metatag_uuid)
+    expect(ObjectTag.authorized(project.id, account.id, "ObjectTag:view").all).to eq [tag]
   end
 
   it "#id should return metatag uuid" do
