@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_2.spdk_installation = si
     disk_2.storage_device = dev2
     disk_2.boot_image = bi
-    vm = Vm.new(family: "standard", cores: 1, vcpus: 2, memory_gib: 8, name: "dummy-vm", arch: "x64", location: "hetzner-fsn1", created_at: Time.now).tap {
+    vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "hetzner-fsn1", created_at: Time.now).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
