@@ -5,7 +5,6 @@ require "openssl"
 
 class Prog::Vnet::LoadBalancerNexus < Prog::Base
   subject_is :load_balancer
-  semaphore :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
 
   def self.assemble(private_subnet_id, name: nil, algorithm: "round_robin", src_port: nil, dst_port: nil,
     health_check_endpoint: "/up", health_check_interval: 30, health_check_timeout: 15,

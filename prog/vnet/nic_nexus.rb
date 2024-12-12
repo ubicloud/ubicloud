@@ -2,7 +2,6 @@
 
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
-  semaphore :destroy, :start_rekey, :trigger_outbound_update, :old_state_drop_trigger, :setup_nic, :repopulate
 
   def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil)
     unless (subnet = PrivateSubnet[private_subnet_id])

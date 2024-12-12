@@ -16,6 +16,10 @@ def #{name}
   @#{name} ||= #{camelize(name.to_s)}[@subject_id]
 end
 ), __FILE__, __LINE__ - 4
+      subject_class = Object.const_get(camelize(name.to_s))
+      if subject_class.respond_to?(:semaphore_names)
+        semaphore(*subject_class.semaphore_names)
+      end
     end
   end
 

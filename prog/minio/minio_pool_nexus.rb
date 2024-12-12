@@ -5,8 +5,6 @@ require_relative "../../lib/util"
 class Prog::Minio::MinioPoolNexus < Prog::Base
   subject_is :minio_pool
 
-  semaphore :destroy, :add_additional_pool
-
   def self.assemble(cluster_id, start_index, server_count, drive_count, storage_size_gib, vm_size)
     unless MinioCluster[cluster_id]
       fail "No existing cluster"

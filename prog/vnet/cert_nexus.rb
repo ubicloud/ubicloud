@@ -5,7 +5,6 @@ require "openssl"
 
 class Prog::Vnet::CertNexus < Prog::Base
   subject_is :cert
-  semaphore :destroy
 
   REVOKE_REASON = "cessationOfOperation"
 

@@ -10,8 +10,6 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   extend Forwardable
   def_delegators :inference_endpoint_replica, :vm, :inference_endpoint, :load_balancers_vm
 
-  semaphore :destroy
-
   def self.assemble(inference_endpoint_id)
     DB.transaction do
       ubid = InferenceEndpointReplica.generate_ubid
