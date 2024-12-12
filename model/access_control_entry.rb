@@ -19,11 +19,8 @@ class AccessControlEntry < Sequel::Model
     end
   end
 
-  def from_ubids(subject, action, object)
-    self.subject_id, self.action_id, self.object_id = [subject, action, object].map! do
-      UBID.to_uuid(_1) if _1
-    end
-    self
+  def update_from_ubids(hash)
+    update(hash.transform_values { UBID.to_uuid(_1) if _1 })
   end
 
   def validate
