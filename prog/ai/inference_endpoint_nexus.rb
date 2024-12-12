@@ -46,7 +46,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
 
     Validation.validate_location(location)
     Validation.validate_name(name)
-    Validation.validate_vm_size(vm_size, "x64")
+    Validation.validate_vm_size(vm_size)
     fail "Invalid replica count" unless replica_count.is_a?(Integer) && (1..9).cover?(replica_count)
 
     DB.transaction do

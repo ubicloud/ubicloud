@@ -23,7 +23,7 @@ class Prog::Vm::Nexus < Prog::Base
       fail "Cannot force and exclude the same host"
     end
     Validation.validate_location(location)
-    vm_size = Validation.validate_vm_size(size, arch)
+    vm_size = Validation.validate_vm_size(size)
 
     storage_volumes ||= [{
       size_gib: vm_size.storage_size_options.first,
@@ -86,8 +86,14 @@ class Prog::Vm::Nexus < Prog::Base
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
 
+      cores = if arch == "arm64"
+        vm_size.vcpu
+      else
+        vm_size.vcpu / 2
+      end
+
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
-        name: name, family: vm_size.family, cores: vm_size.cores, vcpus: vm_size.vcpus, memory_gib: vm_size.memory_gib, location: location,
+        name: name, family: vm_size.family, cores: cores, vcpus: vm_size.vcpu, memory_gib: vm_size.memory, location: location,
         boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
@@ -416,7 +422,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.memory_gib
+        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.mem_gib
       )
 
       vm.pci_devices_dataset.update(vm_id: nil)

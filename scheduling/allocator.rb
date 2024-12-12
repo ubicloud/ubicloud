@@ -16,7 +16,7 @@ module Scheduling::Allocator
     request = Request.new(
       vm.id,
       vm.cores,
-      vm.memory_gib,
+      vm.mem_gib,
       storage_volumes.map { _1["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       vm.boot_image,

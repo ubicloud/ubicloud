@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::Nexus do
     disk_2.spdk_installation = si
     disk_2.storage_device = dev2
     disk_2.boot_image = bi
-    vm = Vm.new(family: "standard", cores: 1, vcpus: 1, memory_gib: 8, name: "dummy-vm", arch: "x64", location: "hetzner-fsn1", created_at: Time.now).tap {
+    vm = Vm.new(family: "standard", cores: 1, vcpus: 2, memory_gib: 8, name: "dummy-vm", arch: "x64", location: "hetzner-fsn1", created_at: Time.now).tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
       _1.vm_storage_volumes.append(disk_1)
       _1.vm_storage_volumes.append(disk_2)
@@ -167,7 +167,8 @@ RSpec.describe Prog::Vm::Nexus do
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
       st = described_class.assemble("some_ssh_key", prj.id, size: "standard-4", arch: "arm64")
       expect(st.subject.cores).to eq(4)
-      expect(st.subject.memory_gib).to eq(12)
+      expect(st.subject.mem_gib_ratio).to eq(3.2)
+      expect(st.subject.mem_gib).to eq(12)
     end
 
     it "requests as many gpus as specified" do
@@ -253,7 +254,7 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
       vmh = instance_double(VmHost, sshable: sshable,
-        total_cpus: 80, total_cores: 80, total_sockets: 1, ndp_needed: false, arch: "arm64")
+        total_cpus: 80, total_cores: 80, total_sockets: 1, ndp_needed: false)
       expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
 
       expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|

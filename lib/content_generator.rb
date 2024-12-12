@@ -24,9 +24,9 @@ module ContentGenerator
 
       [
         size.display_name,
-        "#{size.vcpus} vCPUs / #{size.memory_gib} GB RAM",
-        "$#{"%.2f" % ((size.vcpus / 2) * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % ((size.vcpus / 2) * unit_price * 60)}/hour"
+        "#{size.vcpu} vCPUs / #{size.memory} GB RAM",
+        "$#{"%.2f" % ((size.vcpu / 2) * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % ((size.vcpu / 2) * unit_price * 60)}/hour"
       ]
     end
 
