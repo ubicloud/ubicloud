@@ -96,6 +96,7 @@ RSpec.describe Clover, "personal access token management" do
     expect(access_tag_ds.all).not_to be_empty
     AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
 
+    path = page.current_path
     btn = find(".delete-btn")
     data_url = btn["data-url"]
     _csrf = btn["data-csrf"]
@@ -106,12 +107,103 @@ RSpec.describe Clover, "personal access token management" do
     expect(DB[:applied_subject_tag].where(tag_id: project.subject_tags_dataset.first(name: "Admin").id, subject_id: @api_key.id).all).to be_empty
     expect(AccessControlEntry.where(project_id: project.id, subject_id: @api_key.id).all).to be_empty
 
-    visit "#{project.path}/user/token"
+    visit path
     expect(find_by_id("flash-notice").text).to eq("Personal access token deleted successfully")
 
     page.driver.delete data_url, {_csrf:}
     expect(page.status_code).to eq(204)
     visit "#{project.path}/user/token"
     expect(page.html).not_to include("Personal access token deleted successfully")
+  end
+
+  it "can restrict access" do
+    click_link @api_key.ubid
+    expect(page.title).to eq "Ubicloud - Default - Restrict Personal Access Token"
+    expect(@api_key.unrestricted_token_for_project?(project.id)).to be true
+    click_button "Restrict Personal Access Token"
+
+    expect(find_by_id("flash-notice").text).to eq "Restricted personal access token"
+    expect(@api_key.unrestricted_token_for_project?(project.id)).to be false
+    expect(page.title).to eq "Ubicloud - Default - Token Access Control"
+
+    visit "#{project.path}/user/token/#{@api_key.ubid}/restrict-access"
+    expect(find_by_id("flash-error").text).to eq "Token access is already restricted"
+    expect(page.title).to eq "Ubicloud - Default - Token Access Control"
+  end
+
+  it "can view token access control entries" do
+    @api_key.restrict_token_for_project(project.id)
+    click_link @api_key.ubid
+    expect(page.title).to eq "Ubicloud - Default - Token Access Control"
+    expect(page.html).to include "Currently, this token has no access to the project."
+
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    page.refresh
+    expect(page.html).to include "Below are the access control entries for the token."
+    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+      "Edit", "All", "All", "Remove"
+    ]
+  end
+
+  it "can create token access control entries" do
+    @api_key.restrict_token_for_project(project.id)
+    click_link @api_key.ubid
+    click_link "Create Token Access Control Entry"
+    expect(page.title).to eq "Ubicloud - Default - Create Token Access Control Entry"
+
+    click_button "Create Token Access Control Entry"
+    expect(find_by_id("flash-notice").text).to eq "Token access control entry created successfully"
+    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+      "Edit", "All", "All", "Remove"
+    ]
+
+    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    click_link "Create Token Access Control Entry"
+    select "ActionTag:view"
+    select "OTest"
+    click_button "Create Token Access Control Entry"
+    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+      "Edit", "ActionTag:view", "Tag: OTest", "Remove",
+      "Edit", "All", "All", "Remove"
+    ]
+  end
+
+  it "can edit token access control entries" do
+    @api_key.restrict_token_for_project(project.id)
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    click_link @api_key.ubid
+    click_link "Edit"
+    expect(page.title).to eq "Ubicloud - Default - Update Token Access Control Entry"
+    select "ActionTag:view"
+    select "OTest"
+    click_button "Update Token Access Control Entry"
+    expect(find_by_id("flash-notice").text).to eq "Token access control entry updated successfully"
+    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+      "Edit", "ActionTag:view", "Tag: OTest", "Remove"
+    ]
+  end
+
+  it "handles invalid ubid when editing token access control entry" do
+    @api_key.restrict_token_for_project(project.id)
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    click_link @api_key.ubid
+    ace.destroy
+    click_link "Edit"
+    expect(page.status_code).to eq 404
+  end
+
+  it "can delete token access control entries" do
+    @api_key.restrict_token_for_project(project.id)
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    click_link @api_key.ubid
+    path = page.current_path
+    btn = find ".delete-btn"
+    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+    visit path
+    expect(find_by_id("flash-notice").text).to eq "Token access control entry deleted successfully"
+    expect(page.html).to include "Currently, this token has no access to the project."
   end
 end
