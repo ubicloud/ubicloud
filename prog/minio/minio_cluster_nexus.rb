@@ -5,8 +5,6 @@ require_relative "../../lib/util"
 class Prog::Minio::MinioClusterNexus < Prog::Base
   subject_is :minio_cluster
 
-  semaphore :destroy, :reconfigure
-
   def self.assemble(project_id, cluster_name, location, admin_user,
     storage_size_gib, pool_count, server_count, drive_count, vm_size)
     unless (project = Project[project_id])

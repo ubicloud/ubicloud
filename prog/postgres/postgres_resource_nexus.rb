@@ -10,8 +10,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_resource, :servers, :representative_server
 
-  semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :destroy
-
   def self.assemble(project_id:, location:, name:, target_vm_size:, target_storage_size_gib:,
     version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
