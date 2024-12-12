@@ -11,6 +11,7 @@ class Account < Sequel::Model(:accounts)
 
   include ResourceMethods
   include Authorization::HyperTagMethods
+  include SubjectTag::Cleanup
 
   def hyper_tag_name(project = nil)
     "user/#{email}"
