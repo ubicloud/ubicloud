@@ -28,6 +28,7 @@ class Vm < Sequel::Model
   semaphore :restart, :stop
 
   include Authorization::HyperTagMethods
+  include ObjectTag::Cleanup
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{display_location}/vm/#{name}"
