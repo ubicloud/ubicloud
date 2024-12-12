@@ -73,5 +73,18 @@ RSpec.describe Firewall do
       expect(FirewallsPrivateSubnets.where(firewall_id: fw.id).count).to eq(0)
       expect(described_class[fw.id]).to be_nil
     end
+
+    it "removes referencing access control entries and object tag memberships" do
+      account = Account.create_with_id(email: "test@example.com")
+      project = account.create_project_with_default_policy("project-1", default_policy: false)
+      tag = ObjectTag.create_with_id(project_id: project.id, name: "t")
+      tag.add_member(fw.id)
+      fw.associate_with_project(project)
+      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: fw.id)
+
+      fw.destroy
+      expect(tag.member_ids).to be_empty
+      expect(ace).not_to be_exists
+    end
   end
 end

@@ -7,6 +7,14 @@ class ObjectTag < Sequel::Model
   include AccessControlModelTag
   dataset_module Authorization::Dataset
 
+  module Cleanup
+    def before_destroy
+      AccessControlEntry.where(object_id: id).destroy
+      DB[:applied_object_tag].where(object_id: id).delete
+      super
+    end
+  end
+
   def self.options_for_project(project)
     {
       {"label" => "Tag (grants access to objects contained in tag)", "id" => "object-tag-group"} => project.object_tags,
