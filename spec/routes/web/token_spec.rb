@@ -15,6 +15,70 @@ RSpec.describe Clover, "personal access token management" do
     @api_key = ApiKey.first
   end
 
+  it "is directly accessible from dashboard if Project:user and Project:viewaccess are not allowed" do
+    AccessControlEntry.dataset.destroy
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
+    visit "#{project.path}/dashboard"
+
+    page.within("#desktop-menu") do
+      click_link "Tokens"
+    end
+    expect(page.title).to eq "Ubicloud - Default - Personal Access Tokens"
+  end
+
+  it "only shows token link if user has Project:token permissions" do
+    AccessControlEntry.dataset.destroy
+    visit "#{project.path}/dashboard"
+    expect(find_by_id("desktop-menu").text).not_to include("Users")
+    expect(find_by_id("desktop-menu").text).not_to include("Tokens")
+
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+    page.refresh
+    expect(page.html).not_to include("Tokens")
+    page.within("#desktop-menu") do
+      click_link "Users"
+    end
+    expect(find_by_id("desktop-menu").text).not_to include("Tokens")
+
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
+    page.refresh
+    click_link "Personal Access Tokens"
+    expect(page.title).to eq "Ubicloud - Default - Personal Access Tokens"
+  end
+
+  it "requires Project:token permission to access token page and create/remove tokens" do
+    AccessControlEntry.dataset.destroy
+    page.refresh
+    expect(page.status_code).to eq 403
+
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+    page.refresh
+    expect(page.status_code).to eq 403
+
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
+    page.refresh
+    expect(page.title).to eq "Ubicloud - Default - Personal Access Tokens"
+
+    btn = find(".delete-btn")
+    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+    expect(ApiKey.count).to eq 0
+
+    click_button "Create Token"
+    expect(ApiKey.count).to eq 1
+
+    ace.destroy
+    click_button "Create Token"
+    expect(page.status_code).to eq 403
+    expect(ApiKey.count).to eq 1
+
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
+    visit "#{project.path}/user/token"
+    ace.destroy
+    btn = find(".delete-btn")
+    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+    expect(ApiKey.count).to eq 1
+  end
+
   it "user page allows creating personal access tokens" do
     expect(page).to have_flash_notice("Created personal access token with id #{@api_key.ubid}")
 
