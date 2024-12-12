@@ -7,6 +7,13 @@ class SubjectTag < Sequel::Model
   include AccessControlModelTag
   dataset_module Authorization::Dataset
 
+  def self.options_for_project(project)
+    {
+      "Tag" => project.subject_tags.reject { _1.name == "Admin" },
+      "Account" => project.accounts
+    }
+  end
+
   def self.valid_member?(project_id, subject)
     case subject
     when SubjectTag

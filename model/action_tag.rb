@@ -7,6 +7,14 @@ class ActionTag < Sequel::Model
   include AccessControlModelTag
   dataset_module Authorization::Dataset
 
+  def self.options_for_project(project)
+    {
+      "Global Tag" => ActionTag.where(project_id: nil).order(:name).all,
+      "Tag" => project.action_tags,
+      "Action" => ActionType
+    }
+  end
+
   def self.valid_member?(project_id, action)
     case action
     when ActionTag
