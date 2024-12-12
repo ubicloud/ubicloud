@@ -40,7 +40,7 @@
             <% @tokens.each do |token| %>
               <tr id="token-<%= token.ubid %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%= token.ubid %>
+                  <a href="<%= @project_data[:path] %>/user/token/<%= token.ubid %>/access-control"><%= token.ubid %></a>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                   <%== render("components/revealable_content", locals: { content: "pat-#{token.ubid}-#{token.key}" }) %>
