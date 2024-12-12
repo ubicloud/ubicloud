@@ -118,6 +118,24 @@ module Authorization
         DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])
       end
 
+      if model == ObjectTag
+        # Authorization for accessing ObjectTag itself is done by providing the metatag for the object.
+        # Convert metatag id returned from the applied_object_tag lookup into tag ids, so that the correct
+        # object tags will be found.  Convert non-metatag ids into UUIDs that would be invalid UBIDs,
+        # preventing them from matching any existing ObjectTag instances.  This makes it so that users
+        # authorized to manage members of the tag are not automatically authorized to manage the tag itself.
+        ds = ds
+          .select(Sequel.cast(:object_id, String))
+          .from_self
+          .select {
+          Sequel.join([
+            substr(:object_id, 0, 18),
+            Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
+            substr(:object_id, 19, 18)
+          ]).cast(:uuid).as(:object_id)
+        }
+      end
+
       where(Sequel.|(
         # Allow where there is a specific entry for the object,
         {Sequel[from][:id] => ds},
