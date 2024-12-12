@@ -1488,34 +1488,10 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
-  '/project/{project_id}/kubernetes-cluster':
+  '/project/{project_id}/kubernetes-cluster/{kubernetes_cluster_name}':
     parameters:
       - $ref: '#/components/parameters/project_id'
-    get:
-      operationId: getKubernetesCluster
-      summary: Return the list of kubernetes clusters in the project
-      responses:
-        '200':
-          description: Kubernetes Cluster list retrieved successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  items:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/KubernetesCluster'
-                additionalProperties: false
-                required:
-                  - count
-                  - items
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Kubernetes Cluster
+      - $ref: '#/components/parameters/kubernetes_cluster_name'
     post:
       operationId: createKubernetesCluster
       summary: Create a new kubernetes cluster
@@ -1526,7 +1502,7 @@ paths:
             schema:
               type: object
               properties:
-                subnet:
+                private_subnet_id:
                   description: Name of subnet
                   type: string
                 location:
@@ -1536,7 +1512,7 @@ paths:
                   description: Version of the kubernetes cluster
                   type: string
               required:
-                - subnet
+                - private_subnet_id
                 - location
                 - kubernetes_version
       responses:
@@ -1587,36 +1563,6 @@ paths:
     - $ref: '#/components/parameters/project_id'
     - $ref: '#/components/parameters/location'
     - $ref: '#/components/parameters/kubernetes_cluster_name'
-    post:
-      summary: Create Kubernetes Cluster in a specific location of a project
-      operationId: createLocationKubernetesCluster
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                subnet:
-                  description: Name of subnet
-                  type: string
-                kubernetes_version:
-                  description: Version of the kubernetes cluster
-                  type: string
-              required:
-                - subnet
-                - kubernetes_version
-      responses:
-        '200':
-          description: Kubernetes cluster created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KubernetesCluster'
-        default:
-          $ref: '#/components/responses/Error'
-      tags:
-        - Kubernetes Cluster
     get:
       operationId: getKubernetesClusterDetails
       summary: Get details of a specific Kubernetes Cluster in a location
@@ -2177,8 +2123,8 @@ components:
         kubernetes_version:
           description: Version of the kubernetes cluster
           type: string
-        subnet:
-          description: Name of the kubernetes cluster's subnet
+        private_subnet_id:
+          description: Id of the kubernetes cluster's subnet
           type: string
         location:
           description: Location of the kubernetes cluster

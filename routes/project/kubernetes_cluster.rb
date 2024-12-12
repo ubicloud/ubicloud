@@ -8,8 +8,9 @@ class Clover
 
     r.on web? do
       r.post true do
+        puts "######################################, #{r.params}"
         @location = LocationNameConverter.to_internal_name(r.params["location"])
-        post_kubernetes_cluster(r.params["name"])
+        post_kubernetes_cluster(r.params["kubernetes_cluster_name"])
       end
 
       r.get "create" do

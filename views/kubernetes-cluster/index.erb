@@ -47,7 +47,7 @@
       title: "No Kubernetes Clusters",
       description: "You don't have permission to create Kubernetes Clusters."
     }.merge(has_project_permission("KubernetesCluster:create") ? {
-      description: "Get started by creating a new Kuberentes Cluster.",
+      description: "Get started by creating a new Kubernetes Cluster.",
       button_link: "#{@project_data[:path]}/kubernetes-cluster/create",
       button_title: "New Kubernetes Cluster"
     } : {})

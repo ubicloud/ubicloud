@@ -7,7 +7,7 @@ class Clover
     st = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: name,
       kubernetes_version: request.params["kubernetes_version"],
-      subnet: request.params["subnet"],
+      private_subnet_id: request.params["private_subnet_id"],
       project_id: @project.id,
       location: @location,
       replica: 3

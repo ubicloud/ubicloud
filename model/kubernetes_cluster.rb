@@ -4,6 +4,9 @@ require_relative "../model"
 
 class KubernetesCluster < Sequel::Model
   one_to_one :strand, key: :id
+  one_to_one :load_balancer, key: :load_balancer_id
+  one_to_one :private_subnet, key: :private_subnet_id
+  one_to_many :vm
   one_to_many :kubernetes_nodepool
 
   plugin :association_dependencies, kubernetes_nodepool: :destroy
