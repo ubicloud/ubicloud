@@ -10,6 +10,7 @@ class ObjectTag < Sequel::Model
   def self.options_for_project(project)
     {
       {"label" => "Tag (grants access to objects contained in tag)", "id" => "object-tag-group"} => project.object_tags,
+      "Project" => [project],
       "Vm" => project.vms,
       "PostgresSQL Server" => project.postgres_resources,
       "Private Subnet" => project.private_subnets,
