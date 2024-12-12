@@ -142,9 +142,9 @@ class Clover
           r.post do
             was_new = @ace.new?
 
-            subject, action, object = typecast_params.nonempty_str(%w[subject action object])
-            check_ace_subject(UBID.to_uuid(subject))
-            @ace.from_ubids(subject, action, object).save_changes
+            subject_id, action_id, object_id = typecast_params.nonempty_str(%w[subject action object])
+            check_ace_subject(UBID.to_uuid(subject_id))
+            @ace.update_from_ubids(subject_id:, action_id:, object_id:)
 
             flash["notice"] = "Access control entry #{was_new ? "created" : "updated"} successfully"
             r.redirect "#{@project_data[:path]}/user/access-control"
