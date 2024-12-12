@@ -7,9 +7,12 @@ class ActionTag < Sequel::Model
   include AccessControlModelTag
   dataset_module Authorization::Dataset
 
-  def add_member(action)
-    action = ActionType::NAME_MAP[action] unless action.include?("-")
-    super
+  def self.options_for_project(project)
+    {
+      "Global Tag" => ActionTag.where(project_id: nil).order(:name).all,
+      "Tag" => project.action_tags,
+      "Action" => ActionType
+    }
   end
 
   def self.valid_member?(project_id, action)

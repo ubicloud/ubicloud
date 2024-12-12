@@ -7,6 +7,20 @@ class ObjectTag < Sequel::Model
   include AccessControlModelTag
   dataset_module Authorization::Dataset
 
+  def self.options_for_project(project)
+    {
+      {"label" => "Tag (grants access to objects contained in tag)", "id" => "object-tag-group"} => project.object_tags,
+      "Vm" => project.vms,
+      "PostgresSQL Server" => project.postgres_resources,
+      "Private Subnet" => project.private_subnets,
+      "Firewall" => project.firewalls,
+      "LoadBalancer" => project.load_balancers,
+      "SubjectTag" => project.subject_tags,
+      "ActionTag" => project.action_tags,
+      {"label" => "ObjectTag (grants access to tag itself)", "id" => "object-metatag-group"} => project.object_tags.map(&:metatag)
+    }
+  end
+
   def self.valid_member?(project_id, object)
     case object
     when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint
