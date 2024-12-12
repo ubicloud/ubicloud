@@ -39,6 +39,27 @@ RSpec.describe Validation do
       it "invalid vm size" do
         expect { described_class.validate_vm_size("standard-3", "x64") }.to raise_error described_class::ValidationFailed
       end
+
+      it "no IO limits for standard x64" do
+        io_limits = described_class.validate_vm_size("standard-2", "x64").io_limits
+        expect(io_limits.max_ios_per_sec).to be_nil
+        expect(io_limits.max_read_mbytes_per_sec).to be_nil
+        expect(io_limits.max_write_mbytes_per_sec).to be_nil
+      end
+
+      it "no IO limits for standard arm64" do
+        io_limits = described_class.validate_vm_size("standard-2", "arm64").io_limits
+        expect(io_limits.max_ios_per_sec).to be_nil
+        expect(io_limits.max_read_mbytes_per_sec).to be_nil
+        expect(io_limits.max_write_mbytes_per_sec).to be_nil
+      end
+
+      it "no IO limits for standard-gpu" do
+        io_limits = described_class.validate_vm_size("standard-gpu-6", "x64").io_limits
+        expect(io_limits.max_ios_per_sec).to be_nil
+        expect(io_limits.max_read_mbytes_per_sec).to be_nil
+        expect(io_limits.max_write_mbytes_per_sec).to be_nil
+      end
     end
 
     describe "#validate_vm_storage_size" do
