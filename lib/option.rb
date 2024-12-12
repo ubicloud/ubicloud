@@ -48,17 +48,20 @@ module Option
     ["almalinux-9", "AlmaLinux 9"]
   ].map { |args| BootImage.new(*args) }.freeze
 
-  VmSize = Struct.new(:name, :family, :cores, :vcpus, :memory_gib, :storage_size_options, :visible, :gpu, :arch) do
+  IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
+  NO_IO_LIMITS = IoLimits.new(nil, nil, nil).freeze
+
+  VmSize = Struct.new(:name, :family, :cores, :vcpus, :memory_gib, :storage_size_options, :io_limits, :visible, :gpu, :arch) do
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16, 30, 60].map {
     storage_size_options = [_1 * 20, _1 * 40]
-    VmSize.new("standard-#{_1}", "standard", _1 / 2, _1, _1 * 4, storage_size_options, true, false, "x64")
+    VmSize.new("standard-#{_1}", "standard", _1 / 2, _1, _1 * 4, storage_size_options, NO_IO_LIMITS, true, false, "x64")
   }.concat([2, 4, 8, 16, 30, 60].map {
     storage_size_options = [_1 * 20, _1 * 40]
-    VmSize.new("standard-#{_1}", "standard", _1, _1, (_1 * 3.2).to_i, storage_size_options, false, false, "arm64")
+    VmSize.new("standard-#{_1}", "standard", _1, _1, (_1 * 3.2).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
   }).concat([6].map {
-    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1 / 2, _1, (_1 * 5.34).to_i, [_1 * 30], false, true, "x64")
+    VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1 / 2, _1, (_1 * 5.34).to_i, [_1 * 30], NO_IO_LIMITS, false, true, "x64")
   }).freeze
 
   PostgresSize = Struct.new(:location, :name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do
