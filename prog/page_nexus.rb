@@ -2,7 +2,6 @@
 
 class Prog::PageNexus < Prog::Base
   subject_is :page
-  semaphore :resolve
 
   def self.assemble(summary, tag_parts, related_resources, severity: "error", extra_data: {})
     DB.transaction do

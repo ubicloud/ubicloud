@@ -10,8 +10,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   extend Forwardable
   def_delegators :inference_endpoint, :replicas, :load_balancer, :private_subnet, :project
 
-  semaphore :destroy
-
   def self.model_for_id(model_id)
     Option::AI_MODELS.detect { _1["id"] == model_id }
   end

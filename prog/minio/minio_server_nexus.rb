@@ -10,8 +10,6 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   extend Forwardable
   def_delegators :minio_server, :vm
 
-  semaphore :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning
-
   def self.assemble(minio_pool_id, index)
     unless (minio_pool = MinioPool[minio_pool_id])
       fail "No existing pool"

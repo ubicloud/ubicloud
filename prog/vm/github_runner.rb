@@ -5,8 +5,6 @@ require "net/ssh"
 class Prog::Vm::GithubRunner < Prog::Base
   subject_is :github_runner
 
-  semaphore :destroy, :skip_deregistration
-
   def self.assemble(installation, repository_name:, label:, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
