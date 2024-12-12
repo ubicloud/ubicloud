@@ -77,15 +77,85 @@ class Clover
           end
         end
 
-        r.delete String do |ubid|
-          if (token = current_account.api_keys_dataset.with_pk(UBID.to_uuid(ubid)))
-            DB.transaction do
-              token.destroy
-              @project.disassociate_subject(token.id)
+        r.on String do |ubid|
+          @token = token = current_account.api_keys_dataset.with_pk(UBID.to_uuid(ubid))
+
+          r.delete true do
+            if token
+              DB.transaction do
+                token.destroy
+                @project.disassociate_subject(token.id)
+              end
+              flash["notice"] = "Personal access token deleted successfully"
             end
-            flash["notice"] = "Personal access token deleted successfully"
+            204
           end
-          204
+
+          r.is "restrict-access" do
+            unless token.unrestricted_token_for_project?(@project.id)
+              flash["error"] = "Token access is already restricted"
+              r.redirect "#{@project.path}/user/token/#{token.ubid}/access-control"
+            end
+
+            r.get do
+              view "project/restrict-token"
+            end
+
+            r.post do
+              token.restrict_token_for_project(@project.id)
+              flash["notice"] = "Restricted personal access token"
+              r.redirect "#{@project.path}/user/token/#{token.ubid}/access-control"
+            end
+          end
+
+          r.on "access-control" do
+            if token.unrestricted_token_for_project?(@project.id)
+              r.redirect "#{@project.path}/user/token/#{token.ubid}/restrict-access"
+            end
+
+            r.get true do
+              uuids = {}
+              aces = @project.access_control_entries_dataset.where(subject_id: token.id).all
+              aces.each do |ace|
+                uuids[ace.action_id] = nil if ace.action_id
+                uuids[ace.object_id] = nil if ace.object_id
+              end
+              UBID.resolve_map(uuids)
+              @aces = aces.map do |ace|
+                [ace.ubid, [uuids[ace.action_id], uuids[ace.object_id]], true]
+              end
+              sort_aces!(@aces)
+              view "project/token-access-control"
+            end
+
+            r.is "entry", String do |ubid|
+              if ubid == "new"
+                @ace = AccessControlEntry.new_with_id(project_id: @project.id, subject_id: token.id)
+              else
+                next unless (@ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
+              end
+
+              r.get do
+                view "project/access-control-entry"
+              end
+
+              r.post do
+                was_new = @ace.new?
+
+                action_id, object_id = typecast_params.nonempty_str(%w[action object])
+                @ace.update_from_ubids(action_id:, object_id:)
+
+                flash["notice"] = "Token access control entry #{was_new ? "created" : "updated"} successfully"
+                r.redirect "#{@project_data[:path]}/user/token/#{token.ubid}/access-control"
+              end
+
+              r.delete(!@ace.new?) do
+                @ace.destroy
+                flash["notice"] = "Token access control entry deleted successfully"
+                204
+              end
+            end
+          end
         end
       end
 
