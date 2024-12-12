@@ -542,8 +542,8 @@ RSpec.describe Clover, "access control" do
           expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Tag", "Action"]
           expect(page.all("table#tag-membership-add td").map(&:text)).to eq [*global_tags, "other-action", *action_types].flat_map { [_1, ""] }
         else
-          expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag (grants access to objects contained in tag)", "SubjectTag", "ObjectTag (grants access to tag itself)"]
-          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", "", "Admin", "", "other-object", "", "test-object", ""]
+          expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag (grants access to objects contained in tag)", "Project", "SubjectTag", "ObjectTag (grants access to tag itself)"]
+          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", "", "Default", "", "Admin", "", "other-object", "", "test-object", ""]
         end
 
         tag1.add_member(tag2.id)
@@ -605,6 +605,8 @@ RSpec.describe Clover, "access control" do
         else
           ["Tag (grants access to objects contained in tag)",
             "test3-object", "",
+            "Project",
+            "Default", "",
             "SubjectTag",
             "Admin", "",
             "ObjectTag (grants access to tag itself)",
