@@ -6,8 +6,9 @@ Signal.trap("QUIT") do
   Kernel.exit!(Signal.list["QUIT"] + 128)
 end
 
-require "bundler/setup"
-Bundler.setup
+require "bundler"
+rack_env = ENV["RACK_ENV"] || "development"
+Bundler.setup(:default, rack_env.to_sym)
 
 require_relative "config"
 require "mail"
