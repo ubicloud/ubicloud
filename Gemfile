@@ -35,13 +35,14 @@ gem "argon2-kdf"
 
 group :development do
   gem "awesome_print"
-  gem "brakeman"
   gem "by", ">= 1.1.0"
-  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
   gem "foreman"
   gem "pry-byebug"
   gem "rackup"
-  gem "sequel-annotate"
+  gem "cuprite"
+end
+
+group :rubocop do
   gem "rubocop-capybara"
   gem "rubocop-erb"
   gem "rubocop-performance"
@@ -49,9 +50,11 @@ group :development do
   gem "rubocop-rspec"
   gem "rubocop-sequel"
   gem "standard", ">= 1.24.3"
-  gem "simplecov"
-  gem "turbo_tests"
-  gem "cuprite"
+end
+
+group :lint do
+  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
+  gem "brakeman"
 end
 
 group :test do
@@ -59,6 +62,12 @@ group :test do
   gem "rspec"
   gem "webmock"
   gem "pdf-reader"
+  gem "turbo_tests"
+  gem "simplecov"
+end
+
+group :test, :development do
+  gem "sequel-annotate"
 end
 
 gem "webauthn", "~> 3.2"
