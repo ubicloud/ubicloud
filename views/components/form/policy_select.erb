@@ -6,7 +6,9 @@
     "components/form/select",
     locals: {
       name: name,
-      options: [["", "No access", nil, {}]].concat(@project.subject_tags.map { [_1.name, _1.name, nil, {}] }),
+      options: [["", "No access", nil, {}]].concat(
+        dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").map { [_1.name, _1.name, nil, {}] }
+      ),
       selected: selected
     }
   ) %>
