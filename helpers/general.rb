@@ -59,8 +59,12 @@ class Clover < Roda
   end
 
   def authorize(actions, object_id)
-    each_authorization_id do |id|
-      Authorization.authorize(@project.id, id, actions, object_id)
+    if @project_permissions && object_id == @project.id
+      fail Authorization::Unauthorized unless has_project_permission(actions)
+    else
+      each_authorization_id do |id|
+        Authorization.authorize(@project.id, id, actions, object_id)
+      end
     end
   end
 
