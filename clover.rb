@@ -47,7 +47,6 @@ class Clover < Roda
   plugin :flash
   plugin :h
   plugin :hash_branches
-  plugin :hash_branch_view_subdir
   plugin :hooks
   plugin :Integer_matcher_max
   plugin :json
