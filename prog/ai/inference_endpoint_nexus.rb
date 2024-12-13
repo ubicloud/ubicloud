@@ -85,7 +85,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
 
   label def start
     reconcile_replicas
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
     hop_wait_replicas
   end
 

@@ -92,9 +92,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.incr_initial_provisioning
     if postgres_resource.parent
       bud self.class, frame, :trigger_pg_current_xact_id_on_parent
-      register_deadline(:wait, 120 * 60)
+      register_deadline("wait", 120 * 60)
     else
-      register_deadline(:wait, 10 * 60)
+      register_deadline("wait", 10 * 60)
     end
     hop_refresh_dns_record
   end
