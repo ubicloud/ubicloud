@@ -62,7 +62,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
   end
 
   label def wait_pools
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
     if minio_cluster.pools.all? { _1.strand.label == "wait" }
       # Start all the servers now
       minio_cluster.servers.each(&:incr_restart)

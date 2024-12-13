@@ -135,7 +135,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "sets longer deadline for non-primary servers" do
       expect(postgres_server).to receive(:primary?).and_return(false)
-      expect(nx).to receive(:register_deadline).with(:wait, 120 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 120 * 60)
       expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end

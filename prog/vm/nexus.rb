@@ -204,7 +204,7 @@ class Prog::Vm::Nexus < Prog::Base
       page.incr_resolve
     end
 
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
 
     # We don't need storage_volume info anymore, so delete it before
     # transitioning to the next state.
@@ -313,22 +313,22 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def wait
     when_start_after_host_reboot_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline("wait", 5 * 60)
       hop_start_after_host_reboot
     end
 
     when_update_firewall_rules_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline("wait", 5 * 60)
       hop_update_firewall_rules
     end
 
     when_update_spdk_dependency_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline("wait", 5 * 60)
       hop_update_spdk_dependency
     end
 
     when_restart_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline("wait", 5 * 60)
       hop_restart
     end
 
@@ -391,7 +391,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def prevent_destroy
-    register_deadline(:destroy, 24 * 60 * 60)
+    register_deadline("destroy", 24 * 60 * 60)
     nap 30
   end
 

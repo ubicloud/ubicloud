@@ -75,9 +75,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   label def bootstrap_rhizome
     if postgres_server.primary?
-      register_deadline(:wait, 10 * 60)
+      register_deadline("wait", 10 * 60)
     else
-      register_deadline(:wait, 120 * 60)
+      register_deadline("wait", 120 * 60)
     end
 
     bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi"}
