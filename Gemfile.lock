@@ -242,7 +242,7 @@ GEM
     refrigerator (1.7.0)
     regexp_parser (2.9.3)
     rexml (3.4.0)
-    roda (3.86.0)
+    roda (3.87.0)
       rack
     rodauth (2.37.0)
       roda (>= 2.6.0)
@@ -413,7 +413,7 @@ DEPENDENCIES
   rackup
   rake
   refrigerator (>= 1)
-  roda (>= 3.86)
+  roda (>= 3.87)
   rodauth (>= 2.37)
   rotp
   rqrcode

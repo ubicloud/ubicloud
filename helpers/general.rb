@@ -24,20 +24,6 @@ class Clover < Roda
     end
   end
 
-  def api?
-    return @is_api if defined?(@is_api)
-    @is_api = env["HTTP_HOST"].to_s.start_with?("api.")
-  end
-
-  def runtime?
-    !!@is_runtime
-  end
-
-  def web?
-    return @is_web if defined?(@is_web)
-    @is_web = !api? && !runtime?
-  end
-
   def current_account_id
     rodauth.session_value
   end

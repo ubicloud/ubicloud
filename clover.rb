@@ -57,6 +57,17 @@ class Clover < Roda
   plugin :request_headers
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 
+  plugin :host_routing, scope_predicates: true do |hosts|
+    hosts.register :api, :web, :runtime
+    hosts.default :web do |host|
+      if host.start_with?("api.")
+        :api
+      elsif request.path_info.start_with?("/runtime")
+        :runtime
+      end
+    end
+  end
+
   plugin :conditional_sessions,
     key: "_Clover.session",
     cookie_options: {secure: !(Config.development? || Config.test?)},
@@ -555,7 +566,6 @@ class Clover < Roda
       rodauth.check_active_session unless rodauth.use_pat?
     else
       r.on "runtime" do
-        @is_runtime = true
         response.json = true
         response.skip_content_security_policy!
 
