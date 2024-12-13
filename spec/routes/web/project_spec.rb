@@ -189,7 +189,7 @@ RSpec.describe Clover, "project" do
         expect(page.title).to eq("Ubicloud - project-1 - Users")
       end
 
-      it "requires Project:user permissions to invite users" do
+      it "requires Project:user permissions to invite users, and SubjectTag:add to add to policies" do
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
         fill_in "Email", with: user2.email
@@ -199,6 +199,7 @@ RSpec.describe Clover, "project" do
         expect(Mail::TestMailer.deliveries.length).to eq 0
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"])
         visit "#{project.path}/user"
         fill_in "Email", with: user2.email
         select "Admin", from: "policy"
@@ -228,6 +229,29 @@ RSpec.describe Clover, "project" do
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
+      it "can only add existing invited user to subject tag if SubjectTag:add permissions are allowed for it" do
+        allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+
+        visit "#{project.path}/user"
+        expect(page.html).not_to include "Allowed"
+
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
+
+        page.refresh
+        fill_in "Email", with: user2.email
+        select "Allowed", from: "policy"
+        ace.destroy
+        click_button "Invite"
+
+        expect(page).to have_content user.email
+        expect(page).to have_content user2.email
+        expect(ProjectInvitation.count).to eq 0
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+        expect(allowed.member_ids).to be_empty
+      end
+
       it "can invite existing user to project without a default policy" do
         visit "#{project.path}/user"
 
@@ -241,6 +265,33 @@ RSpec.describe Clover, "project" do
         expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
         expect(page).to have_content user2.email
         expect(Mail::TestMailer.deliveries.length).to eq 1
+      end
+
+      it "can only set subject tag for new invited user if SubjectTag:add permissions are allowed for it" do
+        allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+
+        visit "#{project.path}/user"
+        expect(page.html).not_to include "Allowed"
+
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
+
+        visit "#{project.path}/user"
+        new_email = "newUpper@example.com"
+        expect(page).to have_content user.email
+
+        fill_in "Email", with: new_email
+        select "Allowed", from: "policy"
+        ace.destroy
+        click_button "Invite"
+        expect(page.find_by_id("flash-notice").text).to eq("Invitation sent successfully to 'newUpper@example.com'.")
+
+        expect(page).to have_content user.email
+        expect(page).to have_content new_email
+        expect(page).to have_content "Invitation sent successfully to '#{new_email}'."
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+        expect(ProjectInvitation.where(email: new_email, policy: nil).count).to eq 1
       end
 
       it "can invite non-existent user to project" do
@@ -352,7 +403,7 @@ RSpec.describe Clover, "project" do
         expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
-      it "requires Project:user permissions to update default policy of invited user" do
+      it "requires Project:user permissions to update default policy of invited user, and SubjectTag:add for access to subject tag" do
         invited_email = "invited@example.com"
         project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
         visit "#{project.path}/user"
@@ -364,6 +415,7 @@ RSpec.describe Clover, "project" do
         expect(page.status_code).to eq 403
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"])
         visit "#{project.path}/user"
         within "form#managed-policy" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
@@ -388,6 +440,37 @@ RSpec.describe Clover, "project" do
           click_button "Update"
         end
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Admin")
+      end
+
+      it "can only update default policy of invited user if new policy is allowed subject tag" do
+        allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
+        to_be_removed = SubjectTag.create_with_id(project_id: project.id, name: "ToBeRemoved")
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: to_be_removed.id)
+
+        invited_email = "invited@example.com"
+        project.add_invitation(email: invited_email, policy: "Allowed", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+
+        visit "#{project.path}/user"
+
+        expect(page.html).to include "Allowed"
+        expect(page.html).to include "ToBeRemoved"
+        within "form#managed-policy" do
+          select "Allowed", from: "invitation_policies[#{invited_email}]"
+          click_button "Update"
+        end
+        expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
+
+        ace.destroy
+        within "form#managed-policy" do
+          select "ToBeRemoved", from: "invitation_policies[#{invited_email}]"
+          click_button "Update"
+        end
+        expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
+        expect(page.html).to include "Allowed"
+        expect(page.html).not_to include "ToBeRemoved"
       end
 
       it "can not have more than 50 pending invitations" do
