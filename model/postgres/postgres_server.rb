@@ -25,7 +25,7 @@ class PostgresServer < Sequel::Model
       "max_connections" => (vm.memory_gib * 25).to_s,
       "superuser_reserved_connections" => "3",
       "shared_buffers" => "#{vm.memory_gib * 1024 / 4}MB",
-      "work_mem" => "#{vm.memory_gib / 8}MB",
+      "work_mem" => "#{[vm.memory_gib / 8, 1].max}MB",
       "maintenance_work_mem" => "#{vm.memory_gib * 1024 / 16}MB",
       "max_parallel_workers" => "4",
       "max_parallel_workers_per_gather" => "2",

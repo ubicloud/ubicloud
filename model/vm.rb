@@ -171,6 +171,24 @@ class Vm < Sequel::Model
     vm_storage_volumes.map { _1.size_gib }.sum
   end
 
+  def billing_record_parts
+    billing_resource_type = Option::VmFamilies.find { _1.name == family }.billing_resource_type
+
+    amount = 0
+    case billing_resource_type
+    when "VmCpuPercent"
+      amount = cpu_percent_limit / 100.0
+    when "VmCores"
+      amount = cores
+    else
+      # :nocov:
+      fail "BUG: Unknown billing resource type: #{billing_resource_type}"
+      # :nocov:
+    end
+
+    {resource_type: billing_resource_type, amount: amount}
+  end
+
   def init_health_monitor_session
     {
       ssh_session: vm_host.sshable.start_fresh_session

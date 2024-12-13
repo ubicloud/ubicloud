@@ -250,6 +250,22 @@ RSpec.describe Vm do
     end
   end
 
+  describe "#billing_record_parts" do
+    it "returns correct value for standard family" do
+      vm.family = "standard"
+      vm.cores = 1
+      vm.cpu_percent_limit = 200
+      expect(vm.billing_record_parts).to eq({resource_type: "VmCores", amount: 1})
+    end
+
+    it "returns correct value for burstable family" do
+      vm.family = "burstable"
+      vm.cores = 1
+      vm.cpu_percent_limit = 50
+      expect(vm.billing_record_parts).to eq({resource_type: "VmCpuPercent", amount: 0.5})
+    end
+  end
+
   it "initiates a new health monitor session" do
     vh = instance_double(VmHost, sshable: instance_double(Sshable))
     expect(vm).to receive(:vm_host).and_return(vh).at_least(:once)

@@ -40,6 +40,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   before do
     allow(nx).to receive(:postgres_resource).and_return(postgres_resource)
+    allow(postgres_resource.representative_server.vm).to receive(:billing_record_parts).and_return({resource_type: "VmCores", amount: 1})
   end
 
   describe ".assemble" do

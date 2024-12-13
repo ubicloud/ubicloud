@@ -310,14 +310,13 @@ class Prog::Vm::Nexus < Prog::Base
     project = vm.projects.first
     hop_wait unless project.billable
 
-    billing_resource_type = Option::VmFamilies.find { _1.name == vm.family }.billing_resource_type
-    amount = (billing_resource_type == "VmCpuPercent") ? vm.cpu_percent_limit / 100.0 : vm.cores
+    billing_record_parts = vm.billing_record_parts
     BillingRecord.create_with_id(
       project_id: project.id,
       resource_id: vm.id,
       resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties(billing_resource_type, vm.family, vm.location)["id"],
-      amount: amount
+      billing_rate_id: BillingRate.from_resource_properties(billing_record_parts[:resource_type], vm.family, vm.location)["id"],
+      amount: billing_record_parts[:amount]
     )
 
     vm.storage_volumes.each do |vol|

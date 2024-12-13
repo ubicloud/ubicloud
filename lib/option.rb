@@ -100,7 +100,15 @@ module Option
       PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::PARADEDB, _2, _2 * 4, storage_size_options),
       PostgresSize.new(_1.name, "standard-#{_2}", "standard-#{_2}", PostgresResource::Flavor::LANTERN, _2, _2 * 4, storage_size_options)
     ]
-  }.freeze
+  }.concat(Option.postgres_locations.product([[2, 2], [2, 4]]).flat_map {
+    storage_size_options = [_2[1] * 16, _2[1] * 32, _2[1] * 64]
+    storage_size_options.pop if _1.name == "leaseweb-wdc02"
+    [
+      PostgresSize.new(_1.name, "burstable-#{_2[0]}x#{_2[1]}", "burstable-#{_2[0]}x#{_2[1]}", PostgresResource::Flavor::STANDARD, _2[0], _2[1], storage_size_options),
+      PostgresSize.new(_1.name, "burstable-#{_2[0]}x#{_2[1]}", "burstable-#{_2[0]}x#{_2[1]}", PostgresResource::Flavor::PARADEDB, _2[0], _2[1], storage_size_options),
+      PostgresSize.new(_1.name, "burstable-#{_2[0]}x#{_2[1]}", "burstable-#{_2[0]}x#{_2[1]}", PostgresResource::Flavor::LANTERN, _2[0], _2[1], storage_size_options)
+    ]
+  }).freeze
 
   PostgresHaOption = Struct.new(:name, :standby_count, :title, :explanation)
   PostgresHaOptions = [[PostgresResource::HaType::NONE, 0, "No Standbys", "No replication"],
@@ -114,4 +122,9 @@ module Option
     PostgresResource::Flavor::PARADEDB => ["16", "17"],
     PostgresResource::Flavor::LANTERN => ["16"]
   }
+
+  POSTGRES_BILLING_RESOURCE_TYPES = {
+    "VmCores" => {primary: "PostgresCores", standby: "PostgresStandbyCores"},
+    "VmCpuPercent" => {primary: "PostgresCpuPercent", standby: "PostgresStandbyCpuPercent"}
+  }.freeze
 end
