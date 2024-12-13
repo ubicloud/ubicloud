@@ -49,10 +49,6 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   label def wait
     nap 20 * 60 if postgres_timeline.blob_storage.nil?
 
-    if postgres_timeline.need_backup?
-      hop_take_backup
-    end
-
     # For the purpose of missing backup pages, we act like the very first backup
     # is taken at the creation, which ensures that we would get a page if and only
     # if no backup is taken for 2 days.
@@ -61,6 +57,10 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       Prog::PageNexus.assemble("Missing backup at #{postgres_timeline}!", ["MissingBackup", postgres_timeline.id], postgres_timeline.ubid)
     else
       Page.from_tag_parts("MissingBackup", postgres_timeline.id)&.incr_resolve
+    end
+
+    if postgres_timeline.need_backup?
+      hop_take_backup
     end
 
     nap 20 * 60
