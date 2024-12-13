@@ -30,9 +30,10 @@ class Clover
             r.redirect "#{@project.path}/user"
           end
 
+          tag = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").first(name: policy)
           if (user = Account.exclude(status_id: 3)[email: email])
             user.associate_with_project(@project)
-            @project.subject_tags_dataset.first(name: policy)&.add_subject(user.id)
+            tag&.add_subject(user.id)
             Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
               greeting: "Hello,",
               body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
@@ -41,7 +42,7 @@ class Clover
               button_title: "Join Project",
               button_link: "#{Config.base_url}#{@project.path}/dashboard")
           else
-            @project.add_invitation(email: email, policy: policy, inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
+            @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
             Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
               greeting: "Hello,",
               body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
@@ -51,7 +52,7 @@ class Clover
               button_link: "#{Config.base_url}/create-account")
           end
 
-          flash["notice"] = "Invitation sent successfully to '#{email}'. You need to add some policies to allow new user to operate in the project."
+          flash["notice"] = "Invitation sent successfully to '#{email}'."
 
           r.redirect "#{@project.path}/user"
         end
@@ -163,8 +164,11 @@ class Clover
         authorize("Project:user", @project.id)
 
         invitation_policies = r.params["invitation_policies"] || {}
+        allowed_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
         invitation_policies.each do |email, policy|
-          @project.invitations.find { _1.email == email }&.update(policy: policy)
+          if allowed_tags[policy]
+            @project.invitations.find { _1.email == email }&.update(policy: policy)
+          end
         end
 
         flash["notice"] = "Subject tags for invited users updated successfully."
