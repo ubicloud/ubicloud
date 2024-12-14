@@ -50,10 +50,10 @@ module ThawedMock
   # Models
   allow_mocking(Account, :[])
   allow_mocking(Address, :where)
+  allow_mocking(ArchivedRecord, :create)
   allow_mocking(AssignedVmAddress, :create_with_id)
   allow_mocking(BillingRecord, :create_with_id)
   allow_mocking(BootImage, :where)
-  allow_mocking(DeletedRecord, :create)
   allow_mocking(DnsRecord, :[], :create)
   allow_mocking(DnsZone, :[], :where)
   allow_mocking(FirewallsPrivateSubnets, :where)
