@@ -78,6 +78,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def bootstrap_control_plane_vm
     nap 5 if kubernetes_cluster.load_balancer.hostname.nil?
 
+    if kubernetes_cluster.vms.count >= 3
+      hop_wait
+    end
+
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi",
       kubernetes_cluster.projects.first.id,
@@ -165,27 +169,22 @@ BASH
     # second question: how should we do it?
     # maybe for now:
     # sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf create -f https://cni-installation-url")
-    hop_complete_cluster_bootstrap
-  end
-
-  label def complete_cluster_bootstrap
-    if kubernetes_cluster.vms.count >= 3
-      hop_wait
-    end
-
-    upload_cert_output = first_control_plane.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")
-    set_frame("join_token", first_control_plane.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication"))
-    set_frame("certificate_key", upload_cert_output[/certificate key: (.*)/, 1])
-    set_frame("discovery_token_ca_cert_hash", upload_cert_output[/discovery-token-ca-cert-hash sha256: (.*)/, 1])
     hop_bootstrap_control_plane_vm
   end
 
   label def join_control_plane_vm
+    set_frame("join_token", first_control_plane.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", ""))
+    set_frame("certificate_key", first_control_plane.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1])
+    set_frame("discovery_token_ca_cert_hash", first_control_plane.sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1])
+    hop_execute_join_control_plane_vm
+  end
+
+  label def execute_join_control_plane_vm
     case current_vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
     when "Succeeded"
-      hop_complete_cluster_bootstrap
+      hop_bootstrap_control_plane_vm
     when "NotStarted", "Failed"
-      current_vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node ##{kubernetes_cluster.load_balancer.hostname} #{frame["join_token"]} #{frame["discovery_token_ca_cert_hash"]} #{frame["certificate_key"]}' join_control_plane")
+      current_vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.load_balancer.hostname}:443 #{frame["join_token"]} #{frame["discovery_token_ca_cert_hash"]} #{frame["certificate_key"]}' join_control_plane")
       # when "Failed"
       #   fail "could not join control-plane node"
       # maybe page someone. read logs
