@@ -3,6 +3,7 @@ $(function() {
   setupAutoRefresh();
   setupDatePicker();
   setupFormOptionUpdates();
+  setupPlayground();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -282,4 +283,114 @@ function redrawChildOptions(name){
       redrawChildOptions(child_name);
     });
   }
+}
+
+function setupPlayground() {
+  if ($(document).attr('title') !== 'Ubicloud - Playground') {
+    return;
+  }
+
+  let controller = null;
+
+  const generate = async () => {
+    const prompt = $('#ai-prompt').val();
+    const endpoint = $('#ai-endpoint').val();
+    const token = $('#ai-token').val();
+
+    if (!prompt) {
+      alert("Please enter a prompt.");
+      return;
+    }
+    if (!endpoint) {
+      alert("Please select an inference endpoint.");
+      return;
+    }
+    if (!token) {
+      alert("Please select an inference token.");
+      return;
+    }
+
+    $('#ai-submit').prop("disabled", true);
+    $('#ai-stop').prop("disabled", false);
+    $('#ai-response').text("");
+
+    controller = new AbortController();
+    const signal = controller.signal;
+
+    try {
+      const response = await fetch(`${model}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          model: $('#ai-endpoint').text().trim(),
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 1000,
+          stream: true,
+        }),
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Response status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      $('#ai-response').text("");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value).trim();
+        const lines = chunk.split("data: ");
+        const parsedLines = lines
+          .filter((line) => line !== "" && line !== "[DONE]")
+          .map((line) => JSON.parse(line));
+
+        parsedLines.forEach((parsedLine) => {
+          const content = parsedLine?.choices?.[0]?.delta?.content;
+          if (content) {
+            $('#ai-response').append(content);
+          }
+        });
+      }
+    }
+    catch (error) {
+      let errorMessage;
+
+      if (signal.aborted) {
+        errorMessage = "Request aborted.";
+      } else if (error instanceof TypeError && error.message === "Failed to fetch") {
+        errorMessage = "Failed to get a response from the endpoint. The token may be invalid.";
+      } else {
+        errorMessage = `An error occurred: ${error.message}`;
+      }
+
+      $('#ai-response').text(errorMessage);
+    } finally {
+      $('#ai-submit').prop("disabled", false);
+      $('#ai-stop').prop("disabled", true);
+      controller = null;
+    }
+  };
+
+  $('#ai-submit').on("click", generate);
+  $('#ai-prompt').on("keyup", (event) => {
+    if (event.key === "Enter" && $('#ai-submit').is(":enabled")) {
+      generate();
+    }
+  });
+
+  $('#ai-stop').on("click", () => {
+    if (controller) {
+      controller.abort();
+      controller = null;
+    }
+  });
+
+  $('#ai-stop').prop("disabled", true);
 }
