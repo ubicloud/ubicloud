@@ -104,9 +104,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_prerequistes_on_control_plane
     current_vm.sshable.cmd <<BASH
 set -ueo pipefail
-sudo mkdir -p /etc/kubernetes/pki/etcd
-sudo mkdir -p /run/cluster-api
-sudo mkdir -p /run/kubeadm
 sudo sed -i '/^#net\\.ipv4\\.ip_forward=1/s/^#//' /etc/sysctl.conf
 sudo sysctl -p
 sudo modprobe br_netfilter
@@ -200,6 +197,7 @@ BASH
   label def destroy
     kubernetes_cluster.load_balancer.incr_destroy
     kubernetes_cluster.vms.map(&:incr_destroy)
+    # kubernetes_cluster.kubernetes_nodepool. how to delete child nodepool?
     kubernetes_cluster.projects.map { kubernetes_cluster.dissociate_with_project(_1) }
     pop "kubernetes cluster is deleted"
   end

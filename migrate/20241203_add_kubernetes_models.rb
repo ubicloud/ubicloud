@@ -39,5 +39,16 @@ Sequel.migration do
 
       foreign_key [:kubernetes_cluster_id], :kubernetes_cluster, key: :id, on_delete: :cascade
     end
+
+    create_table(:kubernetes_nodepools_vm) do
+      primary_key :id, :uuid, default: Sequel.lit("gen_random_uuid()")
+      column :kubernetes_nodepool_id, :uuid, null: false
+      column :vm_id, :uuid, null: false
+
+      foreign_key [:kubernetes_nodepool_id], :kubernetes_nodepool, key: :id, on_delete: :cascade
+      foreign_key [:vm_id], :vm, key: :id, on_delete: :cascade
+
+      index [:kubernetes_nodepool_id, :vm_id], unique: true
+    end
   end
 end

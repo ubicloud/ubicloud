@@ -19,6 +19,7 @@ class Project < Sequel::Model
   many_to_many :load_balancers, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :inference_endpoints, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :kubernetes_clusters, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :kubernetes_nodepools, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: :ProjectQuota, key: :project_id
