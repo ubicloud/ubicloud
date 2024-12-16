@@ -200,7 +200,7 @@ RSpec.describe UBID do
     prj = account.create_project_with_default_policy("x")
     expect(prj.ubid).to start_with UBID::TYPE_PROJECT
 
-    policy = prj.access_policies.first
+    policy = AccessPolicy.create_with_id(project_id: prj.id, name: "Any", body: "[]")
     expect(policy.ubid).to start_with UBID::TYPE_ACCESS_POLICY
 
     atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
@@ -255,7 +255,7 @@ RSpec.describe UBID do
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
-    policy = project.access_policies.first
+    policy = AccessPolicy.create_with_id(project_id: project.id, name: "Any", body: "[]")
     atag = AccessTag.create_with_id(project_id: project.id, hyper_tag_table: "x", name: "x")
     subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x")
     nic = Nic.create_with_id(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")

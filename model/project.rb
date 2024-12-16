@@ -5,6 +5,8 @@ require_relative "../model"
 class Project < Sequel::Model
   one_to_many :access_tags
   one_to_many :access_policies
+  one_to_many :access_control_entries
+  one_to_many :subject_tags, order: :name
   one_to_one :billing_info, key: :id, primary_key: :billing_info_id
   one_to_many :usage_alerts
   one_to_many :github_installations
@@ -56,6 +58,11 @@ class Project < Sequel::Model
     else
       location_max_capacity[:location]
     end
+  end
+
+  def disassociate_subject(subject_id)
+    DB[:applied_subject_tag].where(tag_id: subject_tags_dataset.select(:id), subject_id:).delete
+    AccessControlEntry.where(project_id: id, subject_id:).destroy
   end
 
   def path

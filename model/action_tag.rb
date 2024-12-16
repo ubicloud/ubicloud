@@ -3,6 +3,13 @@
 require_relative "../model"
 
 class ActionTag < Sequel::Model
+  include ResourceMethods
+
+  def add_action(action_id)
+    # Support both action names and action type UUIDs
+    action_id = ActionType::NAME_MAP.fetch(action_id) unless action_id.include?("-")
+    DB[:applied_action_tag].insert(tag_id: id, action_id:)
+  end
 end
 
 # Table: action_tag
