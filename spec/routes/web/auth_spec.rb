@@ -101,7 +101,9 @@ RSpec.describe Clover, "auth" do
 
   it "can create new account, verify it, and visit project which invited with default policy" do
     p = Project.create_with_id(name: "Invited-project").tap { _1.associate_with_project(_1) }
-    p.add_invitation(email: TEST_USER_EMAIL, policy: "admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+    subject_id = SubjectTag.create_with_id(project_id: p.id, name: "Admin").id
+    AccessControlEntry.create_with_id(project_id: p.id, subject_id:, action_id: ActionType::NAME_MAP["Project:view"])
+    p.add_invitation(email: TEST_USER_EMAIL, policy: "Admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
     visit "/create-account"
     fill_in "Full Name", with: "John Doe"
