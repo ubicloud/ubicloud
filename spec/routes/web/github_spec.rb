@@ -29,7 +29,9 @@ RSpec.describe Clover, "github" do
 
   it "raises forbidden when does not have permissions to access already enabled installation" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
-    project.access_policies.first.update(body: {})
+    project
+    installation
+    AccessControlEntry.dataset.update(action_id: ActionType::NAME_MAP["Project:view"])
 
     visit "/github/callback?code=123123&installation_id=#{installation.installation_id}"
 
@@ -50,7 +52,7 @@ RSpec.describe Clover, "github" do
   it "raises forbidden when does not have permissions to the project in session" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
-    project.access_policies.first.update(body: {})
+    AccessControlEntry.dataset.destroy
 
     visit "/github/callback?code=123123&installation_id=345"
 

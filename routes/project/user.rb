@@ -108,6 +108,7 @@ class Clover
         r.delete String do |ubid|
           if (token = current_account.api_keys_dataset.with_pk(UBID.to_uuid(ubid)))
             token.destroy
+            @project.disassociate_subject(token.id)
             flash["notice"] = "Personal access token deleted successfully"
           end
           204
@@ -173,14 +174,7 @@ class Clover
           next {error: {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}}
         end
 
-        hyper_tag = user.hyper_tag_name(@project)
-        @project.access_policies_dataset.where(managed: true).each do |policy|
-          if policy.body["acls"].first["subjects"].include?(hyper_tag)
-            policy.body["acls"].first["subjects"].delete(hyper_tag)
-            policy.modified!(:body)
-            policy.save_changes
-          end
-        end
+        @project.disassociate_subject(user.id)
         user.dissociate_with_project(@project)
 
         # Javascript refreshes page

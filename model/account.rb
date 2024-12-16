@@ -17,11 +17,17 @@ class Account < Sequel::Model(:accounts)
 
   include Authorization::TaggableMethods
 
-  def create_project_with_default_policy(name, default_policy: Authorization::ManagedPolicy::Admin)
+  def create_project_with_default_policy(name, default_policy: true)
     project = Project.create_with_id(name: name)
     project.associate_with_project(project)
     associate_with_project(project)
-    default_policy&.apply(project, [self])
+
+    if default_policy # Grant user Admin access
+      subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Admin")
+      subject_tag.add_subject(id)
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: subject_tag.id)
+    end
+
     project
   end
 
