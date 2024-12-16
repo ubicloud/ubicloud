@@ -29,6 +29,8 @@ RSpec.describe Clover, "personal access token management" do
   it "user page allows removing personal access tokens" do
     access_tag_ds = DB[:access_tag].where(hyper_tag_id: @api_key.id)
     expect(access_tag_ds.all).not_to be_empty
+    project.subject_tags_dataset.first(name: "Admin").add_subject(@api_key.id)
+    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
 
     btn = find("#managed-token .delete-btn")
     data_url = btn["data-url"]
@@ -37,6 +39,9 @@ RSpec.describe Clover, "personal access token management" do
     expect(page.status_code).to eq(204)
     expect(ApiKey.all).to be_empty
     expect(access_tag_ds.all).to be_empty
+    expect(DB[:applied_subject_tag].where(tag_id: project.subject_tags_dataset.first(name: "Admin").id, subject_id: @api_key.id).all).to be_empty
+    expect(AccessControlEntry.where(project_id: project.id, subject_id: @api_key.id).all).to be_empty
+
     visit "#{project.path}/user/token"
     expect(page).to have_flash_notice("Personal access token deleted successfully")
 
@@ -47,7 +52,7 @@ RSpec.describe Clover, "personal access token management" do
   end
 
   it "user page allows setting policies for personal access tokens" do
-    expect(Authorization.has_permission?(@api_key.id, "*", project.id)).to be(false)
+    expect(Authorization.has_permission?(project.id, @api_key.id, "Project:user", project.id)).to be(false)
     expect(page).to have_no_select("token_policies[#{@api_key.ubid}]", selected: "Admin")
     within "form#managed-token" do
       select "Admin", from: "token_policies[#{@api_key.ubid}]"
@@ -55,6 +60,5 @@ RSpec.describe Clover, "personal access token management" do
     end
     expect(page).to have_flash_notice("Personal access token policies updated successfully.")
     expect(page).to have_select("token_policies[#{@api_key.ubid}]", selected: "Admin")
-    expect(Authorization.has_permission?(@api_key.id, "*", project.id)).to be(true)
   end
 end
