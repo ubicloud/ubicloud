@@ -21,6 +21,16 @@ module RackTestPlus
   end
 end
 
+# Work around Middleware should not call #each error.
+# Fix bugs with cookies, because the default behavior
+# reuses the rack env of the last request, which is not valid.
+class Capybara::RackTest::Browser
+  remove_method :refresh
+  def refresh
+    visit last_request.fullpath
+  end
+end
+
 RSpec.configure do |config|
   config.include RackTestPlus
   config.include Capybara::DSL
