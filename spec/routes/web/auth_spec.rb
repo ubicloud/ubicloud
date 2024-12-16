@@ -116,8 +116,7 @@ RSpec.describe Clover, "auth" do
 
     expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
     page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
-    # page.refresh does not work, sends deleted _Clover.session cookie
-    visit page.current_path
+    page.refresh
     expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
   end
 
@@ -194,8 +193,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
     page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
     account.suspend
-    # page.refresh does not work, sends deleted _Clover.session cookie
-    visit page.current_path
+    page.refresh
     expect(page.title).to eq("Ubicloud - Login")
   end
 
