@@ -6,6 +6,11 @@ class ActionTag < Sequel::Model
   include ResourceMethods
   include AccessControlModelTag
 
+  def add_member(action)
+    action = ActionType::NAME_MAP[action] unless action.include?("-")
+    super
+  end
+
   def self.valid_member?(project_id, action)
     case action
     when ActionTag

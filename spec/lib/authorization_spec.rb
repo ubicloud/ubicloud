@@ -32,93 +32,145 @@ RSpec.describe Authorization do
   end
 
   describe "#matched_policies" do
+    def add_separate_aces(policies)
+      project_id = projects[0].id
+      ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
+      Array(ace_subjects).each do |subject_id|
+        Array(ace_actions).each do |action|
+          action_id = ActionType::NAME_MAP[action] if action
+          Array(ace_objects).each do |object_id|
+            AccessControlEntry.create_with_id(project_id:, subject_id:, action_id:, object_id:)
+          end
+        end
+      end
+    end
+
+    def add_single_ace(policies)
+      project_id = projects[0].id
+      ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
+
+      subject_tag = SubjectTag.create_with_id(project_id:, name: "S")
+      Array(ace_subjects).each do |subject_id|
+        subject_tag.add_subject(subject_id)
+      end
+
+      action_id = unless ace_actions == [nil]
+        action_tag = ActionTag.create_with_id(project_id:, name: "A")
+        Array(ace_actions).each_with_index do |action_id, i|
+          action_id = ActionType::NAME_MAP[action_id] if i > 0
+          action_tag.add_action(action_id)
+        end
+        action_tag.id
+      end
+
+      object_id = unless ace_objects == [nil]
+        object_tag = ObjectTag.create_with_id(project_id:, name: "A")
+        Array(ace_objects).each do |object_id|
+          object_tag.add_object(object_id)
+        end
+        object_tag.id
+      end
+
+      AccessControlEntry.create_with_id(project_id:, subject_id: subject_tag.id, action_id:, object_id:)
+    end
+
     it "without specific object" do
+      AccessControlEntry.dataset.destroy
+      project_id = projects[0].id
+
       [
-        [[], SecureRandom.uuid, "Vm:view", 0],
-        [[], SecureRandom.uuid, ["Vm:view"], 0],
-        [[], SecureRandom.uuid, ["Vm:view"], 0],
-        [[], users[0].id, "Vm:view", 0],
-        [[], users[0].id, ["Vm:view"], 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, "Vm:view", 12],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, ["Vm:view", "Vm:create"], 12],
-        [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name]}], users[0].id, "Vm:view", 12],
-        [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], 12],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: vms.map { _1.hyper_tag_name(access_policy.project) }}], users[0].id, "Vm:view", 2],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "*", objects: vms[0].hyper_tag_name(access_policy.project)}], users[0].id, "Vm:view", 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:view", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:edit", 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Postgres:edit", objects: pg.hyper_tag_name(access_policy.project)}], users[0].id, "Postgres:view", 0]
+        [{}, SecureRandom.uuid, "Vm:view", 0],
+        [{}, SecureRandom.uuid, ["Vm:view"], 0],
+        [{}, SecureRandom.uuid, ["Vm:view"], 0],
+        [{}, users[0].id, "Vm:view", 0],
+        [{}, users[0].id, ["Vm:view"], 0],
+        [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, "Vm:view", 1],
+        [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], 1],
+        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], 1],
+        [{subjects: users[0].id, actions: "Vm:view", objects: vms[0].id}, users[0].id, "Vm:view", 1],
+        [{subjects: users[0].id, actions: "Vm:view", objects: vms.map { _1.id }}, users[0].id, "Vm:view", 4],
+        [{subjects: users[0].id, actions: "Vm:delete", objects: vms[0].id}, users[0].id, "Vm:view", 0],
+        [{subjects: users[0].id, actions: %w[Vm:view Vm:delete], objects: vms[0].id}, users[0].id, "Vm:view", 1],
+        [{subjects: users[0].id, actions: [nil], objects: vms[0].id}, users[0].id, "Vm:view", 1],
+        [{subjects: users[0].id, actions: "Postgres:view", objects: pg.id}, users[0].id, "Postgres:edit", 0],
+        [{subjects: users[0].id, actions: "Postgres:edit", objects: pg.id}, users[0].id, "Postgres:view", 0],
+        [{subjects: users[0].id, actions: "Postgres:view", objects: pg.id}, users[0].id, "Postgres:view", 1]
       ].each do |policies, subject_id, actions, matched_count|
-        access_policy.update(body: {acls: policies})
-        expect(described_class.matched_policies(subject_id, actions).count).to eq(matched_count)
+        DB.transaction(rollback: :always) do
+          add_separate_aces(policies)
+          expect(described_class.matched_policies(project_id, subject_id, actions).count).to eq(matched_count)
+        end
+
+        DB.transaction(rollback: :always) do
+          add_single_ace(policies)
+          expect(described_class.matched_policies(project_id, subject_id, actions).count).to eq((matched_count == 0) ? 0 : 1)
+        end
+
+        # XXX: Add test for nested tag inclusion
       end
     end
 
     it "with specific object" do
+      AccessControlEntry.dataset.destroy
+      project_id = projects[0].id
+
       [
-        [[], SecureRandom.uuid, "Vm:view", SecureRandom.uuid, 0],
-        [[], SecureRandom.uuid, ["Vm:view"], SecureRandom.uuid, 0],
-        [[], SecureRandom.uuid, ["Vm:view"], vms[0].id, 0],
-        [[], users[0].id, ["Vm:view"], vms[0].id, 0],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, "Vm:view", vms[0].id, 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:view", objects: projects[0].hyper_tag_name}], users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
-        [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name]}], users[0].id, "Vm:view", vms[0].id, 1],
-        [[{subjects: [users[0].hyper_tag_name, users[1].hyper_tag_name], actions: ["Vm:view", "Vm:delete"], objects: [projects[0].hyper_tag_name]}], users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
-        [[{subjects: users[0].hyper_tag_name, actions: "Vm:delete", objects: projects[0].hyper_tag_name}], users[0].id, "Vm:view", vms[0].id, 0],
-        [[{subjects: [users[0].hyper_tag_name], actions: ["Vm:view"], objects: [projects[0].hyper_tag_name, projects[0].hyper_tag_name]}], users[0].id, "Vm:view", vms[0].id, 1]
+        [{}, SecureRandom.uuid, "Vm:view", SecureRandom.uuid, 0],
+        [{}, SecureRandom.uuid, ["Vm:view"], SecureRandom.uuid, 0],
+        [{}, SecureRandom.uuid, ["Vm:view"], vms[0].id, 0],
+        [{}, users[0].id, ["Vm:view"], vms[0].id, 0],
+        [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Vm:view", objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
+        [{subjects: [users[0].id], actions: ["Vm:view"], objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: [nil]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Vm:delete", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 0],
+        [{subjects: [users[0].id], actions: ["Vm:view"], objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Vm:view", objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Vm:view", objects: [vms[0].id, vms[1].id]}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
+        [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: vms[0].id}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Vm:delete", objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 0],
+        [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[0].id}, users[0].id, "Vm:view", vms[0].id, 1],
+        [{subjects: users[0].id, actions: "Vm:view", objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
+        [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
+        [{subjects: [users[0].id, users[1].id], actions: ["Vm:view", "Vm:delete"], objects: vms[1].id}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 0],
+        [{subjects: users[0].id, actions: "Vm:delete", objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
+        [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0]
       ].each do |policies, subject_id, actions, object_id, matched_count|
-        access_policy.update(body: {acls: policies})
-        expect(described_class.matched_policies(subject_id, actions, object_id).count).to eq(matched_count)
+        DB.transaction(rollback: :always) do
+          add_separate_aces(policies)
+          expect(described_class.matched_policies(project_id, subject_id, actions, object_id).count).to eq(matched_count)
+        end
+
+        DB.transaction(rollback: :always) do
+          add_single_ace(policies)
+          expect(described_class.matched_policies(project_id, subject_id, actions, object_id).count).to eq((matched_count == 0) ? 0 : 1)
+        end
+
+        # XXX: Add test for nested tag inclusion
       end
     end
   end
 
   describe "#has_permission?" do
     it "returns true when has matched policies" do
-      expect(described_class.has_permission?(users[0].id, "Vm:view", vms[0].id)).to be(true)
+      expect(described_class.has_permission?(projects[0].id, users[0].id, "Vm:view", vms[0].id)).to be(true)
     end
 
     it "returns false when has no matched policies" do
-      access_policy.update(body: [])
-      expect(described_class.has_permission?(users[0].id, "Vm:view", vms[0].id)).to be(false)
+      AccessControlEntry.dataset.destroy
+      expect(described_class.has_permission?(projects[0].id, users[0].id, "Vm:view", vms[0].id)).to be(false)
     end
   end
 
   describe "#authorize" do
     it "not raises error when has matched policies" do
-      expect { described_class.authorize(users[0].id, "Vm:view", vms[0].id) }.not_to raise_error
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].id) }.not_to raise_error
     end
 
     it "raises error when has no matched policies" do
-      access_policy.update(body: [])
-      expect { described_class.authorize(users[0].id, "Vm:view", vms[0].id) }.to raise_error Authorization::Unauthorized
-    end
-  end
-
-  describe "#authorized_resources_dataset" do
-    it "returns resource ids when has matched policies" do
-      ids = [vms[0].id, vms[1].id, projects[0].id, users[0].id, vms[0].private_subnets[0].id, vms[1].private_subnets[0].id, vms[0].firewalls[0].id, vms[1].firewalls[0].id]
-      expect(described_class.authorized_resources_dataset(users[0].id, "Vm:view").map(:tagged_id).sort).to eq(ids.sort)
-    end
-
-    it "returns no resource ids when has no matched policies" do
-      access_policy.update(body: [])
-      expect(described_class.authorized_resources_dataset(users[0].id, "Vm:view")).to be_empty
-    end
-  end
-
-  describe "#expand_actions" do
-    it "returns expanded actions" do
-      [
-        ["*", ["*"]],
-        ["Vm:*", ["Vm:*", "*"]],
-        ["Vm:view", ["Vm:view", "Vm:*", "*"]],
-        [["Vm:view", "PrivateSubnet:view"], ["Vm:view", "PrivateSubnet:view", "Vm:*", "PrivateSubnet:*", "*"]]
-      ].each do |actions, expected|
-        expect(described_class.expand_actions(actions)).to match_array(expected)
-      end
+      AccessControlEntry.dataset.destroy
+      expect { described_class.authorize(projects[0].id, users[0].id, "Vm:view", vms[0].id) }.to raise_error Authorization::Unauthorized
     end
   end
 
@@ -144,13 +196,12 @@ RSpec.describe Authorization do
   end
 
   describe "#Dataset" do
-    it "returns authorized resources" do
-      ids = [vms[0].id, vms[1].id]
-      expect(Vm.authorized(users[0].id, "Vm:view").select_map(:id).sort).to eq(ids.sort)
-    end
-
-    it "returns no authorized resources" do
-      expect(Vm.authorized(users[0].id, "Vm:view").select_map(:id).sort).to eq([])
+    it "returns authorized resources for user and project" do
+      vms
+      expect(Vm.authorized(projects[0].id, users[0].id, "Vm:view").select_map(:id).sort).to eq([vms[0].id, vms[1].id].sort)
+      expect(Vm.authorized(projects[0].id, users[1].id, "Vm:view").select_map(:id)).to be_empty
+      expect(Vm.authorized(projects[1].id, users[0].id, "Vm:view").select_map(:id)).to be_empty
+      expect(Vm.authorized(projects[1].id, users[1].id, "Vm:view").select_map(:id).sort).to eq([vms[2].id, vms[3].id].sort)
     end
   end
 

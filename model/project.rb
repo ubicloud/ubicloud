@@ -62,6 +62,11 @@ class Project < Sequel::Model
     end
   end
 
+  def disassociate_subject(subject_id)
+    DB[:applied_subject_tag].where(tag_id: subject_tags_dataset.select(:id), subject_id:).delete
+    AccessControlEntry.where(project_id: id, subject_id:).destroy
+  end
+
   def path
     "/project/#{ubid}"
   end
