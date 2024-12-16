@@ -306,6 +306,7 @@ GEM
     sequel_pg (1.17.1)
       pg (>= 0.18.0, != 1.2.0)
       sequel (>= 4.38.0)
+    shellwords (0.1.0)
     simplecov (0.22.0)
       docile (~> 1.1)
       simplecov-html (~> 0.11)
@@ -426,6 +427,7 @@ DEPENDENCIES
   sequel (>= 5.87)
   sequel-annotate
   sequel_pg (>= 1.8)
+  shellwords
   simplecov
   standard (>= 1.24.3)
   stripe
