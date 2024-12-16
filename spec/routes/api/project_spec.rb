@@ -141,7 +141,7 @@ RSpec.describe Clover, "project" do
           it "success with authorized personal access token" do
             project = user.create_project_with_default_policy("project-1")
             @pat.associate_with_project(project)
-            Authorization::ManagedPolicy::ManagedPolicyClass.new("pat-1", ["Project:view"]).apply(project, [@pat])
+            AccessControlEntry.create_with_id(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:view"])
 
             get "/project/#{project.ubid}"
 
@@ -152,7 +152,7 @@ RSpec.describe Clover, "project" do
           it "failure with unauthorized personal access token" do
             project = user.create_project_with_default_policy("project-1")
             @pat.associate_with_project(project)
-            Authorization::ManagedPolicy::ManagedPolicyClass.new("pat-1", ["Project:edit"]).apply(project, [@pat])
+            AccessControlEntry.create_with_id(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:edit"])
 
             get "/project/#{project.ubid}"
             expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")

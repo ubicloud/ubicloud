@@ -7,46 +7,38 @@ module Authorization
     end
   end
 
-  def self.has_permission?(subject_id, actions, object_id)
-    !matched_policies_dataset(subject_id, actions, object_id).empty?
+  def self.has_permission?(project_id, subject_id, actions, object_id)
+    !matched_policies_dataset(project_id, subject_id, actions, object_id).empty?
   end
 
-  def self.authorize(subject_id, actions, object_id)
-    unless has_permission?(subject_id, actions, object_id)
+  def self.authorize(project_id, subject_id, actions, object_id)
+    unless has_permission?(project_id, subject_id, actions, object_id)
       fail Unauthorized
     end
   end
 
-  def self.all_permissions(subject_id, object_id)
-    matched_policies_dataset(subject_id, nil, object_id).select_map(:actions).tap(&:flatten!)
+  def self.all_permissions(project_id, subject_id, object_id)
+    # XXX: Need to use recursive CTEs for nested tag inclusion
+    DB[:action_type]
+      .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
+      .where(Sequel.or([DB[:action_ids], DB[:applied_action_tag].select(:action_id).where(tag_id: DB[:action_ids])].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists)
+      .select_order_map(:name)
   end
 
-  def self.authorized_resources_dataset(subject_id, actions)
-    matched_policies_dataset(subject_id, actions).select(Sequel[:applied_tag][:tagged_id])
-  end
+  def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
+    # XXX: Need to use recursive CTEs for nested tag inclusion
+    dataset = DB[:access_control_entry]
+      .where(project_id:)
+      .where(Sequel.or([subject_id, DB[:applied_subject_tag].select(:tag_id).where(subject_id:)].map { [:subject_id, _1] }))
 
-  def self.expand_actions(actions)
-    extended_actions = Set["*"]
-    Array(actions).each do |action|
-      extended_actions << action
-      parts = action.split(":")
-      parts[0..-2].each_with_index.each { |_, i| extended_actions << "#{parts[0..i].join(":")}:*" }
+    if actions
+      cond = Sequel.expr(action_id: nil)
+      Array(actions).each do |action|
+        action_id = ActionType::NAME_MAP.fetch(action)
+        cond |= Sequel.or([action_id, DB[:applied_action_tag].select(:tag_id).where(action_id:)].map { [:action_id, _1] })
+      end
+      dataset = dataset.where(cond)
     end
-    extended_actions.to_a
-  end
-
-  def self.matched_policies_dataset(subject_id, actions = nil, object_id = nil)
-    dataset = DB.from { access_policy.as(:acl) }
-      .select(Sequel[:applied_tag][:tagged_id], Sequel[:applied_tag][:tagged_table], :subjects, :actions, :objects)
-      .cross_join(Sequel.pg_jsonb_op(Sequel[:acl][:body])["acls"].to_recordset.as(:items, [:subjects, :actions, :objects].map { |c| Sequel.lit("#{c} JSONB") }))
-      .join(:access_tag, project_id: Sequel[:acl][:project_id]) do
-        Sequel.pg_jsonb_op(:objects).has_key?(Sequel[:access_tag][:name])
-      end
-      .join(:applied_tag, access_tag_id: :id)
-      .join(:access_tag, {project_id: Sequel[:acl][:project_id]}, table_alias: :subject_access_tag) do
-        Sequel.pg_jsonb_op(:subjects).has_key?(Sequel[:subject_access_tag][:name])
-      end
-      .join(:applied_tag, {access_tag_id: :id, tagged_id: subject_id}, table_alias: :subject_applied_tag)
 
     if object_id
       begin
@@ -57,18 +49,14 @@ module Authorization
         object_id = ubid.to_uuid
       end
 
-      dataset = dataset.where(Sequel[:applied_tag][:tagged_id] => object_id)
-    end
-
-    if actions
-      dataset = dataset.where(Sequel.pg_jsonb_op(:actions).contain_any(Sequel.pg_array(expand_actions(actions))))
+      dataset = dataset.where(Sequel.or([nil, object_id, DB[:applied_object_tag].select(:tag_id).where(object_id:)].map { [:object_id, _1] }))
     end
 
     dataset
   end
 
-  def self.matched_policies(subject_id, actions = nil, object_id = nil)
-    matched_policies_dataset(subject_id, actions, object_id).all
+  def self.matched_policies(project_id, subject_id, actions = nil, object_id = nil)
+    matched_policies_dataset(project_id, subject_id, actions, object_id).all
   end
 
   module ManagedPolicy
@@ -113,12 +101,25 @@ module Authorization
   end
 
   module Dataset
-    def authorized(subject_id, actions)
+    def authorized(project_id, subject_id, actions)
       # We can't use "id" column directly, because it's ambiguous in big joined queries.
       # We need to determine table of id explicitly.
       # @opts is the hash of options for this dataset, and introduced at Sequel::Dataset.
       from = @opts[:from].first
-      where { {Sequel[from][:id] => Authorization.authorized_resources_dataset(subject_id, actions)} }
+
+      # XXX: Need to use recursive CTEs for nested tag inclusion
+      ds = DB[:object_ids]
+        .union(DB[:applied_object_tag].select(:object_id).where(tag_id: DB[:object_ids]))
+        .with(:object_ids, Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id))
+
+      where(Sequel.|(
+        # Allow where there is a specific entry for the object,
+        {Sequel[from][:id] => ds},
+        # or where the action is allowed for all objects in the project,
+        (ds.where(object_id: nil).exists &
+          # and the object is in the project via a hypertag.
+          {project_id => DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])})
+      ))
     end
   end
 

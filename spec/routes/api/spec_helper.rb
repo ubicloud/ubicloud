@@ -19,8 +19,8 @@ RSpec.configure do |config|
     project = account.create_project_with_default_policy(name)
 
     if @pat
+      SubjectTag.first(project_id: project.id, name: "Admin").add_subject(@pat.id)
       @pat.associate_with_project(project)
-      Authorization::ManagedPolicy::Admin.apply(project, [@pat], append: true)
     end
 
     project

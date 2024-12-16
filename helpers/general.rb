@@ -62,31 +62,35 @@ class Clover < Roda
 
   def authorize(actions, object_id)
     each_authorization_id do |id|
-      Authorization.authorize(id, actions, object_id)
+      Authorization.authorize(@project.id, id, actions, object_id)
     end
   end
 
   def has_permission?(actions, object_id)
     each_authorization_id.all? do |id|
-      Authorization.has_permission?(id, actions, object_id)
+      Authorization.has_permission?(@project.id, id, actions, object_id)
     end
   end
 
-  def all_permissions(actions)
+  def all_permissions(object_id)
     each_authorization_id.map do |id|
-      Authorization.all_permissions(id, actions)
+      Authorization.all_permissions(@project.id, id, object_id)
     end.reduce(:&)
   end
 
   def dataset_authorize(ds, actions)
     each_authorization_id do |id|
-      ds = ds.authorized(id, actions)
+      ds = ds.authorized(@project.id, id, actions)
     end
     ds
   end
 
   def has_project_permission(actions)
-    @project_permissions.intersection(Authorization.expand_actions(actions)).any?
+    if actions.is_a?(Array)
+      !@project_permissions.intersection(actions).empty?
+    else
+      @project_permissions.include?(actions)
+    end
   end
 
   def current_account

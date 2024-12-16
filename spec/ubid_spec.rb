@@ -200,7 +200,7 @@ RSpec.describe UBID do
     prj = account.create_project_with_default_policy("x")
     expect(prj.ubid).to start_with UBID::TYPE_PROJECT
 
-    policy = prj.access_policies.first
+    policy = AccessPolicy.create_with_id(project_id: prj.id, name: "Any", body: "[]")
     expect(policy.ubid).to start_with UBID::TYPE_ACCESS_POLICY
 
     st = SubjectTag.create_with_id(project_id: prj.id, name: "T")
@@ -269,7 +269,7 @@ RSpec.describe UBID do
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
-    policy = project.access_policies.first
+    policy = AccessPolicy.create_with_id(project_id: project.id, name: "Any", body: "[]")
     st = SubjectTag.create_with_id(project_id: project.id, name: "T")
     at = ActionTag.create_with_id(project_id: project.id, name: "T")
     ot = ObjectTag.create_with_id(project_id: project.id, name: "T")
