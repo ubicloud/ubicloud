@@ -43,7 +43,10 @@ class VmSetup
     @vp ||= VmPath.new(@vm_name)
   end
 
-  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
+  def prep(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
+    mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices,
+    boot_image, dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
     network_thread = Thread.new do
       setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
@@ -54,24 +57,35 @@ class VmSetup
     [network_thread, storage_thread].each(&:join)
     hugepages(mem_gib)
     prepare_pci_devices(pci_devices)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     start_systemd_unit
+
+    enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
-  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, pci_devices, multiqueue:)
+  def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params,
+    storage_secrets, dns_ipv4, pci_devices, slice_name, cpu_burst_percent_limit, multiqueue:)
+
     setup_networking(true, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: multiqueue)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     prepare_pci_devices(pci_devices)
     start_systemd_unit
+
+    enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
-  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
+  def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
+    mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image,
+    dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+
     cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
     setup_networking(false, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue: max_vcpus > 1)
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
-    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+
+    enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
   def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue:)
@@ -578,7 +592,7 @@ EOS
     end
   end
 
-  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+  def install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     cpu_setting = "boot=#{max_vcpus},topology=#{cpu_topology}"
 
     tapnames = nics.map { "-i #{_1.tap}" }.join(" ")
@@ -589,6 +603,7 @@ Description=A lightweight DHCP and caching DNS server
 After=network.target
 
 [Service]
+Slice=#{slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 Type=simple
 ExecStartPre=/usr/local/sbin/dnsmasq --test
@@ -636,6 +651,7 @@ After=#{@vm_name}-dnsmasq.service
 Wants=#{@vm_name}-dnsmasq.service
 
 [Service]
+Slice=#{slice_name}
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStartPre=/usr/bin/rm -f #{vp.ch_api_sock}
 
@@ -658,7 +674,18 @@ Group=#{@vm_name}
 LimitNOFILE=500000
 #{limit_memlock}
 SERVICE
+    r "systemctl set-property #{q_vm_service} CPUQuota=#{cpu_percent_limit}%" unless cpu_percent_limit == 0
     r "systemctl daemon-reload"
+  end
+
+  def enable_bursting(slice_name, cpu_burst_percent_limit)
+    # Convert cpu_burst_percent limit to a usec value. This is the additional quota every
+    # 100,000 use that the VM is occasionally allowed to burst to.
+    cpu_burst_limit = cpu_burst_percent_limit * 1000
+
+    cpu_max_burst_path = File.join("/sys/fs/cgroup", slice_name, "#{@vm_name}.service", "cpu.max.burst")
+
+    r "echo #{cpu_burst_limit} > #{cpu_max_burst_path.shellescape}"
   end
 
   def start_systemd_unit
