@@ -84,7 +84,7 @@ class Clover
     options.add_option(name: "name")
     options.add_option(name: "location", values: Option.locations.map(&:display_name))
 
-    subnets = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").map {
+    subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
       {
         location: LocationNameConverter.to_display_name(_1.location),
         value: _1.ubid,
