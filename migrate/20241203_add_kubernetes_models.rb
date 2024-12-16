@@ -17,6 +17,17 @@ Sequel.migration do
       foreign_key [:load_balancer_id], :load_balancer, key: :id, on_delete: :cascade
     end
 
+    create_table(:kubernetes_clusters_vm) do
+      primary_key :id, :uuid, default: Sequel.lit("gen_random_uuid()")
+      column :kubernetes_cluster_id, :uuid, null: false
+      column :vm_id, :uuid, null: false
+
+      foreign_key [:kubernetes_cluster_id], :kubernetes_cluster, key: :id, on_delete: :cascade
+      foreign_key [:vm_id], :vm, key: :id, on_delete: :cascade
+
+      index [:kubernetes_cluster_id, :vm_id], unique: true
+    end
+
     create_table(:kubernetes_nodepool) do
       column :id, :uuid, primary_key: true, default: Sequel.lit("gen_random_uuid()")
       column :name, :text, null: false

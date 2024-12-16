@@ -53,7 +53,6 @@ class Prog::Vnet::CertNexus < Prog::Base
     if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
       nap 10
     end
-
     dns_challenge.request_validation
 
     hop_wait_dns_validation
@@ -115,7 +114,7 @@ class Prog::Vnet::CertNexus < Prog::Base
       Clog.emit("Certificate is already revoked") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
     end
 
-    dns_zone.delete_record(record_name: dns_record_name) if dns_challenge
+    dns_zone.delete_record(record_name: dns_record_name)
     cert.destroy
     pop "certificate revoked and destroyed"
   end

@@ -1,0 +1,35 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+if ARGV.count != 2
+  fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
+end
+
+cluster_name = ARGV[0]
+load_balancer_host_name = ARGV[1]
+
+config = <<YAML
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+clusterName: #{cluster_name}
+kubernetesVersion: stable
+controlPlaneEndpoint: #{load_balancer_host_name}:443
+
+apiServer:
+  certSANs:
+    - #{load_balancer_host_name}
+
+networking:
+  podSubnet: "10.244.0.0/16"
+
+etcd:
+  local:
+    dataDir: "/var/lib/etcd"  
+YAML
+
+config_path = "/tmp/kubeadm-config.yaml"
+
+safe_write_to_file(config_path, config)
+r "sudo kubeadm init --config #{config_path}"

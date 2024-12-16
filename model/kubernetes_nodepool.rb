@@ -5,6 +5,7 @@ require_relative "../model"
 class KubernetesNodepool < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :kubernetes_cluster
+  # one_to_many :vm
 
   include ResourceMethods
   include SemaphoreMethods
