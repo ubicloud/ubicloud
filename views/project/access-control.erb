@@ -1,4 +1,10 @@
 <% @page_title = "#{@project_data[:name]} - Access Control" %>
+
+<% ace_options = [
+  ["aces[][subject]", @subject_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }],
+  ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
+  ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
+] %>
 <%== render("project/user-tabbar") %>
 
 <div class="space-y-1">
@@ -12,35 +18,26 @@
 </div>
 
 <div class="grid gap-6">
-  <div>
-    <% if (edit_perm = has_project_permission("Project:editaccess")) %>
-      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-        <div class="min-w-0 flex-1">
-          Access control in ubicloud is defined using access control entries. Each access control entry has a single
-          subject, action, and object. Access is allowed if there is an access control entry allowing the subject to
-          take the action on the object. Subjects, actions, and objects can all be tags, which are used for grouping.
-          The recommended way to handle access control in Ubicloud is to create appropriate tags, add the subjects,
-          actions, and objects to the tags, and create the minimum number of access control entries you need to enforce
-          the access you want. However, you can create access control entries referencing specific subjects, actions,
-          or objects. You can click on the Subject, Action, and Object buttons below to manage the related tags.
-        </div>
-        <div class="mb-2 md:mb-0">
-          <%== render(
-            "components/button",
-            locals: {
-              text: "Create Access Control Entry",
-              link: "#{@project_data[:path]}/user/access-control/entry/new"
-            }
-          ) %>
-        </div>
+  <% if (edit_perm = has_project_permission("Project:editaccess")) %>
+    <div class="md:flex md:items-center md:justify-between">
+      <div class="min-w-0 flex-1">
+        Access control in Ubicloud is defined using access control entries. Each access control entry has a single
+        subject, action, and object. Access is allowed if there is an access control entry allowing the subject to take
+        the action on the object. Subjects, actions, and objects can all be tags, which are used for grouping. The
+        recommended way to handle access control in Ubicloud is to create appropriate tags, add the subjects, actions,
+        and objects to the tags, and create the minimum number of access control entries you need to enforce the access
+        you want. However, you can create access control entries referencing specific subjects, actions, or objects.
+        You can click on the Subject, Action, and Object buttons below to manage the related tags.
       </div>
-    <% end %>
+    </div>
+  <% end %>
 
+  <form id="access-control-form" action="<%= "#{@project_data[:path]}/user/access-control" %>" role="form" method="POST">
+    <%== csrf_tag("#{@project_data[:path]}/user/access-control") %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <table id="access-control-entries" class="min-w-full divide-y divide-gray-300">
         <thead class="bg-gray-50">
           <tr>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
             <% %w[Subject Action Object].each do |type| %>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                 <%== render(
@@ -55,35 +52,54 @@
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           </tr>
         </thead>
+
         <tbody class="divide-y divide-gray-200 bg-white">
-          <% @aces.each do |ubid, tags, editable| %>
-            <tr id="ace-<%= ubid %>">
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <% if editable && edit_perm %>
-                  <%== render("components/button", locals: { text: "Edit", link: "#{@project_data[:path]}/user/access-control/entry/#{ubid}" }) %>
+          <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
+            <tr id="ace-<%= ubid %>" class="<%= (ubid == "template") ? "hidden" : "" %>">
+              <% if editable && edit_perm %>
+                <%== render("components/form/hidden", locals: { name: "aces[][ubid]", value: ubid }) %>
+                <%== render("components/form/hidden", locals: { name: "aces[][deleted]", value: false }) %>
+                <% ace_options.each_with_index do | (name, options), index| %>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <%== render("components/form/select", locals: { name:, selected: tags[index]&.ubid, options: }) %>
+                  </td>
                 <% end %>
-              </td>
-              <% tags.each do |tag| %>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%= ace_label(tag) %>
-                </td>
-              <% end %>
-              <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                <% if editable && edit_perm %>
+                <td class="py-4 px-3 text-right">
                   <%== render(
-                    "components/delete_button",
+                    "components/button",
                     locals: {
                       text: "Remove",
-                      url: "#{@project_data[:path]}/user/access-control/entry/#{ubid}",
-                      confirmation: "delete entry"
+                      icon: "hero-trash",
+                      extra_class: "remove-ace-btn",
+                      type: "danger"
                     }
                   ) %>
+                </td>
+              <% else %>
+                <% tags.each do |tag| %>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <%= ace_label(tag) %>
+                  </td>
                 <% end %>
-              </td>
+                <td class="py-4 px-3 text-right"></td>
+              <% end %>
             </tr>
           <% end %>
         </tbody>
       </table>
+      <div class="px-3 py-4 flex justify-between">
+        <%== render(
+          "components/button",
+          locals: {
+            icon: "hero-plus",
+            text: "New Access Control Entry",
+            attributes: {
+              id: "new-ace-btn"
+            }
+          }
+        ) %>
+        <%== render("components/button", locals: { text: "Save All" }) %>
+      </div>
     </div>
-  </div>
+  </form>
 </div>
