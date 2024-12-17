@@ -5,7 +5,6 @@ require_relative "../model"
 class ObjectTag < Sequel::Model
   include ResourceMethods
   include AccessControlModelTag
-  dataset_module Authorization::Dataset
 
   module Cleanup
     def before_destroy

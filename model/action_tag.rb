@@ -5,7 +5,6 @@ require_relative "../model"
 class ActionTag < Sequel::Model
   include ResourceMethods
   include AccessControlModelTag
-  dataset_module Authorization::Dataset
 
   def self.options_for_project(project)
     {
