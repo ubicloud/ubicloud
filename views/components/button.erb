@@ -15,7 +15,7 @@ right_icon ||= nil %>
 <% if link %>
   <a
     href="<%= link %>"
-    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> <%= extra_class %>"
+    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> disabled:pointer-events-none disabled:opacity-50 <%= extra_class %>"
     <% attributes.each do |atr_key, atr_value| %>
     <%= atr_key %>="<%= atr_value %>"
     <% end%>
@@ -27,7 +27,7 @@ right_icon ||= nil %>
   </a>
 <% else %>
   <button
-    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> <%= extra_class %>"
+    class="inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 <%= color %> disabled:pointer-events-none disabled:opacity-50 <%= extra_class %>"
     <% attributes.each do |atr_key, atr_value| %>
     <%= atr_key %>="<%= atr_value %>"
     <% end%>
