@@ -33,6 +33,14 @@ class KubernetesCluster < Sequel::Model
     "/location/#{display_location}/kubernetes-cluster/#{name}"
   end
 
+  def endpoint
+    if Config.development?
+      kubernetes_cluster.vms.first.sshable.host
+    else
+      kubernetes_cluster.load_balancer.hostname
+    end
+  end
+
   def install_rhizome(sshable, install_specs: false)
     Strand.create_with_id(prog: "InstallRhizome", label: "start", stack: [{"target_folder" => "kubernetes", "subject_id" => sshable.id, "user" => sshable.unix_user}])
   end

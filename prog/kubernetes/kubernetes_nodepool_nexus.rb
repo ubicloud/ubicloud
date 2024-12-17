@@ -126,7 +126,7 @@ BASH
     when "Succeeded"
       hop_bootstrap_worker_vm
     when "NotStarted", "Failed"
-      current_vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-worker-node #{kubernetes_nodepool.kubernetes_cluster.load_balancer.hostname}:443 #{frame["join_token"]} #{frame["discovery_token_ca_cert_hash"]}' join_worker")
+      current_vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-worker-node #{kubernetes_nodepool.kubernetes_cluster.endpoint}:443 #{frame["join_token"]} #{frame["discovery_token_ca_cert_hash"]}' join_worker")
       # when "Failed"
       # maybe page someone. read logs
     when "InProgress"
