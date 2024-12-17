@@ -22,7 +22,6 @@ class PrivateSubnet < Sequel::Model
   ].freeze
 
   dataset_module Pagination
-  dataset_module Authorization::Dataset
   include Authorization::HyperTagMethods
   include ObjectTag::Cleanup
   def hyper_tag_name(project)

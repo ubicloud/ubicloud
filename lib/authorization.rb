@@ -97,55 +97,52 @@ module Authorization
     matched_policies_dataset(project_id, subject_id, actions, object_id).all
   end
 
-  module Dataset
-    def authorized(project_id, subject_id, actions)
-      # We can't use "id" column directly, because it's ambiguous in big joined queries.
-      # We need to determine table of id explicitly.
-      # @opts is the hash of options for this dataset, and introduced at Sequel::Dataset.
-      from = @opts[:from].first
+  def self.dataset_authorize(dataset, project_id, subject_id, actions)
+    # We can't use "id" column directly, because it's ambiguous in big joined queries.
+    # We need to determine table of id explicitly.
+    from = dataset.opts[:from].first
 
-      ds = DB[:object_ids]
-        .with_recursive(:object_ids,
-          Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
-          DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
-            .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
-            .where { level < Config.recursive_tag_limit },
-          args: [:object_id, :level]).select(:object_id)
+    ds = DB[:object_ids]
+      .with_recursive(:object_ids,
+        Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
+        DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
+          .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:object_id, :level]).select(:object_id)
 
-      project_id_match = if model.columns.include?(:project_id)
-        Sequel[from][:project_id]
-      else
-        DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])
-      end
-
-      if model == ObjectTag
-        # Authorization for accessing ObjectTag itself is done by providing the metatag for the object.
-        # Convert metatag id returned from the applied_object_tag lookup into tag ids, so that the correct
-        # object tags will be found.  Convert non-metatag ids into UUIDs that would be invalid UBIDs,
-        # preventing them from matching any existing ObjectTag instances.  This makes it so that users
-        # authorized to manage members of the tag are not automatically authorized to manage the tag itself.
-        ds = ds
-          .select(Sequel.cast(:object_id, String))
-          .from_self
-          .select {
-          Sequel.join([
-            substr(:object_id, 0, 18),
-            Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
-            substr(:object_id, 19, 18)
-          ]).cast(:uuid).as(:object_id)
-        }
-      end
-
-      where(Sequel.|(
-        # Allow where there is a specific entry for the object,
-        {Sequel[from][:id] => ds},
-        # or where the action is allowed for all objects in the project,
-        (ds.where(object_id: nil).exists &
-          # and the object is related to the project (either with a matching project_id,
-          # or where there is a hyper tag from the object to the project.
-          {project_id => project_id_match})
-      ))
+    project_id_match = if dataset.model.columns.include?(:project_id)
+      Sequel[from][:project_id]
+    else
+      DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])
     end
+
+    if dataset.model == ObjectTag
+      # Authorization for accessing ObjectTag itself is done by providing the metatag for the object.
+      # Convert metatag id returned from the applied_object_tag lookup into tag ids, so that the correct
+      # object tags will be found.  Convert non-metatag ids into UUIDs that would be invalid UBIDs,
+      # preventing them from matching any existing ObjectTag instances.  This makes it so that users
+      # authorized to manage members of the tag are not automatically authorized to manage the tag itself.
+      ds = ds
+        .select(Sequel.cast(:object_id, String))
+        .from_self
+        .select {
+        Sequel.join([
+          substr(:object_id, 0, 18),
+          Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
+          substr(:object_id, 19, 18)
+        ]).cast(:uuid).as(:object_id)
+      }
+    end
+
+    dataset.where(Sequel.|(
+      # Allow where there is a specific entry for the object,
+      {Sequel[from][:id] => ds},
+      # or where the action is allowed for all objects in the project,
+      (ds.where(object_id: nil).exists &
+        # and the object is related to the project (either with a matching project_id,
+        # or where there is a hyper tag from the object to the project.
+        {project_id => project_id_match})
+    ))
   end
 
   module HyperTagMethods
