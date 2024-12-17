@@ -178,7 +178,6 @@ def clover_freeze
   AUTOLOAD_CONSTANT_VALUES.each(&:freeze)
   [
     Authorization,
-    Authorization::Dataset,
     Authorization::HyperTagMethods,
     Authorization::Unauthorized,
     HealthMonitorMethods,
