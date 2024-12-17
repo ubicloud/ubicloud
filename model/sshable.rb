@@ -139,9 +139,8 @@ class Sshable < Sequel::Model
   end
 
   def available?
-    cmd("true")
-    true
-  rescue
+    cmd("true") && true
+  rescue Net::SSH::Disconnect, Net::SSH::ConnectionTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, IOError
     false
   end
 

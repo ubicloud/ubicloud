@@ -141,12 +141,10 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def reboot
-    begin
-      q_last_boot_id = vm_host.last_boot_id.shellescape
-      new_boot_id = sshable.cmd("sudo host/bin/reboot-host #{q_last_boot_id}").strip
-    rescue Net::SSH::Disconnect, Net::SSH::ConnectionTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, IOError
-      nap 30
-    end
+    nap 30 unless sshable.available?
+
+    q_last_boot_id = vm_host.last_boot_id.shellescape
+    new_boot_id = sshable.cmd("sudo host/bin/reboot-host #{q_last_boot_id}").strip
 
     # If we didn't get a valid new boot id, nap. This can happen if reboot-host
     # issues a reboot and returns without closing the ssh connection.

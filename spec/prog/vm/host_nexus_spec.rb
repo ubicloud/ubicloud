@@ -300,14 +300,14 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.prep_reboot }.to hop("reboot")
     end
 
-    it "reboot naps if reboot-host fails causes IOError" do
-      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
-      expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_raise(IOError)
+    it "reboot naps if host sshable is not available" do
+      expect(sshable).to receive(:available?).and_return(false)
 
       expect { nx.reboot }.to nap(30)
     end
 
     it "reboot naps if reboot-host returns empty string" do
+      expect(sshable).to receive(:available?).and_return(true)
       expect(vm_host).to receive(:last_boot_id).and_return("xyz")
       expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_return ""
 
@@ -315,6 +315,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "reboot updates last_boot_id and hops to verify_spdk" do
+      expect(sshable).to receive(:available?).and_return(true)
       expect(vm_host).to receive(:last_boot_id).and_return("xyz")
       expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
       expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
