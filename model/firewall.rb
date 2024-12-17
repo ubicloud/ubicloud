@@ -16,7 +16,6 @@ class Firewall < Sequel::Model
   end
 
   dataset_module Pagination
-  dataset_module Authorization::Dataset
 
   def display_location
     LocationNameConverter.to_display_name(location)
