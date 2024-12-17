@@ -5,7 +5,7 @@ require "countries"
 
 class Clover
   hash_branch(:project_prefix, "billing") do |r|
-    r.on web? do
+    r.web do
       unless (Stripe.api_key = Config.stripe_secret_key)
         response.status = 501
         next "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."

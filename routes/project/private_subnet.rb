@@ -6,7 +6,7 @@ class Clover
       private_subnet_list
     end
 
-    r.on web? do
+    r.web do
       r.post do
         @location = LocationNameConverter.to_internal_name(r.params["location"])
         private_subnet_post(r.params["name"])

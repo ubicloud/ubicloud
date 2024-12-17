@@ -6,7 +6,7 @@ class Clover
       load_balancer_list
     end
 
-    r.on web? do
+    r.web do
       r.post true do
         load_balancer_post(r.params["name"])
       end
