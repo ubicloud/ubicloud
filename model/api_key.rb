@@ -9,8 +9,6 @@ class ApiKey < Sequel::Model
   one_to_many :access_tags, key: :hyper_tag_id
   plugin :association_dependencies, access_tags: :destroy
 
-  dataset_module Authorization::Dataset
-
   plugin :column_encryption do |enc|
     enc.column :key
   end

@@ -19,7 +19,6 @@ class Vm < Sequel::Model
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 
   dataset_module Pagination
-  dataset_module Authorization::Dataset
 
   include ResourceMethods
   include SemaphoreMethods
