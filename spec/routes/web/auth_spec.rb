@@ -42,6 +42,38 @@ RSpec.describe Clover, "auth" do
     expect(page).to have_content("Name must only contain letters, numbers, spaces, and hyphens and have max length 63.")
   end
 
+  it "can send email verification email again after 300 seconds" do
+    visit "/create-account"
+    fill_in "Full Name", with: "John Doe"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    click_button "Create Account"
+
+    expect(page).to have_content("An email has been sent to you with a link to verify your account")
+    expect(Mail::TestMailer.deliveries.length).to eq 1
+
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page).to have_content("You need to wait at least 300 seconds before sending another verification email. If you did not receive the email, please check your spam folder.")
+
+    DB[:account_verification_keys].update(email_last_sent: Time.now - 310)
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page).to have_content("The account you tried to login with is currently awaiting verification")
+
+    click_button "Send Verification Again"
+
+    expect(page).to have_content("An email has been sent to you with a link to verify your account")
+    expect(Mail::TestMailer.deliveries.length).to eq 2
+  end
+
   it "can create new account, verify it, and visit project which invited" do
     p = Project.create_with_id(name: "Invited-project").tap { _1.associate_with_project(_1) }
     p.add_invitation(email: TEST_USER_EMAIL, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)

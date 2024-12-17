@@ -10,6 +10,12 @@
     <p class="leading-6 text-sm"><%== rodauth.verify_account_resend_explanatory_text %></p>
   </div>
 
+  <% if rodauth.param_or_nil(rodauth.login_param) %>
+    <%== render("components/form/hidden", locals: { name: rodauth.login_param, value: rodauth.param(rodauth.login_param) }) %>
+  <% else %>
+    <%== render("components/rodauth/login_field") %>
+  <% end %>
+
   <div class="flex flex-col text-center">
     <%== render("components/form/submit_button", locals: { text: "Send Verification Again" }) %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
