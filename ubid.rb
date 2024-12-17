@@ -73,6 +73,11 @@ class UBID
   TYPE_CERT = "ce"
   TYPE_INFERENCE_ENDPOINT = "1e"
   TYPE_INFERENCE_ENDPOINT_REPLICA = "1r"
+  TYPE_ACTION_TYPE = "tt"
+  TYPE_ACCESS_CONTROL_ENTRY = "te"
+  TYPE_SUBJECT_TAG = "ts"
+  TYPE_ACTION_TAG = "ta"
+  TYPE_OBJECT_TAG = "t0"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
