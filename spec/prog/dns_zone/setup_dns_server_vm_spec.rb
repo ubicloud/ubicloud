@@ -77,7 +77,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
 
   describe "#setup_knot" do
     it "waits until the vm is ready to accept commands again" do
-      expect(prog.sshable).to receive(:cmd).and_raise
+      expect(prog.sshable).to receive(:cmd).and_raise(IOError)
       expect { prog.setup_knot }.to nap(5)
     end
 
