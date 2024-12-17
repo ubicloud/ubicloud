@@ -5,6 +5,10 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
 
   FirewallRuleObj = Struct.new(:cidr, :port_range)
 
+  def before_run
+    pop "firewall rule is added" if vm.destroy_set?
+  end
+
   label def update_firewall_rules
     rules = vm.firewalls.map(&:firewall_rules).flatten
     allowed_ingress_ip4_port_set = consolidate_rules(rules.select { !_1.ip6? && _1.port_range })

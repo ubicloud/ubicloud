@@ -16,6 +16,20 @@ RSpec.describe Prog::Vnet::UpdateFirewallRules do
     instance_double(Vm, private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6)
   }
 
+  describe "#before_run" do
+    it "pops if vm is to be destroyed" do
+      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
+      expect(vm).to receive(:destroy_set?).and_return(true)
+      expect { nx.before_run }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "does not pop if vm is not to be destroyed" do
+      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
+      expect(vm).to receive(:destroy_set?).and_return(false)
+      expect { nx.before_run }.not_to exit
+    end
+  end
+
   describe "update_firewall_rules" do
     it "populates elements if there are fw rules" do
       GloballyBlockedDnsname.create_with_id(dns_name: "blockedhost.com", ip_list: Sequel.lit("ARRAY['123.123.123.123'::inet, '2a00:1450:400e:811::200e'::inet]"))
