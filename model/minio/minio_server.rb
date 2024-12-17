@@ -11,8 +11,6 @@ class MinioServer < Sequel::Model
   many_to_one :pool, key: :minio_pool_id, class: :MinioPool
   one_through_many :cluster, [[:minio_server, :id, :minio_pool_id], [:minio_pool, :id, :cluster_id]], class: :MinioCluster
 
-  dataset_module Authorization::Dataset
-
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods

@@ -64,14 +64,14 @@ RSpec.describe ObjectMetatag do
     }.to raise_error Sequel::ValidationFailed
   end
 
-  it "ObjectTag Dataset#authorized only grants access for matching metatag" do
+  it "Authorization.dataset_authorize for ObjectTag only grants access for matching metatag" do
     account = Account.create_with_id(email: "test@example.com", status_id: 2)
     project = account.create_project_with_default_policy("Default", default_policy: false)
     tag = ObjectTag.create_with_id(project_id: project.id, name: "S")
     ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: tag.id)
-    expect(ObjectTag.authorized(project.id, account.id, "ObjectTag:view").all).to be_empty
+    expect(Authorization.dataset_authorize(ObjectTag.dataset, project.id, account.id, "ObjectTag:view").all).to be_empty
     ace.update(object_id: tag.metatag_uuid)
-    expect(ObjectTag.authorized(project.id, account.id, "ObjectTag:view").all).to eq [tag]
+    expect(Authorization.dataset_authorize(ObjectTag.dataset, project.id, account.id, "ObjectTag:view").all).to eq [tag]
   end
 
   it "#id should return metatag uuid" do

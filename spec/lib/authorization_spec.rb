@@ -228,13 +228,13 @@ RSpec.describe Authorization do
     end
   end
 
-  describe "#Dataset" do
+  describe ".dataset_authorize" do
     it "returns authorized resources for user and project and action when user has full permissions" do
       vms
-      expect(Vm.authorized(projects[0].id, users[0].id, "Vm:view").select_map(:id).sort).to eq([vms[0].id, vms[1].id].sort)
-      expect(Vm.authorized(projects[0].id, users[1].id, "Vm:view").select_map(:id)).to be_empty
-      expect(Vm.authorized(projects[1].id, users[0].id, "Vm:view").select_map(:id)).to be_empty
-      expect(Vm.authorized(projects[1].id, users[1].id, "Vm:view").select_map(:id).sort).to eq([vms[2].id, vms[3].id].sort)
+      expect(described_class.dataset_authorize(Vm.dataset, projects[0].id, users[0].id, "Vm:view").select_map(:id).sort).to eq([vms[0].id, vms[1].id].sort)
+      expect(described_class.dataset_authorize(Vm.dataset, projects[0].id, users[1].id, "Vm:view").select_map(:id)).to be_empty
+      expect(described_class.dataset_authorize(Vm.dataset, projects[1].id, users[0].id, "Vm:view").select_map(:id)).to be_empty
+      expect(described_class.dataset_authorize(Vm.dataset, projects[1].id, users[1].id, "Vm:view").select_map(:id).sort).to eq([vms[2].id, vms[3].id].sort)
     end
 
     {
@@ -248,10 +248,10 @@ RSpec.describe Authorization do
         send(method, {subjects: users[0].id, actions: "Vm:view", objects: vms[0].id})
         send(method, {subjects: users[1].id, actions: "Vm:view", objects: vms[3].id}, project_id: projects[1].id)
 
-        expect(Vm.authorized(projects[0].id, users[0].id, "Vm:view").select_map(:id)).to eq([vms[0].id])
-        expect(Vm.authorized(projects[0].id, users[1].id, "Vm:view").select_map(:id)).to be_empty
-        expect(Vm.authorized(projects[1].id, users[0].id, "Vm:view").select_map(:id)).to be_empty
-        expect(Vm.authorized(projects[1].id, users[1].id, "Vm:view").select_map(:id)).to eq([vms[3].id])
+        expect(described_class.dataset_authorize(Vm.dataset, projects[0].id, users[0].id, "Vm:view").select_map(:id)).to eq([vms[0].id])
+        expect(described_class.dataset_authorize(Vm.dataset, projects[0].id, users[1].id, "Vm:view").select_map(:id)).to be_empty
+        expect(described_class.dataset_authorize(Vm.dataset, projects[1].id, users[0].id, "Vm:view").select_map(:id)).to be_empty
+        expect(described_class.dataset_authorize(Vm.dataset, projects[1].id, users[1].id, "Vm:view").select_map(:id)).to eq([vms[3].id])
       end
     end
   end
