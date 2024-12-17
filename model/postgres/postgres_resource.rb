@@ -15,7 +15,6 @@ class PostgresResource < Sequel::Model
   many_to_one :private_subnet
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
-  dataset_module Authorization::Dataset
   dataset_module Pagination
 
   include ResourceMethods
