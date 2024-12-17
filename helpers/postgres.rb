@@ -95,9 +95,7 @@ class Clover
       storage_size.to_i >= lower_limit && storage_size.to_i <= upper_limit
     end
 
-    options.add_option(name: "version", values: ["16", "17"], parent: "flavor") do |flavor, version|
-      flavor != PostgresResource::Flavor::LANTERN || version == "16"
-    end
+    options.add_option(name: "version", values: ["16", "17"], parent: "flavor")
 
     options.add_option(name: "ha_type", values: ["none", "async", "sync"], parent: "storage_size")
     options.serialize
