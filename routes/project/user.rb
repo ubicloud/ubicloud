@@ -196,39 +196,41 @@ class Clover
           @aces.compact!
           sort_aces!(@aces)
 
+          @subject_options = {nil => [["", "Choose a Subject"]], **SubjectTag.options_for_project(@project)}
+          @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
+          @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
+
           view "project/access-control"
         end
 
-        r.is "entry", String do |ubid|
+        r.post true do
           authorize("Project:editaccess", @project.id)
 
-          if ubid == "new"
-            @ace = AccessControlEntry.new_with_id(project_id: @project.id)
-          else
-            next unless (@ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
-            check_ace_subject(@ace.subject_id)
+          DB.transaction do
+            r.params["aces"].each do
+              ubid, deleted, subject_id, action_id, object_id = _1.values_at("ubid", "deleted", "subject", "action", "object")
+
+              next if subject_id == "" || ubid == "template"
+              check_ace_subject(UBID.to_uuid(subject_id))
+
+              if ubid == "new"
+                next if deleted == "true"
+                ace = AccessControlEntry.new_with_id(project_id: @project.id)
+              else
+                next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+                check_ace_subject(ace.subject_id)
+                if deleted == "true"
+                  ace.destroy
+                  next
+                end
+              end
+              ace.update_from_ubids(subject_id:, action_id:, object_id:)
+            end
           end
 
-          r.get do
-            view "project/access-control-entry"
-          end
+          flash["notice"] = "Access control entries saved successfully"
 
-          r.post do
-            was_new = @ace.new?
-
-            subject_id, action_id, object_id = typecast_params.nonempty_str(%w[subject action object])
-            check_ace_subject(UBID.to_uuid(subject_id))
-            @ace.update_from_ubids(subject_id:, action_id:, object_id:)
-
-            flash["notice"] = "Access control entry #{was_new ? "created" : "updated"} successfully"
-            r.redirect "#{@project_data[:path]}/user/access-control"
-          end
-
-          r.delete(!@ace.new?) do
-            @ace.destroy
-            flash["notice"] = "Access control entry deleted successfully"
-            204
-          end
+          r.redirect "#{@project_data[:path]}/user/access-control"
         end
 
         r.on "tag", %w[subject action object] do |tag_type|
