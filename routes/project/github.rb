@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch(:project_prefix, "github") do |r|
-    r.on web? do
+    r.web do
       unless Config.github_app_name
         response.status = 501
         next "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."

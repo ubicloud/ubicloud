@@ -13,7 +13,7 @@ class Clover
       end
     end
 
-    r.on web? do
+    r.web do
       r.post true do
         @location = LocationNameConverter.to_internal_name(r.params["location"])
         vm_post(r.params["name"])

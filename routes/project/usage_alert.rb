@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch(:project_prefix, "usage-alert") do |r|
-    r.on web? do
+    r.web do
       authorize("Project:billing", @project.id)
 
       r.post true do

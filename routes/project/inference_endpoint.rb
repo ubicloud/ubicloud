@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch(:project_prefix, "inference-endpoint") do |r|
-    r.on web? do
+    r.web do
       next unless @project.get_ff_inference_ui
 
       r.get true do

@@ -77,7 +77,7 @@ class Clover
         end
       end
 
-      r.on api? do
+      r.api do
         @firewall = firewall
         r.hash_branches(:project_location_firewall_prefix)
       end

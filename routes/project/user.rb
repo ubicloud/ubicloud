@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch(:project_prefix, "user") do |r|
-    r.on web? do
+    r.web do
       authorize("Project:user", @project.id)
 
       r.get true do
