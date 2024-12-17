@@ -3,6 +3,7 @@ $(function() {
   setupAutoRefresh();
   setupDatePicker();
   setupFormOptionUpdates();
+  setupAceDeleteButtons();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -38,6 +39,24 @@ $(".dropdown").on("click", function (event) {
 $(".sidebar-group-btn").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });
+
+$("#new-ace-btn").on("click", function (event) {
+  event.preventDefault();
+  $('#ace-template').clone().removeClass('hidden')
+    .insertBefore('#access-control-entries tbody tr:last')
+    .find('input[name="aces[][ubid]"]').first().val("new");
+  $('#access-control-entries tr:not(.hidden) select[name="aces[][subject]"]').attr('required', true);
+  setupAceDeleteButtons();
+});
+
+function setupAceDeleteButtons() {
+  $(".remove-ace-btn").off('click').on("click", function (event) {
+    event.preventDefault();
+    let row = $(this).closest("tr");
+    row.find('input[name="aces[][deleted]"]').first().val("true");
+    row.addClass("hidden");
+  });
+}
 
 $(".delete-btn").on("click", function (event) {
     event.preventDefault();
