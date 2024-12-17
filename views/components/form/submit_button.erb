@@ -1,14 +1,12 @@
 <% name ||= nil
-extra_class ||= nil %>
+extra_class ||= nil
+attributes ||= {} %>
 
 <%== render(
   "components/button",
   locals: {
     text: text,
     extra_class: extra_class,
-    attributes: {
-      "type" => "submit",
-      "name" => name
-    }
+    attributes: { "type" => "submit", "name" => name }.merge!(attributes)
   }
 ) %>
