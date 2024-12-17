@@ -241,7 +241,7 @@ GEM
     rake (13.2.1)
     refrigerator (1.7.0)
     regexp_parser (2.9.3)
-    rexml (3.3.9)
+    rexml (3.4.0)
     roda (3.86.0)
       rack
     rodauth (2.37.0)
@@ -298,7 +298,7 @@ GEM
     sawyer (0.9.2)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
-    securerandom (0.4.0)
+    securerandom (0.4.1)
     sequel (5.87.0)
       bigdecimal
     sequel-annotate (1.7.0)
