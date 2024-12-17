@@ -25,7 +25,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       dz
     end
   end
-  let(:project) { Project.create_with_id(name: "ubicloud_dns").tap { _1.associate_with_project(_1) } }
+  let(:project) { Project.create_with_id(name: "ubicloud-dns").tap { _1.associate_with_project(_1) } }
 
   describe ".assemble" do
     it "validates input" do
