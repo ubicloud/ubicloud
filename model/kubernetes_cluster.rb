@@ -35,9 +35,9 @@ class KubernetesCluster < Sequel::Model
 
   def endpoint
     if Config.development?
-      kubernetes_cluster.vms.first.sshable.host
+      vms.first.sshable.host
     else
-      kubernetes_cluster.load_balancer.hostname
+      load_balancer.hostname
     end
   end
 
