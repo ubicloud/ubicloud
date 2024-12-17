@@ -46,8 +46,8 @@ RSpec.describe Clover, "github" do
   end
 
   describe "cache endpoints" do
-    let(:repository) { GithubRepository.create_with_id(name: "test", default_branch: "main", access_key: "123") }
-    let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User") }
+    let(:repository) { GithubRepository.create_with_id(name: "test", default_branch: "main", access_key: "123", installation:) }
+    let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User", project: Project.create_with_id(name: "test")) }
     let(:runner) { GithubRunner.create_with_id(vm_id: create_vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id, workflow_job: {head_branch: "dev"}) }
     let(:url_presigner) { instance_double(Aws::S3::Presigner, presigned_request: "aa") }
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
@@ -291,12 +291,26 @@ RSpec.describe Clover, "github" do
         GithubCacheEntry.create_with_id(key: "mix-dev-main-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
         GithubCacheEntry.create_with_id(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
 
-        expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url")
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url").at_least(:once)
         get "/runtime/github/cache", {keys: "mix-dev-main-,mix-dev-,mix-", version: "v1"}
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["mix-dev-main-123", "v1", "main"])
         expect(GithubCacheEntry[key: "mix-dev-main-123", version: "v1", scope: "main"].last_accessed_by).to eq(runner.id)
+      end
+
+      it "returns cache from any scope if scope check is disabled" do
+        GithubCacheEntry.create_with_id(key: "mix-dev-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create_with_id(key: "mix-dev-main-123", version: "v1", scope: "feature-b", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create_with_id(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url").at_least(:once)
+        installation.project.set_ff_access_all_cache_scopes(true)
+        get "/runtime/github/cache", {keys: "mix-dev-main-,mix-dev-,mix-", version: "v1"}
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["mix-dev-main-123", "v1", "feature-b"])
+        expect(GithubCacheEntry[key: "mix-dev-main-123", version: "v1", scope: "feature-b"].last_accessed_by).to eq(runner.id)
       end
 
       it "only does a prefix match on key, escapes LIKE metacharacters in submitted keys" do

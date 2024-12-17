@@ -13,18 +13,20 @@ class Clover
       keys, version = r.params["keys"]&.split(","), r.params["version"]
       fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if keys.nil? || keys.empty? || version.nil?
 
-      # Clients can send multiple keys, and we look for caches in multiple scopes.
-      # We prioritize scope over key, returning the cache for the first matching
-      # key in the head branch scope, followed by the first matching key in
-      # default branch scope.
-      scopes = [runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]), repository.default_branch]
-      scopes.compact!
-      scopes.uniq!
+      dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version: version)
 
-      dataset = repository.cache_entries_dataset
-        .exclude(committed_at: nil)
-        .where(version: version, scope: scopes)
-        .order(Sequel.case(scopes.map.with_index { |scope, idx| [{scope:}, idx] }.to_h, scopes.length))
+      unless repository.installation.project.get_ff_access_all_cache_scopes
+        # Clients can send multiple keys, and we look for caches in multiple scopes.
+        # We prioritize scope over key, returning the cache for the first matching
+        # key in the head branch scope, followed by the first matching key in
+        # default branch scope.
+        scopes = [runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]), repository.default_branch]
+        scopes.compact!
+        scopes.uniq!
+
+        dataset = dataset.where(scope: scopes)
+          .order(Sequel.case(scopes.map.with_index { |scope, idx| [{scope:}, idx] }.to_h, scopes.length))
+      end
 
       entry = dataset
         .where(key: keys)
