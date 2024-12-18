@@ -23,6 +23,8 @@ class ObjectTag < Sequel::Model
       "Private Subnet" => project.private_subnets,
       "Firewall" => project.firewalls,
       "LoadBalancer" => project.load_balancers,
+      "InferenceToken" => project.api_keys,
+      "InferenceEndpoint" => project.inference_endpoints,
       "SubjectTag" => project.subject_tags,
       "ActionTag" => project.action_tags,
       {"label" => "ObjectTag (grants access to tag itself)", "id" => "object-metatag-group"} => project.object_tags.map(&:metatag)
