@@ -1,26 +1,18 @@
 <% @page_title = @ps[:name] %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "#{@project_data[:path]}/private-subnet",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Private Subnet", "#{@project_data[:path]}/private-subnet"],
-        [@ps[:name], "#"]
-      ]
-    }
-  ) %>
-  <%== render(
-    "components/page_header",
-    locals: {
-      title: @ps[:name],
-      right_items: [render("components/ps_state_label", locals: { state: @ps[:state], extra_class: "text-md" })]
-    }
-  ) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Private Subnet", "#{@project_data[:path]}/private-subnet"],
+      [@ps[:name], "#"]
+    ],
+    right_items: [render("components/ps_state_label", locals: { state: @ps[:state], extra_class: "text-md" })]
+  }
+) %>
+
 <div class="grid gap-6">
   <!-- Detail Card -->
   <%== render(
@@ -65,10 +57,10 @@
               <% end %>
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <%== render("components/copieble_content", locals: { content: nic[:private_ipv4], message: "Copied Private IPv4" }) %>
+              <%== render("components/copyable_content", locals: { content: nic[:private_ipv4], message: "Copied Private IPv4" }) %>
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <%== render("components/copieble_content", locals: { content: nic[:private_ipv6], message: "Copied Private IPv6" }) %>
+              <%== render("components/copyable_content", locals: { content: nic[:private_ipv6], message: "Copied Private IPv6" }) %>
             </td>
           </tr>
         <% end %>
@@ -95,7 +87,7 @@
         <% @ps[:firewalls].each do |fw| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <% if Authorization.has_permission?(current_account.id, "Firewall:view", fw[:id]) %>
+              <% if has_permission?("Firewall:view", fw[:id]) %>
                 <a
                   href="<%= "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" %>"
                   class="text-orange-600 hover:text-orange-700"
@@ -130,7 +122,7 @@
         <% @connected_subnets.each do |subnet| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <% if Authorization.has_permission?(current_account.id, "PrivateSubnet:view", subnet[:id]) %>
+              <% if has_permission?("PrivateSubnet:view", subnet[:id]) %>
                 <a
                   href="<%= "#{@project_data[:path]}/location/#{subnet[:location]}/private-subnet/#{subnet[:name]}" %>"
                   class="text-orange-600 hover:text-orange-700"
@@ -179,7 +171,7 @@
     </table>
   </div>
   <!-- Delete Card -->
-  <% if Authorization.has_permission?(current_account.id, "PrivateSubnet:delete", @ps[:id]) %>
+  <% if has_permission?("PrivateSubnet:delete", @ps[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">

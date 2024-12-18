@@ -21,7 +21,7 @@ RSpec.describe ResourceMethods do
     scrubbed_values_hash = sa.values.merge(model_name: "Sshable")
     scrubbed_values_hash.delete(:raw_private_key_1)
     scrubbed_values_hash.delete(:raw_private_key_2)
-    expect(DeletedRecord).to receive(:create).with(hash_including(model_values: scrubbed_values_hash))
+    expect(ArchivedRecord).to receive(:create).with(hash_including(model_values: scrubbed_values_hash))
     sa.destroy
   end
 

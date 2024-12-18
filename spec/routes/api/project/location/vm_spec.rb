@@ -5,7 +5,7 @@ require_relative "../../spec_helper"
 RSpec.describe Clover, "vm" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:vm) do
     vm = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject
@@ -195,29 +195,6 @@ RSpec.describe Clover, "vm" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id", {"private_subnet_id" => "Private subnet with the given id \"#{ps_id}\" is not found in the location \"eu-central-h1\""})
-      end
-
-      it "invalid body" do
-        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", "invalid_body"
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
-      end
-
-      it "missing required key" do
-        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
-          unix_user: "ubi"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body must include required parameters: public_key"})
-      end
-
-      it "non allowed key" do
-        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
-          public_key: "ssh key",
-          foo_key: "foo_val"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: public_key, size, storage_size, unix_user, boot_image, enable_ip4, private_subnet_id"})
       end
     end
 

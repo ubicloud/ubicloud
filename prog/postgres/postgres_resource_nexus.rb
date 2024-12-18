@@ -22,7 +22,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     Validation.validate_location(location)
     Validation.validate_name(name)
-    Validation.validate_vm_size(target_vm_size)
+    Validation.validate_vm_size(target_vm_size, "x64")
     Validation.validate_postgres_ha_type(ha_type)
 
     DB.transaction do
@@ -48,10 +48,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           fail Validation::ValidationFailed.new({restore_target: "Restore target must be between #{earliest_restore_time} and #{parent.timeline.latest_restore_time}"})
         end
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
-      end
-
-      if flavor == PostgresResource::Flavor::LANTERN && version == "17"
-        fail Validation::ValidationFailed.new({version: "Lantern flavor is not supported with version 17"})
       end
 
       postgres_resource = PostgresResource.create_with_id(
@@ -90,8 +86,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     nap 5 unless representative_server.vm.strand.label == "wait"
 
     postgres_resource.incr_initial_provisioning
-    register_deadline(:wait, 10 * 60)
-    bud self.class, frame, :trigger_pg_current_xact_id_on_parent if postgres_resource.parent
+    if postgres_resource.parent
+      bud self.class, frame, :trigger_pg_current_xact_id_on_parent
+      register_deadline("wait", 120 * 60)
+    else
+      register_deadline("wait", 10 * 60)
+    end
     hop_refresh_dns_record
   end
 

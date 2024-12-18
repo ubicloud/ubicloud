@@ -33,11 +33,32 @@ RSpec.describe Validation do
 
     describe "#validate_vm_size" do
       it "valid vm size" do
-        expect(described_class.validate_vm_size("standard-2").name).to eq("standard-2")
+        expect(described_class.validate_vm_size("standard-2", "x64").name).to eq("standard-2")
       end
 
       it "invalid vm size" do
-        expect { described_class.validate_vm_size("standard-3") }.to raise_error described_class::ValidationFailed
+        expect { described_class.validate_vm_size("standard-3", "x64") }.to raise_error described_class::ValidationFailed
+      end
+
+      it "no IO limits for standard x64" do
+        io_limits = described_class.validate_vm_size("standard-2", "x64").io_limits
+        expect(io_limits.max_ios_per_sec).to be_nil
+        expect(io_limits.max_read_mbytes_per_sec).to be_nil
+        expect(io_limits.max_write_mbytes_per_sec).to be_nil
+      end
+
+      it "no IO limits for standard arm64" do
+        io_limits = described_class.validate_vm_size("standard-2", "arm64").io_limits
+        expect(io_limits.max_ios_per_sec).to be_nil
+        expect(io_limits.max_read_mbytes_per_sec).to be_nil
+        expect(io_limits.max_write_mbytes_per_sec).to be_nil
+      end
+
+      it "no IO limits for standard-gpu" do
+        io_limits = described_class.validate_vm_size("standard-gpu-6", "x64").io_limits
+        expect(io_limits.max_ios_per_sec).to be_nil
+        expect(io_limits.max_read_mbytes_per_sec).to be_nil
+        expect(io_limits.max_write_mbytes_per_sec).to be_nil
       end
     end
 
@@ -48,7 +69,7 @@ RSpec.describe Validation do
           ["standard-2", "80"],
           ["standard-4", "160"]
         ].each do |vm_size, storage_size|
-          expect(described_class.validate_vm_storage_size(vm_size, storage_size)).to eq(storage_size.to_f)
+          expect(described_class.validate_vm_storage_size(vm_size, "x64", storage_size)).to eq(storage_size.to_f)
         end
       end
 
@@ -61,7 +82,7 @@ RSpec.describe Validation do
           ["standard-5", "40"],
           [nil, "40"]
         ].each do |vm_size, storage_size|
-          expect { described_class.validate_vm_storage_size(vm_size, storage_size) }.to raise_error described_class::ValidationFailed
+          expect { described_class.validate_vm_storage_size(vm_size, "x64", storage_size) }.to raise_error described_class::ValidationFailed
         end
       end
     end
@@ -383,6 +404,12 @@ RSpec.describe Validation do
       ].each do |name|
         expect { described_class.validate_account_name(name) }.to raise_error described_class::ValidationFailed
       end
+    end
+  end
+
+  describe "#validate_request_params" do
+    it "rejects requests without required params" do
+      expect { described_class.validate_request_params({extra: true}, []) }.to raise_error described_class::ValidationFailed
     end
   end
 

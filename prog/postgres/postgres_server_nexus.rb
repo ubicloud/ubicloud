@@ -38,7 +38,6 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         boot_image: postgres_resource.project.get_ff_postgresql_base_image || boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
-        allow_only_ssh: true,
         exclude_host_ids: exclude_host_ids
       )
 
@@ -74,7 +73,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    register_deadline(:wait, 10 * 60)
+    if postgres_server.primary?
+      register_deadline("wait", 10 * 60)
+    else
+      register_deadline("wait", 120 * 60)
+    end
 
     bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi"}
     hop_wait_bootstrap_rhizome
@@ -303,7 +306,12 @@ SQL
   end
 
   label def wait_recovery_completion
-    is_in_recovery = postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
+    is_in_recovery = begin
+      postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
+    rescue => ex
+      raise ex unless ex.stderr.include?("Consistent recovery state has not been yet reached.")
+      nap 5
+    end
 
     if is_in_recovery
       is_wal_replay_paused = postgres_server.run_query("SELECT pg_get_wal_replay_pause_state()").chomp == "paused"

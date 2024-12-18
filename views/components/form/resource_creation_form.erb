@@ -1,0 +1,93 @@
+<% nonce = SecureRandom.base64(32)
+content_security_policy.add_script_src [:nonce, nonce] %>
+
+<script nonce="<%==nonce%>">
+let option_tree = <%==JSON.generate(option_tree)%>
+let option_children = <%==JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? })%>
+let option_dirty = <%==JSON.generate(form_elements.map { _1[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = nil })%>
+</script>
+
+<div class="grid gap-6">
+  <form action="<%= action %>" method="POST" id="creation-form">
+    <%== csrf_tag(action) %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div>
+            <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <% selected_options = {}
+form_elements.each do |element|
+  container_opening_tag = element[:opening_tag] || "<div class='col-span-full'>"
+  container_closing_tag = element[:closing_tag] || "</div>"
+
+  name, type, label, required, placeholder, content_generator = element.values_at(:name, :type, :label, :required, :placeholder, :content_generator)
+
+  has_option = ["radio_small_cards", "select", "checkbox"].include?(type)
+  options = OptionTreeGenerator.generate_allowed_options(name, option_tree, option_parents).map do |option|
+    opt_val = (type == "select") ? option[name][:value] : option[name]
+
+    opt_text = content_generator.call(*option.values)
+
+    parents = option.reject { |k, v| k == name }
+    parents_selected = parents.all? { |k, v| selected_options[k] == v }
+    checked = parents_selected && (flash.dig("old", name) == opt_val || (flash.dig("old", name).nil? && selected_options[name].nil?))
+    selected_options[name] = opt_val if checked
+    opt_classes = (parents.map { |k, v| "form_#{k} form_#{k}_#{v}" } + (parents_selected ? [] : ["hidden"])).join(" ")
+
+    opt_attrs = {}
+    opt_attrs[:disabled] = "disabled" unless parents_selected
+    opt_attrs[:checked] = "checked" if checked
+
+    [opt_val, opt_text, opt_classes, opt_attrs]
+  end if has_option
+
+  if has_option && selected_options[name].nil?
+    options.find{ |_, _, _, opt_attrs| opt_attrs[:disabled].nil? }&.tap do |opt_val, _, _, opt_attrs|
+      opt_attrs[:checked] = "checked"
+      selected_options[name] = opt_val
+    end
+  end
+
+  case type
+  when "radio_small_cards"
+    locals = {name:, label:, options:, attributes: {required:}}
+  when "select"
+    locals = {name:, label:, options:, placeholder:, description: element[:description]}
+  when "checkbox"
+    locals = {name:, label:, options:, selected: "1", description: element[:description]}
+  when "text"
+    locals = {name:, label:, value: element[:value], attributes: {required:, placeholder:}}
+  when "number"
+    locals = {name:, label:, type: "number", attributes: {required:, placeholder:}}
+    type = "text"
+  when "textarea"
+    locals = {name:, label:, description: element[:description], attributes: {required:, placeholder:, rows: 3}}
+  when "hidden"
+    selected_options[name] = element[:value]
+    locals = {name:, value: element[:value]}
+    container_opening_tag, container_closing_tag = "", ""
+  when "partnership_notice"
+    description, tos_text = content_generator.call(@flavor)
+    locals = {name:, description:, tos_text:}
+  when "section"
+    locals = {name:, label:, content: element[:content]}
+  else
+    raise "Unknown element type: #{type}"
+  end %>
+                <%== container_opening_tag %>
+                <%== render("components/form/#{type}", locals:) %>
+                <%== container_closing_tag %>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>

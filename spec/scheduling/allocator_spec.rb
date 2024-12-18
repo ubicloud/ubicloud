@@ -8,7 +8,7 @@ TestAllocation = Struct.new(:score, :is_valid)
 TestResourceAllocation = Struct.new(:utilization, :is_valid)
 RSpec.describe Al do
   let(:vm) {
-    Vm.new(family: "standard", cores: 1, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
+    Vm.new(family: "standard", cores: 1, memory_gib: 8, name: "dummy-vm", arch: "x64", location: "loc1", ip4_enabled: "true", created_at: Time.now, unix_user: "", public_key: "", boot_image: "ubuntu-jammy").tap {
       _1.id = "2464de61-7501-8374-9ab0-416caebe31da"
     }
   }
@@ -490,7 +490,7 @@ RSpec.describe Al do
       Al::Request.new(
         vm.id,
         vm.cores,
-        vm.mem_gib,
+        vm.memory_gib,
         storage_volumes.map { _1["size_gib"] }.sum,
         storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
         vm.boot_image,
@@ -521,7 +521,7 @@ RSpec.describe Al do
       expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 0 }.storage_device_id].name).to eq("stor2")
       expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 1 }.storage_device_id].name).to eq("stor1")
       expect(used_cores + vm.cores).to eq(vmh.used_cores)
-      expect(used_hugepages_1g + vm.mem_gib).to eq(vmh.used_hugepages_1g)
+      expect(used_hugepages_1g + vm.memory_gib).to eq(vmh.used_hugepages_1g)
       expect(available_storage - 180).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
       expect(vmh.pci_devices.map { _1.vm_id }).to eq([nil, nil])
     end
@@ -540,7 +540,7 @@ RSpec.describe Al do
       expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 0 }.storage_device_id].name).to eq("stor2")
       expect(StorageDevice[vm.vm_storage_volumes.detect { _1.disk_index == 1 }.storage_device_id].name).to eq("stor1")
       expect(used_cores + vm.cores).to eq(vmh.used_cores)
-      expect(used_hugepages_1g + vm.mem_gib).to eq(vmh.used_hugepages_1g)
+      expect(used_hugepages_1g + vm.memory_gib).to eq(vmh.used_hugepages_1g)
       expect(available_storage - 180).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
       expect(vmh.pci_devices.map { _1.vm_id }).to eq([vm.id, vm.id])
     end
@@ -558,7 +558,7 @@ RSpec.describe Al do
       al2.update(vm2)
       vmh.reload
       expect(used_cores + vm1.cores + vm2.cores).to eq(vmh.used_cores)
-      expect(used_hugepages_1g + vm1.mem_gib + vm2.mem_gib).to eq(vmh.used_hugepages_1g)
+      expect(used_hugepages_1g + vm1.memory_gib + vm2.memory_gib).to eq(vmh.used_hugepages_1g)
       expect(available_storage - 10).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
     end
 

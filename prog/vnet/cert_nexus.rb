@@ -28,7 +28,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def start
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
 
     if Config.development? && cert.dns_zone_id.nil?
       crt, key = Util.create_certificate(subject: "/CN=" + cert.hostname, duration: 60 * 60 * 24 * 30 * 3)

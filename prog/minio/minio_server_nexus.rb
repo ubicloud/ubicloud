@@ -59,7 +59,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     nap 5 unless vm.strand.label == "wait"
     minio_server.incr_initial_provisioning
 
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
 
     minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
     cert, cert_key = create_certificate
@@ -165,7 +165,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   end
 
   label def unavailable
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
 
     reap
     nap 5 unless strand.children.select { _1.prog == "Minio::MinioServerNexus" && _1.label == "minio_restart" }.empty?

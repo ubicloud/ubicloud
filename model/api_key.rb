@@ -4,22 +4,45 @@ require_relative "../model"
 
 class ApiKey < Sequel::Model
   include ResourceMethods
+  include Authorization::TaggableMethods
+  include Authorization::HyperTagMethods
+
+  one_to_many :access_tags, key: :hyper_tag_id
+  plugin :association_dependencies, access_tags: :destroy
+
+  dataset_module Authorization::Dataset
 
   plugin :column_encryption do |enc|
     enc.column :key
+  end
+
+  def hyper_tag_name(project = nil)
+    "api-key/#{ubid}"
   end
 
   def self.ubid_type
     UBID::TYPE_ETC
   end
 
+  def self.create_personal_access_token(account, project: nil)
+    pat = create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api")
+    pat.associate_with_project(project) if project
+    pat
+  end
+
+  def self.create_inference_token(project)
+    token = ApiKey.create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint")
+    token.associate_with_project(project)
+    token
+  end
+
   def self.create_with_id(owner_table:, owner_id:, used_for:)
-    unless ["project", "inference_endpoint"].include?(owner_table.to_s)
+    unless %w[project inference_endpoint accounts].include?(owner_table.to_s)
       fail "Invalid owner_table: #{owner_table}"
     end
 
     key = SecureRandom.alphanumeric(32)
-    super(owner_table: owner_table, owner_id: owner_id, key: key, used_for: used_for)
+    super(owner_table:, owner_id:, key:, used_for:)
   end
 
   def rotate

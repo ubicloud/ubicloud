@@ -165,7 +165,7 @@ RSpec.describe Prog::Base do
 
       # register if the target is different
       st.label = :set_expired_deadline
-      st.stack.first["deadline_target"] = :napper
+      st.stack.first["deadline_target"] = "napper"
       expect {
         st.unsynchronized_run
       }.to change { st.stack.first["deadline_at"] }
@@ -174,7 +174,7 @@ RSpec.describe Prog::Base do
       # ignore if new deadline is further in the time and target is same
       st.label = :set_expired_deadline
       st.stack.first["deadline_at"] = Time.now - 60
-      st.stack.first["deadline_target"] = :pusher2
+      st.stack.first["deadline_target"] = "pusher2"
       expect {
         st.unsynchronized_run
       }.not_to change { st.stack.first["deadline_at"] }
@@ -182,7 +182,7 @@ RSpec.describe Prog::Base do
       # allow to explicitly extend deadline
       st.label = :extend_deadline
       st.stack.first["deadline_at"] = Time.now
-      st.stack.first["deadline_target"] = :pusher2
+      st.stack.first["deadline_target"] = "pusher2"
       expect {
         st.unsynchronized_run
       }.to change { st.stack.first["deadline_at"] }
@@ -238,7 +238,7 @@ RSpec.describe Prog::Base do
       st = Strand.create_with_id(prog: "Test", label: :napper)
       page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
 
-      st.stack.first["deadline_target"] = :napper
+      st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = Time.now - 1
 
       expect {
@@ -252,7 +252,7 @@ RSpec.describe Prog::Base do
       st = Strand.create_with_id(prog: "Test", label: :start)
       page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
 
-      st.stack.first["deadline_target"] = :napper
+      st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = Time.now - 1
 
       st.update(label: :set_popping_deadline2)
@@ -268,7 +268,7 @@ RSpec.describe Prog::Base do
 
     it "deletes the deadline information once the target is reached" do
       st = Strand.create_with_id(prog: "Test", label: :napper)
-      st.stack.first["deadline_target"] = :napper
+      st.stack.first["deadline_target"] = "napper"
       st.stack.first["deadline_at"] = Time.now - 1
 
       expect(st.stack.first).to receive(:delete).with("deadline_target")

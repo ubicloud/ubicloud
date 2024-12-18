@@ -37,7 +37,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start
-    register_deadline(:download_boot_images, 10 * 60)
+    register_deadline("download_boot_images", 10 * 60)
     hop_prep if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
 
     push Prog::BootstrapRhizome, {"target_folder" => "host"}
@@ -47,9 +47,8 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::Vm::PrepHost
     bud Prog::LearnNetwork unless vm_host.net6
     bud Prog::LearnMemory
-    bud Prog::LearnArch
     bud Prog::LearnOs
-    bud Prog::LearnCores
+    bud Prog::LearnCpu
     bud Prog::LearnStorage
     bud Prog::LearnPci
     bud Prog::InstallDnsmasq
@@ -61,17 +60,17 @@ class Prog::Vm::HostNexus < Prog::Base
   label def wait_prep
     reap.each do |st|
       case st.prog
-      when "LearnArch"
-        vm_host.update(arch: st.exitval.fetch("arch"))
       when "LearnOs"
         vm_host.update(os_version: st.exitval.fetch("os_version"))
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
-      when "LearnCores"
+      when "LearnCpu"
+        arch = st.exitval.fetch("arch")
         total_cores = st.exitval.fetch("total_cores")
         total_cpus = st.exitval.fetch("total_cpus")
         kwargs = {
+          arch: arch,
           total_sockets: st.exitval.fetch("total_sockets"),
           total_dies: st.exitval.fetch("total_dies"),
           total_cores: total_cores,
@@ -110,7 +109,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def download_boot_images
-    register_deadline(:prep_reboot, 4 * 60 * 60)
+    register_deadline("prep_reboot", 4 * 60 * 60)
     frame["default_boot_images"].each { |image_name|
       bud Prog::DownloadBootImage, {
         "image_name" => image_name
@@ -127,7 +126,7 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def prep_reboot
-    register_deadline(:wait, 15 * 60)
+    register_deadline("wait", 15 * 60)
     boot_id = get_boot_id
     vm_host.update(last_boot_id: boot_id)
 
@@ -178,7 +177,7 @@ class Prog::Vm::HostNexus < Prog::Base
     total_hugepages = Integer(total_hugepages_match.captures.first)
     free_hugepages = Integer(free_hugepages_match.captures.first)
 
-    total_vm_mem_gib = vm_host.vms.sum { |vm| vm.mem_gib }
+    total_vm_mem_gib = vm_host.vms.sum { |vm| vm.memory_gib }
     fail "Not enough hugepages for VMs" unless free_hugepages >= total_vm_mem_gib
 
     vm_host.update(
@@ -216,8 +215,6 @@ class Prog::Vm::HostNexus < Prog::Base
       hop_unavailable if !available?
       decr_checkup
     end
-
-    Clog.emit("vm host utilization") { {vm_host_utilization: vm_host.values.slice(:location, :arch, :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :total_storage_gib, :available_storage_gib).merge({vms_count: vm_host.vms_dataset.count})} }
 
     nap 30
   end

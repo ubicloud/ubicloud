@@ -1,20 +1,17 @@
 <% @page_title = @firewall[:name] %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "#{@project_data[:path]}/firewall",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Firewall", "#{@project_data[:path]}/firewall"],
-        [@firewall[:name], "#"]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: @firewall[:name] }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Firewall", "#{@project_data[:path]}/firewall"],
+      [@firewall[:name], "#"]
+    ]
+  }
+) %>
+
 <div class="grid gap-6">
   <!-- Detail Card -->
   <%== render(
@@ -41,7 +38,7 @@
         <tr>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Port range</th>
-          <% if Authorization.has_permission?(current_account.id, "Firewall:edit", @firewall[:id]) %>
+          <% if has_permission?("Firewall:edit", @firewall[:id]) %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
         </tr>
@@ -51,7 +48,7 @@
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:port_range] %></td>
-            <% if Authorization.has_permission?(current_account.id, "Firewall:edit", @firewall[:id]) %>
+            <% if has_permission?("Firewall:edit", @firewall[:id]) %>
               <td
                 id="fwr-delete-<%=fwr[:id]%>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
@@ -61,7 +58,7 @@
             <% end %>
           </tr>
         <% end %>
-        <% if Authorization.has_permission?(current_account.id, "Firewall:edit", @firewall[:id]) %>
+        <% if has_permission?("Firewall:edit", @firewall[:id]) %>
           <tr>
             <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST">
               <%== csrf_tag("#{request.path}/firewall-rule") %>
@@ -102,7 +99,7 @@
       <thead class="bg-gray-50">
         <tr>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-          <% if Authorization.has_permission?(current_account.id, "Firewall:edit", @firewall[:id]) %>
+          <% if has_permission?("Firewall:edit", @firewall[:id]) %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
         </tr>
@@ -125,7 +122,7 @@
             </form>
           </tr>
         <% end %>
-        <% if Authorization.has_permission?(current_account.id, "Firewall:edit", @firewall[:id]) %>
+        <% if has_permission?("Firewall:edit", @firewall[:id]) %>
           <tr>
             <form action="<%= "#{request.path}/attach-subnet" %>" role="form" method="POST">
               <%== csrf_tag("#{request.path}/attach-subnet") %>
@@ -152,7 +149,7 @@
     </table>
   </div>
   <!-- Delete Card -->
-  <% if Authorization.has_permission?(current_account.id, "Firewall:delete", @firewall[:id]) %>
+  <% if has_permission?("Firewall:delete", @firewall[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">

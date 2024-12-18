@@ -215,8 +215,8 @@ RSpec.describe Clover, "billing" do
       btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
       page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-      expect(page.status_code).to eq(200)
-      expect(page.body).to eq({message: "Deleting #{payment_method.ubid}"}.to_json)
+      expect(page.status_code).to eq(204)
+      expect(page.body).to be_empty
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
 
@@ -260,7 +260,7 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing/invoice/#{invoice.ubid}"
 
         expect(page.status_code).to eq(200)
-        expect(page.title).to eq("Ubicloud - #{invoice.name} - Invoice")
+        expect(page.title).to eq("Ubicloud - #{invoice.name} Invoice")
         expect(page).to have_content invoice.name
         expect(page).to have_content "Aggregated"
       end

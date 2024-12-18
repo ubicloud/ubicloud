@@ -55,7 +55,7 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/installation/create"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
       expect(page).to have_content "Project doesn't have valid billing information"
     end
 
@@ -80,30 +80,54 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/setting"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
       expect(page).to have_content "test-user"
       expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins1.installation_id}/
       expect(page).to have_content "test-org"
       expect(page).to have_link "Configure", href: /\/apps\/runner-app\/installations\/#{ins2.installation_id}/
+    end
+
+    it "enables cache for installation" do
+      installation.update(cache_enabled: false)
+
+      visit "#{project.path}/github/setting"
+      csrf_token = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+
+      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: true, _csrf: csrf_token}
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_enabled).to be true
+    end
+
+    it "disables cache for installation" do
+      installation.update(cache_enabled: true)
+
+      visit "#{project.path}/github/setting"
+      csrf_token = find("form[action='#{project.path}/github/installation/#{installation.ubid}'] input[name='_csrf']", visible: false).value
+
+      page.driver.post "#{project.path}/github/installation/#{installation.ubid}", {cache_enabled: false, _csrf: csrf_token}
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_enabled).to be false
+    end
+
+    it "raises not found when installation doesn't exist" do
+      visit "#{project.path}/github/installation/invalid_id"
+
+      expect(page.status_code).to eq(404)
     end
   end
 
   describe "runner" do
     it "can list active runners" do
       runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
-      runner_with_job = GithubRunner.create_with_id(
-        installation_id: installation.id,
-        label: "ubicloud",
-        repository_name: "my-repo",
-        runner_id: 2,
-        workflow_job: {
-          "id" => 123,
-          "name" => "test-job",
-          "run_id" => 456,
-          "workflow_name" => "test-workflow"
-        },
-        vm_id: Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").id
-      )
+      runner_with_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait").subject
+      runner_with_job.update(runner_id: 2, vm_id: Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "runner-vm").id, workflow_job: {
+        "id" => 123,
+        "name" => "test-job",
+        "run_id" => 456,
+        "workflow_name" => "test-workflow"
+      })
       runner_not_created = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo")
       runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_concurrency_limit")
       runner_wo_strand = GithubRunner.create_with_id(installation_id: installation.id, label: "ubicloud", repository_name: "my-repo")
@@ -111,7 +135,7 @@ RSpec.describe Clover, "github" do
       visit "#{project.path}/github/runner"
 
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - GitHub Runners")
+      expect(page.title).to eq("Ubicloud - Active Runners")
       expect(page).to have_content runner_deleted.ubid
       expect(page).to have_content "deleted"
       expect(page).to have_content "Runner doesn't have a job yet"

@@ -4,32 +4,28 @@ require_relative "spec_helper"
 
 RSpec.describe GithubRunner do
   subject(:github_runner) {
-    described_class.new(repository_name: "test-repo", label: "ubicloud").tap {
-      _1.id = "ca2eb084-8a36-8618-a16f-7561d7faf3b6"
-    }
+    vmh = VmHost.create(location: "hetzner-fsn1") { _1.id = Sshable.create_with_id.id }
+    ins = GithubInstallation.create_with_id(installation_id: 123, name: "test-installation", type: "User")
+    vm = Vm.create(vm_host: vmh, unix_user: "ubi", public_key: "ssh-key", name: "runner-vm", location: "hetzner-fsn1", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 1, vcpus: 2, memory_gib: 8) { _1.id = Sshable.create_with_id.id }
+    described_class.create_with_id(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, installation_id: ins.id)
   }
 
-  let(:vm) { instance_double(Vm, sshable: instance_double(Sshable), cores: 2) }
-
-  before do
-    allow(github_runner).to receive_messages(installation: instance_double(GithubInstallation), vm: instance_double(Vm, arch: "x64", cores: 2, ubid: "vm-ubid", pool_id: "pool-id"))
-    allow(github_runner.vm).to receive_messages(sshable: instance_double(Sshable), vm_host: instance_double(VmHost, ubid: "host-ubid"))
-  end
-
   it "can log duration when it's from a vm pool" do
-    expect(VmPool).to receive(:[]).with("pool-id").and_return(instance_double(VmPool, ubid: "pool-ubid"))
+    pool = VmPool.create_with_id(size: 1, vm_size: "standard-2", location: "hetzner-fsn1", boot_image: "github-ubuntu-2204", storage_size_gib: 86)
+    github_runner.vm.update(pool_id: pool.id)
     expect(Clog).to receive(:emit).with("runner_tested").and_call_original
     github_runner.log_duration("runner_tested", 10)
   end
 
   it "can log duration without a vm" do
-    expect(github_runner).to receive(:vm).and_return(nil)
+    github_runner.update(vm_id: nil)
     expect(Clog).to receive(:emit).with("runner_tested").and_call_original
     github_runner.log_duration("runner_tested", 10)
   end
 
   it "provisions a spare runner" do
-    expect(Prog::Vm::GithubRunner).to receive(:assemble).with(github_runner.installation, repository_name: github_runner.repository_name, label: github_runner.label)
+    expect(Prog::Vm::GithubRunner).to receive(:assemble)
+      .with(github_runner.installation, repository_name: github_runner.repository_name, label: github_runner.label)
       .and_return(instance_double(Strand, subject: instance_double(described_class)))
     github_runner.provision_spare_runner
   end

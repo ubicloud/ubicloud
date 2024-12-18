@@ -23,7 +23,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123&installation_id=#{installation.installation_id}"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - Active Runners")
     expect(page).to have_content("GitHub runner integration is already enabled for #{project.name} project.")
   end
 
@@ -43,7 +43,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123&installation_id=345"
 
-    expect(page.title).to eq("Ubicloud - Dashboard")
+    expect(page.title).to eq("Ubicloud - Projects")
     expect(page).to have_content("You should initiate the GitHub App installation request from the project's GitHub runner integration page.")
   end
 
@@ -75,7 +75,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=invalid"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
     expect(page).to have_content("GitHub App installation failed.")
   end
 
@@ -86,20 +86,20 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
     expect(page).to have_content("GitHub App installation failed.")
   end
 
-  it "fails if the current user's account suspended" do
+  it "fails if the project is not active" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})
     expect(Project).to receive(:[]).and_return(project).at_least(:once)
-    user.update(suspended_at: Time.now)
+    expect(project).to receive(:active?).and_return(false)
 
     visit "/github/callback?code=123123&installation_id=345"
 
     expect(page.title).to eq("Ubicloud - project-1 Dashboard")
-    expect(page).to have_content("GitHub runner integration is not allowed for suspended accounts.")
+    expect(page).to have_content("GitHub runner integration is not allowed for inactive projects")
   end
 
   it "creates installation with project from session" do
@@ -109,7 +109,7 @@ RSpec.describe Clover, "github" do
 
     visit "/github/callback?code=123123&installation_id=345"
 
-    expect(page.title).to eq("Ubicloud - GitHub Runners")
+    expect(page.title).to eq("Ubicloud - Active Runners")
     expect(page).to have_content("GitHub runner integration is enabled for #{project.name} project.")
     installation = GithubInstallation[installation_id: 345]
     expect(installation.name).to eq("test-user")

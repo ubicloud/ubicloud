@@ -8,7 +8,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   subject_is :inference_endpoint_replica
 
   extend Forwardable
-  def_delegators :inference_endpoint_replica, :vm, :inference_endpoint
+  def_delegators :inference_endpoint_replica, :vm, :inference_endpoint, :load_balancers_vm
 
   semaphore :destroy
 
@@ -58,7 +58,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    register_deadline(:wait, 15 * 60)
+    register_deadline("wait", 15 * 60)
 
     bud Prog::BootstrapRhizome, {"target_folder" => "inference_endpoint", "subject_id" => vm.id, "user" => "ubi"}
     hop_wait_bootstrap_rhizome
@@ -97,14 +97,13 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   end
 
   label def wait_endpoint_up
-    if inference_endpoint.load_balancer.reload.active_vms.map { _1.id }.include? vm.id
-      hop_wait
-    end
+    hop_wait if available?
 
     nap 5
   end
 
   label def wait
+    hop_unavailable unless available?
     ping_gateway
 
     nap 60
@@ -113,6 +112,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   label def destroy
     decr_destroy
 
+    resolve_page
     strand.children.each { _1.destroy }
     inference_endpoint.load_balancer.evacuate_vm(vm)
     inference_endpoint.load_balancer.remove_vm(vm)
@@ -122,35 +122,72 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     pop "inference endpoint replica is deleted"
   end
 
+  label def unavailable
+    if available?
+      resolve_page
+      hop_wait
+    end
+
+    create_page unless inference_endpoint.maintenance_set? || load_balancers_vm.state_counter <= inference_endpoint.load_balancer.health_check_down_threshold
+    nap 30
+  end
+
+  def available?
+    load_balancers_vm.reload.state == "up"
+  end
+
+  def create_page
+    extra_data = {
+      inference_endpoint_ubid: inference_endpoint.ubid,
+      inference_endpoint_is_public: inference_endpoint.is_public,
+      inference_endpoint_location: inference_endpoint.location,
+      inference_endpoint_name: inference_endpoint.name,
+      inference_endpoint_model_name: inference_endpoint.model_name,
+      inference_endpoint_replica_count: inference_endpoint.replica_count,
+      load_balancer_ubid: inference_endpoint.load_balancer.ubid,
+      private_subnet_ubid: inference_endpoint.load_balancer.private_subnet.ubid,
+      replica_ubid: inference_endpoint_replica.ubid,
+      vm_ubid: vm.ubid,
+      vm_ip: vm.sshable.host,
+      vm_host_ubid: vm.vm_host.ubid,
+      vm_host_ip: vm.vm_host.sshable.host
+    }
+    Prog::PageNexus.assemble("Replica #{inference_endpoint_replica.ubid.to_s[0..7]} of inference endpoint #{inference_endpoint.name} is unavailable",
+      ["InferenceEndpointReplicaUnavailable", inference_endpoint_replica.ubid],
+      inference_endpoint_replica.ubid, severity: "warning", extra_data:)
+  end
+
+  def resolve_page
+    Page.from_tag_parts("InferenceEndpointReplicaUnavailable", inference_endpoint_replica.ubid)&.incr_resolve
+  end
+
   # pushes latest config to inference gateway and collects billing information
   def ping_gateway
-    projects = if inference_endpoint.is_public
-      Project.where(DB[:api_key]
+    api_key_ds = DB[:api_key]
       .where(owner_table: "project")
       .where(used_for: "inference_endpoint")
       .where(is_valid: true)
-      .where(owner_id: Sequel[:project][:id]).exists)
-        .reject { |pj| pj.accounts.any? { |ac| !ac.suspended_at.nil? } }
-        .map do
-        {
-          ubid: _1.ubid,
-          api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
-          quota_rps: 50.0,
-          quota_tps: 5000.0
-        }
-      end
-    else
-      [{
-        ubid: inference_endpoint.project.ubid,
-        api_keys: inference_endpoint.api_keys.select(&:is_valid).map { |k| Digest::SHA2.hexdigest(k.key) },
-        quota_rps: 100.0,
-        quota_tps: 1000000.0
-      }]
+      .where(owner_id: Sequel[:project][:id])
+      .exists
+
+    eligible_projects_ds = Project.where(api_key_ds)
+    eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
+
+    eligible_projects = eligible_projects_ds.all
+      .select(&:active?)
+      .map do
+      {
+        ubid: _1.ubid,
+        api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
+        quota_rps: 50.0,
+        quota_tps: 5000.0
+      }
     end
+
     body = {
       replica_ubid: inference_endpoint_replica.ubid,
       public_endpoint: inference_endpoint.is_public,
-      projects: projects
+      projects: eligible_projects
     }
 
     resp = vm.sshable.cmd("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)

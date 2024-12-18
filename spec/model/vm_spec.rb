@@ -7,18 +7,23 @@ RSpec.describe Vm do
 
   describe "#display_state" do
     it "returns deleting if destroy semaphore increased" do
-      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "destroy")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "destroy")]).at_least(:once)
       expect(vm.display_state).to eq("deleting")
     end
 
+    it "returns restarting if restart semaphore increased" do
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "restart")]).at_least(:once)
+      expect(vm.display_state).to eq("restarting")
+    end
+
     it "returns waiting for capacity if semaphore increased" do
-      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "waiting_for_capacity")]).at_least(:once)
       expect(vm.display_state).to eq("waiting for capacity")
     end
 
     it "returns no capacity available if it's waiting capacity more than 15 minutes" do
       expect(vm).to receive(:created_at).and_return(Time.now - 16 * 60)
-      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "waiting_for_capacity")]).at_least(:once)
       expect(vm.display_state).to eq("no capacity available")
     end
 
@@ -27,19 +32,21 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#mem_gib" do
-    it "handles standard family" do
-      vm.family = "standard"
-      [1, 2, 4, 8, 15, 30].each do |cores|
-        expect(vm).to receive(:cores).and_return(cores)
-        expect(vm.mem_gib).to eq cores * 8
-      end
+  describe "#mem_gib_ratio" do
+    it "returns the correct ratio for arm64" do
+      expect(vm).to receive(:arch).and_return("arm64")
+      expect(vm.mem_gib_ratio).to eq(3.2)
     end
 
-    it "handles standard-6" do
-      vm.family = "standard-gpu"
-      vm.cores = 3
-      expect(vm.mem_gib).to eq 32
+    it "returns the correct ratio for x64" do
+      expect(vm).to receive(:arch).and_return("x64")
+      expect(vm.mem_gib_ratio).to eq(8)
+    end
+
+    it "returns correct ratio for standard-gpu" do
+      expect(vm).to receive(:arch).and_return("x64")
+      expect(vm).to receive(:family).and_return("standard-gpu")
+      expect(vm.mem_gib_ratio).to eq(10.68)
     end
   end
 

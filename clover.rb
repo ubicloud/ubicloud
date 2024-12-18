@@ -2,15 +2,44 @@
 
 require_relative "model"
 
+require "committee"
 require "roda"
 require "tilt"
 require "tilt/erubi"
 
 class Clover < Roda
+  # :nocov:
+  linting = Config.test? && !defined?(SimpleCov)
+  use Rack::Lint if linting
+  if linting || Config.development? # Assume Rack::Lint added automatically in development
+    require "rack/rewindable_input"
+
+    # Switch to use Rack::RewindableInputMiddleware after Rack 3.2
+    class RewindableInputMiddleware
+      def initialize(app)
+        @app = app
+      end
+
+      def call(env)
+        if (input = env["rack.input"])
+          env["rack.input"] = Rack::RewindableInput.new(input)
+        end
+
+        @app.call(env)
+      end
+    end
+    use RewindableInputMiddleware
+  end
+  # :nocov:
+
+  OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true)
+  SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
+  SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
+
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
-  Unreloader.require("routes/helpers") {}
+  Unreloader.require("helpers") {}
 
   plugin :all_verbs
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
@@ -18,10 +47,11 @@ class Clover < Roda
   plugin :flash
   plugin :h
   plugin :hash_branches
-  plugin :hash_branch_view_subdir
+  plugin :hooks
   plugin :Integer_matcher_max
   plugin :json
-  plugin :json_parser
+  plugin :invalid_request_body, :raise
+  plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
   plugin :public
   plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true}
   plugin :request_headers
@@ -34,9 +64,16 @@ class Clover < Roda
       scope.web?
     end
 
+  plugin :custom_block_results
+  handle_block_result Integer do |status_code|
+    response.status = status_code
+    nil
+  end
+
   plugin :route_csrf do |token|
     flash["error"] = "An invalid security token submitted with this request, please try again"
-    return redirect_back_with_inputs
+    response.status = 400
+    redirect_back_with_inputs
   end
 
   plugin :content_security_policy do |csp|
@@ -72,7 +109,7 @@ class Clover < Roda
       message: "Sorry, we couldn’t find the resource you’re looking for."
     }
 
-    if api?
+    if api? || request.headers["Accept"] == "application/json"
       {error: @error}.to_json
     else
       view "/error"
@@ -98,7 +135,7 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed
+    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
@@ -107,15 +144,38 @@ class Clover < Roda
       type = e.type
       message = e.message
       details = e.details
+    when Committee::BadRequest, Committee::InvalidRequest
+      code = 400
+      type = "BadRequest"
+      message = e.message
+
+      case e.original_error
+      when JSON::ParserError
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body isn't a valid JSON object."}
+      when OpenAPIParser::NotExistPropertyDefinition
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body contains unrecognized parameters: #{keys.join(", ")}"}
+      when OpenAPIParser::NotExistRequiredKey
+        keys = e.original_error.instance_variable_get(:@keys)
+        message = "Validation failed for following fields: body"
+        details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
+      end
+    when Committee::InvalidResponse
+      code = 500
+      type = "InternalServerError"
+      message = e.message
     else
       raise e if Config.test? && e.message != "test error"
-
       Clog.emit("route exception") { Util.exception_to_hash(e) }
 
       code = 500
       type = "UnexceptedError"
       message = "Sorry, we couldn’t process your request because of an unexpected error."
     end
+
+    raise e if Config.test? && e.is_a?(Committee::Error)
 
     response.status = code
     next if code == 204
@@ -130,11 +190,11 @@ class Clover < Roda
       case e
       when Sequel::ValidationFailed, DependencyError
         flash["error"] = message
-        return redirect_back_with_inputs
+        redirect_back_with_inputs
       when Validation::ValidationFailed
         flash["error"] = message
-        flash["errors"] = (flash["errors"] || {}).merge(details)
-        return redirect_back_with_inputs
+        flash["errors"] = (flash["errors"] || {}).merge(details).transform_keys(&:to_s)
+        redirect_back_with_inputs
       end
 
       # :nocov:
@@ -145,11 +205,14 @@ class Clover < Roda
     end
   end
 
+  require "rodauth"
+  require_relative "rodauth/features/personal_access_token"
+
   plugin :rodauth, name: :api do
-    enable :argon2, :json, :jwt, :active_sessions, :login
+    enable :argon2, :json, :jwt, :active_sessions, :login, :personal_access_token
 
     only_json? true
-    use_jwt? true
+    use_jwt? { !use_pat? }
 
     # Converting rodauth error response to the common error format of the API
     json_response_body do |hash|
@@ -201,6 +264,7 @@ class Clover < Roda
       :otp, :webauthn, :recovery_codes
 
     title_instance_variable :@page_title
+    check_csrf? false
 
     # :nocov:
     unless Config.development?
@@ -445,12 +509,6 @@ class Clover < Roda
     recovery_auth_view { view "auth/recovery_auth", "Recovery Codes" }
   end
 
-  hash_branch("dashboard") do |r|
-    r.get web? do
-      view "/dashboard"
-    end
-  end
-
   hash_branch("after-login") do |r|
     r.get web? do
       if (project = current_account.projects_dataset.order(:created_at, :name).first)
@@ -469,14 +527,32 @@ class Clover < Roda
   end
   # :nocov:
 
-  autoload_routes("merged")
-  autoload_routes("runtime", "runtime")
+  if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
+    Unreloader.require("routes")
+  # :nocov:
+  else
+    plugin :autoload_hash_branches
+    Dir["routes/**/*.rb"].each do |full_path|
+      parts = full_path.delete_prefix("routes/").split("/")
+      namespaces = parts[0...-1]
+      filename = parts.last
+      segment = File.basename(filename, ".rb").tr("_", "-")
+      namespace = if namespaces.empty?
+        ""
+      else
+        :"#{namespaces.join("_")}_prefix"
+      end
+      autoload_hash_branch(namespace, segment, full_path)
+    end
+    Unreloader.autoload("routes", delete_hook: proc { |f| hash_branch(File.basename(f, ".rb").tr("_", "-")) }) {}
+  end
+  # :nocov:
 
   route do |r|
     if api?
       response.json = true
       response.skip_content_security_policy!
-      r.rodauth
+      rodauth.check_active_session unless rodauth.use_pat?
     else
       r.on "runtime" do
         @is_runtime = true
@@ -487,7 +563,7 @@ class Clover < Roda
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
-        r.hash_branches("runtime")
+        r.hash_branches(:runtime_prefix)
       end
 
       r.public
@@ -497,18 +573,42 @@ class Clover < Roda
         r.hash_branches(:webhook_prefix)
       end
 
-      r.rodauth
-
       check_csrf!
       rodauth.load_memory
 
       r.root do
         r.redirect rodauth.login_route
       end
+
+      rodauth.check_active_session
     end
 
-    rodauth.check_active_session
+    r.rodauth
     rodauth.require_authentication
+
+    if api?
+      # Validate request against OpenAPI schema, after authenticating
+      # (which is thought to be cheaper)
+      begin
+        @schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
+        @schema_validator.request_validate(r)
+
+        next unless @schema_validator.link_exist?
+      rescue JSON::ParserError => e
+        raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
+      end
+    end
+
     r.hash_branches("")
+  end
+
+  # Validate response against OpenAPI schema
+  after do |res|
+    status, headers, body = res
+    next unless api? && status && headers && body
+    @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
+    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
+  rescue JSON::ParserError => e
+    raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end
 end

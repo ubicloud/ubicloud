@@ -1,26 +1,18 @@
 <% @page_title = @pg[:name] %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "#{@project_data[:path]}/postgres",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-        [@pg[:name], "#"]
-      ]
-    }
-  ) %>
-  <%== render(
-    "components/page_header",
-    locals: {
-      title: @pg[:name],
-      right_items: [render("components/pg_state_label", locals: { state: @pg[:state], extra_class: "text-md" })]
-    }
-  ) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
+      [@pg[:name], "#"]
+    ],
+    right_items: [render("components/pg_state_label", locals: { state: @pg[:state], extra_class: "text-md" })]
+  }
+) %>
+
 <div class="grid gap-6">
   <!-- Detail Card -->
   <% data = [
@@ -44,7 +36,7 @@
   if @pg[:connection_string] == ""
     data.push(["Connection String", "Waiting for host to be ready..."])
   else
-    data.push(["Connection String", @pg[:connection_string], { copieble: true, revealable: true }])
+    data.push(["Connection String", @pg[:connection_string], { copyable: true, revealable: true }])
   end %>
 
   <div class="grid grid-cols-1 gap-6 md:grid-cols-6">
@@ -154,56 +146,8 @@
       </div>
     </div>
   <% end %>
-  <!-- Reset password -->
-  <% if @pg[:primary] %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password") %>
-          <div class="space-y-4">
-            <div>
-              <h2 class="text-lg font-medium leading-6 text-gray-900">Reset superuser password</h2>
-            </div>
-            <div class="grid grid-cols-12 gap-6">
-              <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    label: "New password",
-                    name: "password",
-                    type: "password",
-                    attributes: {
-                      required: true
-                    },
-                    extra_class: "reset-superuser-password-new-password"
-                  }
-                ) %>
-              </div>
-              <div class="col-span-12 sm:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    label: "New password (repeat)",
-                    name: "repeat_password",
-                    type: "password",
-                    attributes: {
-                      required: true
-                    },
-                    extra_class: "reset-superuser-password-new-password-repeat"
-                  }
-                ) %>
-              </div>
-              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== render("components/form/submit_button", locals: { text: "Reset" }) %>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  <% end %>
   <!-- Firewall Rules Card -->
-  <% if Authorization.has_permission?(current_account.id, "Postgres:Firewall:view", @pg[:id]) %>
+  <% if has_permission?("Postgres:Firewall:view", @pg[:id]) %>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -217,7 +161,7 @@
           <tr>
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Port Range</th>
-            <% if Authorization.has_permission?(current_account.id, "Postgres:Firewall:edit", @pg[:id]) %>
+            <% if has_permission?("Postgres:Firewall:edit", @pg[:id]) %>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
             <% end %>
           </tr>
@@ -227,7 +171,7 @@
             <tr>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432</td>
-              <% if Authorization.has_permission?(current_account.id, "Postgres:Firewall:edit", @pg[:id]) %>
+              <% if has_permission?("Postgres:Firewall:edit", @pg[:id]) %>
                 <td
                   id="fwr-delete-<%=fwr[:id]%>"
                   class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
@@ -237,7 +181,7 @@
               <% end %>
             </tr>
           <% end %>
-          <% if Authorization.has_permission?(current_account.id, "Postgres:Firewall:edit", @pg[:id]) %>
+          <% if has_permission?("Postgres:Firewall:edit", @pg[:id]) %>
             <tr>
               <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST">
                 <%== csrf_tag("#{request.path}/firewall-rule") %>
@@ -268,7 +212,7 @@
     </div>
   <% end %>
   <!-- Metric Destination Card -->
-  <% if Authorization.has_permission?(current_account.id, "Postgres:edit", @pg[:id]) %>
+  <% if has_permission?("Postgres:edit", @pg[:id]) %>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -283,7 +227,7 @@
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">URL</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Username</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Password</th>
-            <% if Authorization.has_permission?(current_account.id, "Postgres:edit", @pg[:id]) %>
+            <% if has_permission?("Postgres:edit", @pg[:id]) %>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
             <% end %>
           </tr>
@@ -294,7 +238,7 @@
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= md[:url] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= md[:username] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">●●●●●●</td>
-              <% if Authorization.has_permission?(current_account.id, "Postgres:edit", @pg[:id]) %>
+              <% if has_permission?("Postgres:edit", @pg[:id]) %>
                 <td
                   id="md-delete-<%=md[:id]%>"
                   class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
@@ -304,7 +248,7 @@
               <% end %>
             </tr>
           <% end %>
-          <% if Authorization.has_permission?(current_account.id, "Postgres:edit", @pg[:id]) %>
+          <% if has_permission?("Postgres:edit", @pg[:id]) %>
             <tr>
               <form action="<%= "#{request.path}/metric-destination" %>" role="form" method="POST">
                 <%== csrf_tag("#{request.path}/metric-destination") %>
@@ -338,46 +282,102 @@
       </table>
     </div>
   <% end %>
-  <% if Authorization.has_permission?(current_account.id, ["Postgres:edit", "Postgres:delete"], @pg[:id]) %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <!-- Restart Card -->
-      <% if Authorization.has_permission?(current_account.id, "Postgres:edit", @pg[:id]) %>
-        <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restart" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restart") %>
+  <!-- Danger Zone -->
+  <% if has_permission?(["Postgres:view", "Postgres:edit", "Postgres:delete"], @pg[:id]) || @pg[:primary] %>
+    <div>
+      <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Danger Zone
+          </h3>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <!-- Reset password -->
+        <% if @pg[:primary] %>
+          <div class="px-4 py-5 sm:p-6">
+            <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password" %>" role="form" method="POST">
+              <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/reset-superuser-password") %>
+              <div class="space-y-4">
+                <div>
+                  <h3 class="text-base font-semibold leading-6 text-gray-900">Reset superuser password</h3>
+                </div>
+                <div class="grid grid-cols-12 gap-6">
+                  <div class="col-span-12 sm:col-span-5">
+                    <%== render(
+                      "components/form/text",
+                      locals: {
+                        label: "New password",
+                        name: "password",
+                        type: "password",
+                        attributes: {
+                          required: true
+                        },
+                        extra_class: "reset-superuser-password-new-password"
+                      }
+                    ) %>
+                  </div>
+                  <div class="col-span-12 sm:col-span-5">
+                    <%== render(
+                      "components/form/text",
+                      locals: {
+                        label: "New password (repeat)",
+                        name: "repeat_password",
+                        type: "password",
+                        attributes: {
+                          required: true
+                        },
+                        extra_class: "reset-superuser-password-new-password-repeat"
+                      }
+                    ) %>
+                  </div>
+                  <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                    <%== render("components/form/submit_button", locals: { text: "Reset" }) %>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        <% end %>
+        <!-- Restart Card -->
+        <% if has_permission?("Postgres:edit", @pg[:id]) %>
+          <div class="px-4 py-5 sm:p-6">
+            <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restart" %>" role="form" method="POST">
+              <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restart") %>
+              <div class="sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="text-base font-semibold leading-6 text-gray-900">Restart PostgreSQL database</h3>
+                  <div class="mt-2 text-sm text-gray-500">
+                    <p>This action will restart the PostgreSQL database. The database will be offline momentarily, and
+                      all connections will be dropped.</p>
+                  </div>
+                </div>
+                <div id="postgres-restart-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                  <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                    <%== render("components/form/submit_button", locals: { text: "Restart", extra_class: "restart-btn" }) %>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        <% end %>
+        <!-- Delete Card -->
+        <% if has_permission?("Postgres:delete", @pg[:id]) %>
+          <div class="px-4 py-5 sm:p-6">
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
-                <h3 class="text-base font-semibold leading-6 text-gray-900">Restart PostgreSQL database</h3>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Delete PostgreSQL database</h3>
                 <div class="mt-2 text-sm text-gray-500">
-                  <p>This action will restart the PostgreSQL database. The database will be offline momentarily, and all
-                    connections will be dropped.</p>
+                  <p>This action will permanently delete this PostgreSQL database.</p>
                 </div>
               </div>
-              <div id="postgres-restart-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                  <%== render("components/form/submit_button", locals: { text: "Restart", extra_class: "restart-btn" }) %>
-                </div>
+              <div id="postgres-delete-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <%== render("components/delete_button", locals: { confirmation: @pg[:name], redirect: "#{@project_data[:path]}/postgres" }) %>
               </div>
-            </div>
-          </form>
-        </div>
-      <% end %>
-      <!-- Delete Card -->
-      <% if Authorization.has_permission?(current_account.id, "Postgres:delete", @pg[:id]) %>
-        <div class="px-4 py-5 sm:p-6">
-          <div class="sm:flex sm:items-center sm:justify-between">
-            <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Delete PostgreSQL database</h3>
-              <div class="mt-2 text-sm text-gray-500">
-                <p>This action will permanently delete this PostgreSQL database.</p>
-              </div>
-            </div>
-            <div id="postgres-delete-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== render("components/delete_button", locals: { confirmation: @pg[:name], redirect: "#{@project_data[:path]}/postgres" }) %>
             </div>
           </div>
-        </div>
-      <% end %>
+        <% end %>
+      </div>
     </div>
   <% end %>
 </div>

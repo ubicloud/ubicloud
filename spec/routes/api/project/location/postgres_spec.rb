@@ -5,7 +5,7 @@ require_relative "../../spec_helper"
 RSpec.describe Clover, "postgres" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:pg) do
     Prog::Postgres::PostgresResourceNexus.assemble(
@@ -139,34 +139,12 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
       end
 
-      it "invalid body" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", "invalid_body"
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body isn't a valid JSON object."})
-      end
-
-      it "missing required key" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
-          unix_user: "ha_type"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Request body must include required parameters: size"})
-      end
-
-      it "non allowed key" do
-        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-pg", {
-          size: "standard-2",
-          foo_key: "foo_val"
-        }.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body", {"body" => "Only following parameters are allowed: size, storage_size, ha_type, version, flavor"})
-      end
-
       it "firewall-rule" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
           cidr: "0.0.0.0/24"
         }.to_json
 
+        expect(JSON.parse(last_response.body)["cidr"]).to eq("0.0.0.0/24")
         expect(last_response.status).to eq(200)
       end
 
@@ -342,7 +320,8 @@ RSpec.describe Clover, "postgres" do
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/firewall-rule"
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)[0]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
+        expect(JSON.parse(last_response.body)["count"]).to eq(1)
       end
     end
 
@@ -395,7 +374,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "firewall-rule not exist" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/pf000000000000000000000000"
 
         expect(last_response.status).to eq(204)
       end
@@ -413,7 +392,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "metric-destination not exist" do
-        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/foo_ubid"
+        delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/et000000000000000000000000"
 
         expect(last_response.status).to eq(204)
       end

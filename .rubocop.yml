@@ -47,6 +47,12 @@ Layout/SpaceInsideHashLiteralBraces:
   Exclude:
     - 'views/**/*.erb'
 
+Layout/EmptyLinesAroundMethodBody:
+  Enabled: false
+
+RSpec/AnyInstance:
+  Enabled: false
+
 RSpec/ExampleLength:
   Enabled: false
 

@@ -2,239 +2,34 @@
 
 <%== render("components/billing_warning") %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "#{@project_data[:path]}/vm",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Virtual Machines", "#{@project_data[:path]}/vm"],
-        %w[Create #]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: "Create Virtual Machine" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Virtual Machines", "#{@project_data[:path]}/vm"],
+      %w[Create #]
+    ]
+  }
+) %>
 
-<div class="grid gap-6">
-  <form action="<%= "#{@project_data[:path]}/vm" %>" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/vm") %>
-    <!-- Create Card -->
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="px-4 py-5 sm:p-6">
-        <div class="space-y-12">
-          <div>
-            <h2 class="text-base font-semibold leading-7 text-gray-900">Details</h2>
-            <p class="mt-1 text-sm leading-6 text-gray-600">Enter details for your virtual machine.</p>
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="sm:col-span-3">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    label: "Name",
-                    attributes: {
-                      required: true,
-                      placeholder: "Enter name"
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-full">
-                <% locations = Option
-                    .locations(feature_flags: @project_data[:feature_flags])
-                    .map { |l| [l.display_name, l.ui_name, @prices[l.name].to_json] }
+<%
+  ps_description = "<p class='mt-1 text-sm leading-6 text-gray-600'>We recommend using the default subnet for most use-cases. If you'd like to learn more about private subnets, please visit <a href='https://www.ubicloud.com/docs/networking/private-subnet' class='text-orange-600 hover:text-orange-700'>Private Subnets</a> page.</p>"
 
-                   default_location = Option.locations.detect { |l| l.name == @default_location }&.display_name
-                %>
-                <%== render(
-                  "components/form/radio_small_cards",
-                  locals: {
-                    name: "location",
-                    label: "Location",
-                    options: locations,
-                    selected: default_location,
-                    attributes: {
-                      required: true
-                    }
-                  }
-                ) %>
-              </div>
-              <div class="sm:col-span-3">
-                <%== render(
-                  "components/form/select",
-                  locals: {
-                    name: "private_subnet_id",
-                    label: "Private Subnet",
-                    placeholder: "Create new subnet",
-                    options: @subnets.map { |s| [s[:id], s[:name], "location-based-option #{s[:location]}"] }
-                  }
-                ) %>
-              </div>
-              <div class="col-span-full">
-                <%== render(
-                  "components/form/checkbox",
-                  locals: {
-                    name: "enable_ip4",
-                    label: "Public IPv4 Support (+<span class='enable_ip4-1-monthly-price'>-</span><span class='text-xs text-gray-500'>/mo</span>)",
-                    options: [
-                     ["1", "Enable Public IPv4", "location-based-price", {"data-amount" => "1", "data-resource-type" => "IPAddress", "data-resource-family" => "IPv4", "data-default" => "true"}]
-                    ],
-                    selected: "1",
-                    description:
-                      "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address."
-                  }
-                ) %>
-              </div>
-              <div class="col-span-full">
-                <div class="space-y-2">
-                  <label for="size" class="text-sm font-medium leading-6 text-gray-900">Server size (Dedicated CPU)</label>
-                  <fieldset class="radio-small-cards" id="size-radios">
-                    <legend class="sr-only">Server size</legend>
-                    <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      <% Option::VmSizes.select { _1.visible }.each_with_index do |size, idx| %>
-                        <% disabled = !@enabled_vm_sizes.include?(size.name) %>
-                        <label class="size-<%= size.name %>" title="<%= disabled ? "Insufficient quota. You can reach us at support@ubicloud.com to increase your quota." : "" %>">
-                          <input
-                            type="radio"
-                            name="size"
-                            value="<%= size.name %>"
-                            class="peer sr-only location-based-price"
-                            data-resource-type="VmCores"
-                            data-resource-family="<%= size.family %>"
-                            data-amount="<%= size.vcpu / 2 %>"
-                            data-storage-resource-type="VmStorage"
-                            data-storage-size-options="<%= size.storage_size_options %>"
-                            required
-                            <%= (flash.dig("old", "size") == size.name || flash.dig("old", "size").nil? && idx == 0) ? "checked" : "" %>
-                            <%= disabled ? "disabled" : "" %>
-                          >
-                          <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700
-                                <%= disabled ? "opacity-50" : "" %>"
-                          >
-                            <span class="flex flex-col">
-                              <span class="text-md font-semibold"><%= size.display_name %></span>
-                              <span class="text-sm opacity-80">
-                                <span class="block sm:inline">
-                                  <%= size.vcpu %>
-                                  vCPUs /
-                                  <%= size.memory %>
-                                  GB RAM
-                                </span>
-                              </span>
-                            </span>
-                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium"><span class="size-<%= size.name %>-monthly-price">-</span>/mo</span>
-                              <span class="ml-1 opacity-50 sm:ml-0"><span class="size-<%= size.name %>-hourly-price">-</span>/hour</span>
-                            </span>
-                          </span>
-                        </label>
-                      <% end %>
-                    </div>
-                  </fieldset>
-                </div>
-              </div>
+  form_elements = [
+    {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
+    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description: ps_description, content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "enable_ip4", type: "checkbox", label: "Public IPv4 Support", description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address.", content_generator: ContentGenerator::Vm.method(:enable_ipv4)},
+    {name: "size", type: "radio_small_cards", label: "Server size (Dedicated CPU)", required: "required", content_generator: ContentGenerator::Vm.method(:size)},
+    {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Vm.method(:storage_size)},
+    {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
+    {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"},
+    {name: "public_key", type: "textarea", label: "SSH Public Key", required: "required", placeholder: "ssh-ed25519 AAAA...", description: "SSH keys are a more secure method of logging into a server."}
+  ]
 
-              <div class="col-span-full instance-size-based-storage-sizes">
-                <div class="space-y-2">
-                  <label for="storage_size" class="text-sm font-medium leading-6 text-gray-900">Storage size</label>
-                  <fieldset class="radio-small-cards" id="storage-size-radios">
-                  <legend class="sr-only">Storage size</legend>
-                    <div class="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      <% size = flash.dig("old", "size") ? Option::VmSizes.find { _1.name == flash.dig("old", "size") } : Option::VmSizes[0] %>
-                      <% size.storage_size_options.each_with_index do |storage_size, idx| %>
-                        <label class="storage-size storage-size-<%= storage_size %>">
-                          <input
-                            type="radio"
-                            name="storage_size"
-                            value="<%= storage_size %>"
-                            class="peer sr-only"
-                            required
-                            <%= (flash.dig("old", "storage_size") == storage_size || flash.dig("old", "storage_size").nil? && idx == 0) ? "checked" : "" %>
-                          >
-                          <span
-                            class="flex items-center justify-between rounded-md py-4 px-4 sm:flex-1 cursor-pointer focus:outline-none
-                                ring-1 ring-gray-300 bg-white text-gray-900 hover:bg-gray-50
-                                peer-focus-visible:ring-2 peer-focus-visible:ring-orange-600 peer-focus-visible:ring-offset-2 peer-checked:bg-orange-600 peer-checked:text-white peer-checked:hover:bg-orange-700"
-                          >
-                            <span class="text-md font-semibold storage-size-label"><%= storage_size %>GB</span>
-                            <span class="mt-2 flex text-sm sm:ml-4 sm:mt-0 sm:flex-col sm:text-right">
-                              <span class="font-medium"><span class="storage-size-monthly-price">-</span>/mo</span>
-                              <span class="ml-1 opacity-50 sm:ml-0"><span class="storage-size-hourly-price">-</span>/hour</span>
-                            </span>
-                          </span>
-                        </label>
-                      <% end %>
-                    </div>
-                  </fieldset>
-                </div>
-              </div>
+  action = "#{@project_data[:path]}/vm"
+%>
 
-              <div class="col-span-full">
-                <%== render(
-                  "components/form/radio_small_cards",
-                  locals: {
-                    name: "boot_image",
-                    label: "Boot Image",
-                    options: Option::BootImages.to_h { |bi| [bi.name, bi.display_name] },
-                    attributes: {
-                      required: true
-                    }
-                  }
-                ) %>
-              </div>
-            </div>
-          </div>
-          <div>
-            <h2 class="text-base font-semibold leading-7 text-gray-900">Login Information</h2>
-            <p class="mt-1 text-sm leading-6 text-gray-600">This information will be used to login virtual machine.</p>
-
-            <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
-              <div class="sm:col-span-2">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "unix_user",
-                    label: "User",
-                    value: "ubi",
-                    attributes: {
-                      required: true,
-                      placeholder: "Unix username"
-                    }
-                  }
-                ) %>
-              </div>
-
-              <div class="col-span-full">
-                <%== render(
-                  "components/form/textarea",
-                  locals: {
-                    name: "public_key",
-                    label: "SSH Public Key",
-                    description: "SSH keys are a more secure method of logging into a server.",
-                    attributes: {
-                      required: true,
-                      placeholder: "ssh-ed25519 AAAA...",
-                      rows: 3
-                    }
-                  }
-                ) %>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="px-4 py-5 sm:p-6">
-        <div class="flex items-center justify-end gap-x-6">
-          <a href="<%= @project_data[:path] %>/vm" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
-        </div>
-      </div>
-    </div>
-  </form>
-</div>
+<%==render("components/form/resource_creation_form", locals: {action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents})%>

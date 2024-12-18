@@ -16,7 +16,7 @@ RSpec.describe Prog::Vm::HostNexus do
     }
   }
 
-  let(:vms) { [instance_double(Vm, mem_gib: 1), instance_double(Vm, mem_gib: 2)] }
+  let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
   let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1"), instance_double(VmHostSlice, name: "standard2")] }
   let(:vm_host) { instance_double(VmHost, vms: vms, vm_host_slices: vm_host_slices) }
   let(:sshable) { instance_double(Sshable) }
@@ -92,9 +92,8 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(budded).to eq([
         Prog::Vm::PrepHost,
         Prog::LearnMemory,
-        Prog::LearnArch,
         Prog::LearnOs,
-        Prog::LearnCores,
+        Prog::LearnCpu,
         Prog::LearnStorage,
         Prog::LearnPci,
         Prog::InstallDnsmasq,
@@ -120,14 +119,12 @@ RSpec.describe Prog::Vm::HostNexus do
     it "updates the vm_host record from the finished programs" do
       expect(nx).to receive(:leaf?).and_return(true)
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
-      expect(vm_host).to receive(:update).with(arch: "arm64")
       expect(vm_host).to receive(:update).with(os_version: "ubuntu-22.04")
-      expect(vm_host).to receive(:update).with(total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
+      expect(vm_host).to receive(:update).with(arch: "arm64", total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
-        instance_double(Strand, prog: "LearnArch", exitval: {"arch" => "arm64"}),
         instance_double(Strand, prog: "LearnOs", exitval: {"os_version" => "ubuntu-22.04"}),
-        instance_double(Strand, prog: "LearnCores", exitval: {"total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5}),
+        instance_double(Strand, prog: "LearnCpu", exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5}),
         instance_double(Strand, prog: "ArbitraryOtherProg")
       ])
 
@@ -139,9 +136,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"mem_gib\""
     end
 
-    it "crashes if an expected field is not set for LearnCores" do
-      expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnCores", exitval: {})])
-      expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"total_cores\""
+    it "crashes if an expected field is not set for LearnCpu" do
+      expect(nx).to receive(:reap).and_return([instance_double(Strand, prog: "LearnCpu", exitval: {})])
+      expect { nx.wait_prep }.to raise_error KeyError, "key not found: \"arch\""
     end
 
     it "donates to children if they are not exited yet" do
@@ -217,8 +214,6 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#wait" do
     it "naps" do
-      expect(vm_host).to receive(:values).and_return({location: "hetzner-fsn1", arch: "x64", total_cores: 4})
-      expect(vm_host).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, count: 2))
       expect { nx.wait }.to nap(30)
     end
 
@@ -232,8 +227,6 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.wait }.to hop("unavailable")
 
-      expect(vm_host).to receive(:values).and_return({location: "hetzner-fsn1", arch: "x64", total_cores: 4})
-      expect(vm_host).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, count: 2))
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(30)

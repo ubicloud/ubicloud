@@ -142,7 +142,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "can update the project name" do
-        new_name = "New Project Name"
+        new_name = "New-Project-Name"
         visit project.path
 
         fill_in "name", with: new_name
@@ -244,7 +244,19 @@ RSpec.describe Clover, "project" do
         btn = find "#user-#{user2.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Removing #{user2.email} from #{project.name}"}.to_json)
+        expect(page.body).to be_empty
+
+        DB.transaction(rollback: :always) do
+          DB[:account_password_hashes].where(id: user2.id).delete(force: true)
+          user2.destroy
+          page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}, "HTTP_ACCEPT" => "application/json"
+          expect(page.status_code).to eq(404)
+          expect(JSON.parse(page.body).dig("error", "code")).to eq(404)
+        end
+
+        visit "#{project.path}/user"
+        expect(page).to have_content user.email
+        expect(page.find_by_id("flash-notice").text).to eq("Removed #{user2.email} from #{project.name}")
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
@@ -294,6 +306,10 @@ RSpec.describe Clover, "project" do
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         visit "#{project.path}/user"
+        expect(page.find_by_id("flash-notice").text).to eq("Invitation for '#{invited_email}' is removed successfully.")
+
+        visit "#{project.path}/user"
+        expect(page).to have_no_content invited_email
         expect { find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
@@ -335,8 +351,8 @@ RSpec.describe Clover, "project" do
         # UI tests run without a JavaScript enginer.
         btn = find "#user-#{user.ubid} .delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.body).to eq({message: "You can't remove the last user from '#{project.name}' project. Delete project instead."}.to_json)
+        expect(page.status_code).to eq(400)
+        expect(page.body).to eq({error: {message: "You can't remove the last user from '#{project.name}' project. Delete project instead."}}.to_json)
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
@@ -359,7 +375,7 @@ RSpec.describe Clover, "project" do
           ]
         }
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         within "form#advanced-policy" do
           fill_in "body", with: new_policy.to_json
           click_button "Update"
@@ -376,7 +392,7 @@ RSpec.describe Clover, "project" do
           ]
         }
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         expect(page).to have_content current_policy.to_json
         within "form#advanced-policy" do
           fill_in "body", with: new_policy.to_json
@@ -385,10 +401,10 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content new_policy.to_json
       end
 
-      it "can not update policy when it is not valid JSON" do
+      it "cannot update policy when it is not valid JSON" do
         current_policy = project.access_policies.first.body
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         within "form#advanced-policy" do
           fill_in "body", with: "{'invalid': 'json',}"
           click_button "Update"
@@ -399,10 +415,10 @@ RSpec.describe Clover, "project" do
         expect(current_policy).to eq(project.access_policies.first.body)
       end
 
-      it "can not update policy when its root is not JSON object" do
+      it "cannot update policy when its root is not JSON object" do
         current_policy = project.access_policies.first.body
 
-        visit "#{project.path}/user"
+        visit "#{project.path}/user/policy"
         within "form#advanced-policy" do
           fill_in "body", with: "[{}, {}]"
           click_button "Update"

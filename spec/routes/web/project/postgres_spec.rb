@@ -234,7 +234,7 @@ RSpec.describe Clover, "postgres" do
         find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
         click_button "Reset"
 
-        expect(page.status_code).to eq(200)
+        expect(page.status_code).to eq(400)
         expect(page).to have_content "Superuser password cannot be updated during restore!"
       end
 

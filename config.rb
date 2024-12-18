@@ -147,16 +147,16 @@ module Config
   override :ubuntu_jammy_version, "20240701", string
   override :debian_12_version, "20241004-1890", string
   override :almalinux_9_version, "9.4-20240805", string
-  override :github_ubuntu_2404_version, "20241016.1.0", string
-  override :github_ubuntu_2204_version, "20241016.1.0", string
-  override :github_ubuntu_2004_version, "20241016.1.0", string
+  override :github_ubuntu_2404_version, "20241124.1.1", string
+  override :github_ubuntu_2204_version, "20241124.1.1", string
+  override :github_ubuntu_2004_version, "20241124.1.1", string
+  override :github_gpu_ubuntu_2204_version, "20241124.1.1", string
   override :postgres16_ubuntu_2204_version, "20241022.1.0", string
   override :postgres17_ubuntu_2204_version, "20241022.1.0", string
   override :postgres16_paradedb_ubuntu_2204_version, "20241025.1.0", string
   override :postgres17_paradedb_ubuntu_2204_version, "20241025.1.0", string
   override :postgres16_lantern_ubuntu_2204_version, "20241024.1.0", string
-  override :github_gpu_ubuntu_2204_version, "20241016.1.0", string
-  override :ai_ubuntu_2404_nvidia_version, "20241103.1.0", string
+  override :ai_ubuntu_2404_nvidia_version, "20241211.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float

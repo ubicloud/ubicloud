@@ -20,7 +20,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def setup_vms
-    project = Project.create_with_id(name: "project 1")
+    project = Project.create_with_id(name: "project-1")
     project.associate_with_project(project)
 
     subnet1_s = Prog::Vnet::SubnetNexus.assemble(

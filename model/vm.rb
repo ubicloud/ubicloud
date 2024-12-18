@@ -25,6 +25,7 @@ class Vm < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
+  semaphore :restart
 
   include Authorization::HyperTagMethods
 
@@ -60,6 +61,7 @@ class Vm < Sequel::Model
 
   def display_state
     return "deleting" if destroy_set? || strand&.label == "destroy"
+    return "restarting" if restart_set? || strand&.label == "restart"
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
       return "waiting for capacity"
@@ -72,10 +74,6 @@ class Vm < Sequel::Model
     # Special case for GPUs
     return 10.68 if family == "standard-gpu"
     8
-  end
-
-  def mem_gib
-    (cores * mem_gib_ratio).to_i
   end
 
   # cloud-hypervisor takes topology information in this format:
@@ -223,7 +221,7 @@ class Vm < Sequel::Model
       "boot_image" => boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
-      "mem_gib" => mem_gib,
+      "mem_gib" => memory_gib,
       "ndp_needed" => vm_host.ndp_needed,
       "storage_volumes" => storage_volumes,
       "swap_size_bytes" => swap_size_bytes,
@@ -282,6 +280,8 @@ end
 #  arch           | arch                     | NOT NULL DEFAULT 'x64'::arch
 #  allocated_at   | timestamp with time zone |
 #  provisioned_at | timestamp with time zone |
+#  vcpus          | integer                  | NOT NULL
+#  memory_gib     | integer                  | NOT NULL
 # Indexes:
 #  vm_pkey               | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)

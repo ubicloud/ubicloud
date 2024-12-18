@@ -41,8 +41,10 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
     before do
       allow(Github).to receive(:installation_client).and_return(client)
-      expect(client).to receive(:auto_paginate=)
-      expect(github_repository).to receive(:installation).and_return(instance_double(GithubInstallation, installation_id: "123")).at_least(:once)
+      allow(client).to receive(:auto_paginate=)
+      installation = instance_double(GithubInstallation, installation_id: "123")
+      expect(github_repository).to receive(:installation).and_return(installation).at_least(:once)
+      expect(installation).to receive(:project).and_return(instance_double(Project, active?: true)).at_least(:once)
     end
 
     it "creates extra runner if needed" do
@@ -88,6 +90,12 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(15 * 60)
     end
+
+    it "does not poll jobs if the project is not active" do
+      expect(github_repository.installation.project).to receive(:active?).and_return(false)
+      nx.check_queued_jobs
+      expect(nx.polling_interval).to eq(24 * 60 * 60)
+    end
   end
 
   describe ".cleanup_cache" do
@@ -122,12 +130,19 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "deletes oldest cache entries if the total usage exceeds the default limit" do
-      nine_gib_cache = create_cache_entry(created_at: Time.now - 10 * 60, size: 9 * 1024 * 1024 * 1024)
+      twenty_nine_gib_cache = create_cache_entry(created_at: Time.now - 10 * 60, size: 29 * 1024 * 1024 * 1024)
       two_gib_cache = create_cache_entry(created_at: Time.now - 11 * 60, size: 2 * 1024 * 1024 * 1024)
       three_gib_cache = create_cache_entry(created_at: Time.now - 12 * 60, size: 3 * 1024 * 1024 * 1024)
-      expect(blob_storage_client).not_to receive(:delete_object).with(bucket: github_repository.bucket_name, key: nine_gib_cache.blob_key)
+      expect(blob_storage_client).not_to receive(:delete_object).with(bucket: github_repository.bucket_name, key: twenty_nine_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: two_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: three_gib_cache.blob_key)
+      nx.cleanup_cache
+    end
+
+    it "excludes uncommitted cache entries" do
+      thirty_two_gib_cache = create_cache_entry(created_at: Time.now - 10 * 60, size: 32 * 1024 * 1024 * 1024)
+      create_cache_entry(created_at: Time.now - 13 * 60, size: nil)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket: github_repository.bucket_name, key: thirty_two_gib_cache.blob_key)
       nx.cleanup_cache
     end
 

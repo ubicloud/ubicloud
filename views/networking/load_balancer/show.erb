@@ -1,20 +1,17 @@
 <% @page_title = @lb[:name] %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "#{@project_data[:path]}/load-balancer",
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
-        [@lb[:name], "#"]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: @lb[:name] }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
+      [@lb[:name], "#"]
+    ]
+  }
+) %>
+
 <div class="grid gap-6">
   <!-- Detail Card -->
   <%== render(
@@ -23,7 +20,7 @@
       data: [
         ["ID", @lb[:id]],
         ["Name", @lb[:name]],
-        ["Connection String", @lb[:hostname], { copieble: true }],
+        ["Connection String", @lb[:hostname], { copyable: true }],
         [
           "Private Subnet",
           "<a href='#{@project_data[:path]}/location/#{@lb[:location]}/private-subnet/#{@lb[:subnet]}' class='text-rose-500 hover:underline'>#{@lb[:subnet]}</a>",
@@ -49,7 +46,7 @@
         <tr>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM</th>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Application State</th>
-          <% if Authorization.has_permission?(current_account.id, "LoadBalancer:edit", @lb[:id]) %>
+          <% if has_permission?("LoadBalancer:edit", @lb[:id]) %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
         </tr>
@@ -75,7 +72,7 @@
             </form>
           </tr>
         <% end %>
-        <% if Authorization.has_permission?(current_account.id, "LoadBalancer:edit", @lb[:id]) %>
+        <% if has_permission?("LoadBalancer:edit", @lb[:id]) %>
           <tr>
             <form action="<%= "#{request.path}/attach-vm" %>" role="form" method="POST">
               <%== csrf_tag("#{request.path}/attach-vm") %>
@@ -104,7 +101,7 @@
     </table>
   </div>
   <!-- Delete Card -->
-  <% if Authorization.has_permission?(current_account.id, "LoadBalancer:delete", @lb[:id]) %>
+  <% if has_permission?("LoadBalancer:delete", @lb[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">

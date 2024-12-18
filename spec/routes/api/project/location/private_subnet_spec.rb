@@ -5,7 +5,7 @@ require_relative "../../spec_helper"
 RSpec.describe Clover, "private_subnet" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
@@ -190,6 +190,26 @@ RSpec.describe Clover, "private_subnet" do
         delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
 
         expect(last_response).to have_api_error(409, "Private subnet 'dummy-ps-1' has VMs attached, first, delete them.")
+      end
+
+      it "if all dependent vms are marked for deletion the subnet can be deleted" do
+        st = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
+        st.subject.incr_destroy
+
+        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(ps.id).set?("destroy")).to be true
+      end
+
+      it "if all dependent vms are being deleted the subnet can be deleted" do
+        st = Prog::Vm::Nexus.assemble("dummy-public-key", project.id, private_subnet_id: ps.id, name: "dummy-vm")
+        st.update(label: "destroy")
+
+        delete "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"
+
+        expect(last_response.status).to eq(204)
+        expect(SemSnap.new(ps.id).set?("destroy")).to be true
       end
 
       it "not exist" do

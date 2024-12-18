@@ -16,8 +16,8 @@ end
 # Migrate
 migrate = lambda do |env, version, db: nil|
   ENV["RACK_ENV"] = env
-  require "bundler/setup"
-  Bundler.setup
+  require "bundler"
+  Bundler.setup(:default, :development)
   require "logger"
   require_relative "db"
   Sequel.extension :migration
@@ -218,6 +218,7 @@ task "coverage_pspec" do
     warn "SimpleCov failed with exit 2 due to a coverage related error"
     exit(2)
   end
+  exit(1) if command_output.include?("\nFailures:\n")
 ensure
   File.delete(output_file) if File.file?(output_file)
 end
@@ -282,41 +283,39 @@ ensure
   File.delete(by_path) if File.file?(by_path)
 end
 
-begin
-  namespace :linter do
-    # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
-    require "bundler/setup"
-    Bundler.setup
-
-    require "rubocop/rake_task"
-    desc "Run Rubocop"
-    RuboCop::RakeTask.new
-
-    desc "Run Brakeman"
-    task :brakeman do
-      puts "Running Brakeman..."
-      require "brakeman"
-      Brakeman.run app_path: ".", quiet: true, force_scan: true, print_report: true, run_all_checks: true
-    end
-
-    desc "Run ERB::Formatter"
-    task :erb_formatter do
-      puts "Running ERB::Formatter..."
-      require "erb/formatter/command_line"
-      files = Dir.glob("views/**/[!icon]*.erb").entries
-      ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
-    end
-
-    desc "Validate, lint, format OpenAPI YAML file"
-    task :openapi do
-      sh "npx redocly lint openapi.yml"
-      sh "npx @stoplight/spectral-cli --fail-severity=warn lint openapi.yml"
-      sh "echo 'sortPathsBy: path' | npx -- openapi-format -o openapi.yml --sortFile /dev/stdin openapi.yml"
-    end
+namespace :linter do
+  desc "Run Rubocop"
+  task :rubocop do
+    sh "BUNDLE_WITH=rubocop bundle exec rubocop"
   end
 
-  desc "Run all linters"
-  task linter: ["rubocop", "brakeman", "erb_formatter", "openapi"].map { "linter:#{_1}" }
-rescue LoadError
-  puts "Could not load dev dependencies"
+  desc "Run Brakeman"
+  task :brakeman do
+    require "bundler"
+    Bundler.setup(:lint)
+    puts "Running Brakeman..."
+    require "brakeman"
+    Brakeman.run app_path: ".", quiet: true, force_scan: true, print_report: true, run_all_checks: true
+  end
+
+  desc "Run ERB::Formatter"
+  task :erb_formatter do
+    # "fdr/erb-formatter" can't be required without bundler setup because of custom repository.
+    require "bundler"
+    Bundler.setup(:lint)
+    puts "Running ERB::Formatter..."
+    require "erb/formatter/command_line"
+    files = Dir.glob("views/**/[!icon]*.erb").entries
+    ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
+  end
+
+  desc "Validate, lint, format OpenAPI YAML file"
+  task :openapi do
+    sh "npx redocly lint openapi/openapi.yml --config openapi/redocly.yml"
+    sh "npx @stoplight/spectral-cli lint openapi/openapi.yml --fail-severity=warn --ruleset openapi/.spectral.yml"
+    sh "npx openapi-format openapi/openapi.yml --configFile openapi/openapi_format.yml"
+  end
 end
+
+desc "Run all linters"
+task linter: ["rubocop", "brakeman", "erb_formatter", "openapi"].map { "linter:#{_1}" }

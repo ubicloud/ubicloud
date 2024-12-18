@@ -2,25 +2,15 @@
 <div class="auto-refresh hidden" data-interval="10"></div>
 
 <% if @vms.count > 0 %>
-  <div class="space-y-1">
-    <%== render(
-      "components/breadcrumb",
-      locals: {
-        back: @project_data[:path],
-        parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]]
-      }
-    ) %>
-
-    <%== render(
-      "components/page_header",
-      locals: {
-        title: "Virtual Machines",
-        right_items: has_project_permission("Vm:create") ? [
-          render("components/button", locals: { text: "Create Virtual Machine", link: "vm/create" })
-        ] : []
-      }
-    ) %>
-  </div>
+  <%== render(
+    "components/page_header",
+    locals: {
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Virtual Machines", "#"]],
+      right_items: has_project_permission("Vm:create") ? [
+        render("components/button", locals: { text: "Create Virtual Machine", link: "vm/create" })
+      ] : []
+    }
+  ) %>
 
   <div class="grid gap-6">
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -45,16 +35,19 @@
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:location] %></td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:size] %></td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= vm[:storage_size_gib] %>
-                GB</td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%= (vm[:storage_size_gib] > 0) ? "#{vm[:storage_size_gib]} GB" : "-" %>
+              </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <%== render("components/vm_state_label", locals: { state: vm[:state] }) %>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                 <% if vm[:ip4] %>
-                  <%== render("components/copieble_content", locals: { content: vm[:ip4], message: "Copied IPv4" }) %>
+                  <%== render("components/copyable_content", locals: { content: vm[:ip4], message: "Copied IPv4" }) %>
+                <% elsif vm[:ip6] %>
+                  <%== render("components/copyable_content", locals: { content: vm[:ip6], message: "Copied IPv6" }) %>
                 <% else %>
-                  <%== render("components/copieble_content", locals: { content: vm[:ip6], message: "Copied IPv6" }) %>
+                  Not assigned yet
                 <% end %>
               </td>
             </tr>

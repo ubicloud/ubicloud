@@ -126,7 +126,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
   describe "#start" do
     it "reconciles replicas and hops to wait_replicas" do
       expect(nx).to receive(:reconcile_replicas)
-      expect(nx).to receive(:register_deadline).with(:wait, 10 * 60)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect { nx.start }.to hop("wait_replicas")
     end
   end

@@ -275,6 +275,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       # Route ephemeral address to tap.
       r "ip -n #{q_vm} link set dev #{nic.tap} up"
       r "ip -n #{q_vm} route replace #{guest_ephemeral.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
+      r "ip -n #{q_vm} route del #{guest_ephemeral.to_s.shellescape} dev #{nic.tap}"
 
       # Route private subnet addresses to tap.
       ip6 = NetAddr::IPv6Net.parse(nic.net6)
@@ -429,7 +430,7 @@ EOS
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
       vm_sub_4 = NetAddr::IPv4Net.parse(nic.net4)
       <<DHCP
-dhcp-range=#{nic.tap},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},#{vm_sub_4.netmask.prefix_len}
+dhcp-range=#{nic.tap},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},6h
 dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
 DHCP
     end.join("\n")
@@ -440,7 +441,7 @@ DHCP
     runner_config = if boot_image.include?("github")
       <<~ADDRESSES
       address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}
-      filter-AAAA
+      address=/.docker.io/::
       ADDRESSES
     else
       ""
@@ -457,19 +458,18 @@ no-resolv
 #{interfaces}
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
 #{private_ip_dhcp}
-server=149.112.112.112
-server=9.9.9.9
-server=2620:fe::fe
-server=2620:fe::9
-dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+server=2606:4700:4700::1111
+server=2001:4860:4860::8888
 dhcp-option=6,#{dns_ipv4}
-listen-address=#{dnsmasq_address_ip6}
 listen-address=#{dns_ipv4}
 dhcp-option=26,1400
 bind-interfaces
 #{runner_config}
 dhcp-option=54,#{dns_ipv4}
 dns-forward-max=10000
+dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
+listen-address=#{dnsmasq_address_ip6}
+all-servers
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|

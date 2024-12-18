@@ -43,7 +43,7 @@ RSpec.describe Clover, "auth" do
   end
 
   it "can create new account, verify it, and visit project which invited" do
-    p = Project.create_with_id(name: "Invited project").tap { _1.associate_with_project(_1) }
+    p = Project.create_with_id(name: "Invited-project").tap { _1.associate_with_project(_1) }
     p.add_invitation(email: TEST_USER_EMAIL, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
     visit "/create-account"
@@ -68,7 +68,7 @@ RSpec.describe Clover, "auth" do
   end
 
   it "can create new account, verify it, and visit project which invited with default policy" do
-    p = Project.create_with_id(name: "Invited project").tap { _1.associate_with_project(_1) }
+    p = Project.create_with_id(name: "Invited-project").tap { _1.associate_with_project(_1) }
     p.add_invitation(email: TEST_USER_EMAIL, policy: "admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
     visit "/create-account"

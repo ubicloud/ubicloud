@@ -81,7 +81,7 @@ SQL
     prog_label = "#{prog}.#{label}"
     Clog.emit("starting strand") { [self, {strand_started: {prog_label: prog_label}}] }
 
-    if label == stack.first["deadline_target"].to_s
+    if label == stack.first["deadline_target"]
       if (pg = Page.from_tag_parts("Deadline", id, prog, stack.first["deadline_target"]))
         pg.incr_resolve
       end

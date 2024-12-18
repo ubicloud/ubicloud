@@ -8,6 +8,7 @@ class Project < Sequel::Model
   one_to_one :billing_info, key: :id, primary_key: :billing_info_id
   one_to_many :usage_alerts
   one_to_many :github_installations
+  many_through_many :github_runners, [[:github_installation, :project_id, :id], [:github_runner, :installation_id, :id]]
 
   many_to_many :accounts, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :vms, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
@@ -39,7 +40,7 @@ class Project < Sequel::Model
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
-    !!billing_info&.payment_methods&.any?
+    !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
   end
 
   def default_location
@@ -76,6 +77,10 @@ class Project < Sequel::Model
       # Don't forget to clean up billing info and payment methods.
       update(visible: false)
     end
+  end
+
+  def active?
+    visible && accounts_dataset.exclude(suspended_at: nil).empty?
   end
 
   def current_invoice
@@ -117,8 +122,17 @@ class Project < Sequel::Model
     effective_quota_value(resource_type) >= current_resource_usage(resource_type) + requested_additional_usage
   end
 
-  def create_api_key(used_for: "inference_endpoint")
-    ApiKey.create_with_id(owner_table: Project.table_name, owner_id: id, used_for: used_for)
+  def validate
+    super
+    if new? || changed_columns.include?(:name)
+      validates_format(%r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}i, :name, message: "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
+    end
+  end
+
+  def default_private_subnet(location)
+    name = "default-#{LocationNameConverter.to_display_name(location)}"
+    ps = private_subnets_dataset.first(:location => location, Sequel[:private_subnet][:name] => name)
+    ps || Prog::Vnet::SubnetNexus.assemble(id, name: name, location: location).subject
   end
 
   def self.feature_flag(*flags, into: self)
@@ -135,7 +149,7 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra
+  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :inference_ui
 end
 
 # Table: project

@@ -61,17 +61,17 @@ module Validation
     fail ValidationFailed.new({location: msg}) unless available_pg_locs.include?(location)
   end
 
-  def self.validate_vm_size(size, only_visible: false)
+  def self.validate_vm_size(size, arch, only_visible: false)
     available_vm_sizes = Option::VmSizes.select { !only_visible || _1.visible }
-    unless (vm_size = available_vm_sizes.find { _1.name == size })
+    unless (vm_size = available_vm_sizes.find { _1.name == size && _1.arch == arch })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{available_vm_sizes.map(&:name)}"})
     end
     vm_size
   end
 
-  def self.validate_vm_storage_size(size, storage_size)
+  def self.validate_vm_storage_size(size, arch, storage_size)
     storage_size = storage_size.to_i
-    vm_size = validate_vm_size(size)
+    vm_size = validate_vm_size(size, arch)
     fail ValidationFailed.new({storage_size: "Storage size must be one of the following: #{vm_size.storage_size_options.join(", ")}"}) unless vm_size.storage_size_options.include?(storage_size)
     storage_size
   end
@@ -196,13 +196,7 @@ module Validation
     port.to_i
   end
 
-  def self.validate_request_body(request_body, required_keys, allowed_optional_keys = [])
-    begin
-      request_body_params = JSON.parse(request_body)
-    rescue JSON::ParserError
-      fail ValidationFailed.new({body: "Request body isn't a valid JSON object."})
-    end
-
+  def self.validate_request_params(request_body_params, required_keys, allowed_optional_keys = [])
     missing_required_keys = required_keys - request_body_params.keys
     unless missing_required_keys.empty?
       fail ValidationFailed.new({body: "Request body must include required parameters: #{missing_required_keys.join(", ")}"})
