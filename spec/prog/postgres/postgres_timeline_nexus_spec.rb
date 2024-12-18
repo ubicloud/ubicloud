@@ -111,6 +111,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "hops to take_backup if backup is needed" do
       expect(postgres_timeline).to receive(:need_backup?).and_return(true)
+      backup = Struct.new(:last_modified)
+      expect(postgres_timeline).to receive(:backups).and_return([instance_double(backup, last_modified: Time.now - 3 * 24 * 60 * 60)])
+      expect(postgres_timeline).to receive(:leader).and_return(instance_double(PostgresServer))
       expect { nx.wait }.to hop("take_backup")
     end
 

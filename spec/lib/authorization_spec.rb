@@ -10,7 +10,12 @@ RSpec.describe Authorization do
     ]
   }
   let(:projects) { (0..1).map { users[_1].create_project_with_default_policy("project-#{_1}") } }
-  let(:vms) { (0..3).map { Prog::Vm::Nexus.assemble("key", projects[_1 / 2].id, name: "vm#{_1}") }.map(&:subject) }
+  let(:vms) {
+    (0..3).map do |index|
+      ps = Prog::Vnet::SubnetNexus.assemble(projects[index / 2].id, name: "vm#{index}-ps", location: "hetzner-fsn1").subject
+      Prog::Vm::Nexus.assemble("key", projects[index / 2].id, name: "vm#{index}", private_subnet_id: ps.id)
+    end.map(&:subject)
+  }
   let(:pg) {
     Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: projects[0].id, location: "hetzner-fsn1", name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128
@@ -92,15 +97,15 @@ RSpec.describe Authorization do
     end
   end
 
-  describe "#authorized_resources" do
+  describe "#authorized_resources_dataset" do
     it "returns resource ids when has matched policies" do
       ids = [vms[0].id, vms[1].id, projects[0].id, users[0].id, vms[0].private_subnets[0].id, vms[1].private_subnets[0].id, vms[0].firewalls[0].id, vms[1].firewalls[0].id]
-      expect(described_class.authorized_resources(users[0].id, "Vm:view").sort).to eq(ids.sort)
+      expect(described_class.authorized_resources_dataset(users[0].id, "Vm:view").map(:tagged_id).sort).to eq(ids.sort)
     end
 
     it "returns no resource ids when has no matched policies" do
       access_policy.update(body: [])
-      expect(described_class.authorized_resources(users[0].id, "Vm:view")).to eq([])
+      expect(described_class.authorized_resources_dataset(users[0].id, "Vm:view")).to be_empty
     end
   end
 
@@ -123,7 +128,7 @@ RSpec.describe Authorization do
       described_class::ManagedPolicy::Member.apply(projects[0], [users[0], nil, users[1]])
       acl = AccessPolicy[project_id: projects[0].id, name: "member", managed: true].body["acls"].first
       expect(acl["subjects"]).to contain_exactly(users[0].hyper_tag_name)
-      expect(acl["actions"]).to eq(["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github"])
+      expect(acl["actions"]).to eq(["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github", "InferenceEndpoint:view"])
       expect(acl["objects"]).to eq(["project/#{projects[0].ubid}"])
       users[1].associate_with_project(projects[0])
       described_class::ManagedPolicy::Member.apply(projects[0], [users[1]], append: true)

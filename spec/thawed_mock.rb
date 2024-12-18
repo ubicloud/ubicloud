@@ -40,7 +40,7 @@ module ThawedMock
 
   # Ruby Core Classes
   allow_mocking(File, :exist?, :open, :rename, :write)
-  allow_mocking(Kernel, :exit, :exit!)
+  allow_mocking(Kernel, :exit, :exit!, :URI)
   allow_mocking(Thread, :new, :list)
   allow_mocking(Time, :now)
 
@@ -50,10 +50,10 @@ module ThawedMock
   # Models
   allow_mocking(Account, :[])
   allow_mocking(Address, :where)
+  allow_mocking(ArchivedRecord, :create)
   allow_mocking(AssignedVmAddress, :create_with_id)
   allow_mocking(BillingRecord, :create_with_id)
   allow_mocking(BootImage, :where)
-  allow_mocking(DeletedRecord, :create)
   allow_mocking(DnsRecord, :[], :create)
   allow_mocking(DnsZone, :[], :where)
   allow_mocking(FirewallsPrivateSubnets, :where)
@@ -106,6 +106,7 @@ module ThawedMock
   allow_mocking(Scheduling::Allocator::Allocation, :best_allocation, :candidate_hosts, :new, :random_score, :update_vm)
   allow_mocking(Scheduling::Allocator::StorageAllocation, :new)
   allow_mocking(Scheduling::Allocator::VmHostAllocation, :new)
+  allow_mocking(Serializers::Vm, :serialize_internal)
   allow_mocking(SshKey, :generate)
   allow_mocking(ThreadPrinter, :puts, :run)
   allow_mocking(Util, :create_certificate, :create_root_certificate, :rootish_ssh, :send_email)

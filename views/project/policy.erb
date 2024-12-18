@@ -1,154 +1,44 @@
 <% @page_title = "#{@project_data[:name]} - Policy" %>
+<%== render("project/user-tabbar") %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Policy #]]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: "Update Access Policy" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    title: "Advanced Policy Editor",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Policy #]]
+  }
+) %>
 
 <div class="grid gap-6">
-  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-4 py-5 sm:p-6">
-      <form action="<%= "#{@project_data[:path]}/policy/#{@policy[:ubid]}" %>" role="form" method="POST">
-        <%== csrf_tag("#{@project_data[:path]}/policy/#{@policy[:ubid]}") %>
-        <div class="grid grid-cols-12 gap-6">
-          <div class="col-span-full">
-            <div class="policy-editor text-sm">
-              <pre class="bg-gray-50 rounded-lg p-3 h-[60vh] overflow-scroll" contenteditable="true">
-                <%= flash.dig("old", "body") || @policy[:body] %>
-              </pre>
-              <textarea name="body" class="hidden" required></textarea>
+  <div id="policy-editor">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <form id="advanced-policy" action="<%= "#{@project_data[:path]}/user/policy/advanced" %>" role="form" method="POST">
+          <%== csrf_tag("#{@project_data[:path]}/user/policy/advanced") %>
+          <div class="space-y-4">
+            <div>
+              <p class="mt-1 text-sm text-gray-500">
+                If our predefined policies do not meet your needs, you can give more granular permissions by editing
+                the policy below. Any permissions given through the access policy editor will be combined with the
+                user's default access policy. You can learn more about our access policy language in
+                <a href="" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">our documentation</a>.
+              </p>
+            </div>
+            <div class="grid grid-cols-12 gap-6">
+              <div class="col-span-full">
+                <div class="policy-editor text-sm">
+                  <pre class="bg-gray-50 rounded-lg p-3 h-[50vh] overflow-scroll" contenteditable="true">
+                    <%= flash.dig("old", "body") || @policy[:body] %>
+                  </pre>
+                  <textarea id="acl-body" name="body" class="hidden" required></textarea>
+                </div>
+              </div>
+              <div class="col-span-3 sm:col-span-6">
+                <%== render("components/form/submit_button", locals: { text: "Update" }) %>
+              </div>
             </div>
           </div>
-          <div class="col-span-3 sm:col-span-6">
-            <%== render("components/form/submit_button", locals: { text: "Update" }) %>
-          </div>
-        </div>
-      </form>
-    </div>
-    <div class="px-4 py-5 sm:p-6">
-      <div class="space-y-4 text-gray-500 text-sm">
-        <h4 class="font-medium text-gray-900 text-lg">Access Policy Language</h4>
-        <p>
-          Access policies have 3 main parts: subjects, actions, and objects. All of them can be a single string or a
-          list of strings.
-          <span class="text-gray-700 font-medium">"project/&lt;PROJECT_ID&gt;"</span>,
-          <span class="text-gray-700 font-medium">"user/&lt;EMAIL&gt;"</span>,
-          <span class="text-gray-700 font-medium">"project/&lt;PROJECT_ID&gt;/location/&lt;LOCATION_NAME&gt;/vm/&lt;VM_NAME&gt;"</span>
-          or custom tags can be used for subjects, and objects. To use a tag in policy, it has to be associated with
-          the project. Actions are predefined.
-        </p>
-        <table class="min-w-full divide-y divide-gray-300 text-left">
-          <thead class="font-semibold">
-            <tr>
-              <th scope="col" class="px-2 py-3.5 text-gray-900 border">Action</th>
-              <th scope="col" class="px-2 py-3.5 text-gray-900 border">Description</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            <tr>
-              <td class="px-2 py-2 border">Vm:view</td>
-              <td class="px-2 py-2 border">Grants permission to view Vm resources</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Vm:create</td>
-              <td class="px-2 py-2 border">Grants permission to create Vm in Project</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Vm:delete</td>
-              <td class="px-2 py-2 border">Grants permission to delete Vm</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Project:view</td>
-              <td class="px-2 py-2 border">Grants permission to view Project details</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Project:edit</td>
-              <td class="px-2 py-2 border">Grants permission to update Project details</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Project:delete</td>
-              <td class="px-2 py-2 border">Grants permission to delete Project</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Project:user</td>
-              <td class="px-2 py-2 border">Grants permission to add/remove users to/from Project</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Project:policy</td>
-              <td class="px-2 py-2 border">Grants permission to update Project's access policies</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Project:billing</td>
-              <td class="px-2 py-2 border">Grants permission to manage Project's billing informations</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Project:github</td>
-              <td class="px-2 py-2 border">Grants permission to manage Project's GitHub runner integration</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">PrivateSubnet:view</td>
-              <td class="px-2 py-2 border">Grants permission to view Private Subnet details.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">PrivateSubnet:create</td>
-              <td class="px-2 py-2 border">Grants permission to create Private Subnet.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">PrivateSubnet:delete</td>
-              <td class="px-2 py-2 border">Grants permission to delete Private Subnet.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Firewall:view</td>
-              <td class="px-2 py-2 border">Grants permission to view Firewalls.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Firewall:create</td>
-              <td class="px-2 py-2 border">Grants permission to create Firewalls.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Firewall:delete</td>
-              <td class="px-2 py-2 border">Grants permission to delete Firewalls.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Firewall:edit</td>
-              <td class="px-2 py-2 border">Grants permission to edit Firewalls.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Postgres:view</td>
-              <td class="px-2 py-2 border">Grants permission to view PostgreSQL database details.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Postgres:create</td>
-              <td class="px-2 py-2 border">Grants permission to create PostgreSQL database.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Postgres:edit</td>
-              <td class="px-2 py-2 border">Grants permission to edit PostgreSQL database details.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Postgres:delete</td>
-              <td class="px-2 py-2 border">Grants permission to delete PostgreSQL database.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Postgres:Firewall:view</td>
-              <td class="px-2 py-2 border">Grants permission to view PostgreSQL database firewall rules.</td>
-            </tr>
-            <tr>
-              <td class="px-2 py-2 border">Postgres:Firewall:edit</td>
-              <td class="px-2 py-2 border">Grants permission to create/delete PostgreSQL database firewall rules.</td>
-            </tr>
-          </tbody>
-        </table>
-        <p>
-          Be careful while updating policy, if you remove your project permissions, you may lose your access to this
-          project.
-        </p>
+        </form>
       </div>
     </div>
   </div>

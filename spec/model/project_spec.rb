@@ -4,7 +4,50 @@ require_relative "spec_helper"
 require "octokit"
 
 RSpec.describe Project do
-  subject(:project) { described_class.new }
+  subject(:project) { described_class.create_with_id(name: "test") }
+
+  describe "#validate" do
+    invalid_name = "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
+
+    it "validates that name for new object is not empty and has correct format" do
+      project = described_class.new
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq(["is not present", invalid_name])
+
+      project.name = "@"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq([invalid_name])
+
+      project.name = "a"
+      expect(project.valid?).to be true
+
+      project.name = "a-"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq([invalid_name])
+
+      project.name = "a-b"
+      expect(project.valid?).to be true
+
+      project.name = "a-#{"b" * 63}"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq([invalid_name])
+    end
+
+    it "validates that name for existing object is valid if the name has changed" do
+      expect(project.valid?).to be true
+
+      project.name = "-"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq([invalid_name])
+
+      project.name = "a"
+      expect(project.valid?).to be true
+
+      project.name = "@"
+      expect(project.valid?).to be false
+      expect(project.errors[:name]).to eq([invalid_name])
+    end
+  end
 
   describe ".has_valid_payment_method?" do
     it "returns true when Stripe not enabled" do
@@ -14,22 +57,28 @@ RSpec.describe Project do
 
     it "returns false when no billing info" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      expect(project).to receive(:billing_info).and_return(nil)
       expect(project.has_valid_payment_method?).to be false
     end
 
     it "returns false when no payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      bi = instance_double(BillingInfo, payment_methods: [])
-      expect(project).to receive(:billing_info).and_return(bi)
+      bi = BillingInfo.create_with_id(stripe_id: "cus")
+      project.update(billing_info_id: bi.id)
       expect(project.has_valid_payment_method?).to be false
     end
 
     it "returns true when has valid payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      pm = instance_double(PaymentMethod)
-      bi = instance_double(BillingInfo, payment_methods: [pm])
-      expect(project).to receive(:billing_info).and_return(bi)
+      bi = BillingInfo.create_with_id(stripe_id: "cus123")
+      PaymentMethod.create_with_id(billing_info_id: bi.id, stripe_id: "pm123")
+      project.update(billing_info_id: bi.id)
+      expect(project.has_valid_payment_method?).to be true
+    end
+
+    it "returns true when has some credits" do
+      expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+      bi = BillingInfo.create_with_id(stripe_id: "cus")
+      project.update(billing_info_id: bi.id, credit: 100)
       expect(project.has_valid_payment_method?).to be true
     end
 
@@ -53,6 +102,28 @@ RSpec.describe Project do
       expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble)
       expect(project).to receive(:update).with(visible: false)
       project.soft_delete
+    end
+  end
+
+  describe ".active?" do
+    it "returns false if it's soft deleted" do
+      expect(project).to receive(:visible).and_return(false)
+      expect(project.active?).to be false
+    end
+
+    it "returns false if any accounts is suspended" do
+      project = described_class.create_with_id(name: "test")
+      project.associate_with_project(project)
+      Account.create_with_id(email: "user1@example.com").tap { _1.associate_with_project(project) }
+      Account.create_with_id(email: "user2@example.com").tap { _1.associate_with_project(project) }.update(suspended_at: Time.now)
+      expect(project.active?).to be false
+    end
+
+    it "returns true if any condition not match" do
+      project = described_class.create_with_id(name: "test")
+      project.associate_with_project(project)
+      Account.create_with_id(email: "user1@example.com").tap { _1.associate_with_project(project) }
+      expect(project.active?).to be true
     end
   end
 
@@ -104,14 +175,5 @@ RSpec.describe Project do
     expect(project).to receive(:effective_quota_value).and_return(20).twice
     expect(project.quota_available?("VmCores", 5)).to be true
     expect(project.quota_available?("VmCores", 20)).to be false
-  end
-
-  describe ".create_api_key" do
-    it "creates an api key" do
-      project = described_class.create_with_id(name: "test")
-      expect(project.api_keys.count).to be(0)
-      project.create_api_key
-      expect(project.reload.api_keys.count).to be(1)
-    end
   end
 end

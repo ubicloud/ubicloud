@@ -61,8 +61,8 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       custom_hostname_prefix = if custom_dns_zone
         name + (is_public ? "" : "-#{ubid.to_s[-5...]}")
       end
-      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/up", health_check_protocol: "https",
-        custom_hostname_prefix: custom_hostname_prefix, custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: "ipv4")
+      lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/health", health_check_protocol: "https",
+        health_check_down_threshold: 3, health_check_up_threshold: 1, custom_hostname_prefix: custom_hostname_prefix, custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: "ipv4")
 
       inference_endpoint = InferenceEndpoint.create(
         project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, storage_volumes: storage_volumes,
@@ -70,7 +70,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count: gpu_count
       ) { _1.id = ubid.to_uuid }
       inference_endpoint.associate_with_project(project)
-      ApiKey.create_with_id(owner_id: inference_endpoint.id, owner_table: "inference_endpoint", used_for: "inference_endpoint")
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { _1.id = inference_endpoint.id }
     end
@@ -86,7 +85,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
 
   label def start
     reconcile_replicas
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
     hop_wait_replicas
   end
 

@@ -7,18 +7,23 @@ RSpec.describe Vm do
 
   describe "#display_state" do
     it "returns deleting if destroy semaphore increased" do
-      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "destroy")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "destroy")]).at_least(:once)
       expect(vm.display_state).to eq("deleting")
     end
 
+    it "returns restarting if restart semaphore increased" do
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "restart")]).at_least(:once)
+      expect(vm.display_state).to eq("restarting")
+    end
+
     it "returns waiting for capacity if semaphore increased" do
-      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "waiting_for_capacity")]).at_least(:once)
       expect(vm.display_state).to eq("waiting for capacity")
     end
 
     it "returns no capacity available if it's waiting capacity more than 15 minutes" do
       expect(vm).to receive(:created_at).and_return(Time.now - 16 * 60)
-      expect(vm).to receive(:semaphores).twice.and_return([instance_double(Semaphore, name: "waiting_for_capacity")])
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "waiting_for_capacity")]).at_least(:once)
       expect(vm.display_state).to eq("no capacity available")
     end
 
@@ -42,7 +47,7 @@ RSpec.describe Vm do
     it "handles standard family" do
       vm.arch = "x64"
       vm.family = "standard"
-      vm.cpus = 2
+      vm.vcpus = 2
       vm.cpu_percent_limit = 200
       expect(vm.display_size).to eq("standard-2")
     end
@@ -50,7 +55,7 @@ RSpec.describe Vm do
     it "handles burstable family" do
       vm.arch = "arm64"
       vm.family = "burstable"
-      vm.cpus = 2
+      vm.vcpus = 2
       vm.cpu_percent_limit = 50
       expect(vm.display_size).to eq("burstable-2-50")
     end
@@ -62,9 +67,10 @@ RSpec.describe Vm do
       expect(vm.mem_gib_ratio).to eq 8
     end
 
-    it "handles standard-gpu" do
-      vm.family = "standard-gpu"
-      expect(vm.mem_gib_ratio).to eq 10.68
+    it "returns correct ratio for standard-gpu" do
+      expect(vm).to receive(:arch).and_return("x64")
+      expect(vm).to receive(:family).and_return("standard-gpu")
+      expect(vm.mem_gib_ratio).to eq(10.68)
     end
 
     it "handles arm64" do
@@ -88,14 +94,14 @@ RSpec.describe Vm do
     it "handles x64 arch" do
       vm.cpu_percent_limit = 200
       vm.cores = 1
-      vm.cpus = 2
+      vm.vcpus = 2
       expect(vm.can_share_slice?).to be_falsey
     end
 
     it "handles arm64 arch" do
       vm.cpu_percent_limit = 50
       vm.cores = 1
-      vm.cpus = 1
+      vm.vcpus = 1
       expect(vm.can_share_slice?).to be_truthy
     end
   end

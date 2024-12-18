@@ -41,6 +41,12 @@ class Prog::Vm::GithubRunner < Prog::Base
       return picked_vm
     end
 
+    ps = Prog::Vnet::SubnetNexus.assemble(
+      Config.github_runner_service_project_id,
+      location: label_data["location"],
+      allow_only_ssh: true
+    ).subject
+
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "runneradmin",
       Config.github_runner_service_project_id,
@@ -51,8 +57,8 @@ class Prog::Vm::GithubRunner < Prog::Base
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: skip_sync}],
       enable_ip4: true,
       arch: label_data["arch"],
-      allow_only_ssh: true,
-      swap_size_bytes: 4294963200 # ~4096MB, the same value with GitHub hosted runners
+      swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
+      private_subnet_id: ps.id
     )
 
     vm_st.subject
@@ -73,7 +79,9 @@ class Prog::Vm::GithubRunner < Prog::Base
     begin
       begin_time = Time.now.to_date.to_time
       end_time = begin_time + 24 * 60 * 60
-      used_amount = ((Time.now - github_runner.ready_at) / 60).ceil
+      duration = Time.now - github_runner.ready_at
+      used_amount = (duration / 60).ceil
+      github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
         .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
         .where { Sequel.pg_range(_1.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
@@ -125,6 +133,7 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def start
+    pop "Could not provision a runner for inactive project" unless github_runner.installation.project.active?
     hop_wait_concurrency_limit unless quota_available?
     hop_allocate_vm
   end
@@ -136,11 +145,6 @@ class Prog::Vm::GithubRunner < Prog::Base
     utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"]).select_map {
       sum(:used_cores) * 100.0 / sum(:total_cores)
     }.first.to_f
-
-    if github_runner.installation.project.effective_quota_value("GithubRunnerCores") == 0
-      Clog.emit("No quota available for this project") { [github_runner] }
-      nap 2592000
-    end
 
     unless utilization < 70
       Clog.emit("Waiting for customer concurrency limit, utilization is high") { [github_runner, {utilization: utilization}] }
@@ -166,7 +170,7 @@ class Prog::Vm::GithubRunner < Prog::Base
     # definitely more than 13 seconds.
     nap 13 unless vm.allocated_at
     nap 1 unless vm.provisioned_at
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
     hop_setup_environment
   end
 
@@ -201,6 +205,10 @@ class Prog::Vm::GithubRunner < Prog::Base
   end
 
   label def setup_environment
+    docker_daemon_json = JSON.generate({
+      "experimental" => false,
+      "dns-opts" => ["timeout:2", "attempts:3"]
+    })
     command = <<~COMMAND
       # To make sure the script errors out if any command fails
       set -ueo pipefail
@@ -220,9 +228,13 @@ class Prog::Vm::GithubRunner < Prog::Base
       # ubicloud/cache package which forked from the official actions/cache package, sends requests to UBICLOUD_CACHE_URL using this token.
       echo "UBICLOUD_RUNTIME_TOKEN=#{vm.runtime_token}
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
+
+      # We need to configure Docker to work with IPv6 properly. If the docker daemon config file exists, we append the new configuration to it.
+      ([ -f "/etc/docker/daemon.json" ] && sudo cat /etc/docker/daemon.json || echo '{}') | jq '. += #{docker_daemon_json}' | sudo tee /etc/docker/daemon.json
+      sudo systemctl restart docker
     COMMAND
 
-    if github_runner.installation.project.get_ff_transparent_cache
+    if github_runner.installation.cache_enabled
       local_ip = vm.nics.first.private_ipv4.network.to_s
       command += <<~COMMAND
         echo "CUSTOM_ACTIONS_CACHE_URL=http://#{local_ip}:51123/random_token/" | sudo tee -a /etc/environment
@@ -351,8 +363,13 @@ class Prog::Vm::GithubRunner < Prog::Base
           serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
           vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
 
-          # Exclude the "Started" line because it contains sensitive information.
-          vm.sshable.cmd("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+          # We grep only the lines related to 'run-withenv' and 'systemd'. Other
+          # logs include outputs from subprocesses like php, sudo, etc., which
+          # could contain sensitive data. 'run-withenv' is the main process,
+          # while systemd lines provide valuable insights into the lifecycle of
+          # the runner script, including OOM issues.
+          # We exclude the 'Started' line to avoid exposing the JIT token.
+          vm.sshable.cmd("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
         rescue Sshable::SshError
           Clog.emit("Failed to move serial.log or running journalctl") { github_runner }
         end

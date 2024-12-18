@@ -5,7 +5,7 @@ require_relative "../../spec_helper"
 RSpec.describe Clover, "load-balancer" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:lb) do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: LocationNameConverter.to_internal_name(TEST_LOCATION))
@@ -98,12 +98,6 @@ RSpec.describe Clover, "load-balancer" do
         expect(JSON.parse(last_response.body)["name"]).to eq("lb1")
       end
 
-      it "missing required parameters" do
-        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {}.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
-      end
-
       it "invalid private_subnet_id" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: "invalid",
@@ -113,12 +107,6 @@ RSpec.describe Clover, "load-balancer" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
-      end
-
-      it "invalid name" do
-        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/invalid_name", {}.to_json
-
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: body")
       end
     end
 

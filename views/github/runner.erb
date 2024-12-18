@@ -1,21 +1,6 @@
-<% @page_title = "GitHub Runners" %>
+<% @page_title = "Active Runners" %>
 
 <div class="auto-refresh hidden" data-interval="10"></div>
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: @project_data[:path],
-      parts: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["GitHub Runners", "#{@project_data[:path]}/github"],
-        ["Active Runners", "#"]
-      ]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: "GitHub Runner Integration" }) %>
-</div>
 
 <%== render("github/tabbar") %>
 

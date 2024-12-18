@@ -18,7 +18,7 @@ module Scheduling::Allocator
       vm.family,
       vm.cores,
       vm.cpu_percent_limit,
-      vm.mem_gib,
+      vm.memory_gib,
       storage_volumes.map { _1["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
       vm.boot_image,

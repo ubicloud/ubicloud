@@ -1,0 +1,74 @@
+<% @page_title = "Inference Endpoints" %>
+<%== render("inference/tabbar") %>
+
+<% @inference_endpoints.each_with_index do | ie, index |
+
+  path, model_type, model_icon, curl_message = case ie[:model_type]
+    when :text_generation
+      [
+        "/v1/chat/completions",
+        "Text Generation",
+        "hero-chat-bubble-bottom-center-text",
+      <<-MSG
+"messages": [{"role": "user", "content": "say something"}],
+  "stream": true
+MSG
+      ]
+    when :guard
+      [
+        "/v1/chat/completions",
+        "Guard",
+        "hero-shield-check",
+      <<-MSG
+"messages": [{"role": "user", "content": "is this safe?"}]
+MSG
+      ]
+    when :embedding
+      ["/v1/embeddings", "Embedding", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
+    else
+      fail "Unknown model type"
+  end
+  
+
+  curl_snippet = <<-CURL
+curl #{ie[:url]}#{path} \\
+ -H <span class="text-green-400">"Content-Type: application/json"</span> \\
+ -H <span class="text-green-400">"Authorization: Bearer <span class="text-orange-500">$INFERENCE_TOKEN</span>"</span> \\
+ -d <span class="text-green-400">'{
+  "model": "#{ie[:model_name]}",
+  #{curl_message} }'</span>
+CURL
+%>
+
+<div class="inline-block w-auto bg-white shadow-md rounded-lg p-4 mr-4 <%= (index > 0) ? "mt-6" : "" %>">
+  <h2 class="text-lg font-bold mb-4 text-gray-800"><%= ie[:name] %></h2>
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <div class="mb-4">
+        <h3 class="text-sm font-semibold text-gray-900">Type</h3>
+        <p class="text-gray-500"><%== render("components/icon", locals: { name: model_icon, classes: "inline-block w-5 h-5 flex-shrink-0 text-gray-400" }) %> <%= model_type %></p>
+      </div>
+    </div>
+    <div class="mb-4">
+      <h3 class="text-sm font-semibold text-gray-900">Pricing per million tokens</h3>
+      <p class="text-gray-500">$<%= ie[:price_million_tokens] %></p>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 gap-4">
+    <div class="mb-4">
+      <h3 class="text-sm font-semibold text-gray-900">URL</h3>
+      <p class="text-gray-500"><%== render("components/copyable_content", locals: { content: ie[:url], message: "Copied URL" }) %></p>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 gap-2">
+    <div class="mb-2">
+      <h3 class="text-sm font-semibold text-gray-900">
+        CURL usage example
+      </h3>
+      <div class="mt-2">
+        <pre class="text-sm bg-gray-800 text-white p-1 rounded-lg"><%== curl_snippet %></pre>
+      </div>
+    </div>
+  </div>
+</div>
+<% end %>

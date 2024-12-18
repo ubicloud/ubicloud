@@ -26,6 +26,7 @@ class Vm < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
+  semaphore :restart
 
   include Authorization::HyperTagMethods
 
@@ -61,6 +62,7 @@ class Vm < Sequel::Model
 
   def display_state
     return "deleting" if destroy_set? || strand&.label == "destroy"
+    return "restarting" if restart_set? || strand&.label == "restart"
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
       return "waiting for capacity"
@@ -75,17 +77,12 @@ class Vm < Sequel::Model
     8
   end
 
-  def mem_gib
-    # TODO-MACIEK - reconcile this later
-    memory_gib
-  end
-
   def use_slices_for_allocation?
     projects.first.get_ff_use_slices_for_allocation || false
   end
 
   def can_share_slice?
-    use_slices_for_allocation? && (cpus * 100) > cpu_percent_limit
+    use_slices_for_allocation? && (vcpus * 100) > cpu_percent_limit
   end
 
   def enable_diagnostics?
@@ -151,7 +148,7 @@ class Vm < Sequel::Model
     vm_size = Option::VmSizes.find {
       _1.family == family &&
         _1.arch == arch &&
-        _1.vcpu == cpus &&
+        _1.vcpus == vcpus &&
         _1.vcpu_percent_limit == cpu_percent_limit
     }
     vm_size.name
@@ -224,7 +221,7 @@ class Vm < Sequel::Model
       "boot_image" => boot_image,
       "max_vcpus" => topo.max_vcpus,
       "cpu_topology" => topo.to_s,
-      "mem_gib" => mem_gib,
+      "mem_gib" => memory_gib,
       "ndp_needed" => vm_host.ndp_needed,
       "storage_volumes" => storage_volumes,
       "swap_size_bytes" => swap_size_bytes,
@@ -286,11 +283,11 @@ end
 #  arch                    | arch                     | NOT NULL DEFAULT 'x64'::arch
 #  allocated_at            | timestamp with time zone |
 #  provisioned_at          | timestamp with time zone |
+#  vcpus                   | integer                  | NOT NULL
+#  memory_gib              | integer                  | NOT NULL
 #  vm_host_slice_id        | uuid                     |
-#  memory_gib              | integer                  |
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
-#  cpus                    | integer                  |
 # Indexes:
 #  vm_pkey               | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)

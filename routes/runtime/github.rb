@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  hash_branch("runtime", "github") do |r|
+  hash_branch(:runtime_prefix, "github") do |r|
     if (runner = GithubRunner[vm_id: @vm.id]).nil? || (repository = runner.repository).nil?
       fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
     end
@@ -13,33 +13,36 @@ class Clover
       keys, version = r.params["keys"]&.split(","), r.params["version"]
       fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if keys.nil? || keys.empty? || version.nil?
 
-      # Clients can send multiple keys; we return the first matching cache in
-      # incoming key order. The function `.min_by { keys.index(_1.key) }` helps
-      # us achieve this by ordering entries based on the index of key in the
-      # given order. If the same cache exists for both the head_branch and the
-      # default branch, we prioritize and return the cache for the head_branch.
-      # The part `(scopes.index(_1.scope) * keys.size)` assists in sorting the
-      # caches by scope, pushing entries for later scopes to the end of the
-      # list.
-      scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
-      entry = repository.cache_entries_dataset
+      # Clients can send multiple keys, and we look for caches in multiple scopes.
+      # We prioritize scope over key, returning the cache for the first matching
+      # key in the head branch scope, followed by the first matching key in
+      # default branch scope.
+      scopes = [runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]), repository.default_branch]
+      scopes.compact!
+      scopes.uniq!
+
+      dataset = repository.cache_entries_dataset
         .exclude(committed_at: nil)
-        .where(key: keys, version: version, scope: scopes).all
-        .min_by { keys.index(_1.key) + (scopes.index(_1.scope) * keys.size) }
+        .where(version: version, scope: scopes)
+        .order(Sequel.case(scopes.map.with_index { |scope, idx| [{scope:}, idx] }.to_h, scopes.length))
+
+      entry = dataset
+        .where(key: keys)
+        .order_append(Sequel.case(keys.map.with_index { |key, idx| [{key:}, idx] }.to_h, keys.length))
+        .first
 
       # GitHub cache supports prefix match if the key doesn't match exactly.
       # From their docs:
       #   When a key doesn't match directly, the action searches for keys
       #   prefixed with the restore key. If there are multiple partial matches
       #   for a restore key, the action returns the most recently created cache.
-      if entry.nil?
-        entry = repository.cache_entries_dataset
-          .exclude(committed_at: nil)
-          .where { keys.map { |key| Sequel.like(:key, "#{key}%") }.reduce(:|) }
-          .where(version: version, scope: scopes)
-          .order(Sequel.desc(:created_at))
-          .first
-      end
+      #
+      # We still prioritize scope over key in this case, and if there are
+      # multiple prefix matches for a key, this chooses the most recent.
+      entry ||= dataset
+        .grep(:key, keys.map { |key| "#{DB.dataset.escape_like(key)}%" })
+        .order_append(Sequel.case(keys.map.with_index { |key, idx| [Sequel.like(:key, "#{DB.dataset.escape_like(key)}%"), idx] }.to_h, keys.length), Sequel.desc(:created_at))
+        .first
 
       fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil?
 
@@ -87,8 +90,7 @@ class Clover
         size = r.params["cacheSize"]&.to_i
         fail CloverError.new(400, "InvalidRequest", "Wrong parameters") if key.nil? || version.nil?
 
-        unless (scope = runner.workflow_job&.dig("head_branch"))
-          # YYYY: If the webhook not delivered yet, we can try to get the branch from the API
+        unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, r.params["runId"]))
           Clog.emit("The runner does not have a workflow job") { {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}} }
           fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
         end

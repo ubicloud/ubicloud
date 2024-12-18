@@ -320,7 +320,8 @@ RSpec.describe Clover, "firewall" do
         btn = find ".delete-btn"
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
-        expect(page.body).to eq({message: "Deleting #{firewall.name}"}.to_json)
+        expect(page.status_code).to eq(204)
+        expect(page.body).to be_empty
         expect(Firewall.count).to eq(0)
       end
 

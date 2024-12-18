@@ -84,7 +84,7 @@ module ResourceMethods
     inspect_values.inspect
   end
 
-  NON_ARCHIVED_MODELS = ["DeletedRecord", "Semaphore"]
+  NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"]
   def before_destroy
     model_name = self.class.name
     unless NON_ARCHIVED_MODELS.include?(model_name)
@@ -97,7 +97,7 @@ module ResourceMethods
         end
       end
 
-      DeletedRecord.create(deleted_at: Time.now, model_name: model_name, model_values: model_values)
+      ArchivedRecord.create(model_name: model_name, model_values: model_values)
     end
 
     super

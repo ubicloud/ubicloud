@@ -8,9 +8,7 @@ class InferenceEndpoint < Sequel::Model
   one_to_many :replicas, class: :InferenceEndpointReplica, key: :inference_endpoint_id
   one_to_one :load_balancer, key: :id, primary_key: :load_balancer_id
   one_to_one :private_subnet, key: :id, primary_key: :private_subnet_id
-  one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "inference_endpoint", used_for: "inference_endpoint"}
 
-  plugin :association_dependencies, api_keys: :destroy
   dataset_module Authorization::Dataset
   dataset_module Pagination
 
@@ -19,7 +17,7 @@ class InferenceEndpoint < Sequel::Model
   include Authorization::HyperTagMethods
   include Authorization::TaggableMethods
 
-  semaphore :destroy
+  semaphore :destroy, :maintenance
 
   def display_location
     LocationNameConverter.to_display_name(location)
@@ -49,6 +47,16 @@ class InferenceEndpoint < Sequel::Model
     req = Net::HTTP::Post.new(uri.request_uri, header)
     req.body = {model: model_name, messages: [{role: "user", content: content}]}.to_json
     http.request(req)
+  end
+
+  def model_type
+    if model_name == "e5-mistral-7b-it"
+      :embedding
+    elsif model_name.start_with? "llama-guard"
+      :guard
+    else
+      :text_generation
+    end
   end
 end
 

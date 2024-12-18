@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe Clover, "firewall" do
   let(:user) { create_account }
 
-  let(:project) { user.create_project_with_default_policy("project-1") }
+  let(:project) { project_with_default_policy(user) }
 
   let(:firewall) { Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(project) } }
 
@@ -77,7 +77,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "firewall rule delete does not exist" do
-      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/fooubid"
+      delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/fr000000000000000000000000"
       expect(last_response.status).to eq(204)
     end
 
@@ -88,7 +88,7 @@ RSpec.describe Clover, "firewall" do
     end
 
     it "get does not exist" do
-      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/fooubid"
+      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/_#{firewall.ubid}/firewall-rule/fr000000000000000000000000"
 
       expect(last_response.content_type).to eq("application/json")
       expect(last_response).to have_api_error(404)

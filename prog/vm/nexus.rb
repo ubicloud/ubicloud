@@ -9,11 +9,12 @@ require "base64"
 class Prog::Vm::Nexus < Prog::Base
   subject_is :vm
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
+  semaphore :restart
 
   def self.assemble(public_key, project_id, name: nil, size: "standard-2",
     unix_user: "ubi", location: "hetzner-fsn1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
-    enable_ip4: false, pool_id: nil, arch: "x64", allow_only_ssh: false, swap_size_bytes: nil,
+    enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0)
 
     unless (project = Project[project_id])
@@ -34,6 +35,9 @@ class Prog::Vm::Nexus < Prog::Base
     storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_options.first
       volume[:skip_sync] ||= false
+      volume[:max_ios_per_sec] ||= vm_size.io_limits.max_ios_per_sec
+      volume[:max_read_mbytes_per_sec] ||= vm_size.io_limits.max_read_mbytes_per_sec
+      volume[:max_write_mbytes_per_sec] ||= vm_size.io_limits.max_write_mbytes_per_sec
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
 
@@ -81,8 +85,7 @@ class Prog::Vm::Nexus < Prog::Base
           raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
           subnet
         else
-          subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{name}-subnet", location: location, allow_only_ssh: allow_only_ssh).subject
-          PrivateSubnet[subnet.id]
+          project.default_private_subnet(location)
         end
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
@@ -93,10 +96,10 @@ class Prog::Vm::Nexus < Prog::Base
         name: name,
         family: vm_size.family,
         cores: vm_size.cores,
-        cpus: vm_size.vcpu,
+        vcpus: vm_size.vcpus,
         cpu_percent_limit: vm_size.vcpu_percent_limit,
         cpu_burst_percent_limit: vm_size.vcpu_burst_percent_limit,
-        memory_gib: vm_size.memory,
+        memory_gib: vm_size.memory_gib,
         location: location,
         boot_image: boot_image,
         ip4_enabled: enable_ip4,
@@ -214,7 +217,7 @@ class Prog::Vm::Nexus < Prog::Base
       page.incr_resolve
     end
 
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
 
     # We don't need storage_volume info anymore, so delete it before
     # transitioning to the next state.
@@ -340,18 +343,23 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def wait
     when_start_after_host_reboot_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline("wait", 5 * 60)
       hop_start_after_host_reboot
     end
 
     when_update_firewall_rules_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline("wait", 5 * 60)
       hop_update_firewall_rules
     end
 
     when_update_spdk_dependency_set? do
-      register_deadline(:wait, 5 * 60)
+      register_deadline("wait", 5 * 60)
       hop_update_spdk_dependency
+    end
+
+    when_restart_set? do
+      register_deadline("wait", 5 * 60)
+      hop_restart
     end
 
     when_checkup_set? do
@@ -382,6 +390,12 @@ class Prog::Vm::Nexus < Prog::Base
     hop_wait
   end
 
+  label def restart
+    decr_restart
+    host.sshable.cmd("sudo systemctl restart #{vm.inhost_name}")
+    hop_wait
+  end
+
   label def unavailable
     # If the VM become unavailable due to host unavailability, it first needs to
     # go through start_after_host_reboot state to be able to recover.
@@ -407,7 +421,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def prevent_destroy
-    register_deadline(:destroy, 24 * 60 * 60)
+    register_deadline("destroy", 24 * 60 * 60)
     nap 30
   end
 

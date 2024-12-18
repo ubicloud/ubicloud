@@ -128,7 +128,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#bootstrap_rhizome" do
     it "buds a bootstrap rhizome process" do
+      expect(postgres_server).to receive(:primary?).and_return(true)
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => postgres_server.vm.id, "user" => "ubi"})
+      expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
+    end
+
+    it "sets longer deadline for non-primary servers" do
+      expect(postgres_server).to receive(:primary?).and_return(false)
+      expect(nx).to receive(:register_deadline).with("wait", 120 * 60)
       expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end
@@ -455,6 +462,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_return("t")
       expect(postgres_server).to receive(:run_query).with("SELECT pg_get_wal_replay_pause_state()").and_return("not paused")
       expect { nx.wait_recovery_completion }.to nap(5)
+    end
+
+    it "naps if it cannot connect to database due to recovery" do
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_raise(Sshable::SshError.new("", nil, "Consistent recovery state has not been yet reached.", nil, nil))
+      expect { nx.wait_recovery_completion }.to nap(5)
+    end
+
+    it "raises error if it cannot connect to database due a problem other than to continueing recovery" do
+      expect(postgres_server).to receive(:run_query).with("SELECT pg_is_in_recovery()").and_raise(Sshable::SshError.new("", nil, "Bogus", nil, nil))
+      expect { nx.wait_recovery_completion }.to raise_error(Sshable::SshError)
     end
 
     it "stops wal replay and switches to new timeline if it is still in recovery but wal replay is paused" do

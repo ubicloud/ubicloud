@@ -30,10 +30,10 @@ class Prog::InstallDnsmasq < Prog::Base
   end
 
   label def git_clone_dnsmasq
-    q_commit = "5dc14b6e05f39a5ab0dc02e376b1d7da2fda5bc1".shellescape
+    q_commit = "b6769234bca9b0eabfe4768832b88d2cdb187092".shellescape
     sshable.cmd("git init dnsmasq && " \
                 "(cd dnsmasq && " \
-                "  git fetch https://github.com/fdr/dnsmasq.git #{q_commit} --depth=1 &&" \
+                "  git fetch https://github.com/ubicloud/dnsmasq.git #{q_commit} --depth=1 &&" \
                 "  git checkout #{q_commit} &&" \
                 "  git fsck --full)")
     pop "downloaded and verified dnsmasq successfully"

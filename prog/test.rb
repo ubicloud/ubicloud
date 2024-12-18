@@ -91,12 +91,12 @@ class Prog::Test < Prog::Base
   end
 
   label def set_expired_deadline
-    register_deadline(:pusher2, -1)
+    register_deadline("pusher2", -1)
     hop_pusher1
   end
 
   label def extend_deadline
-    register_deadline(:pusher2, 1, allow_extension: true)
+    register_deadline("pusher2", 1, allow_extension: true)
     hop_pusher1
   end
 
@@ -110,7 +110,7 @@ class Prog::Test < Prog::Base
   end
 
   label def set_popping_deadline2
-    register_deadline(:pusher2, -1)
+    register_deadline("pusher2", -1)
     hop_popper
   end
 

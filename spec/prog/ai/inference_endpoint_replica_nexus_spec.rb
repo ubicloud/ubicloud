@@ -7,15 +7,25 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   subject(:nx) { described_class.new(Strand.create(id: "5943c405-0165-471e-93d5-20203e585aaf", prog: "Prog::Ai::InferenceEndpointReplicaNexus", label: "start")) }
 
   let(:inference_endpoint) {
-    instance_double(InferenceEndpoint, id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77", replica_count: 2, model_name: "test-model")
+    instance_double(InferenceEndpoint,
+      id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77",
+      replica_count: 2,
+      model_name: "test-model",
+      ubid: "ie-ubid",
+      is_public: true,
+      location: "hetzner-ai",
+      name: "ie-name",
+      load_balancer: instance_double(LoadBalancer, id: "lb-id", ubid: "lb-ubid", dst_port: 8443, health_check_down_threshold: 3, private_subnet: instance_double(PrivateSubnet, ubid: "subnet-ubid")))
   }
 
   let(:vm) {
     instance_double(
       Vm,
       id: "fe4478f9-9454-466f-be7b-3cff302a4716",
+      ubid: "vm-ubid",
       sshable: sshable,
       ephemeral_net4: "1.2.3.4",
+      vm_host: instance_double(VmHost, ubid: "host-ubid", sshable: instance_double(Sshable, host: "2.3.4.5")),
       private_subnets: [instance_double(PrivateSubnet)]
     )
   }
@@ -30,7 +40,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     )
   }
 
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { instance_double(Sshable, host: "3.4.5.6") }
 
   before do
     allow(nx).to receive_messages(vm: vm, inference_endpoint: inference_endpoint, inference_endpoint_replica: replica)
@@ -154,27 +164,74 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#wait_endpoint_up" do
-    it "naps if vm is not in active set of load balancer" do
-      lb = instance_double(LoadBalancer)
-      expect(inference_endpoint).to receive(:load_balancer).and_return(lb)
-      expect(lb).to receive(:reload).and_return(lb)
-      expect(lb).to receive(:active_vms).and_return([])
+    it "naps if vm is not up" do
+      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 1)
+      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
+      expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.wait_endpoint_up }.to nap(5)
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      lb = instance_double(LoadBalancer)
-      expect(inference_endpoint).to receive(:load_balancer).and_return(lb)
-      expect(lb).to receive(:reload).and_return(lb)
-      expect(lb).to receive(:active_vms).and_return([vm])
+      lb_vm = instance_double(LoadBalancersVms, state: "up", state_counter: 1)
+      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
+      expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.wait_endpoint_up }.to hop("wait")
     end
   end
 
   describe "#wait" do
     it "pings the inference gateway and naps" do
+      expect(nx).to receive(:available?).and_return(true)
       expect(nx).to receive(:ping_gateway)
       expect { nx.wait }.to nap(60)
+    end
+
+    it "hops to unavailable if the replica is not available" do
+      expect(nx).to receive(:available?).and_return(false)
+      expect { nx.wait }.to hop("unavailable")
+    end
+  end
+
+  describe "#unavailable" do
+    it "creates a page if replica is unavailable" do
+      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 5)
+      expect(Prog::PageNexus).to receive(:assemble)
+      expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
+      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm).twice
+      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "does not create a page if replica is in maintenance mode" do
+      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 5)
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect(inference_endpoint).to receive(:maintenance_set?).and_return(true)
+      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
+      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "does not create a page if replica has been down briefly" do
+      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 1)
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
+      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm).twice
+      expect(lb_vm).to receive(:reload).and_return(lb_vm)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "resolves the page if replica is available" do
+      pg = instance_double(Page)
+      expect(pg).to receive(:incr_resolve)
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(pg)
+      expect { nx.unavailable }.to hop("wait")
+    end
+
+    it "does not resolves the page if there is none" do
+      expect(nx).to receive(:available?).and_return(true)
+      expect(Page).to receive(:from_tag_parts).and_return(nil)
+      expect { nx.unavailable }.to hop("wait")
     end
   end
 
@@ -193,25 +250,38 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#ping_gateway" do
+    let(:projects) { [Project.create_with_id(name: "p1").tap { _1.associate_with_project(_1) }, Project.create_with_id(name: "p2").tap { _1.associate_with_project(_1) }] }
+
+    before do
+      ApiKey.create_inference_token(projects.first)
+      ApiKey.create_inference_token(projects.last)
+    end
+
     it "for private endpoints" do
+      expect(inference_endpoint).to receive(:project).and_return(projects.first)
       expect(inference_endpoint).to receive(:is_public).and_return(false).twice
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
-      pj = instance_double(Project)
-      expect(inference_endpoint).to receive(:project).and_return(pj)
-      expect(pj).to receive(:ubid).and_return("theubid")
-      expect(inference_endpoint).to receive(:api_keys).and_return([instance_double(ApiKey, key: "key", is_valid: true)])
       expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
-      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"theubid\",\"api_keys\":[\"2c70e12b7a0646f92279f427c7b38e7334d8e5389cff167a1dc30e73f826b683\"],\"quota_rps\":100.0,\"quota_tps\":1000000.0}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":50.0,\"quota_tps\":5000.0}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       nx.ping_gateway
     end
 
     it "for public endpoints" do
-      pj = Project.create_with_id(name: "test-project")
-      pj.create_api_key
       expect(inference_endpoint).to receive(:is_public).and_return(true).twice
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
+
+      expected_projects = [
+        {"ubid" => projects.first.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.first.api_keys.first.key)], "quota_rps" => 50.0, "quota_tps" => 5000.0},
+        {"ubid" => projects.last.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.last.api_keys.first.key)], "quota_rps" => 50.0, "quota_tps" => 5000.0}
+      ].sort_by { |p| p["ubid"] }
+
+      expect(sshable).to receive(:cmd) do |command, options|
+        json_sent = JSON.parse(options[:stdin])
+        projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
+        expect(projects_sent).to eq(expected_projects)
+      end.and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       expect(nx).to receive(:update_billing_records).with(JSON.parse("[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"))
-      expect(sshable).to receive(:cmd).with("sudo curl -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"theubid\",\"public_endpoint\":true,\"projects\":[{\"ubid\":\"#{pj.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(pj.api_keys.first.key)}\"],\"quota_rps\":50.0,\"quota_tps\":5000.0}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"theubid\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+
       nx.ping_gateway
     end
   end

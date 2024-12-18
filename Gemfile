@@ -4,6 +4,7 @@ source "https://rubygems.org"
 ruby "3.2.6"
 
 gem "argon2"
+gem "committee"
 gem "nokogiri"
 gem "bcrypt_pbkdf"
 gem "ed25519"
@@ -18,7 +19,7 @@ gem "rotp"
 gem "rqrcode"
 gem "mail"
 gem "refrigerator", ">= 1"
-gem "sequel", github: "jeremyevans/sequel", ref: "6a7f9158adfc49d0099e7ef7b5a6a6bbb7c0ea4b"
+gem "sequel", ">= 5.87"
 gem "sequel_pg", ">= 1.8", require: "sequel"
 gem "rack-unreloader", ">= 1.8"
 gem "rake"
@@ -34,13 +35,14 @@ gem "argon2-kdf"
 
 group :development do
   gem "awesome_print"
-  gem "brakeman"
   gem "by", ">= 1.1.0"
-  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
   gem "foreman"
   gem "pry-byebug"
   gem "rackup"
-  gem "sequel-annotate"
+  gem "cuprite"
+end
+
+group :rubocop do
   gem "rubocop-capybara"
   gem "rubocop-erb"
   gem "rubocop-performance"
@@ -48,9 +50,11 @@ group :development do
   gem "rubocop-rspec"
   gem "rubocop-sequel"
   gem "standard", ">= 1.24.3"
-  gem "simplecov"
-  gem "turbo_tests"
-  gem "cuprite"
+end
+
+group :lint do
+  gem "erb-formatter", github: "ubicloud/erb-formatter", ref: "a9ff0001a1eb028e2186b222aeb02b07c04f9808"
+  gem "brakeman"
 end
 
 group :test do
@@ -58,11 +62,17 @@ group :test do
   gem "rspec"
   gem "webmock"
   gem "pdf-reader"
+  gem "turbo_tests"
+  gem "simplecov"
 end
 
-gem "webauthn", "~> 3.1"
+group :test, :development do
+  gem "sequel-annotate"
+end
 
-gem "aws-sdk-s3", "~> 1.170"
+gem "webauthn", "~> 3.2"
+
+gem "aws-sdk-s3", "~> 1.175"
 
 gem "acme-client", "~> 2.0"
 

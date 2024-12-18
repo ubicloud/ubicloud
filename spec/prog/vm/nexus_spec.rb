@@ -35,6 +35,7 @@ RSpec.describe Prog::Vm::Nexus do
       boot_image: "ubuntu-jammy",
       family: "standard",
       cores: 1,
+      vcpus: 1,
       cpu_percent_limit: 100,
       cpu_burst_percent_limit: 0,
       memory_gib: 8,
@@ -180,8 +181,7 @@ RSpec.describe Prog::Vm::Nexus do
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
       st = described_class.assemble("some_ssh_key", prj.id, size: "standard-4", arch: "arm64")
       expect(st.subject.cores).to eq(4)
-      expect(st.subject.mem_gib_ratio).to eq(3.2)
-      expect(st.subject.mem_gib).to eq(12)
+      expect(st.subject.memory_gib).to eq(12)
     end
 
     it "requests as many gpus as specified" do
@@ -288,7 +288,7 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
       vmh = instance_double(VmHost, sshable: sshable,
-        total_cpus: 80, total_cores: 40, total_sockets: 10, ndp_needed: false)
+        total_cpus: 80, total_cores: 40, total_sockets: 10, ndp_needed: false, arch: "arm64")
       expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
 
       expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
@@ -661,6 +661,11 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.wait }.to hop("update_firewall_rules")
     end
 
+    it "hops to restart when needed" do
+      expect(nx).to receive(:when_restart_set?).and_yield
+      expect { nx.wait }.to hop("restart")
+    end
+
     it "hops to unavailable based on the vm's available status" do
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(false)
@@ -699,6 +704,16 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:write_params_json)
       expect(sshable).to receive(:cmd).with("sudo host/bin/setup-vm reinstall-systemd-units #{vm.inhost_name}")
       expect { nx.update_spdk_dependency }.to hop("wait")
+    end
+  end
+
+  describe "#restart" do
+    it "hops to wait after restarting the vm" do
+      sshable = instance_double(Sshable)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
+      expect(nx).to receive(:decr_restart)
+      expect(sshable).to receive(:cmd).with("sudo systemctl restart #{vm.inhost_name}")
+      expect { nx.restart }.to hop("wait")
     end
   end
 

@@ -3,6 +3,7 @@
 require_relative "spec_helper"
 
 require "aws-sdk-s3"
+require "octokit"
 
 RSpec.describe Clover, "github" do
   describe "authentication" do
@@ -46,6 +47,7 @@ RSpec.describe Clover, "github" do
 
   describe "cache endpoints" do
     let(:repository) { GithubRepository.create_with_id(name: "test", default_branch: "main", access_key: "123") }
+    let(:installation) { GithubInstallation.create_with_id(installation_id: 123, name: "test-user", type: "User") }
     let(:runner) { GithubRunner.create_with_id(vm_id: create_vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id, workflow_job: {head_branch: "dev"}) }
     let(:url_presigner) { instance_double(Aws::S3::Presigner, presigned_request: "aa") }
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
@@ -89,12 +91,26 @@ RSpec.describe Clover, "github" do
         expect(last_response).to have_api_error(409, "A cache entry for dev scope already exists with k1 key and v1 version.")
       end
 
-      it "Rollbacks inconsistent cache entry if a failure occurs in the middle" do
+      it "rollbacks inconsistent cache entry if a failure occurs in the middle" do
         expect(blob_storage_client).to receive(:create_multipart_upload).and_raise(CloverError.new(500, "UnexceptedError", "Sorry, we couldn’t process your request because of an unexpected error."))
         post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 75 * 1024 * 1024}
 
         expect(last_response).to have_api_error(500, "Sorry, we couldn’t process your request because of an unexpected error.")
         expect(repository.cache_entries).to be_empty
+      end
+
+      it "gets branch from GitHub API if the runner doesn't have a branch info" do
+        runner.update(workflow_job: nil, installation_id: installation.id)
+        client = instance_double(Octokit::Client)
+        allow(Github).to receive(:installation_client).and_return(client)
+        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
+        expect(blob_storage_client).to receive(:create_multipart_upload).and_return(instance_double(Aws::S3::Types::CreateMultipartUploadOutput, upload_id: "upload-id"))
+        expect(url_presigner).to receive(:presigned_url).with(:upload_part, hash_including(bucket: repository.bucket_name, upload_id: "upload-id"))
+
+        post "/runtime/github/caches", {key: "k1", version: "v1", cacheSize: 100, runId: 123}
+
+        expect(last_response.status).to eq(200)
+        expect(repository.cache_entries.first.scope).to eq("dev")
       end
 
       it "returns presigned urls and upload id for the reserved cache" do
@@ -208,6 +224,41 @@ RSpec.describe Clover, "github" do
         expect(last_response.status).to eq(204)
       end
 
+      it "fails to get head branch if runner name not matched" do
+        runner.update(workflow_job: nil, installation_id: installation.id)
+        GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        client = instance_double(Octokit::Client)
+        allow(Github).to receive(:installation_client).and_return(client)
+        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: "dummy-runner-name"}]})
+        get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "fails to get head branch if GitHub API raises an exception" do
+        runner.update(workflow_job: nil, installation_id: installation.id)
+        GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        client = instance_double(Octokit::Client)
+        allow(Github).to receive(:installation_client).and_return(client)
+        expect(client).to receive(:workflow_run_jobs).and_raise(Octokit::NotFound)
+        get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
+
+        expect(last_response.status).to eq(204)
+      end
+
+      it "gets branch from GitHub API if the runner doesn't have a branch info" do
+        runner.update(workflow_job: nil, installation_id: installation.id)
+        entry = GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "dev", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+        client = instance_double(Octokit::Client)
+        allow(Github).to receive(:installation_client).and_return(client)
+        expect(client).to receive(:workflow_run_jobs).and_return({jobs: [{head_branch: "dev", runner_name: runner.ubid}]})
+        expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: repository.bucket_name, key: entry.blob_key)).and_return("http://presigned-url")
+        get "/runtime/github/cache", {keys: "k1", version: "v1", runId: 123}
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "dev"])
+      end
+
       it "returns a cache from default branch when no branch info" do
         runner.update(workflow_job: nil)
         entry = GithubCacheEntry.create_with_id(key: "k1", version: "v1", scope: "main", repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
@@ -235,17 +286,23 @@ RSpec.describe Clover, "github" do
         expect(GithubCacheEntry[key: "k2", version: "v1", scope: "dev"].last_accessed_by).to eq(runner.id)
       end
 
-      it "partially matched key returns the most recently created cache" do
-        GithubCacheEntry.create_with_id(key: "k1234", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
-        GithubCacheEntry.create_with_id(key: "k12345", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
-        GithubCacheEntry.create_with_id(key: "k123456", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+      it "partially matched key returns the cache according to the order of incoming keys" do
+        GithubCacheEntry.create_with_id(key: "mix-dev-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 2, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create_with_id(key: "mix-dev-main-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now - 1, created_by: runner.id, committed_at: Time.now)
+        GithubCacheEntry.create_with_id(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
 
         expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url")
-        get "/runtime/github/cache", {keys: "k12,k123", version: "v1"}
+        get "/runtime/github/cache", {keys: "mix-dev-main-,mix-dev-,mix-", version: "v1"}
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k123456", "v1", "main"])
-        expect(GithubCacheEntry[key: "k123456", version: "v1", scope: "main"].last_accessed_by).to eq(runner.id)
+        expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["mix-dev-main-123", "v1", "main"])
+        expect(GithubCacheEntry[key: "mix-dev-main-123", version: "v1", scope: "main"].last_accessed_by).to eq(runner.id)
+      end
+
+      it "only does a prefix match on key, escapes LIKE metacharacters in submitted keys" do
+        GithubCacheEntry.create_with_id(key: "k123456", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
+        get "/runtime/github/cache", {keys: "%6", version: "v1"}
+        expect(last_response.status).to eq(204)
       end
     end
 

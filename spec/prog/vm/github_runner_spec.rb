@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   before do
     allow(Github).to receive(:installation_client).and_return(client)
     allow(github_runner).to receive_messages(vm: vm, installation: instance_double(GithubInstallation, installation_id: 123))
-    allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94"))
+    allow(vm).to receive_messages(sshable: sshable, vm_host: instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", data_center: "FSN1-DC1"))
   end
 
   describe ".assemble" do
@@ -72,6 +72,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "provisions a VM if the pool is not existing" do
       expect(VmPool).to receive(:where).and_return([])
+      expect(Prog::Vnet::SubnetNexus).to receive(:assemble).and_call_original
       expect(Prog::Vm::Nexus).to receive(:assemble).and_call_original
       expect(FirewallRule).to receive(:create_with_id).and_call_original.at_least(:once)
       vm = nx.pick_vm
@@ -258,7 +259,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
       installation = instance_double(GithubInstallation)
-      project = instance_double(Project, quota_available?: false, github_installations: [installation])
+      project = instance_double(Project, quota_available?: false, github_installations: [installation], active?: true)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -271,13 +272,20 @@ RSpec.describe Prog::Vm::GithubRunner do
       dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
 
       installation = instance_double(GithubInstallation)
-      project = instance_double(Project, quota_available?: true, github_installations: [installation])
+      project = instance_double(Project, quota_available?: true, github_installations: [installation], active?: true)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
 
       expect { nx.start }.to hop("allocate_vm")
+    end
+
+    it "pops if the project is not active" do
+      installation = instance_double(GithubInstallation, project: instance_double(Project, active?: false))
+      expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
+
+      expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
     end
   end
 
@@ -294,7 +302,6 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
-      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
@@ -321,25 +328,12 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       installation = instance_double(GithubInstallation)
       project = instance_double(Project, quota_available?: false, github_installations: [installation])
-      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(1).at_least(:once)
 
       expect(github_runner).to receive(:installation).and_return(installation).at_least(:once)
       expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
       expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
       VmHost[arch: "x64"].update(used_cores: 4)
       expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
-    end
-
-    it "naps for a long time if the quota is set to 0" do
-      dataset = instance_double(Sequel::Dataset, for_update: instance_double(Sequel::Dataset, all: []))
-
-      installation = instance_double(GithubInstallation)
-      project = instance_double(Project, quota_available?: false, github_installations: [installation])
-      expect(project).to receive(:effective_quota_value).with("GithubRunnerCores").and_return(0)
-      expect(github_runner.installation).to receive(:project_dataset).and_return(dataset)
-      expect(github_runner.installation).to receive(:project).and_return(project).at_least(:once)
-
-      expect { nx.wait_concurrency_limit }.to nap(2592000)
     end
   end
 
@@ -385,7 +379,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to register_runner" do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
-      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx", get_ff_transparent_cache: false)).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+      expect(github_runner.installation).to receive(:cache_enabled).and_return(false)
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
         echo "image version: $ImageVersion"
@@ -393,6 +388,8 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+        ([ -f "/etc/docker/daemon.json" ] && sudo cat /etc/docker/daemon.json || echo '{}') | jq '. += #{JSON.generate({"experimental" => false, "dns-opts" => ["timeout:2", "attempts:3"]})}' | sudo tee /etc/docker/daemon.json
+        sudo systemctl restart docker
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -401,7 +398,8 @@ RSpec.describe Prog::Vm::GithubRunner do
     it "hops to register_runner with after enabling transparent cache" do
       expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
-      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx", get_ff_transparent_cache: true)).at_least(:once)
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+      expect(github_runner.installation).to receive(:cache_enabled).and_return(true)
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))])
       expect(sshable).to receive(:cmd).with(<<~COMMAND)
         set -ueo pipefail
@@ -410,6 +408,8 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+        ([ -f "/etc/docker/daemon.json" ] && sudo cat /etc/docker/daemon.json || echo '{}') | jq '. += #{JSON.generate({"experimental" => false, "dns-opts" => ["timeout:2", "attempts:3"]})}' | sudo tee /etc/docker/daemon.json
+        sudo systemctl restart docker
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment
       COMMAND
 
@@ -549,7 +549,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).to receive(:private_subnets).and_return([ps])
       expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
-      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
@@ -573,7 +573,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       vm_host = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vm_host).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
-      expect(sshable).to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+      expect(sshable).to receive(:cmd).with("journalctl -u runner-script -t 'run-withenv.sh' -t 'systemd' --no-pager | grep -Fv Started")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
@@ -601,7 +601,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
       expect(github_runner).to receive(:workflow_job).and_return({"conclusion" => "success"}).at_least(:once)
       expect(sshable).not_to receive(:cmd).with("sudo ln /vm/9qf22jbv/serial.log /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
-      expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -v -e Started -e sudo")
+      expect(sshable).not_to receive(:cmd).with("journalctl -u runner-script --no-pager | grep -e run-withenv -e systemd | grep -v -e Started")
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")

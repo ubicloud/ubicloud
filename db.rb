@@ -31,7 +31,7 @@ end
 # Load Sequel Database/Global extensions here
 # DB.extension :date_arithmetic
 DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_timestamptz, :pg_range
-Sequel.extension :pg_range_ops
+Sequel.extension :pg_range_ops, :pg_json_ops
 
 DB.extension :pg_schema_caching
 DB.extension :index_caching

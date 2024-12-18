@@ -50,10 +50,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         [parent.superuser_password, parent.timeline.id, "fetch", parent.version]
       end
 
-      if flavor == PostgresResource::Flavor::LANTERN && version == "17"
-        fail Validation::ValidationFailed.new({version: "Lantern flavor is not supported with version 17"})
-      end
-
       postgres_resource = PostgresResource.create_with_id(
         project_id: project_id, location: location, name: name,
         target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
@@ -90,8 +86,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     nap 5 unless representative_server.vm.strand.label == "wait"
 
     postgres_resource.incr_initial_provisioning
-    register_deadline(:wait, 10 * 60)
-    bud self.class, frame, :trigger_pg_current_xact_id_on_parent if postgres_resource.parent
+    if postgres_resource.parent
+      bud self.class, frame, :trigger_pg_current_xact_id_on_parent
+      register_deadline("wait", 120 * 60)
+    else
+      register_deadline("wait", 10 * 60)
+    end
     hop_refresh_dns_record
   end
 

@@ -1,15 +1,13 @@
 <% @page_title = @project_data[:name] %>
 
-<div class="space-y-1">
-  <%== render(
-    "components/breadcrumb",
-    locals: {
-      back: "/project",
-      parts: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
-    }
-  ) %>
-  <%== render("components/page_header", locals: { title: "Project Settings" }) %>
-</div>
+<%== render(
+  "components/page_header",
+  locals: {
+    title: "Project Settings",
+    back: "/project",
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
+  }
+) %>
 
 <div class="grid gap-6">
   <!-- Detail Card -->
@@ -22,7 +20,7 @@
         data: [
           ["ID", @project_data[:id]],
           (
-            if Authorization.has_permission?(current_account.id, "Project:edit", @project_data[:id])
+            if has_permission?("Project:edit", @project_data[:id])
               [
                 "Name",
                 render(
@@ -73,7 +71,7 @@
 
   </div>
   <!-- Delete Card -->
-  <% if Authorization.has_permission?(current_account.id, "Project:delete", @project_data[:id]) %>
+  <% if has_permission?("Project:delete", @project_data[:id]) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
         <div class="sm:flex sm:items-center sm:justify-between">
