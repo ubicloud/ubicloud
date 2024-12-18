@@ -119,6 +119,22 @@ RSpec.describe Clover, "access control" do
         "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
         "Edit", "Tag: STest", "All", "All", "Remove"
       ]
+
+      inference_token = ApiKey.create_inference_token(project)
+      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: inference_token.id)
+      page.refresh
+      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
+        "", "Tag: Admin", "All", "All", "",
+        "Edit", "Account: Tname", "All", "All", "Remove",
+        "Edit", "Account: Tname", "Global Tag: Member", "InferenceToken: #{inference_token.ubid}", "Remove",
+        "Edit", "Account: Tname", "Global Tag: Member", "Tag: OTest2", "Remove",
+        "Edit", "Account: Tname", "Project:view", "All", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest1", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
+        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
+        "Edit", "Tag: STest", "All", "All", "Remove"
+      ]
     end
 
     it "requires Project:viewaccess permissions to view access control entries" do
@@ -747,6 +763,18 @@ RSpec.describe Clover, "access control" do
       find("##{admin.ubid} input").check
       click_button "Add Members"
       expect(find_by_id("flash-error").text).to eq "No change in membership: cannot include Admin subject tag in another tag, 1 members not valid"
+    end
+
+    it "supports adding InferenceToken to ObjectTag" do
+      inference_token = ApiKey.create_inference_token(project)
+      tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
+      visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}/membership"
+      find("##{inference_token.ubid} input").check
+      click_button "Add Members"
+      expect(find_by_id("flash-notice").text).to eq "1 members added to object tag"
+      expect(page.all("table#tag-membership-remove td").map(&:text)).to eq [
+        "InferenceToken: #{inference_token.ubid}", ""
+      ]
     end
 
     it "supports adding ObjectTag to ObjectTag, both as regular tag and metatag" do
