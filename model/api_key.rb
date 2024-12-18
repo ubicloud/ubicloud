@@ -4,13 +4,10 @@ require_relative "../model"
 
 class ApiKey < Sequel::Model
   include ResourceMethods
-  include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
 
   one_to_many :access_tags, key: :hyper_tag_id
   plugin :association_dependencies, access_tags: :destroy
-
-  dataset_module Authorization::Dataset
 
   plugin :column_encryption do |enc|
     enc.column :key
@@ -45,9 +42,24 @@ class ApiKey < Sequel::Model
     super(owner_table:, owner_id:, key:, used_for:)
   end
 
+  def unrestricted_token_for_project?(project_id)
+    !unrestricted_project_access_dataset(project_id).empty?
+  end
+
+  def restrict_token_for_project(project_id)
+    unrestricted_project_access_dataset(project_id).delete
+  end
+
   def rotate
     new_key = SecureRandom.alphanumeric(32)
     update(key: new_key, updated_at: Time.now)
+  end
+
+  private
+
+  def unrestricted_project_access_dataset(project_id)
+    DB[:applied_subject_tag]
+      .where(subject_id: id, tag_id: SubjectTag.where(project_id:, name: "Admin").select(:id))
   end
 end
 

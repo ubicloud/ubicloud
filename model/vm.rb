@@ -19,7 +19,6 @@ class Vm < Sequel::Model
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 
   dataset_module Pagination
-  dataset_module Authorization::Dataset
 
   include ResourceMethods
   include SemaphoreMethods
@@ -28,12 +27,11 @@ class Vm < Sequel::Model
   semaphore :restart
 
   include Authorization::HyperTagMethods
+  include ObjectTag::Cleanup
 
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{display_location}/vm/#{name}"
   end
-
-  include Authorization::TaggableMethods
 
   def firewalls
     private_subnets.flat_map(&:firewalls)

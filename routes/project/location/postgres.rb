@@ -69,7 +69,7 @@ class Clover
 
       r.on "firewall-rule" do
         r.get api?, true do
-          authorize("Postgres:Firewall:view", pg.id)
+          authorize("Postgres:view", pg.id)
           {
             items: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules),
             count: pg.firewall_rules.count
@@ -77,7 +77,7 @@ class Clover
         end
 
         r.post true do
-          authorize("Postgres:Firewall:edit", pg.id)
+          authorize("Postgres:edit", pg.id)
 
           required_parameters = ["cidr"]
           request_body_params = validate_request_params(required_parameters)
@@ -100,7 +100,7 @@ class Clover
         end
 
         r.delete String do |firewall_rule_ubid|
-          authorize("Postgres:Firewall:edit", pg.id)
+          authorize("Postgres:edit", pg.id)
 
           if (fwr = PostgresFirewallRule.from_ubid(firewall_rule_ubid))
             DB.transaction do

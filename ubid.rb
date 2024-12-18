@@ -37,7 +37,7 @@ class UBID
   TYPE_STORAGE_KEY_ENCRYPTION_KEY = "ke"
   TYPE_PROJECT = "pj"
   TYPE_ACCESS_TAG = "tg"
-  TYPE_ACCESS_POLICY = "pc"
+  # TYPE_ACCESS_POLICY = "pc"
   TYPE_ACCOUNT = "ac"
   TYPE_IPSEC_TUNNEL = "tn"
   TYPE_PRIVATE_SUBNET = "ps"
@@ -73,6 +73,12 @@ class UBID
   TYPE_CERT = "ce"
   TYPE_INFERENCE_ENDPOINT = "1e"
   TYPE_INFERENCE_ENDPOINT_REPLICA = "1r"
+  TYPE_ACTION_TYPE = "tt"
+  TYPE_ACCESS_CONTROL_ENTRY = "te"
+  TYPE_SUBJECT_TAG = "ts"
+  TYPE_ACTION_TAG = "ta"
+  TYPE_OBJECT_TAG = "t0"
+  TYPE_OBJECT_METATAG = "t2"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
@@ -99,6 +105,44 @@ class UBID
     from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
   end
 
+  # InferenceToken does not have a type, and using et (TYPE_ETC) seems like a bad idea
+  ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").map! { _1.split(": ") }.to_h.freeze
+    Project: pj
+    Vm: vm
+    PrivateSubnet: ps
+    Firewall: fw
+    LoadBalancer: 1b
+    InferenceEndpoint: 1e
+    InferenceToken: 1t
+    Postgres: pg
+    SubjectTag: ts
+    ActionTag: ta
+    ObjectTag: t0
+  TYPES
+  def self.generate_vanity_action_type(action)
+    prefix, suffix = action.split(":")
+    prefix = ACTION_TYPE_PREFIX_MAP.fetch(prefix)
+    generate_vanity("tt", prefix, suffix[0...7].tr("u", "v"))
+  end
+
+  def self.generate_vanity_action_tag(name)
+    prefix, suffix = name.split(":")
+    if suffix
+      prefix = ACTION_TYPE_PREFIX_MAP.fetch(prefix)
+    else
+      prefix = nil
+      suffix = name
+    end
+    generate_vanity("ta", prefix, suffix[0...7].tr("u", "v"))
+  end
+
+  def self.generate_vanity(type, prefix, suffix)
+    raise "prefix over length 2" if prefix && prefix.length != 2
+    raise "suffix over length 7" unless suffix.length <= 7
+    full = "#{"0" if prefix}#{prefix}0#{suffix}".rjust(11, "z")
+    from_parts(UBID.to_base32_n("zzzzzzzz") * 256, type, 0, UBID.to_base32_n(full) * 16)
+  end
+
   def self.camelize(s)
     s.delete_prefix("TYPE").split("_").map(&:capitalize).join
   end
@@ -118,6 +162,15 @@ class UBID
     # :nocov:
   end
 
+  def self.resolve_map(uuids)
+    uuids.keys.group_by { class_for_ubid(from_uuidish(_1).to_s) }.each do |model, model_uuids|
+      model.where(id: model_uuids).each do
+        uuids[_1.id] = _1
+      end
+    end
+    uuids
+  end
+
   def self.decode(ubid)
     ubid_str = ubid.to_s
     uuid = UBID.parse(ubid_str).to_uuid
@@ -135,6 +188,30 @@ class UBID
   def self.to_uuid(ubid_str)
     parse(ubid_str).to_uuid
   rescue UBIDParseError
+  end
+
+  def self.uuid_class_match?(uuid, klass)
+    uuid_type_match?(uuid, klass.ubid_type)
+  end
+
+  def self.uuid_type_match?(uuid, type)
+    from_uuidish(uuid).type_match?(type)
+  end
+
+  def self.class_match?(ubid, klass)
+    type_match?(ubid, klass.ubid_type)
+  end
+
+  def self.type_match?(ubid, type)
+    ubid[..1] == type
+  end
+
+  def class_match?(klass)
+    type_match?(klass.ubid_type)
+  end
+
+  def type_match?(type)
+    to_s[..1] == type
   end
 
   def to_uuid

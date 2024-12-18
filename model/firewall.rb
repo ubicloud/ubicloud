@@ -9,14 +9,13 @@ class Firewall < Sequel::Model
   plugin :association_dependencies, firewall_rules: :destroy
 
   include ResourceMethods
-  include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
+  include ObjectTag::Cleanup
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{display_location}/firewall/#{name}"
   end
 
   dataset_module Pagination
-  dataset_module Authorization::Dataset
 
   def display_location
     LocationNameConverter.to_display_name(location)

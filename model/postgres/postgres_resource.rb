@@ -15,13 +15,12 @@ class PostgresResource < Sequel::Model
   many_to_one :private_subnet
 
   plugin :association_dependencies, firewall_rules: :destroy, metric_destinations: :destroy
-  dataset_module Authorization::Dataset
   dataset_module Pagination
 
   include ResourceMethods
   include SemaphoreMethods
   include Authorization::HyperTagMethods
-  include Authorization::TaggableMethods
+  include ObjectTag::Cleanup
 
   semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :destroy
 

@@ -3,6 +3,21 @@
 RSpec.describe UBID do
   let(:all_types) { described_class.constants.select { _1.start_with?("TYPE_") }.map { described_class.const_get(_1) } }
 
+  it ".generate_vanity_action_type supports creating vanity ubids for action types" do
+    expect(described_class.generate_vanity_action_type("Project:view").to_s).to eq "ttzzzzzzzz021gzzz0pj0v1ew0"
+    expect(described_class.generate_vanity_action_type("ObjectTag:add").to_s).to eq "ttzzzzzzzz021gzzzz0t00add0"
+  end
+
+  it ".generate_vanity_action_tag supports creating vanity ubids for action tags" do
+    expect(described_class.generate_vanity_action_tag("Vm:all").to_s).to eq "tazzzzzzzz021gzzzz0vm0a111"
+    expect(described_class.generate_vanity_action_tag("Member").to_s).to eq "tazzzzzzzz021gzzzz0member0"
+  end
+
+  it ".generate_vanity raises if prefix or suffix is too long" do
+    expect { described_class.generate_vanity("tt", "foo", "bar") }.to raise_error(RuntimeError)
+    expect { described_class.generate_vanity("tt", "fo", "barbazqu") }.to raise_error(RuntimeError)
+  end
+
   it "can set_bits" do
     expect(described_class.set_bits(0, 0, 7, 0xab)).to eq(0xab)
     expect(described_class.set_bits(0xab, 8, 12, 0xc)).to eq(0xcab)
@@ -185,8 +200,19 @@ RSpec.describe UBID do
     prj = account.create_project_with_default_policy("x")
     expect(prj.ubid).to start_with UBID::TYPE_PROJECT
 
-    policy = prj.access_policies.first
-    expect(policy.ubid).to start_with UBID::TYPE_ACCESS_POLICY
+    st = SubjectTag.create_with_id(project_id: prj.id, name: "T")
+    expect(st.ubid).to start_with UBID::TYPE_SUBJECT_TAG
+
+    at = ActionTag.create_with_id(project_id: prj.id, name: "T")
+    expect(at.ubid).to start_with UBID::TYPE_ACTION_TAG
+
+    ot = ObjectTag.create_with_id(project_id: prj.id, name: "T")
+    expect(ot.ubid).to start_with UBID::TYPE_OBJECT_TAG
+
+    ace = AccessControlEntry.create_with_id(project_id: prj.id, subject_id: st.id)
+    expect(ace.ubid).to start_with UBID::TYPE_ACCESS_CONTROL_ENTRY
+
+    expect(ActionType.first.ubid).to start_with UBID::TYPE_ACTION_TYPE
 
     atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
     expect(atag.ubid).to start_with UBID::TYPE_ACCESS_TAG
@@ -240,7 +266,11 @@ RSpec.describe UBID do
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
-    policy = project.access_policies.first
+    st = SubjectTag.create_with_id(project_id: project.id, name: "T")
+    at = ActionTag.create_with_id(project_id: project.id, name: "T")
+    ot = ObjectTag.create_with_id(project_id: project.id, name: "T")
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: st.id)
+    a_type = ActionType.first
     atag = AccessTag.create_with_id(project_id: project.id, hyper_tag_table: "x", name: "x")
     subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x")
     nic = Nic.create_with_id(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
@@ -257,7 +287,11 @@ RSpec.describe UBID do
     expect(described_class.decode(kek.ubid)).to eq(kek)
     expect(described_class.decode(account.ubid)).to eq(account)
     expect(described_class.decode(project.ubid)).to eq(project)
-    expect(described_class.decode(policy.ubid)).to eq(policy)
+    expect(described_class.decode(ace.ubid)).to eq(ace)
+    expect(described_class.decode(st.ubid)).to eq(st)
+    expect(described_class.decode(at.ubid)).to eq(at)
+    expect(described_class.decode(ot.ubid)).to eq(ot)
+    expect(described_class.decode(a_type.ubid)).to eq(a_type)
     expect(described_class.decode(atag.ubid)).to eq(atag)
     expect(described_class.decode(tun.ubid)).to eq(tun)
     expect(string_kv(described_class.decode(subnet.ubid))).to eq(string_kv(subnet))
@@ -279,5 +313,50 @@ RSpec.describe UBID do
 
   it "can be inspected" do
     expect(described_class.parse("vmqsknkzw5164hkfnt6z6zgjps").inspect).to eq("#<UBID:Vm @ubid=\"vmqsknkzw5164hkfnt6z6zgjps\" @uuid=\"be6759ff-8509-8b74-8cdf-5d1be6fc256c\">")
+  end
+
+  it ".resolve_map populates hash with uuid keys" do
+    page = Page.create_with_id(summary: "x", tag: "y")
+    a_type = ActionType.first
+    hash = {page.id => nil, a_type.id => nil}
+    described_class.resolve_map(hash)
+    expect(hash[page.id]).to eq page
+    expect(hash[a_type.id]).to eq a_type
+  end
+
+  it ".type_match? checks whether given ubid has given type" do
+    ubid = ActionType.first.ubid
+    expect(described_class.type_match?(ubid, described_class::TYPE_ACTION_TYPE)).to be true
+    expect(described_class.type_match?(ubid, described_class::TYPE_ETC)).to be false
+  end
+
+  it ".uuid_type_match? checks whether given uuid has given type" do
+    uuid = ActionType.first.id
+    expect(described_class.uuid_type_match?(uuid, described_class::TYPE_ACTION_TYPE)).to be true
+    expect(described_class.uuid_type_match?(uuid, described_class::TYPE_ETC)).to be false
+  end
+
+  it "#type_match? checks whether receiver has given type" do
+    ubid = described_class.from_uuidish(ActionType.first.id)
+    expect(ubid.type_match?(described_class::TYPE_ACTION_TYPE)).to be true
+    expect(ubid.type_match?(described_class::TYPE_ETC)).to be false
+  end
+
+  it ".class_match? checks whether given ubid has given class" do
+    ubid = ActionType.first.ubid
+    expect(described_class.class_match?(ubid, ActionType)).to be true
+    expect(described_class.class_match?(ubid, ApiKey)).to be false
+  end
+
+  it ".uuid_class_match? checks whether given uuid has given class" do
+    uuid = ActionType.first.id
+    expect(described_class.uuid_class_match?(uuid, ActionType)).to be true
+    expect(described_class.uuid_class_match?(uuid, ApiKey)).to be false
+  end
+
+  it "#class_match? checks whether receiver has given class" do
+    ubid = described_class.from_uuidish(ActionType.first.id)
+    expect(ubid.class_match?(ActionType)).to be true
+    expect(ubid.class_match?(ApiKey)).to be false
   end
 end

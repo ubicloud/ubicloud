@@ -100,7 +100,7 @@ end
 
 desc "Refresh schema and index caches"
 task :refresh_sequel_caches do
-  %w[schema index].each do |type|
+  %w[schema index static_cache].each do |type|
     filename = "cache/#{type}.cache"
     File.delete(filename) if File.file?(filename)
   end
@@ -108,6 +108,7 @@ task :refresh_sequel_caches do
   sh({"RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "ruby", "-r", "./loader", "-e", <<~END)
      DB.dump_schema_cache("cache/schema.cache")
      DB.dump_index_cache("cache/index.cache")
+     Sequel::Model.dump_static_cache_cache
   END
 end
 
@@ -306,6 +307,7 @@ namespace :linter do
     puts "Running ERB::Formatter..."
     require "erb/formatter/command_line"
     files = Dir.glob("views/**/[!icon]*.erb").entries
+    files.delete("views/components/form/select.erb")
     ERB::Formatter::CommandLine.new(files + ["--write", "--print-width", "120"]).run
   end
 

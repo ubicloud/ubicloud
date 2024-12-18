@@ -22,13 +22,11 @@ class PrivateSubnet < Sequel::Model
   ].freeze
 
   dataset_module Pagination
-  dataset_module Authorization::Dataset
   include Authorization::HyperTagMethods
+  include ObjectTag::Cleanup
   def hyper_tag_name(project)
     "project/#{project.ubid}/location/#{display_location}/private-subnet/#{name}"
   end
-
-  include Authorization::TaggableMethods
 
   def connected_subnets
     PrivateSubnet.where(

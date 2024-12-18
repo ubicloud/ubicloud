@@ -4,7 +4,10 @@ require_relative "../model"
 
 class Project < Sequel::Model
   one_to_many :access_tags
-  one_to_many :access_policies
+  one_to_many :access_control_entries
+  one_to_many :subject_tags, order: :name
+  one_to_many :action_tags, order: :name
+  one_to_many :object_tags, order: :name
   one_to_one :billing_info, key: :id, primary_key: :billing_info_id
   one_to_many :usage_alerts
   one_to_many :github_installations
@@ -24,19 +27,20 @@ class Project < Sequel::Model
   one_to_many :invitations, class: :ProjectInvitation, key: :project_id
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
 
-  dataset_module Authorization::Dataset
   dataset_module Pagination
 
-  plugin :association_dependencies, access_tags: :destroy, access_policies: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy
+  plugin :association_dependencies, access_tags: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy
 
   include ResourceMethods
   include Authorization::HyperTagMethods
 
+  def self.filter_authorize_dataset(dataset, object_id)
+    dataset.where(project_id: object_id)
+  end
+
   def hyper_tag_name(project = nil)
     "project/#{ubid}"
   end
-
-  include Authorization::TaggableMethods
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
@@ -58,6 +62,11 @@ class Project < Sequel::Model
     end
   end
 
+  def disassociate_subject(subject_id)
+    DB[:applied_subject_tag].where(tag_id: subject_tags_dataset.select(:id), subject_id:).delete
+    AccessControlEntry.where(project_id: id, subject_id:).destroy
+  end
+
   def path
     "/project/#{ubid}"
   end
@@ -69,7 +78,9 @@ class Project < Sequel::Model
   def soft_delete
     DB.transaction do
       access_tags_dataset.destroy
-      access_policies_dataset.destroy
+      access_control_entries_dataset.destroy
+      DB[:applied_subject_tag].where(tag_id: subject_tags_dataset.select(:id)).delete
+      subject_tags_dataset.destroy
       github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(_1) }
 
       # We still keep the project object for billing purposes.
@@ -173,8 +184,12 @@ end
 # Foreign key constraints:
 #  project_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
 # Referenced By:
-#  access_policy       | access_policy_project_id_fkey       | (project_id) REFERENCES project(id)
-#  access_tag          | access_tag_project_id_fkey          | (project_id) REFERENCES project(id)
-#  github_installation | github_installation_project_id_fkey | (project_id) REFERENCES project(id)
-#  inference_endpoint  | inference_endpoint_project_id_fkey  | (project_id) REFERENCES project(id)
-#  usage_alert         | usage_alert_project_id_fkey         | (project_id) REFERENCES project(id)
+#  access_control_entry | access_control_entry_project_id_fkey | (project_id) REFERENCES project(id)
+#  access_policy        | access_policy_project_id_fkey        | (project_id) REFERENCES project(id)
+#  access_tag           | access_tag_project_id_fkey           | (project_id) REFERENCES project(id)
+#  action_tag           | action_tag_project_id_fkey           | (project_id) REFERENCES project(id)
+#  github_installation  | github_installation_project_id_fkey  | (project_id) REFERENCES project(id)
+#  inference_endpoint   | inference_endpoint_project_id_fkey   | (project_id) REFERENCES project(id)
+#  object_tag           | object_tag_project_id_fkey           | (project_id) REFERENCES project(id)
+#  subject_tag          | subject_tag_project_id_fkey          | (project_id) REFERENCES project(id)
+#  usage_alert          | usage_alert_project_id_fkey          | (project_id) REFERENCES project(id)
