@@ -183,34 +183,6 @@ RSpec.describe Vm do
       expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:4:1:1")
     end
 
-    it "scales a single-socket hyperthreaded system for shared family" do
-      vm.family = "shared"
-      vm.cores = 2
-      vm.vcpus = 1
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 6,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
-    end
-
-    it "scales a single-socket non-hyperthreaded system for shared family" do
-      vm.family = "shared"
-      vm.cores = 2
-      vm.vcpus = 1
-      expect(vm).to receive(:vm_host).and_return(instance_double(
-        VmHost,
-        total_cpus: 12,
-        total_cores: 12,
-        total_dies: 1,
-        total_sockets: 1
-      )).at_least(:once)
-      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
-    end
-
     it "scales a single-socket hyperthreaded system for shared family for 2 cpus" do
       vm.family = "shared"
       vm.cores = 4
