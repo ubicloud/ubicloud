@@ -238,6 +238,45 @@ RSpec.describe Prog::Vnet::CertNexus do
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
     end
+
+    it "emits a log and continues if the cert is not found" do
+      client = instance_double(Acme::Client)
+      expect(cert).to receive(:cert).and_return("test-cert").at_least(:once)
+      expect(nx).to receive(:acme_client).and_return(client)
+      expect(client).to receive(:revoke).and_raise(Acme::Client::Error::NotFound.new("not found"))
+
+      expect(Clog).to receive(:emit).with("Certificate is not found")
+      expect(nx).to receive(:dns_zone).and_return(dns_zone)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
+      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
+      expect(cert).to receive(:destroy)
+
+      expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+    end
+
+    it "emits a log and continues if the cert is revoked previously and we get Unauthorized" do
+      client = instance_double(Acme::Client)
+      expect(cert).to receive(:cert).and_return("test-cert").at_least(:once)
+      expect(nx).to receive(:acme_client).and_return(client)
+      expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate has expired and cannot be revoked"))
+
+      expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked")
+      expect(nx).to receive(:dns_zone).and_return(dns_zone)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
+      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
+      expect(cert).to receive(:destroy)
+
+      expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
+    end
+
+    it "fires an exception if the cert is not authorized and the message is not about the certificate being expired" do
+      client = instance_double(Acme::Client)
+      expect(cert).to receive(:cert).and_return("test-cert").at_least(:once)
+      expect(nx).to receive(:acme_client).and_return(client)
+      expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate is not authorized"))
+
+      expect { nx.destroy }.to raise_error(Acme::Client::Error::Unauthorized)
+    end
   end
 
   describe "#acme_client" do
