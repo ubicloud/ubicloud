@@ -163,7 +163,11 @@ class UBID
   end
 
   def self.resolve_map(uuids)
-    uuids.keys.group_by { class_for_ubid(from_uuidish(_1).to_s) }.each do |model, model_uuids|
+    uuids.keys.group_by do
+      ubid = from_uuidish(_1).to_s
+      # Bad hack, needed because ApiKey does not use a fixed ubid type
+      ubid.start_with?("et") ? ApiKey : class_for_ubid(ubid)
+    end.each do |model, model_uuids|
       model.where(id: model_uuids).each do
         uuids[_1.id] = _1
       end

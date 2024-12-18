@@ -21,6 +21,10 @@ class ApiKey < Sequel::Model
     UBID::TYPE_ETC
   end
 
+  def name
+    ubid
+  end
+
   def self.create_personal_access_token(account, project: nil)
     pat = create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api")
     pat.associate_with_project(project) if project
