@@ -90,9 +90,22 @@ class Prog::Vm::Nexus < Prog::Base
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic").subject
       end
 
-      vm = Vm.create(public_key: public_key, unix_user: unix_user,
-        name: name, family: vm_size.family, cores: vm_size.cores, vcpus: vm_size.vcpus, memory_gib: vm_size.memory_gib, location: location,
-        boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
+      vm = Vm.create(
+        public_key: public_key,
+        unix_user: unix_user,
+        name: name,
+        family: vm_size.family,
+        cores: vm_size.cores,
+        vcpus: vm_size.vcpus,
+        cpu_percent_limit: vm_size.vcpu_percent_limit,
+        cpu_burst_percent_limit: vm_size.vcpu_burst_percent_limit,
+        memory_gib: vm_size.memory_gib,
+        location: location,
+        boot_image: boot_image,
+        ip4_enabled: enable_ip4,
+        pool_id: pool_id,
+        arch: arch
+      ) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
       vm.associate_with_project(project)
@@ -227,6 +240,23 @@ class Prog::Vm::Nexus < Prog::Base
     COMMAND
 
     host.sshable.cmd(command)
+
+    hop_wait_for_slice
+  end
+
+  label def wait_for_slice
+    unless vm.vm_host_slice.nil?
+      if !vm.vm_host_slice.enabled
+        # Just wait here until the slice creation is completed
+        nap 1
+      else
+        # Once the slice is created update its utilization
+        VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
+          used_cpu_percent: Sequel[:used_cpu_percent] + vm.cpu_percent_limit,
+          used_memory_1g: Sequel[:used_memory_1g] + vm.memory_gib
+        )
+      end
+    end
 
     hop_prep
   end
@@ -429,19 +459,27 @@ class Prog::Vm::Nexus < Prog::Base
         vol.storage_device_dataset.update(available_storage_gib: Sequel[:available_storage_gib] + vol.size_gib)
       end
 
-      VmHost.dataset.where(id: vm.vm_host_id).update(
-        used_cores: Sequel[:used_cores] - vm.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.memory_gib
-      )
+      if vm.vm_host_slice.nil?
+        # If there is no slice, we need to update the host utilization directly
+        VmHost.dataset.where(id: vm.vm_host_id).update(
+          used_cores: Sequel[:used_cores] - vm.cores,
+          used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.memory_gib
+        )
+      else
+        # If the vm is running in a slice, the slice deallocation will update cpu and memory on the host
+        # Instead update the slice utilization
+        VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
+          used_cpu_percent: Sequel[:used_cpu_percent] - vm.cpu_percent_limit,
+          used_memory_1g: Sequel[:used_memory_1g] - vm.memory_gib
+        )
+      end
 
       vm.pci_devices_dataset.update(vm_id: nil)
     end
 
     hop_wait_lb_expiry if vm.load_balancer
 
-    final_clean_up
-
-    pop "vm deleted"
+    hop_destroy_slice
   end
 
   label def wait_lb_expiry
@@ -455,7 +493,25 @@ class Prog::Vm::Nexus < Prog::Base
 
     vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
 
+    hop_destroy_slice
+  end
+
+  label def destroy_slice
+    slice = vm.vm_host_slice
+
+    # Remove the VM before we destroy the slice
     final_clean_up
+
+    # Trigger the slice deletion if this is a
+    # dedicated slice for this VM
+    # We do not need to wait for this to complete
+    unless slice.nil?
+      slice.reload
+      if slice.enabled &&
+          (slice.type == "dedicated" || (slice.type == "shared" && slice.vms.count == 0))
+        slice.incr_destroy
+      end
+    end
 
     pop "vm deleted"
   end

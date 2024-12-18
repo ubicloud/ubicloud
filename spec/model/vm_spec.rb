@@ -32,21 +32,77 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#mem_gib_ratio" do
-    it "returns the correct ratio for arm64" do
-      expect(vm).to receive(:arch).and_return("arm64")
-      expect(vm.mem_gib_ratio).to eq(3.2)
+  describe "#display_size" do
+    let(:project) {
+      instance_double(
+        Project
+      )
+    }
+
+    before do
+      allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(true)
+      allow(vm).to receive_messages(projects: [project])
     end
 
-    it "returns the correct ratio for x64" do
-      expect(vm).to receive(:arch).and_return("x64")
-      expect(vm.mem_gib_ratio).to eq(8)
+    it "handles standard family" do
+      vm.arch = "x64"
+      vm.family = "standard"
+      vm.vcpus = 2
+      vm.cpu_percent_limit = 200
+      expect(vm.display_size).to eq("standard-2")
+    end
+
+    it "handles burstable family" do
+      vm.arch = "arm64"
+      vm.family = "burstable"
+      vm.vcpus = 2
+      vm.cpu_percent_limit = 50
+      expect(vm.display_size).to eq("burstable-2-50")
+    end
+  end
+
+  describe "#mem_gib_ratio" do
+    it "handles standard family" do
+      vm.family = "standard"
+      expect(vm.mem_gib_ratio).to eq 8
     end
 
     it "returns correct ratio for standard-gpu" do
       expect(vm).to receive(:arch).and_return("x64")
       expect(vm).to receive(:family).and_return("standard-gpu")
       expect(vm.mem_gib_ratio).to eq(10.68)
+    end
+
+    it "handles arm64" do
+      expect(vm).to receive(:arch).and_return("arm64")
+      expect(vm.mem_gib_ratio).to eq 3.2
+    end
+  end
+
+  describe "#can_share_slice?" do
+    let(:project) {
+      instance_double(
+        Project
+      )
+    }
+
+    before do
+      allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(true)
+      allow(vm).to receive_messages(projects: [project])
+    end
+
+    it "handles x64 arch" do
+      vm.cpu_percent_limit = 200
+      vm.cores = 1
+      vm.vcpus = 2
+      expect(vm.can_share_slice?).to be_falsey
+    end
+
+    it "handles arm64 arch" do
+      vm.cpu_percent_limit = 50
+      vm.cores = 1
+      vm.vcpus = 1
+      expect(vm.can_share_slice?).to be_truthy
     end
   end
 

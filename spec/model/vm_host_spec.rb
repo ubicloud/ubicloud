@@ -330,6 +330,13 @@ RSpec.describe VmHost do
     expect(vh.veth_pair_random_ip4_addr.network.to_s).to eq("169.254.0.20")
   end
 
+  it "#update_spdk_cpus" do
+    expect(vh).to receive(:update).with(used_cores: 1)
+    expect(vh).to receive(:total_cores).and_return(4).at_least(1)
+    expect(vh).to receive(:total_cpus).and_return(8).at_least(1)
+    vh.update_spdk_cpus(2)
+  end
+
   it "initiates a new health monitor session" do
     sshable = instance_double(Sshable)
     expect(vh).to receive(:sshable).and_return(sshable)

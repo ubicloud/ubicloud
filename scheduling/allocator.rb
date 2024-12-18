@@ -15,7 +15,9 @@ module Scheduling::Allocator
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
+      vm.family,
       vm.cores,
+      vm.cpu_percent_limit,
       vm.memory_gib,
       storage_volumes.map { _1["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
@@ -29,7 +31,10 @@ module Scheduling::Allocator
       host_filter,
       host_exclusion_filter,
       location_filter,
-      location_preference
+      location_preference,
+      vm.use_slices_for_allocation?,
+      vm.can_share_slice?,
+      vm.enable_diagnostics?
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -38,8 +43,9 @@ module Scheduling::Allocator
     Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
   end
 
-  Request = Struct.new(:vm_id, :cores, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
-    :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference)
+  Request = Struct.new(:vm_id, :family, :cores, :cpu_percent_limit, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
+    :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference,
+    :use_slices, :can_share_slice, :enable_diagnostics)
 
   class Allocation
     attr_reader :score
@@ -69,10 +75,25 @@ module Scheduling::Allocator
         .join(:used_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
-        .select(Sequel[:vm_host][:id].as(:vm_host_id), :total_cores, :used_cores, :total_hugepages_1g, :used_hugepages_1g, :location, :num_storage_devices, :available_storage_gib, :total_storage_gib, :storage_devices, :total_ipv4, :used_ipv4, Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus), Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus), :available_iommu_groups, Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count))
+        .select(
+          Sequel[:vm_host][:id].as(:vm_host_id),
+          :total_cores,
+          :used_cores,
+          :total_hugepages_1g,
+          :used_hugepages_1g,
+          :location,
+          :num_storage_devices,
+          :available_storage_gib,
+          :total_storage_gib,
+          :storage_devices,
+          :total_ipv4,
+          :used_ipv4,
+          Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus),
+          Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus),
+          :available_iommu_groups,
+          Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count)
+        )
         .where(arch: request.arch_filter)
-        .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
-        .where { (total_cores - used_cores >= request.cores) }
         .with(:total_ipv4, DB[:address]
           .select_group(:routed_to_host_id)
           .select_append { round(sum(power(2, 32 - masklen(cidr)))).cast(:integer).as(total_ipv4) }
@@ -100,6 +121,39 @@ module Scheduling::Allocator
           .select_append { count.function.*.as(vm_provisioning_count) }
           .where(display_state: "creating"))
 
+      ds = if request.can_share_slice
+        # We are looking for hosts that have at least once slice already allocated but with enough room
+        # for our new VM. This means it has to be a sharable slice, with cpu and memory available
+        # We then combine it with search for a host, as usual, with just open space on the host where
+        # we could allocate a new slice
+        # Later in VmHostSliceAllocator the selected hosts will be scored depending if a slice is reused or
+        # new one is created
+        ds.with(:slice_utilization, DB[:vm_host_slice]
+          .select_group(:vm_host_id)
+          .select_append { (sum(Sequel[:total_cpu_percent]) - sum(Sequel[:used_cpu_percent])).as(slice_cpu_available) }
+          .select_append { (sum(Sequel[:total_memory_1g]) - sum(Sequel[:used_memory_1g])).as(slice_memory_available) }
+          .where(enabled: true)
+          .where(type: "shared")
+          .where(cores: request.cores)
+          .where(Sequel[:used_cpu_percent] + request.cpu_percent_limit <= Sequel[:total_cpu_percent])
+          .where(Sequel[:used_memory_1g] + request.mem_gib <= Sequel[:total_memory_1g]))
+          # end of 'with'
+          .left_join(:slice_utilization, vm_host_id: Sequel[:vm_host][:id])
+          .select_append(Sequel.function(:coalesce, :slice_cpu_available, 0).as(:slice_cpu_available))
+          .select_append(Sequel.function(:coalesce, :slice_memory_available, 0).as(:slice_memory_available))
+          .where {
+            ((total_hugepages_1g - used_hugepages_1g >= request.mem_gib) & (total_cores - used_cores >= request.cores)) |
+              ((slice_cpu_available > 0) & (slice_memory_available > 0))
+          }
+      else
+        # If we allocate a dedicated VM, it does not matter if it is in a slice or not, we just need to find space for
+        # it directly on the host, as we used to. So no slice space computation is involved. A new slice will ALWAYS be
+        # allocated for a new VM.
+        ds
+          .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
+          .where { (total_cores - used_cores >= request.cores) }
+      end
+
       ds = ds.join(:boot_image, Sequel[:vm_host][:id] => Sequel[:boot_image][:vm_host_id])
         .where(Sequel[:boot_image][:name] => request.boot_image)
         .exclude(Sequel[:boot_image][:activated_at] => nil)
@@ -117,6 +171,15 @@ module Scheduling::Allocator
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
+      # Match the slice allocation to the hosts that can accept it
+      ds = ds.where(accepts_slices: request.use_slices)
+
+      # For debugging purposes, write the full SQL query, with expanded parameters, to a file,
+      # so it can be run directly against the DB server
+      # :nocov:
+      File.write(File.expand_path("~/allocator.sql"), ds.prepare(:select, :allocator_query).sql) if request.enable_diagnostics
+      # :nocov:
+
       ds.all
     end
 
@@ -138,9 +201,18 @@ module Scheduling::Allocator
       @request = request
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
         VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
+
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
+
+      if request.use_slices
+        # Wrap around and replace the host allocations. That way we can control that logic from the slice POV
+        @slice_allocation = VmHostSliceAllocation.new(candidate_host, request, @vm_host_allocations)
+        @vm_host_allocations = [@slice_allocation]
+      end
+
       @allocations = @vm_host_allocations + @device_allocations
+
       @score = calculate_score
     end
 
@@ -152,7 +224,7 @@ module Scheduling::Allocator
       vm_host = VmHost[@candidate_host[:vm_host_id]]
       DB.transaction do
         Allocation.update_vm(vm_host, vm)
-        VmHost.dataset.where(id: @candidate_host[:vm_host_id]).update(@vm_host_allocations.map { _1.get_vm_host_update }.reduce(&:merge))
+        @vm_host_allocations.each { _1.update(vm, vm_host) }
         @device_allocations.each { _1.update(vm, vm_host) }
       end
     end
@@ -175,6 +247,11 @@ module Scheduling::Allocator
 
       # penalty for ongoing vm provisionings on the host
       score += @candidate_host[:vm_provisioning_count] * 0.5
+
+      # penalty if we are trying to allocate into an shared slice but host has none
+      if @request.can_share_slice
+        score += 0.5 if @candidate_host[:slice_cpu_available] == 0 || @candidate_host[:slice_memory_available] == 0
+      end
 
       # penalty for AX161, TODO: remove after migration to AX162
       score += 0.5 if @candidate_host[:total_cores] == 32
@@ -209,6 +286,118 @@ module Scheduling::Allocator
 
     def get_vm_host_update
       {@column => Sequel[@column] + @requested}
+    end
+
+    def update(vm, vm_host)
+      VmHost.dataset.where(id: vm_host.id).update([get_vm_host_update].reduce(&:merge))
+    end
+  end
+
+  # Dedicated slice needs to be always created for the VM
+  # This finds a space for a new slice and sets is_valid if the cpuset can be created
+  # Upon calling update the actual slice is created
+  #
+  # This is used for VMs that can be co-located inside a slice
+  # It first tries to find a slice that is already allocated but has room
+  # to accept new VMs. If successful it uses that slice. Otherwise it falls back
+  # to the default and creates a new slice
+  class VmHostSliceAllocation
+    attr_reader :is_valid
+    def initialize(candidate_host, request, vm_host_allocations)
+      @candidate_host = candidate_host
+      @request = request
+      @vm_host_allocations = vm_host_allocations
+
+      @is_valid = calculate_cpu_bitmask
+    end
+
+    def utilization
+      # if we found an existing slice, return the desired utilization
+      # to make this a preferred choice
+      return @request.target_host_utilization unless @existing_slice.nil?
+
+      # otherwise, compute the score based on combined CPU and Memory utilization, as usual
+      util = @vm_host_allocations.map { _1.utilization }
+      util.sum.fdiv(util.size)
+    end
+
+    def update(vm, vm_host)
+      slice_id = nil
+
+      if @existing_slice.nil?
+        fail "BUGBUG: must have an allocated cpuset at this point" if @new_slice_allowed_cpus.nil?
+
+        st = Prog::Vm::VmHostSlice.assemble_with_host(
+          "#{vm.family}_#{vm.inhost_name}",
+          vm_host,
+          family: vm.family,
+          allowed_cpus: @new_slice_allowed_cpus,
+          memory_1g: vm.mem_gib_ratio * @request.cores,
+          type: vm.can_share_slice? ? "shared" : "dedicated"
+        )
+
+        slice_id = st.subject.id
+
+        # Update the host utilization
+        VmHost.dataset.where(id: vm_host.id).update(@vm_host_allocations.map { _1.get_vm_host_update }.reduce(&:merge))
+      else
+        slice_id = @existing_slice.id
+      end
+
+      # update the VM
+      vm.update(vm_host_slice_id: slice_id)
+    end
+
+    def calculate_cpu_bitmask
+      if @request&.can_share_slice
+        vm_host = VmHost[@candidate_host[:vm_host_id]]
+
+        # Try to find an existing slice with some room
+        @existing_slice = vm_host.vm_host_slices
+          .select {
+            (_1.used_cpu_percent + @request.cpu_percent_limit <= _1.total_cpu_percent) &&
+              (_1.used_memory_1g + @request.mem_gib <= _1.total_memory_1g) &&
+              (_1.cores == @request.cores) &&
+              (_1.family == @request.family)
+          }
+          .min_by { _1.used_cpu_percent }
+      end
+
+      # if we did not find a sharable slice, try to find room for a new one
+      if @existing_slice.nil?
+        # only check host allocations if we are creating a new slice, otherwise
+        # we are not doing anything on the host
+        return false unless @vm_host_allocations.all? { _1.is_valid }
+
+        vm_host = VmHost[@candidate_host[:vm_host_id]]
+
+        # Build a map of used cpus
+        used_cpus = VmHostSlice.cpuset_to_bitmask(vm_host.cpuset)
+        vm_host.vm_host_slices.map do |slice|
+          used_cpus |= slice.to_cpu_bitmask
+        end
+
+        # Now find required number o(f cpus
+        requested_cpu_bitmask = 0
+        requested_cpus = (vm_host.total_cpus / vm_host.total_cores) * @request.cores
+        i = 0
+        while requested_cpus > 0 && i < vm_host.total_cpus
+          if (used_cpus & (1 << i)) == 0
+            requested_cpu_bitmask |= (1 << i)
+            requested_cpus -= 1
+          end
+          i += 1
+        end
+
+        # we could not allocate enough cpus to match the request
+        return false if requested_cpus > 0
+
+        @new_slice_allowed_cpus = VmHostSlice.bitmask_to_cpuset(requested_cpu_bitmask)
+      end
+
+      # if we are here, we either have found an existing slice or have found a cpuset for a new one
+      # either of those conditions is a success
+      true
     end
   end
 

@@ -149,7 +149,7 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :inference_ui
+  feature_flag :postgresql_base_image, :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :inference_ui, :use_slices_for_allocation, :enable_diagnostics
 end
 
 # Table: project
