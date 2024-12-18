@@ -92,15 +92,15 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "returns URL for x64 almalinux-9 image" do
-      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.4-20240507"}).at_least(:once)
-      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.4-20240507.x86_64.qcow2")
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.5-20241120"}).at_least(:once)
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.5-20241120.x86_64.qcow2")
     end
 
     it "returns URL for arm64 almalinux-9 image" do
-      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.4-20240507"}).at_least(:once)
+      expect(dbi).to receive(:frame).and_return({"image_name" => "almalinux-9", "version" => "9.5-20241120"}).at_least(:once)
       vm_host.update(arch: "arm64")
 
-      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.4-20240507.aarch64.qcow2")
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.5-20241120.aarch64.qcow2")
     end
 
     it "returns URL for ai model image" do
