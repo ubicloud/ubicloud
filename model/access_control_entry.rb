@@ -209,17 +209,17 @@ class AccessControlEntry < Sequel::Model
       {subject_id:, action_id:, object_id:}.each do |field, value|
         next unless value
         ubid = UBID.from_uuidish(value).to_s
-
-        valid = case field
+        model = case field
         when :subject_id
-          SubjectTag.valid_member?(project_id, ubid.start_with?("et") ? ApiKey[value] : UBID.decode(ubid))
+          SubjectTag
         when :action_id
-          ActionTag.valid_member?(project_id, UBID.decode(ubid))
+          ActionTag
         else
-          ObjectTag.valid_member?(project_id, UBID.decode(ubid))
+          ObjectTag
         end
 
-        unless valid
+        object = ubid.start_with?("et") ? ApiKey.with_pk(value) : UBID.decode(ubid)
+        unless model.valid_member?(project_id, object)
           errors.add(field, "is not related to this project")
         end
       end
