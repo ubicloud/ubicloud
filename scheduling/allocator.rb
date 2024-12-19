@@ -43,7 +43,7 @@ module Scheduling::Allocator
     Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
   end
 
-  Request = Struct.new(:vm_id, :family, :cores, :cpu_percent_limit, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
+  Request = Struct.new(:vm_id, :family, :cores, :cpu_percent_limit, :memory_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
     :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference,
     :use_slices, :can_share_slice, :enable_diagnostics) do
       def memory_gib_for_cores
@@ -148,13 +148,13 @@ module Scheduling::Allocator
           .where(type: "shared")
           .where(cores: request.cores)
           .where(Sequel[:used_cpu_percent] + request.cpu_percent_limit <= Sequel[:total_cpu_percent])
-          .where(Sequel[:used_memory_1g] + request.mem_gib <= Sequel[:total_memory_1g]))
+          .where(Sequel[:used_memory_1g] + request.memory_gib <= Sequel[:total_memory_1g]))
           # end of 'with'
           .left_join(:slice_utilization, vm_host_id: Sequel[:vm_host][:id])
           .select_append(Sequel.function(:coalesce, :slice_cpu_available, 0).as(:slice_cpu_available))
           .select_append(Sequel.function(:coalesce, :slice_memory_available, 0).as(:slice_memory_available))
           .where {
-            ((total_hugepages_1g - used_hugepages_1g >= request.mem_gib) & (total_cores - used_cores >= request.cores)) |
+            ((total_hugepages_1g - used_hugepages_1g >= request.memory_gib) & (total_cores - used_cores >= request.cores)) |
               ((slice_cpu_available > 0) & (slice_memory_available > 0))
           }
       else
@@ -162,7 +162,7 @@ module Scheduling::Allocator
         # it directly on the host, as we used to. So no slice space computation is involved. A new slice will ALWAYS be
         # allocated for a new VM.
         ds
-          .where { (total_hugepages_1g - used_hugepages_1g >= request.mem_gib) }
+          .where { (total_hugepages_1g - used_hugepages_1g >= request.memory_gib) }
           .where { (total_cores - used_cores >= request.cores) }
       end
 
@@ -242,7 +242,7 @@ module Scheduling::Allocator
     end
 
     def to_s
-      "#{UBID.from_uuidish(@request.vm_id)} (arch=#{@request.arch_filter}, cpu=#{@request.cores}, mem=#{@request.mem_gib}, storage=#{@request.storage_gib}) -> #{UBID.from_uuidish(@candidate_host[:vm_host_id])} (cpu=#{@candidate_host[:used_cores]}/#{@candidate_host[:total_cores]}, mem=#{@candidate_host[:used_hugepages_1g]}/#{@candidate_host[:total_hugepages_1g]}, storage=#{@candidate_host[:total_storage_gib] - @candidate_host[:available_storage_gib]}/#{@candidate_host[:total_storage_gib]}), score=#{@score}"
+      "#{UBID.from_uuidish(@request.vm_id)} (arch=#{@request.arch_filter}, cpu=#{@request.cores}, mem=#{@request.memory_gib}, storage=#{@request.storage_gib}) -> #{UBID.from_uuidish(@candidate_host[:vm_host_id])} (cpu=#{@candidate_host[:used_cores]}/#{@candidate_host[:total_cores]}, mem=#{@candidate_host[:used_hugepages_1g]}/#{@candidate_host[:total_hugepages_1g]}, storage=#{@candidate_host[:total_storage_gib] - @candidate_host[:available_storage_gib]}/#{@candidate_host[:total_storage_gib]}), score=#{@score}"
     end
 
     private
@@ -368,7 +368,7 @@ module Scheduling::Allocator
         @existing_slice = vm_host.vm_host_slices
           .select {
             (_1.used_cpu_percent + @request.cpu_percent_limit <= _1.total_cpu_percent) &&
-              (_1.used_memory_1g + @request.mem_gib <= _1.total_memory_1g) &&
+              (_1.used_memory_1g + @request.memory_gib <= _1.total_memory_1g) &&
               (_1.cores == @request.cores) &&
               (_1.family == @request.family)
           }
