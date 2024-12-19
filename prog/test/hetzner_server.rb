@@ -112,6 +112,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vm_host.sshable.cmd("sudo mkdir -p #{tmp_dir}")
     vm_host.sshable.cmd("sudo chmod a+rw #{tmp_dir}")
     vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e")
+    vm_host.sshable.cmd("sudo rm -rf #{tmp_dir}")
 
     hop_wait
   end
