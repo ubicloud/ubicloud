@@ -103,6 +103,62 @@ RSpec.describe Clover, "project" do
           expect { click_link "Settings" }.to raise_error Capybara::ElementNotFound
         end
       end
+
+      it "shows content when user has permissions" do
+        visit "#{project.path}/dashboard"
+
+        within "#tiles" do
+          expect(page).to have_content "Virtual Machines"
+          expect(page).to have_content "Databases"
+          expect(page).to have_content "Load Balancers"
+          expect(page).to have_content "Firewalls"
+          if Config.github_app_name
+            expect(page).to have_content "GitHub Runners"
+          else
+            expect(page).to have_no_content "GitHub Runners"
+          end
+          expect(page).to have_content "Users"
+        end
+
+        within "#cards" do
+          expect(page).to have_content "Create Virtual Machine"
+          if Config.github_app_name
+            expect(page).to have_content "Use GitHub Runners"
+          else
+            expect(page).to have_no_content "GitHub Runners"
+          end
+          expect(page).to have_content "Create Managed Database"
+          expect(page).to have_content "Add User to Project"
+          expect(page).to have_content "Distribute Your Traffic"
+          expect(page).to have_content "Create Access Token"
+          expect(page).to have_content "Documentation"
+          expect(page).to have_content "Get Support"
+        end
+      end
+
+      it "does not show content when user does not have permissions" do
+        visit "#{project_wo_permissions.path}/dashboard"
+
+        within "#tiles" do
+          expect(page).to have_no_content "Virtual Machines"
+          expect(page).to have_no_content "Databases"
+          expect(page).to have_no_content "Load Balancers"
+          expect(page).to have_no_content "Firewalls"
+          expect(page).to have_no_content "GitHub Runners"
+          expect(page).to have_no_content "Users"
+        end
+
+        within "#cards" do
+          expect(page).to have_no_content "Create Virtual Machine"
+          expect(page).to have_no_content "Use GitHub Runners"
+          expect(page).to have_no_content "Create Managed Database"
+          expect(page).to have_no_content "Add User to Project"
+          expect(page).to have_no_content "Distribute Your Traffic"
+          expect(page).to have_no_content "Create Access Token"
+          expect(page).to have_content "Documentation"
+          expect(page).to have_content "Get Support"
+        end
+      end
     end
 
     describe "details" do
