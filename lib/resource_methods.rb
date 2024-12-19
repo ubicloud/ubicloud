@@ -5,6 +5,11 @@ module ResourceMethods
     base.extend(ClassMethods)
   end
 
+  def freeze
+    ubid
+    super
+  end
+
   def ubid
     @ubid ||= UBID.from_uuidish(id).to_s.downcase
   end
