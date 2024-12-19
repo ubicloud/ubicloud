@@ -5,6 +5,8 @@ require_relative "../model"
 class ApiKey < Sequel::Model
   include ResourceMethods
   include Authorization::HyperTagMethods
+  include SubjectTag::Cleanup # personal access tokens
+  include ObjectTag::Cleanup # inference tokens
 
   one_to_many :access_tags, key: :hyper_tag_id
   plugin :association_dependencies, access_tags: :destroy
