@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 require "spec_helper"
-require_relative "../../../prog/vm/vm_host_slice"
+require_relative "../../../prog/vm/vm_host_slice_nexus"
 require_relative "../../../prog/vm/host_nexus"
 
-RSpec.describe Prog::Vm::VmHostSlice do
-  subject(:nx) { described_class.new(Strand.create(id: "b231a172-8f56-8b10-bbed-8916ea4e5c28", prog: "Prog::Vm::VmHostSlice", label: "create")) }
+RSpec.describe Prog::Vm::VmHostSliceNexus do
+  subject(:nx) { described_class.new(Strand.create(id: "b231a172-8f56-8b10-bbed-8916ea4e5c28", prog: "Prog::Vm::VmHostSliceNexus", label: "create")) }
 
   let(:vm_host_slice) {
     instance_double(

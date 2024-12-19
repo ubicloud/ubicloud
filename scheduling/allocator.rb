@@ -339,7 +339,7 @@ module Scheduling::Allocator
       if @existing_slice.nil?
         fail "BUGBUG: must have an allocated cpuset at this point" if @new_slice_allowed_cpus.nil?
 
-        st = Prog::Vm::VmHostSlice.assemble_with_host(
+        st = Prog::Vm::VmHostSliceNexus.assemble_with_host(
           "#{vm.family}_#{vm.inhost_name}",
           vm_host,
           family: vm.family,

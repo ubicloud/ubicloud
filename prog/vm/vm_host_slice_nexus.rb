@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class Prog::Vm::VmHostSlice < Prog::Base
+class Prog::Vm::VmHostSliceNexus < Prog::Base
   subject_is :vm_host_slice
 
   semaphore :destroy, :start_after_host_reboot
@@ -31,7 +31,7 @@ class Prog::Vm::VmHostSlice < Prog::Base
       # This validates the cpuset and updates or related values
       vm_host_slice.from_cpu_bitmask(VmHostSlice.cpuset_to_bitmask(allowed_cpus))
 
-      Strand.create(prog: "Vm::VmHostSlice", label: "prep") { _1.id = vm_host_slice.id }
+      Strand.create(prog: "Vm::VmHostSliceNexus", label: "prep") { _1.id = vm_host_slice.id }
     end
   end
 
