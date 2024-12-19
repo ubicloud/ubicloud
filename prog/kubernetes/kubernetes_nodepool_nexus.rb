@@ -79,8 +79,8 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   label def install_prerequistes_on_worker
     current_vm.sshable.cmd <<BASH
 set -ueo pipefail
-sudo sed -i '/^#net\\.ipv4\\.ip_forward=1/s/^#//' /etc/sysctl.conf
-sudo sysctl -p
+echo "net.ipv6.conf.all.forwarding=1\nnet.ipv6.conf.all.proxy_ndp=1\nnet.ipv4.conf.all.forwarding=1\nnet.ipv4.ip_forward=1" \\| sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null
+sudo sysctl --system
 sudo modprobe br_netfilter
 sudo apt update
 sudo apt install -y ca-certificates curl apt-transport-https gpg
@@ -124,7 +124,7 @@ BASH
   label def join_worker
     case current_vm.sshable.cmd("common/bin/daemonizer --check join_worker")
     when "Succeeded"
-      hop_bootstrap_worker_vm
+      hop_install_cni
     when "NotStarted", "Failed"
       current_vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-worker-node #{kubernetes_nodepool.kubernetes_cluster.endpoint}:443 #{frame["join_token"]} #{frame["discovery_token_ca_cert_hash"]}' join_worker")
       # when "Failed"
@@ -132,6 +132,27 @@ BASH
     when "InProgress"
       nap 10
     end
+  end
+
+  label def install_cni
+    current_vm.sshable.cmd("sudo ln -s /home/#{current_vm.sshable.unix_user}/kubernetes/bin/ubicni /opt/cni/bin/ubicni")
+    cni_config = <<CONFIG
+{
+"cniVersion": "1.0.0",
+"name": "ubicni-network",
+"type": "ubicni",
+"ipam": {
+  "type": "host-local",
+  "ranges": [
+    {
+      "subnet": "#{current_vm.ephemeral_net6}"
+    }
+  ]
+}
+}
+CONFIG
+    current_vm.sshable.cmd("sudo tee -a /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    hop_bootstrap_control_plane_vm
   end
 
   label def wait

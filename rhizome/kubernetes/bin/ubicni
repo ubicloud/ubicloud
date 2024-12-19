@@ -1,0 +1,233 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+ENV["GEM_HOME"] = "/home/ubi/.gem"
+ENV["GEM_PATH"] = "/home/ubi/.gem"
+ENV["PATH"] = "#{ENV["PATH"]}:/home/ubi/.gem/bin"
+
+require "/home/ubi/common/lib/util"
+require "netaddr"
+require "json"
+require "logger"
+require "ipaddr"
+require "securerandom"
+
+LOG = Logger.new("cni_plugin.log")
+LOG.level = Logger::INFO
+
+class UBICNI
+  def initialize
+    @stdin_data = read_stdin
+    @cni_command = ENV["CNI_COMMAND"]
+    @collision_dir = "./allocated_ips"
+    Dir.mkdir(@collision_dir) unless Dir.exist?(@collision_dir)
+  end
+
+  def read_stdin
+    input = $stdin.read
+    JSON.parse(input)
+  rescue JSON::ParserError => e
+    error_exit("Failed to parse input JSON: #{e.message}")
+  end
+
+  def run
+    LOG.info "-------------------------------------------------------"
+    LOG.info "Handling new command:"
+    LOG.info "ENV[CNI_COMMAND] #{ENV["CNI_COMMAND"]}"
+    LOG.info "ENV[CNI_CONTAINERID] #{ENV["CNI_CONTAINERID"]}"
+    LOG.info "ENV[CNI_NETNS] #{ENV["CNI_NETNS"]}"
+    LOG.info "ENV[CNI_IFNAME] #{ENV["CNI_IFNAME"]}"
+    LOG.info "ENV[CNI_ARGS] #{ENV["CNI_ARGS"]}"
+    LOG.info "ENV[CNI_PATH] #{ENV["CNI_PATH"]}"
+    LOG.info "stdin: #{@stdin}"
+    LOG.info "-------------------------------------------------------"
+    case @cni_command
+    when "ADD"
+      handle_add
+    when "DEL"
+      handle_del
+    when "GET"
+      handle_get
+    else
+      error_exit("Unsupported CNI command: #{@cni_command}")
+    end
+  end
+
+  def handle_add
+    ipv6_subnet = @stdin_data["ipam"]["ranges"][0]["subnet"]
+
+    container_id = ENV["CNI_CONTAINERID"]
+    container_ip = allocate_ip(ipv6_subnet, @collision_dir)
+    cni_netns = ENV["CNI_NETNS"]
+    mtu_value = 1400
+
+    inner_mac = gen_mac.shellescape
+    inner_link_local = mac_to_ipv6_link_local(inner_mac)
+    inner_ifname = ENV["CNI_IFNAME"]
+
+    outer_mac = gen_mac.shellescape
+    outer_link_local = mac_to_ipv6_link_local(outer_mac)
+    outer_ifname = "veth_#{container_id[0, 8]}"
+
+    r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
+
+    r "ip -6 -n #{cni_netns} addr add #{container_ip} dev #{inner_ifname}"
+    r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{mtu_value}"
+    r "ip -6 -n #{cni_netns} link set #{inner_ifname} up"
+    r "ip -6 -n #{cni_netns} route add default via #{outer_link_local} dev #{inner_ifname} mtu #{mtu_value}"
+
+    r "ip -6 link set #{outer_ifname} mtu #{mtu_value}"
+    r "ip -6 link set #{outer_ifname} up"
+    r "ip -6 route add #{container_ip} via #{inner_link_local} dev #{outer_ifname} mtu #{mtu_value}"
+
+    # dns_config = <<~EOF
+    # nameserver 8.8.8.8
+    # nameserver 8.8.4.4
+    # search example.com
+    # options ndots:5
+    # EOF
+    # File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
+
+    response = {
+      cniVersion: "0.4.0",
+      interfaces: [
+        {
+          name: inner_ifname,
+          mac: inner_mac,
+          sandbox: "/var/run/netns/#{cni_netns}"
+        }
+      ],
+      ips: [
+        {
+          version: "6",
+          address: container_ip,
+          gateway: outer_link_local,
+          interface: 0
+        }
+      ],
+      dns: {
+        nameservers: ["8.8.8.8", "8.8.4.4"],
+        search: ["example.com"],
+        options: ["ndots:5"]
+      }
+    }
+    puts JSON.generate(response)
+  end
+
+  def handle_del
+    cni_netns = ENV["CNI_NETNS"]
+    inner_ifname = ENV["CNI_IFNAME"]
+
+    container_ip = r("ip -n #{cni_netns} -6 addr show dev #{inner_ifname}").match(/inet6 ([0-9a-f:\/]+)/)[1]
+    begin
+      File.delete("#{@collision_dir}/#{container_ip.to_s.tr("/", "_")}")
+    rescue Errno::ENOENT
+    end
+    puts "{}"
+  end
+
+  def handle_get
+    cni_netns = ENV["CNI_NETNS"]
+    inner_ifname = ENV["CNI_IFNAME"]
+
+    inner_mac = r("ip -n #{cni_netns} link show #{inner_ifname}").match(/link\/ether ([0-9a-f:]+)/)[1]
+    container_ip = r("ip -n #{cni_netns} -6 addr show dev #{inner_ifname}").match(/inet6 ([0-9a-f:\/]+)/)[1]
+
+    dns_config_path = "/etc/netns/#{cni_netns}/resolv.conf"
+    dns_servers = []
+    search_domains = []
+    if File.exist?(dns_config_path)
+      File.readlines(dns_config_path).each do |line|
+        if line.start_with?("nameserver")
+          dns_servers << line.split[1]
+        elsif line.start_with?("search")
+          search_domains = line.split.drop(1)
+        end
+      end
+    end
+
+    response = {
+      cniVersion: @stdin_data["cniVersion"],
+      interfaces: [
+        {
+          name: inner_ifname,
+          mac: inner_mac,
+          sandbox: "/var/run/netns/#{cni_netns}"
+        }
+      ],
+      ips: [
+        {
+          version: "6",
+          address: container_ip,
+          gateway: nil,
+          interface: 0
+        }
+      ],
+      dns: {
+        nameservers: dns_servers,
+        search: search_domains,
+        options: ["ndots:5"]
+      }
+    }
+
+    puts JSON.generate(response)
+  end
+
+  def error_exit(message)
+    LOG.error message
+    puts JSON.generate({code: 100, msg: message})
+    exit 1
+  end
+
+  def allocate_ip(updated_subnet, collision_dir)
+    loop do
+      random_ip = generate_random_ip(updated_subnet)
+      filename = File.join(collision_dir, random_ip.to_s.tr("/", "_"))
+
+      unless File.exist?(filename)
+        File.write(filename, "")
+        return random_ip
+      end
+    end
+  end
+
+  # Generate a random network that is a slice of the host's network
+  # for delegation to a VM.
+  def generate_random_ip(addr)
+    prefix = 80 + 8
+    lower_bits = SecureRandom.random_number(2...2**8) << (128 - prefix - 1)
+
+    NetAddr::IPv6Net.new(NetAddr::IPv6.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask128.new(prefix))
+  end
+
+  def gen_mac
+    ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
+      "%0.2X" % _1
+    }.join(":").downcase
+  end
+
+  # By reading the mac address from an interface, compute its ipv6
+  # link local address that it would have if its device state were set
+  # to up.
+  def mac_to_ipv6_link_local(mac)
+    eui = mac.split(":").map(&:hex)
+    eui.insert(3, 0xff, 0xfe)
+    eui[0] ^= 0x02
+
+    "fe80::" + eui.each_slice(2).map { |pair|
+      pair.map { format("%02x", _1) }.join
+    }.join(":")
+  end
+end
+
+if __FILE__ == $PROGRAM_NAME
+  begin
+    cni = UBICNI.new
+    cni.run
+  rescue => e
+    puts p e.backtrace
+    LOG.fatal "Unexpected error: #{e.message}"
+    puts JSON.generate({code: 999, msg: "Unexpected error: #{e.message}"})
+    exit 1
+  end
+end

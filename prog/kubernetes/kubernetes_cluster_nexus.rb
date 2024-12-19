@@ -78,7 +78,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def bootstrap_control_plane_vm
     nap 5 if kubernetes_cluster.load_balancer.hostname.nil?
 
-    if kubernetes_cluster.vms.count >= 3
+    if kubernetes_cluster.vms.count >= kubernetes_cluster.replica
       hop_wait
     end
 
@@ -104,8 +104,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_prerequistes_on_control_plane
     current_vm.sshable.cmd <<BASH
 set -ueo pipefail
-sudo sed -i '/^#net\\.ipv4\\.ip_forward=1/s/^#//' /etc/sysctl.conf
-sudo sysctl -p
+echo "net.ipv6.conf.all.forwarding=1\nnet.ipv6.conf.all.proxy_ndp=1\nnet.ipv4.conf.all.forwarding=1\nnet.ipv4.ip_forward=1" \\| sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null
+sudo sysctl --system
 sudo modprobe br_netfilter
 sudo apt update
 sudo apt install -y ca-certificates curl apt-transport-https gpg
@@ -162,10 +162,23 @@ BASH
   end
 
   label def install_cni
-    # first question: should we do it here?
-    # second question: how should we do it?
-    # maybe for now:
-    # sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf create -f https://cni-installation-url")
+    current_vm.sshable.cmd("sudo ln -s /home/#{current_vm.sshable.unix_user}/kubernetes/bin/ubicni /opt/cni/bin/ubicni")
+    cni_config = <<CONFIG
+{
+  "cniVersion": "1.0.0",
+  "name": "ubicni-network",
+  "type": "ubicni",
+  "ipam": {
+    "type": "host-local",
+    "ranges": [
+      {
+        "subnet": "#{current_vm.ephemeral_net6}"
+      }
+    ]
+  }
+}
+CONFIG
+    current_vm.sshable.cmd("sudo tee -a /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
     hop_bootstrap_control_plane_vm
   end
 
@@ -179,7 +192,7 @@ BASH
   label def execute_join_control_plane_vm
     case current_vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
     when "Succeeded"
-      hop_bootstrap_control_plane_vm
+      hop_install_cni
     when "NotStarted", "Failed"
       current_vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:443 #{frame["join_token"]} #{frame["discovery_token_ca_cert_hash"]} #{frame["certificate_key"]}' join_control_plane")
       # when "Failed"
