@@ -12,15 +12,14 @@ class VmPool < Sequel::Model
   semaphore :destroy
 
   def pick_vm
-    DB.transaction do
-      # first lock the whole pool in the join table so that no other thread can
-      # pick a vm from this pool
-      vms_dataset.for_update.all
-      pick_vm_id_q = vms_dataset.left_join(:github_runner, vm_id: :id)
-        .where(Sequel[:github_runner][:vm_id] => nil, Sequel[:vm][:display_state] => "running")
-        .select(Sequel[:vm][:id])
-      Vm.where(id: pick_vm_id_q).first
-    end
+    # Find an available VM in the "running" state and not associated with a GitHub runner,
+    # and lock it with FOR UPDATE SKIP LOCKED.
+    vms_dataset
+      .where(Sequel[:vm][:display_state] => "running")
+      .exclude(id: DB[:github_runner].exclude(vm_id: nil).select(:vm_id))
+      .for_update
+      .skip_locked
+      .first
   end
 end
 
