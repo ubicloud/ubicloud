@@ -10,9 +10,6 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   extend Forwardable
   def_delegators :postgres_server, :vm
 
-  semaphore :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup
-  semaphore :restart, :configure, :take_over, :configure_prometheus, :destroy
-
   def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid

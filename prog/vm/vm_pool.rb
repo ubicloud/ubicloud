@@ -5,8 +5,6 @@ require "net/ssh"
 class Prog::Vm::VmPool < Prog::Base
   subject_is :vm_pool
 
-  semaphore :destroy
-
   def self.assemble(size:, vm_size:, boot_image:, location:, storage_size_gib:,
     storage_encrypted:, storage_skip_sync:, arch:)
     DB.transaction do

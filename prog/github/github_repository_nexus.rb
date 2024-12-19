@@ -5,8 +5,6 @@ require_relative "../../lib/util"
 class Prog::Github::GithubRepositoryNexus < Prog::Base
   subject_is :github_repository
 
-  semaphore :destroy
-
   def self.assemble(installation, name, default_branch)
     DB.transaction do
       repository = GithubRepository.new_with_id(installation_id: installation.id, name: name)
