@@ -2,7 +2,6 @@
 
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
-  semaphore :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
 
   def self.assemble(project_id, name: nil, location: "hetzner-fsn1", ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil)
     unless (project = Project[project_id])
