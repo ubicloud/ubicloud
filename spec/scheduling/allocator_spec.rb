@@ -286,7 +286,7 @@ RSpec.describe Al do
   describe "Allocation" do
     let(:req) {
       Al::Request.new(
-        "2464de61-7501-8374-9ab0-416caebe31da", "standard", 2, 400, 8, 33,
+        "2464de61-7501-8374-9ab0-416caebe31da", "standard", 2, 400, 16, 33,
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [], false, false
@@ -870,6 +870,8 @@ RSpec.describe Al do
       first_slice.update(used_cpu_percent: 200, used_memory_1g: 8, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
       vh.reload
+      used_cores = vh.used_cores
+      used_hugepages_1g = vh.used_hugepages_1g
 
       vm = create_vm_with_project(family: "burstable", use_slices: true, cores: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, can_share_slice: vm.can_share_slice?))
@@ -883,6 +885,8 @@ RSpec.describe Al do
       expect(slice.id).not_to eq(first_slice.id)
       expect(slice.allowed_cpus).to eq("4-5")
       expect(vh.vm_host_slices.size).to eq(2)
+      expect(vh.used_cores).to eq(used_cores + slice.cores)
+      expect(vh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_1g)
     end
 
     it "places a burstable vm in an existing slice" do
@@ -893,6 +897,8 @@ RSpec.describe Al do
       slice2.update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
       vh.reload
+      used_cores = vh.used_cores
+      used_hugepages_1g = vh.used_hugepages_1g
 
       vm = create_vm_with_project(family: "burstable", use_slices: true, cores: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
       req = create_req(vm, vol, use_slices: true, can_share_slice: vm.can_share_slice?)
@@ -909,6 +915,8 @@ RSpec.describe Al do
       slice = vm.vm_host_slice
       expect(slice).not_to be_nil
       expect(slice.id).to eq(slice2.id)
+      expect(vh.used_cores).to eq(used_cores)
+      expect(vh.used_hugepages_1g).to eq(used_hugepages_1g)
     end
 
     it "prefers a host with available slice for burstables" do
@@ -946,6 +954,8 @@ RSpec.describe Al do
     it "creates a basic vm with a slice" do
       vm = create_vm_with_project(family: "basic", use_slices: true, cores: 2, vcpus: 1, memory_gib: 2, cpu_percent_limit: 100, cpu_burst_percent_limit: 0)
       vmh = VmHost.first
+      used_cores = vmh.used_cores
+      used_hugepages_1g = vmh.used_hugepages_1g
 
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       al.update(vm)
@@ -962,6 +972,8 @@ RSpec.describe Al do
       expect(slice.cores).to eq(2)
       expect(slice.total_cpu_percent).to eq(1600) # overbooking allowed on basic
       expect(slice.total_memory_1g).to eq(16)
+      expect(vmh.used_cores).to eq(used_cores + slice.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_1g)
     end
 
     it "adds a basic vm to an existing slice" do
@@ -992,6 +1004,27 @@ RSpec.describe Al do
       expect(al).not_to be_nil
       al.update(vm)
       expect(vm.vm_host_slice_id).to eq(slice.id)
+    end
+
+    it "memory_gib_for_cores handles standard family" do
+      vm = create_vm_with_project
+      req = create_req(vm, vol)
+
+      expect(req.memory_gib_for_cores).to eq 8
+    end
+
+    it "memory_gib_for_cores returns correct ratio for standard-gpu" do
+      vm = create_vm_with_project(family: "standard-gpu")
+      req = create_req(vm, vol)
+
+      expect(req.memory_gib_for_cores).to eq 10
+    end
+
+    it "memory_gib_for_cores handles arm64" do
+      vm = create_vm_with_project(arch: "arm64")
+      req = create_req(vm, vol)
+
+      expect(req.memory_gib_for_cores).to eq 3
     end
   end
 

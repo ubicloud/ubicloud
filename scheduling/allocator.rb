@@ -45,7 +45,19 @@ module Scheduling::Allocator
 
   Request = Struct.new(:vm_id, :family, :cores, :cpu_percent_limit, :mem_gib, :storage_gib, :storage_volumes, :boot_image, :distinct_storage_devices, :gpu_count, :ip4_enabled,
     :target_host_utilization, :arch_filter, :allocation_state_filter, :host_filter, :host_exclusion_filter, :location_filter, :location_preference,
-    :use_slices, :can_share_slice, :enable_diagnostics)
+    :use_slices, :can_share_slice, :enable_diagnostics) do
+      def memory_gib_for_cores
+        memory_gib_ratio = if arch_filter == "arm64"
+          3.2
+        elsif family == "standard-gpu"
+          10.68
+        else
+          8
+        end
+
+        (cores * memory_gib_ratio).to_i
+      end
+    end
 
   class Allocation
     attr_reader :score
@@ -200,7 +212,7 @@ module Scheduling::Allocator
       @candidate_host = candidate_host
       @request = request
       @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
-        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.mem_gib)]
+        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.memory_gib_for_cores)]
 
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
@@ -332,7 +344,7 @@ module Scheduling::Allocator
           vm_host,
           family: vm.family,
           allowed_cpus: @new_slice_allowed_cpus,
-          memory_1g: vm.mem_gib_ratio * @request.cores,
+          memory_1g: @request.memory_gib_for_cores,
           type: vm.can_share_slice? ? "shared" : "dedicated"
         )
 

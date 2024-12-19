@@ -70,13 +70,6 @@ class Vm < Sequel::Model
     super
   end
 
-  def mem_gib_ratio
-    return 3.2 if arch == "arm64"
-    # Special case for GPUs
-    return 10.68 if family == "standard-gpu"
-    8
-  end
-
   def use_slices_for_allocation?
     projects.first.get_ff_use_slices_for_allocation || false
   end

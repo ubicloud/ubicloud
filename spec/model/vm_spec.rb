@@ -61,24 +61,6 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#mem_gib_ratio" do
-    it "handles standard family" do
-      vm.family = "standard"
-      expect(vm.mem_gib_ratio).to eq 8
-    end
-
-    it "returns correct ratio for standard-gpu" do
-      expect(vm).to receive(:arch).and_return("x64")
-      expect(vm).to receive(:family).and_return("standard-gpu")
-      expect(vm.mem_gib_ratio).to eq(10.68)
-    end
-
-    it "handles arm64" do
-      expect(vm).to receive(:arch).and_return("arm64")
-      expect(vm.mem_gib_ratio).to eq 3.2
-    end
-  end
-
   describe "#can_share_slice?" do
     let(:project) {
       instance_double(
