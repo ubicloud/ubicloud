@@ -15,6 +15,9 @@ class ActionTag < Sequel::Model
     end
   end
 
+  plugin :subset_static_cache
+  cache_subset :global_by_name
+
   def self.options_for_project(project)
     {
       "Global Tag" => ActionTag.global_by_name.all,
