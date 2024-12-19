@@ -128,6 +128,7 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:cmd).with(
         "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
       )
+      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo rm -rf #{tmp_dir}")
       expect { hs_test.run_integration_specs }.to hop("wait")
     end
   end
