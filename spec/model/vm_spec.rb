@@ -32,21 +32,55 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#mem_gib_ratio" do
-    it "returns the correct ratio for arm64" do
-      expect(vm).to receive(:arch).and_return("arm64")
-      expect(vm.mem_gib_ratio).to eq(3.2)
+  describe "#display_size" do
+    let(:project) {
+      instance_double(
+        Project
+      )
+    }
+
+    before do
+      allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(true)
+      allow(vm).to receive_messages(projects: [project])
     end
 
-    it "returns the correct ratio for x64" do
-      expect(vm).to receive(:arch).and_return("x64")
-      expect(vm.mem_gib_ratio).to eq(8)
+    it "handles standard family" do
+      vm.arch = "x64"
+      vm.family = "standard"
+      vm.vcpus = 2
+      vm.cpu_percent_limit = 200
+      expect(vm.display_size).to eq("standard-2")
     end
 
-    it "returns correct ratio for standard-gpu" do
-      expect(vm).to receive(:arch).and_return("x64")
-      expect(vm).to receive(:family).and_return("standard-gpu")
-      expect(vm.mem_gib_ratio).to eq(10.68)
+    it "handles burstable family" do
+      vm.arch = "arm64"
+      vm.family = "burstable"
+      vm.vcpus = 2
+      vm.cpu_percent_limit = 50
+      expect(vm.display_size).to eq("burstable-2x2")
+    end
+  end
+
+  describe "#can_share_slice?" do
+    let(:project) {
+      instance_double(
+        Project
+      )
+    }
+
+    before do
+      allow(project).to receive(:get_ff_use_slices_for_allocation).and_return(true)
+      allow(vm).to receive_messages(projects: [project])
+    end
+
+    it "handles standard family" do
+      vm.family = "standard"
+      expect(vm.can_share_slice?).to be_falsey
+    end
+
+    it "handles burstable family" do
+      vm.family = "burstable"
+      expect(vm.can_share_slice?).to be_truthy
     end
   end
 
@@ -54,6 +88,7 @@ RSpec.describe Vm do
     it "scales a single-socket hyperthreaded system" do
       vm.family = "standard"
       vm.cores = 2
+      vm.vcpus = 4
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 12,
@@ -67,6 +102,7 @@ RSpec.describe Vm do
     it "scales a dual-socket hyperthreaded system" do
       vm.family = "standard"
       vm.cores = 2
+      vm.vcpus = 4
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 24,
@@ -102,6 +138,7 @@ RSpec.describe Vm do
     it "crashes if cores allocated per die is not uniform number" do
       vm.family = "standard"
       vm.cores = 2
+      vm.vcpus = 4
 
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
@@ -112,6 +149,48 @@ RSpec.describe Vm do
       )).at_least(:once)
 
       expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
+    end
+
+    it "scales a single-socket non-hyperthreaded system" do
+      vm.family = "standard"
+      vm.cores = 4
+      vm.vcpus = 4
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 12,
+        total_dies: 1,
+        total_sockets: 1
+      )).at_least(:once)
+      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:4:1:1")
+    end
+
+    it "scales a single-socket hyperthreaded system for shared family for 2 cpus" do
+      vm.family = "shared"
+      vm.cores = 4
+      vm.vcpus = 2
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 6,
+        total_dies: 1,
+        total_sockets: 1
+      )).at_least(:once)
+      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("2:1:1:1")
+    end
+
+    it "scales a single-socket non-hyperthreaded system for shared family for 2 cpus" do
+      vm.family = "shared"
+      vm.cores = 4
+      vm.vcpus = 2
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 12,
+        total_dies: 1,
+        total_sockets: 1
+      )).at_least(:once)
+      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:2:1:1")
     end
   end
 
@@ -150,6 +229,22 @@ RSpec.describe Vm do
 
     it "can compute nil if ipv4 is not assigned" do
       expect(vm.ephemeral_net4).to be_nil
+    end
+  end
+
+  describe "#billing_record_parts" do
+    it "returns correct value for standard family" do
+      vm.family = "standard"
+      vm.cores = 1
+      vm.cpu_percent_limit = 200
+      expect(vm.billing_record_parts).to eq({resource_type: "VmCores", amount: 1})
+    end
+
+    it "returns correct value for burstable family" do
+      vm.family = "burstable"
+      vm.cores = 1
+      vm.cpu_percent_limit = 50
+      expect(vm.billing_record_parts).to eq({resource_type: "VmCpuPercent", amount: 0.5})
     end
   end
 

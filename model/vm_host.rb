@@ -14,6 +14,7 @@ class VmHost < Sequel::Model
   one_to_many :storage_devices, key: :vm_host_id
   one_to_many :pci_devices, key: :vm_host_id
   one_to_many :boot_images, key: :vm_host_id
+  one_to_many :vm_host_slices, key: :vm_host_id
 
   plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy
 
@@ -273,6 +274,23 @@ class VmHost < Sequel::Model
     storage_devices.sum { _1.total_storage_gib }
   end
 
+  def update_spdk_cpus(spdk_cpus, only_cpuset: false)
+    # Mark cpus used by the SDK as taken on the host
+    spdk_cores = (spdk_cpus * total_cores) / total_cpus
+    update(used_cores: spdk_cores)
+  end
+
+  def allocate_host_cpuset(spdk_cpus)
+    cpuset = 0
+    (0..spdk_cpus - 1).each { |i| cpuset |= (1 << i) }
+
+    VmHostSlice.bitmask_to_cpuset(cpuset)
+  end
+
+  def cpuset
+    @cpuset ||= allocate_host_cpuset(spdk_installations.first.cpu_count)
+  end
+
   def render_arch(arm64:, x64:)
     case arch
     when "arm64"
@@ -306,6 +324,7 @@ end
 #  arch               | arch                     |
 #  total_dies         | integer                  |
 #  os_version         | text                     |
+#  accepts_slices     | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  vm_host_pkey     | PRIMARY KEY btree (id)
 #  vm_host_ip6_key  | UNIQUE btree (ip6)
@@ -325,3 +344,4 @@ end
 #  spdk_installation     | spdk_installation_vm_host_id_fkey  | (vm_host_id) REFERENCES vm_host(id)
 #  storage_device        | storage_device_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)
 #  vm                    | vm_vm_host_id_fkey                 | (vm_host_id) REFERENCES vm_host(id)
+#  vm_host_slice         | vm_host_slice_vm_host_id_fkey      | (vm_host_id) REFERENCES vm_host(id)

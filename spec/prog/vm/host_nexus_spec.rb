@@ -17,7 +17,8 @@ RSpec.describe Prog::Vm::HostNexus do
   }
 
   let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
-  let(:vm_host) { instance_double(VmHost, vms: vms) }
+  let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1"), instance_double(VmHostSlice, name: "standard2")] }
+  let(:vm_host) { instance_double(VmHost, vms: vms, vm_host_slices: vm_host_slices) }
   let(:sshable) { instance_double(Sshable) }
 
   before do
@@ -118,7 +119,7 @@ RSpec.describe Prog::Vm::HostNexus do
     it "updates the vm_host record from the finished programs" do
       expect(nx).to receive(:leaf?).and_return(true)
       expect(vm_host).to receive(:update).with(total_mem_gib: 1)
-      expect(vm_host).to receive(:update).with(os_version: "ubuntu-22.04")
+      expect(vm_host).to receive(:update).with(os_version: "ubuntu-22.04", accepts_slices: false)
       expect(vm_host).to receive(:update).with(arch: "arm64", total_cores: 4, total_cpus: 5, total_dies: 3, total_sockets: 2)
       expect(nx).to receive(:reap).and_return([
         instance_double(Strand, prog: "LearnMemory", exitval: {"mem_gib" => 1}),
@@ -180,7 +181,7 @@ RSpec.describe Prog::Vm::HostNexus do
         total_cpus: 96
       )
       allow(nx).to receive(:vm_host).and_return(vmh)
-      expect(vmh).to receive(:update).with({used_cores: 2})
+      expect(vmh).to receive(:update_spdk_cpus).with(4)
       expect { nx.setup_spdk }.to hop("download_boot_images")
     end
   end
@@ -375,7 +376,14 @@ RSpec.describe Prog::Vm::HostNexus do
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 4")
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 5, used_hugepages_1g: 4)
-      expect { nx.verify_hugepages }.to hop("start_vms")
+      expect { nx.verify_hugepages }.to hop("start_vm_host_slices")
+    end
+  end
+
+  describe "#start_vm_host_slices" do
+    it "starts vm host slices and hops" do
+      expect(vm_host_slices).to all receive(:incr_start_after_host_reboot)
+      expect { nx.start_vm_host_slices }.to hop("start_vms")
     end
   end
 
