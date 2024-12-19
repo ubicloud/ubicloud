@@ -305,14 +305,20 @@ module Scheduling::Allocator
     end
   end
 
-  # Dedicated slice needs to be always created for the VM
-  # This finds a space for a new slice and sets is_valid if the cpuset can be created
-  # Upon calling update the actual slice is created
-  #
-  # This is used for VMs that can be co-located inside a slice
-  # It first tries to find a slice that is already allocated but has room
-  # to accept new VMs. If successful it uses that slice. Otherwise it falls back
-  # to the default and creates a new slice
+  # The VmHostSliceAllocation is used when system is configured
+  # to allocate VMs inside VmHostSlice. It wrapps around the VmHostAllocation class
+  # used otherwise.
+  # This class handles two distinct cases - one when a dedicated slice
+  # is created for a VM (as in Standard family). In that case it always looks
+  # for a place for a new slice and finds a cpu set that will be used for that.
+  # The other case is when a shared slice can be used, meaning multiple VMs can be
+  # placed inside a slice. In that case the Allocation first looks if the candidate host
+  # already has a slice allocated that matches the family of the VM and that
+  # has enough room. If so, it will use that. Otherwise, a new slice will be
+  # created same way as in the 'dedicated' case.
+  # All this logic is split between 'can_allocate_slice?' and 'update' methods. The first
+  # one checks if the candidate_host can host a slice or has one already.
+  # The second one creates a slice if needed, once the host candidate is selected.
   class VmHostSliceAllocation
     attr_reader :is_valid
     def initialize(candidate_host, request, vm_host_allocations)
@@ -320,7 +326,7 @@ module Scheduling::Allocator
       @request = request
       @vm_host_allocations = vm_host_allocations
 
-      @is_valid = calculate_cpu_bitmask
+      @is_valid = can_allocate_slice?
     end
 
     def utilization
@@ -360,7 +366,7 @@ module Scheduling::Allocator
       vm.update(vm_host_slice_id: slice_id)
     end
 
-    def calculate_cpu_bitmask
+    def can_allocate_slice?
       if @request&.can_share_slice
         vm_host = VmHost[@candidate_host[:vm_host_id]]
 
