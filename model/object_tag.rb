@@ -55,12 +55,6 @@ class ObjectTag < Sequel::Model
   def metatag_uuid
     UBID.to_uuid(metatag_ubid)
   end
-
-  def before_destroy
-    applied_dataset.where(object_id: metatag_uuid).delete
-    AccessControlEntry.where(object_id: metatag_uuid).destroy
-    super
-  end
 end
 
 # Table: object_tag
