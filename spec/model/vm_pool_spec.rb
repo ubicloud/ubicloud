@@ -36,12 +36,9 @@ RSpec.describe VmPool do
 
     it "returns the vm if there is one in running state" do
       locking_vms = class_double(Vm)
-      expect(pool).to receive(:vms_dataset).and_return(locking_vms).at_least(:once)
-      expect(locking_vms).to receive_message_chain(:for_update, :all).and_return([])  # rubocop:disable RSpec/MessageChain
-      vms_dataset = [vm]
-      expect(pool).to receive_message_chain(:vms_dataset, :left_join, :where, :select).and_return(vm.id) # rubocop:disable RSpec/MessageChain
-      expect(Vm).to receive(:where).and_return(vms_dataset) # rubocop:disable RSpec/MessageChain
-      expect(pool.pick_vm.id).to eq(vm.id)
+      expect(pool).to receive(:vms_dataset).and_return(locking_vms)
+      expect(locking_vms).to receive_message_chain(:where, :exclude, :for_update, :skip_locked, :first).and_return(vm) # rubocop:disable RSpec/MessageChain
+      expect(pool.pick_vm).to eq(vm)
     end
   end
 end
