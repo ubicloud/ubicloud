@@ -253,7 +253,7 @@ class Prog::Vm::Nexus < Prog::Base
         # Once the slice is created update its utilization
         VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
           used_cpu_percent: Sequel[:used_cpu_percent] + vm.cpu_percent_limit,
-          used_memory_1g: Sequel[:used_memory_1g] + vm.memory_gib
+          used_memory_gib: Sequel[:used_memory_gib] + vm.memory_gib
         )
       end
     end
@@ -471,7 +471,7 @@ class Prog::Vm::Nexus < Prog::Base
         # Instead update the slice utilization
         VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
           used_cpu_percent: Sequel[:used_cpu_percent] - vm.cpu_percent_limit,
-          used_memory_1g: Sequel[:used_memory_1g] - vm.memory_gib
+          used_memory_gib: Sequel[:used_memory_gib] - vm.memory_gib
         )
       end
 

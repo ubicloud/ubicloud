@@ -143,12 +143,12 @@ module Scheduling::Allocator
         ds.with(:slice_utilization, DB[:vm_host_slice]
           .select_group(:vm_host_id)
           .select_append { (sum(Sequel[:total_cpu_percent]) - sum(Sequel[:used_cpu_percent])).as(slice_cpu_available) }
-          .select_append { (sum(Sequel[:total_memory_1g]) - sum(Sequel[:used_memory_1g])).as(slice_memory_available) }
+          .select_append { (sum(Sequel[:total_memory_gib]) - sum(Sequel[:used_memory_gib])).as(slice_memory_available) }
           .where(enabled: true)
           .where(type: "shared")
           .where(cores: request.cores)
           .where(Sequel[:used_cpu_percent] + request.cpu_percent_limit <= Sequel[:total_cpu_percent])
-          .where(Sequel[:used_memory_1g] + request.memory_gib <= Sequel[:total_memory_1g]))
+          .where(Sequel[:used_memory_gib] + request.memory_gib <= Sequel[:total_memory_gib]))
           # end of 'with'
           .left_join(:slice_utilization, vm_host_id: Sequel[:vm_host][:id])
           .select_append(Sequel.function(:coalesce, :slice_cpu_available, 0).as(:slice_cpu_available))
@@ -344,7 +344,7 @@ module Scheduling::Allocator
           vm_host,
           family: vm.family,
           allowed_cpus: @new_slice_allowed_cpus,
-          memory_1g: @request.memory_gib_for_cores,
+          memory_gib: @request.memory_gib_for_cores,
           type: vm.can_share_slice? ? "shared" : "dedicated"
         )
 
@@ -368,7 +368,7 @@ module Scheduling::Allocator
         @existing_slice = vm_host.vm_host_slices
           .select {
             (_1.used_cpu_percent + @request.cpu_percent_limit <= _1.total_cpu_percent) &&
-              (_1.used_memory_1g + @request.memory_gib <= _1.total_memory_1g) &&
+              (_1.used_memory_gib + @request.memory_gib <= _1.total_memory_gib) &&
               (_1.cores == @request.cores) &&
               (_1.family == @request.family)
           }

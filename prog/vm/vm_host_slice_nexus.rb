@@ -5,7 +5,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
 
   semaphore :destroy, :start_after_host_reboot
 
-  def self.assemble_with_host(name, vm_host, family:, allowed_cpus:, memory_1g:, type: "dedicated")
+  def self.assemble_with_host(name, vm_host, family:, allowed_cpus:, memory_gib:, type: "dedicated")
     fail "Must provide a VmHost." if vm_host.nil?
     fail "Must provide slice name." if name.nil? || name.empty?
     fail "Must provide family name." if family.nil? || family.empty?
@@ -23,8 +23,8 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
         cores: 0,
         total_cpu_percent: 0,
         used_cpu_percent: 0,
-        total_memory_1g: memory_1g,
-        used_memory_1g: 0,
+        total_memory_gib: memory_gib,
+        used_memory_gib: 0,
         vm_host_id: vm_host.id
       ) { _1.id = ubid.to_uuid }
 
@@ -80,7 +80,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
 
     VmHost.dataset.where(id: host.id).update(
       used_cores: Sequel[:used_cores] - vm_host_slice.cores,
-      used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_1g
+      used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_gib
     )
 
     vm_host_slice.destroy

@@ -12,8 +12,8 @@ RSpec.describe VmHostSlice do
       cores: 1,
       total_cpu_percent: 200,
       used_cpu_percent: 0,
-      total_memory_1g: 4,
-      used_memory_1g: 0
+      total_memory_gib: 4,
+      used_memory_gib: 0
     ) { _1.id = "b231a172-8f56-8b10-bbed-8916ea4e5c28" }
   end
 

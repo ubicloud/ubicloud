@@ -785,8 +785,8 @@ RSpec.describe Al do
 
     it "slice allocation fails on overbooked host" do
       vh = VmHost.first
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-7", memory_1g: 24)
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: "8-15", memory_1g: 32)
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-7", memory_gib: 24)
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: "8-15", memory_gib: 32)
 
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
       expect(al).to be_nil
@@ -827,8 +827,8 @@ RSpec.describe Al do
       expect(slice.cores).to eq(1)
       expect(slice.total_cpu_percent).to eq(200)
       expect(slice.used_cpu_percent).to eq(0)
-      expect(slice.total_memory_1g).to eq(8)
-      expect(slice.used_memory_1g).to eq(0)
+      expect(slice.total_memory_gib).to eq(8)
+      expect(slice.used_memory_gib).to eq(0)
       expect(slice.vm_host_id).to eq(vmh.id)
     end
 
@@ -845,14 +845,14 @@ RSpec.describe Al do
       al2.update(vm2)
       vmh.reload
       expect(used_cores + vm1.vm_host_slice.cores + vm2.vm_host_slice.cores).to eq(vmh.used_cores)
-      expect(used_hugepages_1g + vm1.vm_host_slice.total_memory_1g + vm2.vm_host_slice.total_memory_1g).to eq(vmh.used_hugepages_1g)
+      expect(used_hugepages_1g + vm1.vm_host_slice.total_memory_gib + vm2.vm_host_slice.total_memory_gib).to eq(vmh.used_hugepages_1g)
       expect(available_storage - 10).to eq(vmh.storage_devices.sum { _1.available_storage_gib })
     end
 
     it "finds a disjoined cpuset" do
       vh = VmHost.first
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_1g: 16)
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: "8-11", memory_1g: 16)
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_gib: 16)
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "standard", allowed_cpus: "8-11", memory_gib: 16)
 
       vm = create_vm_with_project(use_slices: true, cores: 2, memory_gib: 16, cpu_percent_limit: 400)
       al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
@@ -866,8 +866,8 @@ RSpec.describe Al do
 
     it "places a burstable vm in an new slice" do
       vh = VmHost.first
-      first_slice = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "burstable", allowed_cpus: "2-3", memory_1g: 8, type: "shared").subject
-      first_slice.update(used_cpu_percent: 200, used_memory_1g: 8, enabled: true)
+      first_slice = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "burstable", allowed_cpus: "2-3", memory_gib: 8, type: "shared").subject
+      first_slice.update(used_cpu_percent: 200, used_memory_gib: 8, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
       vh.reload
       used_cores = vh.used_cores
@@ -886,15 +886,15 @@ RSpec.describe Al do
       expect(slice.allowed_cpus).to eq("4-5")
       expect(vh.vm_host_slices.size).to eq(2)
       expect(vh.used_cores).to eq(used_cores + slice.cores)
-      expect(vh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_1g)
+      expect(vh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_gib)
     end
 
     it "places a burstable vm in an existing slice" do
       vh = VmHost.first
-      slice1 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_1g: 16, type: "dedicated").subject
-      slice2 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "burstable", allowed_cpus: "6-7", memory_1g: 8, type: "shared").subject
-      slice1.update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true)
-      slice2.update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)
+      slice1 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: "2-5", memory_gib: 16, type: "dedicated").subject
+      slice2 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "burstable", allowed_cpus: "6-7", memory_gib: 8, type: "shared").subject
+      slice1.update(used_cpu_percent: 400, used_memory_gib: 16, enabled: true)
+      slice2.update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)
       vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
       vh.reload
       used_cores = vh.used_cores
@@ -921,12 +921,12 @@ RSpec.describe Al do
 
     it "prefers a host with available slice for burstables" do
       vh1 = VmHost.first
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh1, family: "standard", allowed_cpus: "2-5", memory_1g: 16, type: "dedicated")
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh1, family: "standard", allowed_cpus: "2-5", memory_gib: 16, type: "dedicated")
         .subject
-        .update(used_cpu_percent: 400, used_memory_1g: 16, enabled: true) # Full
-      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh1, family: "burstable", allowed_cpus: "6-7", memory_1g: 8, type: "shared")
+        .update(used_cpu_percent: 400, used_memory_gib: 16, enabled: true) # Full
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh1, family: "burstable", allowed_cpus: "6-7", memory_gib: 8, type: "shared")
         .subject
-        .update(used_cpu_percent: 100, used_memory_1g: 4, enabled: true)  # Partially filled in
+        .update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)  # Partially filled in
       vh1.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
       vh1.reload
 
@@ -971,15 +971,15 @@ RSpec.describe Al do
       expect(slice.type).to eq("shared")
       expect(slice.cores).to eq(2)
       expect(slice.total_cpu_percent).to eq(1600) # overbooking allowed on basic
-      expect(slice.total_memory_1g).to eq(16)
+      expect(slice.total_memory_gib).to eq(16)
       expect(vmh.used_cores).to eq(used_cores + slice.cores)
-      expect(vmh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_1g)
+      expect(vmh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_gib)
     end
 
     it "adds a basic vm to an existing slice" do
       vmh = VmHost.first
-      slice = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vmh, family: "basic", allowed_cpus: "2-5", memory_1g: 16, type: "shared").subject
-      slice.update(used_cpu_percent: 200, used_memory_1g: 4, enabled: true) # Partially filled in
+      slice = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vmh, family: "basic", allowed_cpus: "2-5", memory_gib: 16, type: "shared").subject
+      slice.update(used_cpu_percent: 200, used_memory_gib: 4, enabled: true) # Partially filled in
       vmh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
       vmh.reload
 
@@ -993,8 +993,8 @@ RSpec.describe Al do
 
     it "allows to overcommit a basic slice" do
       vmh = VmHost.first
-      slice = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vmh, family: "basic", allowed_cpus: "2-5", memory_1g: 16, type: "shared").subject
-      slice.update(used_cpu_percent: 400, used_memory_1g: 8, enabled: true) # Without an overcommit, 400% would be a full slice
+      slice = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vmh, family: "basic", allowed_cpus: "2-5", memory_gib: 16, type: "shared").subject
+      slice.update(used_cpu_percent: 400, used_memory_gib: 8, enabled: true) # Without an overcommit, 400% would be a full slice
       vmh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
       vmh.reload
 

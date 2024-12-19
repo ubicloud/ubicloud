@@ -17,8 +17,8 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       cores: 1,
       total_cpu_percent: 200,
       used_cpu_percent: 0,
-      total_memory_1g: 4,
-      used_memory_1g: 0
+      total_memory_gib: 4,
+      used_memory_gib: 0
     )
   }
 
@@ -53,7 +53,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
   describe ".assemble_with_host" do
     it "fails with an empty host" do
-      expect { described_class.assemble_with_host("standard", nil, family: "standard", allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Must provide a VmHost."
+      expect { described_class.assemble_with_host("standard", nil, family: "standard", allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Must provide a VmHost."
     end
 
     it "fails with an empty invalid vm_host_slice name" do
@@ -61,11 +61,11 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       host = st_vh.subject
       expect(host).not_to be_nil
 
-      expect { described_class.assemble_with_host(nil, host, family: "standard", allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Must provide slice name."
-      expect { described_class.assemble_with_host("", host, family: "standard", allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Must provide slice name."
-      expect { described_class.assemble_with_host("user", host, family: "standard", allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Slice name cannot be 'user' or 'system'."
-      expect { described_class.assemble_with_host("system", host, family: "standard", allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Slice name cannot be 'user' or 'system'."
-      expect { described_class.assemble_with_host("invalid-name", host, family: "standard", allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Slice name cannot contain a hyphen (-)."
+      expect { described_class.assemble_with_host(nil, host, family: "standard", allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Must provide slice name."
+      expect { described_class.assemble_with_host("", host, family: "standard", allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Must provide slice name."
+      expect { described_class.assemble_with_host("user", host, family: "standard", allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Slice name cannot be 'user' or 'system'."
+      expect { described_class.assemble_with_host("system", host, family: "standard", allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Slice name cannot be 'user' or 'system'."
+      expect { described_class.assemble_with_host("invalid-name", host, family: "standard", allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Slice name cannot contain a hyphen (-)."
     end
 
     it "fails with an empty family name" do
@@ -73,8 +73,8 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       host = st_vh.subject
       expect(host).not_to be_nil
 
-      expect { described_class.assemble_with_host("test", host, family: nil, allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Must provide family name."
-      expect { described_class.assemble_with_host("test", host, family: "", allowed_cpus: "", memory_1g: 0) }.to raise_error RuntimeError, "Must provide family name."
+      expect { described_class.assemble_with_host("test", host, family: nil, allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Must provide family name."
+      expect { described_class.assemble_with_host("test", host, family: "", allowed_cpus: "", memory_gib: 0) }.to raise_error RuntimeError, "Must provide family name."
     end
 
     it "creates vm host slice" do
@@ -85,7 +85,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       host.update(total_cpus: 8, total_cores: 4)
 
       # run the assemble test
-      st_rg = described_class.assemble_with_host("standard", host, family: "standard", allowed_cpus: "2-3", memory_1g: 4)
+      st_rg = described_class.assemble_with_host("standard", host, family: "standard", allowed_cpus: "2-3", memory_gib: 4)
       rg = st_rg.subject
       expect(rg).not_to be_nil
       expect(rg.name).to eq("standard")
@@ -93,8 +93,8 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       expect(rg.cores).to eq(1)
       expect(rg.total_cpu_percent).to eq(200)
       expect(rg.used_cpu_percent).to eq(0)
-      expect(rg.total_memory_1g).to eq(4)
-      expect(rg.used_memory_1g).to eq(0)
+      expect(rg.total_memory_gib).to eq(4)
+      expect(rg.used_memory_gib).to eq(0)
       expect(rg.enabled).to be(false)
       expect(rg.type).to eq("dedicated")
       expect(rg.id).to eq(st_rg.id)
