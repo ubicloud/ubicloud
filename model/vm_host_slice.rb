@@ -120,19 +120,21 @@ end
 #  cores             | integer                  | NOT NULL
 #  total_cpu_percent | integer                  | NOT NULL
 #  used_cpu_percent  | integer                  | NOT NULL
-#  total_memory_1g   | integer                  | NOT NULL
-#  used_memory_1g    | integer                  | NOT NULL
+#  total_memory_1g   | integer                  |
+#  used_memory_1g    | integer                  |
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  vm_host_id        | uuid                     |
 #  family            | text                     |
+#  total_memory_gib  | integer                  | NOT NULL
+#  used_memory_gib   | integer                  | NOT NULL
 # Indexes:
 #  vm_host_slice_pkey | PRIMARY KEY btree (id)
 # Check constraints:
 #  cores_not_negative       | (cores >= 0)
 #  cpu_allocation_limit     | (used_cpu_percent <= total_cpu_percent)
-#  memory_allocation_limit  | (used_memory_1g <= total_memory_1g)
+#  memory_allocation_limit  | (used_memory_gib <= total_memory_gib)
 #  used_cpu_not_negative    | (used_cpu_percent >= 0)
-#  used_memory_not_negative | (used_memory_1g >= 0)
+#  used_memory_not_negative | (used_memory_gib >= 0)
 # Foreign key constraints:
 #  vm_host_slice_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:
