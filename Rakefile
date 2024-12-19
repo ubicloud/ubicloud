@@ -121,10 +121,11 @@ end
 desc "Setup database"
 task :setup_database, [:env, :parallel] do |_, args|
   raise "env must be test or development" unless ["test", "development"].include?(args[:env])
-  raise "parallel can only be used in test" if args[:parallel] && args[:env] != "test"
-  File.binwrite(auto_parallel_tests_file, "1") if args[:parallel] && !File.file?(auto_parallel_tests_file)
+  parallel = args[:parallel] && args[:parallel] != "false"
+  raise "parallel can only be used in test" if parallel && args[:env] != "test"
+  File.binwrite(auto_parallel_tests_file, "1") if parallel && !File.file?(auto_parallel_tests_file)
 
-  database_count = args[:parallel] ? nproc.call.to_i : 1
+  database_count = parallel ? nproc.call.to_i : 1
   threads = []
   database_count.times do |i|
     threads << Thread.new do
