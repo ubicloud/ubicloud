@@ -120,8 +120,6 @@ end
 #  cores             | integer                  | NOT NULL
 #  total_cpu_percent | integer                  | NOT NULL
 #  used_cpu_percent  | integer                  | NOT NULL
-#  total_memory_1g   | integer                  |
-#  used_memory_1g    | integer                  |
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  vm_host_id        | uuid                     |
 #  family            | text                     |
