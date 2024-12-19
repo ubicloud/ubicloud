@@ -51,9 +51,6 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def bootstrap_worker_vm
-    p kubernetes_nodepool
-    p kubernetes_nodepool.kubernetes_cluster
-
     nap 5 if kubernetes_nodepool.kubernetes_cluster.load_balancer.hostname.nil?
 
     if kubernetes_nodepool.vms.count >= kubernetes_nodepool.replica

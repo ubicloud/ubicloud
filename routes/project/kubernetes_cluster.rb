@@ -8,18 +8,16 @@ class Clover
 
     r.on web? do
       r.post true do
-        puts "######################################, #{r.params}"
         @location = LocationNameConverter.to_internal_name(r.params["location"])
-        post_kubernetes_cluster(r.params["kubernetes_cluster_name"])
+        post_kubernetes_cluster(r.params["name"])
       end
 
       r.get "create" do
         authorize("KubernetesCluster:create", @project.id)
         authorize("PrivateSubnet:view", @project.id)
-        authorized_kcs = dataset_authorize(@project.kubernetes_clusters_dataset, "KubernetesCluster:view").all
-        authorized_subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").all
-        @kcs = Serializers::KubernetesCluster.serialize(authorized_kcs)
-        @subnets = Serializers::PrivateSubnet.serialize(authorized_subnets)
+
+        @option_tree, @option_parents = generate_kubernetes_cluster_options
+
         view "kubernetes-cluster/create"
       end
     end
