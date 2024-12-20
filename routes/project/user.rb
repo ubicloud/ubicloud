@@ -92,6 +92,12 @@ class Clover
             204
           end
 
+          r.post "unrestrict-access" do
+            token.unrestrict_token_for_project(@project.id)
+            flash["notice"] = "Token access is now unrestricted"
+            r.redirect "#{@project.path}/user/token/#{token.ubid}/restrict-access"
+          end
+
           r.is "restrict-access" do
             unless token.unrestricted_token_for_project?(@project.id)
               flash["error"] = "Token access is already restricted"
