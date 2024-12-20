@@ -17,6 +17,14 @@ RSpec.describe Clover, "access control" do
   end
 
   describe "authenticated" do
+    # Show the displayed access control entries, except for the Admin one
+    def displayed_access_control_entries
+      page.all("table#access-control-entries .existing-aces-view td.values").map(&:text) +
+        page.all("table#access-control-entries .existing-aces select")
+          .map { |select| select.all("option[selected]")[0] || select.first("option") }
+          .map(&:text)
+    end
+
     before do
       login(user.email)
     end
@@ -27,216 +35,211 @@ RSpec.describe Clover, "access control" do
 
       expect(page.title).to eq("Ubicloud - Default - Access Control")
 
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", ""
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All"
       ]
 
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id)
       user.update(name: "Tname")
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects"
       ]
 
       st = SubjectTag.create_with_id(project_id:, name: "STest")
       AccessControlEntry.create_with_id(project_id:, subject_id: st.id)
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "STest", "All Actions", "All Objects"
       ]
 
       at = ActionTag.create_with_id(project_id:, name: "ATest")
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id)
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "STest", "All Actions", "All Objects"
       ]
 
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Account: Tname", "Project:view", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "STest", "All Actions", "All Objects"
       ]
 
       ot1 = ObjectTag.create_with_id(project_id:, name: "OTest1")
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot1.id)
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Account: Tname", "Project:view", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest1", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "Tname", "ATest", "OTest1",
+        "STest", "All Actions", "All Objects"
       ]
 
       ot2 = ObjectTag.create_with_id(project_id:, name: "OTest2")
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot2.id)
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Account: Tname", "Project:view", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest1", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "Tname", "ATest", "OTest1",
+        "Tname", "ATest", "OTest2",
+        "STest", "All Actions", "All Objects"
       ]
 
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot2.id)
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Account: Tname", "Project:view", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest1", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "Tname", "ATest", "OTest1",
+        "Tname", "ATest", "OTest2",
+        "Tname", "ATest", "OTest2",
+        "STest", "All Actions", "All Objects"
       ]
 
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: ot2.id)
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Account: Tname", "Global Tag: Member", "Tag: OTest2", "Remove",
-        "Edit", "Account: Tname", "Project:view", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest1", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Member", "OTest2",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "Tname", "ATest", "OTest1",
+        "Tname", "ATest", "OTest2",
+        "Tname", "ATest", "OTest2",
+        "STest", "All Actions", "All Objects"
       ]
 
       inference_token = ApiKey.create_inference_token(project)
       AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: inference_token.id)
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Account: Tname", "Global Tag: Member", "InferenceToken: #{inference_token.ubid}", "Remove",
-        "Edit", "Account: Tname", "Global Tag: Member", "Tag: OTest2", "Remove",
-        "Edit", "Account: Tname", "Project:view", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "All", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest1", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
-        "Edit", "Account: Tname", "Tag: ATest", "Tag: OTest2", "Remove",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Member", inference_token.ubid,
+        "Tname", "Member", "OTest2",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "Tname", "ATest", "OTest1",
+        "Tname", "ATest", "OTest2",
+        "Tname", "ATest", "OTest2",
+        "STest", "All Actions", "All Objects"
       ]
     end
 
     it "requires Project:viewaccess permissions to view access control entries" do
       project
+      user.update(name: "foo")
       AccessControlEntry.dataset.destroy
       visit "#{project.path}/user/access-control"
       expect(page.status_code).to eq 403
 
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
-      visit "#{project.path}/user/access-control"
+      page.refresh
       expect(page.title).to eq "Ubicloud - Default - Access Control"
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Account:", "Project:viewaccess", "All", ""
+      expect(displayed_access_control_entries).to eq [
+        "Account: foo", "Project:viewaccess", "All"
       ]
+      expect(page).to have_no_content("Save All")
+      expect(page).to have_no_content("New Access Control Entry")
 
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
       page.refresh
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "Edit", "Account:", "Project:editaccess", "All", "Remove",
-        "Edit", "Account:", "Project:viewaccess", "All", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "foo", "Project:editaccess", "All Objects",
+        "foo", "Project:viewaccess", "All Objects"
       ]
+      expect(page).to have_content("Save All")
+      expect(page).to have_content("New Access Control Entry")
     end
 
     it "does not show access control entries for tokens" do
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: ApiKey.create_personal_access_token(user).id)
 
       visit "#{project.path}/user/access-control"
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", ""
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All"
       ]
     end
 
     it "can create access control entries" do
-      visit "#{project.path}/user/access-control"
       user.update(name: "Tname")
-      click_link "Create Access Control Entry"
-      expect(page.title).to eq "Ubicloud - Default - Create Access Control Entry"
-      select "Tname"
-      click_button "Create Access Control Entry"
-      expect(find_by_id("flash-notice").text).to include("Access control entry created successfully")
-
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove"
-      ]
-
       project_id = project.id
       SubjectTag.create_with_id(project_id:, name: "STest")
       ActionTag.create_with_id(project_id:, name: "ATest")
       ObjectTag.create_with_id(project_id:, name: "OTest")
-      click_link "Create Access Control Entry"
-      within("#subject") { select "STest" }
-      within("#action") { select "ATest" }
-      within("#object #object-tag-group") { select "OTest" }
-      click_button "Create Access Control Entry"
 
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Tag: STest", "Tag: ATest", "Tag: OTest", "Remove"
+      visit "#{project.path}/user/access-control"
+      within("#ace-template .subject") { select "Tname" }
+      click_button "Save All"
+      expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects"
       ]
 
-      click_link "Create Access Control Entry"
-      within("#subject") { select "STest" }
-      within("#action") { select "Member" }
-      within("#object #object-tag-group") { select "OTest" }
-      click_button "Create Access Control Entry"
+      within("#ace-template .subject") { select "STest" }
+      within("#ace-template .action") { select "ATest" }
+      within("#ace-template .object #object-tag-group") { select "OTest" }
+      click_button "Save All"
+      expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "STest", "ATest", "OTest"
+      ]
 
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account: Tname", "All", "All", "Remove",
-        "Edit", "Tag: STest", "Global Tag: Member", "Tag: OTest", "Remove",
-        "Edit", "Tag: STest", "Tag: ATest", "Tag: OTest", "Remove"
+      within("#ace-template .subject") { select "STest" }
+      within("#ace-template .action") { select "Member" }
+      click_button "Save All"
+      expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "STest", "Member", "All Objects",
+        "STest", "ATest", "OTest"
       ]
     end
 
     it "can update access control entries" do
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
+      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
       SubjectTag.create_with_id(project_id: project.id, name: "STest")
       visit "#{project.path}/user/access-control"
-      click_link "Edit"
-      expect(page.title).to eq "Ubicloud - Default - Update Access Control Entry"
-      within("#subject") { select "STest" }
-      click_button "Update Access Control Entry"
-      expect(find_by_id("flash-notice").text).to include("Access control entry updated successfully")
-
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Tag: STest", "All", "All", "Remove"
+      within("#ace-#{ace.ubid} .subject") { select "STest" }
+      click_button "Save All"
+      expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "STest", "All Actions", "All Objects"
       ]
     end
 
     it "can delete access control entries" do
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
+      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
       visit "#{project.path}/user/access-control"
-      btn = find ".delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-      visit "#{project.path}/user/access-control"
-      expect(find_by_id("flash-notice").text).to include("Access control entry deleted successfully")
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", ""
+      within("#ace-#{ace.ubid}") { check "Delete" }
+      click_button "Save All"
+      expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All"
       ]
     end
 
@@ -244,37 +247,34 @@ RSpec.describe Clover, "access control" do
       user.update(name: "Tname")
       project
       AccessControlEntry.dataset.destroy
-      visit "#{project.path}/user/access-control/entry/new"
+      visit "#{project.path}/user/access-control"
       expect(page.status_code).to eq 403
 
-      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
-      visit "#{project.path}/user/access-control/entry/new"
-      expect(page.title).to eq "Ubicloud - Default - Create Access Control Entry"
+      ace1 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      page.refresh
+      expect(page.title).to eq "Ubicloud - Default - Access Control"
 
-      ace.destroy
-      select("Tname")
-      click_button "Create Access Control Entry"
+      within("#ace-template .subject") { select "Tname" }
+      ace2.destroy
+      click_button "Save All"
       expect(page.status_code).to eq 403
-      expect(AccessControlEntry.all).to be_empty
+      expect(AccessControlEntry.all).to eq [ace1]
     end
 
     it "requires Project:editaccess permissions to update access control entries" do
       user.update(name: "Tname")
       project
       AccessControlEntry.dataset.destroy
-      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
-      visit "#{project.path}/user/access-control/entry/#{AccessControlEntry.first.ubid}"
-      expect(page.status_code).to eq 403
+      ace1 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
+      visit "#{project.path}/user/access-control"
 
-      ace.update(action_id: ActionType::NAME_MAP["Project:editaccess"])
-      page.refresh
-      expect(page.title).to eq "Ubicloud - Default - Update Access Control Entry"
-
-      ace.update(action_id: ActionType::NAME_MAP["Project:viewaccess"])
-      select("Project:edit")
-      click_button "Update Access Control Entry"
+      within("#ace-#{ace1.ubid} .action") { select "Member" }
+      ace2.destroy
+      click_button "Save All"
       expect(page.status_code).to eq 403
-      expect(ace.refresh.action_id).to eq ActionType::NAME_MAP["Project:viewaccess"]
+      expect(AccessControlEntry.all).to eq [ace1]
     end
 
     it "requires Project:editaccess permissions to delete access control entries" do
@@ -284,40 +284,31 @@ RSpec.describe Clover, "access control" do
       ace1 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
       ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:editaccess"])
       visit "#{project.path}/user/access-control"
+      within("#ace-#{ace1.ubid}") { check "Delete" }
       ace2.destroy
-      page.within("#ace-#{ace1.ubid}") do
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      end
+      click_button "Save All"
       expect(page.status_code).to eq 403
-    end
-
-    it "shows not found page for invalid access control entries" do
-      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
-      visit "#{project.path}/user/access-control"
-      ace.destroy
-      click_link "Edit"
-      expect(page.title).to eq "Ubicloud - ResourceNotFound"
+      expect(AccessControlEntry.all).to eq [ace1]
     end
 
     it "cannot create access control entries for tokens" do
       # Create subject tag with the same id as token to avoid need to muck with the UI
       SubjectTag.create(project_id: project.id, name: "STest") { |st| st.id = ApiKey.create_personal_access_token(user).id }
       visit "#{project.path}/user/access-control"
-      click_link "Create Access Control Entry"
-      within("#subject") { select "STest" }
-      click_button "Create Access Control Entry"
-      expect(page.status_code).to eq 403
+      within("#ace-template .subject") { select "STest" }
+      expect(AccessControlEntry.count).to eq 1
+      click_button "Save All"
+      expect(AccessControlEntry.count).to eq 1
     end
 
     it "cannot create access control entries for the Admin subject Tag" do
       SubjectTag.where(project_id: project.id, name: "Admin").update(name: "Temp")
       visit "#{project.path}/user/access-control"
-      click_link "Create Access Control Entry"
-      within("#subject") { select "Temp" }
+      within("#ace-template .subject") { select "Temp" }
       SubjectTag.where(project_id: project.id, name: "Temp").update(name: "Admin")
-      click_button "Create Access Control Entry"
-      expect(page.status_code).to eq 403
+      expect(AccessControlEntry.count).to eq 1
+      click_button "Save All"
+      expect(AccessControlEntry.count).to eq 1
     end
 
     %w[subject action object].each do |type|
@@ -809,12 +800,13 @@ RSpec.describe Clover, "access control" do
     end
 
     it "shows object metatag with ObjectTag prefix when viewing access control entries" do
+      user.update(name: "Tname")
       tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
       AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, object_id: tag.metatag_uuid)
       visit "#{project.path}/user/access-control"
-      expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-        "", "Tag: Admin", "All", "All", "",
-        "Edit", "Account:", "All", "ObjectTag: test-obj", "Remove"
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "test-obj"
       ]
     end
 

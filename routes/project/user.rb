@@ -138,10 +138,9 @@ class Clover
                 typecast_params.array!(:Hash, "aces").each do
                   ubid, deleted, action_id, object_id = _1.values_at("ubid", "deleted", "action", "object")
 
-                  next if ubid == "template"
-
-                  if ubid == "new"
+                  if ubid == "template"
                     next if deleted == "true"
+                    next if action_id == "" && object_id == ""
                     ace = AccessControlEntry.new_with_id(project_id: @project.id, subject_id: token.id)
                   else
                     next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
@@ -212,10 +211,10 @@ class Clover
             typecast_params.array!(:Hash, "aces").each do
               ubid, deleted, subject_id, action_id, object_id = _1.values_at("ubid", "deleted", "subject", "action", "object")
 
-              next if subject_id == "" || ubid == "template"
-              check_ace_subject(UBID.to_uuid(subject_id))
+              next if subject_id == ""
+              check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
 
-              if ubid == "new"
+              if ubid == "template"
                 next if deleted == "true"
                 ace = AccessControlEntry.new_with_id(project_id: @project.id)
               else
