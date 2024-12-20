@@ -56,6 +56,13 @@ class ApiKey < Sequel::Model
     unrestricted_project_access_dataset(project_id).delete
   end
 
+  def unrestrict_token_for_project(project_id)
+    AccessControlEntry.where(project_id:, subject_id: id).destroy
+    DB[:applied_subject_tag]
+      .insert_ignore
+      .insert(subject_id: id, tag_id: SubjectTag.where(project_id:, name: "Admin").select(:id))
+  end
+
   def rotate
     new_key = SecureRandom.alphanumeric(32)
     update(key: new_key, updated_at: Time.now)
