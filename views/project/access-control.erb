@@ -1,26 +1,51 @@
-<% @page_title = "#{@project_data[:name]} - Access Control" %>
-
-<% ace_options = [
-  ["aces[][subject]", @subject_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }],
-  ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
-  ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
-] %>
+<% if @token
+  page_header = "Access Control for Token #{@token.ubid}"
+  ace_options = [
+    ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
+    ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
+  ]
+  form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/access-control"
+  table_headers = %w[Action Object]
+  edit_perm = true
+else
+  page_header = "Access Control"
+  ace_options = [
+    ["aces[][subject]", @subject_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }],
+    ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
+    ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
+  ]
+  form_action = "#{@project_data[:path]}/user/access-control"
+  table_headers = %w[Subject Action Object]
+  edit_perm = has_project_permission("Project:editaccess")
+end
+@page_title = "#{@project_data[:name]} - #{page_header}" %>
 <%== render("project/user-tabbar") %>
 
 <div class="space-y-1">
   <%== render(
     "components/page_header",
     locals: {
-      title: "Access Control",
-      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], ["Access Control", "#"]]
+      title: page_header,
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]]
     }
   ) %>
 </div>
 
 <div class="grid gap-6">
-  <% if (edit_perm = has_project_permission("Project:editaccess")) %>
-    <div class="md:flex md:items-center md:justify-between">
-      <div class="min-w-0 flex-1">
+  <div class="md:flex md:items-center md:justify-between">
+    <div class="min-w-0 flex-1">
+      <% if @token %>
+        <% if @aces.empty? %>
+          Currently, this token has no access to the project.
+        <% else %>
+          Below are the access control entries for the token.
+        <% end %>
+        You should grant the token the access you think the token should have. Be aware that the token can never have
+        more access to the project than your account has. Token access control in ubicloud is defined using access
+        control entries. Each access control entry has a single action and object. Access is allowed if there is an
+        access control entry allowing the token to take the action on the object. Actions and objects can be tags,
+        which are used for grouping multiple actions or multiple objects into a single entity.
+      <% elsif edit_perm %>
         Access control in Ubicloud is defined using access control entries. Each access control entry has a single
         subject, action, and object. Access is allowed if there is an access control entry allowing the subject to take
         the action on the object. Subjects, actions, and objects can all be tags, which are used for grouping. The
@@ -28,31 +53,34 @@
         and objects to the tags, and create the minimum number of access control entries you need to enforce the access
         you want. However, you can create access control entries referencing specific subjects, actions, or objects.
         You can click on the Subject, Action, and Object buttons below to manage the related tags.
-      </div>
+      <% end %>
     </div>
-  <% end %>
+  </div>
 
-  <form id="access-control-form" action="<%= "#{@project_data[:path]}/user/access-control" %>" role="form" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/user/access-control") %>
+  <form id="access-control-form" action="<%= form_action %>" role="form" method="POST">
+    <%== csrf_tag(form_action) %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <table id="access-control-entries" class="min-w-full divide-y divide-gray-300">
         <thead class="bg-gray-50">
           <tr>
-            <% %w[Subject Action Object].each do |type| %>
+            <% table_headers.each do |type| %>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                <%== render(
-                  "components/button",
-                  locals: {
-                    text: type,
-                    link: "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}"
-                  }
-                ) %>
+                <% if @token %>
+                  <%= type %>
+                <% else %>
+                  <%== render(
+                    "components/button",
+                    locals: {
+                      text: type,
+                      link: "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}"
+                    }
+                  ) %>
+                <% end %>
               </th>
             <% end %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           </tr>
         </thead>
-
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
             <tr id="ace-<%= ubid %>" class="<%= (ubid == "template") ? "hidden" : "" %>">
