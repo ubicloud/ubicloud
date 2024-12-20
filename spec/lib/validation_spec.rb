@@ -204,11 +204,10 @@ RSpec.describe Validation do
     describe "#validate_postgres_storage_size" do
       it "valid postgres storage sizes" do
         [
-          ["hetzner-fsn1", "standard-2", "128"],
+          ["hetzner-fsn1", "standard-2", "64"],
           ["hetzner-fsn1", "standard-2", "256"],
-          ["hetzner-fsn1", "standard-4", "1024"],
-          ["hetzner-fsn1", "standard-4", "1024"],
-          ["leaseweb-wdc02", "standard-4", "512"]
+          ["hetzner-fsn1", "standard-4", "512"],
+          ["leaseweb-wdc02", "standard-4", "256"]
         ].each do |location, pg_size, storage_size|
           expect(described_class.validate_postgres_storage_size(location, pg_size, storage_size)).to eq(storage_size.to_f)
         end
