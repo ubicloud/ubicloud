@@ -260,7 +260,8 @@ infrastructure itself.
 
 The `setup_database` task will drop databases if they exist, create databases and then migrate them.
 
-You can run also run just the migrations to update to the latest schema with rake:
+If you have already setup the databases, and you want to run new migrations to update them
+to the latest schema:
 
 ```
 $ rake test_up
