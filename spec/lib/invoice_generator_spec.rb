@@ -6,8 +6,8 @@ RSpec.describe InvoiceGenerator do
     case resource
     when Vm
       vm = resource
-      billing_rate_id = BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"]
-      amount = vm.cores
+      billing_rate_id = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)["id"]
+      amount = vm.vcpus
       name = vm.name
     when GithubRunner
       gr = resource
@@ -29,9 +29,9 @@ RSpec.describe InvoiceGenerator do
   def check_invoice_for_single_vm(invoices, project, vm, duration)
     expect(invoices.count).to eq(1)
 
-    br = BillingRate.from_resource_properties("VmCores", vm.family, vm.location)
+    br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)
     duration_mins = [672 * 60, (duration / 60).ceil].min
-    cost = (vm.cores * duration_mins * br["unit_price"]).round(3)
+    cost = (vm.vcpus * duration_mins * br["unit_price"]).round(3)
     expect(invoices.first.content).to eq({
       "project_id" => project.id,
       "project_name" => project.name,
@@ -61,10 +61,10 @@ RSpec.describe InvoiceGenerator do
         "resource_name" => vm.name,
         "line_items" => [{
           "location" => br["location"],
-          "resource_type" => "VmCores",
+          "resource_type" => "VmVCpu",
           "resource_family" => vm.family,
-          "description" => "standard-#{vm.cores * 2} Virtual Machine",
-          "amount" => vm.cores.to_f,
+          "description" => "standard-#{vm.vcpus} Virtual Machine",
+          "amount" => vm.vcpus.to_f,
           "duration" => duration_mins,
           "cost" => cost
         }],

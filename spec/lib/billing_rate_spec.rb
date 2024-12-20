@@ -6,8 +6,8 @@ RSpec.describe BillingRate do
   end
 
   describe ".line_item_description" do
-    it "returns for VmCores" do
-      expect(described_class.line_item_description("VmCores", "standard", 4)).to eq("standard-8 Virtual Machine")
+    it "returns for VmVCpu" do
+      expect(described_class.line_item_description("VmVCpu", "standard", 8)).to eq("standard-8 Virtual Machine")
     end
 
     it "returns for IPAddress" do
@@ -27,7 +27,7 @@ RSpec.describe BillingRate do
 
   describe ".line_item_usage" do
     it "returns usage by duration" do
-      expect(described_class.line_item_usage("VmCores", "standard", 5, 1)).to eq("1 minutes")
+      expect(described_class.line_item_usage("VmVCpu", "standard", 5, 1)).to eq("1 minutes")
     end
 
     it "returns usage by amount" do

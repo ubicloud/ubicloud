@@ -37,7 +37,7 @@ RSpec.describe Prog::Vm::Nexus do
       allow(_1).to receive(:active_billing_records).and_return([BillingRecord.new(
         project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
         resource_name: _1.name,
-        billing_rate_id: BillingRate.from_resource_properties("VmCores", _1.family, _1.location)["id"],
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", _1.family, _1.location)["id"],
         amount: _1.cores
       )])
     }
