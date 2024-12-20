@@ -68,7 +68,7 @@ module Option
     alias_method :display_name, :name
   end
   PostgresSizes = Option.postgres_locations.product([2, 4, 8, 16, 30, 60]).flat_map {
-    storage_size_options = [_2 * 64, _2 * 128, _2 * 256]
+    storage_size_options = [_2 * 32, _2 * 64, _2 * 128]
     storage_size_options.map! { |size| size / 15 * 16 } if [30, 60].include?(_2)
 
     storage_size_options.pop if _1.name == "leaseweb-wdc02"
