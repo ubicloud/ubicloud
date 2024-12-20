@@ -3,7 +3,6 @@ $(function () {
   setupDatePicker();
   setupFormOptionUpdates();
   setupPlayground();
-  setupAceDeleteButtons();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -40,30 +39,23 @@ $(".sidebar-group-btn").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });
 
+$("#ace-template").addClass('hidden');
+
 var num_aces = 0;
 $("#new-ace-btn").on("click", function (event) {
   event.preventDefault();
   num_aces++;
   var template = $('#ace-template').clone().removeClass('hidden').removeAttr('id');
   var pos = 0;
-  template.find('select').each(function(i, element) {
+  var id_attr = '';
+  template.find('select, input').each(function(i, element) {
+    id_attr = 'ace-select-' + num_aces + '-' + pos;
     pos++;
-    $(element).attr('id', 'ace-select-' + num_aces + '-' + pos)
+    $(element).attr('id', id_attr);
   });
-  template.insertBefore('#access-control-entries tbody tr:last')
-    .find('input[name="aces[][ubid]"]').first().val("new");
-  $('#access-control-entries tr:not(.hidden) select[name="aces[][subject]"]').attr('required', true);
-  setupAceDeleteButtons();
+  template.find('label').attr('for', id_attr);
+  template.insertBefore('#access-control-entries tbody tr:last');
 });
-
-function setupAceDeleteButtons() {
-  $(".remove-ace-btn").off('click').on("click", function (event) {
-    event.preventDefault();
-    let row = $(this).closest("tr");
-    row.find('input[name="aces[][deleted]"]').first().val("true");
-    row.addClass("hidden");
-  });
-}
 
 $(".delete-btn").on("click", function (event) {
   event.preventDefault();
