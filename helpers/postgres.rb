@@ -20,8 +20,8 @@ class Clover
     else 0
     end
 
-    requested_postgres_core_count = (requested_standby_count + 1) * parsed_size.vcpu / 2
-    Validation.validate_core_quota(@project, "PostgresCores", requested_postgres_core_count)
+    requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu
+    Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: @project.id,

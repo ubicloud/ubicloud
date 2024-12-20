@@ -55,7 +55,7 @@ class Clover
         if api?
           Serializers::Project.serialize(@project)
         else
-          @quotas = ["VmCores", "PostgresCores"].map {
+          @quotas = ["VmVCpu", "PostgresVCpu"].map {
             {
               resource_type: _1,
               current_resource_usage: @project.current_resource_usage(_1),

@@ -174,14 +174,14 @@ class Prog::Vm::GithubRunner < Prog::Base
 
   def quota_available?
     github_runner.installation.project_dataset.for_update.all
-    # In existing Github quota calculations, we compare total allocated cores
-    # with the core limit and allow passing the limit once. This is because we
+    # In existing Github quota calculations, we compare total allocated cpu count
+    # with the cpu limit and allow passing the limit once. This is because we
     # check quota and allocate VMs in different labels hence transactions and it
     # is difficult to enforce quotas in the environment with lots of concurrent
     # requests. There are some remedies, but it would require some refactoring
     # that I'm not keen to do at the moment. Although it looks weird, passing 0
     # as requested_additional_usage keeps the existing behavior.
-    github_runner.installation.project.quota_available?("GithubRunnerCores", 0)
+    github_runner.installation.project.quota_available?("GithubRunnerVCpu", 0)
   end
 
   def setup_info

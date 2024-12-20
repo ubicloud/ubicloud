@@ -18,7 +18,7 @@ RSpec.describe GithubInstallation do
       Strand.create(prog: "Github::RunnerNexus", label: "allocate_vm") { _1.id = gr.id }
     end
 
-    expect(installation.total_active_runner_cores).to eq(3)
+    expect(installation.total_active_runner_vcpus).to eq(6)
   end
 
   it "returns sum of used vm cores for arm64" do
@@ -29,6 +29,6 @@ RSpec.describe GithubInstallation do
       Strand.create(prog: "Github::RunnerNexus", label: "allocate_vm") { _1.id = gr.id }
     end
 
-    expect(installation.total_active_runner_cores).to eq(6)
+    expect(installation.total_active_runner_vcpus).to eq(6)
   end
 end
