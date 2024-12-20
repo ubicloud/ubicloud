@@ -7,6 +7,14 @@ RSpec.describe Clover, "personal access token management" do
 
   let(:project) { user.projects.first }
 
+  # Show the displayed access control entries, except for the Admin one
+  def displayed_access_control_entries
+    page.all("table#access-control-entries .existing-aces-view td.values").map(&:text) +
+      page.all("table#access-control-entries .existing-aces select")
+        .map { |select| select.all("option[selected]")[0] || select.first("option") }
+        .map(&:text)
+  end
+
   before do
     login(user.email)
     visit "#{project.path}/user/token"
@@ -124,86 +132,75 @@ RSpec.describe Clover, "personal access token management" do
 
     expect(find_by_id("flash-notice").text).to eq "Restricted personal access token"
     expect(@api_key.unrestricted_token_for_project?(project.id)).to be false
-    expect(page.title).to eq "Ubicloud - Default - Token Access Control"
+    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
 
     visit "#{project.path}/user/token/#{@api_key.ubid}/restrict-access"
     expect(find_by_id("flash-error").text).to eq "Token access is already restricted"
-    expect(page.title).to eq "Ubicloud - Default - Token Access Control"
+    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
   end
 
   it "can view token access control entries" do
     @api_key.restrict_token_for_project(project.id)
     click_link @api_key.ubid
-    expect(page.title).to eq "Ubicloud - Default - Token Access Control"
+    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
     expect(page.html).to include "Currently, this token has no access to the project."
 
     AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
     page.refresh
     expect(page.html).to include "Below are the access control entries for the token."
-    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-      "Edit", "All", "All", "Remove"
+    expect(displayed_access_control_entries).to eq [
+      "All Actions", "All Objects"
     ]
   end
 
   it "can create token access control entries" do
     @api_key.restrict_token_for_project(project.id)
     click_link @api_key.ubid
-    click_link "Create Token Access Control Entry"
-    expect(page.title).to eq "Ubicloud - Default - Create Token Access Control Entry"
-
-    click_button "Create Token Access Control Entry"
-    expect(find_by_id("flash-notice").text).to eq "Token access control entry created successfully"
-    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-      "Edit", "All", "All", "Remove"
-    ]
+    within("#ace-template .action") { select "ActionTag:add" }
+    expect(displayed_access_control_entries).to eq []
 
     ObjectTag.create_with_id(project_id: project.id, name: "OTest")
-    click_link "Create Token Access Control Entry"
-    select "ActionTag:view"
-    within("#object #object-tag-group") { select "OTest" }
-    click_button "Create Token Access Control Entry"
-    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-      "Edit", "ActionTag:view", "Tag: OTest", "Remove",
-      "Edit", "All", "All", "Remove"
+    click_button "Save All"
+    expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
+    expect(displayed_access_control_entries).to eq [
+      "ActionTag:add", "All Objects"
+    ]
+
+    within("#ace-template .action") { select "ActionTag:view" }
+    within("#ace-template .object #object-tag-group") { select "OTest" }
+    click_button "Save All"
+    expect(displayed_access_control_entries).to eq [
+      "ActionTag:add", "All Objects",
+      "ActionTag:view", "OTest"
     ]
   end
 
   it "can edit token access control entries" do
     @api_key.restrict_token_for_project(project.id)
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
     ObjectTag.create_with_id(project_id: project.id, name: "OTest")
     click_link @api_key.ubid
-    click_link "Edit"
-    expect(page.title).to eq "Ubicloud - Default - Update Token Access Control Entry"
-    select "ActionTag:view"
-    within("#object #object-tag-group") { select "OTest" }
-    click_button "Update Token Access Control Entry"
-    expect(find_by_id("flash-notice").text).to eq "Token access control entry updated successfully"
-    expect(page.all("table#access-control-entries td").map(&:text)).to eq [
-      "Edit", "ActionTag:view", "Tag: OTest", "Remove"
+    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
+    within("#ace-#{ace.ubid} .action") { select "ActionTag:view" }
+    within("#ace-#{ace.ubid} .object #object-tag-group") { select "OTest" }
+    click_button "Save All"
+    expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
+    expect(displayed_access_control_entries).to eq [
+      "ActionTag:view", "OTest"
     ]
-  end
-
-  it "handles invalid ubid when editing token access control entry" do
-    @api_key.restrict_token_for_project(project.id)
-    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
-    click_link @api_key.ubid
-    ace.destroy
-    click_link "Edit"
-    expect(page.status_code).to eq 404
   end
 
   it "can delete token access control entries" do
     @api_key.restrict_token_for_project(project.id)
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
     ObjectTag.create_with_id(project_id: project.id, name: "OTest")
     click_link @api_key.ubid
-    path = page.current_path
-    btn = find ".delete-btn"
-    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+    within("#ace-#{ace.ubid}") { check "Delete" }
 
-    visit path
-    expect(find_by_id("flash-notice").text).to eq "Token access control entry deleted successfully"
+    click_button "Save All"
+    expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
+    expect(ace).not_to be_exists
+
     expect(page.html).to include "Currently, this token has no access to the project."
   end
 end
