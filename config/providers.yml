@@ -14,7 +14,6 @@
     provider_internal_name: leaseweb,
     locations: [
       {display_name: us-east-a2, internal_name: leaseweb-wdc02, ui_name: "Virginia, US", visible: true},
-      {display_name: us-south-a13, internal_name: leaseweb-dal13,  ui_name: "Dallas, US", visible: false},
     ]
   },
   {
