@@ -104,7 +104,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def install_prerequistes_on_control_plane
     current_vm.sshable.cmd <<BASH
 set -ueo pipefail
-echo "net.ipv6.conf.all.forwarding=1\nnet.ipv6.conf.all.proxy_ndp=1\nnet.ipv4.conf.all.forwarding=1\nnet.ipv4.ip_forward=1" \\| sudo tee /etc/sysctl.d/72-clover-forward-packets.conf > /dev/null
+echo "net.ipv6.conf.all.forwarding=1\nnet.ipv6.conf.all.proxy_ndp=1\nnet.ipv4.conf.all.forwarding=1\nnet.ipv4.ip_forward=1" | sudo tee /etc/sysctl.d/72-clover-forward-packets.conf
 sudo sysctl --system
 sudo modprobe br_netfilter
 sudo apt update
@@ -195,9 +195,7 @@ CONFIG
       hop_install_cni
     when "NotStarted", "Failed"
       current_vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:443 #{frame["join_token"]} #{frame["discovery_token_ca_cert_hash"]} #{frame["certificate_key"]}' join_control_plane")
-      # when "Failed"
-      #   fail "could not join control-plane node"
-      # maybe page someone. read logs
+      nap 5
     when "InProgress"
       nap 10
     end
