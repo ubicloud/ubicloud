@@ -2,15 +2,18 @@
 
 require "net/ssh"
 
+DEFAULT_BOOT_IMAGE_NAMES = Option::BootImages.map { _1.name }.freeze
+
 class Prog::Test::VmGroup < Prog::Test::Base
-  def self.assemble(storage_encrypted: true, test_reboot: true)
+  def self.assemble(storage_encrypted: true, test_reboot: true, boot_images: DEFAULT_BOOT_IMAGE_NAMES)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
         "storage_encrypted" => storage_encrypted,
         "test_reboot" => test_reboot,
-        "vms" => []
+        "vms" => [],
+        "boot_images" => boot_images
       }]
     )
   end
@@ -32,6 +35,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     )
 
     storage_encrypted = frame.fetch("storage_encrypted", true)
+    boot_images = frame.fetch("boot_images")
 
     vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi", project.id,
@@ -40,7 +44,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
         {encrypted: storage_encrypted, skip_sync: true},
         {encrypted: storage_encrypted, size_gib: 5}
       ],
-      boot_image: Option::BootImages.map { _1.name }.sample,
+      boot_image: boot_images.sample,
       enable_ip4: true
     )
 
@@ -53,7 +57,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
         max_write_mbytes_per_sec: 150,
         max_ios_per_sec: 25600
       }],
-      boot_image: Option::BootImages.map { _1.name }.sample,
+      boot_image: boot_images.sample,
       enable_ip4: true
     )
 
@@ -61,7 +65,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       "ubi", project.id,
       private_subnet_id: subnet2_s.id,
       storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
-      boot_image: Option::BootImages.map { _1.name }.sample,
+      boot_image: boot_images.sample,
       enable_ip4: true
     )
 
