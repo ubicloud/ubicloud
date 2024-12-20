@@ -59,8 +59,8 @@ class Clover
     end
     assemble_params["private_subnet_id"] = ps&.id
 
-    requested_vm_core_count = parsed_size.nil? ? 1 : parsed_size.cores
-    Validation.validate_core_quota(project, "VmCores", requested_vm_core_count)
+    requested_vm_cpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
+    Validation.validate_cpu_quota(project, "VmCpu", requested_vm_cpu_count)
 
     st = Prog::Vm::Nexus.assemble(
       request_body_params["public_key"],

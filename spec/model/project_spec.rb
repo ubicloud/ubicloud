@@ -145,14 +145,14 @@ RSpec.describe Project do
   end
 
   it "calculates current resource usage" do
-    expect(project).to receive(:vms).and_return([instance_double(Vm, cores: 2), instance_double(Vm, cores: 4)])
-    expect(project.current_resource_usage("VmCores")).to eq 6
+    expect(project).to receive(:vms).and_return([instance_double(Vm, vcpus: 2), instance_double(Vm, vcpus: 4)])
+    expect(project.current_resource_usage("VmCpu")).to eq 6
 
-    expect(project).to receive(:github_installations).and_return([instance_double(GithubInstallation, total_active_runner_cores: 10), instance_double(GithubInstallation, total_active_runner_cores: 20)])
-    expect(project.current_resource_usage("GithubRunnerCores")).to eq 30
+    expect(project).to receive(:github_installations).and_return([instance_double(GithubInstallation, total_active_runner_cpus: 10), instance_double(GithubInstallation, total_active_runner_cpus: 20)])
+    expect(project.current_resource_usage("GithubRunnerCpu")).to eq 30
 
-    expect(project).to receive(:postgres_resources).and_return([instance_double(PostgresResource, servers: [instance_double(PostgresServer, vm: instance_double(Vm, cores: 2)), instance_double(PostgresServer, vm: instance_double(Vm, cores: 4))])])
-    expect(project.current_resource_usage("PostgresCores")).to eq 6
+    expect(project).to receive(:postgres_resources).and_return([instance_double(PostgresResource, servers: [instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 2)), instance_double(PostgresServer, vm: instance_double(Vm, vcpus: 4))])])
+    expect(project.current_resource_usage("PostgresCpu")).to eq 6
 
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)
   end
@@ -160,20 +160,20 @@ RSpec.describe Project do
   it "calculates effective quota value" do
     project = described_class.create_with_id(name: "test")
     project.add_quota(ProjectQuota.new(value: 1000).tap { _1.quota_id = "14fa6820-bf63-41d2-b35e-4a4dcefd1b15" })
-    expect(project.effective_quota_value("VmCores")).to eq 16
-    expect(project.effective_quota_value("GithubRunnerCores")).to eq 1000
-    expect(project.effective_quota_value("PostgresCores")).to eq 64
+    expect(project.effective_quota_value("VmCpu")).to eq 32
+    expect(project.effective_quota_value("GithubRunnerCpu")).to eq 1000
+    expect(project.effective_quota_value("PostgresCpu")).to eq 128
 
     expect(project).to receive(:reputation).and_return("verified").at_least(:once)
-    expect(project.effective_quota_value("VmCores")).to eq 128
-    expect(project.effective_quota_value("GithubRunnerCores")).to eq 1000
-    expect(project.effective_quota_value("PostgresCores")).to eq 128
+    expect(project.effective_quota_value("VmCpu")).to eq 256
+    expect(project.effective_quota_value("GithubRunnerCpu")).to eq 1000
+    expect(project.effective_quota_value("PostgresCpu")).to eq 256
   end
 
   it "checks if quota is available" do
     expect(project).to receive(:current_resource_usage).and_return(10).twice
     expect(project).to receive(:effective_quota_value).and_return(20).twice
-    expect(project.quota_available?("VmCores", 5)).to be true
-    expect(project.quota_available?("VmCores", 20)).to be false
+    expect(project.quota_available?("VmCpu", 5)).to be true
+    expect(project.quota_available?("VmCpu", 20)).to be false
   end
 end

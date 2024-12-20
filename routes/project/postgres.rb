@@ -21,7 +21,7 @@ class Clover
         @flavor = flavor
         @prices = fetch_location_based_prices("PostgresCores", "PostgresStorage")
         @has_valid_payment_method = @project.has_valid_payment_method?
-        @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresCores", _1.cores) }.map(&:name)
+        @enabled_postgres_sizes = Option::VmSizes.select { @project.quota_available?("PostgresCpu", _1.vcpus) }.map(&:name)
         @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
 
         view "postgres/create"

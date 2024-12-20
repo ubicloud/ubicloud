@@ -234,12 +234,12 @@ module Validation
     fail ValidationFailed.new({url: "Invalid URL"})
   end
 
-  def self.validate_core_quota(project, resource_type, requested_core_count)
-    if !project.quota_available?(resource_type, requested_core_count)
-      current_used_core_count = project.current_resource_usage(resource_type)
+  def self.validate_cpu_quota(project, resource_type, requested_cpu_count)
+    if !project.quota_available?(resource_type, requested_cpu_count)
+      current_used_cpu_count = project.current_resource_usage(resource_type)
       effective_quota_value = project.effective_quota_value(resource_type)
 
-      fail ValidationFailed.new({size: "Insufficient quota for requested size. Requested core count: #{requested_core_count}, currently used core count: #{current_used_core_count}, maximum allowed core count: #{effective_quota_value}, remaining core count: #{effective_quota_value - current_used_core_count}"})
+      fail ValidationFailed.new({size: "Insufficient quota for requested size. Requested CPU count: #{requested_cpu_count}, currently used CPU count: #{current_used_cpu_count}, maximum allowed CPU count: #{effective_quota_value}, remaining CPU count: #{effective_quota_value - current_used_cpu_count}"})
     end
   end
 
