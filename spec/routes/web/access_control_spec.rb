@@ -39,7 +39,7 @@ RSpec.describe Clover, "access control" do
         "Tag: Admin", "All", "All"
       ]
 
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id)
+      ace = AccessControlEntry.create_with_id(project_id:, subject_id: user.id)
       user.update(name: "Tname")
       page.refresh
       expect(displayed_access_control_entries).to eq [
@@ -143,6 +143,40 @@ RSpec.describe Clover, "access control" do
         "Tname", "ATest", "OTest2",
         "STest", "All Actions", "All Objects"
       ]
+
+      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: at.id, object_id: ot1.metatag_uuid)
+      page.refresh
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "Tname", "Member", inference_token.ubid,
+        "Tname", "Member", "OTest2",
+        "Tname", "Project:view", "All Objects",
+        "Tname", "ATest", "All Objects",
+        "Tname", "ATest", "OTest1",
+        "Tname", "ATest", "OTest1",
+        "Tname", "ATest", "OTest2",
+        "Tname", "ATest", "OTest2",
+        "STest", "All Actions", "All Objects"
+      ]
+
+      project.subject_tags_dataset.where(name: "Admin").first.remove_members([user.id])
+      ace.destroy
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:viewaccess"])
+      page.refresh
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Account: Tname", "Global Tag: Member", "InferenceToken: #{inference_token.ubid}",
+        "Account: Tname", "Global Tag: Member", "Tag: OTest2",
+        "Account: Tname", "Project:view", "All",
+        "Account: Tname", "Project:viewaccess", "All",
+        "Account: Tname", "Tag: ATest", "All",
+        "Account: Tname", "Tag: ATest", "ObjectTag: OTest1",
+        "Account: Tname", "Tag: ATest", "Tag: OTest1",
+        "Account: Tname", "Tag: ATest", "Tag: OTest2",
+        "Account: Tname", "Tag: ATest", "Tag: OTest2",
+        "Tag: STest", "All", "All"
+      ]
     end
 
     it "requires Project:viewaccess permissions to view access control entries" do
@@ -217,6 +251,18 @@ RSpec.describe Clover, "access control" do
         "STest", "Member", "All Objects",
         "STest", "ATest", "OTest"
       ]
+
+      within("#ace-template .subject") { select "STest" }
+      within("#ace-template .action") { select "Member" }
+      within("#ace-template") { check "Delete" }
+      click_button "Save All"
+      expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All",
+        "Tname", "All Actions", "All Objects",
+        "STest", "Member", "All Objects",
+        "STest", "ATest", "OTest"
+      ]
     end
 
     it "can update access control entries" do
@@ -229,6 +275,19 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "STest", "All Actions", "All Objects"
+      ]
+    end
+
+    it "skips nonexisting entries when updating access control entries" do
+      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
+      SubjectTag.create_with_id(project_id: project.id, name: "STest")
+      visit "#{project.path}/user/access-control"
+      within("#ace-#{ace.ubid} .subject") { select "STest" }
+      ace.destroy
+      click_button "Save All"
+      expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
+      expect(displayed_access_control_entries).to eq [
+        "Tag: Admin", "All", "All"
       ]
     end
 
