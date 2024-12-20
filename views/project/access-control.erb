@@ -52,7 +52,8 @@ end
         recommended way to handle access control in Ubicloud is to create appropriate tags, add the subjects, actions,
         and objects to the tags, and create the minimum number of access control entries you need to enforce the access
         you want. However, you can create access control entries referencing specific subjects, actions, or objects.
-        You can click on the Subject, Action, and Object buttons below to manage the related tags.
+        You can click on the Subject, Action, and Object buttons below to manage the related tags. New access control
+        entries without a subject will be ignored.
       <% end %>
     </div>
   </div>
@@ -78,56 +79,72 @@ end
                 <% end %>
               </th>
             <% end %>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+            <% if edit_perm %>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Delete</th>
+            <% end %>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
           <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
-            <tr id="ace-<%= ubid %>" class="<%= (ubid == "template") ? "hidden" : "" %>">
-              <% if editable && edit_perm %>
+            <% editable &&= edit_perm %>
+            <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
+              <% if editable %>
                 <%== render("components/form/hidden", locals: { name: "aces[][ubid]", value: ubid }) %>
-                <%== render("components/form/hidden", locals: { name: "aces[][deleted]", value: false }) %>
                 <% ace_options.each_with_index do | (name, options), index| %>
+                  <% attributes = { required: "required" } if !@token && index == 0 && ubid != "template" %>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%== render("components/form/select", locals: { id: "ace-#{ubid}-#{index}", name:, selected: tags[index]&.ubid, options: }) %>
+                    <%== render(
+                      "components/form/select",
+                      locals: {
+                        id: "ace-#{ubid}-#{index}",
+                        name:,
+                        selected: tags[index]&.ubid,
+                        options:,
+                        classes: table_headers[index].downcase,
+                        attributes:
+                      }
+                    ) %>
                   </td>
                 <% end %>
                 <td class="py-4 px-3 text-right">
                   <%== render(
-                    "components/button",
+                    "components/form/checkbox",
                     locals: {
-                      text: "Remove",
-                      icon: "hero-trash",
-                      extra_class: "remove-ace-btn",
-                      type: "danger"
+                      id_prefix: "ace-#{ubid}-",
+                      name: "aces[][deleted]",
+                      options: [%w[true Delete]]
                     }
                   ) %>
                 </td>
               <% else %>
                 <% tags.each do |tag| %>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <td class="values whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     <%= ace_label(tag) %>
                   </td>
                 <% end %>
-                <td class="py-4 px-3 text-right"></td>
+                <% if edit_perm %>
+                  <td class="py-4 px-3 text-right"></td>
+                <% end %>
               <% end %>
             </tr>
           <% end %>
         </tbody>
       </table>
-      <div class="px-3 py-4 flex justify-between">
-        <%== render(
-          "components/button",
-          locals: {
-            icon: "hero-plus",
-            text: "New Access Control Entry",
-            attributes: {
-              id: "new-ace-btn"
+      <% if edit_perm %>
+        <div class="px-3 py-4 flex justify-between">
+          <%== render(
+            "components/button",
+            locals: {
+              icon: "hero-plus",
+              text: "New Access Control Entry",
+              attributes: {
+                id: "new-ace-btn"
+              }
             }
-          }
-        ) %>
-        <%== render("components/button", locals: { text: "Save All" }) %>
-      </div>
+          ) %>
+          <%== render("components/button", locals: { text: "Save All" }) %>
+        </div>
+      <% end %>
     </div>
   </form>
 </div>
