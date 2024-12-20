@@ -1,5 +1,4 @@
 $(function() {
-  setupPolicyEditor();
   setupAutoRefresh();
   setupDatePicker();
   setupFormOptionUpdates();
@@ -146,22 +145,6 @@ function notification(message) {
     setTimeout(function () {
         newNotification.remove();
     }, 2000);
-}
-
-function setupPolicyEditor() {
-  $(".policy-editor").each(function() {
-    let pre = $(this).find("pre");
-    let textarea = $(this).find("textarea");
-    pre.html(jsonHighlight(DOMPurify.sanitize(pre.text())));
-
-    pre.on("focusout", function () {
-      pre.html(jsonHighlight(DOMPurify.sanitize(pre.text())));
-    })
-
-    pre.on("keyup", function () {
-      textarea.val(pre.text());
-    })
-  });
 }
 
 // Forked from: https://jsfiddle.net/ourcodeworld/KJQ9K/1209/
