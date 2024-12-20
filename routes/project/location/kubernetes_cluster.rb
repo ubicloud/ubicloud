@@ -29,6 +29,15 @@ class Clover
           view "kubernetes-cluster/show"
         end
       end
+
+      r.on "kubeconfig" do
+        r.get do
+          content = kc.kubeconfig
+          response["Content-Type"] = "text/plain"
+          response["Content-Disposition"] = "attachment; filename=\"#{kc.name}.config\""
+          response.write(content)
+        end
+      end
     end
   end
 end

@@ -44,4 +44,8 @@ class KubernetesCluster < Sequel::Model
   def install_rhizome(sshable, install_specs: false)
     Strand.create_with_id(prog: "InstallRhizome", label: "start", stack: [{"target_folder" => "kubernetes", "subject_id" => sshable.id, "user" => sshable.unix_user}])
   end
+
+  def kubeconfig
+    vms.first.sshable.cmd("sudo cat /etc/kubernetes/admin.conf")
+  end
 end
