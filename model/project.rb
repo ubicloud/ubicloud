@@ -114,9 +114,9 @@ class Project < Sequel::Model
 
   def current_resource_usage(resource_type)
     case resource_type
-    when "VmCores" then vms.sum(&:cores)
-    when "GithubRunnerCores" then github_installations.sum(&:total_active_runner_cores)
-    when "PostgresCores" then postgres_resources.flat_map { _1.servers.map { |s| s.vm.cores } }.sum
+    when "VmVCpu" then vms.sum(&:vcpus)
+    when "GithubRunnerVCpu" then github_installations.sum(&:total_active_runner_vcpus)
+    when "PostgresVCpu" then postgres_resources.flat_map { _1.servers.map { |s| s.vm.vcpus } }.sum
     else
       raise "Unknown resource type: #{resource_type}"
     end
