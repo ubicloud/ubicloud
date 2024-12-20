@@ -203,4 +203,14 @@ RSpec.describe Clover, "personal access token management" do
 
     expect(page.html).to include "Currently, this token has no access to the project."
   end
+
+  it "can unrestrict tokens after restricting them" do
+    @api_key.restrict_token_for_project(project.id)
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    click_link @api_key.ubid
+    click_button "Unrestrict Token"
+    expect(find_by_id("flash-notice").text).to eq "Token access is now unrestricted"
+    expect(ace).not_to be_exists
+    expect(page.title).to eq "Ubicloud - Default - Restrict Personal Access Token"
+  end
 end
