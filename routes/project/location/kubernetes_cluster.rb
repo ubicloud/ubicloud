@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch(:project_location_prefix, "kubernetes-cluster") do |r|
-    r.get do
+    r.get api? do
       kubernetes_cluster_list
     end
 

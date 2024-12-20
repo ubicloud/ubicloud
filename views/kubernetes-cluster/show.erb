@@ -1,0 +1,102 @@
+<% @page_title = @kc[:name] %>
+
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
+      [@kc[:name], "#"]
+    ],
+    # right_items: [render("components/vm_state_label", locals: { state: @kc[:state], extra_class: "text-md" })]
+  }
+) %>
+
+
+<div class="grid gap-6">
+  <!-- Detail Card -->
+  <%== render(
+    "components/kv_data_card",
+    locals: {
+      data: [
+        ["ID", @kc[:id]],
+        ["Name", @kc[:name]],
+        ["Location", @kc[:location]],
+        ["Kubernetes Version", @kc[:kubernetes_version]],
+        ["Control Plane Nodes", @kc[:replica]]
+      ]
+    }
+  ) %>
+
+  <!-- Nodes Card -->
+  <%
+    @nodes = @kc[:vms].map{ |vm| {name: vm[:name], role: 'Controller', state: vm[:state]}} +
+             @kc[:nodepools].flat_map{ |np| np[:vms].map{|vm| {name: vm[:name], role: 'Node Pool: ' + np[:name], state: vm[:state]}}}
+    
+  %>
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Nodes
+      </h3>
+    </div>
+  </div>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @nodes.each do |n| %>
+          <tr>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <%= n[:name] %>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <%= n[:role] %>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <%= n[:state] %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Danger Zone -->
+  <div>
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Danger Zone
+        </h3>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <!-- Delete Card -->
+      <% if has_permission?("KubernetesCluster:delete", @kc[:id]) %>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Delete Kubernetes Cluster</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>This action will permanently delete this cluster. Deleted data cannot be recovered. Use it
+                  carefully.</p>
+              </div>
+            </div>
+            <div id="kc-delete-<%=@kc[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== render("components/delete_button", locals: { confirmation: @kc[:name], redirect: "#{@project_data[:path]}/kubernetes-cluster" }) %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+

@@ -9,9 +9,9 @@ class KubernetesCluster < Sequel::Model
   many_through_many :vms, [[:kubernetes_clusters_vm, :kubernetes_cluster_id, :vm_id]], class: :Vm do |ds|
     ds.order_by(:created_at)
   end
-  one_to_many :kubernetes_nodepool
+  one_to_many :kubernetes_nodepools
 
-  plugin :association_dependencies, kubernetes_nodepool: :destroy
+  plugin :association_dependencies, kubernetes_nodepools: :destroy
 
   include ResourceMethods
   include SemaphoreMethods

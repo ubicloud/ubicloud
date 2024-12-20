@@ -210,7 +210,7 @@ CONFIG
   label def destroy
     kubernetes_cluster.load_balancer.incr_destroy
     kubernetes_cluster.vms.map(&:incr_destroy)
-    # kubernetes_cluster.kubernetes_nodepool. how to delete child nodepool?
+    # kubernetes_cluster.kubernetes_nodepools. how to delete child nodepool?
     kubernetes_cluster.projects.map { kubernetes_cluster.dissociate_with_project(_1) }
     pop "kubernetes cluster is deleted"
   end
