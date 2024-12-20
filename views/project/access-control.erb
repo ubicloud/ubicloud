@@ -7,6 +7,13 @@
   form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/access-control"
   table_headers = %w[Action Object]
   edit_perm = true
+  unrestrict_path = "#{@project_data[:path]}/user/token/#{@token.ubid}/unrestrict-access"
+  right_items = [<<-CREATE]
+    <form id="create-pat" action="#{unrestrict_path}" role="form" method="POST">
+      #{csrf_tag(unrestrict_path)}
+      #{render("components/form/submit_button", locals: { text: "Unrestrict Token" })}
+    </form>
+  CREATE
 else
   page_header = "Access Control"
   ace_options = [
@@ -26,7 +33,8 @@ end
     "components/page_header",
     locals: {
       title: page_header,
-      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]]
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]],
+      right_items:
     }
   ) %>
 </div>
@@ -44,7 +52,9 @@ end
         more access to the project than your account has. Token access control in ubicloud is defined using access
         control entries. Each access control entry has a single action and object. Access is allowed if there is an
         access control entry allowing the token to take the action on the object. Actions and objects can be tags,
-        which are used for grouping multiple actions or multiple objects into a single entity.
+        which are used for grouping multiple actions or multiple objects into a single entity. If you would like to
+        remove access control restrictions, and grant the token full access to your account, click on the Unrestrict
+        Token button above.
       <% elsif edit_perm %>
         Access control in Ubicloud is defined using access control entries. Each access control entry has a single
         subject, action, and object. Access is allowed if there is an access control entry allowing the subject to take
