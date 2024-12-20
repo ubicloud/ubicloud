@@ -159,7 +159,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def create_billing_record
     billing_record_parts = []
     (postgres_resource.required_standby_count + 1).times do |index|
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresCores" : "PostgresStandbyCores", amount: representative_server.vm.cores})
+      billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", amount: representative_server.vm.vcpus})
       billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", amount: postgres_resource.target_storage_size_gib})
     end
 

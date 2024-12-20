@@ -15,7 +15,7 @@ class BillingRecord < Sequel::Model
 
   def duration(begin_time, end_time)
     # Billing logic differs based on the resource type: some are billed by duration, others
-    # by amount. For 'VmCores' billing records, the core counts are stored in the amount
+    # by amount. For 'VmVCpu' billing records, the core counts are stored in the amount
     # column and charges are based on duration. For example, 10 minutes of standard-4 vm
     # usage would be calculated as `10 (duration) x 2 (amount) x rate_for_standard_core`.
     # 'GitHubRunnerMinutes' records, on the other hand, store the used minutes in the

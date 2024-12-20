@@ -8,7 +8,7 @@ RSpec.describe BillingRecord do
       project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
       resource_id: "2464de61-7501-8374-9ab0-416caebe31da",
       resource_name: "whatever",
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", "standard", "hetzner-fsn1")["id"],
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"],
       amount: 1
     )
     expect(described_class.active.all).to eq([expected])

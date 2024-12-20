@@ -282,8 +282,8 @@ class Prog::Vm::Nexus < Prog::Base
       project_id: project.id,
       resource_id: vm.id,
       resource_name: vm.name,
-      billing_rate_id: BillingRate.from_resource_properties("VmCores", vm.family, vm.location)["id"],
-      amount: vm.cores
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location)["id"],
+      amount: vm.vcpus
     )
 
     vm.storage_volumes.each do |vol|

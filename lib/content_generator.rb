@@ -20,13 +20,13 @@ module ContentGenerator
     def self.size(location, size)
       location = LocationNameConverter.to_internal_name(location)
       size = Option::VmSizes.find { _1.display_name == size }
-      unit_price = BillingRate.from_resource_properties("VmCores", "standard", location)["unit_price"].to_f
+      unit_price = BillingRate.from_resource_properties("VmVCpu", "standard", location)["unit_price"].to_f
 
       [
         size.display_name,
         "#{size.vcpus} vCPUs / #{size.memory_gib} GB RAM",
-        "$#{"%.2f" % ((size.vcpus / 2) * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % ((size.vcpus / 2) * unit_price * 60)}/hour"
+        "$#{"%.2f" % (size.vcpus * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (size.vcpus * unit_price * 60)}/hour"
       ]
     end
 
@@ -56,13 +56,13 @@ module ContentGenerator
     def self.size(flavor, location, size)
       location = LocationNameConverter.to_internal_name(location)
       size = Option::PostgresSizes.find { _1.display_name == size }
-      unit_price = BillingRate.from_resource_properties("PostgresCores", flavor, location)["unit_price"].to_f
+      unit_price = BillingRate.from_resource_properties("PostgresVCpu", flavor, location)["unit_price"].to_f
 
       [
         size.display_name,
         "#{size.vcpu} vCPUs / #{size.memory} GB RAM",
-        "$#{"%.2f" % ((size.vcpu / 2) * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % ((size.vcpu / 2) * unit_price * 60)}/hour"
+        "$#{"%.2f" % (size.vcpu * unit_price * 60 * 672)}/mo",
+        "$#{"%.3f" % (size.vcpu * unit_price * 60)}/hour"
       ]
     end
 
@@ -86,15 +86,15 @@ module ContentGenerator
       location = LocationNameConverter.to_internal_name(location)
       vcpu = Option::PostgresSizes.find { _1.display_name == vm_size }.vcpu
       ha_type = Option::PostgresHaOptions.find { _1.name == ha_type }
-      compute_unit_price = BillingRate.from_resource_properties("PostgresCores", flavor, location)["unit_price"].to_f
+      compute_unit_price = BillingRate.from_resource_properties("PostgresVCpu", flavor, location)["unit_price"].to_f
       storage_unit_price = BillingRate.from_resource_properties("PostgresStorage", flavor, location)["unit_price"].to_f
       standby_count = ha_type.standby_count
 
       [
         ha_type.title,
         ha_type.explanation,
-        "$#{"%.2f" % (standby_count * (((vcpu / 2) * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
-        "$#{"%.3f" % (standby_count * (((vcpu / 2) * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
+        "$#{"%.2f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
+        "$#{"%.3f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
       ]
     end
 
