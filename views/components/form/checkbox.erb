@@ -1,4 +1,5 @@
 <% name ||= nil
+id_prefix ||= nil
 label ||= nil
 options ||= {}
 error ||= rodauth.field_error(name) || flash.dig("errors", name)
@@ -12,10 +13,11 @@ attributes ||= {} %>
   <fieldset>
     <div class="space-y-5">
       <% options.each_with_index do |(opt_val, opt_text, opt_classes, opt_attrs), idx| %>
+        <% id = "#{id_prefix}#{name}-#{opt_val}-#{idx}" %>
         <div class="relative flex items-start <%= opt_classes %>">
           <div class="flex h-6 items-center">
             <input
-              id="<%= name %>-<%= opt_val %>-<%= idx %>"
+              id="<%= id %>"
               name="<%= name %>"
               type="checkbox"
               value="<%= opt_val %>"
@@ -26,7 +28,7 @@ attributes ||= {} %>
             >
           </div>
           <div class="ml-3 text-sm leading-6">
-            <label for="<%= name %>-<%= opt_val %>-<%= idx %>" class="font-medium text-gray-900"><%== opt_text %></label>
+            <label for="<%= id %>" class="font-medium text-gray-900"><%== opt_text %></label>
           </div>
         </div>
       <% end %>
