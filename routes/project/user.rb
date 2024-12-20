@@ -143,10 +143,11 @@ class Clover
               DB.transaction do
                 typecast_params.array!(:Hash, "aces").each do
                   ubid, deleted, action_id, object_id = _1.values_at("ubid", "deleted", "action", "object")
+                  action_id = nil if action_id == ""
+                  object_id = nil if object_id == ""
 
                   if ubid == "template"
-                    next if deleted == "true"
-                    next if action_id == "" && object_id == ""
+                    next if deleted == "true" || (action_id.nil? && object_id.nil?)
                     ace = AccessControlEntry.new_with_id(project_id: @project.id, subject_id: token.id)
                   else
                     next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
@@ -216,8 +217,11 @@ class Clover
           DB.transaction do
             typecast_params.array!(:Hash, "aces").each do
               ubid, deleted, subject_id, action_id, object_id = _1.values_at("ubid", "deleted", "subject", "action", "object")
+              subject_id = nil if subject_id == ""
+              action_id = nil if action_id == ""
+              object_id = nil if object_id == ""
 
-              next if subject_id == ""
+              next unless subject_id
               check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
 
               if ubid == "template"
