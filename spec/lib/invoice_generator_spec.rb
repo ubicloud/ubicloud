@@ -30,7 +30,7 @@ RSpec.describe InvoiceGenerator do
     expect(invoices.count).to eq(1)
 
     br = BillingRate.from_resource_properties("VmCpu", vm.family, vm.location)
-    duration_mins = [672 * 60, (duration / 60).ceil].min
+    duration_mins = (duration / 60).ceil
     cost = (vm.cores * duration_mins * br["unit_price"]).round(3)
     expect(invoices.first.content).to eq({
       "project_id" => project.id,

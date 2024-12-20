@@ -124,10 +124,7 @@ class InvoiceGenerator
       .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
     active_billing_records = active_billing_records.where(project_id: @project_ids) unless @project_ids.empty?
     active_billing_records.all.map do |br|
-      # We cap the billable duration at 672 hours. In this way, we can
-      # charge the users same each month no matter the number of days
-      # in that month.
-      duration = [672 * 60, br.duration(@begin_time, @end_time).ceil].min
+      duration = br.duration(@begin_time, @end_time).ceil
       {
         project: br.project,
         resource_id: br.resource_id,

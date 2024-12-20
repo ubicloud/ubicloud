@@ -86,19 +86,14 @@ class Clover < Roda
   end
 
   def fetch_location_based_prices(*resource_types)
-    # We use 1 month = 672 hours for conversion. Number of hours
-    # in a month changes between 672 and 744, We are  also capping
-    # billable hours to 672 while generating invoices. This ensures
-    # that users won't see higher price in their invoice compared
-    # to price calculator and also we charge same amount no matter
-    # the number of days in a given month.
+    # We use 1 month = 730 hours for conversion, which is the average number of hours in a month.
     BillingRate.rates.filter { resource_types.include?(_1["resource_type"]) }
       .group_by { [_1["resource_type"], _1["resource_family"], _1["location"]] }
       .map { |_, brs| brs.max_by { _1["active_from"] } }
       .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
       hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
         hourly: br["unit_price"].to_f * 60,
-        monthly: br["unit_price"].to_f * 60 * 672
+        monthly: br["unit_price"].to_f * 60 * 730
       }
     end
   end
