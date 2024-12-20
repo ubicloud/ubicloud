@@ -173,6 +173,15 @@ RSpec.describe Clover, "personal access token management" do
       "ActionTag:add", "All Objects",
       "ActionTag:view", "OTest"
     ]
+
+    within("#ace-template .action") { select "SubjectTag:view" }
+    within("#ace-template .object #object-tag-group") { select "OTest" }
+    within("#ace-template") { check "Delete" }
+    click_button "Save All"
+    expect(displayed_access_control_entries).to eq [
+      "ActionTag:add", "All Objects",
+      "ActionTag:view", "OTest"
+    ]
   end
 
   it "can edit token access control entries" do
@@ -188,6 +197,21 @@ RSpec.describe Clover, "personal access token management" do
     expect(displayed_access_control_entries).to eq [
       "ActionTag:view", "OTest"
     ]
+  end
+
+  it "ignores unmatched entries when editing access control entries" do
+    @api_key.restrict_token_for_project(project.id)
+    ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
+    ObjectTag.create_with_id(project_id: project.id, name: "OTest")
+    click_link @api_key.ubid
+    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
+    within("#ace-#{ace.ubid} .action") { select "ActionTag:view" }
+    within("#ace-#{ace.ubid} .object #object-tag-group") { select "OTest" }
+    ace.destroy
+    click_button "Save All"
+    expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
+    expect(displayed_access_control_entries).to eq []
+    expect(ace).not_to be_exists
   end
 
   it "can delete token access control entries" do
