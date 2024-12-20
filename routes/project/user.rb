@@ -126,35 +126,37 @@ class Clover
                 [ace.ubid, [uuids[ace.action_id], uuids[ace.object_id]], true]
               end
               sort_aces!(@aces)
-              view "project/token-access-control"
+
+              @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
+              @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
+
+              view "project/access-control"
             end
 
-            r.is "entry", String do |ubid|
-              if ubid == "new"
-                @ace = AccessControlEntry.new_with_id(project_id: @project.id, subject_id: token.id)
-              else
-                next unless (@ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
+            r.post true do
+              DB.transaction do
+                r.params["aces"].each do
+                  ubid, deleted, action_id, object_id = _1.values_at("ubid", "deleted", "action", "object")
+
+                  next if ubid == "template"
+
+                  if ubid == "new"
+                    next if deleted == "true"
+                    ace = AccessControlEntry.new_with_id(project_id: @project.id, subject_id: token.id)
+                  else
+                    next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
+                    if deleted == "true"
+                      ace.destroy
+                      next
+                    end
+                  end
+                  ace.update_from_ubids(action_id:, object_id:)
+                end
               end
 
-              r.get do
-                view "project/access-control-entry"
-              end
+              flash["notice"] = "Token access control entries saved successfully"
 
-              r.post do
-                was_new = @ace.new?
-
-                action_id, object_id = typecast_params.nonempty_str(%w[action object])
-                @ace.update_from_ubids(action_id:, object_id:)
-
-                flash["notice"] = "Token access control entry #{was_new ? "created" : "updated"} successfully"
-                r.redirect "#{@project_data[:path]}/user/token/#{token.ubid}/access-control"
-              end
-
-              r.delete(!@ace.new?) do
-                @ace.destroy
-                flash["notice"] = "Token access control entry deleted successfully"
-                204
-              end
+              r.redirect "#{@project_data[:path]}/user/token/#{token.ubid}/access-control"
             end
           end
         end
