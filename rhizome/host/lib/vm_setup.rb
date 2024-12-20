@@ -283,6 +283,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       # Allocate ::1 in the guest network for DHCPv6.
       r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{nic.tap}"
       r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
+      r "ip -n #{q_vm} route del #{ip6.to_s.shellescape} dev #{nic.tap}"
     end
 
     r "ip -n #{q_vm} addr replace fd00:0b1c:100d:5AFE:CE::/56 dev #{nics.first.tap}"

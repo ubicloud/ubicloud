@@ -63,7 +63,6 @@ class UBICNI
     mtu_value = 1400
 
     inner_mac = gen_mac.shellescape
-    inner_link_local = mac_to_ipv6_link_local(inner_mac)
     inner_ifname = ENV["CNI_IFNAME"]
 
     outer_mac = gen_mac.shellescape
@@ -80,7 +79,6 @@ class UBICNI
     r "ip -6 link set #{outer_ifname} mtu #{mtu_value}"
     r "ip -6 link set #{outer_ifname} up"
     r "ip -6 route add #{container_ip} dev #{outer_ifname} mtu #{mtu_value}"
-    r "ip neigh add proxy #{container_ip.network} dev ens3"
 
     # dns_config = <<~EOF
     # nameserver 8.8.8.8
@@ -200,7 +198,7 @@ class UBICNI
     prefix = 80 + 8
     lower_bits = SecureRandom.random_number(2...2**8) << (128 - prefix - 1)
 
-    NetAddr::IPv6Net.new(NetAddr::IPv6.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask128.new(128))
+    NetAddr::IPv6Net.new(NetAddr::IPv6.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask128.new(prefix))
   end
 
   def gen_mac
