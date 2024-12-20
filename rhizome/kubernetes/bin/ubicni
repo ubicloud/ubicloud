@@ -54,7 +54,8 @@ class UBICNI
   end
 
   def handle_add
-    ipv6_subnet = @stdin_data["ipam"]["ranges"][0]["subnet"]
+    # ipv6_subnet = @stdin_data["ipam"]["ranges"][0]["subnet"]
+    ipv6_subnet = r("ip -6 addr show | awk '/inet6 fd/ {print $2}'")
 
     container_id = ENV["CNI_CONTAINERID"]
     container_ip = allocate_ip(ipv6_subnet, @collision_dir)
@@ -78,7 +79,8 @@ class UBICNI
 
     r "ip -6 link set #{outer_ifname} mtu #{mtu_value}"
     r "ip -6 link set #{outer_ifname} up"
-    r "ip -6 route add #{container_ip} via #{inner_link_local} dev #{outer_ifname} mtu #{mtu_value}"
+    r "ip -6 route add #{container_ip} dev #{outer_ifname} mtu #{mtu_value}"
+    r "ip neigh add proxy #{container_ip.network} dev ens3"
 
     # dns_config = <<~EOF
     # nameserver 8.8.8.8
@@ -194,10 +196,11 @@ class UBICNI
   # Generate a random network that is a slice of the host's network
   # for delegation to a VM.
   def generate_random_ip(addr)
+    # addr = fd2d:3fab:684b:b11f:55f6::2/128
     prefix = 80 + 8
     lower_bits = SecureRandom.random_number(2...2**8) << (128 - prefix - 1)
 
-    NetAddr::IPv6Net.new(NetAddr::IPv6.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask128.new(prefix))
+    NetAddr::IPv6Net.new(NetAddr::IPv6.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask128.new(128))
   end
 
   def gen_mac
