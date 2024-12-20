@@ -135,7 +135,7 @@ class Clover
 
             r.post true do
               DB.transaction do
-                r.params["aces"].each do
+                typecast_params.array!(:Hash, "aces").each do
                   ubid, deleted, action_id, object_id = _1.values_at("ubid", "deleted", "action", "object")
 
                   next if ubid == "template"
@@ -209,7 +209,7 @@ class Clover
           authorize("Project:editaccess", @project.id)
 
           DB.transaction do
-            r.params["aces"].each do
+            typecast_params.array!(:Hash, "aces").each do
               ubid, deleted, subject_id, action_id, object_id = _1.values_at("ubid", "deleted", "subject", "action", "object")
 
               next if subject_id == "" || ubid == "template"
