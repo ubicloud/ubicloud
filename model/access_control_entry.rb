@@ -10,15 +10,6 @@ class AccessControlEntry < Sequel::Model
   # use __id__ if you want the internal object id
   def_column_alias :object_id, :object_id
 
-  %I[subject action object].each do |type|
-    method = :"#{type}_id"
-    define_method(:"#{type}_ubid") do
-      if (value = send(method))
-        UBID.from_uuidish(value).to_s
-      end
-    end
-  end
-
   def update_from_ubids(hash)
     update(hash.transform_values { UBID.to_uuid(_1) if _1 })
   end
