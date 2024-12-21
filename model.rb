@@ -59,6 +59,16 @@ module ResourceMethods
     ubid if id
   end
 
+  def before_validation
+    set_uuid
+    super
+  end
+
+  def set_uuid
+    self.id ||= self.class.generate_uuid if new?
+    self
+  end
+
   INSPECT_CONVERTERS = {
     "uuid" => lambda { |v| UBID.from_uuidish(v).to_s },
     "cidr" => :to_s.to_proc,
@@ -144,12 +154,12 @@ module ResourceMethods
       generate_ubid.to_uuid
     end
 
-    def new_with_id(*, **)
-      new(*, **) { _1.id = generate_uuid }
+    def new_with_id(...)
+      new(...).set_uuid
     end
 
-    def create_with_id(*, **)
-      create(*, **) { _1.id = generate_uuid }
+    def create_with_id(...)
+      create(...)
     end
 
     def redacted_columns
