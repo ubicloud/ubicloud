@@ -1,5 +1,16 @@
-<% page_title = "#{@display_tag_type} Tags" %>
-<% @page_title = "#{@project_data[:name]} - #{page_title}" %>
+<% page_title = "#{@display_tag_type} Tags"
+@page_title = "#{@project_data[:name]} - #{page_title}"
+if (modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion)\z/, "").downcase}tag"))
+  right_items = [
+    render(
+      "components/button",
+      locals: {
+        text: "Create #{@display_tag_type} Tag",
+        link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/new"
+      }
+    )
+  ]
+end %>
 <%== render("project/user-tabbar") %>
 
 <div class="space-y-1">
@@ -12,14 +23,15 @@
         [@project_data[:name], @project_data[:path]],
         ["Access Control", "#{@project_data[:path]}/user/access-control"],
         [page_title, "#"]
-      ]
+      ],
+      right_items:
     }
   ) %>
 </div>
 
 <div class="grid gap-6">
   <div>
-    <% if (modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion)\z/, "").downcase}tag")) %>
+    <% if modification_allowed %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
           <% case @tag_type
@@ -40,15 +52,6 @@
           tags can contain other
           <%= @tag_type %>
           tags, recursively, to allow for easier management.
-        </div>
-        <div class="mb-2 md:mb-0">
-          <%== render(
-            "components/button",
-            locals: {
-              text: "Create #{@display_tag_type} Tag",
-              link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/new"
-            }
-          ) %>
         </div>
       </div>
     <% end %>
