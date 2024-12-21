@@ -1,0 +1,57 @@
+<% @page_title = "Playground" %>
+<%== render("inference/tabbar") %>
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+  <div class="flex space-x-4">
+    <div class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+      <%== render(
+        "components/form/select",
+        locals: {
+          name: "inference_endpoint",
+          label: "Inference Endpoint",
+          placeholder: "Pick an endpoint",
+          options: @inference_endpoints.map { |ie| [ie[:url], ie[:model_name]] },
+          selected: @inference_endpoints.any? ? @inference_endpoints.first[:url] : nil
+        }
+      ) %>
+    </div>
+    <div class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+      <%== render(
+        "components/form/select",
+        locals: {
+          name: "inference_token",
+          label: "Inference Token",
+          placeholder: "Pick a token",
+          options: @inference_tokens.map { |it| [it[:key], it[:id]] },
+          selected: @inference_tokens.any? ? @inference_tokens.first[:key] : nil
+        }
+      ) %>
+    </div>
+  </div>
+  <div class="shadow-md rounded-lg p-2 ml-2 mr-2 mb-2 bg-gray-50">
+    <%== render(
+      "components/form/textarea",
+      locals: {
+        name: "inference_prompt",
+        attributes: {
+          "autofocus" => true,
+          "placeholder" => "User prompt to be submitted to the inference endpoint"
+        }
+      }
+    ) %>
+    <%== render(
+      "components/button",
+      locals: {
+        text: "Submit",
+        attributes: {
+          "name" => "inference_submit",
+          "id" => "inference_submit",
+          "type" => "button"
+        },
+        extra_class: "mt-2"
+      }
+    ) %>
+  </div>
+  <div class="mt-4 ml-2 mr-2 text-sm text-gray-900">
+    <span id="inference_response" class="overflow-auto min-h-48 whitespace-pre-line"></span>
+  </div>
+</div>

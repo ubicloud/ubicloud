@@ -3,6 +3,7 @@ $(function () {
   setupAutoRefresh();
   setupDatePicker();
   setupFormOptionUpdates();
+  setupPlayground();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -282,4 +283,104 @@ function redrawChildOptions(name) {
       redrawChildOptions(child_name);
     });
   }
+}
+
+function setupPlayground() {
+  if ($(document).attr('title') !== 'Ubicloud - Playground') {
+    return;
+  }
+
+  let controller = null;
+
+  const generate = async () => {
+    if (controller) {
+      controller.abort();
+      $('#inference_submit').text("Submit");
+      controller = null;
+      return;
+    }
+
+    const prompt = $('#inference_prompt').val();
+    const endpoint = $('#inference_endpoint').val();
+    const token = $('#inference_token').val();
+
+    if (!prompt) {
+      alert("Please enter a prompt.");
+      return;
+    }
+    if (!endpoint) {
+      alert("Please select an inference endpoint.");
+      return;
+    }
+    if (!token) {
+      alert("Please select an inference token.");
+      return;
+    }
+
+    $('#inference_response').text("");
+    $('#inference_submit').text("Stop");
+
+    controller = new AbortController();
+    const signal = controller.signal;
+
+    try {
+      const response = await fetch(`${endpoint}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          model: $('#inference_endpoint option:selected').text().trim(),
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 1000,
+          stream: true,
+        }),
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Response status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value).trim();
+        const lines = chunk.split("data: ");
+        const parsedLines = lines
+          .filter((line) => line !== "" && line !== "[DONE]")
+          .map((line) => JSON.parse(line));
+
+        parsedLines.forEach((parsedLine) => {
+          const content = parsedLine?.choices?.[0]?.delta?.content;
+          if (content) {
+            $('#inference_response').append(content);
+          }
+        });
+      }
+    }
+    catch (error) {
+      let errorMessage;
+
+      if (signal.aborted) {
+        errorMessage = "Request aborted.";
+      } else if (error instanceof TypeError && error.message === "Failed to fetch") {
+        errorMessage = "Unable to get a response from the endpoint. This may be due to network connectivity or permission-related issues.";
+      } else {
+        errorMessage = `An error occurred: ${error.message}`;
+      }
+
+      $('#inference_response').text(errorMessage);
+    } finally {
+      $('#inference_submit').text("Submit");
+      controller = null;
+    }
+  };
+
+  $('#inference_submit').on("click", generate);
 }
