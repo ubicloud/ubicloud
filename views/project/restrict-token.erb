@@ -1,6 +1,14 @@
-<% page_action = "Restrict Personal Access Token"
-@page_title = "#{@project_data[:name]} - #{page_action}"
-form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/restrict-access" %>
+<% form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/restrict-access"
+page_action = "Restrict Personal Access Token"
+
+right_items = [<<-CREATE]
+  <form id="create-pat" action="#{form_action}" role="form" method="POST">
+    #{csrf_tag(form_action)}
+    #{render("components/form/submit_button", locals: { text: page_action })}
+  </form>
+CREATE
+
+@page_title = "#{@project_data[:name]} - #{page_action}" %>
 <%== render("project/user-tabbar") %>
 
 <div class="space-y-1">
@@ -13,7 +21,8 @@ form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/restrict-access
         [@project_data[:name], @project_data[:path]],
         ["Personal Access Tokens", "#{@project_data[:path]}/user/token"],
         [page_action, "#"]
-      ]
+      ],
+      right_items:
     }
   ) %>
 </div>
@@ -28,12 +37,6 @@ form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/restrict-access
         of this token, use the "Restrict Token Access" button. After restricting token access, the token will have no
         access to the project, and you can grant the specific access you want the token to have. Be aware that the
         token can never have more access to the project than your account has.
-      </div>
-      <div class="mb-2 md:mb-0">
-        <form id="create-pat" action="<%= form_action %>" role="form" method="POST">
-          <%== csrf_tag(form_action) %>
-          <%== render("components/form/submit_button", locals: { text: page_action }) %>
-        </form>
       </div>
     </div>
   </div>
