@@ -69,9 +69,9 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content name
 
         project = Project[name: name]
-        expect(project.access_tags.count).to be 2
-        expect(project.access_control_entries.count).to be 1
-        expect(project.subject_tags.count).to be 1
+        expect(project.access_tags.count).to eq 2
+        expect(project.access_control_entries.count).to eq 2
+        expect(project.subject_tags.map(&:name).sort).to eq %w[Admin Member]
         expect(user.hyper_tag(project)).to exist
       end
     end
@@ -482,7 +482,6 @@ RSpec.describe Clover, "project" do
 
       it "can update default policy of invited user" do
         invited_email = "invited@example.com"
-        SubjectTag.create_with_id(project_id: project.id, name: "Member")
 
         project.add_invitation(email: invited_email, policy: "Member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
         inv2 = project.add_invitation(email: "invited2@example.com", policy: "Member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
