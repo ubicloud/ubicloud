@@ -9,7 +9,7 @@ works = nil
 error = +""
 queue = Queue.new
 
-Open3.popen3({"RACK_ENV" => "production"}, "bundle", "exec", "puma") do |stdin, stdout, stderr, wait_thr|
+Open3.popen3({"RACK_ENV" => "production"}, "bundle", "exec", "puma", "-p", "8081") do |stdin, stdout, stderr, wait_thr|
   pid = wait_thr.pid
 
   timer_thread = Thread.new do
