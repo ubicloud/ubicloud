@@ -30,8 +30,9 @@ RSpec.describe Clover, "access control" do
     end
 
     it "can view sorted access control entries" do
-      visit "#{project.path}/user/access-control"
       project_id = project.id
+      AccessControlEntry.where(project_id:, action_id: Sequel::NOTNULL).destroy
+      visit "#{project.path}/user/access-control"
 
       expect(page.title).to eq("Ubicloud - Default - Access Control")
 
@@ -210,7 +211,8 @@ RSpec.describe Clover, "access control" do
 
       visit "#{project.path}/user/access-control"
       expect(displayed_access_control_entries).to eq [
-        "Tag: Admin", "All", "All"
+        "Tag: Admin", "All", "All",
+        "Member", "Member", "All Objects"
       ]
     end
 
@@ -227,7 +229,8 @@ RSpec.describe Clover, "access control" do
       expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
-        "Tname", "All Actions", "All Objects"
+        "Tname", "All Actions", "All Objects",
+        "Member", "Member", "All Objects"
       ]
 
       within("#ace-template .subject") { select "STest" }
@@ -238,6 +241,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
+        "Member", "Member", "All Objects",
         "STest", "ATest", "OTest"
       ]
 
@@ -248,6 +252,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
+        "Member", "Member", "All Objects",
         "STest", "Member", "All Objects",
         "STest", "ATest", "OTest"
       ]
@@ -260,6 +265,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
+        "Member", "Member", "All Objects",
         "STest", "Member", "All Objects",
         "STest", "ATest", "OTest"
       ]
@@ -274,6 +280,7 @@ RSpec.describe Clover, "access control" do
       expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
+        "Member", "Member", "All Objects",
         "STest", "All Actions", "All Objects"
       ]
     end
@@ -287,12 +294,13 @@ RSpec.describe Clover, "access control" do
       click_button "Save All"
       expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
       expect(displayed_access_control_entries).to eq [
-        "Tag: Admin", "All", "All"
+        "Tag: Admin", "All", "All",
+        "Member", "Member", "All Objects"
       ]
     end
 
     it "can delete access control entries" do
-      ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id)
+      ace = AccessControlEntry[project_id: project.id, action_id: Sequel::NOTNULL]
       visit "#{project.path}/user/access-control"
       within("#ace-#{ace.ubid}") { check "Delete" }
       click_button "Save All"
@@ -355,9 +363,9 @@ RSpec.describe Clover, "access control" do
       SubjectTag.create(project_id: project.id, name: "STest") { |st| st.id = ApiKey.create_personal_access_token(user).id }
       visit "#{project.path}/user/access-control"
       within("#ace-template .subject") { select "STest" }
-      expect(AccessControlEntry.count).to eq 1
+      expect(AccessControlEntry.count).to eq 2
       click_button "Save All"
-      expect(AccessControlEntry.count).to eq 1
+      expect(AccessControlEntry.count).to eq 2
     end
 
     it "cannot create access control entries for the Admin subject Tag" do
@@ -365,9 +373,9 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       within("#ace-template .subject") { select "Temp" }
       SubjectTag.where(project_id: project.id, name: "Temp").update(name: "Admin")
-      expect(AccessControlEntry.count).to eq 1
+      expect(AccessControlEntry.count).to eq 2
       click_button "Save All"
-      expect(AccessControlEntry.count).to eq 1
+      expect(AccessControlEntry.count).to eq 2
     end
 
     %w[subject action object].each do |type|
@@ -382,7 +390,10 @@ RSpec.describe Clover, "access control" do
         tds = page.all("table#tag-list td").map(&:text)
 
         if type == "subject"
-          expect(tds).to eq ["View Membership", "Admin", ""]
+          expect(tds).to eq [
+            "View Membership", "Admin", "",
+            "View Membership", "Member", "Remove"
+          ]
         else
           expect(tds).to eq []
         end
@@ -394,6 +405,7 @@ RSpec.describe Clover, "access control" do
         if type == "subject"
           expect(tds).to eq [
             "View Membership", "Admin", "",
+            "View Membership", "Member", "Remove",
             "View Membership", "test-subject", "Remove"
           ]
         else
@@ -539,6 +551,7 @@ RSpec.describe Clover, "access control" do
       end
 
       it "can delete #{type} tag" do
+        SubjectTag.where(name: "Member").destroy
         name = "test-#{type}"
         model.create_with_id(project_id: project.id, name:)
         visit "#{project.path}/user/access-control/tag/#{type}"
@@ -586,8 +599,8 @@ RSpec.describe Clover, "access control" do
         default = lambda do
           case type
           when "subject"
-            expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Account"]
-            expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["test-account", ""]
+            expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag", "Account"]
+            expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["Member", "", "test-account", ""]
           when "action"
             expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Action"]
             expect(page.all("table#tag-membership-add td").map(&:text)).to eq (global_tags + action_types).flat_map { [_1, ""] }
@@ -603,13 +616,13 @@ RSpec.describe Clover, "access control" do
         case type
         when "subject"
           expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag", "Account"]
-          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-subject", "", "test-account", ""]
+          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["Member", "", "other-subject", "", "test-account", ""]
         when "action"
           expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Global Tag", "Tag", "Action"]
           expect(page.all("table#tag-membership-add td").map(&:text)).to eq [*global_tags, "other-action", *action_types].flat_map { [_1, ""] }
         else
           expect(page.all("table#tag-membership-add tbody th").map(&:text)).to eq ["Tag (grants access to objects contained in tag)", "Project", "SubjectTag", "ObjectTag (grants access to tag itself)"]
-          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", "", "Default", "", "Admin", "", "other-object", "", "test-object", ""]
+          expect(page.all("table#tag-membership-add td").map(&:text)).to eq ["other-object", "", "Default", "", "Admin", "", "Member", "", "other-object", "", "test-object", ""]
         end
 
         tag1.add_member(tag2.id)
@@ -619,8 +632,9 @@ RSpec.describe Clover, "access control" do
         default.call
       end
 
-      it "requires #{cap_type}:view permissions to view members of #{type} tag, and #{cap_type}:{add,remove} to show options" do
+      it "requires #{model}:view permissions to view members of #{type} tag, and #{model}:{add,remove} to show options" do
         project
+        SubjectTag.where(name: "Member").destroy
         AccessControlEntry.dataset.destroy
         name = "test-#{type}"
         tag = model.create_with_id(project_id: project.id, name:)
@@ -710,7 +724,7 @@ RSpec.describe Clover, "access control" do
         expect(find_by_id("flash-error").text).to eq "No change in membership: 1 members already in tag"
       end
 
-      it "requires #{cap_type}:add permissions to add members to #{type} tag" do
+      it "requires #{model}:add permissions to add members to #{type} tag" do
         project
         AccessControlEntry.dataset.destroy
         tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
@@ -739,7 +753,7 @@ RSpec.describe Clover, "access control" do
         expect(find_by_id("flash-notice").text).to eq "1 members removed from #{type} tag"
       end
 
-      it "requires #{cap_type}:remove permissions to remove members from #{type} tag" do
+      it "requires #{model}:remove permissions to remove members from #{type} tag" do
         project
         AccessControlEntry.dataset.destroy
         tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
@@ -778,6 +792,7 @@ RSpec.describe Clover, "access control" do
     end
 
     it "cannot delete Admin subject tag" do
+      SubjectTag.where(name: "Member").destroy
       admin = SubjectTag[project_id: project.id, name: "Admin"]
       admin.update(name: "not-Admin")
       visit "#{project.path}/user/access-control/tag/subject"
@@ -865,7 +880,8 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
-        "Tname", "All Actions", "test-obj"
+        "Tname", "All Actions", "test-obj",
+        "Member", "Member", "All Objects"
       ]
     end
 
