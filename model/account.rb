@@ -21,10 +21,16 @@ class Account < Sequel::Model(:accounts)
     project.associate_with_project(project)
     associate_with_project(project)
 
-    if default_policy # Grant user Admin access
-      subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Admin")
-      subject_tag.add_subject(id)
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: subject_tag.id)
+    if default_policy
+      # Grant user Admin access
+      admin_subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Admin")
+      admin_subject_tag.add_subject(id)
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: admin_subject_tag.id)
+
+      # Also create a Member subject tag with access to member actions
+      member_subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Member")
+      # Use Enumerable.find here, because ActionTag.global_by_name will be cached soon
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: member_subject_tag.id, action_id: ActionTag.global_by_name.find { |tag| tag.name == "Member" }.id)
     end
 
     project
