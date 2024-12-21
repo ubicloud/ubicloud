@@ -1,0 +1,68 @@
+<% @page_title = "Playground" %>
+<%== render("inference/tabbar") %>
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+  <div class="flex space-x-4">
+    <div class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+      <%== render(
+        "components/form/select",
+        locals: {
+          name: "inference_endpoint",
+          label: "Inference Endpoint",
+          placeholder: "Pick an endpoint",
+          options: @inference_endpoints.map { |ie| [ie[:url], ie[:name]] },
+          selected: @inference_endpoints.any? ? @inference_endpoints.first[:url] : nil
+        }
+      ) %>
+    </div>
+    <div class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+      <%== render(
+        "components/form/select",
+        locals: {
+          name: "inference_token",
+          label: "Inference Token",
+          placeholder: "Pick a token",
+          options: @inference_tokens.map { |it| [it[:key], it[:id]] },
+          selected: @inference_tokens.any? ? @inference_tokens.first[:key] : nil
+        }
+      ) %>
+    </div>
+  </div>
+  <div class="shadow-md rounded-lg p-2 ml-2 mr-2 mb-2 bg-gray-50">
+    <div class="space-y-2 text-gray-900">
+      <div class="flex gap-x-2">
+        <input
+          id="user_prompt"
+          type="text"
+          name="user_prompt"
+          placeholder="Ask a question here"
+          class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"
+        >
+        <%== render(
+          "components/button",
+          locals: {
+            text: "Submit",
+            attributes: {
+              "name" => "inference_submit",
+              "id" => "inference_submit",
+              "type" => "button"
+            }
+          }
+        ) %>
+        <%== render(
+          "components/button",
+          locals: {
+            text: "Stop",
+            attributes: {
+              "name" => "inference_stop",
+              "id" => "inference_stop",
+              "type" => "button"
+            }
+          }
+        ) %>
+      </div>
+    </div>
+    <div class="mt-4">
+      <span id="inference_response" class="overflow-auto min-h-48 whitespace-pre-line"></span>
+    </div>
+  </div>
+</div>
