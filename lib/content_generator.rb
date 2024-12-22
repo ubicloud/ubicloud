@@ -14,7 +14,7 @@ module ContentGenerator
       location = LocationNameConverter.to_internal_name(location)
       unit_price = BillingRate.from_resource_properties("IPAddress", "IPv4", location)["unit_price"].to_f
 
-      "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 672)}/mo)"
+      "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 730)}/mo)"
     end
 
     def self.size(location, size)
@@ -25,7 +25,7 @@ module ContentGenerator
       [
         size.display_name,
         "#{size.vcpus} vCPUs / #{size.memory_gib} GB RAM",
-        "$#{"%.2f" % (size.vcpus * unit_price * 60 * 672)}/mo",
+        "$#{"%.2f" % (size.vcpus * unit_price * 60 * 730)}/mo",
         "$#{"%.3f" % (size.vcpus * unit_price * 60)}/hour"
       ]
     end
@@ -38,7 +38,7 @@ module ContentGenerator
       [
         "#{storage_size}GB",
         nil,
-        "$#{"%.2f" % (storage_size * unit_price * 60 * 672)}/mo",
+        "$#{"%.2f" % (storage_size * unit_price * 60 * 730)}/mo",
         "$#{"%.3f" % (storage_size * unit_price * 60)}/hour"
       ]
     end
@@ -61,7 +61,7 @@ module ContentGenerator
       [
         size.display_name,
         "#{size.vcpu} vCPUs / #{size.memory} GB RAM",
-        "$#{"%.2f" % (size.vcpu * unit_price * 60 * 672)}/mo",
+        "$#{"%.2f" % (size.vcpu * unit_price * 60 * 730)}/mo",
         "$#{"%.3f" % (size.vcpu * unit_price * 60)}/hour"
       ]
     end
@@ -73,7 +73,7 @@ module ContentGenerator
       [
         "#{storage_size}GB",
         nil,
-        "$#{"%.2f" % (storage_size.to_i * unit_price * 60 * 672)}/mo",
+        "$#{"%.2f" % (storage_size.to_i * unit_price * 60 * 730)}/mo",
         "$#{"%.3f" % (storage_size.to_i * unit_price * 60)}/hour"
       ]
     end
@@ -93,7 +93,7 @@ module ContentGenerator
       [
         ha_type.title,
         ha_type.explanation,
-        "$#{"%.2f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
+        "$#{"%.2f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 730)}/mo",
         "$#{"%.3f" % (standby_count * ((vcpu * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
       ]
     end
