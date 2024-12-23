@@ -342,20 +342,10 @@ class Clover < Roda
     password_confirm_label "Password Confirmation"
     before_create_account do
       Validation.validate_cloudflare_turnstile(param("cf-turnstile-response"))
-      account[:id] = Account.generate_uuid
-      account[:name] = param("name")
-      Validation.validate_account_name(account[:name])
+      scope.before_rodauth_create_account(account, param("name"))
     end
     after_create_account do
-      account = Account[account_id]
-      account.create_project_with_default_policy("Default")
-      ProjectInvitation.where(email: account.email).each do |inv|
-        account.associate_with_project(inv.project)
-        if (managed_policy = Authorization::ManagedPolicy.from_name(inv.policy))
-          managed_policy.apply(inv.project, [account], append: true)
-        end
-        inv.destroy
-      end
+      scope.after_rodauth_create_account(account_id)
     end
 
     # :nocov:
@@ -370,21 +360,11 @@ class Clover < Roda
     # :nocov:
 
     before_omniauth_create_account do
-      account[:id] = Account.generate_uuid
-      account[:name] = omniauth_name
-      Validation.validate_account_name(account[:name])
+      scope.before_rodauth_create_account(account, omniauth_name)
     end
 
     after_omniauth_create_account do
-      account = Account[account_id]
-      account.create_project_with_default_policy("Default")
-      ProjectInvitation.where(email: account.email).each do |inv|
-        account.associate_with_project(inv.project)
-        if (managed_policy = Authorization::ManagedPolicy.from_name(inv.policy))
-          managed_policy.apply(inv.project, [account], append: true)
-        end
-        inv.destroy
-      end
+      scope.after_rodauth_create_account(account_id)
     end
 
     reset_password_view { view "auth/reset_password", "Request Password" }
