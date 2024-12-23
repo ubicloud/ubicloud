@@ -6,14 +6,14 @@ RSpec.describe Clover, "auth" do
   it "no jwt token" do
     get "/runtime"
 
-    expect(last_response).to have_api_error(400, "invalid JWT format or claim in Authorization header")
+    expect(last_response).to have_runtime_error(400, "invalid JWT format or claim in Authorization header")
   end
 
   it "wrong jwt token" do
     header "Authorization", "Bearer wrongjwt"
     get "/runtime"
 
-    expect(last_response).to have_api_error(400, "invalid JWT format or claim in Authorization header")
+    expect(last_response).to have_runtime_error(400, "invalid JWT format or claim in Authorization header")
   end
 
   it "valid jwt token but no active vm" do
@@ -21,7 +21,7 @@ RSpec.describe Clover, "auth" do
     header "Authorization", "Bearer #{vm.runtime_token}"
     get "/runtime"
 
-    expect(last_response).to have_api_error(400, "invalid JWT format or claim in Authorization header")
+    expect(last_response).to have_runtime_error(400, "invalid JWT format or claim in Authorization header")
   end
 
   it "valid jwt token with an active vm" do

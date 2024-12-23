@@ -17,21 +17,32 @@ RSpec.configure do |config|
     Clover.app
   end
 
-  RSpec::Matchers.define :have_api_error do |expected_state, expected_message, expected_details|
+  def error_response_matcher(expected_state, expected_message, expected_details, nested_error)
+    message_path = nested_error ? ["error", "message"] : ["message"]
+    details_path = nested_error ? ["error", "details"] : ["details"]
+
     match do |response|
       parsed_body = JSON.parse(response.body)
       response.status == expected_state &&
-        (expected_message.nil? || parsed_body.dig("error", "message") == expected_message) &&
-        (expected_details.nil? || parsed_body.dig("error", "details") == expected_details)
+        (expected_message.nil? || parsed_body.dig(*message_path) == expected_message) &&
+        (expected_details.nil? || parsed_body.dig(*details_path) == expected_details)
     end
 
     failure_message do |response|
       parsed_body = JSON.parse(response.body)
       <<~MESSAGE
         #{"expected: ".rjust(16)}#{expected_state}#{expected_message && " - #{expected_message}"}#{expected_details && " - #{expected_details}"}
-        #{"got: ".rjust(16)}#{response.status}#{expected_message && " - #{parsed_body.dig("error", "message")}"}#{expected_details && " - #{parsed_body.dig("error", "details")}"}
+        #{"got: ".rjust(16)}#{response.status}#{expected_message && " - #{parsed_body.dig(*message_path)}"}#{expected_details && " - #{parsed_body.dig(*details_path)}"}
       MESSAGE
     end
+  end
+
+  RSpec::Matchers.define :have_api_error do |expected_state, expected_message, expected_details|
+    error_response_matcher(expected_state, expected_message, expected_details, true)
+  end
+
+  RSpec::Matchers.define :have_runtime_error do |expected_state, expected_message, expected_details|
+    error_response_matcher(expected_state, expected_message, expected_details, false)
   end
 end
 
