@@ -453,7 +453,9 @@ class Prog::Vm::Nexus < Prog::Base
 
     vm.load_balancer.remove_vm(vm) if vm.load_balancer
 
-    vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
+    if vm.vm_host
+      vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
+    end
 
     final_clean_up
 
