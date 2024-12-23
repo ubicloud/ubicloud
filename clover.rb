@@ -193,7 +193,9 @@ class Clover < Roda
 
     error = {code:, type:, message:, details:}
 
-    if api? || runtime? || request.headers["Accept"] == "application/json"
+    if runtime?
+      error
+    elsif api? || request.headers["Accept"] == "application/json"
       {error:}
     else
       @error = error
