@@ -162,23 +162,23 @@ BASH
   end
 
   label def install_cni
-    current_vm.sshable.cmd("sudo ln -s /home/#{current_vm.sshable.unix_user}/kubernetes/bin/ubicni /opt/cni/bin/ubicni")
-    cni_config = <<CONFIG
-{
-  "cniVersion": "1.0.0",
-  "name": "ubicni-network",
-  "type": "ubicni",
-  "ipam": {
-    "type": "host-local",
-    "ranges": [
-      {
-        "subnet": "#{current_vm.ephemeral_net6}"
-      }
-    ]
-  }
-}
-CONFIG
-    current_vm.sshable.cmd("sudo tee -a /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    #     current_vm.sshable.cmd("sudo ln -s /home/#{current_vm.sshable.unix_user}/kubernetes/bin/ubicni /opt/cni/bin/ubicni")
+    #     cni_config = <<CONFIG
+    # {
+    #   "cniVersion": "1.0.0",
+    #   "name": "ubicni-network",
+    #   "type": "ubicni",
+    #   "ipam": {
+    #     "type": "host-local",
+    #     "ranges": [
+    #       {
+    #         "subnet": "#{current_vm.ephemeral_net6}"
+    #       }
+    #     ]
+    #   }
+    # }
+    # CONFIG
+    #     current_vm.sshable.cmd("sudo tee -a /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
     hop_bootstrap_control_plane_vm
   end
 
