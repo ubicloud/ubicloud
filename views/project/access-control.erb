@@ -89,7 +89,7 @@ end
                 <%== render("components/form/hidden", locals: { name: "aces[][deleted]", value: false }) %>
                 <% ace_options.each_with_index do | (name, options), index| %>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%== render("components/form/select", locals: { name:, selected: tags[index]&.ubid, options: }) %>
+                    <%== render("components/form/select", locals: { id: "ace-#{ubid}-#{index}", name:, selected: tags[index]&.ubid, options: }) %>
                   </td>
                 <% end %>
                 <td class="py-4 px-3 text-right">

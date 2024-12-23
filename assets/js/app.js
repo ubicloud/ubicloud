@@ -40,10 +40,17 @@ $(".sidebar-group-btn").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });
 
+var num_aces = 0;
 $("#new-ace-btn").on("click", function (event) {
   event.preventDefault();
-  $('#ace-template').clone().removeClass('hidden')
-    .insertBefore('#access-control-entries tbody tr:last')
+  num_aces++;
+  var template = $('#ace-template').clone().removeClass('hidden').removeAttr('id');
+  var pos = 0;
+  template.find('select').each(function(i, element) {
+    pos++;
+    $(element).attr('id', 'ace-select-' + num_aces + '-' + pos)
+  });
+  template.insertBefore('#access-control-entries tbody tr:last')
     .find('input[name="aces[][ubid]"]').first().val("new");
   $('#access-control-entries tr:not(.hidden) select[name="aces[][subject]"]').attr('required', true);
   setupAceDeleteButtons();
