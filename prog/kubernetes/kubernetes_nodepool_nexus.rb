@@ -150,7 +150,9 @@ BASH_SCRIPT
   "type": "host-local",
   "ranges": [
     {
-      "subnet": "#{current_vm.ephemeral_net6}"
+      "subnet_ula_ipv6": "#{current_vm.nics.first.private_ipv6}",
+      "subnet_ipv6": "#{current_vm.ephemeral_net6}",
+      "subnet_ipv4": "#{current_vm.nics.first.private_ipv4}"
     }
   ]
 }
@@ -167,6 +169,7 @@ CONFIG
   label def destroy
     kubernetes_nodepool.vms.map(&:incr_destroy)
     kubernetes_nodepool.projects.map { kubernetes_nodepool.dissociate_with_project(_1) }
+    kubernetes_nodepool.destroy
     pop "kubernetes nodepool is deleted"
   end
 end

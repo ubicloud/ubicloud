@@ -86,9 +86,9 @@ class PrivateSubnet < Sequel::Model
   # is the source;
   # https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html
   def random_private_ipv4
-    total_hosts = 2**(32 - net4.netmask.prefix_len) - 5
+    total_hosts = 2**(24 - net4.netmask.prefix_len) - 5
     random_offset = SecureRandom.random_number(total_hosts) + 4
-    addr = net4.nth_subnet(32, random_offset)
+    addr = net4.nth_subnet(24, random_offset)
     return random_private_ipv4 if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
 
     addr

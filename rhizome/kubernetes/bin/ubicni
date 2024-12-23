@@ -20,6 +20,7 @@ class UBICNI
     @stdin_data = read_stdin
     @cni_command = ENV["CNI_COMMAND"]
     @collision_dir = "./allocated_ips"
+    @mtu = 1400
     Dir.mkdir(@collision_dir) unless Dir.exist?(@collision_dir)
   end
 
@@ -54,39 +55,31 @@ class UBICNI
   end
 
   def handle_add
-    # ipv6_subnet = @stdin_data["ipam"]["ranges"][0]["subnet"]
-    ipv6_subnet = r("ip -6 addr show | awk '/inet6 fd/ {print $2}'")
+    subnet_ula_ipv6 = @stdin_data["ipam"]["ranges"][0]["subnet_ula_ipv6"]
+    # subnet_ipv6 = @stdin_data["ipam"]["ranges"][0]["subnet_ipv6"]
+    subnet_ipv4 = @stdin_data["ipam"]["ranges"][0]["subnet_ipv4"]
 
     container_id = ENV["CNI_CONTAINERID"]
-    container_ip = allocate_ip(ipv6_subnet, @collision_dir)
     cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
-    mtu_value = 1400
 
     inner_mac = gen_mac.shellescape
+    inner_link_local = mac_to_ipv6_link_local(inner_mac)
     inner_ifname = ENV["CNI_IFNAME"]
 
     outer_mac = gen_mac.shellescape
     outer_link_local = mac_to_ipv6_link_local(outer_mac)
     outer_ifname = "veth_#{container_id[0, 8]}"
 
-    r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
+    container_ula_ipv6 = setup_ipv6(subnet_ula_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
+    container_ipv4 = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
 
-    r "ip -6 -n #{cni_netns} addr add #{container_ip} dev #{inner_ifname}"
-    r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{mtu_value}"
-    r "ip -6 -n #{cni_netns} link set #{inner_ifname} up"
-    r "ip -6 -n #{cni_netns} route add default via #{outer_link_local} dev #{inner_ifname} mtu #{mtu_value}"
-
-    r "ip -6 link set #{outer_ifname} mtu #{mtu_value}"
-    r "ip -6 link set #{outer_ifname} up"
-    r "ip -6 route add #{container_ip} dev #{outer_ifname} mtu #{mtu_value}"
-
-    # dns_config = <<~EOF
-    # nameserver 8.8.8.8
-    # nameserver 8.8.4.4
-    # search example.com
-    # options ndots:5
-    # EOF
-    # File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
+    dns_config = <<~EOF
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+search example.com
+options ndots:5
+    EOF
+    File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
 
     response = {
       cniVersion: "0.4.0",
@@ -99,8 +92,13 @@ class UBICNI
       ],
       ips: [
         {
+          version: "4",
+          address: container_ipv4,
+          interface: 0
+        },
+        {
           version: "6",
-          address: container_ip,
+          address: container_ula_ipv6,
           gateway: outer_link_local,
           interface: 0
         }
@@ -112,6 +110,37 @@ class UBICNI
       }
     }
     puts JSON.generate(response)
+  end
+
+  def setup_ipv6(subnet, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
+    container_ip = allocate_ipv6(subnet, @collision_dir)
+
+    r "ip -6 -n #{cni_netns} addr add #{container_ip} dev #{inner_ifname}"
+    r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
+    r "ip -6 -n #{cni_netns} route add default via #{outer_link_local} dev #{inner_ifname}"
+
+    r "ip -6 link set #{outer_ifname} mtu #{@mtu} up"
+    r "ip -6 route add #{container_ip} via #{inner_link_local} dev #{outer_ifname} mtu #{@mtu}"
+
+    container_ip
+  end
+
+  def setup_ipv4(subnet, cni_netns, inner_ifname, outer_ifname)
+    container_ip = allocate_ipv4(subnet, @collision_dir)
+    subnet_cidr = NetAddr::CIDR.create(subnet)
+    last_ip = subnet_cidr.range.last
+    host_ip = "#{last_ip}/#{subnet_cidr.bits}"
+
+    r "ip -n #{cni_netns} addr add #{container_ip} dev #{inner_ifname}"
+    r "ip -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
+    r "ip -n #{cni_netns} route add default via #{last_ip}"
+
+    r "ip addr add #{host_ip} dev #{outer_ifname}"
+    r "ip link set #{outer_ifname} mtu #{@mtu} up"
+
+    r "iptables -t nat -A POSTROUTING -s #{subnet} -o ens3 -j MASQUERADE"
+
+    container_ip
   end
 
   def handle_del
@@ -179,9 +208,21 @@ class UBICNI
     exit 1
   end
 
-  def allocate_ip(updated_subnet, collision_dir)
+  def allocate_ipv6(subnet, collision_dir)
     loop do
-      random_ip = generate_random_ip(updated_subnet)
+      random_ip = generate_random_ipv6(subnet)
+      filename = File.join(collision_dir, random_ip.to_s.tr("/", "_"))
+
+      unless File.exist?(filename)
+        File.write(filename, "")
+        return random_ip
+      end
+    end
+  end
+
+  def allocate_ipv4(subnet, collision_dir)
+    loop do
+      random_ip = generate_random_ipv4(subnet)
       filename = File.join(collision_dir, random_ip.to_s.tr("/", "_"))
 
       unless File.exist?(filename)
@@ -193,12 +234,18 @@ class UBICNI
 
   # Generate a random network that is a slice of the host's network
   # for delegation to a VM.
-  def generate_random_ip(addr)
-    # addr = fd2d:3fab:684b:b11f:55f6::2/128
+  def generate_random_ipv6(addr)
     prefix = 80 + 8
     lower_bits = SecureRandom.random_number(2...2**8) << (128 - prefix - 1)
 
     NetAddr::IPv6Net.new(NetAddr::IPv6.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask128.new(prefix))
+  end
+
+  def generate_random_ipv4(addr)
+    prefix = 16 + 8
+    lower_bits = SecureRandom.random_number(2...2**8) << (32 - prefix - 1)
+
+    NetAddr::IPv4Net.new(NetAddr::IPv4.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask32.new(prefix))
   end
 
   def gen_mac

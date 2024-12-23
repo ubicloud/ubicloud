@@ -92,6 +92,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     kubernetes_cluster.vms.map(&:incr_destroy)
     # kubernetes_cluster.kubernetes_nodepools. how to delete child nodepool?
     kubernetes_cluster.projects.map { kubernetes_cluster.dissociate_with_project(_1) }
+    kubernetes_cluster.destroy
     pop "kubernetes cluster is deleted"
   end
 end
