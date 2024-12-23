@@ -26,7 +26,7 @@ class Clover
       private_subnet_id: private_subnet.ubid,
       project_id: @project.id,
       location: @location,
-      replica: 3
+      replica: 1
     )
 
     if api?
