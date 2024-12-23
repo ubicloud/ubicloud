@@ -33,8 +33,8 @@
 
   <!-- Nodes Card -->
   <%
-    @nodes = @kc[:vms].map{ |vm| {name: vm[:name], role: 'Controller', state: vm[:state]}} +
-             @kc[:nodepools].flat_map{ |np| np[:vms].map{|vm| {name: vm[:name], role: 'Node Pool: ' + np[:name], state: vm[:state]}}}
+    @nodes = @kc[:vms].map{ |vm| {name: vm[:name], role: 'Controller', state: vm[:state], hostname: vm[:hostname]}} +
+             @kc[:nodepools].flat_map{ |np| np[:vms].map{|vm| {name: vm[:name], role: 'Node Pool: ' + np[:name], state: vm[:state], hostname: vm[:hostname]}}}
     
   %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -51,6 +51,7 @@
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">VM</th>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role</th>
           <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Hostname</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
@@ -64,6 +65,9 @@
             </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
               <%= n[:state] %>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <%== render("components/copyable_content", locals: { content: n[:hostname], message: "Copied Node Hostname" }) %>
             </td>
           </tr>
         <% end %>

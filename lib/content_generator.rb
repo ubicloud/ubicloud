@@ -136,5 +136,13 @@ module ContentGenerator
     def self.private_subnet(location, private_subnet)
       private_subnet[:display_name]
     end
+
+    def self.cp_nodes(cp_nodes)
+      cp_nodes.to_s
+    end
+
+    def self.worker_nodes(worker_nodes)
+      worker_nodes[:display_name]
+    end
   end
 end

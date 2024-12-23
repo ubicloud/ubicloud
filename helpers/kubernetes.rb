@@ -4,7 +4,7 @@ class Clover
   def post_kubernetes_cluster(name)
     authorize("KubernetesCluster:create", @project.id)
 
-    required_parameters = ["name", "location", "kubernetes_version", "private_subnet_id"]
+    required_parameters = ["name", "location", "kubernetes_version", "private_subnet_id", "cp_nodes", "worker_nodes"]
     request_body_params = validate_request_params(required_parameters)
 
     private_subnet = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
@@ -64,6 +64,9 @@ class Clover
     options.add_option(name: "name")
     options.add_option(name: "location", values: Option.kubernetes_locations.map(&:display_name))
     options.add_option(name: "kubernetes_version", values: ["v1.32.0", "v1.31.0"])
+    options.add_option(name: "cp_nodes", values: ["1", "3"])
+    options.add_option(name: "worker_nodes", values: (1..6).map { {value: _1.to_s, display_name: _1.to_s} })
+    # options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: _1.downcase.tr(" ", "_"), display_name: _1} })
 
     subnets = @project.private_subnets_dataset.authorized(current_account.id, "PrivateSubnet:view").map {
       {
