@@ -5,6 +5,10 @@ require_relative "../model"
 class Project < Sequel::Model
   one_to_many :access_tags
   one_to_many :access_policies
+  one_to_many :access_control_entries
+  one_to_many :subject_tags, order: :name
+  one_to_many :action_tags, order: :name
+  one_to_many :object_tags, order: :name
   one_to_one :billing_info, key: :id, primary_key: :billing_info_id
   one_to_many :usage_alerts
   one_to_many :github_installations
@@ -71,8 +75,11 @@ class Project < Sequel::Model
       access_tags_dataset.destroy
       access_policies_dataset.destroy
       access_control_entries_dataset.destroy
-      DB[:applied_subject_tag].where(tag_id: subject_tags_dataset.select(:id)).delete
-      subject_tags_dataset.destroy
+      %w[subject action object].each do |tag_type|
+        dataset = send(:"#{tag_type}_tags_dataset")
+        DB[:"applied_#{tag_type}_tag"].where(tag_id: dataset.select(:id)).delete
+        dataset.destroy
+      end
       github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(_1) }
 
       # We still keep the project object for billing purposes.
