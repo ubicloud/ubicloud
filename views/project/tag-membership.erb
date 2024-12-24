@@ -1,5 +1,4 @@
-<% page_action = "#{@display_tag_type} Tag Members: #{@tag.name}"
-@page_title = "#{@project_data[:name]} - #{page_action}"
+<% @page_title = "#{@project_data[:name]} - #{@tag.name}"
 addition_allowed = has_permission?("#{@tag_model}:add", @authorize_id)
 removal_allowed = has_permission?("#{@tag_model}:remove", @authorize_id)
 
@@ -30,13 +29,13 @@ current_members.sort! %>
   <%== render(
     "components/page_header",
     locals: {
-      title: page_action,
+      title: "#{@display_tag_type} Tag: #{@tag.name}",
       breadcrumbs: [
         %w[Projects /project],
         [@project_data[:name], @project_data[:path]],
         ["Access Control", "#{@project_data[:path]}/user/access-control"],
         ["#{@display_tag_type} Tags", "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"],
-        [page_action, "#"]
+        [@tag.name, "#"]
       ]
     }
   ) %>
@@ -53,12 +52,7 @@ current_members.sort! %>
     <% else %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-            Current Members of
-            <%= @display_tag_type %>
-            Tag:
-            <%= @tag.name %>
-          </h3>
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Current Members</h3>
         </div>
       </div>
       <form action="<%= disassociate_path %>" method="POST">
@@ -96,7 +90,7 @@ current_members.sort! %>
           </table>
         </div>
         <% if removal_allowed %>
-          <div class="px-4 py-5 sm:p-6">
+          <div class="py-4">
             <%== render("components/form/submit_button", locals: { text: "Remove Members" }) %>
           </div>
         <% end %>
@@ -107,12 +101,7 @@ current_members.sort! %>
     <% if addition_allowed && !add_groups.all? { _2.empty? } %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-            Add Members to
-            <%= @display_tag_type %>
-            Tag:
-            <%= @tag.name %>
-          </h3>
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Add Members</h3>
         </div>
       </div>
       <form action="<%= associate_path %>" method="POST">
@@ -129,11 +118,11 @@ current_members.sort! %>
               <% add_groups.each do |name, available_to_add| %>
                 <% name = name["label"] if name.is_a?(Hash) %>
                 <tr>
-                  <th colspan="2" class="text-left px-3 py-3.5"><%= name %></th>
+                  <th colspan="2" class="text-left px-3 py-3.5 bg-gray-50"><%= name %></th>
                 </tr>
                 <% available_to_add.each do |label, ubid| %>
                   <tr id="<%= ubid %>">
-                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                    <td class="whitespace-nowrap py-4 pl-5 pr-3 text-sm font-medium text-gray-900 sm:pl-7" scope="row">
                       <%== label %>
                     </td>
                     <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
@@ -151,7 +140,7 @@ current_members.sort! %>
             </tbody>
           </table>
         </div>
-        <div class="px-4 py-5 sm:p-6">
+        <div class="py-4">
           <%== render("components/form/submit_button", locals: { text: "Add Members" }) %>
         </div>
       </form>
