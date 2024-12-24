@@ -63,19 +63,42 @@ RSpec.describe Prog::Vm::VmPool do
       expect { nx.wait }.to nap(30)
     end
 
-    it "hops to create_new_vm, if vm count is less than the size and there are no waiting GithubRunners" do
+    it "hops to create_new_vm if there are enough idle cores" do
       pool.update(size: 1)
+
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
+      expect(VmHost).to receive(:where).and_return(instance_double(Sequel::Dataset, select_map: [10]))
+
       expect { nx.wait }.to hop("create_new_vm")
     end
 
-    it "waits even if the vm count is less when there are waiting GithubRunners" do
+    it "hops to create_new_vm if there are enough idle cores for the given arch" do
       pool.update(size: 1)
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      expect(GithubRunner).to receive_message_chain(:join, :where, :count).and_return(1) # rubocop:disable RSpec/MessageChain
-      expect {
-        nx.wait
-      }.to nap(30)
+
+      expect(VmHost).to receive(:where).and_return(instance_double(Sequel::Dataset, select_map: [3]))
+      expect(GithubRunner).to receive_message_chain(:join, :where, :select_map).and_return(["ubicloud-standard-2", "ubicloud-standard-8-arm"])  # rubocop:disable RSpec/MessageChain
+
+      expect { nx.wait }.to hop("create_new_vm")
+    end
+
+    it "waits if there are not enough idle cores due to pool vm" do
+      pool.update(size: 1)
+
+      expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
+      expect(VmHost).to receive(:where).and_return(instance_double(Sequel::Dataset, select_map: [1])) # rubocop:disable RSpec/MessageChain
+
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "waits if there are not enough idle cores due to waiting github runners" do
+      pool.update(size: 1)
+      expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
+
+      expect(VmHost).to receive(:where).and_return(instance_double(Sequel::Dataset, select_map: [3]))
+      expect(GithubRunner).to receive_message_chain(:join, :where, :select_map).and_return(["ubicloud-standard-4"])  # rubocop:disable RSpec/MessageChain
+
+      expect { nx.wait }.to nap(30)
     end
   end
 
