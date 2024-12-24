@@ -83,18 +83,14 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
               <% editable = !(@tag_type == "subject" && tag.name == "Admin") && modification_allowed %>
               <tr id="<%= tag.ubid %>">
                 <td class="pl-4 pr-3 sm:pl-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <% if editable %>
-                    <a href="<%= @project_data[:path] %>/user/access-control/tag/<%= @tag_type %>/<%= tag.ubid %>"><%= tag.name %></a>
-                  <% else %>
-                    <%= tag.name %>
-                  <% end %>
+                  <%= tag.name %>
                 </td>
                 <td class="pl-3 pr-4 sm:pr-6 py-4 flex items-center space-x-2 justify-end">
                   <%== render(
                     "components/button",
                     locals: {
                       text: "Manage",
-                      link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}/membership",
+                      link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
                       attributes: {
                         id: "#{tag.ubid}-edit"
                       }
