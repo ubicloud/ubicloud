@@ -184,18 +184,68 @@ class Clover
         DB.transaction do
           allowed_add_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").to_hash(:name)
           allowed_remove_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").to_hash(:name)
+          additions = {}
+          removals = {}
+          issues = []
+          user_policies = r.params["user_policies"] || {}
+          user_policies.each do |ubid, policy|
+            policy = nil if policy == ""
+            user = Account.from_ubid(ubid)
+            existing_tags = user.subject_tags_dataset.where(project_id: @project.id).select_map(:name)
+            unless existing_tags.length < 2
+              issues << "Cannot change the policy for user, as they are in multiple subject tags"
+              next
+            end
+            next if existing_tags.include?(policy)
+            unless (added_tag = allowed_add_tags[policy]) || !policy
+              issues << "You don't have permission to add members to '#{policy}' tag"
+              next
+            end
+            if (tag = existing_tags.first)
+              unless (removed_tag = allowed_remove_tags[tag])
+                issues << "You don't have permission to remove members from '#{tag}' tag"
+                next
+              end
+              (removals[removed_tag.name] ||= []) << user.id
+            end
+            (additions[added_tag.name] ||= []) << user.id if added_tag
+          end
+
+          additions.each { |name, user_ids| @project.subject_tags_dataset.first(name:).add_members(user_ids) }
+          removals.each { |name, user_ids| @project.subject_tags_dataset.first(name:).remove_members(user_ids) }
+
+          if @project.subject_tags_dataset.first(name: "Admin").member_ids.empty?
+            flash["error"] = "The project must have at least one admin."
+            DB.rollback_on_exit
+            r.redirect "#{@project.path}/user"
+          end
 
           invitation_policies = r.params["invitation_policies"] || {}
           invitation_policies.each do |email, policy|
             policy = nil if policy == ""
-            next if policy && !allowed_add_tags[policy]
             next unless (inv = @project.invitations_dataset.where(email: email).first)
             old_policy = inv.policy
-            next if old_policy && !allowed_remove_tags[old_policy]
+            next if policy == old_policy
+            if policy && !allowed_add_tags[policy]
+              issues << "You don't have permission to add invitation to '#{policy}' tag"
+              next
+            end
+            if old_policy && !allowed_remove_tags[old_policy]
+              issues << "You don't have permission to remove invitation from '#{old_policy}' tag"
+              next
+            end
             inv.update(policy: policy)
+            (additions[inv.policy] ||= []) << 1 if inv.policy
+            (removals[old_policy] ||= []) << 1 if old_policy
           end
+
+          changes = []
+          additions.each { |name, user_ids| changes << "#{user_ids.size} members added to #{name}" }
+          removals.each { |name, user_ids| changes << "#{user_ids.size} members removed from #{name}" }
+
+          flash["notice"] = changes.empty? ? "No change in user policies" : changes.join(", ")
+          flash["error"] = issues.join(", ") unless issues.empty?
         end
-        flash["notice"] = "Subject tags for invited users updated successfully."
 
         r.redirect "#{@project.path}/user"
       end
