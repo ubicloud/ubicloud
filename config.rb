@@ -50,6 +50,10 @@ module Config
   optional :heartbeat_url, string
   optional :clover_database_root_certs, string
   override :max_monitor_threads, 32, int
+  optional :omniauth_github_id, string, clear: true
+  optional :omniauth_github_secret, string, clear: true
+  optional :omniauth_google_id, string, clear: true
+  optional :omniauth_google_secret, string, clear: true
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol

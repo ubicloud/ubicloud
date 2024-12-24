@@ -24,6 +24,24 @@ class Clover < Roda
     end
   end
 
+  def before_rodauth_create_account(account, name)
+    account[:id] = Account.generate_uuid
+    account[:name] = name
+    Validation.validate_account_name(account[:name])
+  end
+
+  def after_rodauth_create_account(account_id)
+    account = Account[account_id]
+    account.create_project_with_default_policy("Default")
+    ProjectInvitation.where(email: account.email).each do |inv|
+      account.associate_with_project(inv.project)
+      if (managed_policy = Authorization::ManagedPolicy.from_name(inv.policy))
+        managed_policy.apply(inv.project, [account], append: true)
+      end
+      inv.destroy
+    end
+  end
+
   def current_account_id
     rodauth.session_value
   end

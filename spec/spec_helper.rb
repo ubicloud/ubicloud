@@ -20,6 +20,7 @@ ENV["MAIL_DRIVER"] = "test"
 ENV["HETZNER_CONNECTION_STRING"] = "https://robot-ws.your-server.de"
 ENV["HETZNER_USER"] = "user1"
 ENV["HETZNER_PASSWORD"] = "pass"
+ENV["OMNIAUTH_GITHUB_ID"] = "1234567890"
 require_relative "coverage_helper"
 require_relative "../loader"
 require "rspec"
@@ -30,6 +31,8 @@ require "webmock/rspec"
 Warning.ignore([:not_reached, :unused_var], /.*lib\/mail\/parser.*/)
 Warning.ignore([:mismatched_indentations], /.*lib\/stripe\/api_operations.*/)
 Warning.ignore([:unused_var], /.*lib\/aws-sdk-(s3|core)\/(endpoint_provider|cbor).*/)
+Warning.ignore(/URI::ABS_URI is obsolete/, /.*lib\/omniauth\/strategy\.rb/)
+Warning.ignore(/URI::RFC3986_PARSER.make_regexp is obsolete/, /.*lib\/capybara\/session\/config\.rb/)
 # https://github.com/prawnpdf/prawn/issues/1349
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 
