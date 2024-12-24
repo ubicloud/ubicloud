@@ -449,7 +449,7 @@ RSpec.describe Clover, "access control" do
           "test-#{type}1", "Manage Remove"
         ]
         expect(page.all("table#tag-list td a").map(&:text)).to eq [
-          "test-#{type}1", "Manage"
+          "Manage"
         ]
 
         click_link "Manage"
@@ -496,11 +496,11 @@ RSpec.describe Clover, "access control" do
 
       it "can rename #{type} tag" do
         name = "test-#{type}"
-        model.create_with_id(project_id: project.id, name:)
+        ubid = model.create_with_id(project_id: project.id, name:).ubid
         visit "#{project.path}/user/access-control/tag/#{type}"
-        click_link name
+        click_link "#{ubid}-edit"
 
-        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag"
+        expect(page.title).to eq "Ubicloud - Default - #{name}"
         fill_in "Name", with: "-"
         click_button "Update"
         expect(find_by_id("flash-error").text).to eq "name must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number"
@@ -512,7 +512,7 @@ RSpec.describe Clover, "access control" do
         expect(model[project_id: project.id, name: old_name]).to be_nil
         expect(model[project_id: project.id, name:]).not_to be_nil
         expect(find_by_id("flash-notice").text).to eq "#{cap_type} tag name updated successfully"
-        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
+        expect(page.title).to eq "Ubicloud - Default - #{name}"
         expect(page.html).to include name
         expect(page.html).not_to include old_name
       end
@@ -526,8 +526,10 @@ RSpec.describe Clover, "access control" do
         expect(page.status_code).to eq 403
 
         ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
+
         page.refresh
-        expect(page.title).to eq "Ubicloud - Default - Update #{cap_type} Tag"
+        expect(page.title).to eq "Ubicloud - Default - #{name}"
 
         ace.destroy
         name = "test2-#{type}"
@@ -626,7 +628,7 @@ RSpec.describe Clover, "access control" do
         name = "test-#{type}"
         tag = model.create_with_id(project_id: project.id, name:)
         tag2 = model.create_with_id(project_id: project.id, name: "test2-#{type}")
-        visit "#{project.path}/user/access-control/tag/#{type}/#{tag.ubid}/membership"
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag.ubid}"
         expect(page.status_code).to eq 403
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
@@ -689,7 +691,7 @@ RSpec.describe Clover, "access control" do
       it "can add members to #{type} tag" do
         tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
         tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
-        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}/membership"
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         find("##{tag2.ubid} input").check
         click_button "Add Members"
@@ -701,7 +703,7 @@ RSpec.describe Clover, "access control" do
       it "handles errors when adding members to #{type} tag" do
         tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
         tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
-        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}/membership"
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         tag1.add_member(tag2.id)
         find("##{tag2.ubid} input").check
@@ -718,7 +720,7 @@ RSpec.describe Clover, "access control" do
         tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
         ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:add"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
-        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}/membership"
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         ace.destroy
         find("##{tag2.ubid} input").check
@@ -731,7 +733,7 @@ RSpec.describe Clover, "access control" do
         tag1 = model.create_with_id(project_id: project.id, name: "test-#{type}")
         tag2 = model.create_with_id(project_id: project.id, name: "other-#{type}")
         tag1.add_member(tag2.id)
-        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}/membership"
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         find("##{tag2.ubid} input").check
         click_button "Remove Members"
@@ -748,7 +750,7 @@ RSpec.describe Clover, "access control" do
         tag1.add_member(tag2.id)
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
         ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:remove"], object_id: (type == "object") ? tag1.metatag_uuid : tag1.id)
-        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}/membership"
+        visit "#{project.path}/user/access-control/tag/#{type}/#{tag1.ubid}"
 
         ace.destroy
         find("##{tag2.ubid} input").check
@@ -760,7 +762,7 @@ RSpec.describe Clover, "access control" do
 
     it "can add global action tag members to action tag" do
       tag = ActionTag.create_with_id(project_id: project.id, name: "test-action")
-      visit "#{project.path}/user/access-control/tag/action/#{tag.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/action/#{tag.ubid}"
 
       member_global_tag = ActionTag[project_id: nil, name: "Member"]
       find("##{member_global_tag.ubid} input").check
@@ -774,7 +776,7 @@ RSpec.describe Clover, "access control" do
       tag = SubjectTag.create_with_id(project_id: project.id, name: "test-subject")
       api_key = ApiKey.create_personal_access_token(user, project: project)
       tag.add_member(api_key.id)
-      visit "#{project.path}/user/access-control/tag/subject/#{tag.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/subject/#{tag.ubid}"
       expect(page.html).not_to include "Current Members of Subject Tag"
     end
 
@@ -796,11 +798,13 @@ RSpec.describe Clover, "access control" do
     it "cannot rename Admin subject tag" do
       admin = SubjectTag[project_id: project.id, name: "Admin"]
       visit "#{project.path}/user/access-control/tag/subject/#{admin.ubid}"
-      expect(find_by_id("flash-error").text).to eq "Cannot modify Admin subject tag"
+
+      expect(page).to have_no_content("Update Subject Tag")
 
       admin.update(name: "not-Admin")
       visit "#{project.path}/user/access-control/tag/subject/#{admin.ubid}"
       admin.update(name: "Admin")
+      expect(page).to have_content("Update Subject Tag")
       fill_in "Name", with: "not-Admin"
       click_button "Update"
       expect(find_by_id("flash-error").text).to eq "Cannot modify Admin subject tag"
@@ -810,7 +814,7 @@ RSpec.describe Clover, "access control" do
       tag = SubjectTag.create_with_id(project_id: project.id, name: "test-subject")
       admin = SubjectTag[project_id: project.id, name: "Admin"]
       admin.update(name: "not-Admin")
-      visit "#{project.path}/user/access-control/tag/subject/#{tag.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/subject/#{tag.ubid}"
       admin.update(name: "Admin")
       find("##{admin.ubid} input").check
       click_button "Add Members"
@@ -820,7 +824,7 @@ RSpec.describe Clover, "access control" do
     it "supports adding InferenceToken to ObjectTag" do
       inference_token = ApiKey.create_inference_token(project)
       tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
-      visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}"
       find("##{inference_token.ubid} input").check
       click_button "Add Members"
       expect(find_by_id("flash-notice").text).to eq "1 members added to object tag"
@@ -832,7 +836,7 @@ RSpec.describe Clover, "access control" do
     it "supports adding ObjectTag to ObjectTag, both as regular tag and metatag" do
       tag1 = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
       tag2 = ObjectTag.create_with_id(project_id: project.id, name: "other-obj")
-      visit "#{project.path}/user/access-control/tag/object/#{tag1.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/object/#{tag1.ubid}"
       find("##{tag1.metatag_ubid} input").check
       find("##{tag2.ubid} input").check
       find("##{tag2.metatag_ubid} input").check
@@ -849,7 +853,7 @@ RSpec.describe Clover, "access control" do
       st = SubjectTag.create_with_id(project_id: project.id, name: "st")
       at = ActionTag.create_with_id(project_id: project.id, name: "at")
       tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
-      visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}"
       find("##{st.ubid} input").check
       find("##{at.ubid} input").check
       click_button "Add Members"
@@ -874,7 +878,7 @@ RSpec.describe Clover, "access control" do
 
     it "cannot remove all accounts from Admin subject tag" do
       admin = SubjectTag[project_id: project.id, name: "Admin"]
-      visit "#{project.path}/user/access-control/tag/subject/#{admin.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/subject/#{admin.ubid}"
       check "remove[]"
       click_button "Remove Members"
       expect(find_by_id("flash-error").text).to eq "Members not removed from tag: must keep at least one account in Admin subject tag"
@@ -883,7 +887,7 @@ RSpec.describe Clover, "access control" do
     it "handles serialization failure when adding members" do
       tag1 = SubjectTag.create_with_id(project_id: project.id, name: "test-subject")
       tag2 = SubjectTag.create_with_id(project_id: project.id, name: "other-subject")
-      visit "#{project.path}/user/access-control/tag/subject/#{tag1.ubid}/membership"
+      visit "#{project.path}/user/access-control/tag/subject/#{tag1.ubid}"
 
       find("##{tag2.ubid} input").check
       5.times do
