@@ -361,8 +361,24 @@ class Clover
 
           r.on String do |ubid|
             next unless (@tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)])
+            # Metatag uuid is used to differentiate being allowed to manage
+            # tag itself, compared to being able to manage things contained in
+            # the tag.
+            @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
 
             r.is do
+              r.get true do
+                authorize("#{@tag.class}:view", @authorize_id)
+
+                members = @current_members = {}
+                @tag.member_ids.each do
+                  next if @tag_type == "subject" && UBID.uuid_class_match?(_1, ApiKey)
+                  members[_1] = nil
+                end
+                UBID.resolve_map(members)
+                view "project/tag"
+              end
+
               authorize(tag_perm_map[tag_type], @project.id)
 
               if @tag_type == "subject" && @tag.name == "Admin"
@@ -370,8 +386,10 @@ class Clover
                 r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
               end
 
-              r.get do
-                view "project/tag"
+              r.post do
+                @tag.update(name: typecast_params.nonempty_str("name"))
+                flash["notice"] = "#{@display_tag_type} tag name updated successfully"
+                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
               end
 
               r.delete do
@@ -382,23 +400,6 @@ class Clover
             end
 
             r.on do
-              # Metatag uuid is used to differentiate being allowed to manage
-              # tag itself, compared to being able to manage things contained in
-              # the tag.
-              @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
-
-              r.get "membership" do
-                authorize("#{@tag.class}:view", @authorize_id)
-
-                members = @current_members = {}
-                @tag.member_ids.each do
-                  next if @tag_type == "subject" && UBID.uuid_class_match?(_1, ApiKey)
-                  members[_1] = nil
-                end
-                UBID.resolve_map(members)
-                view "project/tag-membership"
-              end
-
               r.post "associate" do
                 authorize("#{@tag.class}:add", @authorize_id)
 
@@ -423,7 +424,7 @@ class Clover
                   flash["error"] = "No change in membership#{issues}"
                 end
 
-                r.redirect "membership"
+                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
               end
 
               r.post "disassociate" do
@@ -452,7 +453,7 @@ class Clover
                   flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
                 end
 
-                r.redirect "membership"
+                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
               end
             end
           end
