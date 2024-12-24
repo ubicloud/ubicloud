@@ -99,6 +99,13 @@ RSpec.describe Clover, "personal access token management" do
     expect(SubjectTag[project_id: project.id, name: "Admin"].member_ids).to include @api_key.id
   end
 
+  it "user page only shows tokens related to project" do
+    key = ApiKey.create_personal_access_token(user)
+    page.refresh
+    expect(page).to have_content(@api_key.ubid)
+    expect(page).to have_no_content(key.ubid)
+  end
+
   it "user page allows removing personal access tokens" do
     access_tag_ds = DB[:access_tag].where(hyper_tag_id: @api_key.id)
     expect(access_tag_ds.all).not_to be_empty
@@ -137,6 +144,12 @@ RSpec.describe Clover, "personal access token management" do
     visit "#{project.path}/user/token/#{@api_key.ubid}/restrict-access"
     expect(find_by_id("flash-error").text).to eq "Token access is already restricted"
     expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
+  end
+
+  it "cannot view token access control entries for token not associated with this project" do
+    key = ApiKey.create_personal_access_token(user)
+    visit "#{project.path}/user/token/#{key.ubid}/access-control"
+    expect(page.status_code).to eq 404
   end
 
   it "can view token access control entries" do
