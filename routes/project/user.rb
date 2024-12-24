@@ -172,10 +172,31 @@ class Clover
         authorize("Project:user", @project.id)
 
         DB.transaction do
+          allowed_add_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").all.to_h { [_1.name, _1] }
+          allowed_remove_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").all.to_h { [_1.name, _1] }
+
+          user_policies = r.params["user_policies"] || {}
+          user_policies.each do |ubid, policy|
+            user = Account.from_ubid(ubid)
+            existing_tags = user.subject_tags_dataset.where(project_id: @project.id).select_map(:name)
+            next if existing_tags.include?(policy)
+            existing_tags.each do |tag|
+              next unless (removed_tag = allowed_remove_tags[tag])
+              removed_tag.remove_members(user.id)
+            end
+            next unless (added_tag = allowed_add_tags[policy])
+            added_tag.add_member(user.id)
+          end
+
+          if @project.subject_tags_dataset.where(name: "Admin").first.member_ids.empty?
+            flash["error"] = "The project must have at least one admin."
+            DB.rollback_on_exit
+            r.redirect "#{@project.path}/user"
+          end
+
           invitation_policies = r.params["invitation_policies"] || {}
-          allowed_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
           invitation_policies.each do |email, policy|
-            if allowed_tags[policy]
+            if allowed_add_tags[policy]
               @project.invitations.find { _1.email == email }&.update(policy: policy)
             end
           end
