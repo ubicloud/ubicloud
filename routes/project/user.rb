@@ -13,7 +13,7 @@ class Clover
         authorize("Project:user", @project.id)
 
         r.get do
-          @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
+          @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all, {project_id: @project.id})
           @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
           view "project/user"
         end
