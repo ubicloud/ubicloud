@@ -13,8 +13,22 @@ auto_parallel_tests = lambda do
   use_auto_parallel_tests
 end
 
+nproc = lambda do
+  # Limit to 6 processes, as higher number results in more time
+  `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i.clamp(1, 6).to_s
+end
+
+clone_test_database = lambda do
+  Sequel::DATABASES.each(&:disconnect)
+  nproc.call.to_i.times do |i|
+    database_name = "clover_test#{i + 1}"
+    sh "dropdb --if-exists -U postgres #{database_name}"
+    sh "createdb -U postgres -O clover -T clover_test #{database_name}"
+  end
+end
+
 # Migrate
-migrate = lambda do |env, version, db: nil|
+migrate = lambda do |env, version|
   ENV["RACK_ENV"] = env
   require "bundler"
   Bundler.setup(:default, :development)
@@ -22,33 +36,32 @@ migrate = lambda do |env, version, db: nil|
   require_relative "db"
   Sequel.extension :migration
 
-  db ||= DB
-  db.extension :pg_enum
+  DB.extension :pg_enum
 
-  db.loggers << Logger.new($stdout) if db.loggers.empty?
-  Sequel::Migrator.apply(db, "migrate", version)
+  DB.loggers << Logger.new($stdout) if DB.loggers.empty?
+  Sequel::Migrator.apply(DB, "migrate", version)
 
   # Check if the alternate-user password hash user needs to run
   # migrations.  It's desirable to avoid always connecting to run
   # migrations, since, almost always, there will be nothing to do and
   # it gluts output.
-  case db[<<SQL].get
+  case DB[<<SQL].get
 SELECT count(*)
 FROM pg_class
 WHERE relnamespace = 'public'::regnamespace AND relname = 'account_password_hashes'
 SQL
   when 0
-    user = db.get(Sequel.lit("current_user"))
+    user = DB.get(Sequel.lit("current_user"))
     ph_user = "#{user}_password"
 
     # NB: this grant/revoke cannot be transaction-isolated, so, in
     # sensitive settings, it would be good to check role access.
-    db["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
-    Sequel.postgres(**db.opts.merge(user: ph_user)) do |ph_db|
+    DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
+    Sequel.postgres(**DB.opts.merge(user: ph_user)) do |ph_db|
       ph_db.loggers << Logger.new($stdout) if ph_db.loggers.empty?
       Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
     end
-    db["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
+    DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
   when 1
     # Already ran the "ph" migration as the alternate user.  This
     # branch is taken nearly all the time in a production situation.
@@ -66,7 +79,7 @@ task test_down: [:_test_down, :refresh_sequel_caches, :annotate]
 # rubocop:disable Rake/Desc
 task :_test_up do
   migrate.call("test", nil)
-  Rake::Task["setup_database"].invoke("test", true) if auto_parallel_tests.call
+  clone_test_database.call if auto_parallel_tests.call
 end
 
 migrate_version = lambda do |env|
@@ -79,7 +92,7 @@ end
 
 task :_test_down do
   migrate_version.call("test")
-  Rake::Task["setup_database"].invoke("test", true) if auto_parallel_tests.call
+  clone_test_database.call if auto_parallel_tests.call
 end
 # rubocop:enable Rake/Desc
 
@@ -114,11 +127,6 @@ end
 
 # Database setup
 
-nproc = lambda do
-  # Limit to 6 processes, as higher number results in more time
-  `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i.clamp(1, 6).to_s
-end
-
 desc "Setup database"
 task :setup_database, [:env, :parallel] do |_, args|
   raise "env must be test or development" unless ["test", "development"].include?(args[:env])
@@ -126,21 +134,12 @@ task :setup_database, [:env, :parallel] do |_, args|
   raise "parallel can only be used in test" if parallel && args[:env] != "test"
   File.binwrite(auto_parallel_tests_file, "1") if parallel && !File.file?(auto_parallel_tests_file)
 
-  database_count = parallel ? nproc.call.to_i : 1
-  threads = []
-  database_count.times do |i|
-    threads << Thread.new do
-      puts "Creating database #{i}..."
-      database_name = "clover_#{args[:env]}#{parallel ? (i + 1) : ""}"
-      sh "dropdb --if-exists -U postgres #{database_name}"
-      sh "createdb -U postgres -O clover #{database_name}"
-      sh "psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}"
-      db = Sequel.connect("postgres:///#{database_name}?user=clover")
-      migrate.call(args[:env], nil, db: db)
-    end
-  end
-
-  threads.each(&:join)
+  database_name = "clover_#{args[:env]}"
+  sh "dropdb --if-exists -U postgres #{database_name}"
+  sh "createdb -U postgres -O clover #{database_name}"
+  sh "psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}"
+  migrate.call(args[:env], nil)
+  clone_test_database.call if parallel
 end
 
 desc "Generate a new .env.rb"
