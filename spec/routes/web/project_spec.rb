@@ -481,7 +481,7 @@ RSpec.describe Clover, "project" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("Subject tags for invited users updated successfully.")
+        expect(page.find_by_id("flash-notice").text).to eq("1 members added to Admin")
       end
 
       it "can update default policy of invited user" do
@@ -498,6 +498,7 @@ RSpec.describe Clover, "project" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
+        expect(page.find_by_id("flash-notice").text).to eq("1 members added to Admin, 1 members removed from Member")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Admin")
       end
 
@@ -515,9 +516,15 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
 
         within "form#managed-policy" do
+          click_button "Update"
+        end
+
+        within "form#managed-policy" do
           select "ToBeRemoved", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
+        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
+        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to remove invitation from 'Allowed' tag")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: allowed.id)
@@ -526,13 +533,90 @@ RSpec.describe Clover, "project" do
           ace.destroy
           click_button "Update"
         end
+        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
+        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to add invitation to 'ToBeRemoved' tag")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
 
         within "form#managed-policy" do
           select "No access", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
+        expect(page.find_by_id("flash-notice").text).to eq("1 members removed from Allowed")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: nil)
+      end
+
+      it "can update default policy of existing user" do
+        tag1 = SubjectTag.create_with_id(project_id: project.id, name: "FirstTag")
+        tag2 = SubjectTag.create_with_id(project_id: project.id, name: "SecondTag")
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag1.id)
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag2.id)
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag2.id)
+
+        user2.associate_with_project(project)
+        tag1.add_subject(user2.id)
+
+        visit "#{project.path}/user"
+
+        admin_tag = project.subject_tags_dataset.first(name: "Admin")
+        within "form#managed-policy" do
+          select "SecondTag", from: "user_policies[#{user2.ubid}]"
+          admin_tag.add_subject(user2.id)
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
+        expect(page.find_by_id("flash-error").text).to eq("Cannot change the policy for user, as they are in multiple subject tags")
+        expect(page.find_by_id("user-#{user2.ubid}")).to have_content "Admin, FirstTag"
+        admin_tag.remove_members(user2.id)
+
+        page.refresh
+        within "form#managed-policy" do
+          select "SecondTag", from: "user_policies[#{user2.ubid}]"
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
+        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to remove members from 'FirstTag' tag")
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "FirstTag")
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag1.id)
+        within "form#managed-policy" do
+          select "SecondTag", from: "user_policies[#{user2.ubid}]"
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-notice").text).to eq("1 members added to SecondTag, 1 members removed from FirstTag")
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
+
+        within "form#managed-policy" do
+          select "FirstTag", from: "user_policies[#{user2.ubid}]"
+          ace.destroy
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
+        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to add members to 'FirstTag' tag")
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
+
+        within "form#managed-policy" do
+          select "No access", from: "user_policies[#{user2.ubid}]"
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-notice").text).to eq("1 members removed from SecondTag")
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: nil)
+
+        within "form#managed-policy" do
+          select "SecondTag", from: "user_policies[#{user2.ubid}]"
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-notice").text).to eq("1 members added to SecondTag")
+        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: admin_tag.id)
+        expect(page).to have_select("user_policies[#{user.ubid}]", selected: "Admin")
+        within "form#managed-policy" do
+          select "No access", from: "user_policies[#{user.ubid}]"
+          click_button "Update"
+        end
+        expect(page.find_by_id("flash-error").text).to eq("The project must have at least one admin.")
       end
 
       it "can not have more than 50 pending invitations" do
