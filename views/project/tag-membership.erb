@@ -43,115 +43,118 @@ current_members.sort! %>
 </div>
 
 <div class="grid gap-6">
-  <% if current_members.empty? %>
-    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-      No current members of
-      <%= @tag_type %>
-      tag.
-    </div>
-  <% else %>
-    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          Current Members of
-          <%= @display_tag_type %>
-          Tag:
-          <%= @tag.name %>
-        </h3>
+  <div>
+    <% if current_members.empty? %>
+      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+        No current members of
+        <%= @tag_type %>
+        tag.
       </div>
-    </div>
-    <form action="<%= disassociate_path %>" method="POST">
-      <%== csrf_tag(disassociate_path) %>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table id="tag-membership-remove" class="min-w-full divide-y divide-gray-300">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
-              <% if removal_allowed %>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Remove?</th>
-              <% end %>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% current_members.each do |label, ubid| %>
-              <tr id="<%= ubid %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%== label %>
-                </td>
+    <% else %>
+      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Current Members of
+            <%= @display_tag_type %>
+            Tag:
+            <%= @tag.name %>
+          </h3>
+        </div>
+      </div>
+      <form action="<%= disassociate_path %>" method="POST">
+        <%== csrf_tag(disassociate_path) %>
+        <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+          <table id="tag-membership-remove" class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
                 <% if removal_allowed %>
-                  <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                    <%== render(
-                      "components/form/checkbox",
-                      locals: {
-                        name: "remove[]",
-                        options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["remove"]&.include?(ubid))]]
-                      }
-                    ) %>
-                  </td>
+                  <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Remove?</th>
                 <% end %>
               </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-      <% if removal_allowed %>
-        <div class="px-4 py-5 sm:p-6">
-          <%== render("components/form/submit_button", locals: { text: "Remove Members" }) %>
-        </div>
-      <% end %>
-    </form>
-  <% end %>
-
-  <% if addition_allowed && !add_groups.all? { _2.empty? } %>
-    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          Add Members to
-          <%= @display_tag_type %>
-          Tag:
-          <%= @tag.name %>
-        </h3>
-      </div>
-    </div>
-    <form action="<%= associate_path %>" method="POST">
-      <%== csrf_tag(associate_path) %>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table id="tag-membership-add" class="min-w-full divide-y divide-gray-300">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Add?</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% add_groups.each do |name, available_to_add| %>
-              <% name = name["label"] if name.is_a?(Hash) %>
-              <tr>
-                <th colspan="2" class="text-left px-3 py-3.5"><%= name %></th>
-              </tr>
-              <% available_to_add.each do |label, ubid| %>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+              <% current_members.each do |label, ubid| %>
                 <tr id="<%= ubid %>">
                   <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                     <%== label %>
                   </td>
-                  <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                    <%== render(
-                      "components/form/checkbox",
-                      locals: {
-                        name: "add[]",
-                        options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["add"]&.include?(ubid))]]
-                      }
-                    ) %>
-                  </td>
+                  <% if removal_allowed %>
+                    <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                      <%== render(
+                        "components/form/checkbox",
+                        locals: {
+                          name: "remove[]",
+                          options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["remove"]&.include?(ubid))]]
+                        }
+                      ) %>
+                    </td>
+                  <% end %>
                 </tr>
               <% end %>
-            <% end %>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
+        <% if removal_allowed %>
+          <div class="px-4 py-5 sm:p-6">
+            <%== render("components/form/submit_button", locals: { text: "Remove Members" }) %>
+          </div>
+        <% end %>
+      </form>
+    <% end %>
+  </div>
+  <div>
+    <% if addition_allowed && !add_groups.all? { _2.empty? } %>
+      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Add Members to
+            <%= @display_tag_type %>
+            Tag:
+            <%= @tag.name %>
+          </h3>
+        </div>
       </div>
-      <div class="px-4 py-5 sm:p-6">
-        <%== render("components/form/submit_button", locals: { text: "Add Members" }) %>
-      </div>
-    </form>
-  <% end %>
+      <form action="<%= associate_path %>" method="POST">
+        <%== csrf_tag(associate_path) %>
+        <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+          <table id="tag-membership-add" class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Add?</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+              <% add_groups.each do |name, available_to_add| %>
+                <% name = name["label"] if name.is_a?(Hash) %>
+                <tr>
+                  <th colspan="2" class="text-left px-3 py-3.5"><%= name %></th>
+                </tr>
+                <% available_to_add.each do |label, ubid| %>
+                  <tr id="<%= ubid %>">
+                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                      <%== label %>
+                    </td>
+                    <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                      <%== render(
+                        "components/form/checkbox",
+                        locals: {
+                          name: "add[]",
+                          options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["add"]&.include?(ubid))]]
+                        }
+                      ) %>
+                    </td>
+                  </tr>
+                <% end %>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-4 py-5 sm:p-6">
+          <%== render("components/form/submit_button", locals: { text: "Add Members" }) %>
+        </div>
+      </form>
+    <% end %>
+  </div>
 </div>
