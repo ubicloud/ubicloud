@@ -13,7 +13,7 @@ class Clover
         authorize("Project:user", @project.id)
 
         r.get do
-          @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
+          @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all, {project_id: @project.id})
           @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
           view "project/user"
         end
@@ -176,14 +176,36 @@ class Clover
       r.post "policy/managed" do
         authorize("Project:user", @project.id)
 
-        invitation_policies = r.params["invitation_policies"] || {}
-        allowed_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
-        invitation_policies.each do |email, policy|
-          if allowed_tags[policy]
-            @project.invitations.find { _1.email == email }&.update(policy: policy)
+        DB.transaction do
+          allowed_add_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").all.to_h { [_1.name, _1] }
+          allowed_remove_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").all.to_h { [_1.name, _1] }
+
+          user_policies = r.params["user_policies"] || {}
+          user_policies.each do |ubid, policy|
+            user = Account.from_ubid(ubid)
+            existing_tags = user.subject_tags_dataset.where(project_id: @project.id).select_map(:name)
+            next if existing_tags.include?(policy)
+            existing_tags.each do |tag|
+              next unless (removed_tag = allowed_remove_tags[tag])
+              removed_tag.remove_members(user.id)
+            end
+            next unless (added_tag = allowed_add_tags[policy])
+            added_tag.add_member(user.id)
+          end
+
+          if @project.subject_tags_dataset.where(name: "Admin").first.member_ids.empty?
+            flash["error"] = "The project must have at least one admin."
+            DB.rollback_on_exit
+            r.redirect "#{@project.path}/user"
+          end
+
+          invitation_policies = r.params["invitation_policies"] || {}
+          invitation_policies.each do |email, policy|
+            if allowed_add_tags[policy]
+              @project.invitations.find { _1.email == email }&.update(policy: policy)
+            end
           end
         end
-
         flash["notice"] = "Subject tags for invited users updated successfully."
 
         r.redirect "#{@project.path}/user"
