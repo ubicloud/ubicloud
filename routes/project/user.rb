@@ -176,14 +176,15 @@ class Clover
       r.post "policy/managed" do
         authorize("Project:user", @project.id)
 
-        invitation_policies = r.params["invitation_policies"] || {}
-        allowed_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
-        invitation_policies.each do |email, policy|
-          if allowed_tags[policy]
-            @project.invitations.find { _1.email == email }&.update(policy: policy)
+        DB.transaction do
+          invitation_policies = r.params["invitation_policies"] || {}
+          allowed_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
+          invitation_policies.each do |email, policy|
+            if allowed_tags[policy]
+              @project.invitations.find { _1.email == email }&.update(policy: policy)
+            end
           end
         end
-
         flash["notice"] = "Subject tags for invited users updated successfully."
 
         r.redirect "#{@project.path}/user"
