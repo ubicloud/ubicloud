@@ -130,7 +130,7 @@ task :setup_database, [:env, :parallel] do |_, args|
   database_count.times do |i|
     threads << Thread.new do
       puts "Creating database #{i}..."
-      database_name = "clover_#{args[:env]}#{args[:parallel] ? (i + 1) : ""}"
+      database_name = "clover_#{args[:env]}#{parallel ? (i + 1) : ""}"
       sh "dropdb --if-exists -U postgres #{database_name}"
       sh "createdb -U postgres -O clover #{database_name}"
       sh "psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}"
