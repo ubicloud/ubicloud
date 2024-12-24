@@ -6,10 +6,7 @@ class Clover
       next unless @project.get_ff_inference_ui
 
       r.get true do
-        dataset = dataset_authorize(@project.api_keys_dataset.where(used_for: "inference_endpoint"), "InferenceToken:view")
-        dataset = dataset.where(is_valid: true)
-        dataset = dataset.order(:created_at)
-        @inference_tokens = Serializers::InferenceToken.serialize(dataset.all)
+        @inference_tokens = Serializers::InferenceToken.serialize(inference_token_ds.all)
         view "inference/token/index"
       end
 
