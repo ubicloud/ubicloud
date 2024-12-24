@@ -352,13 +352,15 @@ class Clover
             view "project/tag-list"
           end
 
+          r.post true do
+            authorize(tag_perm_map[tag_type], @project.id)
+            @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+            flash["notice"] = "#{@display_tag_type} tag created successfully"
+            r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+          end
+
           r.on String do |ubid|
-            if ubid == "new"
-              @tag = @tag_model.new_with_id(project_id: @project.id)
-              new = true
-            else
-              next unless (@tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)])
-            end
+            next unless (@tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)])
 
             r.is do
               authorize(tag_perm_map[tag_type], @project.id)
@@ -372,20 +374,14 @@ class Clover
                 view "project/tag"
               end
 
-              r.post do
-                @tag.update(name: typecast_params.nonempty_str("name"))
-                flash["notice"] = "#{@display_tag_type} tag #{new ? "created" : "name updated"} successfully"
-                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
-              end
-
-              r.delete(!new) do
+              r.delete do
                 @tag.destroy
                 flash["notice"] = "#{@display_tag_type} tag deleted successfully"
                 204
               end
             end
 
-            r.on !new do
+            r.on do
               # Metatag uuid is used to differentiate being allowed to manage
               # tag itself, compared to being able to manage things contained in
               # the tag.
