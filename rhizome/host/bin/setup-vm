@@ -52,6 +52,9 @@ begin
   pci_devices = params.fetch("pci_devices", [])
   boot_image = params.fetch("boot_image")
   dns_ipv4 = params.fetch("dns_ipv4")
+  slice_name = params.fetch("slice_name", "system.slice")
+  cpu_percent_limit = params.fetch("cpu_percent_limit", 0)
+  cpu_burst_percent_limit = params.fetch("cpu_burst_percent_limit", 0)
 rescue KeyError => e
   puts "Needed #{e.key} in parameters json"
   exit 1
@@ -68,7 +71,8 @@ when "prep"
   vm_setup.prep(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, swap_size_bytes,
-    pci_devices, boot_image, dns_ipv4)
+    pci_devices, boot_image, dns_ipv4,
+    slice_name, cpu_percent_limit, cpu_burst_percent_limit)
 when "recreate-unpersisted"
   secrets = JSON.parse($stdin.read)
   unless (storage_secrets = secrets["storage"])
@@ -79,11 +83,13 @@ when "recreate-unpersisted"
   vm_setup.recreate_unpersisted(
     gua, ip4, local_ip4, nics, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
-    pci_devices, multiqueue: max_vcpus > 1
+    pci_devices, slice_name, cpu_burst_percent_limit,
+    multiqueue: max_vcpus > 1
   )
 when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(
-    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics
+    max_vcpus, cpu_topology, mem_gib, storage_volumes, nics,
+    pci_devices, slice_name, cpu_percent_limit, cpu_burst_percent_limit
   )
 when "reassign-ip6"
   secrets = JSON.parse($stdin.read)
@@ -93,7 +99,9 @@ when "reassign-ip6"
   end
   vm_setup.reassign_ip6(unix_user, ssh_public_keys, nics, gua, ip4,
     local_ip4, max_vcpus, cpu_topology, mem_gib,
-    ndp_needed, storage_volumes, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
+    ndp_needed, storage_volumes, storage_secrets,
+    swap_size_bytes, pci_devices, boot_image, dns_ipv4,
+    slice_name, cpu_percent_limit, cpu_burst_percent_limit)
 else
   puts "Invalid action #{action}"
   exit 1

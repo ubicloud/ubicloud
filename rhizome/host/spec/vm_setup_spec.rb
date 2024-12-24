@@ -150,8 +150,25 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
       expect(vs).to receive(:prepare_pci_devices).with([])
       expect(vs).to receive(:start_systemd_unit)
+      expect(vs).to receive(:enable_bursting).with("some_slice.slice", 200)
 
-      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets", "10.0.0.2", [], multiqueue: true)
+      vs.recreate_unpersisted(
+        "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",
+        "10.0.0.2", [], "some_slice.slice", 200, multiqueue: true
+      )
+    end
+
+    it "can create unpersisted state without bursting" do
+      expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false, "10.0.0.2", multiqueue: true)
+      expect(vs).to receive(:hugepages).with(4)
+      expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
+      expect(vs).to receive(:prepare_pci_devices).with([])
+      expect(vs).to receive(:start_systemd_unit)
+
+      vs.recreate_unpersisted(
+        "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",
+        "10.0.0.2", [], "system.slice", 0, multiqueue: true
+      )
     end
   end
 
