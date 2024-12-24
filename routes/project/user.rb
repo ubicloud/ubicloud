@@ -60,10 +60,13 @@ class Clover
 
       r.on "token" do
         authorize("Project:token", @project.id)
+        token_ds = current_account
+          .api_keys_dataset
+          .where(id: AccessTag.where(project_id: @project.id).select(:hyper_tag_id))
 
         r.is do
           r.get do
-            @tokens = current_account.api_keys
+            @tokens = token_ds.all
             view "project/token"
           end
 
@@ -79,7 +82,7 @@ class Clover
         end
 
         r.on String do |ubid|
-          @token = token = current_account.api_keys_dataset.with_pk(UBID.to_uuid(ubid))
+          @token = token = token_ds.with_pk(UBID.to_uuid(ubid))
 
           r.delete true do
             if token
@@ -91,6 +94,8 @@ class Clover
             end
             204
           end
+
+          next unless token
 
           r.post "unrestrict-access" do
             token.unrestrict_token_for_project(@project.id)
