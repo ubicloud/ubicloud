@@ -453,7 +453,7 @@ RSpec.describe Clover, "access control" do
         ]
 
         click_link "Manage"
-        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag.name}"
+        expect(page.title).to eq "Ubicloud - Default - #{tag.name}"
       end
 
       it "can create #{type} tag" do
@@ -579,7 +579,7 @@ RSpec.describe Clover, "access control" do
         visit "#{project.path}/user/access-control/tag/#{type}"
         page.find("##{tag1.ubid}-edit").click
 
-        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
+        expect(page.title).to eq "Ubicloud - Default - #{tag1.name}"
         expect(page.html).not_to include "Current Members of #{cap_type} Tag"
         global_tags = ActionTag.where(project_id: nil).select_order_map(:name)
         action_types = ActionType.map(&:name).sort
@@ -614,7 +614,7 @@ RSpec.describe Clover, "access control" do
 
         tag1.add_member(tag2.id)
         page.refresh
-        expect(page.html).to match(/Current\s*Members\s+of\s+#{cap_type}\s+Tag/)
+        expect(page.html).to match(/Current\s*Members/)
         expect(page.all("table#tag-membership-remove td").map(&:text)).to eq ["Tag: other-#{type}", ""]
         default.call
       end
@@ -631,7 +631,7 @@ RSpec.describe Clover, "access control" do
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["#{cap_type}Tag:view"], object_id: (type == "object") ? tag.metatag_uuid : tag.id)
         page.refresh
-        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{name}"
+        expect(page.title).to eq "Ubicloud - Default - #{name}"
         expect(page.html).to match(/No current members of\s+#{type}\s+tag\./m)
         expect(page.all("table#tag-membership-add td").map(&:text)).to be_empty
         expect(page.html).not_to include("Add Members")
@@ -694,7 +694,7 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Add Members"
         expect(tag1.member_ids).to include tag2.id
-        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
+        expect(page.title).to eq "Ubicloud - Default - #{tag1.name}"
         expect(find_by_id("flash-notice").text).to eq "1 members added to #{type} tag"
       end
 
@@ -707,7 +707,7 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Add Members"
         expect(tag1.member_ids).to include tag2.id
-        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
+        expect(page.title).to eq "Ubicloud - Default - #{tag1.name}"
         expect(find_by_id("flash-error").text).to eq "No change in membership: 1 members already in tag"
       end
 
@@ -736,7 +736,7 @@ RSpec.describe Clover, "access control" do
         find("##{tag2.ubid} input").check
         click_button "Remove Members"
         expect(tag1.member_ids).to be_empty
-        expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tag Members: #{tag1.name}"
+        expect(page.title).to eq "Ubicloud - Default - #{tag1.name}"
         expect(find_by_id("flash-notice").text).to eq "1 members removed from #{type} tag"
       end
 
@@ -766,7 +766,7 @@ RSpec.describe Clover, "access control" do
       find("##{member_global_tag.ubid} input").check
       click_button "Add Members"
       expect(tag.member_ids).to include member_global_tag.id
-      expect(page.title).to eq "Ubicloud - Default - Action Tag Members: test-action"
+      expect(page.title).to eq "Ubicloud - Default - test-action"
       expect(find_by_id("flash-notice").text).to eq "1 members added to action tag"
     end
 
@@ -895,7 +895,7 @@ RSpec.describe Clover, "access control" do
       expect(UBID).to receive(:class_match?).and_return(false)
       click_button "Add Members"
       expect(tag1.member_ids).to include tag2.id
-      expect(page.title).to eq "Ubicloud - Default - Subject Tag Members: #{tag1.name}"
+      expect(page.title).to eq "Ubicloud - Default - #{tag1.name}"
       expect(find_by_id("flash-notice").text).to eq "1 members added to subject tag"
     end
   end
