@@ -4,9 +4,33 @@ require_relative "../model"
 
 class SubjectTag < Sequel::Model
   include ResourceMethods
+  include AccessControlModelTag
 
-  def add_subject(subject_id)
-    DB[:applied_subject_tag].insert(tag_id: id, subject_id:)
+  module Cleanup
+    def before_destroy
+      AccessControlEntry.where(subject_id: id).destroy
+      DB[:applied_subject_tag].where(subject_id: id).delete
+      super
+    end
+  end
+
+  def self.options_for_project(project)
+    {
+      "Tag" => project.subject_tags.reject { _1.name == "Admin" },
+      "Account" => project.accounts
+    }
+  end
+
+  def self.valid_member?(project_id, subject)
+    case subject
+    when SubjectTag
+      subject.project_id == project_id
+    when Account
+      !AccessTag.where(project_id:, hyper_tag_id: subject.id).empty?
+    when ApiKey
+      subject.owner_table == "accounts" &&
+        !AccessTag.where(project_id:, hyper_tag_id: subject.owner_id).empty?
+    end
   end
 end
 

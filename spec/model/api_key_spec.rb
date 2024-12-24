@@ -20,5 +20,12 @@ RSpec.describe ApiKey do
     it "can be created and rotated2" do
       expect { described_class.create_with_id(owner_table: "invalid-owner", owner_id: "2d1784a8-f70d-48e7-92b1-3f428381d62f", used_for: "inference_endpoint") }.to raise_error("Invalid owner_table: invalid-owner")
     end
+
+    it "can be deleted even with applied_tag references to related access tag" do
+      token = described_class.create_personal_access_token(Account.create_with_id(email: "test@example.com"), project: prj)
+      DB[:applied_tag].insert(access_tag_id: token.access_tags.first.id, tagged_id: token.id, tagged_table: "")
+      token.destroy
+      expect(token).not_to be_exists
+    end
   end
 end

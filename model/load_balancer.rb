@@ -18,9 +18,8 @@ class LoadBalancer < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  include Authorization::TaggableMethods
   include Authorization::HyperTagMethods
-  dataset_module Authorization::Dataset
+  include ObjectTag::Cleanup
   dataset_module Pagination
   semaphore :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
 

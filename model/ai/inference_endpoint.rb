@@ -9,13 +9,12 @@ class InferenceEndpoint < Sequel::Model
   one_to_one :load_balancer, key: :id, primary_key: :load_balancer_id
   one_to_one :private_subnet, key: :id, primary_key: :private_subnet_id
 
-  dataset_module Authorization::Dataset
   dataset_module Pagination
 
   include ResourceMethods
   include SemaphoreMethods
   include Authorization::HyperTagMethods
-  include Authorization::TaggableMethods
+  include ObjectTag::Cleanup
 
   semaphore :destroy, :maintenance
 

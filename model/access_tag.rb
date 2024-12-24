@@ -4,11 +4,14 @@ require_relative "../model"
 
 class AccessTag < Sequel::Model
   many_to_one :project
-  one_to_many :applied_tags
-
-  plugin :association_dependencies, applied_tags: :destroy
 
   include ResourceMethods
+
+  def before_destroy
+    # XXX: Remove when dropping applied_tag table
+    DB[:applied_tag].where(access_tag_id: id).delete
+    super
+  end
 end
 
 # Table: access_tag

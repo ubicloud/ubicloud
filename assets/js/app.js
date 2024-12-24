@@ -1,5 +1,4 @@
 $(function() {
-  setupPolicyEditor();
   setupAutoRefresh();
   setupDatePicker();
   setupFormOptionUpdates();
@@ -37,6 +36,24 @@ $(".dropdown").on("click", function (event) {
 
 $(".sidebar-group-btn").on("click", function (event) {
   $(this).parent().toggleClass("active");
+});
+
+$("#ace-template").addClass('hidden');
+
+var num_aces = 0;
+$("#new-ace-btn").on("click", function (event) {
+  event.preventDefault();
+  num_aces++;
+  var template = $('#ace-template').clone().removeClass('hidden').removeAttr('id');
+  var pos = 0;
+  var id_attr = '';
+  template.find('select, input').each(function(i, element) {
+    id_attr = 'ace-select-' + num_aces + '-' + pos;
+    pos++;
+    $(element).attr('id', id_attr);
+  });
+  template.find('label').attr('for', id_attr);
+  template.insertBefore('#access-control-entries tbody tr:last');
 });
 
 $(".delete-btn").on("click", function (event) {
@@ -127,22 +144,6 @@ function notification(message) {
     setTimeout(function () {
         newNotification.remove();
     }, 2000);
-}
-
-function setupPolicyEditor() {
-  $(".policy-editor").each(function() {
-    let pre = $(this).find("pre");
-    let textarea = $(this).find("textarea");
-    pre.html(jsonHighlight(DOMPurify.sanitize(pre.text())));
-
-    pre.on("focusout", function () {
-      pre.html(jsonHighlight(DOMPurify.sanitize(pre.text())));
-    })
-
-    pre.on("keyup", function () {
-      textarea.val(pre.text());
-    })
-  });
 }
 
 // Forked from: https://jsfiddle.net/ourcodeworld/KJQ9K/1209/
