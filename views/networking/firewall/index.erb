@@ -1,5 +1,10 @@
-<% @page_title = "Firewalls" %>
+<% @page_title = "Firewalls"
+@right_items = has_project_permission("Firewall:create") ? [
+  render("components/button", locals: { text: "Create Firewall", link: "#{@project_data[:path]}/firewall/create" })
+] : [] %>
+
 <%== render("networking/tabbar") %>
+
 <% if @firewalls.count > 0 %>
   <div class="grid gap-6">
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -34,13 +39,6 @@
         </tbody>
       </table>
     </div>
-  </div>
-  <div class="flex justify-end space-y-1 mt-6">
-      <% if has_project_permission("Firewall:create")%>
-      <%== render(
-        "components/button", locals: { text: "Create Firewall", link: "firewall/create" })
-      %>
-      <% end %>
   </div>
 <% else %>
   <div class="mt-6">
