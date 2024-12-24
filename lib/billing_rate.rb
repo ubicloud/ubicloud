@@ -26,15 +26,15 @@ class BillingRate
 
   def self.line_item_description(resource_type, resource_family, amount)
     case resource_type
-    when "VmCores"
+    when "VmCores", "VmCpu"
       "#{resource_family}-#{(amount * 2).to_i} Virtual Machine"
     when "VmStorage"
       "#{amount.to_i} GiB Storage for Virtual Machine"
     when "IPAddress"
       "#{resource_family} Address"
-    when "PostgresCores"
+    when "PostgresCores", "PostgresCpu"
       "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database"
-    when "PostgresStandbyCores"
+    when "PostgresStandbyCores", "PostgresStandbyCpu"
       "#{resource_family}-#{(amount * 2).to_i} backed PostgreSQL Database (HA Standby)"
     when "PostgresStorage"
       "#{amount.to_i} GiB Storage for PostgreSQL Database"
