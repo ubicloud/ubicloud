@@ -28,7 +28,12 @@ module SemaphoreMethods
   end
 
   module ClassMethods
+    def semaphore_names
+      @semaphore_names || []
+    end
+
     def semaphore(*names)
+      (@semaphore_names ||= []).concat(names)
       names.each do |sym|
         name = sym.name
         define_method :"incr_#{name}" do

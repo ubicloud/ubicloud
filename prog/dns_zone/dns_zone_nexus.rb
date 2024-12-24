@@ -5,8 +5,6 @@ require_relative "../../lib/util"
 class Prog::DnsZone::DnsZoneNexus < Prog::Base
   subject_is :dns_zone
 
-  semaphore :refresh_dns_servers
-
   label def wait
     if dns_zone.last_purged_at < Time.now - 60 * 60 * 1 # ~1 hour
       register_deadline("wait", 5 * 60)
