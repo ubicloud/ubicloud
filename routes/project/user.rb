@@ -182,12 +182,17 @@ class Clover
         authorize("Project:user", @project.id)
 
         DB.transaction do
+          allowed_add_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").to_hash(:name)
+          allowed_remove_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").to_hash(:name)
+
           invitation_policies = r.params["invitation_policies"] || {}
-          allowed_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
           invitation_policies.each do |email, policy|
-            if allowed_tags[policy]
-              @project.invitations.find { _1.email == email }&.update(policy: policy)
-            end
+            policy = nil if policy == ""
+            next if policy && !allowed_add_tags[policy]
+            next unless (inv = @project.invitations_dataset.where(email: email).first)
+            old_policy = inv.policy
+            next if old_policy && !allowed_remove_tags[old_policy]
+            inv.update(policy: policy)
           end
         end
         flash["notice"] = "Subject tags for invited users updated successfully."
