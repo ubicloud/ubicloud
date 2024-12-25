@@ -257,7 +257,7 @@ GEM
     rainbow (3.1.1)
     rake (13.2.1)
     refrigerator (1.7.0)
-    regexp_parser (2.9.3)
+    regexp_parser (2.10.0)
     rexml (3.4.0)
     roda (3.87.0)
       rack
