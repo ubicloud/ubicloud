@@ -1,5 +1,6 @@
 <%# locals: (name: nil, selected: nil) %>
-<% selected = flash.dig("old", name) || selected %>
+<% selected = flash.dig("old", name) || selected
+allowed_add_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").map(&:name) %>
 
 <div class="">
   <%== render(
@@ -7,7 +8,9 @@
     locals: {
       name: name,
       options: [["", "No access", nil, {}]].concat(
-        dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").map { [_1.name, _1.name, nil, {}] }
+        @project.subject_tags_dataset.map do
+          [_1.name, _1.name, nil, allowed_add_tags.include?(_1.name) ? {} : { disabled: true }]
+        end
       ),
       selected: selected
     }
