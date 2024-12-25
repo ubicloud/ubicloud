@@ -514,21 +514,25 @@ RSpec.describe Clover, "project" do
 
         visit "#{project.path}/user"
 
-        expect(page.html).to include "Allowed"
-        expect(page.html).to include "ToBeRemoved"
-        within "form#managed-policy" do
-          select "Allowed", from: "invitation_policies[#{invited_email}]"
-          click_button "Update"
-        end
-        expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
-
-        ace.destroy
         within "form#managed-policy" do
           select "ToBeRemoved", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
-        expect(page.html).to include "Allowed"
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: allowed.id)
+        within "form#managed-policy" do
+          select "ToBeRemoved", from: "invitation_policies[#{invited_email}]"
+          ace.destroy
+          click_button "Update"
+        end
+        expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
+
+        within "form#managed-policy" do
+          select "No access", from: "invitation_policies[#{invited_email}]"
+          click_button "Update"
+        end
+        expect(page).to have_select("invitation_policies[#{invited_email}]", selected: nil)
       end
 
       it "can not have more than 50 pending invitations" do
