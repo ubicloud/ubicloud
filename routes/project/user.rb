@@ -31,6 +31,11 @@ class Clover
           end
 
           tag = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").first(name: policy)
+          unless tag || policy == ""
+            flash["error"] = "You don't have permission to invite users with this subject tag."
+            r.redirect "#{@project_data[:path]}/user"
+          end
+
           if (user = Account.exclude(status_id: 3)[email: email])
             user.associate_with_project(@project)
             tag&.add_subject(user.id)
