@@ -50,6 +50,10 @@ RSpec.describe Prog::Vm::VmPool do
   end
 
   describe "#wait" do
+    before do
+      VmHost.create(location: "github-runners", allocation_state: "accepting", arch: "x64", total_cores: 2, used_cores: 0) { _1.id = Sshable.create_with_id.id }
+    end
+
     let(:pool) {
       VmPool.create_with_id(
         size: 0, vm_size: "standard-2", boot_image: "img", location: "hetzner-fsn1",
@@ -63,19 +67,29 @@ RSpec.describe Prog::Vm::VmPool do
       expect { nx.wait }.to nap(30)
     end
 
-    it "hops to create_new_vm, if vm count is less than the size and there are no waiting GithubRunners" do
+    it "hops to create_new_vm if there are enough idle cores" do
       pool.update(size: 1)
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
+
       expect { nx.wait }.to hop("create_new_vm")
     end
 
-    it "waits even if the vm count is less when there are waiting GithubRunners" do
+    it "hops to create_new_vm if there are enough idle cores for the given arch" do
       pool.update(size: 1)
+
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      expect(GithubRunner).to receive_message_chain(:join, :where, :count).and_return(1) # rubocop:disable RSpec/MessageChain
-      expect {
-        nx.wait
-      }.to nap(30)
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 4, vcpus: 2, memory_gib: 8) { _1.id = Sshable.create_with_id.id }
+
+      expect { nx.wait }.to hop("create_new_vm")
+    end
+
+    it "waits if there are not enough idle cores due to waiting github runners" do
+      pool.update(size: 1)
+
+      expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 2, memory_gib: 8) { _1.id = Sshable.create_with_id.id }
+
+      expect { nx.wait }.to nap(30)
     end
   end
 
