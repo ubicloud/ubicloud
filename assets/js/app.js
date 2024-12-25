@@ -39,6 +39,14 @@ $(".sidebar-group-btn").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });
 
+$("#tag-membership-add tr, #tag-membership-remove tr").on("click", function (event) {
+  let checkbox = $(this).find("input[type=checkbox]");
+  if ($(event.target).is("input") || checkbox.prop("disabled")) {
+    return;
+  }
+  checkbox.prop("checked", !checkbox.prop("checked"));
+});
+
 $("#ace-template").addClass('hidden');
 
 var num_aces = 0;
