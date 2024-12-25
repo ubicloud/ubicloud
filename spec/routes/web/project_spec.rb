@@ -291,14 +291,15 @@ RSpec.describe Clover, "project" do
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
 
         visit "#{project.path}/user"
-        expect(page.html).not_to include "Allowed"
+        fill_in "Email", with: user2.email
+        select "Allowed", from: "policy"
+        click_button "Invite"
 
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
+        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to invite users with this subject tag.")
 
         page.refresh
         fill_in "Email", with: user2.email
-        select "Allowed", from: "policy"
-        ace.destroy
+        select "No access", from: "policy"
         click_button "Invite"
 
         expect(page).to have_content user.email
@@ -329,20 +330,23 @@ RSpec.describe Clover, "project" do
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
 
         visit "#{project.path}/user"
-        expect(page.html).not_to include "Allowed"
+        fill_in "Email", with: user2.email
+        select "Allowed", from: "policy"
+        click_button "Invite"
 
-        ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
+        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to invite users with this subject tag.")
+
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
 
         visit "#{project.path}/user"
         new_email = "newUpper@example.com"
         expect(page).to have_content user.email
 
         fill_in "Email", with: new_email
-        select "Allowed", from: "policy"
-        ace.destroy
+        select "No access", from: "policy"
         click_button "Invite"
-        expect(page.find_by_id("flash-notice").text).to eq("Invitation sent successfully to 'newUpper@example.com'.")
 
+        expect(page.find_by_id("flash-notice").text).to eq("Invitation sent successfully to 'newUpper@example.com'.")
         expect(page).to have_content user.email
         expect(page).to have_content new_email
         expect(page).to have_content "Invitation sent successfully to '#{new_email}'."
@@ -525,7 +529,6 @@ RSpec.describe Clover, "project" do
         end
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
         expect(page.html).to include "Allowed"
-        expect(page.html).not_to include "ToBeRemoved"
       end
 
       it "can not have more than 50 pending invitations" do
