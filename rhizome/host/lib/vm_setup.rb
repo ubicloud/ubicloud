@@ -56,6 +56,7 @@ class VmSetup
     prepare_pci_devices(pci_devices)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
     start_systemd_unit
+    # fix_via_routes(nics)
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, pci_devices, multiqueue:)
@@ -64,6 +65,7 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
     prepare_pci_devices(pci_devices)
     start_systemd_unit
+    # fix_via_routes(nics)
   end
 
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
@@ -72,6 +74,7 @@ class VmSetup
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
+    # fix_via_routes(nics)
   end
 
   def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue:)
@@ -226,7 +229,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     multiqueue_fragment = multiqueue ? " multi_queue vnet_hdr " : " "
     nics.each do |nic|
       r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm} #{multiqueue_fragment}"
-      r "ip -n #{q_vm} addr replace #{nic.private_ipv4_gateway} dev #{nic.tap}"
+      r "ip -n #{q_vm} addr replace #{nic.private_ipv4_gateway} dev #{nic.tap} noprefixroute"
     end
   end
 
@@ -319,6 +322,22 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{nic.tap}/proxy_arp'"
+    end
+  end
+
+  def fix_via_routes(nics)
+    loop do
+      state = r("systemctl show -p SubState --value #{q_vm}.service").chomp
+      if state != "running"
+        sleep(5)
+      else
+        break
+      end
+    end
+
+    nics.each do |nic|
+      local_ip4 = NetAddr::IPv4Net.parse(nic.net4)
+      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(0).to_s.shellescape} dev #{nic.tap}"
     end
   end
 

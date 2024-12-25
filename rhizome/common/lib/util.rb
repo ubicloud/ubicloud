@@ -25,6 +25,7 @@ end
 # rubocop:enable Lint/InheritException
 
 def r(commandline, stdin: "")
+  puts "DEBUG: #{commandline}"
   stdout, stderr, status = Open3.capture3(commandline, stdin_data: stdin)
   fail CommandFail.new("command failed: " + commandline, stdout, stderr) unless status.success?
   stdout
