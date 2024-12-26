@@ -367,6 +367,16 @@ class Clover < Roda
       scope.after_rodauth_create_account(account_id)
     end
 
+    before_omniauth_callback_route do
+      account = Account[account_from_omniauth&.[](:id)]
+      if account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
+        flash["error"] = "There is already an account with this email address, and it has not been linked to the #{omniauth_provider.capitalize} account.
+        Please login to the existing account normally, and then link it to the #{omniauth_provider.capitalize} account from your account settings.
+        Then you can can login using the #{omniauth_provider.capitalize} account."
+        scope.redirect_back_with_inputs
+      end
+    end
+
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
     reset_password_redirect { login_route }
