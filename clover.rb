@@ -323,7 +323,13 @@ class Clover < Roda
     login_label "Email Address"
     two_factor_auth_return_to_requested_location? true
     already_logged_in { redirect login_redirect }
-    after_login { remember_login if request.params["remember-me"] == "on" }
+    after_login do
+      remember_login if request.params["remember-me"] == "on"
+      if omniauth_identity && (url = omniauth_params["redirect_url"])
+        flash["notice"] = "You have successfully connected your account with #{omniauth_provider.capitalize}."
+        redirect url
+      end
+    end
 
     update_session do
       if Account[account_session_value].suspended_at
@@ -369,13 +375,20 @@ class Clover < Roda
 
     before_omniauth_callback_route do
       account = Account[account_from_omniauth&.[](:id)]
-      if account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
+      if authenticated?
+        unless account && account.id == scope.current_account.id
+          flash["error"] = "Your account's email address is different from the email address associated with the #{omniauth_provider.capitalize} account."
+          redirect "/account/login-method"
+        end
+      elsif account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
         flash["error"] = "There is already an account with this email address, and it has not been linked to the #{omniauth_provider.capitalize} account.
         Please login to the existing account normally, and then link it to the #{omniauth_provider.capitalize} account from your account settings.
         Then you can can login using the #{omniauth_provider.capitalize} account."
         scope.redirect_back_with_inputs
       end
     end
+
+    omniauth_create_account? { !authenticated? }
 
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }

@@ -373,14 +373,14 @@ RSpec.describe Clover, "auth" do
   end
 
   describe "social login" do
-    def mock_provider(provider)
+    def mock_provider(provider, email = TEST_USER_EMAIL)
       expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once)
       OmniAuth.config.add_mock(provider, {
         provider: provider,
         uid: "123456790",
         info: {
           name: "John Doe",
-          email: TEST_USER_EMAIL
+          email: email
         }
       })
     end
@@ -427,6 +427,90 @@ RSpec.describe Clover, "auth" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Login")
       expect(page).to have_content("There is already an account with this email address")
+    end
+
+    describe "authenticated" do
+      let(:account) { create_account }
+
+      before do
+        login(account.email)
+      end
+
+      it "can connect to existing account" do
+        mock_provider(:github, "uSer@example.com")
+
+        visit "/account/login-method"
+        within "#login-method-github" do
+          click_button "Connect"
+        end
+
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_content "You have successfully connected your account with Github"
+      end
+
+      it "can disconnect from existing account" do
+        account.add_identity(provider: "google", uid: "123456790")
+        account.add_identity(provider: "github", uid: "123456790")
+
+        visit "/account/login-method"
+        within "#login-method-github" do
+          click_button "Disconnect"
+        end
+
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_content "Your account has been disconnected from Github"
+      end
+
+      it "can not disconnect the last login method" do
+        account.add_identity(provider: "github", uid: "123456790")
+
+        visit "/account/login-method"
+        within "#login-method-github" do
+          click_button "Disconnect"
+        end
+
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_content "You must have at least one login method"
+      end
+
+      it "can not disconnect if it's already disconnected" do
+        account.add_identity(provider: "google", uid: "123456790")
+        account.add_identity(provider: "github", uid: "123456790")
+
+        visit "/account/login-method"
+        account.identities_dataset.first(provider: "github").update(uid: "0987654321")
+        within "#login-method-github" do
+          click_button "Disconnect"
+        end
+
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_content "Your account already has been disconnected from Github"
+      end
+
+      it "can not connect an account with different email" do
+        mock_provider(:github, "user2@example.com")
+
+        visit "/account/login-method"
+        within "#login-method-github" do
+          click_button "Connect"
+        end
+
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_content "Your account's email address is different from the email address associated"
+      end
+
+      it "can not connect a social account with multiple accounts" do
+        create_account("user2@example.com")
+        mock_provider(:github, "user2@example.com")
+
+        visit "/account/login-method"
+        within "#login-method-github" do
+          click_button "Connect"
+        end
+
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_content "Your account's email address is different from the email address associated"
+      end
     end
   end
 end
