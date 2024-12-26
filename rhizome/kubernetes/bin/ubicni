@@ -10,6 +10,7 @@ require "netaddr"
 require "json"
 require "logger"
 require "ipaddr"
+require "fileutils"
 require "securerandom"
 
 LOG = Logger.new("cni_plugin.log")
@@ -70,16 +71,18 @@ class UBICNI
     outer_link_local = mac_to_ipv6_link_local(outer_mac)
     outer_ifname = "veth_#{container_id[0, 8]}"
 
-    container_ula_ipv6 = setup_ipv6(subnet_ula_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
-    ipv4_ips = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
-
+    FileUtils.mkdir_p("/etc/netns/#{cni_netns}")
     dns_config = <<~EOF
-nameserver 8.8.8.8
-nameserver 8.8.4.4
-search example.com
+nameserver 10.96.0.10
+search default.svc.cluster.local svc.cluster.local cluster.local
 options ndots:5
     EOF
     File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
+
+    r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
+
+    container_ula_ipv6 = setup_ipv6(subnet_ula_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
+    ipv4_ips = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
 
     response = {
       cniVersion: "0.4.0",
@@ -105,8 +108,8 @@ options ndots:5
         }
       ],
       dns: {
-        nameservers: ["8.8.8.8", "8.8.4.4"],
-        search: ["example.com"],
+        nameservers: ["10.96.0.10"],
+        search: ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
         options: ["ndots:5"]
       }
     }
@@ -114,7 +117,7 @@ options ndots:5
   end
 
   def setup_ipv6(subnet, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
-    container_ip = allocate_ipv6(subnet, @collision_dir)
+    container_ip = allocate_ipv6(subnet)
 
     r "ip -6 -n #{cni_netns} addr add #{container_ip} dev #{inner_ifname}"
     r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
@@ -127,16 +130,17 @@ options ndots:5
   end
 
   def setup_ipv4(subnet, cni_netns, inner_ifname, outer_ifname)
-    container_ip = allocate_ipv4(subnet, @collision_dir)
-    gateway_ip = allocate_ipv4(subnet, @collision_dir)
+    container_ip = allocate_ipv4(subnet)
+    gateway_ip = allocate_ipv4(subnet)
 
-    r "ip -n #{cni_netns} addr add #{container_ip} dev #{inner_ifname}"
+    r "ip addr add #{gateway_ip.network}/24 dev #{outer_ifname}"
+    r "ip link set #{outer_ifname} mtu #{@mtu} up"
+
+    r "ip -n #{cni_netns} addr add #{container_ip.network}/24 dev #{inner_ifname}"
     r "ip -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
     r "ip -n #{cni_netns} route add default via #{gateway_ip.network}"
 
-    r "ip addr add #{gateway_ip} dev #{outer_ifname}"
-    r "ip link set #{outer_ifname} mtu #{@mtu} up"
-    r "ip route add #{container_ip.network} via #{gateway_ip} dev #{outer_ifname}"
+    r "ip route add #{container_ip} via #{gateway_ip.network} dev #{outer_ifname}"
     # r "iptables -t nat -A POSTROUTING -s #{subnet} -o ens3 -j MASQUERADE"
 
     {container_ip: container_ip, gateway_ip: gateway_ip}
@@ -207,10 +211,10 @@ options ndots:5
     exit 1
   end
 
-  def allocate_ipv6(subnet, collision_dir)
+  def allocate_ipv6(subnet)
     loop do
       random_ip = generate_random_ipv6(subnet)
-      filename = File.join(collision_dir, random_ip.to_s.tr("/", "_"))
+      filename = File.join(@collision_dir, random_ip.to_s.tr("/", "_"))
 
       unless File.exist?(filename)
         File.write(filename, "")
@@ -219,10 +223,10 @@ options ndots:5
     end
   end
 
-  def allocate_ipv4(subnet, collision_dir)
+  def allocate_ipv4(subnet)
     loop do
       random_ip = generate_random_ipv4(subnet)
-      filename = File.join(collision_dir, random_ip.to_s.tr("/", "_"))
+      filename = File.join(@collision_dir, random_ip.to_s.tr("/", "_"))
 
       unless File.exist?(filename)
         File.write(filename, "")
@@ -241,10 +245,12 @@ options ndots:5
   end
 
   def generate_random_ipv4(addr)
-    prefix = 16 + 8
-    lower_bits = SecureRandom.random_number(2...2**8) << (32 - prefix - 1)
+    network = NetAddr.parse_net(addr)
+    prefix = network.netmask.prefix_len
 
-    NetAddr::IPv4Net.new(NetAddr::IPv4.new(NetAddr.parse_net(addr).network.addr | lower_bits), NetAddr::Mask32.new(prefix))
+    lower_bits = SecureRandom.random_number(0...(2**(32 - prefix)))
+    random_addr = network.network.addr + lower_bits
+    NetAddr::IPv4Net.new(NetAddr::IPv4.new(random_addr), NetAddr::Mask32.new(32))
   end
 
   def gen_mac
