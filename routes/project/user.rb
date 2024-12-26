@@ -73,6 +73,7 @@ class Clover
         token_ds = current_account
           .api_keys_dataset
           .where(id: AccessTag.where(project_id: @project.id).select(:hyper_tag_id))
+          .reverse(:created_at)
 
         r.is do
           r.get do
@@ -107,34 +108,18 @@ class Clover
 
           next unless token
 
-          r.post "unrestrict-access" do
-            token.unrestrict_token_for_project(@project.id)
-            flash["notice"] = "Token access is now unrestricted"
-            r.redirect "#{@project.path}/user/token/#{token.ubid}/restrict-access"
-          end
-
-          r.is "restrict-access" do
-            unless token.unrestricted_token_for_project?(@project.id)
-              flash["error"] = "Token access is already restricted"
-              r.redirect "#{@project.path}/user/token/#{token.ubid}/access-control"
-            end
-
-            r.get do
-              view "project/restrict-token"
-            end
-
-            r.post do
+          r.post %w[unrestrict-access restrict-access] do |action|
+            if action == "restrict-access"
               token.restrict_token_for_project(@project.id)
               flash["notice"] = "Restricted personal access token"
-              r.redirect "#{@project.path}/user/token/#{token.ubid}/access-control"
+            else
+              token.unrestrict_token_for_project(@project.id)
+              flash["notice"] = "Token access is now unrestricted"
             end
+            r.redirect "#{@project.path}/user/token/#{token.ubid}/access-control"
           end
 
           r.on "access-control" do
-            if token.unrestricted_token_for_project?(@project.id)
-              r.redirect "#{@project.path}/user/token/#{token.ubid}/restrict-access"
-            end
-
             r.get true do
               uuids = {}
               aces = @project.access_control_entries_dataset.where(subject_id: token.id).all

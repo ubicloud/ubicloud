@@ -1,5 +1,5 @@
 <% if @token
-  page_header = "Access Control for Token #{@token.ubid}"
+  page_header = "Token #{@token.ubid}"
   ace_options = [
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
@@ -7,13 +7,14 @@
   form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/access-control"
   table_headers = %w[Action Object]
   edit_perm = true
-  unrestrict_path = "#{@project_data[:path]}/user/token/#{@token.ubid}/unrestrict-access"
-  right_items = [<<-CREATE]
-    <form id="create-pat" action="#{unrestrict_path}" role="form" method="POST">
-      #{csrf_tag(unrestrict_path)}
-      #{render("components/form/submit_button", locals: { text: "Unrestrict Token" })}
-    </form>
-  CREATE
+
+  unrestricted = @token.unrestricted_token_for_project?(@project.id)
+  restriction_title, restriction_path =
+    if unrestricted
+      ["Restrict", "#{@project_data[:path]}/user/token/#{@token.ubid}/restrict-access"]
+    else
+      ["Unrestrict", "#{@project_data[:path]}/user/token/#{@token.ubid}/unrestrict-access"]
+    end
 else
   page_header = "Access Control"
   ace_options = [
@@ -33,128 +34,164 @@ end
     "components/page_header",
     locals: {
       title: page_header,
-      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]],
-      right_items:
+      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]]
     }
   ) %>
 </div>
 
 <div class="grid gap-6">
-  <div class="md:flex md:items-center md:justify-between">
-    <div class="min-w-0 flex-1">
-      <% if @token %>
-        <% if @aces.empty? %>
-          Currently, this token has no access to the project.
-        <% else %>
-          Below are the access control entries for the token.
-        <% end %>
-        You should grant the token the access you think the token should have. Be aware that the token can never have
-        more access to the project than your account has. Token access control in ubicloud is defined using access
-        control entries. Each access control entry has a single action and object. Access is allowed if there is an
-        access control entry allowing the token to take the action on the object. Actions and objects can be tags,
-        which are used for grouping multiple actions or multiple objects into a single entity. If you would like to
-        remove access control restrictions, and grant the token full access to your account, click on the Unrestrict
-        Token button above.
-      <% elsif edit_perm %>
-        Access control in Ubicloud is defined using access control entries. Each access control entry has a single
-        subject, action, and object. Access is allowed if there is an access control entry allowing the subject to take
-        the action on the object. Subjects, actions, and objects can all be tags, which are used for grouping. The
-        recommended way to handle access control in Ubicloud is to create appropriate tags, add the subjects, actions,
-        and objects to the tags, and create the minimum number of access control entries you need to enforce the access
-        you want. However, you can create access control entries referencing specific subjects, actions, or objects.
-        You can click on the Subject, Action, and Object buttons below to manage the related tags. New access control
-        entries without a subject will be ignored.
-      <% end %>
-    </div>
-  </div>
+  <% unless unrestricted %>
+    <% if @token.nil? && edit_perm %>
+      <div class="md:flex md:items-center md:justify-between">
+        <div class="min-w-0 flex-1">
+          Access control in Ubicloud is defined using access control entries. Each access control entry has a single
+          subject, action, and object. Access is allowed if there is an access control entry allowing the subject to
+          take the action on the object. Subjects, actions, and objects can all be tags, which are used for grouping.
+          The recommended way to handle access control in Ubicloud is to create appropriate tags, add the subjects,
+          actions, and objects to the tags, and create the minimum number of access control entries you need to enforce
+          the access you want. However, you can create access control entries referencing specific subjects, actions,
+          or objects. You can click on the Subject, Action, and Object buttons below to manage the related tags. New
+          access control entries without a subject will be ignored.
+        </div>
+      </div>
+    <% end %>
 
-  <form id="access-control-form" action="<%= form_action %>" role="form" method="POST">
-    <%== csrf_tag(form_action) %>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table id="access-control-entries" class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <% table_headers.each do |type| %>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                <% if @token %>
-                  <%= type %>
-                <% else %>
-                  <%== render(
-                    "components/button",
-                    locals: {
-                      text: type,
-                      link: "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}"
-                    }
-                  ) %>
-                <% end %>
-              </th>
-            <% end %>
-            <% if edit_perm %>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Delete</th>
-            <% end %>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
-            <% editable &&= edit_perm %>
-            <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
-              <% if editable %>
-                <%== render("components/form/hidden", locals: { name: "aces[][ubid]", value: ubid }) %>
-                <% ace_options.each_with_index do | (name, options), index| %>
-                  <% attributes = { required: "required" } if !@token && index == 0 && ubid != "template" %>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+    <form id="access-control-form" action="<%= form_action %>" role="form" method="POST">
+      <%== csrf_tag(form_action) %>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
+          <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
+            <tr>
+              <% table_headers.each do |type| %>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                  <% if @token %>
+                    <%= type %>
+                  <% else %>
                     <%== render(
-                      "components/form/select",
+                      "components/button",
                       locals: {
-                        id: "ace-#{ubid}-#{index}",
-                        name:,
-                        selected: tags[index]&.ubid,
-                        options:,
-                        classes: table_headers[index].downcase,
-                        attributes:
+                        text: type,
+                        link: "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}"
+                      }
+                    ) %>
+                  <% end %>
+                </th>
+              <% end %>
+              <% if edit_perm %>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Delete</th>
+              <% end %>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <% @aces.append(["template", [], true]).each do |ubid, tags, editable| %>
+              <% editable &&= edit_perm %>
+              <tr id="ace-<%= ubid %>" class="<%= "existing-aces#{"-view" unless editable}" unless ubid == "template" %>">
+                <% if editable %>
+                  <%== render("components/form/hidden", locals: { name: "aces[][ubid]", value: ubid }) %>
+                  <% ace_options.each_with_index do | (name, options), index| %>
+                    <% attributes = { required: "required" } if !@token && index == 0 && ubid != "template" %>
+                    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      <%== render(
+                        "components/form/select",
+                        locals: {
+                          id: "ace-#{ubid}-#{index}",
+                          name:,
+                          selected: tags[index]&.ubid,
+                          options:,
+                          classes: table_headers[index].downcase,
+                          attributes:
+                        }
+                      ) %>
+                    </td>
+                  <% end %>
+                  <td class="py-4 px-3 text-right">
+                    <%== render(
+                      "components/form/checkbox",
+                      locals: {
+                        id_prefix: "ace-#{ubid}-",
+                        name: "aces[][deleted]",
+                        options: [%w[true Delete]]
                       }
                     ) %>
                   </td>
+                <% else %>
+                  <% tags.each do |tag| %>
+                    <td class="values whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                      <%= ace_label(tag) %>
+                    </td>
+                  <% end %>
+                  <% if edit_perm %>
+                    <td class="py-4 px-3 text-right"></td>
+                  <% end %>
                 <% end %>
-                <td class="py-4 px-3 text-right">
-                  <%== render(
-                    "components/form/checkbox",
-                    locals: {
-                      id_prefix: "ace-#{ubid}-",
-                      name: "aces[][deleted]",
-                      options: [%w[true Delete]]
-                    }
-                  ) %>
+              </tr>
+            <% end %>
+            <% if @aces.count == 1 %>
+              <tr class="group-[&:has(tr:nth-child(n+3))]:hidden">
+                <td colspan="3" class="text-center py-4 px-8 lg:px-32">
+                  Currently, this token has no access to the project.
+                  <br>
+                  You should grant the token the access you think the token should have. Be aware that the token can
+                  never have more access to the project than your account has. Each access control entry has a single
+                  action and object. Access is allowed if there is an access control entry allowing the token to take
+                  the action on the object. Actions and objects can be tags, which are used for grouping multiple
+                  actions or multiple objects into a single entity.
                 </td>
-              <% else %>
-                <% tags.each do |tag| %>
-                  <td class="values whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%= ace_label(tag) %>
-                  </td>
-                <% end %>
-                <% if edit_perm %>
-                  <td class="py-4 px-3 text-right"></td>
-                <% end %>
-              <% end %>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-      <% if edit_perm %>
-        <div class="px-3 py-4 flex justify-between">
-          <%== render(
-            "components/button",
-            locals: {
-              icon: "hero-plus",
-              text: "New Access Control Entry",
-              attributes: {
-                id: "new-ace-btn"
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+        <% if edit_perm %>
+          <div class="px-3 py-4 flex justify-between">
+            <%== render(
+              "components/button",
+              locals: {
+                icon: "hero-plus",
+                text: "New Access Control Entry",
+                attributes: {
+                  id: "new-ace-btn"
+                }
               }
-            }
-          ) %>
-          <%== render("components/button", locals: { text: "Save All" }) %>
-        </div>
-      <% end %>
+            ) %>
+            <%== render("components/button", locals: { text: "Save All" }) %>
+          </div>
+        <% end %>
+      </div>
+    </form>
+  <% end %>
+  <% if @token %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-4 py-5 sm:p-6">
+        <form action="<%= restriction_path %>" role="form" method="POST">
+          <%== csrf_tag(restriction_path) %>
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900"><%= restriction_title %>
+                Personal Access Token</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>
+                  <% if unrestricted %>
+                    This token currently has the same access to this project that your account has. If you would like
+                    to restrict the access of this token, use the "Restrict Token Access" button. After restricting
+                    token access, the token will have no access to the project, and you can grant the specific access
+                    you want the token to have. Be aware that the token can never have more access to the project than
+                    your account has.
+                  <% else %>
+                    This token currently has access to the project based on the access control entries above. If you
+                    would like to remove access control restrictions, and grant the token full access to your account,
+                    click on the "Unestrict Token Access" button.
+                  <% end %>
+                </p>
+              </div>
+            </div>
+            <div id="restrict-<%=@token.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== render("components/form/submit_button", locals: { text: "#{restriction_title} Token Access" }) %>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
-  </form>
+  <% end %>
 </div>

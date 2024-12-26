@@ -133,17 +133,13 @@ RSpec.describe Clover, "personal access token management" do
 
   it "can restrict access" do
     click_link @api_key.ubid
-    expect(page.title).to eq "Ubicloud - Default - Restrict Personal Access Token"
+    expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
     expect(@api_key.unrestricted_token_for_project?(project.id)).to be true
-    click_button "Restrict Personal Access Token"
+    click_button "Restrict Token Access"
 
     expect(find_by_id("flash-notice").text).to eq "Restricted personal access token"
     expect(@api_key.unrestricted_token_for_project?(project.id)).to be false
-    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
-
-    visit "#{project.path}/user/token/#{@api_key.ubid}/restrict-access"
-    expect(find_by_id("flash-error").text).to eq "Token access is already restricted"
-    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
+    expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
   end
 
   it "cannot view token access control entries for token not associated with this project" do
@@ -155,12 +151,11 @@ RSpec.describe Clover, "personal access token management" do
   it "can view token access control entries" do
     @api_key.restrict_token_for_project(project.id)
     click_link @api_key.ubid
-    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
+    expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
     expect(page.html).to include "Currently, this token has no access to the project."
 
     AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
     page.refresh
-    expect(page.html).to include "Below are the access control entries for the token."
     expect(displayed_access_control_entries).to eq [
       "All Actions", "All Objects"
     ]
@@ -202,7 +197,7 @@ RSpec.describe Clover, "personal access token management" do
     ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
     ObjectTag.create_with_id(project_id: project.id, name: "OTest")
     click_link @api_key.ubid
-    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
+    expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
     within("#ace-#{ace.ubid} .action") { select "ActionTag:view" }
     within("#ace-#{ace.ubid} .object #object-tag-group") { select "OTest" }
     click_button "Save All"
@@ -217,7 +212,7 @@ RSpec.describe Clover, "personal access token management" do
     ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
     ObjectTag.create_with_id(project_id: project.id, name: "OTest")
     click_link @api_key.ubid
-    expect(page.title).to eq "Ubicloud - Default - Access Control for Token #{@api_key.ubid}"
+    expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
     within("#ace-#{ace.ubid} .action") { select "ActionTag:view" }
     within("#ace-#{ace.ubid} .object #object-tag-group") { select "OTest" }
     ace.destroy
@@ -245,9 +240,9 @@ RSpec.describe Clover, "personal access token management" do
     @api_key.restrict_token_for_project(project.id)
     ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: @api_key.id)
     click_link @api_key.ubid
-    click_button "Unrestrict Token"
+    click_button "Unrestrict Token Access"
     expect(find_by_id("flash-notice").text).to eq "Token access is now unrestricted"
     expect(ace).not_to be_exists
-    expect(page.title).to eq "Ubicloud - Default - Restrict Personal Access Token"
+    expect(page.title).to eq "Ubicloud - Default - Token #{@api_key.ubid}"
   end
 end
