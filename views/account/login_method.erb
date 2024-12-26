@@ -1,0 +1,48 @@
+<% @page_title = "Login Methods" %>
+
+<%== render("components/page_header", locals: { title: "My Account" }) %>
+
+<main>
+  <div class="max-w-screen-xl pb-6 lg:pb-16">
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
+        <%== render("account/submenu") %>
+        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10 pb-10">
+          <% omniauth_providers.each do |provider, name| %>
+            <div id="login-method-<%= provider %>" class="px-4 py-6 sm:p-6 lg:pb-8 space-y-4">
+              <div class="mt-6 grid grid-cols-6 gap-6">
+                <div class="col-span-6 sm:col-span-4">
+                  <div class="text-lg font-medium leading-6 text-gray-900">Login with
+                    <%= name %></div>
+                  <p class="mt-1 text-sm text-gray-500">Connect your
+                    <%= name %>
+                    to log in to your Ubicloud account</p>
+                </div>
+                <div class="col-span-6 sm:col-span-2 text-right space-y-1">
+                  <% if uid = @identities[provider.to_s] %>
+                    <form action="/account/login-method/disconnect" role="form" method="POST" class="grow">
+                      <%== csrf_tag("/account/login-method/disconnect") %>
+                      <%== render("components/form/hidden", locals: { name: "provider", value: provider }) %>
+                      <%== render("components/form/hidden", locals: { name: "uid", value: uid }) %>
+                      <%== render("components/button", locals: { text: "Disconnect", type: "danger" }) %>
+                    </form>
+                  <% else %>
+                    <form
+                      action="<%= rodauth.omniauth_request_path(provider, redirect_url: "/account/login-method") %>"
+                      role="form"
+                      method="POST"
+                      class="grow"
+                    >
+                      <div class="hidden"><%== rodauth.csrf_tag(rodauth.omniauth_request_path(provider)) %></div>
+                      <%== render("components/button", locals: { text: "Connect" }) %>
+                    </form>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
