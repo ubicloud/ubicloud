@@ -48,4 +48,8 @@ class KubernetesCluster < Sequel::Model
   def kubeconfig
     vms.first.sshable.cmd("sudo cat /etc/kubernetes/admin.conf")
   end
+
+  def kubectl(cmd)
+    vms.first.sshable.cmd("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+  end
 end
