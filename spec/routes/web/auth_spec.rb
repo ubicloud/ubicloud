@@ -373,42 +373,48 @@ RSpec.describe Clover, "auth" do
   end
 
   describe "social login" do
-    before do
-      OmniAuth.config.logger = Logger.new(IO::NULL)
-      expect(Config).to receive(:omniauth_github_id).and_return("12345").at_least(:once)
-      OmniAuth.config.test_mode = true
-      OmniAuth.config.mock_auth[:github] = OmniAuth::AuthHash.new(
-        provider: "github",
+    def mock_provider(provider)
+      expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once)
+      OmniAuth.config.add_mock(provider, {
+        provider: provider,
         uid: "123456790",
         info: {
           name: "John Doe",
           email: TEST_USER_EMAIL
         }
-      )
+      })
+    end
+
+    before do
+      OmniAuth.config.logger = Logger.new(IO::NULL)
+      OmniAuth.config.test_mode = true
     end
 
     it "can create new account" do
+      mock_provider(:github)
+
       visit "/login"
       click_button "GitHub"
 
-      user = Account[email: TEST_USER_EMAIL]
-      expect(user).not_to be_nil
-      expect(DB[:account_identities].first(account_id: user.id, provider: "github", uid: "123456790")).not_to be_nil
+      account = Account[email: TEST_USER_EMAIL]
+      expect(account).not_to be_nil
+      expect(account.identities_dataset.first(provider: "github", uid: "123456790")).not_to be_nil
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - #{user.projects.first.name} Dashboard")
+      expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
     end
 
     it "can login existing account" do
-      user = create_account
-      DB[:account_identities].insert(account_id: user.id, provider: "github", uid: "123456790")
+      mock_provider(:google)
+      account = create_account
+      account.add_identity(provider: "google", uid: "123456790")
 
       visit "/login"
-      click_button "GitHub"
+      click_button "Google"
 
       expect(Account.count).to eq(1)
-      expect(DB[:account_identities].count).to eq(1)
+      expect(AccountIdentity.count).to eq(1)
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - #{user.projects.first.name} Dashboard")
+      expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
     end
   end
 end
