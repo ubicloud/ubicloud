@@ -13,7 +13,7 @@ require "ipaddr"
 require "fileutils"
 require "securerandom"
 
-LOG = Logger.new("cni_plugin.log")
+LOG = Logger.new("/opt/cni/bin/cni_plugin.log")
 LOG.level = Logger::INFO
 
 class UBICNI
@@ -34,14 +34,12 @@ class UBICNI
 
   def run
     LOG.info "-------------------------------------------------------"
-    LOG.info "Handling new command:"
-    LOG.info "ENV[CNI_COMMAND] #{ENV["CNI_COMMAND"]}"
+    LOG.info "Handling new command: #{ENV["CNI_COMMAND"]}"
     LOG.info "ENV[CNI_CONTAINERID] #{ENV["CNI_CONTAINERID"]}"
     LOG.info "ENV[CNI_NETNS] #{ENV["CNI_NETNS"]}"
     LOG.info "ENV[CNI_IFNAME] #{ENV["CNI_IFNAME"]}"
     LOG.info "ENV[CNI_ARGS] #{ENV["CNI_ARGS"]}"
     LOG.info "ENV[CNI_PATH] #{ENV["CNI_PATH"]}"
-    LOG.info "stdin: #{@stdin}"
     LOG.info "-------------------------------------------------------"
     case @cni_command
     when "ADD"
@@ -85,7 +83,7 @@ options ndots:5
     ipv4_ips = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
 
     response = {
-      cniVersion: "0.4.0",
+      cniVersion: "1.0.0",
       interfaces: [
         {
           name: inner_ifname,
@@ -95,16 +93,19 @@ options ndots:5
       ],
       ips: [
         {
-          version: "4",
-          address: ipv4_ips["container_ip"],
-          gateway: ipv4_ips["gateway_ip"],
+          address: ipv4_ips[:container_ip].to_s,
+          gateway: ipv4_ips[:gateway_ip].to_s,
           interface: 0
         },
         {
-          version: "6",
-          address: container_ula_ipv6,
+          address: container_ula_ipv6.to_s,
           gateway: outer_link_local,
           interface: 0
+        }
+      ],
+      routes: [
+        {
+          dst: "0.0.0.0/0"
         }
       ],
       dns: {
@@ -113,6 +114,7 @@ options ndots:5
         options: ["ndots:5"]
       }
     }
+    LOG.info "add response: #{JSON.generate(response)}"
     puts JSON.generate(response)
   end
 
@@ -141,9 +143,10 @@ options ndots:5
     r "ip -n #{cni_netns} route add default via #{gateway_ip.network}"
 
     r "ip route add #{container_ip} via #{gateway_ip.network} dev #{outer_ifname}"
-    # r "iptables -t nat -A POSTROUTING -s #{subnet} -o ens3 -j MASQUERADE"
+    r "echo 1 > /proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
+    r "iptables -t nat -A POSTROUTING -s #{subnet} -o ens3 -j MASQUERADE"
 
-    {container_ip: container_ip, gateway_ip: gateway_ip}
+    {container_ip: container_ip, gateway_ip: gateway_ip.network}
   end
 
   def handle_del
@@ -189,7 +192,6 @@ options ndots:5
       ],
       ips: [
         {
-          version: "6",
           address: container_ip,
           gateway: nil,
           interface: 0

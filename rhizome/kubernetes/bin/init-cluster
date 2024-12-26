@@ -3,12 +3,15 @@
 
 require_relative "../../common/lib/util"
 
-if ARGV.count != 2
+if ARGV.count != 5
   fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
 end
 
 cluster_name = ARGV[0]
 load_balancer_host_name = ARGV[1]
+private_subnet_cidr4 = ARGV[2]
+private_subnet_cidr6 = ARGV[3]
+vm_cidr = ARGV[4]
 
 config = <<YAML
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -22,11 +25,20 @@ apiServer:
     - #{load_balancer_host_name}
 
 networking:
-  podSubnet: "10.244.0.0/16"
+  podSubnet: "#{private_subnet_cidr4},#{private_subnet_cidr6}"
+  dualStack: true
+
+controllerManager:
+  extraArgs:
+    allocate-node-cidrs: "false"
+
+nodeRegistration:
+  kubeletExtraArgs:
+    pod-cidr: "#{vm_cidr}"
 
 etcd:
   local:
-    dataDir: "/var/lib/etcd"  
+    dataDir: "/var/lib/etcd"
 YAML
 
 config_path = "/tmp/kubeadm-config.yaml"
