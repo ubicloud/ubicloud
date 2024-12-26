@@ -56,7 +56,7 @@ class VmSetup
     prepare_pci_devices(pci_devices)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
     start_systemd_unit
-    # fix_via_routes(nics)
+    fix_via_routes(nics)
   end
 
   def recreate_unpersisted(gua, ip4, local_ip4, nics, mem_gib, ndp_needed, storage_params, storage_secrets, dns_ipv4, pci_devices, multiqueue:)
@@ -65,7 +65,7 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
     prepare_pci_devices(pci_devices)
     start_systemd_unit
-    # fix_via_routes(nics)
+    fix_via_routes(nics)
   end
 
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology, mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image, dns_ipv4)
@@ -74,7 +74,7 @@ class VmSetup
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices)
-    # fix_via_routes(nics)
+    fix_via_routes(nics)
   end
 
   def setup_networking(skip_persisted, gua, ip4, local_ip4, nics, ndp_needed, dns_ipv4, multiqueue:)
@@ -229,7 +229,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     multiqueue_fragment = multiqueue ? " multi_queue vnet_hdr " : " "
     nics.each do |nic|
       r "ip -n #{q_vm} tuntap add dev #{nic.tap} mode tap user #{q_vm} #{multiqueue_fragment}"
-      r "ip -n #{q_vm} addr replace #{nic.private_ipv4_gateway} dev #{nic.tap} noprefixroute"
+      r "ip -n #{q_vm} addr replace #{nic.private_ipv4_gateway} dev #{nic.tap}"
     end
   end
 
@@ -327,8 +327,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
   def fix_via_routes(nics)
     loop do
-      state = r("systemctl show -p SubState --value #{q_vm}.service").chomp
-      if state != "running"
+      link_state = r("ip -n #{q_vm} link | grep -E \"^[0-9]+: nc[^:]+:\" | grep -q \"state UP\" && echo UP || echo DOWN").chomp
+      if link_state == "DOWN"
         sleep(5)
       else
         break
