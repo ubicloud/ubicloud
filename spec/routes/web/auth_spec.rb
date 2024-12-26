@@ -416,5 +416,17 @@ RSpec.describe Clover, "auth" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
     end
+
+    it "can not login existing account before linking it" do
+      mock_provider(:github)
+      create_account
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Login")
+      expect(page).to have_content("There is already an account with this email address")
+    end
   end
 end
