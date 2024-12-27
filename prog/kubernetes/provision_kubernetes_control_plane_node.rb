@@ -99,13 +99,13 @@ BASH
     kubernetes_cluster.kubectl("apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml")
     kubernetes_cluster.kubectl("-n kube-system patch cm calico-config -p '{\"data\":{\"veth_mtu\":\"1300\"}}'")
     kubernetes_cluster.kubectl("-n kube-system rollout restart ds calico-node")
-    pop "CP VM initialized"
+    pop vm_id: vm.id
   end
 
   label def join_cluster
     case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
     when "Succeeded"
-      pop "CP VM joined"
+      pop vm_id: vm.id
     when "NotStarted", "Failed"
       join_token = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
       certificate_key = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]

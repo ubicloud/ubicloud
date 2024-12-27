@@ -75,13 +75,16 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     # Note that the kubernetes_version should point to the next version we are targeting
 
     # Pick a control plane node to upgrade
-    node_to_upgrade = kubernetes_cluster.vms.first do |vm|
-      vm.sshable.cmd("sudo kubectl ")
+    node_to_upgrade = kubernetes_cluster.vms.find do |vm|
+      # TODO: Put another check here to make sure the version we receive is either one version old or the correct version, just in case
+      res = vm.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version")
+      puts res
+      res.match(/Client Version: (v1\.\d\d)\.\d/).captures.first != kubernetes_cluster.kubernetes_version
     end
 
     hop_wait unless node_to_upgrade
 
-    push Prog::Kubernetes::UpgradeKubernetesNode, {"vm_id" => node_to_upgrade.id}
+    push Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => node_to_upgrade.id}
   end
 
   label def destroy
