@@ -26,7 +26,7 @@ class Clover
       private_subnet_id: private_subnet.ubid,
       project_id: @project.id,
       location: @location,
-      replica: 1
+      replica: request.params["cp_nodes"].to_i
     )
 
     if api?

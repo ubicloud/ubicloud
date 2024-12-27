@@ -229,6 +229,11 @@ end
     end
   end
 
+  def set_frame(key, value)
+    strand.stack.first[key] = value
+    strand.modified!(:stack)
+  end
+
   # Copied from sequel/model/inflections.rb's camelize, to convert
   # table names into idiomatic model class names.
   private_class_method def self.camelize(s)
