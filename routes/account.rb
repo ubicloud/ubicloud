@@ -17,9 +17,7 @@ class Clover
         r.post "disconnect" do
           provider, uid = typecast_params.nonempty_str(["provider", "uid"])
           identities = current_account.identities
-          unless identities.length > 1
-            # YYYY: We can allow to disconnect the last omniauth provider if the user has a password
-            # But need https://github.com/jeremyevans/rodauth/pull/461 to be merged first.
+          unless identities.length > (rodauth.has_password? ? 0 : 1)
             flash[:error] = "You must have at least one login method"
             r.redirect "/account/login-method"
           end

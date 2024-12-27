@@ -461,7 +461,8 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_content "Your account has been disconnected from Github"
       end
 
-      it "can not disconnect the last login method" do
+      it "can not disconnect the last login method if has no password" do
+        DB[:account_password_hashes].where(id: account.id).delete
         account.add_identity(provider: "github", uid: "123456790")
 
         visit "/account/login-method"
