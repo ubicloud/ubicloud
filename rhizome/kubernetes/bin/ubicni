@@ -54,9 +54,9 @@ class UBICNI
   end
 
   def handle_add
-    subnet_ula_ipv6 = @stdin_data["ipam"]["ranges"][0]["subnet_ula_ipv6"]
-    subnet_ipv6 = @stdin_data["ipam"]["ranges"][0]["subnet_ipv6"]
-    subnet_ipv4 = @stdin_data["ipam"]["ranges"][0]["subnet_ipv4"]
+    subnet_ula_ipv6 = @stdin_data["ranges"]["subnet_ula_ipv6"]
+    subnet_ipv6 = @stdin_data["ranges"]["subnet_ipv6"]
+    subnet_ipv4 = @stdin_data["ranges"]["subnet_ipv4"]
 
     container_id = ENV["CNI_CONTAINERID"]
     cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
