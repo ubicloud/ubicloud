@@ -21,7 +21,11 @@ class Clover
             flash[:error] = "You must have at least one login method"
             r.redirect "/account/login-method"
           end
-          if (identity = identities.find { _1.provider == provider && _1.uid == uid })
+          if provider == "password"
+            DB[:account_password_hashes].where(id: current_account.id).delete
+            DB[:account_previous_password_hashes].where(account_id: current_account.id).delete
+            flash[:notice] = "Your password has been deleted"
+          elsif (identity = identities.find { _1.provider == provider && _1.uid == uid })
             identity.destroy
             flash[:notice] = "Your account has been disconnected from #{provider.capitalize}"
           else
