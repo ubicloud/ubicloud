@@ -255,6 +255,7 @@ RSpec.describe Clover, "project" do
         expect(Mail::TestMailer.deliveries.length).to eq 0
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"])
         visit "#{project.path}/user"
         fill_in "Email", with: user2.email
@@ -289,6 +290,7 @@ RSpec.describe Clover, "project" do
         allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
 
         visit "#{project.path}/user"
         fill_in "Email", with: user2.email
@@ -328,6 +330,7 @@ RSpec.describe Clover, "project" do
         allowed = SubjectTag.create_with_id(project_id: project.id, name: "Allowed")
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
 
         visit "#{project.path}/user"
         fill_in "Email", with: user2.email
@@ -468,6 +471,7 @@ RSpec.describe Clover, "project" do
         project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
         within "form#managed-policy" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
@@ -507,6 +511,7 @@ RSpec.describe Clover, "project" do
         to_be_removed = SubjectTag.create_with_id(project_id: project.id, name: "ToBeRemoved")
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
         ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: to_be_removed.id)
 
@@ -550,6 +555,7 @@ RSpec.describe Clover, "project" do
         tag2 = SubjectTag.create_with_id(project_id: project.id, name: "SecondTag")
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
         ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag1.id)
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag2.id)
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag2.id)
