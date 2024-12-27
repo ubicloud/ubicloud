@@ -557,6 +557,7 @@ RSpec.describe Clover, "project" do
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
         ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag1.id)
+        remove_ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag1.id)
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag2.id)
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag2.id)
 
@@ -588,15 +589,19 @@ RSpec.describe Clover, "project" do
         end
 
         page.refresh
+        remove_ace.destroy
         within "form#managed-policy" do
           select "SecondTag", from: "user_policies[#{user2.ubid}]"
           click_button "Update"
         end
         expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
         expect(page.find_by_id("flash-error").text).to eq("You don't have permission to remove members from 'FirstTag' tag")
-        expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "FirstTag")
+        noremove = page.find_by_id("user-#{user2.ubid}-noremove")
+        expect(noremove["title"]).to eq "You cannot change the policy for this user"
+        expect(noremove.text).to eq "FirstTag"
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag1.id)
+        page.refresh
         within "form#managed-policy" do
           select "SecondTag", from: "user_policies[#{user2.ubid}]"
           click_button "Update"
@@ -628,6 +633,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: admin_tag.id)
+        page.refresh
         expect(page).to have_select("user_policies[#{user.ubid}]", selected: "Admin")
         within "form#managed-policy" do
           select "No access", from: "user_policies[#{user.ubid}]"
