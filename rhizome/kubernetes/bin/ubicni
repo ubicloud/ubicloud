@@ -55,7 +55,7 @@ class UBICNI
 
   def handle_add
     subnet_ula_ipv6 = @stdin_data["ipam"]["ranges"][0]["subnet_ula_ipv6"]
-    # subnet_ipv6 = @stdin_data["ipam"]["ranges"][0]["subnet_ipv6"]
+    subnet_ipv6 = @stdin_data["ipam"]["ranges"][0]["subnet_ipv6"]
     subnet_ipv4 = @stdin_data["ipam"]["ranges"][0]["subnet_ipv4"]
 
     container_id = ENV["CNI_CONTAINERID"]
@@ -79,6 +79,7 @@ options ndots:5
 
     r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
 
+    container_ipv6 = setup_ipv6(subnet_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: true)
     container_ula_ipv6 = setup_ipv6(subnet_ula_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
     ipv4_ips = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
 
@@ -101,6 +102,11 @@ options ndots:5
           address: container_ula_ipv6.to_s,
           gateway: outer_link_local,
           interface: 0
+        },
+        {
+          address: container_ipv6.to_s,
+          gateway: outer_link_local,
+          interface: 0
         }
       ],
       routes: [
@@ -118,12 +124,14 @@ options ndots:5
     puts JSON.generate(response)
   end
 
-  def setup_ipv6(subnet, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
+  def setup_ipv6(subnet, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: false)
     container_ip = allocate_ipv6(subnet)
 
     r "ip -6 -n #{cni_netns} addr add #{container_ip} dev #{inner_ifname}"
     r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
-    r "ip -6 -n #{cni_netns} route add default via #{outer_link_local} dev #{inner_ifname}"
+    if setup_default_route
+      r "ip -6 -n #{cni_netns} route add default via #{outer_link_local} dev #{inner_ifname}"
+    end
 
     r "ip -6 link set #{outer_ifname} mtu #{@mtu} up"
     r "ip -6 route add #{container_ip} via #{inner_link_local} dev #{outer_ifname} mtu #{@mtu}"
@@ -144,7 +152,6 @@ options ndots:5
 
     r "ip route add #{container_ip} via #{gateway_ip.network} dev #{outer_ifname}"
     r "echo 1 > /proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
-    r "iptables -t nat -A POSTROUTING -s #{subnet} -o ens3 -j MASQUERADE"
 
     {container_ip: container_ip, gateway_ip: gateway_ip.network}
   end
