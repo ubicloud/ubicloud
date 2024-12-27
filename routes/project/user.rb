@@ -17,6 +17,7 @@ class Clover
           @subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, @users.map(&:id))
           @allowed_view_tag_names = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:view").map(:name)
           @allowed_add_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
+          @allowed_remove_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").select_hash(:name, Sequel.as(true, :v))
           @invitations = @project.invitations_dataset.order_by(:email).all
           view "project/user"
         end
