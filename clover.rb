@@ -406,6 +406,14 @@ class Clover < Roda
         button_title: "Reset Password",
         button_link: reset_password_email_link)
     end
+
+    before_reset_password_request do
+      unless has_password?
+        flash["error"] = "Login with password is not enabled for this account. Please use other login methods. For any questions or assistance, reach out to our team at support@ubicloud.com"
+        redirect login_route
+      end
+    end
+
     after_reset_password do
       remove_all_active_sessions_except_current
     end

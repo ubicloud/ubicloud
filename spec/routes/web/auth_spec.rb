@@ -182,6 +182,20 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
   end
 
+  it "can not reset password if password disabled" do
+    account = create_account
+    DB[:account_password_hashes].where(id: account.id).delete
+
+    visit "/login"
+    click_link "Forgot your password?"
+
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    click_button "Request Password Reset"
+
+    expect(page).to have_content("Login with password is not enabled for this account.")
+    expect(DB[:account_password_reset_keys].count).to eq 0
+  end
+
   it "can login to an account without projects" do
     create_account(with_project: false)
 
