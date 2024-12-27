@@ -13,8 +13,9 @@ class Clover
         authorize("Project:user", @project.id)
 
         r.get do
-          @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all, {project_id: @project.id})
-          @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
+          @users = @project.accounts_dataset.order_by(:email).all
+          @subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, @users.map(&:id))
+          @invitations = @project.invitations_dataset.order_by(:email).all
           view "project/user"
         end
 
@@ -193,10 +194,7 @@ class Clover
             .accounts_dataset
             .where(Sequel[:accounts][:id] => account_ids)
             .select_map(Sequel[:accounts][:id])
-          subject_tag_map = DB[:applied_subject_tag]
-            .join(:subject_tag, id: :tag_id)
-            .where(subject_id: project_account_ids, project_id: @project.id)
-            .select_hash_groups(:subject_id, :name)
+          subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, project_account_ids)
           project_account_ids.each do |account_id|
             subject_tag_map[account_id] ||= [] # Handle accounts not in any tags
           end
