@@ -77,23 +77,17 @@
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @users.each do |user| %>
-              <tr id="user-<%= user[:ubid]%>">
+              <tr id="user-<%= user.ubid %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%= user[:email] %>
+                  <%= user.email %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <% if user[:policies].length < 2 %>
-                    <%== render(
-                      "components/form/policy_select",
-                      locals: {
-                        name: "user_policies[#{user[:ubid]}]",
-                        selected: user[:policies].first
-                      }
-                    ) %>
-                  <% else %>
+                  <% if (tags = @subject_tag_map[user.id]) && tags.length >= 2 %>
                     <span title="You can manage this user's policies from the Access Control tab.">
-                      <%= user[:policies].join(", ") %>
+                      <%= tags.join(", ") %>
                     </span>
+                  <% else %>
+                    <%== render("components/form/policy_select", locals: { name: "user_policies[#{user.ubid}]", selected: tags&.first }) %>
                   <% end %>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
@@ -101,30 +95,30 @@
                     "components/delete_button",
                     locals: {
                       text: "Remove",
-                      url: "#{@project_data[:path]}/user/#{user[:ubid]}",
-                      confirmation: user[:email]
+                      url: "#{@project_data[:path]}/user/#{user.ubid}",
+                      confirmation: user.email
                     }
                   ) %>
                 </td>
               </tr>
             <% end %>
             <% @invitations.each do |invitation| %>
-              <tr id="invitation-<%= invitation[:email].gsub(/\W+/, "") %>">
+              <tr id="invitation-<%= invitation.email.gsub(/\W+/, "") %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%= invitation[:email] %>
                   <span
                     class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
                   >
                     Invitation expires on
-                    <%= invitation[:expires_at] %>
+                    <%= invitation.expires_at.strftime("%B %d, %Y") %>
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                   <%== render(
                     "components/form/policy_select",
                     locals: {
-                      name: "invitation_policies[#{invitation[:email]}]",
-                      selected: invitation[:policy]
+                      name: "invitation_policies[#{invitation.email}]",
+                      selected: invitation.policy
                     }
                   ) %>
                 </td>
@@ -133,8 +127,8 @@
                     "components/delete_button",
                     locals: {
                       text: "Remove",
-                      url: "#{@project_data[:path]}/user/invitation/#{invitation[:email]}",
-                      confirmation: invitation[:email]
+                      url: "#{@project_data[:path]}/user/invitation/#{invitation.email}",
+                      confirmation: invitation.email
                     }
                   ) %>
                 </td>
