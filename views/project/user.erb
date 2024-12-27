@@ -86,8 +86,12 @@
                     <span title="You can manage this user's policies from the Access Control tab.">
                       <%= tags.join(", ") %>
                     </span>
+                  <% elsif (tag = tags&.first) && !@allowed_remove_tag_names_map[tag] %>
+                    <span id="user-<%= user.ubid %>-noremove" title="You cannot change the policy for this user">
+                      <%= tag %>
+                    </span>
                   <% else %>
-                    <%== render("components/form/policy_select", locals: { name: "user_policies[#{user.ubid}]", selected: tags&.first }) %>
+                    <%== render("components/form/policy_select", locals: { name: "user_policies[#{user.ubid}]", selected: tag }) %>
                   <% end %>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
