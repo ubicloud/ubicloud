@@ -571,6 +571,17 @@ RSpec.describe Clover, "project" do
         admin_tag.remove_members(user2.id)
 
         page.refresh
+        DB.transaction(rollback: :always) do
+          within "form#managed-policy" do
+            select "SecondTag", from: "user_policies[#{user2.ubid}]"
+            user2.dissociate_with_project(project)
+            click_button "Update"
+          end
+          expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
+          expect(page.find_by_id("flash-error").text).to eq("Cannot change the policy for user, as they are not associated to project")
+        end
+
+        page.refresh
         within "form#managed-policy" do
           select "SecondTag", from: "user_policies[#{user2.ubid}]"
           click_button "Update"
