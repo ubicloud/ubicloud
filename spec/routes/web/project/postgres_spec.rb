@@ -370,7 +370,6 @@ RSpec.describe Clover, "postgres" do
       it "can not delete PostgreSQL database when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:Firewall:view"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
         expect(page.title).to eq "Ubicloud - pg-without-permission"

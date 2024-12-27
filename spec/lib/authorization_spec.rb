@@ -34,7 +34,7 @@ RSpec.describe Authorization do
     ace_subjects, ace_actions, ace_objects = policies.values_at(:subjects, :actions, :objects)
     Array(ace_subjects).each do |subject_id|
       Array(ace_actions).each do |action|
-        action_id = ActionType::NAME_MAP[action] || ActionTag[project_id: nil, name: action].id if action
+        action_id = ActionType::NAME_MAP.fetch(action) { ActionTag[project_id: nil, name: action].id } if action
         Array(ace_objects).each do |object_id|
           AccessControlEntry.create_with_id(project_id:, subject_id:, action_id:, object_id:)
         end
@@ -54,7 +54,7 @@ RSpec.describe Authorization do
     action_id = unless ace_actions == [nil]
       action_tag = ActionTag.create_with_id(project_id:, name: "A")
       Array(ace_actions).each_with_index do |action_id, i|
-        action_id = ActionType::NAME_MAP[action_id] || ActionTag[project_id: nil, name: action_id].id
+        action_id = ActionType::NAME_MAP.fetch(action_id) { ActionTag[project_id: nil, name: action_id].id }
         action_tag.add_action(action_id)
       end
       action_tag = yield action_tag if block_given?

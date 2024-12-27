@@ -12,7 +12,7 @@ class ActionType < Sequel::Model
 
   plugin :static_cache
 
-  NAME_MAP = {}
+  NAME_MAP = Hash.new { |h, k| raise KeyError, "Invalid action type name: #{k}" }
   each { |t| NAME_MAP[t.name] = t.id }
   NAME_MAP.freeze
 end
