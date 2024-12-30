@@ -91,6 +91,8 @@ autoload_normal.call("model", flat: true)
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
   files = %w[model lib scheduling prog serializers].flat_map { Dir["#{_1}/**/*.rb"] }
   files.concat(%w[clover.rb clover_error.rb])
+
+  Sequel::DATABASES.each(&:disconnect)
   files.each do |file|
     pid = fork do
       require_relative file
