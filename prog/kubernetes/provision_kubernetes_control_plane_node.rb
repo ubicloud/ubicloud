@@ -114,7 +114,6 @@ cd /home/ubi || {
 }
 exec ./kubernetes/bin/ubicni
 BASH_SCRIPT
-    vm.sshable.cmd("iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
     vm.sshable.cmd("sudo tee /opt/cni/bin/ubicni", stdin: script)
     vm.sshable.cmd("sudo chmod +x /opt/cni/bin/ubicni")
     cni_config = <<CONFIG
@@ -123,13 +122,14 @@ BASH_SCRIPT
   "name": "ubicni-network",
   "type": "ubicni",
   "ranges":{
-      "subnet_ipv6": "#{vm.ephemeral_net6}",
+      "subnet_ipv6": "#{vm.ephemeral_net6.network}/80",
       "subnet_ula_ipv6": "#{vm.nics.first.private_ipv6}",
       "subnet_ipv4": "#{vm.nics.first.private_ipv4}"
   }
 }
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    vm.sshable.cmd("sudo iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
     pop vm_id: vm.id
   end
 
