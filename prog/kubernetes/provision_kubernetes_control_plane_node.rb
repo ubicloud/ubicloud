@@ -105,17 +105,40 @@ BASH
   end
 
   label def install_cni
-    # CALICO
-    kubernetes_cluster.kubectl("apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.29.1/manifests/calico.yaml")
-    kubernetes_cluster.kubectl("-n kube-system patch cm calico-config -p '{\"data\":{\"veth_mtu\":\"1300\"}}'")
-    kubernetes_cluster.kubectl("-n kube-system rollout restart ds calico-node")
+    script = <<BASH_SCRIPT
+#!/bin/bash
+cd /home/ubi || {
+    echo "Failed to change directory to /home/ubi" >&2
+    exit 1
+}
+exec ./kubernetes/bin/ubicni
+BASH_SCRIPT
+    vm.sshable.cmd("sudo tee -a /opt/cni/bin/ubicni", stdin: script)
+    vm.sshable.cmd("sudo chmod +x /opt/cni/bin/ubicni")
+    cni_config = <<CONFIG
+{
+  "cniVersion": "1.0.0",
+  "name": "ubicni-network",
+  "type": "ubicni",
+  "ipam": {
+    "type": "host-local",
+    "ranges": [
+      {
+        "subnet": "#{vm.ephemeral_net6}"
+      }
+    ]
+  }
+}
+CONFIG
+    vm.sshable.cmd("sudo tee -a /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    hop_bootstrap_control_plane_vm
     pop vm_id: vm.id
   end
 
   label def join_cluster
     case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
     when "Succeeded"
-      pop vm_id: vm.id
+      hop_install_cni
     when "NotStarted"
       join_token = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
       certificate_key = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]
