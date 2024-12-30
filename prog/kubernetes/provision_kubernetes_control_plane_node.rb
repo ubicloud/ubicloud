@@ -91,7 +91,8 @@ BASH
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo /home/ubi/kubernetes/bin/init-cluster #{kubernetes_cluster.name} #{kubernetes_cluster.endpoint}' init_kubernetes_cluster")
+      ps = PrivateSubnet[kubernetes_cluster.private_subnet_id]
+      vm.sshable.cmd("common/bin/daemonizer 'sudo /home/ubi/kubernetes/bin/init-cluster #{kubernetes_cluster.name} #{kubernetes_cluster.endpoint} #{ps.net4} #{ps.net6} #{vm.nics.first.private_ipv4}' init_kubernetes_cluster")
       nap 10
     when "Failed"
       puts "INIT CLUSTER FAILED"

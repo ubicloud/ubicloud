@@ -91,10 +91,10 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     # DB.transaction do
     #   KubernetesNodepool.where(kubernetes_cluster_id: kubernetes_cluster.id).each(&:incr_destroy)
     # end
-    kubernetes_cluster.load_balancer.incr_destroy
-    kubernetes_cluster.vms.map(&:incr_destroy)
-    kubernetes_cluster.projects.map { kubernetes_cluster.dissociate_with_project(_1) }
-    kubernetes_cluster.destroy
+    kubernetes_cluster&.load_balancer&.incr_destroy
+    kubernetes_cluster&.vms&.map(&:incr_destroy)
+    kubernetes_cluster&.projects&.map { kubernetes_cluster&.dissociate_with_project(_1) }
+    kubernetes_cluster&.destroy
     pop "kubernetes cluster is deleted"
   end
 end
