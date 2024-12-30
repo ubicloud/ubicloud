@@ -384,7 +384,7 @@ class Clover < Roda
         flash["error"] = "There is already an account with this email address, and it has not been linked to the #{omniauth_provider.capitalize} account.
         Please login to the existing account normally, and then link it to the #{omniauth_provider.capitalize} account from your account settings.
         Then you can can login using the #{omniauth_provider.capitalize} account."
-        scope.redirect_back_with_inputs
+        redirect "/login"
       end
     end
 
