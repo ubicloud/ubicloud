@@ -37,6 +37,16 @@
       expect(tag.member_ids).to be_empty
     end
 
+    it "#remove_members moves deleted records to archived_records" do
+      tag.add_members([tag1.id, tag2.id])
+      tag.remove_members([tag1.id, tag2.id])
+      column = model.table_name.to_s.sub("tag", "id")
+      rows = DB[:archived_record].where(model_name: "applied_#{model.table_name}").select_map(:model_values)
+      expect(rows.length).to eq 2
+      expect(rows.map { _1["tag_id"] }.uniq).to eq [tag.id]
+      expect(rows.map { _1[column] }.sort).to eq [tag1.id, tag2.id].sort
+    end
+
     it "#currently_included_in returns all tag ids that directly or indirectly include this tag" do
       expect(tag.currently_included_in).to be_empty
       tag1.add_member(tag.id)
