@@ -114,7 +114,7 @@ cd /home/ubi || {
 }
 exec ./kubernetes/bin/ubicni
 BASH_SCRIPT
-
+    vm.sshable.cmd("iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
     vm.sshable.cmd("sudo tee /opt/cni/bin/ubicni", stdin: script)
     vm.sshable.cmd("sudo chmod +x /opt/cni/bin/ubicni")
     cni_config = <<CONFIG
