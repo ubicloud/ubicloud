@@ -121,18 +121,14 @@ BASH_SCRIPT
   "cniVersion": "1.0.0",
   "name": "ubicni-network",
   "type": "ubicni",
-  "ipam": {
-    "type": "host-local",
-    "ranges": [
-      {
-        "subnet": "#{vm.ephemeral_net6}"
-      }
-    ]
+  "ranges":{
+      "subnet_ipv6": "#{vm.ephemeral_net6}",
+      "subnet_ula_ipv6": "#{vm.nics.first.private_ipv6}",
+      "subnet_ipv4": "#{vm.nics.first.private_ipv4}"
   }
 }
 CONFIG
     vm.sshable.cmd("sudo tee -a /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
-    hop_bootstrap_control_plane_vm
     pop vm_id: vm.id
   end
 
