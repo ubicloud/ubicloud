@@ -114,7 +114,8 @@ cd /home/ubi || {
 }
 exec ./kubernetes/bin/ubicni
 BASH_SCRIPT
-    vm.sshable.cmd("sudo tee -a /opt/cni/bin/ubicni", stdin: script)
+
+    vm.sshable.cmd("sudo tee /opt/cni/bin/ubicni", stdin: script)
     vm.sshable.cmd("sudo chmod +x /opt/cni/bin/ubicni")
     cni_config = <<CONFIG
 {
@@ -128,7 +129,7 @@ BASH_SCRIPT
   }
 }
 CONFIG
-    vm.sshable.cmd("sudo tee -a /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
     pop vm_id: vm.id
   end
 
