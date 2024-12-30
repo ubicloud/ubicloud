@@ -21,10 +21,10 @@ Warning.ignore(/To use (retry|multipart) middleware with Faraday v2\.0\+, instal
 force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 Unreloader = Rack::Unreloader.new(reload: Config.development?, autoload: true) { Clover }
 
-Unreloader.autoload("#{__dir__}/db.rb") { "DB" }
+autoload :DB, "#{__dir__}/db.rb"
 Unreloader.autoload("#{__dir__}/ubid.rb") { "UBID" }
 
-AUTOLOAD_CONSTANTS = ["DB", "UBID"]
+AUTOLOAD_CONSTANTS = ["UBID"]
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
@@ -176,6 +176,7 @@ def clover_freeze
   Gem.source_date_epoch
 
   # Freeze all constants that are autoloaded
+  DB.freeze
   Sequel::Model.freeze_descendants
   AUTOLOAD_CONSTANT_VALUES.each(&:freeze)
   [
