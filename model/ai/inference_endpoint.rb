@@ -80,6 +80,7 @@ end
 #  load_balancer_id  | uuid                     | NOT NULL
 #  private_subnet_id | uuid                     | NOT NULL
 #  gpu_count         | integer                  | NOT NULL DEFAULT 1
+#  tags              | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 # Indexes:
 #  inference_endpoint_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
