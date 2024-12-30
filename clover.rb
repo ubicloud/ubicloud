@@ -40,6 +40,7 @@ class Clover < Roda
   opts[:check_arity] = :warn
 
   Unreloader.require("helpers") {}
+  Unreloader.record_split_class(__FILE__, "helpers")
 
   plugin :all_verbs
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
