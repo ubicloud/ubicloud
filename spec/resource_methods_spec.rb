@@ -31,5 +31,18 @@ RSpec.describe ResourceMethods do
 
     access_tag.id = UBID.parse("tgx1y9wja1064pncxffe7aw4s4").to_uuid
     expect(access_tag.inspect).to eq "#<AccessTag[\"tgx1y9wja1064pncxffe7aw4s4\"] @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :created_at=>\"2024-11-13 09:16:56\"}>"
+
+    access_tag.created_at = nil
+    expect(access_tag.inspect).to eq "#<AccessTag[\"tgx1y9wja1064pncxffe7aw4s4\"] @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :created_at=>nil}>"
+  end
+
+  it "Model.[] allows lookup using both uuid and ubid" do
+    expect(Sshable[sa.id]).to eq sa
+    expect(Sshable[sa.ubid]).to eq sa
+  end
+
+  it "Model.[] handles invalid ubids by passing them to the database" do
+    expect(Sshable["sh1lawjdkcj25gq7hhb8tj3v6p"]).to be_nil
+    expect { Sshable["sh4oc37mce4p3nsdy34qa0n9j8"] }.to raise_error(Sequel::DatabaseError)
   end
 end
