@@ -13,9 +13,12 @@ auto_parallel_tests = lambda do
   use_auto_parallel_tests
 end
 
+ncpu = nil
 nproc = lambda do
+  return ncpu if ncpu
+  require "etc"
   # Limit to 6 processes, as higher number results in more time
-  `(nproc 2> /dev/null) || sysctl -n hw.logicalcpu`.to_i.clamp(1, 6).to_s
+  ncpu = Etc.nprocessors.clamp(1, 6).to_s
 end
 
 clone_test_database = lambda do
