@@ -7,6 +7,14 @@ class Prog::Kubernetes::ProvisionKubernetesControlPlaneNode < Prog::Base
     @vm ||= Vm[frame.fetch("vm_id")] || nil
   end
 
+  def write_hosts_file_if_needed(ip = nil)
+    return unless Config.development? # not sure about test
+    return if vm.sshable.cmd("sudo cat /etc/hosts").match?(/#{kubernetes_cluster.endpoint}/)
+    ip = kubernetes_cluster.vms.first.ephemeral_net4 if ip.nil?
+
+    vm.sshable.cmd("echo '#{ip} #{kubernetes_cluster.endpoint}' | sudo tee -a /etc/hosts")
+  end
+
   label def start
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi",
@@ -71,6 +79,8 @@ BASH
   end
 
   label def assign_role
+    write_hosts_file_if_needed
+
     hop_init_cluster if kubernetes_cluster.vms.count == 1
 
     hop_join_cluster
@@ -106,13 +116,17 @@ BASH
     case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
     when "Succeeded"
       pop vm_id: vm.id
-    when "NotStarted", "Failed"
+    when "NotStarted"
       join_token = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
       certificate_key = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]
       discovery_token_ca_cert_hash = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
 
       vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:443 #{join_token} #{discovery_token_ca_cert_hash} #{certificate_key}' join_control_plane")
       nap 5
+    when "Failed"
+      # TODO: Create a page or something
+      puts "JOIN CLUSTER FAILED"
+      nap 30
     when "InProgress"
       nap 10
     end

@@ -28,8 +28,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   end
 
   label def drain_old_node
-    kubernetes_cluster.kubectl "cordon #{old_vm.inhost_name}"
-    kubernetes_cluster.kubectl "drain #{old_vm.inhost_name} --ignore-daemonsets --delete-local-data --force"
+    kubernetes_cluster.kubectl "drain #{old_vm.inhost_name} --ignore-daemonsets"
 
     hop_drop_old_node
   end
@@ -37,7 +36,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
   label def drop_old_node
     # Only required for dev, as we use static IP, not the LB, as the hostname
     kubernetes_cluster.vms.each do |vm|
-      vm.sshable.cmd("sudo sed -i 's/#{old_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/#{new_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/g' /etc/kubernetes/admin.conf")
+      vm.sshable.cmd("sudo sed -i 's/#{old_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/#{new_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/g' /etc/hosts")
     end
     kubernetes_cluster.kubectl "delete node #{old_vm.inhost_name}"
   end

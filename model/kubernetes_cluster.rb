@@ -34,11 +34,7 @@ class KubernetesCluster < Sequel::Model
   end
 
   def endpoint
-    if Config.development?
-      vms.first.sshable.host
-    else
-      load_balancer.hostname
-    end
+    load_balancer.hostname
   end
 
   def install_rhizome(sshable, install_specs: false)
