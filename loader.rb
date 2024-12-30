@@ -107,6 +107,11 @@ end
 
 AUTOLOAD_CONSTANTS.freeze
 
+Unreloader.record_dependency("lib/authorization.rb", "model")
+Unreloader.record_dependency("lib/health_monitor_methods.rb", "model")
+Unreloader.record_dependency("lib/resource_methods.rb", "model")
+Unreloader.record_dependency("lib/semaphore_methods.rb", "model")
+
 if force_autoload
   AUTOLOAD_CONSTANT_VALUES = AUTOLOAD_CONSTANTS.map { Object.const_get(_1) }.freeze
 
