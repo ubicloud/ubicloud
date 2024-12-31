@@ -19,7 +19,7 @@
                 <%= token[:id] %>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <%== render("components/revealable_content", locals: { content: token[:key] }) %>
+                <%== render("components/copyable_content", locals: { content: token[:key], revealable: true }) %>
               </td>
               <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                 <%== has_project_permission("InferenceToken:delete") ? render(
