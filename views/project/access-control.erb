@@ -44,14 +44,11 @@ end
     <% if @token.nil? && edit_perm %>
       <div class="md:flex md:items-center md:justify-between">
         <div class="min-w-0 flex-1">
-          Access control in Ubicloud is defined using access control entries. Each access control entry has a single
-          subject, action, and object. Access is allowed if there is an access control entry allowing the subject to
-          take the action on the object. Subjects, actions, and objects can all be tags, which are used for grouping.
-          The recommended way to handle access control in Ubicloud is to create appropriate tags, add the subjects,
-          actions, and objects to the tags, and create the minimum number of access control entries you need to enforce
-          the access you want. However, you can create access control entries referencing specific subjects, actions,
-          or objects. You can click on the Subject, Action, and Object buttons below to manage the related tags. New
-          access control entries without a subject will be ignored.
+          Access is allowed if there is an access control entry allowing the subject to take the action on the object.
+          Subjects, actions, and objects can all be tags, which are used for grouping. The recommended way to handle
+          access control in Ubicloud is to create appropriate tags, add the subjects, actions, and objects to the tags,
+          and create the minimum number of access control entries you need to enforce the access you want. However, you
+          can create access control entries referencing specific subjects, actions, or objects.
         </div>
       </div>
     <% end %>
@@ -64,21 +61,20 @@ end
             <tr>
               <% table_headers.each do |type| %>
                 <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  <% if @token %>
-                    <%= type %>
-                  <% else %>
-                    <%== render(
-                      "components/button",
-                      locals: {
-                        text: type,
-                        link: "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}"
-                      }
-                    ) %>
+                  <%= type %>
+                  <% unless @token %>
+                    <a
+                      id="<%= type.downcase %>-tags-link"
+                      href="<%= "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}" %>"
+                      class="text-orange-600 hover:text-orange-700 text-xs"
+                    >
+                      (Tags)
+                    </a>
                   <% end %>
                 </th>
               <% end %>
               <% if edit_perm %>
-                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Delete</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
               <% end %>
             </tr>
           </thead>
