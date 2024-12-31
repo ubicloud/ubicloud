@@ -7,6 +7,7 @@ class Clover
 
     dataset = dataset_private.union(dataset_public)
     dataset = dataset.where(visible: true)
+    dataset = dataset.where(Sequel.pg_jsonb_op(:tags).get_text("capability") => ["Text Generation", "Embeddings"])
     dataset = dataset.order(:model_name)
     dataset.eager(:load_balancer)
   end
