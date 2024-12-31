@@ -382,7 +382,7 @@ RSpec.describe Clover, "access control" do
 
       it "can view #{type} tags" do
         visit "#{project.path}/user/access-control"
-        click_link cap_type
+        find("##{cap_type.downcase}-tags-link").click
         expect(page.title).to eq "Ubicloud - Default - #{cap_type} Tags"
         tds = page.all("table#tag-list td").map(&:text)
 
