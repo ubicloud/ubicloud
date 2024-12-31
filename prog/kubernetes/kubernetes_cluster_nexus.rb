@@ -50,7 +50,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       src_port: 443,
       dst_port: 6443,
       health_check_endpoint: "/healthz",
-      health_check_protocol: "tcp"
+      health_check_protocol: "tcp",
+      stack: Config.development? ? LoadBalancer::Stack::IPV4 : LoadBalancer::Stack::DUAL
     )
     kubernetes_cluster.update(load_balancer_id: load_balancer_st.id)
     hop_bootstrap_control_plane_vms

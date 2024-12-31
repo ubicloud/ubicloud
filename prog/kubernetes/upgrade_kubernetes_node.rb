@@ -38,6 +38,16 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
     kubernetes_cluster.vms.each do |vm|
       vm.sshable.cmd("sudo sed -i 's/#{old_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/#{new_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/g' /etc/hosts")
     end
-    kubernetes_cluster.kubectl "delete node #{old_vm.inhost_name}"
+
+    begin
+      kubernetes_cluster.kubectl "delete node #{old_vm.inhost_name}"
+    rescue Sshable::SshError => ex
+      raise unless /nodes "#{old_vm.inhost_name}" not found/.match?(ex.stderr)
+    end
+
+    DB.run("DELETE FROM kubernetes_clusters_vm WHERE kubernetes_cluster_id = '#{kubernetes_cluster.id}' AND vm_id = '#{old_vm.id}'")
+
+    old_vm.incr_destroy
+    pop "upgraded node"
   end
 end

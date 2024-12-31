@@ -30,7 +30,6 @@ class Prog::Kubernetes::ProvisionKubernetesControlPlaneNode < Prog::Base
     set_frame("vm_id", vm_st.id)
     # TODO: fix later by introducing a KubernetesNode object?
     DB[:kubernetes_clusters_vm].insert(SecureRandom.uuid, kubernetes_cluster.id, vm_st.subject.id)
-    kubernetes_cluster.load_balancer.add_vm(vm_st.subject)
 
     hop_install_software
   end
@@ -50,7 +49,7 @@ class Prog::Kubernetes::ProvisionKubernetesControlPlaneNode < Prog::Base
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \\$(. /etc/os-release && echo "\\$VERSION_CODENAME") stable" \\| sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   sudo apt update
   sudo apt install -y containerd
-  sudo mkdir /etc/containerd
+  sudo mkdir -p /etc/containerd
   sudo touch /etc/containerd/config.toml
   containerd config default | sudo tee /etc/containerd/config.toml
   sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
@@ -130,6 +129,9 @@ BASH_SCRIPT
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
     vm.sshable.cmd("sudo iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
+
+    kubernetes_cluster.load_balancer.add_vm(vm_st.subject)
+
     pop vm_id: vm.id
   end
 
