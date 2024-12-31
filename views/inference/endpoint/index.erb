@@ -43,6 +43,20 @@ curl #{ie[:url]}#{path} \\
         <h3 class="text-sm font-semibold text-gray-900">Pricing per million tokens</h3>
         <p class="text-gray-500">$<%= ie[:price_million_tokens] %></p>
       </div>
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
+        <div class="flex items-center gap-1 text-gray-500">
+          <%if hf_model = ie[:tags]["hf_model"]%>
+          <a target="_blank" rel="noreferrer" href="https://huggingface.co/<%= hf_model %>" class="text-orange-600">🤗 <%= hf_model %></a>
+          <%else%>
+          <p class="text-gray-500">Not available</p>
+          <%end%>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900">Context length</h3>
+        <p class="text-gray-500"><%= ie[:tags].fetch("context_length", "Full") %></p>
+      </div>
       <div class="sm:col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">URL</h3>
         <p class="text-gray-500"><%== render("components/copyable_content", locals: { content: ie[:url], message: "Copied URL" }) %></p>
