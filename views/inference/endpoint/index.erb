@@ -3,30 +3,20 @@
 
 <div class="grid xl:grid-cols-2 2xl:grid-cols-3 gap-4">
   <% @inference_endpoints.each_with_index do | ie, index |
-    path, model_type, model_icon, curl_message = case ie[:model_type]
-      when :text_generation
+    path, model_icon, curl_message = case ie[:tags]["capability"]
+      when "Text Generation"
         [
           "/v1/chat/completions",
-          "Text Generation",
           "hero-chat-bubble-bottom-center-text",
         <<-MSG
 "messages": [{"role": "user", "content": "say something"}],
     "stream": true
 MSG
         ]
-      when :guard
-        [
-          "/v1/chat/completions",
-          "Guard",
-          "hero-shield-check",
-        <<~MSG
-  "messages": [{"role": "user", "content": "is this safe?"}]
-  MSG
-        ]
-      when :embedding
-        ["/v1/embeddings", "Embedding", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
+      when "Embeddings"
+        ["/v1/embeddings", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
       else
-        fail "Unknown model type"
+        fail "Unknown model capability"
     end
 
 
@@ -43,10 +33,10 @@ curl #{ie[:url]}#{path} \\
     <h2 class="text-lg font-bold mb-4 text-gray-800"><%= ie[:name] %></h2>
     <div class="grid sm:grid-cols-2 gap-4">
       <div>
-        <h3 class="text-sm font-semibold text-gray-900">Type</h3>
+        <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
         <div class="flex items-center gap-1 text-gray-500">
           <%== render("components/icon", locals: { name: model_icon, classes: "w-5 h-5 text-gray-400" }) %>
-          <%= model_type %>
+          <%= ie[:tags]["capability"] %>
         </div>
       </div>
       <div>

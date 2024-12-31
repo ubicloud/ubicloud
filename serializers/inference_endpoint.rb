@@ -6,7 +6,7 @@ class Serializers::InferenceEndpoint < Serializers::Base
       id: ie.ubid,
       name: ie.name,
       model_name: ie.model_name,
-      model_type: ie.model_type,
+      tags: ie.tags,
       url: "#{ie.load_balancer.health_check_protocol}://#{ie.load_balancer.hostname}",
       is_public: ie.is_public,
       location: ie.display_location,
