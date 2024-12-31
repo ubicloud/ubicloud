@@ -58,6 +58,10 @@ attributes ||= {} %>
     <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
   <% end %>
   <% if description %>
-    <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%== description %></p>
+    <% if description.start_with?("<p") %>
+      <%== description %>
+    <% else %>
+      <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%== description %></p>
+    <% end %>
   <% end %>
 </div>

@@ -7,6 +7,7 @@ File.write(css_file, "") unless File.file?(css_file)
 
 require "capybara"
 require "capybara/rspec"
+require "capybara/validate_html5" if ENV["CLOVER_FREEZE"] == "1"
 
 Gem.suffix_pattern
 

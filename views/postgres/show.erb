@@ -183,28 +183,29 @@
           <% end %>
           <% if edit_perm %>
             <tr>
-              <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST">
-                <%== csrf_tag("#{request.path}/firewall-rule") %>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "cidr",
-                      type: "cidr",
-                      attributes: {
-                        placeholder: "0.0.0.0/0",
-                        required: true
-                      }
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "cidr",
+                    type: "cidr",
+                    attributes: {
+                      placeholder: "0.0.0.0/0",
+                      required: true,
+                      form: "form-pg-fwr-create"
                     }
-                  ) %>
-                </td>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  5432
-                </td>
-                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                  }
+                ) %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                5432
+              </td>
+              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST" id="form-pg-fwr-create">
+                  <%== csrf_tag("#{request.path}/firewall-rule") %>
                   <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "firewall-rule-create-button" }) %>
-                </td>
-              </form>
+                </form>
+              </td>
             </tr>
           <% end %>
         </tbody>
@@ -250,32 +251,33 @@
           <% end %>
           <% if has_permission?("Postgres:edit", @pg[:id]) %>
             <tr>
-              <form action="<%= "#{request.path}/metric-destination" %>" role="form" method="POST">
-                <%== csrf_tag("#{request.path}/metric-destination") %>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%== render("components/form/text", locals: { name: "url", attributes: { required: true } }) %>
-                </td>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%== render("components/form/text", locals: { name: "username", attributes: { required: true } }) %>
-                </td>
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "password",
-                      type: "password",
-                      attributes: {
-                        required: true,
-                        autocomplete: "new-password"
-                      },
-                      extra_class: "metric-destination-password"
-                    }
-                  ) %>
-                </td>
-                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== render("components/form/text", locals: { name: "url", attributes: { form: "form-pg-md-create", required: true } }) %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== render("components/form/text", locals: { name: "username", attributes: { form: "form-pg-md-create", required: true } }) %>
+              </td>
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <%== render(
+                  "components/form/text",
+                  locals: {
+                    name: "password",
+                    type: "password",
+                    attributes: {
+                      required: true,
+                      form: "form-pg-md-create",
+                      autocomplete: "new-password"
+                    },
+                    extra_class: "metric-destination-password"
+                  }
+                ) %>
+              </td>
+              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                <form action="<%= "#{request.path}/metric-destination" %>" role="form" method="POST" id="form-pg-md-create">
+                  <%== csrf_tag("#{request.path}/metric-destination") %>
                   <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "metric-destination-create-button" }) %>
-                </td>
-              </form>
+                </form>
+              </td>
             </tr>
           <% end %>
         </tbody>

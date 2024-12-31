@@ -149,23 +149,26 @@
           </tr>
         <% end %>
         <tr>
-          <form action="<%= "#{request.path}/connect" %>" role="form" method="POST">
-            <%== csrf_tag("#{request.path}/connect") %>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render(
-                "components/form/select",
-                locals: {
-                  name: "connected-subnet-ubid",
-                  label: "",
-                  placeholder: "Pick a subnet to connect",
-                  options: @connectable_subnets.map { |s| [s[:id], s[:name]] }
+          <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+            <%== render(
+              "components/form/select",
+              locals: {
+                name: "connected-subnet-ubid",
+                label: "",
+                placeholder: "Pick a subnet to connect",
+                options: @connectable_subnets.map { |s| [s[:id], s[:name]] },
+                attributes: {
+                  form: "form-connect-subnet"
                 }
-              ) %>
-            </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              }
+            ) %>
+          </td>
+          <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+            <form action="<%= "#{request.path}/connect" %>" role="form" method="POST" id="form-connect-subnet">
+              <%== csrf_tag("#{request.path}/connect") %>
               <%== render("components/form/submit_button", locals: { text: "Connect" }) %>
-            </td>
-          </form>
+            </form>
+          </td>
         </tr>
       </tbody>
     </table>

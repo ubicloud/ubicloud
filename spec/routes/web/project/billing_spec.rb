@@ -31,7 +31,7 @@ RSpec.describe Clover, "billing" do
 
     visit "#{project.path}/billing"
     expect(page.status_code).to eq(501)
-    expect(page).to have_content "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
+    expect(page.body).to eq "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
   end
 
   it "tag payment method fraud after account suspension" do
