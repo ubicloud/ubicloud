@@ -167,6 +167,7 @@ class UBID
       # Bad hack, needed because ApiKey does not use a fixed ubid type
       ubid.start_with?("et") ? ApiKey : class_for_ubid(ubid)
     end.each do |model, model_uuids|
+      next unless model
       model.where(id: model_uuids).each do
         uuids[_1.id] = _1
       end

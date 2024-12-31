@@ -324,11 +324,13 @@ RSpec.describe UBID do
     page = Page.create_with_id(summary: "x", tag: "y")
     a_type = ActionType.first
     api_key = ApiKey.create(owner_table: "project", owner_id: Project.create(name: "test-project").id, used_for: "inference_endpoint", key: "1")
-    hash = {page.id => nil, a_type.id => nil, api_key.id => nil}
+    invalid = described_class.to_uuid("han2sefsk4f61k91z77vn0y978")
+    hash = {page.id => nil, a_type.id => nil, api_key.id => nil, invalid => nil}
     described_class.resolve_map(hash)
     expect(hash[page.id]).to eq page
     expect(hash[a_type.id]).to eq a_type
     expect(hash[api_key.id]).to eq api_key
+    expect(hash[invalid]).to be_nil
   end
 
   it ".type_match? checks whether given ubid has given type" do
