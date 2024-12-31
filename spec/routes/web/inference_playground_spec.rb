@@ -26,16 +26,16 @@ RSpec.describe Clover, "inference-playground" do
       lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
       lb2 = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
       [
-        ["ie1", "e5-mistral-7b-it", project_wo_permissions.id, true, true, lb.id],
-        ["ie2", "e5-mistral-8b-it", project_wo_permissions.id, true, false, lb.id],
-        ["ie3", "llama-guard-3-8b", project_wo_permissions.id, false, true, lb.id],
-        ["ie4", "llama-3-1-405b-it", project.id, false, true, lb2.id],
-        ["ie5", "llama-3-2-3b-it", project.id, false, true, lb.id],
-        ["ie6", "test-model", project_wo_permissions.id, true, true, lb.id]
-      ].each do |name, model_name, project_id, is_public, visible, load_balancer_id|
-        InferenceEndpoint.create_with_id(name:, model_name:, project_id:, is_public:, visible:, load_balancer_id:, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id)
+        ["ie1", "e5-mistral-7b-it", project_wo_permissions, true, true, lb.id, {capability: "Embeddings"}],
+        ["ie2", "e5-mistral-8b-it", project_wo_permissions, true, false, lb.id, {capability: "Text Generation"}],
+        ["ie3", "llama-guard-3-8b", project_wo_permissions, false, true, lb.id, {capability: "Text Generation"}],
+        ["ie4", "llama-3-1-405b-it", project, false, true, lb2.id, {capability: "Text Generation"}],
+        ["ie5", "llama-3-2-3b-it", project, false, false, lb.id, {capability: "Text Generation"}],
+        ["ie6", "test-model", project_wo_permissions, true, true, lb.id, {capability: "Text Generation"}]
+      ].each do |name, model_name, project, is_public, visible, load_balancer_id, tags|
+        ie = InferenceEndpoint.create_with_id(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id:, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
+        ie.associate_with_project(project)
       end
-      InferenceEndpoint.first(name: "ie4").associate_with_project(project)
       visit "#{project.path}/inference-playground"
 
       expect(page.title).to eq("Ubicloud - Playground")
