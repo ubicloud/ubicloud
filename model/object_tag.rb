@@ -8,12 +8,14 @@ class ObjectTag < Sequel::Model
 
   def self.valid_member?(project_id, object)
     case object
-    when ObjectTag, SubjectTag, ActionTag
+    when ObjectTag, SubjectTag, ActionTag, InferenceEndpoint
       object.project_id == project_id
     when Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
       !AccessTag.where(project_id:, hyper_tag_id: object.id).empty?
     when Project
       object.id == project_id
+    when ApiKey
+      object.owner_table == "project" && object.owner_id == project_id
     end
   end
 end

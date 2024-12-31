@@ -323,10 +323,12 @@ RSpec.describe UBID do
   it ".resolve_map populates hash with uuid keys" do
     page = Page.create_with_id(summary: "x", tag: "y")
     a_type = ActionType.first
-    hash = {page.id => nil, a_type.id => nil}
+    api_key = ApiKey.create(owner_table: "project", owner_id: Project.create(name: "test-project").id, used_for: "inference_endpoint", key: "1")
+    hash = {page.id => nil, a_type.id => nil, api_key.id => nil}
     described_class.resolve_map(hash)
     expect(hash[page.id]).to eq page
     expect(hash[a_type.id]).to eq a_type
+    expect(hash[api_key.id]).to eq api_key
   end
 
   it ".type_match? checks whether given ubid has given type" do
