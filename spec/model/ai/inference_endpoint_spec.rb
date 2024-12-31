@@ -49,22 +49,6 @@ RSpec.describe InferenceEndpoint do
     end
   end
 
-  describe "#model_type" do
-    it "embedding" do
-      inference_endpoint.model_name = "e5-mistral-7b-it"
-      expect(inference_endpoint.model_type).to eq(:embedding)
-    end
-
-    it "guard" do
-      inference_endpoint.model_name = "llama-guard-abc"
-      expect(inference_endpoint.model_type).to eq(:guard)
-    end
-
-    it "text generation" do
-      expect(inference_endpoint.model_type).to eq(:text_generation)
-    end
-  end
-
   shared_examples "chat completion request" do |development|
     let(:http) { instance_double(Net::HTTP, read_timeout: 30) }
     let(:load_balancer) { instance_double(LoadBalancer, health_check_protocol: "https") }

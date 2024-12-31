@@ -48,16 +48,6 @@ class InferenceEndpoint < Sequel::Model
     req.body = {model: model_name, messages: [{role: "user", content: content}]}.to_json
     http.request(req)
   end
-
-  def model_type
-    if model_name == "e5-mistral-7b-it"
-      :embedding
-    elsif model_name.start_with? "llama-guard"
-      :guard
-    else
-      :text_generation
-    end
-  end
 end
 
 # Table: inference_endpoint
