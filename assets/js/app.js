@@ -49,12 +49,12 @@ $(".delete-btn").on("click", function (event) {
   let redirect = $(this).data("redirect");
   let method = $(this).data("method");
 
-  if (!confirm(confirmationMessage || "Are you sure to delete?")) {
-    return;
-  }
-
-  if (confirmation && prompt(`Please type "${confirmation}" to confirm deletion`, "") != confirmation) {
-    alert("Could not confirm resource name");
+  if (confirmation) {
+    if (prompt(`Please type "${confirmation}" to confirm deletion`, "") != confirmation) {
+      alert("Could not confirm resource name");
+      return;
+    }
+  } else if (!confirm(confirmationMessage || "Are you sure to delete?")) {
     return;
   }
 
