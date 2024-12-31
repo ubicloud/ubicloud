@@ -1,7 +1,15 @@
 <% tabs = [
   (["User Management", @project_data[:path] + "/user"] if has_project_permission("Project:user")),
-  (["Personal Access Tokens", @project_data[:path] + "/user/token"] if has_project_permission("Project:token")),
-  (["Access Control", @project_data[:path] + "/user/access-control"] if has_project_permission("Project:viewaccess"))
+  (
+    if has_project_permission("Project:token")
+      ["Personal Access Tokens", @project_data[:path] + "/user/token", request.path.include?("/user/token")]
+    end
+  ),
+  (
+    if has_project_permission("Project:viewaccess")
+      ["Access Control", @project_data[:path] + "/user/access-control", request.path.include?("/user/access-control")]
+    end
+  )
 ]
 tabs.compact! %>
 <%== render("components/tabbar", locals: { tabs: tabs }) if tabs.length >= 2 %>
