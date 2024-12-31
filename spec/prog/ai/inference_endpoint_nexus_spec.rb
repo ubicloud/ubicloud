@@ -16,7 +16,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
   end
 
   describe ".assemble_with_model" do
-    let(:model) { {"id" => "model_id", "boot_image" => "ai-ubuntu-2404-nvidia", "vm_size" => "standard-gpu-6", "storage_volumes" => "storage_volumes", "model_name" => "llama-3-1-8b-it", "engine" => "vllm", "engine_params" => "engine_params", "gpu_count" => 1} }
+    let(:model) { {"id" => "model_id", "boot_image" => "ai-ubuntu-2404-nvidia", "vm_size" => "standard-gpu-6", "storage_volumes" => "storage_volumes", "model_name" => "llama-3-1-8b-it", "engine" => "vllm", "engine_params" => "engine_params", "gpu_count" => 1, "tags" => {}} }
 
     it "assembles with model" do
       expect(described_class).to receive(:model_for_id).and_return(model)
@@ -32,7 +32,8 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
         engine_params: "engine_params",
         replica_count: 1,
         is_public: false,
-        gpu_count: 1
+        gpu_count: 1,
+        tags: {}
       )
 
       described_class.assemble_with_model(project_id: 1, location: "hetzner-fsn1", name: "test-endpoint", model_id: "model_id")
@@ -56,48 +57,48 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       DnsZone.create_with_id(name: "ai.ubicloud.com", project_id: ie_project.id)
 
       expect {
-        described_class.assemble(project_id: "ed6afccf-7025-4f35-8241-454221d75e18", location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: "ed6afccf-7025-4f35-8241-454221d75e18", location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
       }.to raise_error("No existing project")
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-abc", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-abc", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: provider"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-x", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-x", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: size"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: "abc", is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: "abc", is_public: false, gpu_count: 1, tags: {})
       }.to raise_error("Invalid replica count")
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 0, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 0, is_public: false, gpu_count: 1, tags: {})
       }.to raise_error("Invalid replica count")
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 10, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 10, is_public: false, gpu_count: 1, tags: {})
       }.to raise_error("Invalid replica count")
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "leaseweb-wdc02", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "leaseweb-wdc02", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
       }.to raise_error("No firewall named 'inference-endpoint-firewall' configured for inference endpoints in leaseweb-wdc02")
 
       expect {
-        st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+        st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
         expect(st.subject.load_balancer.hostname).to eq("test-endpoint-#{st.subject.ubid.to_s[-5...]}.ai.ubicloud.com")
         expect(st.subject.load_balancer.stack).to eq("ipv4")
       }.not_to raise_error
 
       expect {
-        st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint-public", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: true, gpu_count: 1)
+        st = described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint-public", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: true, gpu_count: 1, tags: {})
         expect(st.subject.load_balancer.hostname).to eq("test-endpoint-public.ai.ubicloud.com")
         expect(st.subject.load_balancer.stack).to eq("ipv4")
       }.not_to raise_error
 
       expect {
         ie_project.destroy
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
       }.to raise_error("No project configured for inference endpoints")
     end
 
@@ -105,7 +106,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
       Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(ie_project) }
       expect {
-        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1)
+        described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
       }.not_to raise_error
     end
   end

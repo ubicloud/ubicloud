@@ -21,9 +21,9 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     fail "Model with id #{model_id} not found" unless model
 
     assemble(
-      project_id: project_id,
-      location: location,
-      name: name,
+      project_id:,
+      location:,
+      name:,
       boot_image: model["boot_image"],
       vm_size: model["vm_size"],
       storage_volumes: model["storage_volumes"],
@@ -32,12 +32,13 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       engine_params: model["engine_params"],
       replica_count: replica_count,
       is_public: is_public,
-      gpu_count: model["gpu_count"]
+      gpu_count: model["gpu_count"],
+      tags: model["tags"]
     )
   end
 
   def self.assemble(project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:, model_name:,
-    engine:, engine_params:, replica_count:, is_public:, gpu_count:)
+    engine:, engine_params:, replica_count:, is_public:, gpu_count:, tags:)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -63,9 +64,9 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         health_check_down_threshold: 3, health_check_up_threshold: 1, custom_hostname_prefix: custom_hostname_prefix, custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: "ipv4")
 
       inference_endpoint = InferenceEndpoint.create(
-        project_id: project_id, location: location, boot_image: boot_image, name: name, vm_size: vm_size, storage_volumes: storage_volumes,
-        model_name: model_name, engine: engine, engine_params: engine_params, replica_count: replica_count, is_public: is_public,
-        load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count: gpu_count
+        project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:,
+        model_name:, engine:, engine_params:, replica_count:, is_public:,
+        load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count:, tags:
       ) { _1.id = ubid.to_uuid }
       inference_endpoint.associate_with_project(project)
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
