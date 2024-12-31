@@ -54,47 +54,48 @@
       <tbody class="divide-y divide-gray-200 bg-white">
         <% @lb[:vms].each do |vm| %>
           <tr>
-            <form action="<%= "#{request.path}/detach-vm" %>" role="form" method="POST">
-              <%== csrf_tag("#{request.path}/detach-vm") %>
-              <input type="hidden" name="vm_id" value="<%= vm[:id] %>">
-              <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <a
-                  href="<%= "#{@project_data[:path]}/location/#{vm[:location]}/vm/#{vm[:name]}" %>"
-                  class="text-orange-600 hover:text-orange-700"
-                ><%= vm[:name] %></a>
-              </td>
-              <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
-                <%= vm[:load_balancer_state] %>
-              </td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+            <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <a
+                href="<%= "#{@project_data[:path]}/location/#{vm[:location]}/vm/#{vm[:name]}" %>"
+                class="text-orange-600 hover:text-orange-700"
+              ><%= vm[:name] %></a>
+            </td>
+            <td class="px-3 py-3.5 whitespace-nowrap text-sm text-gray-900">
+              <%= vm[:load_balancer_state] %>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <form action="<%= "#{request.path}/detach-vm" %>" role="form" method="POST">
+                <%== csrf_tag("#{request.path}/detach-vm") %>
+                <input type="hidden" name="vm_id" value="<%= vm[:id] %>">
                 <%== render("components/form/submit_button", locals: { text: "Detach" }) %>
-              </td>
-            </form>
+              </form>
+            </td>
           </tr>
         <% end %>
         <% if has_permission?("LoadBalancer:edit", @lb[:id]) %>
           <tr>
-            <form action="<%= "#{request.path}/attach-vm" %>" role="form" method="POST">
-              <%== csrf_tag("#{request.path}/attach-vm") %>
-              <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== render(
-                  "components/form/select",
-                  locals: {
-                    name: "vm_id",
-                    placeholder: "Select a VM",
-                    options: @attachable_vms.map { |s| [s[:id], s[:name]] },
-                    attributes: {
-                      required: true
-                    }
+            <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== render(
+                "components/form/select",
+                locals: {
+                  name: "vm_id",
+                  placeholder: "Select a VM",
+                  options: @attachable_vms.map { |s| [s[:id], s[:name]] },
+                  attributes: {
+                    required: true,
+                    form: "form-lb-#{@lb[:id]}"
                   }
-                ) %>
-              </td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              </td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                }
+              ) %>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <form action="<%= "#{request.path}/attach-vm" %>" role="form" method="POST" id="form-lb-<%= @lb[:id] %>">
+                <%== csrf_tag("#{request.path}/attach-vm") %>
                 <%== render("components/form/submit_button", locals: { text: "Attach" }) %>
-              </td>
-            </form>
+              </form>
+            </td>
           </tr>
         <% end %>
       </tbody>

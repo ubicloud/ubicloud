@@ -26,7 +26,7 @@ RSpec.describe Clover, "github" do
 
     visit "#{project.path}/github"
     expect(page.status_code).to eq(501)
-    expect(page).to have_content "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
+    expect(page.body).to eq "GitHub Action Runner integration is not enabled. Set GITHUB_APP_NAME to enable it."
   end
 
   it "raises forbidden when does not have permissions" do

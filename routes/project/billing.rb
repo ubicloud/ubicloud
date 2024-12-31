@@ -8,6 +8,7 @@ class Clover
     r.web do
       unless (Stripe.api_key = Config.stripe_secret_key)
         response.status = 501
+        response["content-type"] = "text/plain"
         next "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
       end
 

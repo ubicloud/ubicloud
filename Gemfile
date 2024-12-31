@@ -63,6 +63,7 @@ end
 
 group :test do
   gem "capybara"
+  gem "capybara-validate_html5", ">= 2"
   gem "rspec"
   gem "webmock"
   gem "pdf-reader"

@@ -414,6 +414,7 @@ class Clover < Roda
         redirect login_route
       end
     end
+    reset_password_explanatory_text "If you have forgotten your password, you can request a password reset:"
 
     after_reset_password do
       remove_all_active_sessions_except_current
