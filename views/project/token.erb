@@ -16,52 +16,50 @@
 ) %>
 
 <div class="grid gap-6">
-  <div>
-    <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-      <div class="min-w-0 flex-1">
-        Personal access tokens are both account-specific and project-specific. You can use a separate access control
-        entries for each token, but be aware that regardless of the access permissions of the token, requests made
-        using the token cannot exceed the access permissions of your account.
-      </div>
+  <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
+    <div class="min-w-0 flex-1">
+      Personal access tokens are both account-specific and project-specific. You can use a separate access control
+      entries for each token, but be aware that regardless of the access permissions of the token, requests made using
+      the token cannot exceed the access permissions of your account.
     </div>
+  </div>
 
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <% unless @tokens.empty? %>
-        <table class="min-w-full divide-y divide-gray-300">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">ID</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Token</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <% unless @tokens.empty? %>
+      <table class="min-w-full divide-y divide-gray-300">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">ID</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Token</th>
+            <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          <% @tokens.each do |token| %>
+            <tr id="token-<%= token.ubid %>">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                <a
+                  href="<%= @project_data[:path] %>/user/token/<%= token.ubid %>/access-control"
+                  class="text-orange-600 hover:text-orange-700"
+                ><%= token.ubid %></a>
+              </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                <%== render("components/copyable_content", locals: { content: "pat-#{token.ubid}-#{token.key}", revealable: true }) %>
+              </td>
+              <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                <%== render(
+                  "components/delete_button",
+                  locals: {
+                    text: "Remove",
+                    url: "#{@project_data[:path]}/user/token/#{token.ubid}",
+                    confirmation: "delete token"
+                  }
+                ) %>
+              </td>
             </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% @tokens.each do |token| %>
-              <tr id="token-<%= token.ubid %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a
-                    href="<%= @project_data[:path] %>/user/token/<%= token.ubid %>/access-control"
-                    class="text-orange-600 hover:text-orange-700"
-                  ><%= token.ubid %></a>
-                </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%== render("components/copyable_content", locals: { content: "pat-#{token.ubid}-#{token.key}", revealable: true }) %>
-                </td>
-                <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                  <%== render(
-                    "components/delete_button",
-                    locals: {
-                      text: "Remove",
-                      url: "#{@project_data[:path]}/user/token/#{token.ubid}",
-                      confirmation: "delete token"
-                    }
-                  ) %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      <% end %>
-    </div>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
   </div>
 </div>
