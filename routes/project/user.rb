@@ -384,62 +384,60 @@ class Clover
               end
             end
 
-            r.on do
-              r.post "associate" do
-                authorize("#{@tag.class}:add", @authorize_id)
+            r.post "associate" do
+              authorize("#{@tag.class}:add", @authorize_id)
 
-                # Use serializable isolation to try to prevent concurrent changes
-                # from introducing loops
-                changes_made = to_add = issues = nil
-                DB.transaction(isolation: :serializable) do
-                  to_add = typecast_params.array(:nonempty_str, "add") || []
-                  to_add.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
-                  to_add.map! { UBID.to_uuid(_1) }
-                  to_add, issues = @tag.check_members_to_add(to_add)
-                  issues = "#{": " unless issues.empty?}#{issues.join(", ")}"
-                  unless to_add.empty?
-                    @tag.add_members(to_add)
-                    changes_made = true
-                  end
+              # Use serializable isolation to try to prevent concurrent changes
+              # from introducing loops
+              changes_made = to_add = issues = nil
+              DB.transaction(isolation: :serializable) do
+                to_add = typecast_params.array(:nonempty_str, "add") || []
+                to_add.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
+                to_add.map! { UBID.to_uuid(_1) }
+                to_add, issues = @tag.check_members_to_add(to_add)
+                issues = "#{": " unless issues.empty?}#{issues.join(", ")}"
+                unless to_add.empty?
+                  @tag.add_members(to_add)
+                  changes_made = true
                 end
-
-                if changes_made
-                  flash["notice"] = "#{to_add.length} members added to #{@tag_type} tag#{issues}"
-                else
-                  flash["error"] = "No change in membership#{issues}"
-                end
-
-                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
               end
 
-              r.post "disassociate" do
-                authorize("#{@tag.class}:remove", @authorize_id)
-
-                to_remove = typecast_params.array(:nonempty_str, "remove") || []
-                to_remove.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
-                to_remove.map! { UBID.to_uuid(_1) }
-
-                error = false
-                num_removed = nil
-                # No need for serializable isolation here, as we are removing
-                # entries and that will not introduce loops
-                DB.transaction do
-                  num_removed = @tag.remove_members(to_remove)
-
-                  if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(_1, Account) }
-                    error = "must keep at least one account in Admin subject tag"
-                    DB.rollback_on_exit
-                  end
-                end
-
-                if error
-                  flash["error"] = "Members not removed from tag: #{error}"
-                else
-                  flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
-                end
-
-                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+              if changes_made
+                flash["notice"] = "#{to_add.length} members added to #{@tag_type} tag#{issues}"
+              else
+                flash["error"] = "No change in membership#{issues}"
               end
+
+              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+            end
+
+            r.post "disassociate" do
+              authorize("#{@tag.class}:remove", @authorize_id)
+
+              to_remove = typecast_params.array(:nonempty_str, "remove") || []
+              to_remove.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
+              to_remove.map! { UBID.to_uuid(_1) }
+
+              error = false
+              num_removed = nil
+              # No need for serializable isolation here, as we are removing
+              # entries and that will not introduce loops
+              DB.transaction do
+                num_removed = @tag.remove_members(to_remove)
+
+                if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(_1, Account) }
+                  error = "must keep at least one account in Admin subject tag"
+                  DB.rollback_on_exit
+                end
+              end
+
+              if error
+                flash["error"] = "Members not removed from tag: #{error}"
+              else
+                flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
+              end
+
+              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
             end
           end
         end
