@@ -127,9 +127,13 @@ class PostgresServer < Sequel::Model
     !resource.representative_server.primary?
   end
 
+  def needs_recycling?
+    vm.display_size != resource.target_vm_size || vm.vm_storage_volumes.none? { !_1.boot && _1.size_gib == resource.target_storage_size_gib }
+  end
+
   def failover_target
     target = resource.servers
-      .select { _1.standby? && _1.strand.label == "wait" }
+      .select { _1.standby? && _1.strand.label == "wait" && !_1.needs_recycling? }
       .map { {server: _1, lsn: _1.run_query("SELECT pg_last_wal_receive_lsn()").chomp} }
       .max_by { lsn2int(_1[:lsn]) }
 
