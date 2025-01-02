@@ -29,7 +29,6 @@ SQL
     return false unless affected
     lease_time = affected.fetch(:lease)
 
-    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} }
     reload
 
     begin
@@ -47,7 +46,7 @@ UPDATE strand
 SET lease = NULL
 WHERE id = ? AND lease = ?
 SQL
-          Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} }
+
           unless num_updated == 1
             Clog.emit("lease violated data") do
               {lease_clear_debug_snapshot: lease_clear_debug_snapshot}
