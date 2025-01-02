@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../spec_helper"
+Warning.ignore(:mismatched_indentations, File.expand_path("coverage/views")) if defined?(SimpleCov)
 
 css_file = File.expand_path("../../../assets/css/app.css", __dir__)
 File.write(css_file, "") unless File.file?(css_file)
