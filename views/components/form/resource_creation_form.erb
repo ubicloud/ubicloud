@@ -54,7 +54,7 @@ form_elements.each do |element|
   when "select"
     locals = {name:, label:, options:, placeholder:, description: element[:description]}
   when "checkbox"
-    locals = {name:, label:, options:, selected: "1", description: element[:description]}
+    locals = {name:, label:, options:, description: element[:description]}
   when "text"
     locals = {name:, label:, value: element[:value], attributes: {required:, placeholder:}}
   when "number"
@@ -68,9 +68,9 @@ form_elements.each do |element|
     container_opening_tag, container_closing_tag = "", ""
   when "partnership_notice"
     description, tos_text = content_generator.call(@flavor)
-    locals = {name:, description:, tos_text:}
+    locals = {description:, tos_text:}
   when "section"
-    locals = {name:, label:, content: element[:content]}
+    locals = {label:, content: element[:content]}
   else
     raise "Unknown element type: #{type}"
   end %>
