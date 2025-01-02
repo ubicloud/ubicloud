@@ -509,9 +509,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to nap(30)
     end
 
-    it "hops to wait_primary_destroy if take_over is set" do
+    it "hops to prepare_for_take_over if take_over is set" do
       expect(nx).to receive(:when_take_over_set?).and_yield
-      expect { nx.wait }.to hop("wait_primary_destroy")
+      expect { nx.wait }.to hop("prepare_for_take_over")
     end
 
     it "hops to refresh_certificates if refresh_certificates is set" do
@@ -581,27 +581,27 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
-  describe "#wait_primary_destroy" do
+  describe "#prepare_for_take_over" do
     it "naps if primary still exists" do
       expect(nx).to receive(:decr_take_over)
       expect(postgres_server.resource).to receive(:representative_server).and_return("something")
-      expect { nx.wait_primary_destroy }.to nap(5)
+      expect { nx.prepare_for_take_over }.to nap(5)
     end
 
-    it "hops to take_over if primary still exists" do
+    it "hops to taking_over if primary still exists" do
       expect(nx).to receive(:decr_take_over)
       expect(postgres_server.resource).to receive(:representative_server).and_return(nil)
-      expect { nx.wait_primary_destroy }.to hop("take_over")
+      expect { nx.prepare_for_take_over }.to hop("taking_over")
     end
   end
 
-  describe "#take_over" do
+  describe "#taking_over" do
     it "triggers promote if promote command is not sent yet or failed" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo pg_ctlcluster 16 main promote' promote_postgres").twice
 
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("NotStarted", "Failed")
-      expect { nx.take_over }.to nap(0)
-      expect { nx.take_over }.to nap(0)
+      expect { nx.taking_over }.to nap(0)
+      expect { nx.taking_over }.to nap(0)
     end
 
     it "updates the metadata and hops to configure if promote command is succeeded" do
@@ -619,12 +619,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect(postgres_server.resource).to receive(:servers).and_return([postgres_server, standby]).twice
 
-      expect { nx.take_over }.to hop("configure")
+      expect { nx.taking_over }.to hop("configure")
     end
 
     it "naps if script return unknown status" do
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check promote_postgres").and_return("Unknown")
-      expect { nx.take_over }.to nap(5)
+      expect { nx.taking_over }.to nap(5)
     end
   end
 

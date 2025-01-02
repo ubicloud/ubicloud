@@ -337,7 +337,7 @@ SQL
     decr_initial_provisioning
 
     when_take_over_set? do
-      hop_wait_primary_destroy
+      hop_prepare_for_take_over
     end
 
     when_refresh_certificates_set? do
@@ -386,13 +386,13 @@ SQL
     nap 5
   end
 
-  label def wait_primary_destroy
+  label def prepare_for_take_over
     decr_take_over
-    hop_take_over if postgres_server.resource.representative_server.nil?
+    hop_taking_over if postgres_server.resource.representative_server.nil?
     nap 5
   end
 
-  label def take_over
+  label def taking_over
     case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
     when "Succeeded"
       postgres_server.update(timeline_access: "push", representative_at: Time.now)
