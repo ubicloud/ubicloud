@@ -1,4 +1,5 @@
 <% @page_title = "Playground" %>
+<% @enable_marked = true %>
 <%== render("inference/tabbar") %>
 <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
   <div class="px-4 py-5 sm:p-6 grid gap-6">
@@ -53,7 +54,8 @@
       ) %>
     </div>
     <div class="mt-4 text-gray-900">
-      <span id="inference_response" class="overflow-auto min-h-48 whitespace-pre-line"></span>
+      <span id="inference_response_stream" class="overflow-auto min-h-48 whitespace-pre-line"></span>
+      <span id="inference_response_pretty" class="prose"></span>
     </div>
   </div>
 </div>
