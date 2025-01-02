@@ -317,7 +317,8 @@ function setupPlayground() {
       return;
     }
 
-    $('#inference_response').text("");
+    $('#inference_response_stream').text("");
+    $('#inference_response_pretty').text("");
     $('#inference_submit').text("Stop");
 
     controller = new AbortController();
@@ -359,10 +360,13 @@ function setupPlayground() {
         parsedLines.forEach((parsedLine) => {
           const content = parsedLine?.choices?.[0]?.delta?.content;
           if (content) {
-            $('#inference_response').append(content);
+            $('#inference_response_stream').append(content);
           }
         });
       }
+      const parsed_response = DOMPurify.sanitize(marked.parse($('#inference_response_stream').text()));
+      $('#inference_response_stream').text("");
+      $('#inference_response_pretty').html(parsed_response);
     }
     catch (error) {
       let errorMessage;
@@ -375,7 +379,7 @@ function setupPlayground() {
         errorMessage = `An error occurred: ${error.message}`;
       }
 
-      $('#inference_response').text(errorMessage);
+      $('#inference_response_stream').text(errorMessage);
     } finally {
       $('#inference_submit').text("Submit");
       controller = null;
