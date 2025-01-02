@@ -1,6 +1,6 @@
 <% @page_title = "Create Project" %>
 
-<%== render("components/page_header", locals: { parts: [%w[Projects /project], %w[Create #]] }) %>
+<%== render("components/page_header", locals: { breadcrumbs: [%w[Projects /project], %w[Create #]] }) %>
 
 <div class="grid gap-6">
   <form action="/project" method="POST">
