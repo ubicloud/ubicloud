@@ -358,7 +358,7 @@ class Clover < Roda
     # :nocov:
     if Config.omniauth_github_id
       require "omniauth-github"
-      omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret
+      omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret, scope: "user:email"
     end
     if Config.omniauth_google_id
       require "omniauth-google-oauth2"
