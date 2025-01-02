@@ -80,9 +80,13 @@ class PostgresResource < Sequel::Model
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
   end
 
-  def required_standby_count
-    required_standby_count_map = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}
-    required_standby_count_map[ha_type]
+  def target_standby_count
+    target_standby_count_map = {HaType::NONE => 0, HaType::ASYNC => 1, HaType::SYNC => 2}
+    target_standby_count_map[ha_type]
+  end
+
+  def target_server_count
+    target_standby_count + 1
   end
 
   def set_firewall_rules
