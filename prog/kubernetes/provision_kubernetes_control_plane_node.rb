@@ -130,7 +130,7 @@ CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
     vm.sshable.cmd("sudo iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
 
-    kubernetes_cluster.load_balancer.add_vm(vm_st.subject)
+    kubernetes_cluster.load_balancer.add_vm(vm)
 
     pop vm_id: vm.id
   end
