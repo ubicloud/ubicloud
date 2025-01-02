@@ -1,10 +1,6 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
-ENV["GEM_HOME"] = "/home/ubi/.gem"
-ENV["GEM_PATH"] = "/home/ubi/.gem"
-ENV["PATH"] = "#{ENV["PATH"]}:/home/ubi/.gem/bin"
-
 require "/home/ubi/common/lib/util"
 require "json"
 require "logger"
@@ -94,8 +90,9 @@ options ndots:5
     container_ipv6 = setup_ipv6(subnet_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: true)
     container_ula_ipv6 = setup_ipv6(subnet_ula_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
     ipv4_ips = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
+    ipv4_container_ip, ipv4_gateway_ip = ipv4_ips[:container_ip], ipv4_ips[:gateway_ip]
 
-    @ipam_store["allocated_ips"][container_id] = [ipv4_ips[:container_ip].to_s, container_ula_ipv6.to_s, container_ipv6.to_s]
+    @ipam_store["allocated_ips"][container_id] = [ipv4_container_ip.to_s, ipv4_gateway_ip.to_s, container_ula_ipv6.to_s, container_ipv6.to_s]
     save_state
 
     response = {
@@ -109,17 +106,17 @@ options ndots:5
       ],
       ips: [
         {
-          address: ipv4_ips[:container_ip].to_s,
-          gateway: ipv4_ips[:gateway_ip].to_s,
+          address: "#{ipv4_container_ip}/#{ipv4_container_ip.prefix}",
+          gateway: ipv4_gateway_ip.to_s,
           interface: 0
         },
         {
-          address: container_ula_ipv6.to_s,
+          address: "#{container_ula_ipv6}/#{container_ula_ipv6.prefix}",
           gateway: outer_link_local,
           interface: 0
         },
         {
-          address: container_ipv6.to_s,
+          address: "#{container_ipv6}/#{container_ipv6.prefix}",
           gateway: outer_link_local,
           interface: 0
         }
@@ -151,7 +148,7 @@ options ndots:5
     r "ip -6 link set #{outer_ifname} mtu #{@mtu} up"
     r "ip -6 route add #{container_ip}/#{container_ip.prefix} via #{inner_link_local} dev #{outer_ifname} mtu #{@mtu}"
 
-    "#{container_ip}/#{container_ip.prefix}"
+    container_ip
   end
 
   def setup_ipv4(subnet, cni_netns, inner_ifname, outer_ifname)
@@ -168,7 +165,7 @@ options ndots:5
     r "ip route add #{container_ip}/#{container_ip.prefix} via #{gateway_ip} dev #{outer_ifname}"
     r "echo 1 > /proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
 
-    {container_ip: "#{container_ip}/#{container_ip.prefix}", gateway_ip: gateway_ip}
+    {container_ip: container_ip, gateway_ip: gateway_ip}
   end
 
   def handle_del
@@ -291,8 +288,7 @@ if __FILE__ == $PROGRAM_NAME
     cni = UBICNI.new
     cni.run
   rescue => e
-    puts p e.backtrace
-    LOG.fatal "Unexpected error: #{e.message}"
+    LOG.fatal "Unexpected error: #{e.message}, #{e.backtrace}"
     puts JSON.generate({code: 999, msg: "Unexpected error: #{e.message}"})
     exit 1
   end

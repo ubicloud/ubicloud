@@ -30,6 +30,7 @@ class Prog::Kubernetes::ProvisionKubernetesControlPlaneNode < Prog::Base
     set_frame("vm_id", vm_st.id)
     # TODO: fix later by introducing a KubernetesNode object?
     DB[:kubernetes_clusters_vm].insert(SecureRandom.uuid, kubernetes_cluster.id, vm_st.subject.id)
+    kubernetes_cluster.load_balancer.add_vm(vm_st.subject)
 
     hop_install_software
   end
@@ -129,8 +130,6 @@ BASH_SCRIPT
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
     vm.sshable.cmd("sudo iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
-
-    kubernetes_cluster.load_balancer.add_vm(vm)
 
     pop vm_id: vm.id
   end
