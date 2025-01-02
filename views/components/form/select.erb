@@ -1,13 +1,6 @@
-<% name ||= nil
-id ||= name
-classes ||= nil
-label ||= nil
-options ||= {}
-selected = flash.dig("old", name) || selected
-placeholder ||= nil
-error ||= flash.dig("errors", name)
-description ||= nil
-attributes ||= {} %>
+<%# locals: (name: nil, id: name, classes: nil, label: nil, options: {}, selected: nil, placeholder: nil, error: nil, description: nil, attributes: {}) %>
+<% selected = flash.dig("old", name) || selected
+error ||= flash.dig("errors", name) %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>

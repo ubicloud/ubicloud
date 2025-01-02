@@ -1,3 +1,4 @@
+<%# locals: (state:, extra_class: nil) %>
 <% case state %>
 <% when "running" %>
   <% color = "bg-green-100 text-green-800" %>
@@ -8,7 +9,6 @@
 <% else %>
   <% color = "bg-slate-100 text-slate-800" %>
 <% end %>
-<% extra_class ||= nil %>
 
 <span
   class="inline-flex items-baseline rounded-full px-2 text-xs font-semibold leading-5 <%= color %> <%= extra_class %>"

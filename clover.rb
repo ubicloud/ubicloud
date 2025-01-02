@@ -42,6 +42,14 @@ class Clover < Roda
   Unreloader.require("helpers") {}
   Unreloader.record_split_class(__FILE__, "helpers")
 
+  # :nocov:
+  default_fixed_locals = if Config.production? || ENV["CLOVER_FREEZE"] == "1"
+    "()"
+  # :nocov:
+  else
+    "(_no_kw: nil)"
+  end
+
   plugin :all_verbs
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :disallow_file_uploads
@@ -54,7 +62,7 @@ class Clover < Roda
   plugin :invalid_request_body, :raise
   plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
   plugin :public
-  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true}
+  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true, scope_class: self, default_fixed_locals:, extract_fixed_locals: true}
   plugin :request_headers
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
 

@@ -1,3 +1,4 @@
+<%# locals: (numerator:, denominator:, title:) %>
 <% progress = [100, 100 * numerator / denominator].min
 color = (progress < 60) ? "bg-blue-500" : (progress < 80) ? "bg-yellow-500" : "bg-red-500" %>
 

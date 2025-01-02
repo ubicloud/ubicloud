@@ -1,8 +1,10 @@
-<% if !defined?(has_permission) || has_permission%>
+<%# locals: (url:, is_active:, icon:, name:, html_id: nil, has_permission: true) %>
+
+<% if has_permission %>
   <li>
     <a
       href="<%= url %>"
-      <% if defined?(html_id) %>
+      <% if html_id %>
         id="<%= html_id %>"
       <% end %>
       class="<%= is_active ? "bg-orange-700 text-white" : "text-orange-100 hover:text-white hover:bg-orange-700" %> group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"

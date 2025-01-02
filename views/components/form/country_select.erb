@@ -1,8 +1,5 @@
-<% name ||= "country"
-label ||= "Country"
-selected = flash.dig("old", name) || selected
-description ||= nil
-attributes ||= {} %>
+<%# locals: (name: "country", label: "Country", selected: nil, description: nil, attributes: {}) %>
+<% selected = flash.dig("old", name) || selected %>
 
 <%== render(
   "components/form/select",
