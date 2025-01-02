@@ -79,7 +79,6 @@ SQL
   def unsynchronized_run
     start_time = Time.now
     prog_label = "#{prog}.#{label}"
-    Clog.emit("starting strand") { [self, {strand_started: {prog_label: prog_label}}] }
 
     if label == stack.first["deadline_target"]
       if (pg = Page.from_tag_parts("Deadline", id, prog, stack.first["deadline_target"]))
