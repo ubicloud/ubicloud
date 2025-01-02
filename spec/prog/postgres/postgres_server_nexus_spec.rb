@@ -98,18 +98,29 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(postgres_server).to receive(:resource).and_return(nil)
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if already in the destroy state" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(resource).to receive(:strand).and_return(nil)
+      expect(nx.strand).to receive(:label).and_return("destroy").at_least(:once)
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "cancels the destroy if the server is picked up for take over" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(nx.strand).to receive(:label).and_return("prepare_for_take_over").at_least(:once)
+      expect(nx).to receive(:decr_destroy)
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops additional operations from stack" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy"))
+      expect(nx.strand).to receive(:label).and_return("destroy").at_least(:once)
       expect(nx.strand.stack).to receive(:count).and_return(2)
       expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the postgres server"})
     end
