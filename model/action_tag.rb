@@ -6,10 +6,30 @@ class ActionTag < Sequel::Model
   include ResourceMethods
   include AccessControlModelTag
 
+  dataset_module do
+    where :global, project_id: nil
+    order :by_name, :name
+
+    def global_by_name
+      global.by_name
+    end
+  end
+
+  plugin :subset_static_cache
+  cache_subset :global_by_name
+
+  def self.options_for_project(project)
+    {
+      "Global Tag" => ActionTag.global_by_name.all,
+      "Tag" => project.action_tags,
+      "Action" => ActionType
+    }
+  end
+
   def self.valid_member?(project_id, action)
     case action
     when ActionTag
-      action.project_id == project_id
+      action.project_id == project_id || !action.project_id
     when ActionType
       true
     end

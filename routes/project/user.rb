@@ -1,164 +1,451 @@
 # frozen_string_literal: true
 
 class Clover
+  tag_perm_map = {
+    "subject" => "Project:subjtag",
+    "action" => "Project:acttag",
+    "object" => "Project:objtag"
+  }.freeze
+
   hash_branch(:project_prefix, "user") do |r|
     r.web do
-      authorize("Project:user", @project.id)
+      r.is do
+        authorize("Project:user", @project.id)
 
-      r.get true do
-        @user_policies = {}
-        @project.access_policies_dataset.where(managed: true).each do |policy|
-          policy.body["acls"].first["subjects"].each do |subject|
-            # We plan to convert tags to UBIDs in our access policies while
-            # persisting them. Until this change is implemented, we must locate
-            # the access tag by its name. I opted for Ruby's 'find' method over
-            # 'dataset' to repeatedly use cached data.
-            if (account = Account[@project.access_tags.find { _1.name == subject }&.hyper_tag_id])
-              @user_policies[account.ubid] = policy.name
+        r.get do
+          @users = @project.accounts_dataset.order_by(:email).all
+          @subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, @users.map(&:id))
+          @allowed_view_tag_names = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:view").map(:name)
+          @allowed_add_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").select_hash(:name, Sequel.as(true, :v))
+          @allowed_remove_tag_names_map = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").select_hash(:name, Sequel.as(true, :v))
+          @invitations = @project.invitations_dataset.order_by(:email).all
+          view "project/user"
+        end
+
+        r.post do
+          email = r.params["email"]
+          policy = r.params["policy"]
+
+          if ProjectInvitation[project_id: @project.id, email: email]
+            flash["error"] = "'#{email}' already invited to join the project."
+            r.redirect "#{@project.path}/user"
+          elsif @project.invitations_dataset.count >= 50
+            flash["error"] = "You can't have more than 50 pending invitations."
+            r.redirect "#{@project.path}/user"
+          end
+
+          unless policy == ""
+            unless (tag = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").first(name: policy))
+              flash["error"] = "You don't have permission to invite users with this subject tag."
+              r.redirect "#{@project_data[:path]}/user"
+            end
+          end
+
+          if (user = Account.exclude(status_id: 3)[email: email])
+            user.associate_with_project(@project)
+            tag&.add_subject(user.id)
+            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+              greeting: "Hello,",
+              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+                "To join project, click the button below.",
+                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+              button_title: "Join Project",
+              button_link: "#{Config.base_url}#{@project.path}/dashboard")
+          else
+            @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
+            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+              greeting: "Hello,",
+              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+                "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
+                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+              button_title: "Create Account",
+              button_link: "#{Config.base_url}/create-account")
+          end
+
+          flash["notice"] = "Invitation sent successfully to '#{email}'."
+
+          r.redirect "#{@project.path}/user"
+        end
+      end
+
+      r.on "token" do
+        authorize("Project:token", @project.id)
+        token_ds = current_account
+          .api_keys_dataset
+          .where(id: AccessTag.where(project_id: @project.id).select(:hyper_tag_id))
+          .reverse(:created_at)
+
+        r.is do
+          r.get do
+            @tokens = token_ds.all
+            view "project/token"
+          end
+
+          r.post do
+            pat = nil
+            DB.transaction do
+              pat = ApiKey.create_personal_access_token(current_account, project: @project)
+              SubjectTag[project_id: @project.id, name: "Admin"].add_subject(pat.id)
+            end
+            flash["notice"] = "Created personal access token with id #{pat.ubid}"
+            r.redirect "#{@project.path}/user/token"
+          end
+        end
+
+        r.on String do |ubid|
+          @token = token = token_ds.with_pk(UBID.to_uuid(ubid))
+
+          r.delete true do
+            if token
+              DB.transaction do
+                token.destroy
+                @project.disassociate_subject(token.id)
+              end
+              flash["notice"] = "Personal access token deleted successfully"
+            end
+            204
+          end
+
+          next unless token
+
+          r.post %w[unrestrict-access restrict-access] do |action|
+            if action == "restrict-access"
+              token.restrict_token_for_project(@project.id)
+              flash["notice"] = "Restricted personal access token"
+            else
+              token.unrestrict_token_for_project(@project.id)
+              flash["notice"] = "Token access is now unrestricted"
+            end
+            r.redirect "#{@project.path}/user/token/#{token.ubid}/access-control"
+          end
+
+          r.on "access-control" do
+            r.get true do
+              uuids = {}
+              aces = @project.access_control_entries_dataset.where(subject_id: token.id).all
+              aces.each do |ace|
+                uuids[ace.action_id] = nil if ace.action_id
+                uuids[ace.object_id] = nil if ace.object_id
+              end
+              UBID.resolve_map(uuids)
+              @aces = aces.map do |ace|
+                [ace.ubid, [uuids[ace.action_id], uuids[ace.object_id]], true]
+              end
+              sort_aces!(@aces)
+
+              @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
+              @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
+
+              view "project/access-control"
+            end
+
+            r.post true do
+              DB.transaction do
+                typecast_params.array!(:Hash, "aces").each do
+                  ubid, deleted, action_id, object_id = _1.values_at("ubid", "deleted", "action", "object")
+                  action_id = nil if action_id == ""
+                  object_id = nil if object_id == ""
+
+                  if ubid == "template"
+                    next if deleted == "true" || (action_id.nil? && object_id.nil?)
+                    ace = AccessControlEntry.new_with_id(project_id: @project.id, subject_id: token.id)
+                  else
+                    next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
+                    if deleted == "true"
+                      ace.destroy
+                      next
+                    end
+                  end
+                  ace.update_from_ubids(action_id:, object_id:)
+                end
+              end
+
+              flash["notice"] = "Token access control entries saved successfully"
+
+              r.redirect "#{@project_data[:path]}/user/token/#{token.ubid}/access-control"
             end
           end
         end
-        @users = Serializers::Account.serialize(@project.accounts_dataset.order_by(:email).all)
-        @invitations = Serializers::ProjectInvitation.serialize(@project.invitations_dataset.order_by(:email).all)
-
-        view "project/user"
       end
 
-      r.get "token" do
-        @token_policies = {}
-        @tokens = current_account.api_keys
-        @project.access_policies_dataset.where(managed: true).each do |policy|
-          policy.body["acls"].first["subjects"].each do |subject|
-            if (token = @tokens.find { _1.hyper_tag_name == subject })
-              @token_policies[token.ubid] = policy.name
+      r.post "policy/managed" do
+        authorize("Project:user", @project.id)
+        user_policies = typecast_params.Hash("user_policies") || {}
+        invitation_policies = typecast_params.Hash("invitation_policies") || {}
+        user_policies.transform_keys! { UBID.to_uuid(_1) }
+        account_ids = user_policies.keys
+
+        DB.transaction do
+          allowed_add_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:add").to_hash(:name)
+          allowed_remove_tags = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:remove").to_hash(:name)
+          project_account_ids = @project
+            .accounts_dataset
+            .where(Sequel[:accounts][:id] => account_ids)
+            .select_map(Sequel[:accounts][:id])
+          subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, project_account_ids)
+          project_account_ids.each do |account_id|
+            subject_tag_map[account_id] ||= [] # Handle accounts not in any tags
+          end
+          additions = {}
+          removals = {}
+          issues = []
+
+          user_policies.each do |account_id, policy|
+            unless (existing_tags = subject_tag_map[account_id])
+              issues << "Cannot change the policy for user, as they are not associated to project"
+              next
             end
+            unless existing_tags.length < 2
+              issues << "Cannot change the policy for user, as they are in multiple subject tags"
+              next
+            end
+            policy = nil if policy == ""
+            next if existing_tags.include?(policy)
+            unless (added_tag = allowed_add_tags[policy]) || !policy
+              issues << "You don't have permission to add members to '#{policy}' tag"
+              next
+            end
+            if (tag = existing_tags.first)
+              unless (removed_tag = allowed_remove_tags[tag])
+                issues << "You don't have permission to remove members from '#{tag}' tag"
+                next
+              end
+              (removals[removed_tag] ||= []) << account_id
+            end
+            (additions[added_tag] ||= []) << account_id if added_tag
           end
-        end
 
-        view "project/token"
-      end
+          additions.each { |tag, user_ids| tag.add_members(user_ids) }
+          removals.each { |tag, user_ids| tag.remove_members(user_ids) }
+          additions.transform_keys!(&:name)
+          removals.transform_keys!(&:name)
 
-      r.get "policy" do
-        @policy = Serializers::AccessPolicy.serialize(@project.access_policies_dataset.where(managed: false).first) || {body: {acls: []}.to_json}
-
-        view "project/policy"
-      end
-
-      r.post true do
-        email = r.params["email"]
-        policy = r.params["policy"]
-
-        if ProjectInvitation[project_id: @project.id, email: email]
-          flash["error"] = "'#{email}' already invited to join the project."
-          r.redirect "#{@project.path}/user"
-        elsif @project.invitations_dataset.count >= 50
-          flash["error"] = "You can't have more than 50 pending invitations."
-          r.redirect "#{@project.path}/user"
-        end
-
-        if (user = Account.exclude(status_id: 3)[email: email])
-          user.associate_with_project(@project)
-          if (managed_policy = Authorization::ManagedPolicy.from_name(policy))
-            managed_policy.apply(@project, [user], append: true)
+          if @project.subject_tags_dataset.first(name: "Admin").member_ids.empty?
+            flash["error"] = "The project must have at least one admin."
+            DB.rollback_on_exit
+            r.redirect "#{@project.path}/user"
           end
-          Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-            greeting: "Hello,",
-            body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-              "To join project, click the button below.",
-              "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-            button_title: "Join Project",
-            button_link: "#{Config.base_url}#{@project.path}/dashboard")
-        else
-          @project.add_invitation(email: email, policy: policy, inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
-          Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-            greeting: "Hello,",
-            body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-              "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
-              "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-            button_title: "Create Account",
-            button_link: "#{Config.base_url}/create-account")
-        end
 
-        flash["notice"] = "Invitation sent successfully to '#{email}'. You need to add some policies to allow new user to operate in the project."
+          invitatation_map = @project
+            .invitations_dataset
+            .where(email: invitation_policies.keys)
+            .to_hash(:email)
+          invitation_policy_changes = {}
+          invitation_policies.each do |email, policy|
+            policy = nil if policy == ""
+            next unless (inv = invitatation_map[email])
+            old_policy = inv.policy
+            next if policy == old_policy
+            if policy && !allowed_add_tags[policy]
+              issues << "You don't have permission to add invitation to '#{policy}' tag"
+              next
+            end
+            if old_policy && !allowed_remove_tags[old_policy]
+              issues << "You don't have permission to remove invitation from '#{old_policy}' tag"
+              next
+            end
+            (invitation_policy_changes[policy] ||= []) << inv.email
+            (additions[policy] ||= []) << 1 if policy
+            (removals[old_policy] ||= []) << 1 if old_policy
+          end
+          invitation_policy_changes.each do |policy, emails|
+            @project
+              .invitations_dataset
+              .where(email: emails)
+              .update(policy:)
+          end
+
+          changes = []
+          additions.each { |name, user_ids| changes << "#{user_ids.size} members added to #{name}" }
+          removals.each { |name, user_ids| changes << "#{user_ids.size} members removed from #{name}" }
+
+          flash["notice"] = changes.empty? ? "No change in user policies" : changes.join(", ")
+          flash["error"] = issues.uniq.join(", ") unless issues.empty?
+        end
 
         r.redirect "#{@project.path}/user"
       end
 
-      r.on "token" do
+      r.on "access-control" do
+        r.get true do
+          authorize("Project:viewaccess", @project.id)
+
+          uuids = {}
+          @project.access_control_entries.each do |ace|
+            # Omit personal action token subjects
+            uuids[ace.subject_id] = nil unless UBID.uuid_class_match?(ace.subject_id, ApiKey)
+            uuids[ace.action_id] = nil if ace.action_id
+            uuids[ace.object_id] = nil if ace.object_id
+          end
+          UBID.resolve_map(uuids)
+          @aces = @project.access_control_entries.map do |ace|
+            next unless (subject = uuids[ace.subject_id])
+            editable = !(subject.is_a?(SubjectTag) && subject.name == "Admin")
+            [ace.ubid, [subject, uuids[ace.action_id], uuids[ace.object_id]], editable]
+          end
+          @aces.compact!
+          sort_aces!(@aces)
+
+          @subject_options = {nil => [["", "Choose a Subject"]], **SubjectTag.options_for_project(@project)}
+          @action_options = {nil => [["", "All Actions"]], **ActionTag.options_for_project(@project)}
+          @object_options = {nil => [["", "All Objects"]], **ObjectTag.options_for_project(@project)}
+
+          view "project/access-control"
+        end
+
         r.post true do
-          pat = DB.transaction { ApiKey.create_personal_access_token(current_account, project: @project) }
-          flash["notice"] = "Created personal access token with id #{pat.ubid}"
-          r.redirect "#{@project.path}/user/token"
-        end
+          authorize("Project:editaccess", @project.id)
 
-        r.post "update-policies" do
-          token_policies = r.params["token_policies"] || {}
-          existing_tokens = current_account.api_keys.map(&:hyper_tag_name)
-          [Authorization::ManagedPolicy::Admin, Authorization::ManagedPolicy::Member].each do |policy|
-            tokens = token_policies.select { _2 == policy.name }.keys.map { ApiKey[owner_id: current_account_id, id: UBID.to_uuid(_1)] }
-            # Do not modify existing user subjects or api_key subjects for other accounts
-            policy.apply(@project, tokens, remove_subjects: existing_tokens) unless tokens.empty?
-          end
+          DB.transaction do
+            typecast_params.array!(:Hash, "aces").each do
+              ubid, deleted, subject_id, action_id, object_id = _1.values_at("ubid", "deleted", "subject", "action", "object")
+              subject_id = nil if subject_id == ""
+              action_id = nil if action_id == ""
+              object_id = nil if object_id == ""
 
-          flash["notice"] = "Personal access token policies updated successfully."
+              next unless subject_id
+              check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
 
-          r.redirect "#{@project.path}/user/token"
-        end
-
-        r.delete String do |ubid|
-          if (token = current_account.api_keys_dataset.with_pk(UBID.to_uuid(ubid)))
-            token.destroy
-            flash["notice"] = "Personal access token deleted successfully"
-          end
-          204
-        end
-      end
-
-      r.on "policy" do
-        r.post "managed" do
-          user_policies = r.params["user_policies"] || {}
-          # We iterate over all managed policies, not user_policies, to make sure
-          # we clear out any policy that no one is using.
-          [Authorization::ManagedPolicy::Admin, Authorization::ManagedPolicy::Member].each do |policy|
-            accounts = user_policies.select { _2 == policy.name }.keys.map { Account.from_ubid(_1) }
-            if policy == Authorization::ManagedPolicy::Admin && accounts.empty?
-              flash["error"] = "The project must have at least one admin."
-              redirect_back_with_inputs
+              if ubid == "template"
+                next if deleted == "true"
+                ace = AccessControlEntry.new_with_id(project_id: @project.id)
+              else
+                next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+                check_ace_subject(ace.subject_id)
+                if deleted == "true"
+                  ace.destroy
+                  next
+                end
+              end
+              ace.update_from_ubids(subject_id:, action_id:, object_id:)
             end
-            # Do not modify existing api_token subjects
-            policy.apply(@project, accounts, remove_subjects: "user/")
-          end
-          invitation_policies = r.params["invitation_policies"] || {}
-          invitation_policies.each do |email, policy|
-            @project.invitations.find { _1.email == email }&.update(policy: policy)
           end
 
-          flash["notice"] = "User policies updated successfully."
+          flash["notice"] = "Access control entries saved successfully"
 
-          r.redirect "#{@project.path}/user"
+          r.redirect "#{@project_data[:path]}/user/access-control"
         end
 
-        r.post "advanced" do
-          body = r.params["body"]
-          begin
-            fail JSON::ParserError unless JSON.parse(body).is_a?(Hash)
-          rescue JSON::ParserError
-            flash["error"] = "The policy isn't a valid JSON object."
-            redirect_back_with_inputs
+        r.on "tag", %w[subject action object] do |tag_type|
+          @tag_type = tag_type
+          @display_tag_type = tag_type.capitalize
+          @tag_model = Object.const_get(:"#{@display_tag_type}Tag")
+
+          r.get true do
+            authorize("Project:viewaccess", @project.id)
+            @tags = dataset_authorize(@tag_model.where(project_id: @project.id).order(:name), "#{@tag_model}:view").all
+            view "project/tag-list"
           end
 
-          if (policy = @project.access_policies_dataset.where(managed: false).first)
-            policy.update(body: body)
-          else
-            AccessPolicy.create_with_id(project_id: @project.id, name: "advanced", managed: false, body: body)
+          r.post true do
+            authorize(tag_perm_map[tag_type], @project.id)
+            @tag_model.create_with_id(project_id: @project.id, name: typecast_params.nonempty_str("name"))
+            flash["notice"] = "#{@display_tag_type} tag created successfully"
+            r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
           end
 
-          flash["notice"] = "Advanced policy updated for '#{@project.name}'"
-          r.redirect "#{@project.path}/user/policy"
+          r.on String do |ubid|
+            next unless (@tag = @tag_model[project_id: @project.id, id: UBID.to_uuid(ubid)])
+            # Metatag uuid is used to differentiate being allowed to manage
+            # tag itself, compared to being able to manage things contained in
+            # the tag.
+            @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
+
+            r.is do
+              r.get true do
+                authorize("#{@tag.class}:view", @authorize_id)
+
+                members = @current_members = {}
+                @tag.member_ids.each do
+                  next if @tag_type == "subject" && UBID.uuid_class_match?(_1, ApiKey)
+                  members[_1] = nil
+                end
+                UBID.resolve_map(members)
+                view "project/tag"
+              end
+
+              authorize(tag_perm_map[tag_type], @project.id)
+
+              if @tag_type == "subject" && @tag.name == "Admin"
+                flash["error"] = "Cannot modify Admin subject tag"
+                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+              end
+
+              r.post do
+                @tag.update(name: typecast_params.nonempty_str("name"))
+                flash["notice"] = "#{@display_tag_type} tag name updated successfully"
+                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+              end
+
+              r.delete do
+                @tag.destroy
+                flash["notice"] = "#{@display_tag_type} tag deleted successfully"
+                204
+              end
+            end
+
+            r.post "associate" do
+              authorize("#{@tag.class}:add", @authorize_id)
+
+              # Use serializable isolation to try to prevent concurrent changes
+              # from introducing loops
+              changes_made = to_add = issues = nil
+              DB.transaction(isolation: :serializable) do
+                to_add = typecast_params.array(:nonempty_str, "add") || []
+                to_add.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
+                to_add.map! { UBID.to_uuid(_1) }
+                to_add, issues = @tag.check_members_to_add(to_add)
+                issues = "#{": " unless issues.empty?}#{issues.join(", ")}"
+                unless to_add.empty?
+                  @tag.add_members(to_add)
+                  changes_made = true
+                end
+              end
+
+              if changes_made
+                flash["notice"] = "#{to_add.length} members added to #{@tag_type} tag#{issues}"
+              else
+                flash["error"] = "No change in membership#{issues}"
+              end
+
+              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+            end
+
+            r.post "disassociate" do
+              authorize("#{@tag.class}:remove", @authorize_id)
+
+              to_remove = typecast_params.array(:nonempty_str, "remove") || []
+              to_remove.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
+              to_remove.map! { UBID.to_uuid(_1) }
+
+              error = false
+              num_removed = nil
+              # No need for serializable isolation here, as we are removing
+              # entries and that will not introduce loops
+              DB.transaction do
+                num_removed = @tag.remove_members(to_remove)
+
+                if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(_1, Account) }
+                  error = "must keep at least one account in Admin subject tag"
+                  DB.rollback_on_exit
+                end
+              end
+
+              if error
+                flash["error"] = "Members not removed from tag: #{error}"
+              else
+                flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
+              end
+
+              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+            end
+          end
         end
       end
 
       r.delete "invitation", String do |email|
+        authorize("Project:user", @project.id)
+
         @project.invitations_dataset.where(email: email).destroy
         # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."
@@ -166,6 +453,8 @@ class Clover
       end
 
       r.delete String do |user_ubid|
+        authorize("Project:user", @project.id)
+
         next unless (user = Account.from_ubid(user_ubid))
 
         unless @project.accounts.count > 1
@@ -173,14 +462,7 @@ class Clover
           next {error: {message: "You can't remove the last user from '#{@project.name}' project. Delete project instead."}}
         end
 
-        hyper_tag = user.hyper_tag_name(@project)
-        @project.access_policies_dataset.where(managed: true).each do |policy|
-          if policy.body["acls"].first["subjects"].include?(hyper_tag)
-            policy.body["acls"].first["subjects"].delete(hyper_tag)
-            policy.modified!(:body)
-            policy.save_changes
-          end
-        end
+        @project.disassociate_subject(user.id)
         user.dissociate_with_project(@project)
 
         # Javascript refreshes page

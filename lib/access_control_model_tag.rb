@@ -1,8 +1,16 @@
 # frozen_string_literal: true
 
 module AccessControlModelTag
+  module ClassMethods
+    def filter_authorize_dataset(dataset, object_id)
+      dataset.where(project_id: self.dataset.where(id: object_id).select(:project_id))
+    end
+  end
+
   def self.included(model)
     model.class_eval do
+      extend ClassMethods
+
       base = name.delete_suffix("Tag").downcase
       table = :"applied_#{base}_tag"
       column = :"#{base}_id"
@@ -93,8 +101,10 @@ module AccessControlModelTag
   end
 
   def before_destroy
+    meta_cond = {object_id: respond_to?(:metatag_uuid) ? metatag_uuid : id}
     applied_dataset.where(tag_id: id).or(applied_column => id).delete
-    AccessControlEntry.where(applied_column => id).destroy
+    DB[:applied_object_tag].where(meta_cond).delete
+    AccessControlEntry.where(applied_column => id).or(meta_cond).destroy
     super
   end
 

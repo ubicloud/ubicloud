@@ -6,16 +6,9 @@ selected = flash.dig("old", name) || selected %>
     "components/form/select",
     locals: {
       name: name,
-      options: [
-        ["", "No policy", nil, { title: "Can't access any resources, need advanced access policy" }],
-        [
-          Authorization::ManagedPolicy::Member.name,
-          "Member",
-          nil,
-          { title: "Can perform all actions except managing users and billing" }
-        ],
-        [Authorization::ManagedPolicy::Admin.name, "Admin", nil, { title: "Can perform all actions" }]
-      ],
+      options: [["", "No access", nil, {}]].concat(
+        @allowed_view_tag_names.map { [_1, _1, nil, @allowed_add_tag_names_map.include?(_1) ? {} : { disabled: true }] }
+      ),
       selected: selected
     }
   ) %>

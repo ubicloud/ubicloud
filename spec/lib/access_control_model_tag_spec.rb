@@ -88,13 +88,20 @@
         action_id = tag.id
       when ObjectTag
         object_id = tag.id
+        meta_id = ObjectMetatag.to_meta_uuid(object_id)
       end
       subject_id ||= SubjectTag.create_with_id(project_id: project.id, name: "t").id
+      meta_id ||= tag.id
       ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id:, action_id:, object_id:)
+      ace2 = AccessControlEntry.create_with_id(project_id: project.id, subject_id:, action_id:, object_id: meta_id)
+      ot = ObjectTag.create_with_id(project_id: project.id, name: "t2")
+      ot.add_member(meta_id)
 
       tag.destroy
       expect(tag1.member_ids).to be_empty
       expect(ace.exists?).to be false
+      expect(ace2.exists?).to be false
+      expect(ot.member_ids).to be_empty
     end
 
     it "validates name format" do

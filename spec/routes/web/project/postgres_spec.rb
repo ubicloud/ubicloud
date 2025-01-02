@@ -268,27 +268,19 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can not delete firewall rules when does not have permissions" do
-        # Give permission to view, so we can see the detail page
-        AccessPolicy.create_with_id(
-          project_id: project_wo_permissions.id,
-          name: "only-view",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:view"], objects: project_wo_permissions.hyper_tag_name}]}
-        )
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+        expect(page.title).to eq "Ubicloud - pg-without-permission"
 
         expect { find "#fwr-delete-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
       end
 
       it "does not show create firewall rule when does not have permissions" do
-        # Give permission to view, so we can see the detail page
-        AccessPolicy.create_with_id(
-          project_id: project_wo_permissions.id,
-          name: "only-view",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Postgres:view", "Postgres:view"], objects: project_wo_permissions.hyper_tag_name}]}
-        )
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+        expect(page.title).to eq "Ubicloud - pg-without-permission"
 
         expect { find_by_id "fwr-create" }.to raise_error Capybara::ElementNotFound
       end
@@ -377,13 +369,10 @@ RSpec.describe Clover, "postgres" do
 
       it "can not delete PostgreSQL database when does not have permissions" do
         # Give permission to view, so we can see the detail page
-        AccessPolicy.create_with_id(
-          project_id: project_wo_permissions.id,
-          name: "only-view",
-          body: {acls: [{subjects: user.hyper_tag_name, actions: ["Postgres:view"], objects: project_wo_permissions.hyper_tag_name}]}
-        )
+        AccessControlEntry.create_with_id(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}"
+        expect(page.title).to eq "Ubicloud - pg-without-permission"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
       end

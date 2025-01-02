@@ -1,24 +1,18 @@
-<% if flash["notice"] %>
-  <div class="-mt-6 mb-2 rounded-md bg-green-50 p-4">
-    <div class="flex">
-      <div class="flex-shrink-0">
-        <%== render("components/icon", locals: { name: "hero-check-circle-mini", classes: "h-5 w-5 text-green-400" }) %>
-      </div>
-      <div class="ml-3">
-        <h3 id="flash-notice" class="text-sm font-medium text-green-800"><%= flash["notice"] %></h3>
-      </div>
-    </div>
-  </div>
-<% end %>
-<% if flash["error"] %>
-  <div class="-mt-6 mb-2 rounded-md bg-red-50 p-4">
-    <div class="flex">
-      <div class="flex-shrink-0">
-        <%== render("components/icon", locals: { name: "hero-x-circle-mini", classes: "h-5 w-5 text-red-400" }) %>
-      </div>
-      <div class="ml-3">
-        <h3 id="flash-error" class="text-sm font-medium text-red-800"><%= flash["error"] %></h3>
+<div class="-mt-6 mb-2 space-y-2">
+  <% [
+    ["notice", "hero-check-circle-mini", "bg-green-50", "text-green-800", "text-green-400"],
+    ["error", "hero-x-circle-mini", "bg-red-50", "text-red-800", "text-red-400"]
+  ].each do |type, icon, bg_color, text_color, icon_color| %>
+    <% next unless flash[type] %>
+    <div class="rounded-md <%= bg_color %> p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <%== render("components/icon", locals: { name: icon, classes: "h-5 w-5 #{icon_color}" }) %>
+        </div>
+        <div class="ml-3">
+          <h3 id="flash-<%= type %>" class="text-sm font-medium <%= text_color %>"><%= flash[type] %></h3>
+        </div>
       </div>
     </div>
-  </div>
-<% end %>
+  <% end %>
+</div>

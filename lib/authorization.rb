@@ -7,124 +7,154 @@ module Authorization
     end
   end
 
-  def self.has_permission?(subject_id, actions, object_id)
-    !matched_policies_dataset(subject_id, actions, object_id).empty?
+  def self.has_permission?(project_id, subject_id, actions, object_id)
+    !matched_policies_dataset(project_id, subject_id, actions, object_id).empty?
   end
 
-  def self.authorize(subject_id, actions, object_id)
-    unless has_permission?(subject_id, actions, object_id)
+  def self.authorize(project_id, subject_id, actions, object_id)
+    unless has_permission?(project_id, subject_id, actions, object_id)
       fail Unauthorized
     end
   end
 
-  def self.all_permissions(subject_id, object_id)
-    matched_policies_dataset(subject_id, nil, object_id).select_map(:actions).tap(&:flatten!)
+  def self.all_permissions(project_id, subject_id, object_id)
+    DB[:action_type]
+      .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
+      .with_recursive(:rec_action_ids,
+        DB[:applied_action_tag].select(:action_id, 0).where(tag_id: DB[:action_ids]),
+        DB[:applied_action_tag].join(:rec_action_ids, action_id: :tag_id)
+          .select(Sequel[:applied_action_tag][:action_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:action_id, :level])
+      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, _1] }) | DB[:action_ids].where(action_id: nil).exists)
+      .select_order_map(:name)
   end
 
-  def self.authorized_resources_dataset(subject_id, actions)
-    matched_policies_dataset(subject_id, actions).select(Sequel[:applied_tag][:tagged_id])
-  end
+  # Used to avoid dynamic symbol creation at runtime
+  RECURSIVE_TAG_QUERY_MAP = {
+    subject: [:applied_subject_tag, :subject_id],
+    action: [:applied_action_tag, :action_id],
+    object: [:applied_object_tag, :object_id]
+  }.freeze
+  private_class_method def self.recursive_tag_query(type, values, project_id: nil)
+    table, column = RECURSIVE_TAG_QUERY_MAP.fetch(type, values)
 
-  def self.expand_actions(actions)
-    extended_actions = Set["*"]
-    Array(actions).each do |action|
-      extended_actions << action
-      parts = action.split(":")
-      parts[0..-2].each_with_index.each { |_, i| extended_actions << "#{parts[0..i].join(":")}:*" }
+    base_ds = DB[table]
+      .select(:tag_id, 0)
+      .where(column => values)
+
+    if project_id
+      # We only look for applied_action_tag entries with an action_tag for the project or global action_tags.
+      # This is done for actions and not subjects and objects because actions are shared
+      # across projects, unlike subjects and objects.
+      base_ds = base_ds.where(tag_id: DB[:action_tag].where(project_id:).or(project_id: nil).select(:id))
     end
-    extended_actions.to_a
+
+    DB[:tag]
+      .with_recursive(:tag,
+        base_ds,
+        DB[table].join(:tag, tag_id: column)
+          .select(Sequel[table][:tag_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:tag_id, :level]).select(:tag_id)
   end
 
-  def self.matched_policies_dataset(subject_id, actions = nil, object_id = nil)
-    dataset = DB.from { access_policy.as(:acl) }
-      .select(Sequel[:applied_tag][:tagged_id], Sequel[:applied_tag][:tagged_table], :subjects, :actions, :objects)
-      .cross_join(Sequel.pg_jsonb_op(Sequel[:acl][:body])["acls"].to_recordset.as(:items, [:subjects, :actions, :objects].map { |c| Sequel.lit("#{c} JSONB") }))
-      .join(:access_tag, project_id: Sequel[:acl][:project_id]) do
-        Sequel.pg_jsonb_op(:objects).has_key?(Sequel[:access_tag][:name])
-      end
-      .join(:applied_tag, access_tag_id: :id)
-      .join(:access_tag, {project_id: Sequel[:acl][:project_id]}, table_alias: :subject_access_tag) do
-        Sequel.pg_jsonb_op(:subjects).has_key?(Sequel[:subject_access_tag][:name])
-      end
-      .join(:applied_tag, {access_tag_id: :id, tagged_id: subject_id}, table_alias: :subject_applied_tag)
-
-    if object_id
-      begin
-        ubid = UBID.parse(object_id)
-      rescue UBIDParseError
-        # nothing
-      else
-        object_id = ubid.to_uuid
-      end
-
-      dataset = dataset.where(Sequel[:applied_tag][:tagged_id] => object_id)
-    end
+  def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
+    dataset = DB[:access_control_entry]
+      .where(project_id:)
+      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, _1] }))
 
     if actions
-      dataset = dataset.where(Sequel.pg_jsonb_op(:actions).contain_any(Sequel.pg_array(expand_actions(actions))))
+      actions = Array(actions).map { ActionType::NAME_MAP.fetch(_1) }
+      dataset = dataset.where(Sequel.or([nil, actions, recursive_tag_query(:action, actions, project_id:)].map { [:action_id, _1] }))
+    end
+
+    if object_id
+      # Recognize UUID format
+      if /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+        ubid = UBID.from_uuidish(object_id).to_s
+      else
+        ubid = object_id
+        # Otherwise, should be valid UBID, raise error if not
+        object_id = UBID.parse(object_id).to_uuid
+      end
+
+      if (klass = UBID.class_for_ubid(ubid))
+        # This checks that the object being authorized is actually related to the project.
+        # This is probably a redundant check, but I think it helps to have defense in depth
+        # here.  This makes it so if a project-level restriction is missed before the
+        # authorization call, this will make authorization fail.
+        dataset = klass.filter_authorize_dataset(dataset, object_id)
+      end
+
+      dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }))
     end
 
     dataset
   end
 
-  def self.matched_policies(subject_id, actions = nil, object_id = nil)
-    matched_policies_dataset(subject_id, actions, object_id).all
+  def self.matched_policies(project_id, subject_id, actions = nil, object_id = nil)
+    matched_policies_dataset(project_id, subject_id, actions, object_id).all
   end
 
-  module ManagedPolicy
-    ManagedPolicyClass = Struct.new(:name, :actions) do
-      def acls(subjects, objects)
-        {acls: [{subjects: Array(subjects), actions: actions, objects: Array(objects)}]}
-      end
+  def self.dataset_authorize(dataset, project_id, subject_id, actions)
+    # We can't use "id" column directly, because it's ambiguous in big joined queries.
+    # We need to determine table of id explicitly.
+    from = dataset.opts[:from].first
 
-      def apply(project, accounts, append: false, remove_subjects: nil)
-        subjects = accounts.map { _1&.hyper_tag(project) }.compact.map { _1.name }
-        if append || remove_subjects
-          if (existing_body = project.access_policies_dataset.where(name: name).select_map(:body).first)
-            existing_subjects = existing_body["acls"].first["subjects"]
+    ds = DB[:object_ids]
+      .with_recursive(:object_ids,
+        Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
+        DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
+          .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:object_id, :level]).select(:object_id)
 
-            case remove_subjects
-            when Array
-              existing_subjects = existing_subjects.reject { remove_subjects.include?(_1) }
-            when String
-              existing_subjects = existing_subjects.reject { _1.start_with?(remove_subjects) }
-            end
-            subjects = existing_subjects + subjects
-            subjects.uniq!
-          end
-        end
-        object = project.hyper_tag_name(project)
-        acls = self.acls(subjects, object).to_json
-        policy = AccessPolicy.new_with_id(project_id: project.id, name: name, managed: true, body: acls)
-        policy.skip_auto_validations(:unique) do
-          policy.insert_conflict(target: [:project_id, :name], update: {body: acls}).save_changes
-        end
-      end
+    project_id_match = if dataset.model.columns.include?(:project_id)
+      Sequel[from][:project_id]
+    else
+      DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])
     end
 
-    Admin = ManagedPolicyClass.new("admin", ["*"])
-    Member = ManagedPolicyClass.new("member", ["Vm:*", "PrivateSubnet:*", "Firewall:*", "Postgres:*", "Project:view", "Project:github", "InferenceEndpoint:view"])
-
-    def self.from_name(name)
-      ManagedPolicy.const_get(name.to_s.capitalize)
-    rescue NameError
-      nil
+    if dataset.model == ObjectTag
+      # Authorization for accessing ObjectTag itself is done by providing the metatag for the object.
+      # Convert metatag id returned from the applied_object_tag lookup into tag ids, so that the correct
+      # object tags will be found.  Convert non-metatag ids into UUIDs that would be invalid UBIDs,
+      # preventing them from matching any existing ObjectTag instances.  This makes it so that users
+      # authorized to manage members of the tag are not automatically authorized to manage the tag itself.
+      ds = ds
+        .select(Sequel.cast(:object_id, String))
+        .from_self
+        .select {
+        Sequel.join([
+          substr(:object_id, 0, 18),
+          Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
+          substr(:object_id, 19, 18)
+        ]).cast(:uuid).as(:object_id)
+      }
     end
-  end
 
-  module Dataset
-    def authorized(subject_id, actions)
-      # We can't use "id" column directly, because it's ambiguous in big joined queries.
-      # We need to determine table of id explicitly.
-      # @opts is the hash of options for this dataset, and introduced at Sequel::Dataset.
-      from = @opts[:from].first
-      where { {Sequel[from][:id] => Authorization.authorized_resources_dataset(subject_id, actions)} }
-    end
+    dataset.where(Sequel.|(
+      # Allow where there is a specific entry for the object,
+      {Sequel[from][:id] => ds},
+      # or where the action is allowed for all objects in the project,
+      (ds.where(object_id: nil).exists &
+        # and the object is related to the project (either with a matching project_id,
+        # or where there is a hyper tag from the object to the project.
+        {project_id => project_id_match})
+    ))
   end
 
   module HyperTagMethods
+    module ClassMethods
+      def filter_authorize_dataset(dataset, object_id)
+        dataset.where(project_id: DB[:access_tag].where(hyper_tag_id: object_id).select(:project_id))
+      end
+    end
+
     def self.included(base)
       base.class_eval do
+        extend ClassMethods
         many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
       end
     end
@@ -140,44 +170,17 @@ module Authorization
     def associate_with_project(project)
       return if project.nil?
 
-      DB.transaction do
-        self_tag = AccessTag.create_with_id(
-          project_id: project.id,
-          name: hyper_tag_name(project),
-          hyper_tag_id: id,
-          hyper_tag_table: self.class.table_name
-        )
-        project_tag = project.hyper_tag(project)
-        tag(self_tag)
-        tag(project_tag) if self_tag.id != project_tag.id
-        self_tag
-      end
+      AccessTag.create_with_id(
+        project_id: project.id,
+        name: hyper_tag_name(project),
+        hyper_tag_id: id,
+        hyper_tag_table: self.class.table_name
+      )
     end
 
     def dissociate_with_project(project)
       return if project.nil?
-
-      DB.transaction do
-        project_tag = project.hyper_tag(project)
-        untag(project_tag)
-        hyper_tag(project).destroy
-      end
-    end
-  end
-
-  module TaggableMethods
-    def self.included(base)
-      base.class_eval do
-        many_to_many :applied_access_tags, class: :AccessTag, join_table: :applied_tag, left_key: :tagged_id, right_key: :access_tag_id
-      end
-    end
-
-    def tag(access_tag)
-      AppliedTag.create(access_tag_id: access_tag.id, tagged_id: id, tagged_table: self.class.table_name)
-    end
-
-    def untag(access_tag)
-      AppliedTag.where(access_tag_id: access_tag.id, tagged_id: id).destroy
+      hyper_tag(project).destroy
     end
   end
 end

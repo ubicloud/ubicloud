@@ -200,9 +200,6 @@ RSpec.describe UBID do
     prj = account.create_project_with_default_policy("x")
     expect(prj.ubid).to start_with UBID::TYPE_PROJECT
 
-    policy = prj.access_policies.first
-    expect(policy.ubid).to start_with UBID::TYPE_ACCESS_POLICY
-
     st = SubjectTag.create_with_id(project_id: prj.id, name: "T")
     expect(st.ubid).to start_with UBID::TYPE_SUBJECT_TAG
 
@@ -269,7 +266,6 @@ RSpec.describe UBID do
     kek = StorageKeyEncryptionKey.create_with_id(algorithm: "x", key: "x", init_vector: "x", auth_data: "x")
     account = Account.create_with_id(email: "x@y.net")
     project = account.create_project_with_default_policy("x")
-    policy = project.access_policies.first
     st = SubjectTag.create_with_id(project_id: project.id, name: "T")
     at = ActionTag.create_with_id(project_id: project.id, name: "T")
     ot = ObjectTag.create_with_id(project_id: project.id, name: "T")
@@ -291,7 +287,6 @@ RSpec.describe UBID do
     expect(described_class.decode(kek.ubid)).to eq(kek)
     expect(described_class.decode(account.ubid)).to eq(account)
     expect(described_class.decode(project.ubid)).to eq(project)
-    expect(described_class.decode(policy.ubid)).to eq(policy)
     expect(described_class.decode(st.ubid)).to eq(st)
     expect(described_class.decode(at.ubid)).to eq(at)
     expect(described_class.decode(ot.ubid)).to eq(ot)
@@ -323,10 +318,14 @@ RSpec.describe UBID do
   it ".resolve_map populates hash with uuid keys" do
     page = Page.create_with_id(summary: "x", tag: "y")
     a_type = ActionType.first
-    hash = {page.id => nil, a_type.id => nil}
+    api_key = ApiKey.create(owner_table: "project", owner_id: Project.create(name: "test-project").id, used_for: "inference_endpoint", key: "1")
+    invalid = described_class.to_uuid("han2sefsk4f61k91z77vn0y978")
+    hash = {page.id => nil, a_type.id => nil, api_key.id => nil, invalid => nil}
     described_class.resolve_map(hash)
     expect(hash[page.id]).to eq page
     expect(hash[a_type.id]).to eq a_type
+    expect(hash[api_key.id]).to eq api_key
+    expect(hash[invalid]).to be_nil
   end
 
   it ".type_match? checks whether given ubid has given type" do

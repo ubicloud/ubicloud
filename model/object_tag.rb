@@ -6,15 +6,54 @@ class ObjectTag < Sequel::Model
   include ResourceMethods
   include AccessControlModelTag
 
+  module Cleanup
+    def before_destroy
+      AccessControlEntry.where(object_id: id).destroy
+      DB[:applied_object_tag].where(object_id: id).delete
+      super
+    end
+  end
+
+  def self.options_for_project(project)
+    {
+      {"label" => "Tag (grants access to objects contained in tag)", "id" => "object-tag-group"} => project.object_tags,
+      "Project" => [project],
+      "Vm" => project.vms,
+      "PostgresSQL Server" => project.postgres_resources,
+      "Private Subnet" => project.private_subnets,
+      "Firewall" => project.firewalls,
+      "LoadBalancer" => project.load_balancers,
+      "InferenceToken" => project.api_keys,
+      "InferenceEndpoint" => project.inference_endpoints,
+      "SubjectTag" => project.subject_tags,
+      "ActionTag" => project.action_tags,
+      {"label" => "ObjectTag (grants access to tag itself)", "id" => "object-metatag-group"} => project.object_tags.map(&:metatag)
+    }
+  end
+
   def self.valid_member?(project_id, object)
     case object
-    when ObjectTag, SubjectTag, ActionTag
+    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint
       object.project_id == project_id
     when Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
       !AccessTag.where(project_id:, hyper_tag_id: object.id).empty?
     when Project
       object.id == project_id
+    when ApiKey
+      object.owner_table == "project" && object.owner_id == project_id
     end
+  end
+
+  def metatag
+    ObjectMetatag.new(self)
+  end
+
+  def metatag_ubid
+    ObjectMetatag.to_meta(ubid)
+  end
+
+  def metatag_uuid
+    UBID.to_uuid(metatag_ubid)
   end
 end
 

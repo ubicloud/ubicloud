@@ -26,10 +26,7 @@
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
-                You can invite a new user to your project using one of the preconfigured access policies below. If
-                you'd like to further customize permissions, you can use the
-                <a href="<%= @project_data[:path] %>/user/policy" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">
-                  advanced policy editor</a>.
+                You can invite a new user to your project, adding them to the given subject tag (role).
               </p>
             </div>
             <div class="grid grid-cols-12 gap-3">
@@ -47,7 +44,7 @@
                 ) %>
               </div>
               <div class="col-span-12 sm:col-span-3">
-                <%== render("components/form/policy_select", locals: { name: "policy", selected: "member" }) %>
+                <%== render("components/form/policy_select", locals: { name: "policy", selected: "Member" }) %>
               </div>
               <div class="col-span-3 sm:col-span-2">
                 <%== render("components/form/submit_button", locals: { text: "Invite" }) %>
@@ -74,55 +71,58 @@
           <thead class="bg-gray-50">
             <tr>
               <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Email</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Default Policy</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Subject Tag</th>
               <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @users.each do |user| %>
-              <tr id="user-<%= user[:ubid]%>">
+              <tr id="user-<%= user.ubid %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <%= user[:email] %>
+                  <%= user.email %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%== render(
-                    "components/form/policy_select",
-                    locals: {
-                      name: "user_policies[#{user[:ubid]}]",
-                      selected: @user_policies[user[:ubid]]
-                    }
-                  ) %>
+                  <% if (tags = @subject_tag_map[user.id]) && tags.length >= 2 %>
+                    <span title="You can manage this user's policies from the Access Control tab.">
+                      <%= tags.join(", ") %>
+                    </span>
+                  <% elsif (tag = tags&.first) && !@allowed_remove_tag_names_map[tag] %>
+                    <span id="user-<%= user.ubid %>-noremove" title="You cannot change the policy for this user">
+                      <%= tag %>
+                    </span>
+                  <% else %>
+                    <%== render("components/form/policy_select", locals: { name: "user_policies[#{user.ubid}]", selected: tag }) %>
+                  <% end %>
                 </td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== render(
                     "components/delete_button",
                     locals: {
                       text: "Remove",
-                      url: "#{@project_data[:path]}/user/#{user[:ubid]}",
-                      confirmation: user[:email]
+                      url: "#{@project_data[:path]}/user/#{user.ubid}",
+                      confirmation: user.email
                     }
                   ) %>
                 </td>
-
               </tr>
             <% end %>
             <% @invitations.each do |invitation| %>
-              <tr id="invitation-<%= invitation[:email].gsub(/\W+/, "") %>">
+              <tr id="invitation-<%= invitation.email.gsub(/\W+/, "") %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
                   <%= invitation[:email] %>
                   <span
                     class="inline-flex items-baseline rounded-full ml-1 px-2 text-xs font-semibold leading-5 bg-yellow-100 text-yellow-800"
                   >
                     Invitation expires on
-                    <%= invitation[:expires_at] %>
+                    <%= invitation.expires_at.strftime("%B %d, %Y") %>
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                   <%== render(
                     "components/form/policy_select",
                     locals: {
-                      name: "invitation_policies[#{invitation[:email]}]",
-                      selected: invitation[:policy]
+                      name: "invitation_policies[#{invitation.email}]",
+                      selected: invitation.policy
                     }
                   ) %>
                 </td>
@@ -131,8 +131,8 @@
                     "components/delete_button",
                     locals: {
                       text: "Remove",
-                      url: "#{@project_data[:path]}/user/invitation/#{invitation[:email]}",
-                      confirmation: invitation[:email]
+                      url: "#{@project_data[:path]}/user/invitation/#{invitation.email}",
+                      confirmation: invitation.email
                     }
                   ) %>
                 </td>

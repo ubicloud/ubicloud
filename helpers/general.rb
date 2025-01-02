@@ -33,11 +33,9 @@ class Clover < Roda
   def after_rodauth_create_account(account_id)
     account = Account[account_id]
     account.create_project_with_default_policy("Default")
-    ProjectInvitation.where(email: account.email).each do |inv|
+    ProjectInvitation.where(email: account.email).all do |inv|
       account.associate_with_project(inv.project)
-      if (managed_policy = Authorization::ManagedPolicy.from_name(inv.policy))
-        managed_policy.apply(inv.project, [account], append: true)
-      end
+      inv.project.subject_tags_dataset.first(name: inv.policy)&.add_subject(account_id)
       inv.destroy
     end
   end
@@ -61,32 +59,40 @@ class Clover < Roda
   end
 
   def authorize(actions, object_id)
-    each_authorization_id do |id|
-      Authorization.authorize(id, actions, object_id)
+    if @project_permissions && object_id == @project.id
+      fail Authorization::Unauthorized unless has_project_permission(actions)
+    else
+      each_authorization_id do |id|
+        Authorization.authorize(@project.id, id, actions, object_id)
+      end
     end
   end
 
   def has_permission?(actions, object_id)
     each_authorization_id.all? do |id|
-      Authorization.has_permission?(id, actions, object_id)
+      Authorization.has_permission?(@project.id, id, actions, object_id)
     end
   end
 
-  def all_permissions(actions)
+  def all_permissions(object_id)
     each_authorization_id.map do |id|
-      Authorization.all_permissions(id, actions)
+      Authorization.all_permissions(@project.id, id, object_id)
     end.reduce(:&)
   end
 
   def dataset_authorize(ds, actions)
     each_authorization_id do |id|
-      ds = ds.authorized(id, actions)
+      ds = Authorization.dataset_authorize(ds, @project.id, id, actions)
     end
     ds
   end
 
   def has_project_permission(actions)
-    @project_permissions.intersection(Authorization.expand_actions(actions)).any?
+    if actions.is_a?(Array)
+      !@project_permissions.intersection(actions).empty?
+    else
+      @project_permissions.include?(actions)
+    end
   end
 
   def current_account

@@ -11,18 +11,29 @@ class Account < Sequel::Model(:accounts)
 
   include ResourceMethods
   include Authorization::HyperTagMethods
+  include SubjectTag::Cleanup
 
   def hyper_tag_name(project = nil)
     "user/#{email}"
   end
 
-  include Authorization::TaggableMethods
-
-  def create_project_with_default_policy(name, default_policy: Authorization::ManagedPolicy::Admin)
+  def create_project_with_default_policy(name, default_policy: true)
     project = Project.create_with_id(name: name)
     project.associate_with_project(project)
     associate_with_project(project)
-    default_policy&.apply(project, [self])
+
+    if default_policy
+      # Grant user Admin access
+      admin_subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Admin")
+      admin_subject_tag.add_subject(id)
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: admin_subject_tag.id)
+
+      # Also create a Member subject tag with access to member actions
+      member_subject_tag = SubjectTag.create_with_id(project_id: project.id, name: "Member")
+      # Use Enumerable.find here, because ActionTag.global_by_name will be cached soon
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: member_subject_tag.id, action_id: ActionTag.global_by_name.find { |tag| tag.name == "Member" }.id)
+    end
+
     project
   end
 
