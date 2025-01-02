@@ -389,6 +389,9 @@ SQL
   label def prepare_for_take_over
     decr_take_over
     hop_taking_over if postgres_server.resource.representative_server.nil?
+
+    postgres_server.resource.representative_server.incr_destroy
+
     nap 5
   end
 

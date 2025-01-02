@@ -108,7 +108,6 @@ class PostgresServer < Sequel::Model
   def trigger_failover
     if primary? && (standby = failover_target)
       standby.incr_take_over
-      incr_destroy
       true
     else
       Clog.emit("Failed to trigger failover")

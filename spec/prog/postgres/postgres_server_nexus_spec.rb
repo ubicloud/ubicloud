@@ -584,7 +584,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#prepare_for_take_over" do
     it "naps if primary still exists" do
       expect(nx).to receive(:decr_take_over)
-      expect(postgres_server.resource).to receive(:representative_server).and_return("something")
+      representative_server = instance_double(PostgresServer, id: "something")
+      expect(representative_server).to receive(:incr_destroy)
+      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
       expect { nx.prepare_for_take_over }.to nap(5)
     end
 
