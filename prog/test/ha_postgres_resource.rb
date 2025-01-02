@@ -56,8 +56,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
 
   label def wait_postgres_resource
     server_count = postgres_resource.servers.count
-    required_server_count = 1 + postgres_resource.required_standby_count
-    nap 10 if server_count != required_server_count || postgres_resource.servers.filter { _1.strand.label != "wait" }.any?
+    nap 10 if server_count != postgres_resource.target_server_count || postgres_resource.servers.filter { _1.strand.label != "wait" }.any?
     hop_test_postgres
   end
 
