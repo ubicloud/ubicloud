@@ -34,6 +34,13 @@
     <% if @enable_cloudflare_turnstile %>
       <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" defer></script>
     <% end %>
+    <% if @enable_marked %>
+      <script
+        src="https://cdn.jsdelivr.net/npm/marked@15.0.5/marked.min.js"
+        integrity="sha256-1Yrhpf0RL7M7U0N9wP74sARr2/obHqHIdQ6iGVTve+s="
+        crossorigin="anonymous"
+      ></script>
+    <% end %>
   </head>
 
   <body class="h-full">
