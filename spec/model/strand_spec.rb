@@ -58,7 +58,7 @@ SQL
       end.at_least(:once)
 
       expect(Clog).to receive(:emit).with("lease violated data").and_call_original
-      expect(Clog).to receive(:emit).at_least(:once).and_call_original
+      allow(Clog).to receive(:emit).and_call_original
       expect { st.run }.to raise_error RuntimeError, "BUG: lease violated"
     end
   end
@@ -102,5 +102,14 @@ SQL
     expect(Time).to receive(:now).and_return(Time.now - 10, Time.now, Time.now)
     expect(Clog).to receive(:emit).with("finished strand").and_call_original
     st.unsynchronized_run
+  end
+
+  it "occasionally logs acquisition and release of lease" do
+    st.label = "napper"
+    st.save_changes
+    expect(st).to receive(:rand).and_return(0)
+    expect(Clog).to receive(:emit).with("obtained lease").and_call_original
+    expect(Clog).to receive(:emit).with("lease cleared").and_call_original
+    st.take_lease_and_reload {}
   end
 end

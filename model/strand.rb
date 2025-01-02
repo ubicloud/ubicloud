@@ -28,8 +28,9 @@ RETURNING lease
 SQL
     return false unless affected
     lease_time = affected.fetch(:lease)
+    verbose_logging = rand(1000) == 0
 
-    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} }
+    Clog.emit("obtained lease") { {lease_acquired: {time: lease_time, delay: Time.now - schedule}} } if verbose_logging
     reload
 
     begin
@@ -47,7 +48,7 @@ UPDATE strand
 SET lease = NULL
 WHERE id = ? AND lease = ?
 SQL
-          Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} }
+          Clog.emit("lease cleared") { {lease_cleared: {num_updated: num_updated}} } if verbose_logging
           unless num_updated == 1
             Clog.emit("lease violated data") do
               {lease_clear_debug_snapshot: lease_clear_debug_snapshot}
