@@ -95,4 +95,12 @@ SQL
       st.run(10)
     }.to change { [st.label, st.exitval] }.from(["hop_entry", nil]).to(["hop_exit", {msg: "hop finished"}])
   end
+
+  it "logs end of strand if it took long" do
+    st.label = "napper"
+    st.save_changes
+    expect(Time).to receive(:now).and_return(Time.now - 10, Time.now, Time.now)
+    expect(Clog).to receive(:emit).with("finished strand").and_call_original
+    st.unsynchronized_run
+  end
 end

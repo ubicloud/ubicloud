@@ -157,7 +157,8 @@ SQL
       fail "BUG: Prog #{prog}##{label} did not provide flow control"
     end
   ensure
-    Clog.emit("finished strand") { [self, {strand_finished: {duration: Time.now - start_time, prog_label: prog_label}}] }
+    duration = Time.now - start_time
+    Clog.emit("finished strand") { [self, {strand_finished: {duration:, prog_label:}}] } if duration > 1
   end
 
   def run(seconds = 0)
