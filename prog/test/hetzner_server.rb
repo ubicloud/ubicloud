@@ -10,11 +10,11 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       vm_host = VmHost[vm_host_id]
       {
         vm_host_id: vm_host.id, server_id: vm_host.hetzner_host.server_identifier,
-        hostname: vm_host.sshable.host, destroy: false
+        hostname: vm_host.sshable.host, setup_host: false
       }
     else
       {
-        server_id: Config.ci_hetzner_sacrificial_server_id, destroy: true
+        server_id: Config.ci_hetzner_sacrificial_server_id, setup_host: true
       }
     end
 
@@ -30,7 +30,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def start
-    hop_wait_setup_host if frame["vm_host_id"]
+    hop_wait_setup_host unless frame["setup_host"]
     hop_fetch_hostname
   end
 
@@ -94,8 +94,8 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       hop_run_integration_specs
     end
 
-    # We shouldn't install specs by default
-    verify_specs_installation(installed: false)
+    # We shouldn't install specs by default when running Prog::Vm::HostNexus.assemble
+    verify_specs_installation(installed: false) if frame["setup_host"]
 
     # install specs
     push Prog::InstallRhizome, {subject_id: vm_host.id, target_folder: "host", install_specs: true}
@@ -125,7 +125,8 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def destroy
-    hop_finish unless frame["destroy"]
+    # don't destroy the vm_host if we didn't set it up.
+    hop_finish unless frame["setup_host"]
 
     hetzner_api.delete_key(hetzner_ssh_keypair.public_key)
     vm_host.incr_destroy
