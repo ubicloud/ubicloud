@@ -209,6 +209,11 @@ task "coverage" => [:coverage_spec]
   end
 end
 
+coverage_setup = lambda do
+  FileUtils.rm_rf("coverage/views")
+  FileUtils.mkdir_p("coverage/views")
+end
+
 desc "Run specs with coverage"
 task "coverage_spec" do
   Rake::Task[auto_parallel_tests.call ? "coverage_pspec" : "coverage_sspec"].invoke
@@ -216,15 +221,16 @@ end
 
 desc "Run specs in serial with coverage"
 task "coverage_sspec" do
-  rspec.call("COVERAGE" => "1")
+  coverage_setup.call
+  rspec.call("COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no")
 end
 
 desc "Run specs in parallel with coverage"
 task "coverage_pspec" do
-  Dir.mkdir("coverage") unless File.directory?("coverage")
   output_file = "coverage/output.txt"
+  coverage_setup.call
   command = "bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}"
-  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1"}, command)
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no"}, command)
   command_output = File.binread(output_file)
   unless command_output.include?("Line Coverage: 100.0%") && command_output.include?("Branch Coverage: 100.0%")
     warn "SimpleCov failed with exit 2 due to a coverage related error"

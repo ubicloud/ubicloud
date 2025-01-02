@@ -214,6 +214,7 @@ json_parser
 not_found
 public
 render
+render_coverage
 request_headers
 route_csrf
 run_handler

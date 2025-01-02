@@ -62,9 +62,15 @@ class Clover < Roda
   plugin :invalid_request_body, :raise
   plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
   plugin :public
-  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: true, freeze: true, skip_compiled_encoding_detection: true, scope_class: self, default_fixed_locals:, extract_fixed_locals: true}
+  plugin :render, escape: true, layout: "./layouts/app", template_opts: {chain_appends: !defined?(SimpleCov), freeze: true, skip_compiled_encoding_detection: true, scope_class: self, default_fixed_locals:, extract_fixed_locals: true}
   plugin :request_headers
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
+
+  # :nocov:
+  if Config.test? && defined?(SimpleCov)
+    plugin :render_coverage
+  end
+  # :nocov:
 
   plugin :host_routing, scope_predicates: true do |hosts|
     hosts.register :api, :web, :runtime
