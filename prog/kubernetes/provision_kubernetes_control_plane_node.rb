@@ -92,7 +92,8 @@ BASH
       hop_install_cni
     when "NotStarted"
       ps = PrivateSubnet[kubernetes_cluster.private_subnet_id]
-      vm.sshable.cmd("common/bin/daemonizer 'sudo /home/ubi/kubernetes/bin/init-cluster #{kubernetes_cluster.name} #{kubernetes_cluster.endpoint} #{ps.net4} #{ps.net6} #{vm.nics.first.private_ipv4}' init_kubernetes_cluster")
+      port = Config.development? ? 6443 : 443
+      vm.sshable.cmd("common/bin/daemonizer 'sudo /home/ubi/kubernetes/bin/init-cluster #{kubernetes_cluster.name} #{kubernetes_cluster.endpoint} #{port} #{ps.net4} #{ps.net6} #{vm.nics.first.private_ipv4}' init_kubernetes_cluster")
       nap 10
     when "Failed"
       puts "INIT CLUSTER FAILED"
@@ -142,8 +143,9 @@ CONFIG
       join_token = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
       certificate_key = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]
       discovery_token_ca_cert_hash = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
+      port = Config.development? ? 6443 : 443
 
-      vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:443 #{join_token} #{discovery_token_ca_cert_hash} #{certificate_key}' join_control_plane")
+      vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:#{port} #{join_token} #{discovery_token_ca_cert_hash} #{certificate_key}' join_control_plane")
       nap 5
     when "Failed"
       # TODO: Create a page or something
