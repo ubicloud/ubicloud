@@ -1,5 +1,5 @@
-<% name ||= nil
-selected = flash.dig("old", name) || selected %>
+<%# locals: (name: nil, selected: nil) %>
+<% selected = flash.dig("old", name) || selected %>
 
 <div class="">
   <%== render(

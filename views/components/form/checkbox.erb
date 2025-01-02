@@ -1,10 +1,5 @@
-<% name ||= nil
-id_prefix ||= nil
-label ||= nil
-options ||= {}
-error ||= rodauth.field_error(name) || flash.dig("errors", name)
-description ||= nil
-attributes ||= {} %>
+<%# locals: (name: nil, id_prefix: nil, label: nil, options: {}, error: nil, description: nil, attributes: {}) %>
+<% error ||= rodauth.field_error(name) || flash.dig("errors", name) %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>

@@ -1,10 +1,5 @@
+<%# locals: (name: nil, label: nil, default_date: nil, min_date: nil, max_date: nil) %>
 <% @enable_datepicker = true %>
-
-<% name ||= nil
-label ||= nil
-default_date ||= nil
-min_date ||= nil
-max_date ||= nil %>
 
 <%== render(
   "components/form/text",

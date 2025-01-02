@@ -1,8 +1,4 @@
-<% title ||= @page_title
-breadcrumbs ||= []
-left_items ||= nil
-right_items ||= nil
-back ||= breadcrumbs.dig(-2, 1) || "#" %>
+<%# locals: (title: @page_title, breadcrumbs: [], left_items: nil, right_items: nil, back: breadcrumbs.dig(-2, 1) || "#") %>
 
 <div class="space-y-1 sticky -mx-10 mb-0.5 px-10 top-[2.9rem] bg-gray-50 z-30">
   <% unless breadcrumbs.empty? %>
