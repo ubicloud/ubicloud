@@ -2,32 +2,22 @@
 <%== render("networking/tabbar") %>
 <% if @pss.count > 0 %>
   <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @pss.each do |ps| %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <a href="<%= @project_data[:path] %><%= ps[:path] %>" class="text-orange-600 hover:text-orange-700">
-                  <%= ps[:name] %>
-                </a>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= ps[:location] %></td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <%== render("components/ps_state_label", locals: { state: ps[:state] }) %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+    <%== render(
+      "components/table_card",
+      locals: {
+        headers: ["Name", "Location", "State"],
+        rows: @pss.map do |ps|
+          [
+            [
+              [ps[:name], {link: @project_data[:path] + ps[:path]}],
+              ps[:location],
+              ["ps_state_label", {component: { state: ps[:state] }}]
+            ],
+            {id: "ps-#{ps[:id]}"}
+          ]
+        end
+      }
+    ) %>
   </div>
   <div class="flex justify-end space-y-1 mt-6">
     <% if has_project_permission("PrivateSubnet:create")%>

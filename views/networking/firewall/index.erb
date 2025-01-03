@@ -2,38 +2,22 @@
 <%== render("networking/tabbar") %>
 <% if @firewalls.count > 0 %>
   <div class="grid gap-6">
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
-            font-semibold text-gray-900 sm:pl-6">Name</th>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
-            font-semibold text-gray-900 sm:pl-6">Location</th>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm
-            font-semibold text-gray-900 sm:pl-6">Description</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @firewalls.each do |fw| %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium
-              text-gray-900 sm:pl-6" scope="row">
-                <% if has_permission?("Firewall:view", fw[:id]) %>
-                  <a href="<%= @project_data[:path] %><%= fw[:path] %>"
-                  class="text-orange-600 hover:text-orange-700"><%= fw[:name]
-                  %></a>
-                <% else %>
-                  <%= fw[:name] %>
-                <% end %>
-              </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fw[:location] %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fw[:description] %></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
+    <%== render(
+      "components/table_card",
+      locals: {
+        headers: ["Name", "Location", "Description"],
+        rows: @firewalls.map do |fw|
+          [
+            [
+              [fw[:name], {link: @project_data[:path] + fw[:path]}],
+              fw[:location],
+              fw[:description]
+            ],
+            {id: "fw-#{fw[:id]}"}
+          ]
+        end
+      }
+    ) %>
   </div>
   <div class="flex justify-end space-y-1 mt-6">
       <% if has_project_permission("Firewall:create")%>
