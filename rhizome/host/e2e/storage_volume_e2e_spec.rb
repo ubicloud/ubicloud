@@ -17,6 +17,10 @@ RSpec.describe StorageVolume do
 
   after do
     r "sudo userdel --remove #{vm}"
+
+    # YYY: Don't delete manually after moving the storage dir purge logic from
+    # vm_setup.rb to storage_volume.rb.
+    rm_if_exists("/var/storage/#{vm}")
   end
 
   describe "#encrypted_storage_volume" do
