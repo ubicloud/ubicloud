@@ -155,6 +155,81 @@ class RegenScreenshots
     click_link "postgresql-demo"
     screenshot "managed-postgresql/overview-2-screenshot.png"
 
+    click_link "Users"
+    fill_in "email", with: "other@example.com"
+    find("input[name=email]").click
+    screenshot "security/users-1-screenshot.png"
+
+    account2 = Account.create(email: "other@example.com", name: "Other")
+    click_button "Invite"
+    page.refresh
+    page.evaluate_script("$('#user_policy_#{account2.ubid}').focus()")
+    screenshot "security/users-2-screenshot.png"
+
+    click_link "Access Control"
+    access_control_path = page.current_path
+    screenshot "security/access-control-1-screenshot.png"
+
+    click_link "subject-tags-link"
+    screenshot "security/subject-tag-1-screenshot.png"
+
+    fill_in "name", with: "System-Admins"
+    click_button "Create"
+    fill_in "name", with: "Network-Admins"
+    click_button "Create"
+    page.refresh
+    fill_in "name", with: "Database-Admins"
+    page.evaluate_script("$('#name').focus()")
+    screenshot "security/subject-tag-2-screenshot.png"
+    click_button "Create"
+
+    resize(1020)
+    click_link "#{SubjectTag[name: "System-Admins"].ubid}-edit"
+    screenshot "security/subject-tag-3-screenshot.png"
+
+    resize(1140)
+    check "add[]-#{account2.ubid}-0"
+    click_button "Add Members"
+    page.refresh
+    screenshot "security/subject-tag-4-screenshot.png"
+
+    resize(800)
+    visit access_control_path
+    click_link "action-tags-link"
+    fill_in "name", with: "Networking"
+    click_button "Create"
+    page.refresh
+    screenshot "security/action-tag-1-screenshot.png"
+
+    resize(1140)
+    click_link "Manage"
+    check "add[]-tazzzzzzzz021gzzzz0fw0a110-0"
+    check "add[]-tazzzzzzzz021gzzzz01b0a111-0"
+    check "add[]-tazzzzzzzz021gzzzz0ps0a111-0"
+    screenshot "security/action-tag-2-screenshot.png"
+
+    resize(800)
+    click_button "Add Members"
+    page.refresh
+    screenshot "security/action-tag-3-screenshot.png"
+
+    resize(850)
+    visit access_control_path
+    3.times do
+      click_button "New Access Control Entry"
+    end
+    screenshot "security/access-control-2-screenshot.png"
+
+    select "System-Admins", from: "ace-select-1-1"
+    select "Vm:all", from: "ace-select-1-2"
+
+    select "Network-Admins", from: "ace-select-2-1"
+    select "Networking", from: "ace-select-2-2"
+
+    select "Database-Admins", from: "ace-select-3-1"
+    select "Postgres:all", from: "ace-select-3-2"
+    screenshot "security/access-control-3-screenshot.png"
+
     resize(1800)
     click_link "Compute"
     click_link "New Virtual Machine"
