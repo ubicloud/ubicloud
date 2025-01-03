@@ -628,6 +628,11 @@ RSpec.describe Prog::Vm::Nexus do
       expect { nx.wait }.to hop("restart")
     end
 
+    it "hops to stopped when needed" do
+      expect(nx).to receive(:when_stop_set?).and_yield
+      expect { nx.wait }.to hop("stopped")
+    end
+
     it "hops to unavailable based on the vm's available status" do
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(false)
@@ -676,6 +681,23 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:decr_restart)
       expect(sshable).to receive(:cmd).with("sudo systemctl restart #{vm.inhost_name}")
       expect { nx.restart }.to hop("wait")
+    end
+  end
+
+  describe "#stopped" do
+    it "naps after stopping the vm" do
+      sshable = instance_double(Sshable)
+      expect(nx).to receive(:when_stop_set?).and_yield
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: sshable))
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop #{vm.inhost_name}")
+      expect(nx).to receive(:decr_stop)
+      expect { nx.stopped }.to nap(60 * 60)
+    end
+
+    it "does not stop if already stopped" do
+      expect(vm).not_to receive(:vm_host)
+      expect(nx).to receive(:decr_stop)
+      expect { nx.stopped }.to nap(60 * 60)
     end
   end
 

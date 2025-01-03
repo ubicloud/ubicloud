@@ -25,7 +25,7 @@ class Vm < Sequel::Model
   include SemaphoreMethods
   include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules, :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started
-  semaphore :restart
+  semaphore :restart, :stop
 
   include Authorization::HyperTagMethods
 
@@ -62,6 +62,7 @@ class Vm < Sequel::Model
   def display_state
     return "deleting" if destroy_set? || strand&.label == "destroy"
     return "restarting" if restart_set? || strand&.label == "restart"
+    return "stopped" if stop_set? || strand&.label == "stopped"
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
       return "waiting for capacity"
