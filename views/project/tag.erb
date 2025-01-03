@@ -12,8 +12,8 @@ avoid = @current_members.dup
 avoid[@tag.id] = true
 add_groups.transform_values! do |v|
   v = v.reject { avoid.include?(_1.id) }
-  v.map! { [_1.name, _1.ubid] }
-  v.sort_by! { _1 }
+  v.map! { [_1.name.to_s, _1.ubid] }
+  v.sort!
 end
 add_groups.reject! { _2.empty? }
 
