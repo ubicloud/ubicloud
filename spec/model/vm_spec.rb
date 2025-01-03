@@ -16,6 +16,11 @@ RSpec.describe Vm do
       expect(vm.display_state).to eq("restarting")
     end
 
+    it "returns stopped if stop semaphore increased" do
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "stop")]).at_least(:once)
+      expect(vm.display_state).to eq("stopped")
+    end
+
     it "returns waiting for capacity if semaphore increased" do
       expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "waiting_for_capacity")]).at_least(:once)
       expect(vm.display_state).to eq("waiting for capacity")

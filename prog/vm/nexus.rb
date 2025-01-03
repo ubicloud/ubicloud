@@ -330,6 +330,10 @@ class Prog::Vm::Nexus < Prog::Base
       hop_restart
     end
 
+    when_stop_set? do
+      hop_stopped
+    end
+
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
@@ -362,6 +366,15 @@ class Prog::Vm::Nexus < Prog::Base
     decr_restart
     host.sshable.cmd("sudo systemctl restart #{vm.inhost_name}")
     hop_wait
+  end
+
+  label def stopped
+    when_stop_set? do
+      host.sshable.cmd("sudo systemctl stop #{vm.inhost_name}")
+    end
+    decr_stop
+
+    nap 60 * 60
   end
 
   label def unavailable
