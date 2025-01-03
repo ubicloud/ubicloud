@@ -156,11 +156,12 @@ module Config
   override :github_ubuntu_2204_version, "20241124.1.1", string
   override :github_ubuntu_2004_version, "20241124.1.1", string
   override :github_gpu_ubuntu_2204_version, "20241124.1.1", string
-  override :postgres16_ubuntu_2204_version, "20241022.1.0", string
-  override :postgres17_ubuntu_2204_version, "20241022.1.0", string
-  override :postgres16_paradedb_ubuntu_2204_version, "20241025.1.0", string
-  override :postgres17_paradedb_ubuntu_2204_version, "20241025.1.0", string
-  override :postgres16_lantern_ubuntu_2204_version, "20241024.1.0", string
+  override :postgres16_ubuntu_2204_version, "20250103.1.0", string
+  override :postgres17_ubuntu_2204_version, "20250103.1.0", string
+  override :postgres16_paradedb_ubuntu_2204_version, "20250103.1.0", string
+  override :postgres17_paradedb_ubuntu_2204_version, "20250103.1.0", string
+  override :postgres16_lantern_ubuntu_2204_version, "20250103.1.0", string
+  override :postgres17_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :ai_ubuntu_2404_nvidia_version, "20250108.1.0", string
 
   # Allocator
