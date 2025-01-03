@@ -120,7 +120,7 @@ class RegenScreenshots
       type: "user"
     )
     click_link "GitHub Runners"
-    click_link "Settings", href: "#{project.path}/github/setting"
+    click_link "Settings"
     screenshot "github-actions-integration/transparent-cache-enable-screenshot.png"
 
     resize(650)
@@ -144,7 +144,7 @@ class RegenScreenshots
     Project.define_method(:postgres_resources_dataset) do |*a|
       super(*a).with_extend do
         define_method(:all) { [pg_resource] }
-        define_method(:first) { pg_resource }
+        define_method(:first) { |*| pg_resource }
       end
     end
     PostgresResource.define_method(:display_state) { "running" }
