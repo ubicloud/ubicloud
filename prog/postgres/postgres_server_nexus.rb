@@ -369,7 +369,7 @@ SQL
   end
 
   label def unavailable
-    register_deadline(:wait, 10 * 60)
+    register_deadline("wait", 10 * 60)
 
     nap 0 if postgres_server.trigger_failover
 
