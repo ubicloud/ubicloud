@@ -334,7 +334,6 @@ function setupPlayground() {
         body: JSON.stringify({
           model: $('#inference_endpoint option:selected').text().trim(),
           messages: [{ role: "user", content: prompt }],
-          max_tokens: 1000,
           stream: true,
         }),
         signal,
