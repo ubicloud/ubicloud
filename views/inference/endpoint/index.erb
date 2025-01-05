@@ -41,7 +41,7 @@ curl #{ie[:url]}#{path} \\
       </div>
       <div>
         <h3 class="text-sm font-semibold text-gray-900">Pricing per million tokens</h3>
-        <p class="text-gray-500">$<%= ie[:price_million_tokens] %></p>
+        <p class="text-gray-500">$<%= "%0.02f" % ie[:price_million_tokens] %></p>
       </div>
       <div>
         <h3 class="text-sm font-semibold text-gray-900">Model card</h3>
