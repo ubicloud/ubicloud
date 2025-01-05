@@ -1,7 +1,7 @@
 <% @page_title = "Playground" %>
 <% @enable_marked = true %>
 <%== render("inference/tabbar") %>
-<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+<div class="rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
   <div class="px-4 py-5 sm:p-6 grid gap-6">
     <div class="flex gap-10 text-gray-900">
       <div class="flex items-center gap-2">
@@ -29,7 +29,7 @@
         ) %>
       </div>
     </div>
-    <div class="shadow-md rounded-lg p-2 bg-gray-50">
+    <div class="shadow-md rounded-lg p-2 bg-gray-50 sticky top-16 z-40">
       <%== render(
         "components/form/textarea",
         locals: {

@@ -363,10 +363,12 @@ function setupPlayground() {
             $('#inference_response_stream').append(content);
           }
         });
+        window.scrollTo(0, document.body.scrollHeight);
       }
       const parsed_response = DOMPurify.sanitize(marked.parse($('#inference_response_stream').text()));
       $('#inference_response_stream').text("");
       $('#inference_response_pretty').html(parsed_response);
+      window.scrollTo(0, document.body.scrollHeight);
     }
     catch (error) {
       let errorMessage;
