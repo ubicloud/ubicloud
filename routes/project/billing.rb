@@ -31,7 +31,7 @@ class Clover
           begin
             Stripe::Customer.update(billing_info.stripe_id, {
               name: r.params["name"],
-              email: r.params["email"],
+              email: r.params["email"].strip,
               address: {
                 country: r.params["country"],
                 state: r.params["state"],
