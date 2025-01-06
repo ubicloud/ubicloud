@@ -133,6 +133,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def destroy
     decr_destroy
     strand.children.map { _1.destroy }
+    load_balancer.private_subnet.incr_update_firewall_rules
+
     # The following if statement makes sure that it's OK to not have dns_zone
     # only if it's not in production.
     if (dns_zone = load_balancer.dns_zone) && (Config.production? || dns_zone)
@@ -186,6 +188,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       end
     end
 
+    load_balancer.private_subnet.incr_update_firewall_rules
     hop_wait
   end
 end
