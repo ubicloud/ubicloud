@@ -28,22 +28,26 @@ class Clover
 
       r.post true do
         if (billing_info = @project.billing_info)
-          Stripe::Customer.update(billing_info.stripe_id, {
-            name: r.params["name"],
-            email: r.params["email"],
-            address: {
-              country: r.params["country"],
-              state: r.params["state"],
-              city: r.params["city"],
-              postal_code: r.params["postal_code"],
-              line1: r.params["address"],
-              line2: nil
-            },
-            metadata: {
-              tax_id: r.params["tax_id"],
-              company_name: r.params["company_name"]
-            }
-          })
+          begin
+            Stripe::Customer.update(billing_info.stripe_id, {
+              name: r.params["name"],
+              email: r.params["email"],
+              address: {
+                country: r.params["country"],
+                state: r.params["state"],
+                city: r.params["city"],
+                postal_code: r.params["postal_code"],
+                line1: r.params["address"],
+                line2: nil
+              },
+              metadata: {
+                tax_id: r.params["tax_id"],
+                company_name: r.params["company_name"]
+              }
+            })
+          rescue Stripe::InvalidRequestError => e
+            flash["error"] = e.message
+          end
 
           r.redirect @project.path + "/billing"
         end

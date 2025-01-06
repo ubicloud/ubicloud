@@ -126,6 +126,24 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Tax ID (Optional)", with: "456789")
     end
 
+    it "shows error if billing info update failed" do
+      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
+        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "456789"}}
+      ).twice
+      expect(Stripe::Customer).to receive(:update).and_raise(Stripe::InvalidRequestError.new("Invalid email address:    test@test.com", "email"))
+
+      visit "#{project.path}/billing"
+
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      fill_in "Billing Email", with: "  test@test.com"
+
+      click_button "Update"
+
+      expect(page.status_code).to eq(200)
+      expect(find_by_id("flash-error").text).to eq("Invalid email address: test@test.com")
+    end
+
     it "can add new payment method" do
       expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
       expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return({"card" => {"brand" => "visa"}}).twice
