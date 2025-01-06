@@ -284,4 +284,21 @@ RSpec.describe Hosting::HetznerApis do
       expect(hetzner_apis.pull_ips).to eq expected
     end
   end
+
+  describe "set_server_name" do
+    it "can set the server name" do
+      Excon.stub({path: "/server/123", method: :post, body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0"}, {status: 200, body: "{}"})
+      expect { hetzner_apis.set_server_name(123, "84fe406c-42af-8771-bcde-4a29adc23bb0") }.not_to raise_error
+    end
+
+    it "raises an error if setting the server name fails due to invalid input" do
+      Excon.stub({path: "/server/123", method: :post, body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0"}, {status: 400, body: ""})
+      expect { hetzner_apis.set_server_name(123, "84fe406c-42af-8771-bcde-4a29adc23bb0") }.to raise_error Excon::Error::BadRequest
+    end
+
+    it "raises an error if setting the server name fails due to not found" do
+      Excon.stub({path: "/server/123", method: :post, body: "server_name=84fe406c-42af-8771-bcde-4a29adc23bb0"}, {status: 404, body: ""})
+      expect { hetzner_apis.set_server_name(123, "84fe406c-42af-8771-bcde-4a29adc23bb0") }.to raise_error Excon::Error::NotFound
+    end
+  end
 end

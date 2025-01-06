@@ -14,6 +14,7 @@ class Prog::Vm::HostNexus < Prog::Base
         HetznerHost.create(server_identifier: hetzner_server_identifier) { _1.id = vmh.id }
         vmh.create_addresses
         vmh.set_data_center
+        vmh.set_server_name
       else
         Address.create(cidr: sshable_hostname, routed_to_host_id: vmh.id) { _1.id = vmh.id }
         AssignedHostAddress.create_with_id(ip: sshable_hostname, address_id: vmh.id, host_id: vmh.id)

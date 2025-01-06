@@ -150,4 +150,14 @@ class Hosting::HetznerApis
     json_server = JSON.parse(response.body)
     json_server.dig("server", "dc")
   end
+
+  def set_server_name(server_id, name)
+    connection = Excon.new(@host.connection_string,
+      user: @host.user,
+      password: @host.password,
+      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+    connection.post(path: "/server/#{server_id}",
+      body: URI.encode_www_form(server_name: name),
+      expects: 200)
+  end
 end
