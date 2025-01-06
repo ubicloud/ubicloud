@@ -235,6 +235,10 @@ class VmHost < Sequel::Model
     update(data_center: Hosting::Apis.pull_data_center(self))
   end
 
+  def set_server_name
+    Hosting::Apis.set_server_name(self)
+  end
+
   def reset
     unless Config.development?
       fail "BUG: reset is only allowed in development"
