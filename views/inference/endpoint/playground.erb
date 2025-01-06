@@ -53,8 +53,31 @@
         }
       ) %>
     </div>
-      <span id="inference_response_raw" class="overflow-auto min-h-48 whitespace-pre-line"></span>
-      <span id="inference_response_preview" class="prose"></span>
+    <div class="border-b border-gray-200">
+      <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500 dark:text-gray-400">
+        <% [
+          ["raw", "hero-code-bracket"],
+          ["preview", "hero-eye"]
+      ].each do |name, icon| %>
+          <li class="me-2 group inference-tab <%= (name == "raw") ? "active" : "" %>" data-target="<%= name %>">
+            <a
+              id="inference_tab_<%= name %>"
+              href="#"
+              class="inline-flex items-center justify-center p-4 border-b-2 rounded-t-lg group-[.active]:text-orange-600 group-[.active]:border-orange-600 group-[:not(.active)]:hover:text-gray-600 group-[:not(.active)]:hover:border-gray-300"
+            >
+              <%== render("components/icon", locals: { name: icon, classes: "h-4 w-4 mr-1" }) %>
+              <%= name.capitalize %>
+            </a>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+    <div class="mt-1 text-gray-900">
+      <span
+        id="inference_response_raw"
+        class="inference-response whitespace-pre-line flex flex-col-reverse overflow-y-auto leading-7"
+      ></span>
+      <span id="inference_response_preview" class="inference-response prose"></span>
     </div>
   </div>
 </div>
