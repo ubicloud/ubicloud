@@ -88,7 +88,7 @@ RSpec.describe Clover, "postgres" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
-        expect(page).to have_content "'#{name}' will be ready in a few minutes"
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.projects.first.id).to eq(project.id)
       end
@@ -109,7 +109,7 @@ RSpec.describe Clover, "postgres" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
-        expect(page).to have_content "'#{name}' will be ready in a few minutes"
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
         expect(PostgresResource.first.projects.first.id).to eq(project.id)
       end
@@ -136,7 +136,7 @@ RSpec.describe Clover, "postgres" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
-        expect(page).to have_content "name is already taken"
+        expect(page).to have_flash_error("name is already taken")
       end
 
       it "can not select invisible location" do
@@ -235,7 +235,7 @@ RSpec.describe Clover, "postgres" do
         click_button "Reset"
 
         expect(page.status_code).to eq(400)
-        expect(page).to have_content "Superuser password cannot be updated during restore!"
+        expect(page).to have_flash_error("Superuser password cannot be updated during restore!")
       end
 
       it "can restart PostgreSQL database" do

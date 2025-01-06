@@ -76,7 +76,7 @@ RSpec.describe Clover, "private subnet" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
-        expect(page).to have_content "'#{name}' will be ready in a few seconds"
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few seconds")
         expect(PrivateSubnet.count).to eq(1)
         expect(PrivateSubnet.first.projects.first.id).to eq(project.id)
       end
@@ -93,7 +93,7 @@ RSpec.describe Clover, "private subnet" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
-        expect(page).to have_content "name is already taken"
+        expect(page).to have_flash_error("project_id and name is already taken")
       end
     end
 

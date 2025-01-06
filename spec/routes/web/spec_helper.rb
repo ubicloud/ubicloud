@@ -39,6 +39,33 @@ RSpec.configure do |config|
     Capybara.reset_sessions!
     Capybara.use_default_driver
   end
+
+  def flash_message_matcher(expected_type, expected_message)
+    match do |page|
+      actual_message = page.find_by_id("flash-#{expected_type}").text
+      if expected_message.is_a?(String)
+        actual_message == expected_message
+      else
+        actual_message =~ expected_message
+      end
+    end
+
+    failure_message do |page|
+      <<~MESSAGE
+        #{"expected: ".rjust(16)}#{expected_type} - #{expected_message}
+        #{"actual error: ".rjust(16)}#{page.has_css?("#flash-error") ? page.find_by_id("flash-error").text : "(no error message)"}
+        #{"actual notice: ".rjust(16)}#{page.has_css?("#flash-notice") ? page.find_by_id("flash-notice").text : "(no notice message)"}
+      MESSAGE
+    end
+  end
+
+  RSpec::Matchers.define :have_flash_notice do |expected_message|
+    flash_message_matcher(:notice, expected_message)
+  end
+
+  RSpec::Matchers.define :have_flash_error do |expected_message|
+    flash_message_matcher(:error, expected_message)
+  end
 end
 
 def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)

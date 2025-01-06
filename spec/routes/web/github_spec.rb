@@ -24,7 +24,7 @@ RSpec.describe Clover, "github" do
     visit "/github/callback?code=123123&installation_id=#{installation.installation_id}"
 
     expect(page.title).to eq("Ubicloud - Active Runners")
-    expect(page).to have_content("GitHub runner integration is already enabled for #{project.name} project.")
+    expect(page).to have_flash_notice("GitHub runner integration is already enabled for #{project.name} project.")
   end
 
   it "raises forbidden when does not have permissions to access already enabled installation" do
@@ -44,7 +44,7 @@ RSpec.describe Clover, "github" do
     visit "/github/callback?code=123123&installation_id=345"
 
     expect(page.title).to eq("Ubicloud - Projects")
-    expect(page).to have_content("You should initiate the GitHub App installation request from the project's GitHub runner integration page.")
+    expect(page).to have_flash_error("You should initiate the GitHub App installation request from the project's GitHub runner integration page.")
   end
 
   it "raises forbidden when does not have permissions to the project in session" do
@@ -66,7 +66,7 @@ RSpec.describe Clover, "github" do
     visit "/github/callback?code=123123&setup_action=request"
 
     expect(page.title).to eq("Ubicloud - #{project.name} - Users")
-    expect(page).to have_content("awaiting approval from the GitHub organization's administrator")
+    expect(page).to have_flash_notice(/.*awaiting approval from the GitHub organization's administrator.*/)
   end
 
   it "fails if oauth code is invalid" do
@@ -76,7 +76,7 @@ RSpec.describe Clover, "github" do
     visit "/github/callback?code=invalid"
 
     expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
-    expect(page).to have_content("GitHub App installation failed.")
+    expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
   it "fails if installation not found" do
@@ -87,7 +87,7 @@ RSpec.describe Clover, "github" do
     visit "/github/callback?code=123123"
 
     expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
-    expect(page).to have_content("GitHub App installation failed.")
+    expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
   it "fails if the project is not active" do
@@ -99,7 +99,7 @@ RSpec.describe Clover, "github" do
     visit "/github/callback?code=123123&installation_id=345"
 
     expect(page.title).to eq("Ubicloud - project-1 Dashboard")
-    expect(page).to have_content("GitHub runner integration is not allowed for inactive projects")
+    expect(page).to have_flash_error("GitHub runner integration is not allowed for inactive projects")
   end
 
   it "creates installation with project from session" do
@@ -110,7 +110,7 @@ RSpec.describe Clover, "github" do
     visit "/github/callback?code=123123&installation_id=345"
 
     expect(page.title).to eq("Ubicloud - Active Runners")
-    expect(page).to have_content("GitHub runner integration is enabled for #{project.name} project.")
+    expect(page).to have_flash_notice("GitHub runner integration is enabled for #{project.name} project.")
     installation = GithubInstallation[installation_id: 345]
     expect(installation.name).to eq("test-user")
     expect(installation.type).to eq("User")

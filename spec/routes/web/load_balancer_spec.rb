@@ -83,7 +83,7 @@ RSpec.describe Clover, "load balancer" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
-        expect(page).to have_content "'#{name}' is created"
+        expect(page).to have_flash_notice("'#{name}' is created")
         expect(LoadBalancer.count).to eq(1)
         expect(LoadBalancer.first.projects.first.id).to eq(project.id)
       end
@@ -212,7 +212,7 @@ RSpec.describe Clover, "load balancer" do
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
-        expect(page).to have_content "VM is attached"
+        expect(page).to have_flash_notice("VM is attached to the load balancer")
         expect(lb.vms.count).to eq(1)
 
         visit "#{project.path}#{lb.path}"
@@ -277,7 +277,7 @@ RSpec.describe Clover, "load balancer" do
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
-        expect(page).to have_content "VM is detached"
+        expect(page).to have_flash_notice("VM is detached from the load balancer")
         expect(Strand.where(prog: "Vnet::LoadBalancerHealthProbes").all.count { |st| st.stack[0]["subject_id"] == lb.id && st.stack[0]["vm_id"] == vm.id }).to eq(0)
         expect(lb.update_load_balancer_set?).to be(true)
         expect(lb.load_balancers_vms_dataset.where(vm_id: vm.id).first.state).to eq("detaching")

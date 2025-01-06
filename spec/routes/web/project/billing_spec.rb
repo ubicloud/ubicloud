@@ -101,7 +101,7 @@ RSpec.describe Clover, "billing" do
       click_button "Add new billing information"
 
       expect(page.status_code).to eq(200)
-      expect(page).to have_content("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
+      expect(page).to have_flash_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
     end
 
     it "can update billing info" do
@@ -141,7 +141,7 @@ RSpec.describe Clover, "billing" do
       click_button "Update"
 
       expect(page.status_code).to eq(200)
-      expect(find_by_id("flash-error").text).to eq("Invalid email address: test@test.com")
+      expect(page).to have_flash_error("Invalid email address: test@test.com")
     end
 
     it "can add new payment method" do
@@ -185,7 +185,7 @@ RSpec.describe Clover, "billing" do
       expect(page.title).to eq("Ubicloud - Project Billing")
       expect(billing_info.payment_methods.count).to eq(1)
       expect(page).to have_content "Visa"
-      expect(page).to have_content("Payment method you added is labeled as fraud. Please contact support.")
+      expect(page).to have_flash_error("Payment method you added is labeled as fraud. Please contact support.")
     end
 
     it "raises not found when payment method not exists" do
