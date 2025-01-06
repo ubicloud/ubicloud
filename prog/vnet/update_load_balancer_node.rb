@@ -54,19 +54,21 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
 
     ipv4_prerouting = if load_balancer.ipv4_enabled?
       <<-IPV4_PREROUTING
+ip daddr #{public_ipv4} tcp dport #{load_balancer.src_port} meta mark set 0x00B1C100D
 ip daddr #{public_ipv4} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip4} mod #{modulo} map { #{ipv4_map_def} }
 ip daddr #{private_ipv4} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{private_ipv4}:#{load_balancer.dst_port}
       IPV4_PREROUTING
     end
     ipv6_prerouting = if load_balancer.ipv6_enabled?
       <<-IPV6_PREROUTING
+ip6 daddr #{public_ipv6} tcp dport #{load_balancer.src_port} meta mark set 0x00B1C100D
 ip6 daddr #{public_ipv6} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip6} mod #{modulo} map { #{ipv6_map_def} }
 ip6 daddr #{private_ipv6} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to [#{public_ipv6}]:#{load_balancer.dst_port}
       IPV6_PREROUTING
     end
 
     ipv4_postrouting_rule = load_balancer.ipv4_enabled? ? "ip daddr @neighbor_ips_v4 tcp dport #{load_balancer.src_port} ct state established,related,new counter snat to #{private_ipv4}" : ""
-    ipv6_postrouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr @neighbor_ips_v6 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv6}" : ""
+    ipv6_postrouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr @neighbor_ips_v6 tcp dport #{load_balancer.src_port} ct state established,related,new counter snat to #{private_ipv6}" : ""
     <<TEMPLATE
 table ip nat;
 delete table ip nat;
@@ -119,7 +121,8 @@ TEMPLATE
     end.join(", "),
       load_balancer.active_vms.map.with_index do |active_vm, i|
         port = (active_vm.id == vm.id) ? load_balancer.dst_port : load_balancer.src_port
-        "#{i} : #{active_vm.nics.first.private_ipv6.nth(2)} . #{port}"
+        address = (active_vm.id == vm.id) ? vm.ephemeral_net6.nth(2) : active_vm.nics.first.private_ipv6.nth(2)
+        "#{i} : #{address} . #{port}"
       end.join(", ")]
   end
 
