@@ -359,7 +359,7 @@ function setupPlayground() {
         parsedLines.forEach((parsedLine) => {
           const content = parsedLine?.choices?.[0]?.delta?.content;
           if (content) {
-            $('#inference_response_stream').append(content);
+            $('#inference_response_stream').text($('#inference_response_stream').text() + content);
           }
         });
       }
