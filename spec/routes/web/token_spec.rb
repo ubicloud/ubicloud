@@ -16,7 +16,7 @@ RSpec.describe Clover, "personal access token management" do
   end
 
   it "user page allows creating personal access tokens" do
-    expect(find_by_id("flash-notice").text).to include("Created personal access token with id ")
+    expect(page).to have_flash_notice("Created personal access token with id #{@api_key.ubid}")
 
     expect(ApiKey.count).to eq(1)
     expect(@api_key.owner_id).to eq(user.id)
@@ -38,7 +38,7 @@ RSpec.describe Clover, "personal access token management" do
     expect(ApiKey.all).to be_empty
     expect(access_tag_ds.all).to be_empty
     visit "#{project.path}/user/token"
-    expect(find_by_id("flash-notice").text).to eq("Personal access token deleted successfully")
+    expect(page).to have_flash_notice("Personal access token deleted successfully")
 
     page.driver.delete data_url, {_csrf:}
     expect(page.status_code).to eq(204)
@@ -53,7 +53,7 @@ RSpec.describe Clover, "personal access token management" do
       select "Admin", from: "token_policies[#{@api_key.ubid}]"
       click_button "Update Personal Access Token Policies"
     end
-    expect(find_by_id("flash-notice").text).to eq("Personal access token policies updated successfully.")
+    expect(page).to have_flash_notice("Personal access token policies updated successfully.")
     expect(page).to have_select("token_policies[#{@api_key.ubid}]", selected: "Admin")
     expect(Authorization.has_permission?(@api_key.id, "*", project.id)).to be(true)
   end

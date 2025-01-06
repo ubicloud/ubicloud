@@ -50,7 +50,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
 
-    expect(page).to have_content("An email has been sent to you with a link to verify your account")
+    expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
     expect(Mail::TestMailer.deliveries.length).to eq 1
 
     fill_in "Email Address", with: TEST_USER_EMAIL
@@ -66,11 +66,11 @@ RSpec.describe Clover, "auth" do
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
-    expect(page).to have_content("The account you tried to login with is currently awaiting verification")
+    expect(page).to have_flash_error("The account you tried to login with is currently awaiting verification")
 
     click_button "Send Verification Again"
 
-    expect(page).to have_content("An email has been sent to you with a link to verify your account")
+    expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
     expect(Mail::TestMailer.deliveries.length).to eq 2
   end
 
@@ -85,7 +85,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
 
-    expect(page).to have_content("An email has been sent to you with a link to verify your account")
+    expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
     expect(Mail::TestMailer.deliveries.length).to eq 1
     verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
 
@@ -110,7 +110,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
     click_button "Create Account"
 
-    expect(page).to have_content("An email has been sent to you with a link to verify your account")
+    expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
     expect(Mail::TestMailer.deliveries.length).to eq 1
     verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-account.+?)"/)[1]
 
@@ -162,7 +162,7 @@ RSpec.describe Clover, "auth" do
 
     click_button "Request Password Reset"
 
-    expect(page).to have_content("An email has been sent to you with a link to reset the password for your account")
+    expect(page).to have_flash_notice("An email has been sent to you with a link to reset the password for your account")
     expect(Mail::TestMailer.deliveries.length).to eq 1
     reset_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/reset-password.+?)"/)[1]
 
@@ -192,7 +192,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Email Address", with: TEST_USER_EMAIL
     click_button "Request Password Reset"
 
-    expect(page).to have_content("Login with password is not enabled for this account.")
+    expect(page).to have_flash_error(/Login with password is not enabled for this account.*/)
     expect(DB[:account_password_reset_keys].count).to eq 0
   end
 
@@ -224,7 +224,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - Login")
-    expect(page).to have_content("Your account has been suspended")
+    expect(page).to have_flash_error(/Your account has been suspended.*/)
   end
 
   it "can not login if the account is suspended via remember token" do
@@ -317,7 +317,7 @@ RSpec.describe Clover, "auth" do
 
       click_button "Change Email"
 
-      expect(page).to have_content("An email has been sent to you with a link to verify your login change")
+      expect(page).to have_flash_notice("An email has been sent to you with a link to verify your login change")
       expect(Mail::TestMailer.deliveries.length).to eq 1
       verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
 
@@ -367,7 +367,7 @@ RSpec.describe Clover, "auth" do
       click_button "Close Account"
 
       expect(page.title).to eq("Ubicloud - Login")
-      expect(page).to have_content("Your account has been closed")
+      expect(page).to have_flash_notice("Your account has been closed")
 
       expect(Account[email: TEST_USER_EMAIL]).to be_nil
       expect(AccessTag.where(name: "user/#{TEST_USER_EMAIL}").count).to eq 0
@@ -375,14 +375,15 @@ RSpec.describe Clover, "auth" do
 
     it "can not close account if the project has some resources" do
       vm = create_vm
-      vm.associate_with_project(Account[email: TEST_USER_EMAIL].projects.first)
+      project = Account[email: TEST_USER_EMAIL].projects.first
+      vm.associate_with_project(project)
 
       visit "/account/close-account"
 
       click_button "Close Account"
 
       expect(page.title).to eq("Ubicloud - Close Account")
-      expect(page).to have_content("project has some resources. Delete all related resources first")
+      expect(page).to have_flash_error("'#{project.name}' project has some resources. Delete all related resources first.")
     end
   end
 
@@ -440,7 +441,7 @@ RSpec.describe Clover, "auth" do
 
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Login")
-      expect(page).to have_content("There is already an account with this email address")
+      expect(page).to have_flash_error(/There is already an account with this email address.*/)
     end
 
     describe "authenticated" do
@@ -459,7 +460,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_content "You have successfully connected your account with Github"
+        expect(page).to have_flash_notice("You have successfully connected your account with Github.")
       end
 
       it "can disconnect from existing account" do
@@ -472,7 +473,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_content "Your account has been disconnected from Github"
+        expect(page).to have_flash_notice("Your account has been disconnected from Github")
       end
 
       it "can delete password if another login method is available" do
@@ -484,7 +485,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_content "Your password has been deleted"
+        expect(page).to have_flash_notice("Your password has been deleted")
       end
 
       it "can not disconnect the last login method if has no password" do
@@ -497,7 +498,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_content "You must have at least one login method"
+        expect(page).to have_flash_error("You must have at least one login method")
       end
 
       it "can not disconnect if it's already disconnected" do
@@ -511,7 +512,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_content "Your account already has been disconnected from Github"
+        expect(page).to have_flash_error("Your account already has been disconnected from Github")
       end
 
       it "can not connect an account with different email" do
@@ -523,7 +524,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_content "Your account's email address is different from the email address associated"
+        expect(page).to have_flash_error("Your account's email address is different from the email address associated with the Github account.")
       end
 
       it "can not connect a social account with multiple accounts" do
@@ -536,7 +537,7 @@ RSpec.describe Clover, "auth" do
         end
 
         expect(page.title).to eq("Ubicloud - Login Methods")
-        expect(page).to have_content "Your account's email address is different from the email address associated"
+        expect(page).to have_flash_error("Your account's email address is different from the email address associated with the Github account.")
       end
     end
   end

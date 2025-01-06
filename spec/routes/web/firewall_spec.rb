@@ -75,7 +75,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
-        expect(page).to have_content "'#{name}' is created"
+        expect(page).to have_flash_notice("'#{name}' is created")
         expect(Firewall.count).to eq(1)
         expect(Firewall.first.projects.first.id).to eq(project.id)
       end
@@ -94,7 +94,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{name}")
-        expect(page).to have_content "'#{name}' is created"
+        expect(page).to have_flash_notice("'#{name}' is created")
         fw = Firewall[name: name]
         expect(fw.private_subnets.first.id).to eq(ps.id)
 
@@ -180,7 +180,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_content "Private subnet #{ps.name} is attached to the firewall"
+        expect(page).to have_flash_notice("Private subnet #{ps.name} is attached to the firewall")
         expect(firewall.private_subnets_dataset.count).to eq(1)
 
         visit "#{project.path}#{firewall.path}"
@@ -198,7 +198,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_content "Private subnet not found"
+        expect(page).to have_flash_error("Private subnet not found")
         expect(firewall.private_subnets_dataset.count).to eq(0)
       end
 
@@ -212,7 +212,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_content "Private subnet #{ps.name} is detached from the firewall"
+        expect(page).to have_flash_notice("Private subnet #{ps.name} is detached from the firewall")
         expect(firewall.private_subnets_dataset.count).to eq(0)
 
         visit "#{project.path}#{ps.path}"
@@ -232,7 +232,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_content "Private subnet not found"
+        expect(page).to have_flash_error("Private subnet not found")
         expect(firewall.private_subnets_dataset.count).to eq(0)
       end
     end
@@ -247,7 +247,7 @@ RSpec.describe Clover, "firewall" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_content "Firewall rule is created"
+        expect(page).to have_flash_notice("Firewall rule is created")
         expect(firewall.firewall_rules_dataset.count).to eq(1)
       end
 

@@ -9,7 +9,7 @@ RSpec.describe Clover do
     click_button "Sign in"
 
     expect(page.status_code).to eq(400)
-    expect(page).to have_content("An invalid security token submitted with this request")
+    expect(page).to have_flash_error("An invalid security token submitted with this request, please try again")
   end
 
   it "handles expected errors" do

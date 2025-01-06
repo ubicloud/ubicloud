@@ -219,7 +219,7 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_content user.email
         expect(page).to have_content new_email
-        expect(page).to have_content "Invitation sent successfully to '#{new_email}'."
+        expect(page).to have_flash_notice(/Invitation sent successfully to '#{new_email}'.*/)
         expect(page).to have_select("invitation_policies[#{new_email}]", selected: "Admin")
         expect(Mail::TestMailer.deliveries.length).to eq 1
         expect(ProjectInvitation.where(email: new_email).count).to eq 1
@@ -227,7 +227,7 @@ RSpec.describe Clover, "project" do
         fill_in "Email", with: new_email.downcase
         click_button "Invite"
 
-        expect(page).to have_content "'#{new_email.downcase}' already invited to join the project."
+        expect(page).to have_flash_error("'#{new_email.downcase}' already invited to join the project.")
       end
 
       it "can remove user from project" do
@@ -256,7 +256,7 @@ RSpec.describe Clover, "project" do
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
-        expect(page.find_by_id("flash-notice").text).to eq("Removed #{user2.email} from #{project.name}")
+        expect(page).to have_flash_notice("Removed #{user2.email} from #{project.name}")
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
@@ -289,7 +289,7 @@ RSpec.describe Clover, "project" do
           select "Member", from: "user_policies[#{user.ubid}]"
           click_button "Update"
         end
-        expect(page).to have_content "The project must have at least one admin"
+        expect(page).to have_flash_error("The project must have at least one admin.")
         expect(page).to have_select("user_policies[#{user.ubid}]", selected: "Admin")
       end
 
@@ -306,7 +306,7 @@ RSpec.describe Clover, "project" do
         page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
 
         visit "#{project.path}/user"
-        expect(page.find_by_id("flash-notice").text).to eq("Invitation for '#{invited_email}' is removed successfully.")
+        expect(page).to have_flash_notice("Invitation for '#{invited_email}' is removed successfully.")
 
         visit "#{project.path}/user"
         expect(page).to have_no_content invited_email
@@ -340,7 +340,7 @@ RSpec.describe Clover, "project" do
         click_button "Invite"
 
         expect(page).to have_no_content "new@example.com"
-        expect(page).to have_content "You can't have more than 50 pending invitations"
+        expect(page).to have_flash_error("You can't have more than 50 pending invitations.")
       end
 
       it "raises bad request when it's the last user" do
