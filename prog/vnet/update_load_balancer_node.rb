@@ -52,11 +52,21 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
       fail ArgumentError, "Unsupported load balancer algorithm: #{load_balancer.algorithm}"
     end
 
-    ipv4_prerouting_rule = load_balancer.ipv4_enabled? ? "ip daddr #{public_ipv4} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip4} mod #{modulo} map { #{ipv4_map_def} }" : ""
-    ipv6_prerouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr #{public_ipv6} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip6} mod #{modulo} map { #{ipv6_map_def} }" : ""
+    ipv4_prerouting = if load_balancer.ipv4_enabled?
+      <<-IPV4_PREROUTING
+ip daddr #{public_ipv4} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip4} mod #{modulo} map { #{ipv4_map_def} }
+ip daddr #{private_ipv4} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{private_ipv4}:#{load_balancer.dst_port}
+      IPV4_PREROUTING
+    end
+    ipv6_prerouting = if load_balancer.ipv6_enabled?
+      <<-IPV6_PREROUTING
+ip6 daddr #{public_ipv6} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to #{balance_mode_ip6} mod #{modulo} map { #{ipv6_map_def} }
+ip6 daddr #{private_ipv6} tcp dport #{load_balancer.src_port} ct state established,related,new counter dnat to [#{public_ipv6}]:#{load_balancer.dst_port}
+      IPV6_PREROUTING
+    end
 
-    ipv4_postrouting_rule = load_balancer.ipv4_enabled? ? "ip daddr @neighbor_ips_v4 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv4}:#{load_balancer.dst_port}" : ""
-    ipv6_postrouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr @neighbor_ips_v6 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv6}:#{load_balancer.dst_port}" : ""
+    ipv4_postrouting_rule = load_balancer.ipv4_enabled? ? "ip daddr @neighbor_ips_v4 tcp dport #{load_balancer.src_port} ct state established,related,new counter snat to #{private_ipv4}" : ""
+    ipv6_postrouting_rule = load_balancer.ipv6_enabled? ? "ip6 daddr @neighbor_ips_v6 tcp dport #{load_balancer.dst_port} ct state established,related,new counter snat to #{private_ipv6}" : ""
     <<TEMPLATE
 table ip nat;
 delete table ip nat;
@@ -75,8 +85,8 @@ table inet nat {
 
   chain prerouting {
     type nat hook prerouting priority dstnat; policy accept;
-#{ipv4_prerouting_rule}
-#{ipv6_prerouting_rule}
+#{ipv4_prerouting}
+#{ipv6_prerouting}
 
     # Basic NAT for public IPv4 to private IPv4
     ip daddr #{public_ipv4} dnat to #{private_ipv4}
@@ -103,8 +113,14 @@ TEMPLATE
   end
 
   def generate_lb_map_defs
-    [load_balancer.active_vms.map.with_index { |vm, i| "#{i} : #{vm.nics.first.private_ipv4.network} . #{load_balancer.dst_port}" }.join(", "),
-      load_balancer.active_vms.map.with_index { |vm, i| "#{i} : #{vm.nics.first.private_ipv6.nth(2)} . #{load_balancer.dst_port}" }.join(", ")]
+    [load_balancer.active_vms.map.with_index do |active_vm, i|
+      port = (active_vm.id == vm.id) ? load_balancer.dst_port : load_balancer.src_port
+      "#{i} : #{active_vm.nics.first.private_ipv4.network} . #{port}"
+    end.join(", "),
+      load_balancer.active_vms.map.with_index do |active_vm, i|
+        port = (active_vm.id == vm.id) ? load_balancer.dst_port : load_balancer.src_port
+        "#{i} : #{active_vm.nics.first.private_ipv6.nth(2)} . #{port}"
+      end.join(", ")]
   end
 
   def generate_nat_rules(current_public_ipv4, current_private_ipv4)

@@ -13,6 +13,17 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
 
     globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
 
+    load_balancer_allow_rule = if vm.load_balancer
+      allow_ipv4_lb_neigh_incoming = "ip saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { _1.nics.first.private_ipv4.network.to_s + " . " + vm.load_balancer.src_port.to_s }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
+      allow_ipv6_lb_neigh_incoming = "ip6 saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { _1.nics.first.private_ipv6.nth(2).to_s + " . " + vm.load_balancer.src_port.to_s }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
+      <<~LOAD_BALANCER_ALLOW_RULE
+#{allow_ipv4_lb_neigh_incoming}
+#{allow_ipv6_lb_neigh_incoming}
+      LOAD_BALANCER_ALLOW_RULE
+    else
+      ""
+    end
+
     vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<TEMPLATE)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
@@ -125,6 +136,9 @@ table inet fw_table {
     ip6 daddr ::/0 icmpv6 type echo-request counter accept
     ip6 saddr ::/0 icmpv6 type echo-reply counter accept
     ip6 daddr ::/0 icmpv6 type echo-reply counter accept
+
+    # Allow load balancer traffic
+#{load_balancer_allow_rule}
   }
 }
 TEMPLATE
