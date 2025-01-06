@@ -290,6 +290,19 @@ function setupPlayground() {
     return;
   }
 
+  function show_tab(name) {
+    $(".inference-tab").removeClass("active");
+    $(".inference-response").hide();
+    $(`#inference_tab_${name}`).show().parent().addClass("active");
+    $(`#inference_response_${name}`).show().removeClass("max-h-96");
+  }
+
+  $(".inference-tab").on("click", function (event) {
+    show_tab($(this).data("target"));
+  });
+
+  $('#inference_tab_preview').hide();
+
   let controller = null;
 
   const generate = async () => {
@@ -320,6 +333,9 @@ function setupPlayground() {
     $('#inference_response_raw').text("");
     $('#inference_response_preview').text("");
     $('#inference_submit').text("Stop");
+    show_tab("raw");
+    $('#inference_tab_preview').hide();
+    $('#inference_response_raw').addClass("max-h-96");
 
     controller = new AbortController();
     const signal = controller.signal;
@@ -364,8 +380,8 @@ function setupPlayground() {
         });
       }
       const parsed_response = DOMPurify.sanitize(marked.parse($('#inference_response_raw').text()));
-      $('#inference_response_raw').text("");
       $('#inference_response_preview').html(parsed_response);
+      show_tab("preview");
     }
     catch (error) {
       let errorMessage;
