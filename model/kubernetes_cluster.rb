@@ -48,4 +48,8 @@ class KubernetesCluster < Sequel::Model
   def kubectl(cmd)
     vms.first.sshable.cmd("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
   end
+
+  def etcdctl(cmd)
+    kubectl("exec etcd-#{vms.first.inhost_name} -n kube-system -- etcdctl --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/peer.crt --key /etc/kubernetes/pki/etcd/peer.key #{cmd}")
+  end
 end

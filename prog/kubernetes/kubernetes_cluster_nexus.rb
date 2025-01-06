@@ -74,13 +74,24 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def upgrade
     # Note that the kubernetes_version should point to the next version we are targeting
+    decr_upgrade
 
     # Pick a control plane node to upgrade
     node_to_upgrade = kubernetes_cluster.vms.find do |vm|
       # TODO: Put another check here to make sure the version we receive is either one version old or the correct version, just in case
       res = vm.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version")
-      puts res
       res.match(/Client Version: (v1\.\d\d)\.\d/).captures.first != kubernetes_cluster.kubernetes_version
+    end
+
+    # If CP nodes are upgraded, check worker nodes
+    unless node_to_upgrade
+      kubernetes_cluster.kubernetes_nodepools.flat_map { |np| np.vms }.each do |vm|
+        res = vm.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version")
+        if res.match(/Client Version: (v1\.\d\d)\.\d/).captures.first != kubernetes_cluster.kubernetes_version
+          node_to_upgrade = vm
+          break
+        end
+      end
     end
 
     hop_wait unless node_to_upgrade
