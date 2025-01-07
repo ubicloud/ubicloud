@@ -11,6 +11,7 @@ unicode_normalize/normalize
 unicode_normalize/tables
 enc/trans/single_byte
 enc/trans/utf_16_32
+enc/iso_8859_1
 enc/utf_16be
 enc/utf_16le
 rubygems/openssl
@@ -99,6 +100,7 @@ mail/parsers/content_transfer_encoding_parser
 mail/parsers/content_type_parser
 mail/parsers/message_ids_parser
 mail/parsers/mime_version_parser
+omniauth/builder
 aws-sdk-s3/client
 aws-sdk-s3/client_api
 aws-sdk-s3/customizations/errors
@@ -179,6 +181,7 @@ singular_table_names
 static_cache
 static_cache_cache
 subclasses
+subset_static_cache
 validation_helpers
 END
 
@@ -203,6 +206,7 @@ flash
 h
 hash_branch_view_subdir
 hash_branches
+host_routing
 hooks
 invalid_request_body
 json
@@ -212,6 +216,7 @@ public
 render
 request_headers
 route_csrf
+run_handler
 sessions
 status_handler
 typecast_params
@@ -239,6 +244,8 @@ lockout
 login
 login_password_requirements_base
 logout
+omniauth
+omniauth_base
 otp
 password_grace_period
 recovery_codes
