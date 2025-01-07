@@ -62,7 +62,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
     hop_wait if kubernetes_cluster.vms.count >= kubernetes_cluster.replica
 
-    push Prog::Kubernetes::ProvisionKubernetesControlPlaneNode
+    push Prog::Kubernetes::ProvisionKubernetesNode
   end
 
   label def wait
@@ -85,12 +85,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
     # If CP nodes are upgraded, check worker nodes
     unless node_to_upgrade
-      kubernetes_cluster.kubernetes_nodepools.flat_map { |np| np.vms }.each do |vm|
-        res = vm.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version")
-        if res.match(/Client Version: (v1\.\d\d)\.\d/).captures.first != kubernetes_cluster.kubernetes_version
-          node_to_upgrade = vm
-          break
-        end
+      kubernetes_cluster.kubernetes_nodepools.each do |np|
+        np.update(kubernetes_version: kubernetes_cluster.kubernetes_version)
+        np.incr_upgrade
       end
     end
 
@@ -100,9 +97,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def destroy
-    # DB.transaction do
-    #   KubernetesNodepool.where(kubernetes_cluster_id: kubernetes_cluster.id).each(&:incr_destroy)
-    # end
+    KubernetesNodepool.where(kubernetes_cluster_id: kubernetes_cluster.id).each(&:incr_destroy)
     kubernetes_cluster&.load_balancer&.incr_destroy
     kubernetes_cluster&.vms&.map(&:incr_destroy)
     kubernetes_cluster&.projects&.map { kubernetes_cluster&.dissociate_with_project(_1) }

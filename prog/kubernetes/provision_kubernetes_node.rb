@@ -1,10 +1,14 @@
 # frozen_string_literal: true
 
-class Prog::Kubernetes::ProvisionKubernetesControlPlaneNode < Prog::Base
+class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 
   def vm
     @vm ||= Vm[frame.fetch("vm_id")] || nil
+  end
+
+  def kubernetes_nodepool
+    @kubernetes_nodepool ||= KubernetesNodepool[frame.fetch("nodepool_id", nil)] || nil
   end
 
   def write_hosts_file_if_needed(ip = nil)
@@ -16,11 +20,16 @@ class Prog::Kubernetes::ProvisionKubernetesControlPlaneNode < Prog::Base
   end
 
   label def start
+    name = if kubernetes_nodepool
+      "#{kubernetes_nodepool.name}-#{SecureRandom.alphanumeric(5).downcase}"
+    else
+      "#{kubernetes_cluster.name.downcase}-control-plane-#{SecureRandom.alphanumeric(5).downcase}"
+    end
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi",
       kubernetes_cluster.projects.first.id,
       # we should reiterate how we name the vm. some how correlate it to the vm's info.
-      name: "#{kubernetes_cluster.name.downcase}-control-plane-#{SecureRandom.alphanumeric(5).downcase}",
+      name: name,
       location: kubernetes_cluster.location,
       size: "standard-2",
       boot_image: "ubuntu-jammy",
@@ -29,8 +38,12 @@ class Prog::Kubernetes::ProvisionKubernetesControlPlaneNode < Prog::Base
     )
     set_frame("vm_id", vm_st.id)
     # TODO: fix later by introducing a KubernetesNode object?
-    DB[:kubernetes_clusters_vm].insert(SecureRandom.uuid, kubernetes_cluster.id, vm_st.subject.id)
-    kubernetes_cluster.load_balancer.add_vm(vm_st.subject)
+    if kubernetes_nodepool
+      DB[:kubernetes_nodepools_vm].insert(SecureRandom.uuid, kubernetes_nodepool.id, vm_st.subject.id)
+    else
+      DB[:kubernetes_clusters_vm].insert(SecureRandom.uuid, kubernetes_cluster.id, vm_st.subject.id)
+      kubernetes_cluster.load_balancer.add_vm(vm_st.subject)
+    end
 
     hop_install_software
   end
@@ -81,9 +94,11 @@ BASH
   label def assign_role
     write_hosts_file_if_needed
 
+    hop_join_worker if kubernetes_nodepool
+
     hop_init_cluster if kubernetes_cluster.vms.count == 1
 
-    hop_join_cluster
+    hop_join_control_plane
   end
 
   label def init_cluster
@@ -101,6 +116,47 @@ BASH
       # TODO: register deadline
       #   fail "could not init control-plane cluster"
       # TODO: page someone. read logs
+    when "InProgress"
+      nap 10
+    end
+  end
+
+  label def join_control_plane
+    case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
+    when "Succeeded"
+      hop_install_cni
+    when "NotStarted"
+      join_token = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
+      certificate_key = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]
+      discovery_token_ca_cert_hash = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
+      port = Config.development? ? 6443 : 443
+
+      vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:#{port} #{join_token} #{discovery_token_ca_cert_hash} #{certificate_key}' join_control_plane")
+      nap 5
+    when "Failed"
+      # TODO: Create a page or something
+      puts "JOIN CLUSTER FAILED"
+      nap 30
+    when "InProgress"
+      nap 10
+    end
+  end
+
+  label def join_worker
+    case vm.sshable.cmd("common/bin/daemonizer --check join_worker")
+    when "Succeeded"
+      hop_install_cni
+    when "NotStarted"
+      join_token = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
+      discovery_token_ca_cert_hash = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
+      port = Config.development? ? 6443 : 443
+
+      vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-worker-node #{kubernetes_nodepool.kubernetes_cluster.endpoint}:#{port} #{join_token} #{discovery_token_ca_cert_hash}' join_worker")
+      nap 5
+    when "Failed"
+      # TODO: Create a page or something
+      puts "JOIN CLUSTER FAILED"
+      nap 30
     when "InProgress"
       nap 10
     end
@@ -133,26 +189,5 @@ CONFIG
     vm.sshable.cmd("sudo iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
 
     pop vm_id: vm.id
-  end
-
-  label def join_cluster
-    case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
-    when "Succeeded"
-      hop_install_cni
-    when "NotStarted"
-      join_token = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
-      certificate_key = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]
-      discovery_token_ca_cert_hash = kubernetes_cluster.vms.first.sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
-      port = Config.development? ? 6443 : 443
-
-      vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:#{port} #{join_token} #{discovery_token_ca_cert_hash} #{certificate_key}' join_control_plane")
-      nap 5
-    when "Failed"
-      # TODO: Create a page or something
-      puts "JOIN CLUSTER FAILED"
-      nap 30
-    when "InProgress"
-      nap 10
-    end
   end
 end

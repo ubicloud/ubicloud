@@ -15,7 +15,7 @@ class KubernetesNodepool < Sequel::Model
   include Authorization::HyperTagMethods
   dataset_module Authorization::Dataset
   dataset_module Pagination
-  semaphore :destroy
+  semaphore :destroy, :upgrade
 
   def display_location
     LocationNameConverter.to_display_name(location)

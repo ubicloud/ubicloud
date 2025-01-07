@@ -11,8 +11,18 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
     @new_vm ||= Vm[frame.fetch("new_vm_id")] || nil
   end
 
+  def kubernetes_nodepool
+    @kubernetes_nodepool ||= KubernetesNodepool[frame.fetch("nodepool_id", nil)] || nil
+  end
+
   label def start
-    bud Prog::Kubernetes::ProvisionKubernetesControlPlaneNode
+    new_frame = if kubernetes_nodepool
+      {"nodepool_id" => kubernetes_nodepool.id}
+    else
+      {}
+    end
+
+    bud Prog::Kubernetes::ProvisionKubernetesNode, new_frame
 
     hop_wait_new_node
   end
@@ -38,7 +48,7 @@ class Prog::Kubernetes::UpgradeKubernetesNode < Prog::Base
 
   label def drop_old_node
     # Only required for dev, as we use static IP, not the LB, as the hostname
-    kubernetes_cluster.vms.each do |vm|
+    kubernetes_cluster.all_vms.each do |vm|
       vm.sshable.cmd("sudo sed -i 's/#{old_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/#{new_vm.ephemeral_net4.to_s.gsub(".", "\\.")}/g' /etc/hosts")
     end
 

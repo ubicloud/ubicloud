@@ -20,20 +20,31 @@ class Clover
 
     authorize("PrivateSubnet:edit", private_subnet.id)
 
-    st = Prog::Kubernetes::KubernetesClusterNexus.assemble(
-      name: name,
-      kubernetes_version: request.params["kubernetes_version"],
-      private_subnet_id: private_subnet.ubid,
-      project_id: @project.id,
-      location: @location,
-      replica: request.params["cp_nodes"].to_i
-    )
+    DB.transaction do
+      st = Prog::Kubernetes::KubernetesClusterNexus.assemble(
+        name: name,
+        kubernetes_version: request.params["kubernetes_version"],
+        private_subnet_id: private_subnet.ubid,
+        project_id: @project.id,
+        location: @location,
+        replica: request.params["cp_nodes"].to_i
+      )
 
-    if api?
-      Serializers::KubernetesCluster.serialize(st.subject)
-    else
-      flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{KubernetesCluster[st.id].path}"
+      Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+        name: name + "-np",
+        kubernetes_version: request.params["kubernetes_version"],
+        project_id: @project.id,
+        location: @location,
+        replica: request.params["worker_nodes"].to_i,
+        kubernetes_cluster_id: st.subject.id
+      )
+
+      if api?
+        Serializers::KubernetesCluster.serialize(st.subject)
+      else
+        flash["notice"] = "'#{name}' will be ready in a few minutes"
+        request.redirect "#{@project.path}#{KubernetesCluster[st.id].path}"
+      end
     end
   end
 
