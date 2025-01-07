@@ -297,7 +297,7 @@ RSpec.describe Clover, "project" do
         select "Allowed", from: "policy"
         click_button "Invite"
 
-        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to invite users with this subject tag.")
+        expect(page).to have_flash_error("You don't have permission to invite users with this subject tag.")
 
         page.refresh
         fill_in "Email", with: user2.email
@@ -337,7 +337,7 @@ RSpec.describe Clover, "project" do
         select "Allowed", from: "policy"
         click_button "Invite"
 
-        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to invite users with this subject tag.")
+        expect(page).to have_flash_error("You don't have permission to invite users with this subject tag.")
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: allowed.id)
 
@@ -349,7 +349,7 @@ RSpec.describe Clover, "project" do
         select "No access", from: "policy"
         click_button "Invite"
 
-        expect(page.find_by_id("flash-notice").text).to eq("Invitation sent successfully to 'newUpper@example.com'.")
+        expect(page).to have_flash_notice("Invitation sent successfully to 'newUpper@example.com'.")
         expect(page).to have_content user.email
         expect(page).to have_content new_email
         expect(page).to have_content "Invitation sent successfully to '#{new_email}'."
@@ -485,7 +485,7 @@ RSpec.describe Clover, "project" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("1 members added to Admin")
+        expect(page).to have_flash_notice("1 members added to Admin")
       end
 
       it "can update default policy of invited user" do
@@ -502,7 +502,7 @@ RSpec.describe Clover, "project" do
           select "Admin", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("1 members added to Admin, 1 members removed from Member")
+        expect(page).to have_flash_notice("1 members added to Admin, 1 members removed from Member")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Admin")
       end
 
@@ -528,8 +528,8 @@ RSpec.describe Clover, "project" do
           select "ToBeRemoved", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
-        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to remove invitation from 'Allowed' tag")
+        expect(page).to have_flash_notice("No change in user policies")
+        expect(page).to have_flash_error("You don't have permission to remove invitation from 'Allowed' tag")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: allowed.id)
@@ -538,15 +538,15 @@ RSpec.describe Clover, "project" do
           ace.destroy
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
-        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to add invitation to 'ToBeRemoved' tag")
+        expect(page).to have_flash_notice("No change in user policies")
+        expect(page).to have_flash_error("You don't have permission to add invitation to 'ToBeRemoved' tag")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: "Allowed")
 
         within "form#managed-policy" do
           select "No access", from: "invitation_policies[#{invited_email}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("1 members removed from Allowed")
+        expect(page).to have_flash_notice("1 members removed from Allowed")
         expect(page).to have_select("invitation_policies[#{invited_email}]", selected: nil)
       end
 
@@ -572,8 +572,8 @@ RSpec.describe Clover, "project" do
           admin_tag.add_subject(user2.id)
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
-        expect(page.find_by_id("flash-error").text).to eq("Cannot change the policy for user, as they are in multiple subject tags")
+        expect(page).to have_flash_notice("No change in user policies")
+        expect(page).to have_flash_error("Cannot change the policy for user, as they are in multiple subject tags")
         expect(page.find_by_id("user-#{user2.ubid}")).to have_content "Admin, FirstTag"
         admin_tag.remove_members(user2.id)
 
@@ -584,8 +584,8 @@ RSpec.describe Clover, "project" do
             user2.dissociate_with_project(project)
             click_button "Update"
           end
-          expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
-          expect(page.find_by_id("flash-error").text).to eq("Cannot change the policy for user, as they are not associated to project")
+          expect(page).to have_flash_notice("No change in user policies")
+          expect(page).to have_flash_error("Cannot change the policy for user, as they are not associated to project")
         end
 
         page.refresh
@@ -594,8 +594,8 @@ RSpec.describe Clover, "project" do
           select "SecondTag", from: "user_policies[#{user2.ubid}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
-        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to remove members from 'FirstTag' tag")
+        expect(page).to have_flash_notice("No change in user policies")
+        expect(page).to have_flash_error("You don't have permission to remove members from 'FirstTag' tag")
         noremove = page.find_by_id("user-#{user2.ubid}-noremove")
         expect(noremove["title"]).to eq "You cannot change the policy for this user"
         expect(noremove.text).to eq "FirstTag"
@@ -606,7 +606,7 @@ RSpec.describe Clover, "project" do
           select "SecondTag", from: "user_policies[#{user2.ubid}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("1 members added to SecondTag, 1 members removed from FirstTag")
+        expect(page).to have_flash_notice("1 members added to SecondTag, 1 members removed from FirstTag")
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
 
         within "form#managed-policy" do
@@ -614,22 +614,22 @@ RSpec.describe Clover, "project" do
           ace.destroy
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("No change in user policies")
-        expect(page.find_by_id("flash-error").text).to eq("You don't have permission to add members to 'FirstTag' tag")
+        expect(page).to have_flash_notice("No change in user policies")
+        expect(page).to have_flash_error("You don't have permission to add members to 'FirstTag' tag")
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
 
         within "form#managed-policy" do
           select "No access", from: "user_policies[#{user2.ubid}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("1 members removed from SecondTag")
+        expect(page).to have_flash_notice("1 members removed from SecondTag")
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: nil)
 
         within "form#managed-policy" do
           select "SecondTag", from: "user_policies[#{user2.ubid}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-notice").text).to eq("1 members added to SecondTag")
+        expect(page).to have_flash_notice("1 members added to SecondTag")
         expect(page).to have_select("user_policies[#{user2.ubid}]", selected: "SecondTag")
 
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: admin_tag.id)
@@ -639,7 +639,7 @@ RSpec.describe Clover, "project" do
           select "No access", from: "user_policies[#{user.ubid}]"
           click_button "Update"
         end
-        expect(page.find_by_id("flash-error").text).to eq("The project must have at least one admin.")
+        expect(page).to have_flash_error("The project must have at least one admin.")
       end
 
       it "can not have more than 50 pending invitations" do
