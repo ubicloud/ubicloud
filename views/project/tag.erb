@@ -17,6 +17,9 @@ add_groups.transform_values! do |v|
 end
 add_groups.reject! { _2.empty? }
 
+add_checked = flash.dig("old", "add")
+remove_checked = flash.dig("old", "remove")
+
 base_path = "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
 associate_path = "#{base_path}/associate"
 disassociate_path = "#{base_path}/disassociate"
@@ -114,7 +117,7 @@ current_members.sort! %>
                         "components/form/checkbox",
                         locals: {
                           name: "remove[]",
-                          options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["remove"]&.include?(ubid))]]
+                          options: [[ubid, nil, nil, ({ checked: "checked" } if remove_checked&.include?(ubid))]]
                         }
                       ) %>
                     </td>
@@ -165,7 +168,7 @@ current_members.sort! %>
                         "components/form/checkbox",
                         locals: {
                           name: "add[]",
-                          options: [[ubid, nil, nil, ({ checked: "checked" } if request.params["add"]&.include?(ubid))]]
+                          options: [[ubid, nil, nil, ({ checked: "checked" } if add_checked&.include?(ubid))]]
                         }
                       ) %>
                     </td>
