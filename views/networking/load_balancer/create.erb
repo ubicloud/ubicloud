@@ -17,6 +17,7 @@
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
     {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Select private subnet", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
     {name: "algorithm", type: "select", label: "Load Balancing Algorithm", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
+    {name: "stack", type: "select", label: "Stack", required: "required", content_generator: ContentGenerator::LoadBalancer.method(:select_option), opening_tag: "<div class='col-span-6 col-start-1 md:col-end-4 xl:col-end-3'>"},
     {name: "forwarding_rule", type: "section", label: "Forwarding Rule", content: "Configures the routing of traffic from the load balancer to your virtual machines."},
     {name: "src_port", type: "number", label: "Load Balancer Port", required: "required", placeholder: "80", opening_tag: "<div class='col-span-6 col-start-1 md:col-end-3 xl:col-end-2'>"},
     {name: "dst_port", type: "number", label: "Application Port", required: "required", placeholder: "80", opening_tag: "<div class='col-span-6 col-start-1 md:col-start-3 md:col-end-5 xl:col-start-2 xl:col-end-3'>"},

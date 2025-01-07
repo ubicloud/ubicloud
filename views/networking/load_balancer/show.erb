@@ -27,6 +27,7 @@
           { escape: false }
         ],
         ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
+        ["Stack", @lb[:stack].gsub("ip", "IP")],
         ["Load Balancer Port", @lb[:src_port]],
         ["Application Port", @lb[:dst_port]],
         ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
