@@ -953,7 +953,7 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       tags:
-        - Firewall Rule
+        - Postgres Firewall Rule
     get:
       operationId: getLocationPostgresFirewallRuleDetailsWithId
       summary: Get details of a Postgres firewall rule
