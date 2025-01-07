@@ -7,6 +7,7 @@ class Serializers::LoadBalancer < Serializers::Base
       name: lb.name,
       hostname: lb.hostname,
       algorithm: lb.algorithm,
+      stack: lb.stack,
       health_check_endpoint: lb.health_check_endpoint,
       health_check_protocol: lb.health_check_protocol,
       src_port: lb.src_port,
