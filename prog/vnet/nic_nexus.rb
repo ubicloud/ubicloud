@@ -16,7 +16,7 @@ class Prog::Vnet::NicNexus < Prog::Base
 
     DB.transaction do
       nic = Nic.create(private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac: gen_mac, name: name, private_subnet_id: private_subnet_id) { _1.id = ubid.to_uuid }
-      Strand.create(prog: "Vnet::NicNexus", label: "wait_setup") { _1.id = nic.id }
+      Strand.create(prog: "Vnet::NicNexus", label: "wait_allocation") { _1.id = nic.id }
     end
   end
 
@@ -24,6 +24,13 @@ class Prog::Vnet::NicNexus < Prog::Base
     when_destroy_set? do
       hop_destroy if strand.label != "destroy"
     end
+  end
+
+  label def wait_allocation
+    if nic.vm.allocated_at
+      hop_wait_setup
+    end
+    nap 5
   end
 
   label def wait_setup
