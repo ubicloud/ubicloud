@@ -89,6 +89,7 @@ RSpec.describe Clover, "load-balancer" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-1", location: "hetzner-fsn1").subject
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: ps.ubid,
+          stack: LoadBalancer::Stack::IPV4,
           src_port: "80", dst_port: "80",
           health_check_endpoint: "/up", algorithm: "round_robin",
           health_check_protocol: "http"
@@ -101,6 +102,7 @@ RSpec.describe Clover, "load-balancer" do
       it "invalid private_subnet_id" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/lb1", {
           private_subnet_id: "invalid",
+          stack: LoadBalancer::Stack::IPV6,
           src_port: "80", dst_port: "80",
           health_check_endpoint: "/up", algorithm: "round_robin",
           health_check_protocol: "http"
