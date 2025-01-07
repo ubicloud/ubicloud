@@ -21,7 +21,7 @@ class Clover < Roda
       # Force flash rotation, so flash works correctly for internal redirects
       _roda_after_40__flash(nil)
 
-      rack_response = Clover.call(env.merge("REQUEST_METHOD" => "GET", "PATH_INFO" => uri.path))
+      rack_response = Clover.call(env.merge("REQUEST_METHOD" => "GET", "PATH_INFO" => uri.path, "rack.input" => StringIO.new("".b), "rack.request.form_input" => nil, "rack.request.form_hash" => nil))
       flash.discard
       flash["referrer"] = referrer
       env.delete("roda.session.serialized")
