@@ -1,4 +1,13 @@
 GIT
+  remote: https://github.com/janko/rodauth-omniauth.git
+  revision: 477810179ba0cab8d459be1a0d87dca5b57ec94b
+  ref: 477810179ba0cab8d459be1a0d87dca5b57ec94b
+  specs:
+    rodauth-omniauth (0.6.0)
+      omniauth (~> 2.0)
+      rodauth (~> 2.36)
+
+GIT
   remote: https://github.com/jeremyevans/roda.git
   revision: 430177d850bb013b3bba9df0a65f45744779fd2a
   ref: 430177d850bb013b3bba9df0a65f45744779fd2a
@@ -303,9 +312,6 @@ GEM
     refrigerator (1.8.0)
     regexp_parser (2.10.0)
     rexml (3.4.0)
-    rodauth-omniauth (0.6.0)
-      omniauth (~> 2.0)
-      rodauth (~> 2.36)
     rotp (6.3.0)
     rqrcode (2.2.0)
       chunky_png (~> 1.0)
@@ -480,7 +486,7 @@ DEPENDENCIES
   refrigerator (>= 1)
   roda!
   rodauth!
-  rodauth-omniauth (>= 0.6.0)
+  rodauth-omniauth!
   rotp
   rqrcode
   rspec

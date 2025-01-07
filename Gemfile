@@ -33,7 +33,7 @@ gem "stripe"
 gem "countries"
 gem "octokit"
 gem "argon2-kdf"
-gem "rodauth-omniauth", ">= 0.6.0"
+gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8d459be1a0d87dca5b57ec94b"
 gem "omniauth-github", "~> 2.0"
 gem "omniauth-google-oauth2", "~> 1.2"
 
