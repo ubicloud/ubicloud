@@ -18,7 +18,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
   let(:vm_host) { instance_double(VmHost, vms: vms) }
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { instance_double(Sshable, raw_private_key_1: "bogus") }
 
   before do
     allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
@@ -77,14 +77,78 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#start" do
+    it "hops to setup_ssh_keys" do
+      expect { nx.start }.to hop("setup_ssh_keys")
+    end
+  end
+
+  describe "#setup_ssh_keys" do
+    it "generates a keypair if one is not set" do
+      expect(Config).to receive(:hetzner_ssh_private_key).and_return(nil)
+      expect(sshable).to receive(:raw_private_key_1).and_return(nil)
+      expect(sshable).to receive(:update) do |**args|
+        key = args[:raw_private_key_1]
+        expect(key).to be_instance_of String
+        expect(key.length).to eq 64
+      end
+
+      expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
+    end
+
+    it "does not generate a keypair if one is already set" do
+      expect(Config).to receive(:hetzner_ssh_private_key).and_return(nil)
+      expect(sshable).to receive(:raw_private_key_1).and_return("bogus")
+      expect(sshable).not_to receive(:update)
+      expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
+    end
+
+    it "skips if private key is not set" do
+      expect(Config).to receive(:hetzner_ssh_private_key).and_return(nil)
+      expect(Util).not_to receive(:rootish_ssh)
+
+      expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
+    end
+
+    it "adds a public key if private key is set" do
+      root_key = SshKey.generate
+      vmhost_key = SshKey.generate
+      test_public_keys = vmhost_key.public_key.to_s
+
+      expect(Config).to receive(:hetzner_ssh_private_key).exactly(2).and_return(root_key.private_key)
+      expect(Config).to receive(:operator_ssh_public_keys).and_return(nil)
+      expect(sshable).to receive(:keys).and_return([vmhost_key])
+      expect(sshable).to receive(:host).and_return("127.0.0.1")
+      expect(Util).to receive(:rootish_ssh).with("127.0.0.1", "root", anything, "echo '#{test_public_keys}' > ~/.ssh/authorized_keys")
+
+      expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
+    end
+
+    it "adds operational keys if set" do
+      root_key = SshKey.generate
+      vmhost_key = SshKey.generate
+      operational_key_1 = SshKey.generate
+      operational_key_2 = SshKey.generate
+      test_public_keys = "#{vmhost_key.public_key}\n#{operational_key_1.public_key}\n#{operational_key_2.public_key}"
+
+      expect(Config).to receive(:hetzner_ssh_private_key).exactly(2).and_return(root_key.private_key)
+      expect(Config).to receive(:operator_ssh_public_keys).exactly(2).and_return("#{operational_key_1.public_key}\n#{operational_key_2.public_key}")
+      expect(sshable).to receive(:keys).and_return([vmhost_key])
+      expect(sshable).to receive(:host).and_return("127.0.0.1")
+      expect(Util).to receive(:rootish_ssh).with("127.0.0.1", "root", anything, "echo '#{test_public_keys}' > ~/.ssh/authorized_keys")
+
+      expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
+    end
+  end
+
+  describe "#bootstrap_rhizome" do
     it "pushes a bootstrap rhizome process" do
       expect(nx).to receive(:push).with(Prog::BootstrapRhizome, {"target_folder" => "host"}).and_call_original
-      expect { nx.start }.to hop("start", "BootstrapRhizome")
+      expect { nx.bootstrap_rhizome }.to hop("start", "BootstrapRhizome")
     end
 
     it "hops once BootstrapRhizome has returned" do
       nx.strand.retval = {"msg" => "rhizome user bootstrapped and source installed"}
-      expect { nx.start }.to hop("prep")
+      expect { nx.bootstrap_rhizome }.to hop("prep")
     end
   end
 

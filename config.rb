@@ -54,6 +54,9 @@ module Config
   optional :omniauth_github_secret, string, clear: true
   optional :omniauth_google_id, string, clear: true
   optional :omniauth_google_secret, string, clear: true
+  optional :hetzner_ssh_private_key, string, clear: true
+  optional :hetzner_ssh_private_key_passphrase, string, clear: true
+  optional :operator_ssh_public_keys, string
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
