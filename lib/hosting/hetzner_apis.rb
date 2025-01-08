@@ -15,10 +15,7 @@ class Hosting::HetznerApis
     decoded_data = Base64.decode64(key_data)
     fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
     formatted_fingerprint = fingerprint.scan(/../).join(":")
-    connection = Excon.new(@host.connection_string,
-      user: @host.user,
-      password: @host.password,
-      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
+    connection = create_connection
     connection.post(path: "/boot/#{server_id}/linux",
       body: URI.encode_www_form(dist: dist, lang: "en", authorized_key: formatted_fingerprint),
       expects: 200)
@@ -28,11 +25,7 @@ class Hosting::HetznerApis
   end
 
   def add_key(name, key)
-    connection = Excon.new(@host.connection_string,
-      user: @host.user,
-      password: @host.password,
-      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    connection.post(path: "/key",
+    create_connection.post(path: "/key",
       body: URI.encode_www_form(name: name, data: key),
       expects: 201)
     nil
@@ -43,21 +36,12 @@ class Hosting::HetznerApis
     decoded_data = Base64.decode64(key_data)
     fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
 
-    connection = Excon.new(@host.connection_string,
-      user: @host.user,
-      password: @host.password,
-      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    connection.delete(path: "/key/#{fingerprint}", expects: [200, 404])
-
+    create_connection.delete(path: "/key/#{fingerprint}", expects: [200, 404])
     nil
   end
 
   def get_main_ip4
-    connection = Excon.new(@host.connection_string,
-      user: @host.user,
-      password: @host.password,
-      headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    response = connection.get(path: "/server/#{@host.server_identifier}",
+    response = create_connection.get(path: "/server/#{@host.server_identifier}",
       expects: 200)
 
     response_hash = JSON.parse(response.body)
@@ -72,7 +56,7 @@ class Hosting::HetznerApis
   # the original server. host even if the failover is performed. So we need to
   # check the failover IP separately.
   def pull_ips
-    connection = Excon.new(@host.connection_string, user: @host.user, password: @host.password)
+    connection = create_connection
     response = connection.get(path: "/subnet", expects: 200)
     json_arr_subnets = JSON.parse(response.body)
 
@@ -145,19 +129,21 @@ class Hosting::HetznerApis
   end
 
   def pull_dc(server_id)
-    connection = Excon.new(@host.connection_string, user: @host.user, password: @host.password)
-    response = connection.get(path: "/server/#{server_id}", expects: 200)
+    response = create_connection.get(path: "/server/#{server_id}", expects: 200)
     json_server = JSON.parse(response.body)
     json_server.dig("server", "dc")
   end
 
   def set_server_name(server_id, name)
-    connection = Excon.new(@host.connection_string,
+    create_connection.post(path: "/server/#{server_id}",
+      body: URI.encode_www_form(server_name: name),
+      expects: 200)
+  end
+
+  def create_connection
+    Excon.new(@host.connection_string,
       user: @host.user,
       password: @host.password,
       headers: {"Content-Type" => "application/x-www-form-urlencoded"})
-    connection.post(path: "/server/#{server_id}",
-      body: URI.encode_www_form(server_name: name),
-      expects: 200)
   end
 end
