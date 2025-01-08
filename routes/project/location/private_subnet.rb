@@ -48,7 +48,7 @@ class Clover
           authorize("PrivateSubnet:disconnect", subnet.id)
           ps.disconnect_subnet(subnet)
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-          ""
+          204
         end
       end
 
