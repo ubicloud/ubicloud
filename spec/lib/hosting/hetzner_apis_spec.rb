@@ -38,6 +38,18 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "reset" do
+    it "can reset a server" do
+      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 200, body: ""})
+      expect(hetzner_apis.reset(123)).to be_nil
+    end
+
+    it "raises an error if the reset fails" do
+      Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 400, body: ""})
+      expect { hetzner_apis.reset(123) }.to raise_error Excon::Error::BadRequest
+    end
+  end
+
   describe "add_key" do
     it "can add a key" do
       key_data = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0"

@@ -231,6 +231,11 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.wait }.to hop("prep_reboot")
     end
 
+    it "hops to prep_hardware_reset when needed" do
+      expect(nx).to receive(:when_hardware_reset_set?).and_yield
+      expect { nx.wait }.to hop("prep_hardware_reset")
+    end
+
     it "hops to unavailable based on the host's available status" do
       expect(nx).to receive(:when_checkup_set?).and_yield
       expect(nx).to receive(:available?).and_return(false)
@@ -354,6 +359,39 @@ RSpec.describe Prog::Vm::HostNexus do
     it "can get boot id" do
       expect(sshable).to receive(:cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("xyz\n")
       expect(nx.get_boot_id).to eq("xyz")
+    end
+  end
+
+  describe "host hardware reset" do
+    it "prep_hardware_reset transitions to hardware_reset" do
+      vms_dataset = instance_double(Vm.dataset.class)
+      expect(vm_host).to receive(:vms_dataset).and_return(vms_dataset)
+      expect(vms_dataset).to receive(:update).with(display_state: "rebooting")
+      expect(nx).to receive(:decr_hardware_reset)
+      expect { nx.prep_hardware_reset }.to hop("hardware_reset")
+    end
+
+    it "hardware_reset transitions to reboot if is in draining state" do
+      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      expect(vm_host).to receive(:hardware_reset)
+      expect { nx.hardware_reset }.to hop("reboot")
+    end
+
+    it "hardware_reset transitions to reboot if is not in draining state but has no vms" do
+      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      vms_dataset = instance_double(Vm.dataset.class)
+      expect(vm_host).to receive(:vms_dataset).and_return(vms_dataset)
+      expect(vms_dataset).to receive(:empty?).and_return(true)
+      expect(vm_host).to receive(:hardware_reset)
+      expect { nx.hardware_reset }.to hop("reboot")
+    end
+
+    it "hardware_reset fails if has vms and is not in draining state" do
+      vms_dataset = instance_double(Vm.dataset.class)
+      expect(vm_host).to receive(:vms_dataset).and_return(vms_dataset)
+      expect(vms_dataset).to receive(:empty?).and_return(false)
+      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      expect { nx.hardware_reset }.to raise_error RuntimeError, "Host has VMs and is not in draining state"
     end
   end
 

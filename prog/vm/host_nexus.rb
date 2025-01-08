@@ -156,6 +156,37 @@ class Prog::Vm::HostNexus < Prog::Base
     hop_verify_spdk
   end
 
+  label def prep_hardware_reset
+    register_deadline("wait", 20 * 60)
+    vm_host.vms_dataset.update(display_state: "rebooting")
+    decr_hardware_reset
+    hop_hardware_reset
+  end
+
+  # Cuts power to a Server and starts it again. This forcefully stops it
+  # without giving the Server operating system time to gracefully stop. This
+  # may lead to data loss, it’s equivalent to pulling the power cord and
+  # plugging it in again. Reset should only be used when reboot does not work.
+  label def hardware_reset
+    unless vm_host.allocation_state == "draining" || vm_host.vms_dataset.empty?
+      fail "Host has VMs and is not in draining state"
+    end
+
+    vm_host.hardware_reset
+
+    # Attempt to hop to reboot immediately after sending the hardware reset
+    # signal.
+    # The reboot may:
+    # 1. Fail, if the host is unreachable, which is a typical reason for a
+    #    hardware reset.
+    # 2. Succeed, if the host is reachable; however, the hardware reset may
+    #    interrupt the reboot.
+    # Regardless, the hardware reset will proceed, and upon completion, the
+    # host will receive a new boot id, allowing the sequence to continue
+    # without an additional reboot.
+    hop_reboot
+  end
+
   label def verify_spdk
     vm_host.spdk_installations.each { |installation|
       q_version = installation.version.shellescape
@@ -202,6 +233,10 @@ class Prog::Vm::HostNexus < Prog::Base
   label def wait
     when_reboot_set? do
       hop_prep_reboot
+    end
+
+    when_hardware_reset_set? do
+      hop_prep_hardware_reset
     end
 
     when_checkup_set? do

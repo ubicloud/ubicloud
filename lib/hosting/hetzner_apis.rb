@@ -24,6 +24,15 @@ class Hosting::HetznerApis
     nil
   end
 
+  # Cuts power to a Server and starts it again. This forcefully stops it
+  # without giving the Server operating system time to gracefully stop. This
+  # may lead to data loss, it’s equivalent to pulling the power cord and
+  # plugging it in again. Reset should only be used when reboot does not work.
+  def reset(server_id, dist: "Ubuntu 22.04.2 LTS base")
+    create_connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
+    nil
+  end
+
   def add_key(name, key)
     create_connection.post(path: "/key",
       body: URI.encode_www_form(name: name, data: key),

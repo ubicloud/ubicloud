@@ -20,7 +20,7 @@ class VmHost < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
   include HealthMonitorMethods
-  semaphore :checkup, :reboot, :destroy
+  semaphore :checkup, :reboot, :hardware_reset, :destroy
 
   def host_prefix
     net6.netmask.prefix_len
@@ -245,6 +245,14 @@ class VmHost < Sequel::Model
     end
 
     Hosting::Apis.reimage_server(self)
+  end
+
+  # Cuts power to a Server and starts it again. This forcefully stops it
+  # without giving the Server operating system time to gracefully stop. This
+  # may lead to data loss, it’s equivalent to pulling the power cord and
+  # plugging it in again. Reset should only be used when reboot does not work.
+  def hardware_reset
+    Hosting::Apis.hardware_reset_server(self)
   end
 
   def init_health_monitor_session
