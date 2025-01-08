@@ -311,33 +311,40 @@ RSpec.describe Clover, "auth" do
       expect(page.title).to eq("Ubicloud - Login")
     end
 
-    it "can change email" do
-      new_email = "new@example.com"
-      visit "/account/change-login"
+    [true, false].each do |logged_in|
+      it "can change email, verifying when #{"not " unless logged_in}logged in" do
+        new_email = "new@example.com"
+        visit "/account/change-login"
 
-      fill_in "New Email Address", with: new_email
+        fill_in "New Email Address", with: new_email
 
-      click_button "Change Email"
+        click_button "Change Email"
 
-      expect(page).to have_flash_notice("An email has been sent to you with a link to verify your login change")
-      expect(Mail::TestMailer.deliveries.length).to eq 1
-      verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
+        expect(page).to have_flash_notice("An email has been sent to you with a link to verify your login change")
+        expect(Mail::TestMailer.deliveries.length).to eq 1
+        verify_link = Mail::TestMailer.deliveries.first.html_part.body.match(/(\/verify-login-change.+?)"/)[1]
 
-      visit verify_link
-      expect(page.title).to eq("Ubicloud - Verify New Email")
+        click_button "Log out" unless logged_in
+        visit verify_link
+        expect(page.title).to eq("Ubicloud - Verify New Email")
+        expect(page).to have_content("Verify your new email") unless logged_in
 
-      click_button "Click to Verify New Email"
+        click_button "Click to Verify New Email"
 
-      expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_notice "Your login change has been verified"
+        if logged_in
+          expect(page.title).to eq("Ubicloud - Default Dashboard")
+          click_button "Log out"
+        end
 
-      click_button "Log out"
+        expect(page.title).to eq("Ubicloud - Login")
 
-      expect(page.title).to eq("Ubicloud - Login")
+        fill_in "Email Address", with: new_email
+        fill_in "Password", with: TEST_USER_PASSWORD
 
-      fill_in "Email Address", with: new_email
-      fill_in "Password", with: TEST_USER_PASSWORD
-
-      click_button "Sign in"
+        click_button "Sign in"
+        expect(page).to have_flash_notice "You have been logged in"
+      end
     end
 
     it "can change password" do
