@@ -13,16 +13,14 @@
             <form action="/<%= rodauth.otp_setup_route %>" role="form" method="POST">
               <%== rodauth.otp_setup_additional_form_tags %>
               <input type="hidden" id="otp-key" name="<%= rodauth.otp_setup_param %>" value="<%= rodauth.otp_user_key %>"/>
-              <% if rodauth.otp_keys_use_hmac? %>
-                <input type="hidden" id="otp-hmac-secretkey" name="<%= rodauth.otp_setup_raw_param %>" value="<%= rodauth.otp_key %>"/>
-              <% end %>
+              <input type="hidden" id="otp-hmac-secretkey" name="<%= rodauth.otp_setup_raw_param %>" value="<%= rodauth.otp_key %>"/>
               <%== rodauth.csrf_tag("/" + rodauth.otp_setup_route) %>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 md:col-span-3">
                   <%== rodauth.otp_qr_code %>
                   <p class="mt-2 text-sm text-gray-500 text-center">
                     If you can't scan the QR code, please enter the following secret in your authenticator app manually: <br>
-                    <span class="font-bold break-words"><%= rodauth.otp_user_key %></span>
+                    <span id="otp-secret" class="font-bold break-words"><%= rodauth.otp_user_key %></span>
                   </p>
                 </div>
                 <div class="col-span-6 md:col-span-3 space-y-4">

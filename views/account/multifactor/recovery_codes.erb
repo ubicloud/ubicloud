@@ -37,7 +37,10 @@
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-6">
                   <% if rodauth.recovery_codes.any? %>
-                    <div class="w-fit text-sm xl:text-base whitespace-nowrap border p-3 bg-slate-100 text-rose-500 font-mono rounded">
+                    <div
+                      id="recovery-codes-text"
+                      class="w-fit text-sm xl:text-base whitespace-nowrap border p-3 bg-slate-100 text-rose-500 font-mono rounded"
+                    >
                       <% rodauth.recovery_codes.each do |code| %>
                         <div><%= code %></div>
                       <% end %>

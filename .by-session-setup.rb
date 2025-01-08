@@ -152,6 +152,7 @@ aws-sdk-core/xml/parser/nokogiri_engine
 aws-sdk-core/xml/parser/parsing_error
 aws-sdk-core/xml/parser/stack
 argon2/kdf/ffi
+webauthn/fake_client
 END
 
 <<END.split.each { |f| require "sequel/extensions/#{f}" }
