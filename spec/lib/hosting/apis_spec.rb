@@ -45,6 +45,18 @@ RSpec.describe Hosting::Apis do
     end
   end
 
+  describe "hardware_reset_server" do
+    it "can hardware reset a server" do
+      expect(hetzner_apis).to receive(:reset).with(123).and_return(true)
+      described_class.hardware_reset_server(vm_host)
+    end
+
+    it "raises an error if the provider is unknown" do
+      expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
+      expect { described_class.hardware_reset_server(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
+    end
+  end
+
   describe "pull_dc" do
     it "can set dc of a server" do
       expect(hetzner_apis).to receive(:pull_dc).with(123).and_return("dc1")

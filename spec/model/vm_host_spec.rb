@@ -224,6 +224,11 @@ RSpec.describe VmHost do
     vh.reimage
   end
 
+  it "hardware resets the server" do
+    expect(Hosting::Apis).to receive(:hardware_reset_server).with(vh)
+    vh.hardware_reset
+  end
+
   it "create_addresses fails if a failover ip of non existent server is being added" do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
     expect(vh).to receive(:id).and_return("46683a25-acb1-4371-afe9-d39f303e44b4").at_least(:once)
