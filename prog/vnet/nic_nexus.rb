@@ -27,13 +27,14 @@ class Prog::Vnet::NicNexus < Prog::Base
   end
 
   label def wait_allocation
-    if nic.vm.allocated_at
+    when_vm_allocated_set? do
       hop_wait_setup
     end
     nap 5
   end
 
   label def wait_setup
+    decr_vm_allocated
     when_start_rekey_set? do
       decr_setup_nic
       hop_start_rekey

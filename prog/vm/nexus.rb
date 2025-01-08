@@ -197,6 +197,7 @@ class Prog::Vm::Nexus < Prog::Base
       nap 30
     end
 
+    vm.nics.each(&:incr_vm_allocated)
     decr_waiting_for_capacity
     if (page = Page.from_tag_parts("NoCapacity", vm.location, vm.arch, vm.family)) && page.created_at < Time.now - 15 * 60 && queued_vms.count <= 1
       page.incr_resolve
