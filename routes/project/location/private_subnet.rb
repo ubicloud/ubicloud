@@ -26,6 +26,11 @@ class Clover
         r.post "connect" do
           authorize("PrivateSubnet:connect", ps.id)
           subnet = PrivateSubnet.from_ubid(r.params["connected-subnet-ubid"])
+          unless subnet
+            flash["error"] = "Subnet to be connected not found"
+            r.redirect "#{@project.path}#{ps.path}"
+          end
+
           authorize("PrivateSubnet:connect", subnet.id)
           ps.connect_subnet(subnet)
           flash["notice"] = "#{subnet.name} will be connected in a few seconds"
@@ -35,6 +40,11 @@ class Clover
         r.post "disconnect", String do |disconnecting_ps_ubid|
           authorize("PrivateSubnet:disconnect", ps.id)
           subnet = PrivateSubnet.from_ubid(disconnecting_ps_ubid)
+          unless subnet
+            response.status = 400
+            next {error: {message: "Subnet to be disconnected not found"}}
+          end
+
           authorize("PrivateSubnet:disconnect", subnet.id)
           ps.disconnect_subnet(subnet)
           flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
