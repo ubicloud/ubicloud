@@ -48,17 +48,15 @@
                 icon: "hero-circle-stack"
               }
             ) %>
-            <% if @project.get_ff_inference_ui %>
-              <%== render(
-                "layouts/sidebar/item",
-                locals: {
-                  name: "AI Inference",
-                  url: "#{@project_data[:path]}/inference-endpoint",
-                  is_active: request.path.start_with?("#{@project_data[:path]}/inference"),
-                  icon: "tabler-robot"
-                }
-              ) %>
-            <% end %>
+            <%== render(
+              "layouts/sidebar/item",
+              locals: {
+                name: "AI Inference",
+                url: "#{@project_data[:path]}/inference-endpoint",
+                is_active: request.path.start_with?("#{@project_data[:path]}/inference"),
+                icon: "tabler-robot"
+              }
+            ) %>
           <% else %>
             <%== render(
               "layouts/sidebar/item",

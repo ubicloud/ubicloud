@@ -3,8 +3,6 @@
 class Clover
   hash_branch(:project_prefix, "inference-token") do |r|
     r.web do
-      next unless @project.get_ff_inference_ui
-
       r.get true do
         @inference_tokens = Serializers::InferenceToken.serialize(inference_token_ds.all)
         view "inference/token/index"
