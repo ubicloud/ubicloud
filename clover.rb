@@ -579,6 +579,7 @@ class Clover < Roda
     add_recovery_codes_view { view "account/multifactor/recovery_codes", "My Account" }
     auto_add_recovery_codes? true
     auto_remove_recovery_codes? true
+    add_recovery_codes_heading "Add Additional Recovery Codes"
     recovery_auth_view { view "auth/recovery_auth", "Recovery Codes" }
   end
 
@@ -594,11 +595,16 @@ class Clover < Roda
 
   # :nocov:
   if Config.test?
+    # :nocov:
     hash_branch(:webhook_prefix, "test-error") do |r|
       raise(r.params["message"] || "test error")
     end
+
+    hash_branch("clear-last-password-entry") do |r|
+      session.delete("last_password_entry")
+      ""
+    end
   end
-  # :nocov:
 
   if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
     Unreloader.require("routes")
