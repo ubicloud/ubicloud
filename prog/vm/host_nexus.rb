@@ -38,6 +38,27 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def start
+    hop_setup_ssh_keys
+  end
+
+  label def setup_ssh_keys
+    # Generate a new SSH key if one is not set.
+    sshable.update(raw_private_key_1: SshKey.generate.keypair) unless sshable.raw_private_key_1
+
+    if Config.hetzner_ssh_private_key
+      root_key = Net::SSH::Authentication::ED25519::PrivKey.read(Config.hetzner_ssh_private_key, Config.hetzner_ssh_private_key_passphrase).sign_key
+      root_ssh_key = SshKey.from_binary(root_key.keypair)
+
+      public_keys = sshable.keys.first.public_key
+      public_keys += "\n#{Config.operator_ssh_public_keys}" if Config.operator_ssh_public_keys
+
+      Util.rootish_ssh(sshable.host, "root", root_ssh_key.private_key, "echo '#{public_keys}' > ~/.ssh/authorized_keys")
+    end
+
+    hop_bootstrap_rhizome
+  end
+
+  label def bootstrap_rhizome
     register_deadline("download_boot_images", 10 * 60)
     hop_prep if retval&.dig("msg") == "rhizome user bootstrapped and source installed"
 

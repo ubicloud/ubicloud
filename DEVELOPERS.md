@@ -489,7 +489,9 @@ We show cloudifying a host from Hetzner, but the principles should work everywhe
     ```ruby
     ENV["HETZNER_USER"] ||= HETZNER_ACCOUNT_ID 
     ENV["HETZNER_PASSWORD"] ||= HETZNER_ACCOUNT_PASS
-    ENV["HETZNER_SSH_KEY"] ||= YOUR_PUBLIC_SSH_KEY
+    ENV["HETZNER_SSH_PUBLIC_KEY"] ||= YOUR_PUBLIC_SSH_KEY
+    ENV["HETZNER_SSH_PRIVATE_KEY"] ||= YOUR_PRIVATE_SSH_KEY
+    ENV["OPERATOR_SSH_PUBLIC_KEYS"] ||= YOUR_PUBLIC_SSH_KEY\nOTHER_PUBLIC_SSH_KEYS
     ```
 
 2. In **terminal 1**, start the respirate process:
@@ -507,14 +509,7 @@ We show cloudifying a host from Hetzner, but the principles should work everywhe
     vmh = st.subject
     ```
 
-4. Get and copy the public key used by Clover
-    ```ruby
-    pub_key = vmh.sshable.keys.map(&:public_key)
-    ```
-
-5. In **terminal 3**, connect to the host via `ssh root@VM_HOST_IP` and paste the public key you obtained into `~/.ssh/authorized_keys`. After that, you can exit the host.
-
-6. Get back to **terminal 2** and observe `VmHost` cloudification process
+4. Get back to **terminal 2** and observe `VmHost` cloudification process
     ```ruby
     while true
       lbl = vmh.strand.reload.label
