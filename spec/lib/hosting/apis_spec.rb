@@ -33,15 +33,15 @@ RSpec.describe Hosting::Apis do
     end
   end
 
-  describe "reset_server" do
-    it "can reset a server" do
-      expect(hetzner_apis).to receive(:reset).with(123).and_return(true)
-      described_class.reset_server(vm_host)
+  describe "reimage_server" do
+    it "can reimage a server" do
+      expect(hetzner_apis).to receive(:reimage).with(123).and_return(true)
+      described_class.reimage_server(vm_host)
     end
 
     it "raises an error if the provider is unknown" do
       expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
-      expect { described_class.reset_server(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
+      expect { described_class.reimage_server(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
     end
   end
 

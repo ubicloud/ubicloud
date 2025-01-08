@@ -6,7 +6,7 @@ class Hosting::HetznerApis
     @host = hetzner_host
   end
 
-  def reset(server_id, hetzner_ssh_key: Config.hetzner_ssh_key, dist: "Ubuntu 22.04.2 LTS base")
+  def reimage(server_id, hetzner_ssh_key: Config.hetzner_ssh_key, dist: "Ubuntu 22.04.2 LTS base")
     unless hetzner_ssh_key
       raise "hetzner_ssh_key is not set"
     end
