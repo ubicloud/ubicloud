@@ -68,22 +68,23 @@ RSpec.describe Prog::Vnet::NicNexus do
 
   describe "#wait_allocation" do
     it "naps if nothing to do" do
-      expect(nx).to receive(:nic).and_return(instance_double(Nic, vm: instance_double(Vm, allocated_at: nil)))
       expect { nx.wait_allocation }.to nap(5)
     end
 
     it "hops to wait_setup if allocated" do
-      expect(nx).to receive(:nic).and_return(instance_double(Nic, vm: instance_double(Vm, allocated_at: Time.now)))
+      expect(nx).to receive(:when_vm_allocated_set?).and_yield
       expect { nx.wait_allocation }.to hop("wait_setup")
     end
   end
 
   describe "#wait_setup" do
     it "naps if nothing to do" do
+      expect(nx).to receive(:decr_vm_allocated)
       expect { nx.wait_setup }.to nap(5)
     end
 
     it "starts rekeying if setup is triggered" do
+      expect(nx).to receive(:decr_vm_allocated)
       expect(nx).to receive(:when_start_rekey_set?).and_yield
       expect(nx).to receive(:decr_setup_nic)
       expect { nx.wait_setup }.to hop("start_rekey")

@@ -14,7 +14,7 @@ class Nic < Sequel::Model
   include SemaphoreMethods
 
   semaphore :destroy, :start_rekey, :trigger_outbound_update,
-    :old_state_drop_trigger, :setup_nic, :repopulate, :lock
+    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated
 
   plugin :column_encryption do |enc|
     enc.column :encryption_key
