@@ -42,7 +42,11 @@ migrate = lambda do |env, version|
   DB.extension :pg_enum
 
   DB.loggers << Logger.new($stdout) if DB.loggers.empty?
-  Sequel::Migrator.apply(DB, "migrate", version)
+  if version.is_a?(String) && File.file?(version)
+    Sequel::TimestampMigrator.new(DB, "migrate").run_single(version, :down)
+  else
+    Sequel::TimestampMigrator.apply(DB, "migrate", version)
+  end
 
   # Check if the alternate-user password hash user needs to run
   # migrations.  It's desirable to avoid always connecting to run
@@ -76,7 +80,7 @@ end
 desc "Migrate test database to latest version"
 task test_up: [:_test_up, :refresh_sequel_caches, :annotate]
 
-desc "Migrate test database down. If VERSION isn't given, migrates to all the way down."
+desc "Migrate test database down. Must specify VERSION environment variable."
 task test_down: [:_test_down, :refresh_sequel_caches, :annotate]
 
 # rubocop:disable Rake/Desc
@@ -87,8 +91,12 @@ end
 
 migrate_version = lambda do |env|
   last_irreversible_migration = 20241011
-  unless (version = ENV["VERSION"].to_i) >= last_irreversible_migration
-    raise "Must provide VERSION environment variable >= #{last_irreversible_migration} to migrate down"
+  version = ENV["VERSION"]
+  unless version && File.file?(version)
+    version = version.to_i
+    unless version >= last_irreversible_migration
+      raise "Must provide VERSION environment variable >= #{last_irreversible_migration} (or a migration filename) to migrate down"
+    end
   end
   migrate.call(env, version)
 end
@@ -104,7 +112,7 @@ task :dev_up do
   migrate.call("development", nil)
 end
 
-desc "Migrate development database down. If VERSION isn't given, migrates to all the way down."
+desc "Migrate development database down. Must specify VERSION environment variable."
 task :dev_down do
   migrate_version.call("development")
 end
