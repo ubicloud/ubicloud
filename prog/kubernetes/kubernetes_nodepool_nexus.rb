@@ -80,7 +80,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def destroy
-    kubernetes_nodepool.vms.map(&:incr_destroy)
+    kubernetes_nodepool.vms.each(&:incr_destroy)
     kubernetes_nodepool.projects.map { kubernetes_nodepool.dissociate_with_project(_1) }
     kubernetes_nodepool.destroy
     pop "kubernetes nodepool is deleted"
