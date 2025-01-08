@@ -11,30 +11,30 @@ RSpec.describe Hosting::HetznerApis do
   let(:hetzner_host) { instance_double(HetznerHost, connection_string: "https://robot-ws.your-server.de", server_identifier: "123", user: "user1", password: "pass", vm_host: vm_host) }
   let(:hetzner_apis) { described_class.new(hetzner_host) }
 
-  describe "reset" do
-    it "can reset a server" do
+  describe "reimage" do
+    it "can reimage a server" do
       expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
       Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 200, body: ""})
-      expect(hetzner_apis.reset(123)).to be_nil
+      expect(hetzner_apis.reimage(123)).to be_nil
     end
 
-    it "raises an error if the reset fails" do
+    it "raises an error if the reimage fails" do
       expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
       Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 400, body: ""})
-      expect { hetzner_apis.reset(123) }.to raise_error Excon::Error::BadRequest
+      expect { hetzner_apis.reimage(123) }.to raise_error Excon::Error::BadRequest
     end
 
     it "raises an error if the ssh key is not set" do
       expect(Config).to receive(:hetzner_ssh_key).and_return(nil)
-      expect { hetzner_apis.reset(123) }.to raise_error RuntimeError, "hetzner_ssh_key is not set"
+      expect { hetzner_apis.reimage(123) }.to raise_error RuntimeError, "hetzner_ssh_key is not set"
     end
 
     it "raises an error if the boot fails" do
       expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 400, body: ""})
-      expect { hetzner_apis.reset(123) }.to raise_error Excon::Error::BadRequest
+      expect { hetzner_apis.reimage(123) }.to raise_error Excon::Error::BadRequest
     end
   end
 

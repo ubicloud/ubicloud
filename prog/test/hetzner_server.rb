@@ -45,20 +45,20 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     hetzner_api.add_key("ubicloud_ci_key_#{strand.ubid}", keypair.public_key)
     update_stack({"hetzner_ssh_keypair" => Base64.encode64(keypair.keypair)})
 
-    hop_reset
+    hop_reimage
   end
 
-  label def reset
-    hetzner_api.reset(
+  label def reimage
+    hetzner_api.reimage(
       frame["server_id"],
       hetzner_ssh_key: hetzner_ssh_keypair.public_key,
       dist: "Ubuntu 24.04 LTS base"
     )
 
-    hop_wait_reset
+    hop_wait_reimage
   end
 
-  label def wait_reset
+  label def wait_reimage
     begin
       Util.rootish_ssh(frame["hostname"], "root", [hetzner_ssh_keypair.private_key], "echo 1")
     rescue

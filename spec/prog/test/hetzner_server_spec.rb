@@ -53,26 +53,26 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#add_ssh_key" do
     it "can add ssh key" do
       expect(hetzner_api).to receive(:add_key)
-      expect { hs_test.add_ssh_key }.to hop("reset")
+      expect { hs_test.add_ssh_key }.to hop("reimage")
     end
   end
 
-  describe "#reset" do
-    it "can reset" do
-      expect(hetzner_api).to receive(:reset).with("1234", dist: "Ubuntu 24.04 LTS base", hetzner_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
-      expect { hs_test.reset }.to hop("wait_reset")
+  describe "#reimage" do
+    it "can reimage" do
+      expect(hetzner_api).to receive(:reimage).with("1234", dist: "Ubuntu 24.04 LTS base", hetzner_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
+      expect { hs_test.reimage }.to hop("wait_reimage")
     end
   end
 
-  describe "#wait_reset" do
+  describe "#wait_reimage" do
     it "hops to setup_host if the server is up" do
       expect(Util).to receive(:rootish_ssh)
-      expect { hs_test.wait_reset }.to hop("setup_host")
+      expect { hs_test.wait_reimage }.to hop("setup_host")
     end
 
     it "naps if the server is not up yet" do
       expect(Util).to receive(:rootish_ssh).and_raise RuntimeError, "ssh failed"
-      expect { hs_test.wait_reset }.to nap(15)
+      expect { hs_test.wait_reimage }.to nap(15)
     end
   end
 

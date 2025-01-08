@@ -10,9 +10,9 @@ class Hosting::Apis
     end
   end
 
-  def self.reset_server(vm_host)
+  def self.reimage_server(vm_host)
     if vm_host.provider == HetznerHost::PROVIDER_NAME
-      vm_host.hetzner_host.api.reset(vm_host.hetzner_host.server_identifier)
+      vm_host.hetzner_host.api.reimage(vm_host.hetzner_host.server_identifier)
     else
       raise "unknown provider #{vm_host.provider}"
     end

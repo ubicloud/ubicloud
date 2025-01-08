@@ -239,12 +239,12 @@ class VmHost < Sequel::Model
     Hosting::Apis.set_server_name(self)
   end
 
-  def reset
+  def reimage
     unless Config.development?
-      fail "BUG: reset is only allowed in development"
+      fail "BUG: reimage is only allowed in development"
     end
 
-    Hosting::Apis.reset_server(self)
+    Hosting::Apis.reimage_server(self)
   end
 
   def init_health_monitor_session
