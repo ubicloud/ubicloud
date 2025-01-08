@@ -37,21 +37,12 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   label def fetch_hostname
     update_stack({"hostname" => hetzner_api.get_main_ip4})
 
-    hop_add_ssh_key
-  end
-
-  label def add_ssh_key
-    keypair = SshKey.generate
-    hetzner_api.add_key("ubicloud_ci_key_#{strand.ubid}", keypair.public_key)
-    update_stack({"hetzner_ssh_keypair" => Base64.encode64(keypair.keypair)})
-
     hop_reimage
   end
 
   label def reimage
     hetzner_api.reimage(
       frame["server_id"],
-      hetzner_ssh_key: hetzner_ssh_keypair.public_key,
       dist: "Ubuntu 24.04 LTS base"
     )
 
@@ -60,7 +51,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def wait_reimage
     begin
-      Util.rootish_ssh(frame["hostname"], "root", [hetzner_ssh_keypair.private_key], "echo 1")
+      Util.rootish_ssh(frame["hostname"], "root", [Config.hetzner_ssh_private_key], "echo 1")
     rescue
       nap 15
     end
@@ -76,11 +67,6 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       default_boot_images: Option::BootImages.map { _1.name }
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
-
-    # BootstrapRhizome::start will override raw_private_key_1, so save the key in
-    # raw_private_key_2. This will allow BootstrapRhizome::setup to do a root
-    # ssh into the server.
-    vm_host.sshable.update(raw_private_key_2: hetzner_ssh_keypair.keypair)
 
     hop_wait_setup_host
   end
@@ -128,7 +114,6 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     # don't destroy the vm_host if we didn't set it up.
     hop_finish unless frame["setup_host"]
 
-    hetzner_api.delete_key(hetzner_ssh_keypair.public_key)
     vm_host.incr_destroy
 
     hop_wait_vm_host_destroyed
@@ -155,10 +140,6 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     @hetzner_api ||= Hosting::HetznerApis.new(
       HetznerHost.new(server_identifier: frame["server_id"])
     )
-  end
-
-  def hetzner_ssh_keypair
-    @hetzner_ssh_keypair ||= SshKey.from_binary(Base64.decode64(frame["hetzner_ssh_keypair"]))
   end
 
   def vm_host

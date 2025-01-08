@@ -46,20 +46,13 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#fetch_hostname" do
     it "can fetch hostname" do
       expect(hetzner_api).to receive(:get_main_ip4)
-      expect { hs_test.fetch_hostname }.to hop("add_ssh_key")
-    end
-  end
-
-  describe "#add_ssh_key" do
-    it "can add ssh key" do
-      expect(hetzner_api).to receive(:add_key)
-      expect { hs_test.add_ssh_key }.to hop("reimage")
+      expect { hs_test.fetch_hostname }.to hop("reimage")
     end
   end
 
   describe "#reimage" do
     it "can reimage" do
-      expect(hetzner_api).to receive(:reimage).with("1234", dist: "Ubuntu 24.04 LTS base", hetzner_ssh_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
+      expect(hetzner_api).to receive(:reimage).with("1234", dist: "Ubuntu 24.04 LTS base")
       expect { hs_test.reimage }.to hop("wait_reimage")
     end
   end
@@ -158,9 +151,8 @@ RSpec.describe Prog::Test::HetznerServer do
       expect { hs_test.destroy }.to hop("finish")
     end
 
-    it "deletes key and vm host" do
+    it "deletes vm host" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => true})
-      expect(hetzner_api).to receive(:delete_key).with("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGbDGrHrzWaxywYEtpDaJZCw5gEFUsO1BZ7+B/c1E3IH")
       expect(vm_host).to receive(:incr_destroy)
       expect { hs_test.destroy }.to hop("wait_vm_host_destroyed")
     end

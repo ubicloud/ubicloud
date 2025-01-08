@@ -112,6 +112,8 @@ jobs:
         GITHUB_CACHE_BLOB_STORAGE_API_KEY: ${{ secrets.GH_CACHE_BLOB_STORAGE_API_KEY }}
         VM_POOL_PROJECT_ID: ${{ secrets.VM_POOL_PROJECT_ID }}
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
+        HETZNER_SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
+        HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
       run: timeout 40m foreman start
 
     - name: Send notification if failed
