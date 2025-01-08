@@ -10,9 +10,7 @@ RSpec.describe Clover, "inference-playground" do
 
   describe "feature enabled" do
     before do
-      project.set_ff_inference_ui(true)
-      project_wo_permissions.set_ff_inference_ui(true)
-      login
+      login(user.email)
     end
 
     it "can handle empty list of inference endpoints" do
@@ -55,15 +53,6 @@ RSpec.describe Clover, "inference-playground" do
 
       expect(page.title).to eq("Ubicloud - Playground")
       expect(page).to have_select("inference_token", selected: ApiKey.first.ubid)
-    end
-  end
-
-  describe "feature disabled" do
-    it "inference playground page is not accessible" do
-      project.set_ff_inference_ui(false)
-      login
-      visit "#{project.path}/inference-playground"
-      expect(page.status_code).to eq(404)
     end
   end
 

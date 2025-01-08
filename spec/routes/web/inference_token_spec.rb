@@ -9,7 +9,6 @@ RSpec.describe Clover, "inference-token" do
 
   describe "feature enabled" do
     before do
-      project.set_ff_inference_ui(true)
       login(user.email)
       visit "#{project.path}/inference-token"
       expect(ApiKey.all).to be_empty
@@ -46,18 +45,6 @@ RSpec.describe Clover, "inference-token" do
       expect(page.status_code).to eq(204)
       visit "#{project.path}/user/token"
       expect(page.html).not_to include("Inference token deleted successfully")
-    end
-  end
-
-  describe "feature disabled" do
-    before do
-      project.set_ff_inference_ui(false)
-      login(user.email)
-      visit "#{project.path}/inference-token"
-    end
-
-    it "inference token page is not accessible" do
-      expect(page.status_code).to eq(404)
     end
   end
 

@@ -10,9 +10,7 @@ RSpec.describe Clover, "inference-endpoint" do
 
   describe "feature enabled" do
     before do
-      project.set_ff_inference_ui(true)
-      project_wo_permissions.set_ff_inference_ui(true)
-      login
+      login(user.email)
     end
 
     it "can handle empty list of inference endpoints" do
@@ -57,18 +55,6 @@ RSpec.describe Clover, "inference-endpoint" do
 
       expect(page.title).to eq("Ubicloud - Inference Endpoints")
       expect(page).to have_no_content("e5-mistral-7b-it")
-    end
-  end
-
-  describe "feature disabled" do
-    before do
-      project.set_ff_inference_ui(false)
-      login(user.email)
-      visit "#{project.path}/inference-endpoint"
-    end
-
-    it "inference endpoint page is not accessible" do
-      expect(page.status_code).to eq(404)
     end
   end
 
