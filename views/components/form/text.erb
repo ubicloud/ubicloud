@@ -1,6 +1,6 @@
-<%# locals: (name: nil, label: nil, type: "text", value: nil, error: nil, description: nil, attributes: {}, extra_class: nil, button_title: nil) %>
+<%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil) %>
 <% value = flash.dig("old", name) || value
-error ||= rodauth.field_error(name) || flash.dig("errors", name) %>
+error = rodauth.field_error(name) || flash.dig("errors", name) %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
@@ -33,8 +33,5 @@ error ||= rodauth.field_error(name) || flash.dig("errors", name) %>
     <% else %>
       <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
     <% end %>
-  <% end %>
-  <% if description %>
-    <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%== description %></p>
   <% end %>
 </div>
