@@ -313,10 +313,12 @@ RSpec.describe Clover, "auth" do
 
     [true, false].each do |logged_in|
       it "can change email, verifying when #{"not " unless logged_in}logged in" do
+        visit "/clear-last-password-entry" if logged_in
         new_email = "new@example.com"
         visit "/account/change-login"
 
         fill_in "New Email Address", with: new_email
+        fill_in "Password", with: TEST_USER_PASSWORD if logged_in
 
         click_button "Change Email"
 
@@ -347,13 +349,15 @@ RSpec.describe Clover, "auth" do
       end
     end
 
-    it "can change password" do
+    it "can create password for accounts that do not have a password" do
+      DB[:account_password_hashes].delete
       visit "/account/change-password"
+      expect(page.title).to eq("Ubicloud - Create Password")
 
       fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
       fill_in "New Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
 
-      click_button "Change Password"
+      click_button "Create Password"
 
       expect(page.title).to eq("Ubicloud - Change Password")
 
@@ -367,19 +371,45 @@ RSpec.describe Clover, "auth" do
       click_button "Sign in"
     end
 
-    it "can close account" do
-      account = Account[email: TEST_USER_EMAIL]
-      UsageAlert.create_with_id(project_id: account.projects.first.id, user_id: account.id, name: "test", limit: 100)
+    [true, false].each do |clear_last_password_entry|
+      it "can change password when password entry is #{"not " unless clear_last_password_entry}required" do
+        visit "/clear-last-password-entry" if clear_last_password_entry
+        visit "/account/change-password"
 
-      visit "/account/close-account"
+        fill_in "Current Password", with: TEST_USER_PASSWORD if clear_last_password_entry
+        fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
+        fill_in "New Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
 
-      click_button "Close Account"
+        click_button "Change Password"
 
-      expect(page.title).to eq("Ubicloud - Login")
-      expect(page).to have_flash_notice("Your account has been closed")
+        expect(page.title).to eq("Ubicloud - Change Password")
 
-      expect(Account[email: TEST_USER_EMAIL]).to be_nil
-      expect(AccessTag.where(name: "user/#{TEST_USER_EMAIL}").count).to eq 0
+        click_button "Log out"
+
+        expect(page.title).to eq("Ubicloud - Login")
+
+        fill_in "Email Address", with: TEST_USER_EMAIL
+        fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+
+        click_button "Sign in"
+      end
+
+      it "can close account when password entry is #{"not " unless clear_last_password_entry}required" do
+        visit "/clear-last-password-entry" if clear_last_password_entry
+        account = Account[email: TEST_USER_EMAIL]
+        UsageAlert.create_with_id(project_id: account.projects.first.id, user_id: account.id, name: "test", limit: 100)
+
+        visit "/account/close-account"
+
+        fill_in "Password", with: TEST_USER_PASSWORD if clear_last_password_entry
+        click_button "Close Account"
+
+        expect(page.title).to eq("Ubicloud - Login")
+        expect(page).to have_flash_notice("Your account has been closed")
+
+        expect(Account[email: TEST_USER_EMAIL]).to be_nil
+        expect(AccessTag.where(name: "user/#{TEST_USER_EMAIL}").count).to eq 0
+      end
     end
 
     it "can not close account if the project has some resources" do
