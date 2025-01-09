@@ -15,8 +15,10 @@ MSG
         ]
       when "Embeddings"
         ["/v1/embeddings", "hero-document-arrow-down", "\"input\": \"embed me!\"\n"]
+      # :nocov:
       else
         fail "Unknown model capability"
+      # :nocov:
     end
 
 

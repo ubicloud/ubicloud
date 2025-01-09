@@ -23,7 +23,7 @@ RSpec.describe Clover, "inference-endpoint" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
       lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
       [
-        ["ie1", "e5-mistral-7b-it", project_wo_permissions, true, true, {capability: "Embeddings"}],
+        ["ie1", "e5-mistral-7b-it", project_wo_permissions, true, true, {capability: "Embeddings", hf_model: "foo/bar"}],
         ["ie2", "e5-mistral-8b-it", project_wo_permissions, true, false, {capability: "Embeddings"}],
         ["ie3", "llama-guard-3-8b", project_wo_permissions, false, true, {capability: "Text Generation"}],
         ["ie4", "llama-3-1-405b-it", project, false, true, {capability: "Text Generation"}],
@@ -39,6 +39,7 @@ RSpec.describe Clover, "inference-endpoint" do
 
       expect(page.title).to eq("Ubicloud - Inference Endpoints")
       expect(page).to have_content("e5-mistral-7b-it")
+      expect(page.all("a").any? { |a| a["href"] == "https://huggingface.co/foo/bar" }).to be true
       expect(page).to have_no_content("e5-mistral-8b-it") # not visible
       expect(page).to have_no_content("llama-guard-3-8b") # private model of another project
       expect(page).to have_content("llama-3-1-405b-it")
