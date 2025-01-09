@@ -1,10 +1,10 @@
-- { name: ubicloud,                             vm_size: standard-2,     arch: x64,   storage_size_gib: 86,  boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-2,                  vm_size: standard-2,     arch: x64,   storage_size_gib: 86,  boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-4,                  vm_size: standard-4,     arch: x64,   storage_size_gib: 150, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-8,                  vm_size: standard-8,     arch: x64,   storage_size_gib: 200, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-16,                 vm_size: standard-16,    arch: x64,   storage_size_gib: 300, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-30,                 vm_size: standard-30,    arch: x64,   storage_size_gib: 400, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-60,                 vm_size: standard-60,    arch: x64,   storage_size_gib: 600, boot_image: github-ubuntu-2204,     location: github-runners }
+- { name: ubicloud,                             alias_for: ubicloud-standard-2-ubuntu-2204 }
+- { name: ubicloud-standard-2,                  alias_for: ubicloud-standard-2-ubuntu-2204 }
+- { name: ubicloud-standard-4,                  alias_for: ubicloud-standard-4-ubuntu-2204 }
+- { name: ubicloud-standard-8,                  alias_for: ubicloud-standard-8-ubuntu-2204 }
+- { name: ubicloud-standard-16,                 alias_for: ubicloud-standard-16-ubuntu-2204 }
+- { name: ubicloud-standard-30,                 alias_for: ubicloud-standard-30-ubuntu-2204 }
+- { name: ubicloud-standard-60,                 alias_for: ubicloud-standard-60-ubuntu-2204 }
 - { name: ubicloud-standard-2-ubuntu-2404,      vm_size: standard-2,     arch: x64,   storage_size_gib: 75,  boot_image: github-ubuntu-2404,     location: github-runners }
 - { name: ubicloud-standard-4-ubuntu-2404,      vm_size: standard-4,     arch: x64,   storage_size_gib: 150, boot_image: github-ubuntu-2404,     location: github-runners }
 - { name: ubicloud-standard-8-ubuntu-2404,      vm_size: standard-8,     arch: x64,   storage_size_gib: 200, boot_image: github-ubuntu-2404,     location: github-runners }
@@ -23,13 +23,13 @@
 - { name: ubicloud-standard-16-ubuntu-2004,     vm_size: standard-16,    arch: x64,   storage_size_gib: 300, boot_image: github-ubuntu-2004,     location: github-runners }
 - { name: ubicloud-standard-30-ubuntu-2004,     vm_size: standard-30,    arch: x64,   storage_size_gib: 400, boot_image: github-ubuntu-2004,     location: github-runners }
 - { name: ubicloud-standard-60-ubuntu-2004,     vm_size: standard-60,    arch: x64,   storage_size_gib: 600, boot_image: github-ubuntu-2004,     location: github-runners }
-- { name: ubicloud-arm,                         vm_size: standard-2,     arch: arm64, storage_size_gib: 86,  boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-2-arm,              vm_size: standard-2,     arch: arm64, storage_size_gib: 86,  boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-4-arm,              vm_size: standard-4,     arch: arm64, storage_size_gib: 150, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-8-arm,              vm_size: standard-8,     arch: arm64, storage_size_gib: 200, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-16-arm,             vm_size: standard-16,    arch: arm64, storage_size_gib: 300, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-30-arm,             vm_size: standard-30,    arch: arm64, storage_size_gib: 400, boot_image: github-ubuntu-2204,     location: github-runners }
-- { name: ubicloud-standard-60-arm,             vm_size: standard-60,    arch: arm64, storage_size_gib: 600, boot_image: github-ubuntu-2204,     location: github-runners }
+- { name: ubicloud-arm,                         alias_for: ubicloud-standard-2-arm-ubuntu-2204 }
+- { name: ubicloud-standard-2-arm,              alias_for: ubicloud-standard-2-arm-ubuntu-2204 }
+- { name: ubicloud-standard-4-arm,              alias_for: ubicloud-standard-4-arm-ubuntu-2204 }
+- { name: ubicloud-standard-8-arm,              alias_for: ubicloud-standard-8-arm-ubuntu-2204 }
+- { name: ubicloud-standard-16-arm,             alias_for: ubicloud-standard-16-arm-ubuntu-2204 }
+- { name: ubicloud-standard-30-arm,             alias_for: ubicloud-standard-30-arm-ubuntu-2204 }
+- { name: ubicloud-standard-60-arm,             alias_for: ubicloud-standard-60-arm-ubuntu-2204 }
 - { name: ubicloud-standard-2-arm-ubuntu-2404,  vm_size: standard-2,     arch: arm64, storage_size_gib: 86,  boot_image: github-ubuntu-2404,     location: github-runners }
 - { name: ubicloud-standard-4-arm-ubuntu-2404,  vm_size: standard-4,     arch: arm64, storage_size_gib: 150, boot_image: github-ubuntu-2404,     location: github-runners }
 - { name: ubicloud-standard-8-arm-ubuntu-2404,  vm_size: standard-8,     arch: arm64, storage_size_gib: 200, boot_image: github-ubuntu-2404,     location: github-runners }
@@ -50,12 +50,12 @@
 - { name: ubicloud-standard-60-arm-ubuntu-2004, vm_size: standard-60,    arch: arm64, storage_size_gib: 600, boot_image: github-ubuntu-2004,     location: github-runners }
 - { name: ubicloud-gpu,                         vm_size: standard-gpu-6, arch: x64,   storage_size_gib: 180, boot_image: github-gpu-ubuntu-2204, location: github-runners, gpu: true  }
 # Deprecated: Remove old labels once all customers have migrated to new labels.
-- { name: ubicloud-standard-2-ubuntu-2204-arm,  vm_size: standard-2,  arch: arm64,  storage_size_gib: 86,  boot_image: github-ubuntu-2204, location: github-runners }
-- { name: ubicloud-standard-4-ubuntu-2204-arm,  vm_size: standard-4,  arch: arm64,  storage_size_gib: 150, boot_image: github-ubuntu-2204, location: github-runners }
-- { name: ubicloud-standard-8-ubuntu-2204-arm,  vm_size: standard-8,  arch: arm64,  storage_size_gib: 200, boot_image: github-ubuntu-2204, location: github-runners }
-- { name: ubicloud-standard-16-ubuntu-2204-arm, vm_size: standard-16, arch: arm64,  storage_size_gib: 300, boot_image: github-ubuntu-2204, location: github-runners }
-- { name: ubicloud-standard-2-ubuntu-2004-arm,  vm_size: standard-2,  arch: arm64,  storage_size_gib: 86,  boot_image: github-ubuntu-2004, location: github-runners }
-- { name: ubicloud-standard-4-ubuntu-2004-arm,  vm_size: standard-4,  arch: arm64,  storage_size_gib: 150, boot_image: github-ubuntu-2004, location: github-runners }
-- { name: ubicloud-standard-8-ubuntu-2004-arm,  vm_size: standard-8,  arch: arm64,  storage_size_gib: 200, boot_image: github-ubuntu-2004, location: github-runners }
-- { name: ubicloud-standard-16-ubuntu-2004-arm, vm_size: standard-16, arch: arm64,  storage_size_gib: 300, boot_image: github-ubuntu-2004, location: github-runners }
-- { name: ubicloud-gpu-standard-1-latest,       vm_size: standard-gpu-6, arch: x64,   storage_size_gib: 180, boot_image: github-gpu-ubuntu-2204, location: github-runners, gpu: true  }
+- { name: ubicloud-standard-2-ubuntu-2204-arm,  alias_for: ubicloud-standard-2-arm-ubuntu-2204 }
+- { name: ubicloud-standard-4-ubuntu-2204-arm,  alias_for: ubicloud-standard-4-arm-ubuntu-2204 }
+- { name: ubicloud-standard-8-ubuntu-2204-arm,  alias_for: ubicloud-standard-8-arm-ubuntu-2204 }
+- { name: ubicloud-standard-16-ubuntu-2204-arm, alias_for: ubicloud-standard-16-arm-ubuntu-2204 }
+- { name: ubicloud-standard-2-ubuntu-2004-arm,  alias_for: ubicloud-standard-2-arm-ubuntu-2004 }
+- { name: ubicloud-standard-4-ubuntu-2004-arm,  alias_for: ubicloud-standard-4-arm-ubuntu-2004 }
+- { name: ubicloud-standard-8-ubuntu-2004-arm,  alias_for: ubicloud-standard-8-arm-ubuntu-2004 }
+- { name: ubicloud-standard-16-ubuntu-2004-arm, alias_for: ubicloud-standard-16-arm-ubuntu-2004 }
+- { name: ubicloud-gpu-standard-1-latest,       alias_for: ubicloud-gpu }
