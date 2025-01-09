@@ -33,7 +33,7 @@ class ApiKey < Sequel::Model
     pat
   end
 
-  def self.create_inference_token(project)
+  def self.create_inference_api_key(project)
     token = ApiKey.create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint")
     token.associate_with_project(project)
     token

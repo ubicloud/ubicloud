@@ -44,15 +44,15 @@ RSpec.describe Clover, "inference-playground" do
       expect(page).to have_select("inference_endpoint", selected: "llama-3-1-405b-it", with_options: ["llama-3-1-405b-it", "test-model"])
     end
 
-    it "gives choice of inference tokens" do
-      visit "#{project.path}/inference-token"
+    it "gives choice of inference api keys" do
+      visit "#{project.path}/inference-api-key"
       expect(ApiKey.all).to be_empty
-      click_button "Create Token"
+      click_button "Create API Key"
 
       visit "#{project.path}/inference-playground"
 
       expect(page.title).to eq("Ubicloud - Playground")
-      expect(page).to have_select("inference_token", selected: ApiKey.first.ubid)
+      expect(page).to have_select("inference_api_key", selected: ApiKey.first.ubid)
     end
   end
 

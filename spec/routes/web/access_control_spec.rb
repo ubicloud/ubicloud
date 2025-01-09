@@ -126,13 +126,13 @@ RSpec.describe Clover, "access control" do
         "STest", "All Actions", "All Objects"
       ]
 
-      inference_token = ApiKey.create_inference_token(project)
-      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: inference_token.id)
+      inference_api_key = ApiKey.create_inference_api_key(project)
+      AccessControlEntry.create_with_id(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: inference_api_key.id)
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
-        "Tname", "Member", inference_token.ubid,
+        "Tname", "Member", inference_api_key.ubid,
         "Tname", "Member", "OTest2",
         "Tname", "Project:view", "All Objects",
         "Tname", "ATest", "All Objects",
@@ -147,7 +147,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
-        "Tname", "Member", inference_token.ubid,
+        "Tname", "Member", inference_api_key.ubid,
         "Tname", "Member", "OTest2",
         "Tname", "Project:view", "All Objects",
         "Tname", "ATest", "All Objects",
@@ -164,7 +164,7 @@ RSpec.describe Clover, "access control" do
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
-        "Account: Tname", "Global Tag: Member", "InferenceToken: #{inference_token.ubid}",
+        "Account: Tname", "Global Tag: Member", "InferenceApiKey: #{inference_api_key.ubid}",
         "Account: Tname", "Global Tag: Member", "Tag: OTest2",
         "Account: Tname", "Project:view", "All",
         "Account: Tname", "Project:viewaccess", "All",
@@ -821,15 +821,15 @@ RSpec.describe Clover, "access control" do
       expect(page).to have_flash_error "No change in membership: cannot include Admin subject tag in another tag, 1 members not valid"
     end
 
-    it "supports adding InferenceToken to ObjectTag" do
-      inference_token = ApiKey.create_inference_token(project)
+    it "supports adding InferenceApiKey to ObjectTag" do
+      inference_api_key = ApiKey.create_inference_api_key(project)
       tag = ObjectTag.create_with_id(project_id: project.id, name: "test-obj")
       visit "#{project.path}/user/access-control/tag/object/#{tag.ubid}"
-      find("##{inference_token.ubid} input").check
+      find("##{inference_api_key.ubid} input").check
       click_button "Add Members"
       expect(page).to have_flash_notice "1 members added to object tag"
       expect(page.all("table#tag-membership-remove td").map(&:text)).to eq [
-        "InferenceToken: #{inference_token.ubid}", ""
+        "InferenceApiKey: #{inference_api_key.ubid}", ""
       ]
     end
 

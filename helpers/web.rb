@@ -76,7 +76,7 @@ class Clover < Roda
     when ObjectMetatag
       "ObjectTag: #{obj.name}"
     when ApiKey
-      "InferenceToken: #{obj.name}"
+      "InferenceApiKey: #{obj.name}"
     else
       "#{obj.class.name}: #{obj.name}"
     end
@@ -89,7 +89,7 @@ class Clover < Roda
     when ObjectMetatag
       "ObjectTag: #{obj.name}"
     when ApiKey
-      "InferenceToken: #{obj.name}"
+      "InferenceApiKey: #{obj.name}"
     else
       "#{obj.class.name}: #{obj.name}"
     end
