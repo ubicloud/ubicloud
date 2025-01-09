@@ -38,7 +38,10 @@ module Github
   # :nocov:
 
   def self.runner_labels
-    @runner_labels ||= YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
+    @runner_labels ||= begin
+      labels = YAML.load_file("config/github_runner_labels.yml").to_h { [_1["name"], _1] }
+      labels.transform_values { |v| (a = v["alias_for"]) ? labels[a] : v }
+    end
   end
 
   def self.failed_deliveries(since, max_page = 50)
