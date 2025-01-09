@@ -48,7 +48,7 @@ RSpec.describe CertServerSetup do
       expect(FileUtils).to receive(:mkdir_p).with("/opt/metadata-endpoint-0.1.5")
       expect(FileUtils).to receive(:cd).with("/opt/metadata-endpoint-0.1.5")
       expect(FileUtils).to receive(:rm_f).with("/tmp/metadata-endpoint-0.1.5.tar.gz")
-      expect { cert_server_setup.download_server }.not_to raise_error
+      cert_server_setup.download_server
     end
   end
 
