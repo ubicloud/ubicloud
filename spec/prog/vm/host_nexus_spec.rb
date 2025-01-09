@@ -290,6 +290,11 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.wait }.to nap(30)
     end
 
+    it "hops to prep_graceful_reboot when needed" do
+      expect(nx).to receive(:when_graceful_reboot_set?).and_yield
+      expect { nx.wait }.to hop("prep_graceful_reboot")
+    end
+
     it "hops to prep_reboot when needed" do
       expect(nx).to receive(:when_reboot_set?).and_yield
       expect { nx.wait }.to hop("prep_reboot")
@@ -360,6 +365,41 @@ RSpec.describe Prog::Vm::HostNexus do
     end
   end
 
+  describe "host graceful reboot" do
+    it "prep_graceful_reboot sets allocation_state to draining if it is in accepting" do
+      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      expect(vm_host).to receive(:update).with(allocation_state: "draining")
+      expect(vm_host).to receive(:vms_dataset).and_return([true])
+      expect { nx.prep_graceful_reboot }.to nap(30)
+    end
+
+    it "prep_graceful_reboot does not change allocation_state if it is already draining" do
+      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      expect(vm_host).not_to receive(:update)
+      expect(vm_host).to receive(:vms_dataset).and_return([true])
+      expect { nx.prep_graceful_reboot }.to nap(30)
+    end
+
+    it "prep_graceful_reboot fails if not in accepting or draining state" do
+      expect(vm_host).to receive(:allocation_state).and_return("unprepared")
+      expect(vm_host).not_to receive(:update)
+      expect(vm_host).not_to receive(:vms_dataset)
+      expect { nx.prep_graceful_reboot }.to raise_error(RuntimeError)
+    end
+
+    it "prep_graceful_reboot transitions to prep_reboot if there are no VMs" do
+      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      expect(vm_host).to receive(:vms_dataset).and_return([])
+      expect { nx.prep_graceful_reboot }.to hop("prep_reboot")
+    end
+
+    it "prep_graceful_reboot transitions to nap if there are VMs" do
+      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      expect(vm_host).to receive(:vms_dataset).and_return([true])
+      expect { nx.prep_graceful_reboot }.to nap(30)
+    end
+  end
+
   describe "host reboot" do
     it "prep_reboot transitions to reboot" do
       expect(nx).to receive(:get_boot_id).and_return("xyz")
@@ -407,6 +447,21 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host).to receive(:allocation_state).and_return("unprepared")
       expect(vm_host).to receive(:update).with(allocation_state: "accepting")
       expect { nx.start_vms }.to hop("wait")
+    end
+
+    it "start_vms starts vms & becomes accepting & hops to wait if was draining an in graceful reboot" do
+      expect(vm_host).to receive(:allocation_state).twice.and_return("draining")
+      expect(nx).to receive(:when_graceful_reboot_set?).and_yield
+      expect(vms).to all receive(:incr_start_after_host_reboot)
+      expect(vm_host).to receive(:update).with(allocation_state: "accepting")
+      expect { nx.start_vms }.to hop("wait")
+    end
+
+    it "start_vms starts vms & raises if not in draining and in graceful reboot" do
+      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      expect(nx).to receive(:when_graceful_reboot_set?).and_yield
+      expect(vms).to all receive(:incr_start_after_host_reboot)
+      expect { nx.start_vms }.to raise_error(RuntimeError)
     end
 
     it "start_vms starts vms & hops to wait if accepting" do
