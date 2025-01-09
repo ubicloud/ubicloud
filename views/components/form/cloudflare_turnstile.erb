@@ -1,5 +1,3 @@
-<% @enable_cloudflare_turnstile = Config.cloudflare_turnstile_site_key %>
-
-<% if @enable_cloudflare_turnstile %>
-  <div class="cf-turnstile" data-sitekey="<%= Config.cloudflare_turnstile_site_key %>"></div>
+<% if (@enable_cloudflare_turnstile = Config.cloudflare_turnstile_site_key) %>
+  <div class="cf-turnstile" data-sitekey="<%= @enable_cloudflare_turnstile %>"></div>
 <% end %>
