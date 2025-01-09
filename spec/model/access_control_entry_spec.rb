@@ -72,11 +72,11 @@ RSpec.describe AccessControlEntry do
     firewall.associate_with_project(project)
     expect(ace.valid?).to be true
 
-    ace.object_id = ApiKey.create_inference_token(project2).id
+    ace.object_id = ApiKey.create_inference_api_key(project2).id
     expect(ace.valid?).to be false
     expect(ace.errors).to eq(object_id: ["is not related to this project"])
 
-    ace.object_id = ApiKey.create_inference_token(project).id
+    ace.object_id = ApiKey.create_inference_api_key(project).id
     expect(ace.valid?).to be true
 
     private_subnet_id = PrivateSubnet.create_with_id(

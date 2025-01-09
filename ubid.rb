@@ -105,7 +105,7 @@ class UBID
     from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
   end
 
-  # InferenceToken does not have a type, and using et (TYPE_ETC) seems like a bad idea
+  # InferenceApiKey does not have a type, and using et (TYPE_ETC) seems like a bad idea
   ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").map! { _1.split(": ") }.to_h.freeze
     Project: pj
     Vm: vm
@@ -113,7 +113,7 @@ class UBID
     Firewall: fw
     LoadBalancer: 1b
     InferenceEndpoint: 1e
-    InferenceToken: 1t
+    InferenceApiKey: 1t
     Postgres: pg
     SubjectTag: ts
     ActionTag: ta

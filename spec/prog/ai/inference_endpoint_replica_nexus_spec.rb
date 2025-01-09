@@ -253,8 +253,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     let(:projects) { [Project.create_with_id(name: "p1").tap { _1.associate_with_project(_1) }, Project.create_with_id(name: "p2").tap { _1.associate_with_project(_1) }] }
 
     before do
-      ApiKey.create_inference_token(projects.first)
-      ApiKey.create_inference_token(projects.last)
+      ApiKey.create_inference_api_key(projects.first)
+      ApiKey.create_inference_api_key(projects.last)
     end
 
     it "for private endpoints" do

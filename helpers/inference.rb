@@ -12,8 +12,8 @@ class Clover
     dataset.eager(:load_balancer)
   end
 
-  def inference_token_ds
-    dataset = dataset_authorize(@project.api_keys_dataset.where(used_for: "inference_endpoint"), "InferenceToken:view")
+  def inference_api_key_ds
+    dataset = dataset_authorize(@project.api_keys_dataset.where(used_for: "inference_endpoint"), "InferenceApiKey:view")
     dataset = dataset.where(is_valid: true)
     dataset.order(:created_at)
   end

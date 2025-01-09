@@ -23,7 +23,7 @@ MSG
     curl_snippet = <<-CURL
 curl #{ie[:url]}#{path} \\
   -H <span class="text-green-400">"Content-Type: application/json"</span> \\
-  -H <span class="text-green-400">"Authorization: Bearer <span class="text-orange-500">$INFERENCE_TOKEN</span>"</span> \\
+  -H <span class="text-green-400">"Authorization: Bearer <span class="text-orange-500">$INFERENCE_API_KEY</span>"</span> \\
   -d <span class="text-green-400">'{
     "model": "#{ie[:model_name]}",
     #{curl_message}   }'</span>

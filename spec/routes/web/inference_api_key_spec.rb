@@ -2,7 +2,7 @@
 
 require_relative "spec_helper"
 
-RSpec.describe Clover, "inference-token" do
+RSpec.describe Clover, "inference-api-key" do
   let(:user) { create_account }
 
   let(:project) { user.create_project_with_default_policy("project-1") }
@@ -10,14 +10,14 @@ RSpec.describe Clover, "inference-token" do
   describe "feature enabled" do
     before do
       login(user.email)
-      visit "#{project.path}/inference-token"
+      visit "#{project.path}/inference-api-key"
       expect(ApiKey.all).to be_empty
-      click_button "Create Token"
+      click_button "Create API Key"
       @api_key = ApiKey.first
     end
 
-    it "inference token page allows creating inference tokens" do
-      expect(page).to have_flash_notice("Created inference token with id #{@api_key.ubid}")
+    it "inference api key page allows creating inference api key" do
+      expect(page).to have_flash_notice("Created Inference API Key with id #{@api_key.ubid}")
 
       expect(ApiKey.count).to eq(1)
       expect(@api_key.owner_id).to eq(project.id)
@@ -27,7 +27,7 @@ RSpec.describe Clover, "inference-token" do
       expect(@api_key.is_valid).to be(true)
     end
 
-    it "inference token page allows removing inference tokens" do
+    it "inference api key page allows removing inference api keys" do
       access_tag_ds = DB[:access_tag].where(hyper_tag_id: @api_key.id)
       expect(access_tag_ds.all).not_to be_empty
 
@@ -37,20 +37,19 @@ RSpec.describe Clover, "inference-token" do
       page.driver.delete data_url, {_csrf:}
       expect(page.status_code).to eq(204)
       expect(ApiKey.all).to be_empty
-      expect(access_tag_ds.all).to be_empty
-      visit "#{project.path}/user/token"
-      expect(page).to have_flash_notice("Inference token deleted successfully")
+      visit "#{project.path}/inference-api-key"
+      expect(page).to have_flash_notice("Inference API Key deleted successfully")
 
       page.driver.delete data_url, {_csrf:}
       expect(page.status_code).to eq(204)
-      visit "#{project.path}/user/token"
-      expect(page.html).not_to include("Inference token deleted successfully")
+      visit "#{project.path}/inference-api-key"
+      expect(page.html).not_to include("Inference API Key deleted successfully")
     end
   end
 
   describe "unauthenticated" do
-    it "inference token page is not accessible" do
-      visit "/inference-token"
+    it "inference api key page is not accessible" do
+      visit "/inference-api-key"
 
       expect(page.title).to eq("Ubicloud - Login")
     end

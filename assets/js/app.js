@@ -297,7 +297,7 @@ function setupPlayground() {
 
     const prompt = $('#inference_prompt').val();
     const endpoint = $('#inference_endpoint').val();
-    const token = $('#inference_token').val();
+    const api_key = $('#inference_api_key').val();
 
     if (!prompt) {
       alert("Please enter a prompt.");
@@ -307,8 +307,8 @@ function setupPlayground() {
       alert("Please select an inference endpoint.");
       return;
     }
-    if (!token) {
-      alert("Please select an inference token.");
+    if (!api_key) {
+      alert("Please select an inference api key.");
       return;
     }
 
@@ -327,7 +327,7 @@ function setupPlayground() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${api_key}`,
         },
         body: JSON.stringify({
           model: $('#inference_endpoint option:selected').text().trim(),

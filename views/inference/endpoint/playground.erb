@@ -17,14 +17,14 @@
         ) %>
       </div>
       <div class="flex items-center gap-2">
-        <label for="inference_token" class="text-sm font-medium leading-6">Inference Token</label>
+        <label for="inference_api_key" class="text-sm font-medium leading-6">Inference API Key</label>
         <%== render(
           "components/form/select",
           locals: {
-            name: "inference_token",
-            placeholder: "Pick a token",
-            options: @inference_tokens.map { |it| [it[:key], it[:id]] },
-            selected: @inference_tokens.any? ? @inference_tokens.first[:key] : nil
+            name: "inference_api_key",
+            placeholder: "Pick a key",
+            options: @inference_api_keys.map { |it| [it[:key], it[:id]] },
+            selected: @inference_api_keys.any? ? @inference_api_keys.first[:key] : nil
           }
         ) %>
       </div>
