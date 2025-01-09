@@ -121,13 +121,13 @@
               <% if @invoice_data[:discount] != "$0.00" %>
                 <dl class="grid grid-cols-2 gap-x-3">
                   <dt class="text-right font-semibold text-gray-800">Discount:</dt>
-                  <dd class="text-gray-500">-<%= @invoice_data[:discount] %></dd>
+                  <dd class="text-gray-500" id="invoice-discount">-<%= @invoice_data[:discount] %></dd>
                 </dl>
               <% end %>
               <% if @invoice_data[:credit] != "$0.00" %>
                 <dl class="grid grid-cols-2 gap-x-3">
                   <dt class="text-right font-semibold text-gray-800">Credit:</dt>
-                  <dd class="text-gray-500">-<%= @invoice_data[:credit] %></dd>
+                  <dd class="text-gray-500" id="invoice-credit">-<%= @invoice_data[:credit] %></dd>
                 </dl>
               <% end %>
               <dl class="grid grid-cols-2 gap-x-3 text-2xl">
