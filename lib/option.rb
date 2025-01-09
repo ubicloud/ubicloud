@@ -71,8 +71,6 @@ module Option
     storage_size_options = [_2 * 32, _2 * 64, _2 * 128]
     storage_size_options.map! { |size| size / 15 * 16 } if [30, 60].include?(_2)
 
-    storage_size_options.pop if _1.name == "leaseweb-wdc02"
-
     storage_size_limiter = [4096, storage_size_options.last].min.fdiv(storage_size_options.last)
     storage_size_options.map! { |size| size * storage_size_limiter }
     [
