@@ -105,7 +105,10 @@ RSpec.describe Clover, "auth" do
     AccessControlEntry.create_with_id(project_id: p.id, subject_id:, action_id: ActionType::NAME_MAP["Project:view"])
     p.add_invitation(email: TEST_USER_EMAIL, policy: "Admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
+    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("1")
     visit "/create-account"
+    expect(page.find(".cf-turnstile")["data-sitekey"]).to eq "1"
+    expect(Config).to receive(:cloudflare_turnstile_site_key).and_return(nil)
     fill_in "Full Name", with: "John Doe"
     fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
