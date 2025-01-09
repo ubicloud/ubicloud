@@ -91,7 +91,7 @@ class Clover
     options.add_option(name: "storage_size", values: ["64", "128", "256", "512", "1024", "2048", "4096"], parent: "size") do |flavor, location, size, storage_size|
       size = size.split("-").last.to_i
       lower_limit = [size * 32, 1024].min
-      upper_limit = (2**Math.log2(size).ceil) * ((location == "eu-central-h1") ? 128 : 64)
+      upper_limit = (2**Math.log2(size).ceil) * 128
       storage_size.to_i >= lower_limit && storage_size.to_i <= upper_limit
     end
 
