@@ -7,18 +7,6 @@ class Prog::Vnet::CertServer < Prog::Base
     @vm ||= Vm[frame.fetch("vm_id")]
   end
 
-  def cert_folder
-    "/vm/#{vm.inhost_name}/cert"
-  end
-
-  def cert_path
-    "#{cert_folder}/cert.pem"
-  end
-
-  def key_path
-    "#{cert_folder}/key.pem"
-  end
-
   label def before_run
     pop "vm is destroyed" unless vm
   end
@@ -51,8 +39,6 @@ class Prog::Vnet::CertServer < Prog::Base
 
     cert_payload = cert.cert
     cert_key_payload = OpenSSL::PKey::EC.new(cert.csr_key).to_pem
-    vm.vm_host.sshable.cmd("sudo -u #{vm.inhost_name} mkdir -p #{cert_folder}")
-    vm.vm_host.sshable.cmd("sudo -u #{vm.inhost_name} tee #{cert_path}", stdin: cert_payload)
-    vm.vm_host.sshable.cmd("sudo -u #{vm.inhost_name} tee #{key_path}", stdin: cert_key_payload)
+    vm.vm_host.sshable.cmd("sudo host/bin/setup-cert-server put-certificate #{vm.inhost_name}", stdin: JSON.generate({cert_payload: cert_payload.to_s, cert_key_payload: cert_key_payload.to_s}))
   end
 end

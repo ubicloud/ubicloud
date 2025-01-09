@@ -47,17 +47,15 @@ RSpec.describe Prog::Vnet::CertServer do
   end
 
   describe "#reshare_certificate" do
-    it "reates a certificate folder, puts the certificate and pops" do
+    it "puts the certificate and pops" do
       expect(nx).to receive(:put_cert_to_vm)
       expect { nx.reshare_certificate }.to exit({"msg" => "certificate is reshared"})
     end
   end
 
   describe "#put_certificate" do
-    it "creates a certificate folder, puts the certificate and hops to start_certificate_server" do
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo -u #{vm.inhost_name} mkdir -p /vm/#{vm.inhost_name}/cert")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo -u #{vm.inhost_name} tee /vm/#{vm.inhost_name}/cert/cert.pem", stdin: "cert")
-      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo -u #{vm.inhost_name} tee /vm/#{vm.inhost_name}/cert/key.pem", stdin: OpenSSL::PKey::EC.new(cert.csr_key).to_pem)
+    it "puts the certificate to vm and hops to start_certificate_server" do
+      expect(vm.vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-cert-server put-certificate test-vm", stdin: JSON.generate({cert_payload: "cert", cert_key_payload: OpenSSL::PKey::EC.new(cert.csr_key).to_pem}))
       expect { nx.put_certificate }.to hop("start_certificate_server")
     end
 
