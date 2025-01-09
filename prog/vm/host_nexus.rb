@@ -244,12 +244,39 @@ class Prog::Vm::HostNexus < Prog::Base
       vm.incr_start_after_host_reboot
     }
 
+    when_graceful_reboot_set? do
+      fail "BUG: VmHost not in draining state" unless vm_host.allocation_state == "draining"
+      vm_host.update(allocation_state: "accepting")
+      decr_graceful_reboot
+    end
+
     vm_host.update(allocation_state: "accepting") if vm_host.allocation_state == "unprepared"
 
     hop_wait
   end
 
+  label def prep_graceful_reboot
+    case vm_host.allocation_state
+    when "accepting"
+      vm_host.update(allocation_state: "draining")
+    when "draining"
+      # nothing
+    else
+      fail "BUG: VmHost not in accepting or draining state"
+    end
+
+    if vm_host.vms_dataset.empty?
+      hop_prep_reboot
+    end
+
+    nap 30
+  end
+
   label def wait
+    when_graceful_reboot_set? do
+      hop_prep_graceful_reboot
+    end
+
     when_reboot_set? do
       hop_prep_reboot
     end
