@@ -1,6 +1,27 @@
 # frozen_string_literal: true
 
 class Clover < Roda
+  PG_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
+    "running" => "bg-green-100 text-green-800",
+    "creating" => "bg-yellow-100 text-yellow-800",
+    "deleting" => "bg-red-100 text-red-800"
+  ).freeze
+
+  PS_STATE_LABEL_COLOR = Hash.new("bg-yellow-100 text-yellow-80").merge!(
+    "available" => "bg-green-100 text-green-800"
+  ).freeze
+
+  VM_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
+    "running" => "bg-green-100 text-green-800",
+    "creating" => "bg-yellow-100 text-yellow-800",
+    "deleting" => "bg-red-100 text-red-800"
+  )
+  ["rebooting", "starting", "waiting for capacity", "restarting"].each do
+    VM_STATE_LABEL_COLOR[_1] = VM_STATE_LABEL_COLOR["creating"]
+  end
+  VM_STATE_LABEL_COLOR["deleted"] = VM_STATE_LABEL_COLOR["deleting"]
+  VM_STATE_LABEL_COLOR.freeze
+
   def csrf_tag(*)
     render("components/form/hidden", locals: {name: csrf_field, value: csrf_token(*)})
   end

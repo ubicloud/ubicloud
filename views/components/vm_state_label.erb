@@ -1,18 +1,2 @@
 <%# locals: (state:, extra_class: nil) %>
-<% case state %>
-<% when "running" %>
-  <% color = "bg-green-100 text-green-800" %>
-<% when "creating", "rebooting", "starting", "waiting for capacity", "restarting" %>
-  <% color = "bg-yellow-100 text-yellow-800" %>
-<% when "deleting", "deleted" %>
-  <% color = "bg-red-100 text-red-800" %>
-<% else %>
-  <% color = "bg-slate-100 text-slate-800" %>
-<% end %>
-
-<span
-  class="inline-flex items-baseline rounded-full px-2 text-xs font-semibold leading-5 <%= color %> <%= extra_class %>"
->
-  <%== render("components/icon", locals: { name: "dot", classes: "mr-1.5 h-2 w-2" }) %>
-  <%= state %>
-</span>
+<%== render("components/state_label", locals: { state:, color: VM_STATE_LABEL_COLOR[state], extra_class: }) %>
