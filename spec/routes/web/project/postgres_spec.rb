@@ -207,12 +207,24 @@ RSpec.describe Clover, "postgres" do
 
       it "can reset superuser password of PostgreSQL database" do
         visit "#{project.path}#{pg.path}"
+        expect(page.title).to eq "Ubicloud - pg-with-permission"
         expect(page).to have_content "Reset superuser password"
+        password = pg.superuser_password
+
+        find(".reset-superuser-password-new-password").set("Dummy")
+        find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
+        click_button "Reset"
+        expect(page).to have_flash_error "Validation failed for following fields: password, repeat_password"
+        expect(find_by_id("password-error").text).to eq "Password must have 12 characters minimum. Password must have at least one digit."
+        expect(find_by_id("repeat_password-error").text).to eq "Passwords must match."
+
+        expect(pg.reload.superuser_password).to eq password
 
         find(".reset-superuser-password-new-password").set("DummyPassword123")
         find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
         click_button "Reset"
 
+        expect(page).to have_flash_notice "The superuser password will be updated in a few seconds"
         expect(pg.reload.superuser_password).to eq("DummyPassword123")
         expect(page.status_code).to eq(200)
       end

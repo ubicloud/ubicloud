@@ -152,15 +152,13 @@ module Validation
     messages.push("Password must have at least one lowercase letter.") unless original_password.match?(/[a-z]/)
     messages.push("Password must have at least one uppercase letter.") unless original_password.match?(/[A-Z]/)
     messages.push("Password must have at least one digit.") unless original_password.match?(/[0-9]/)
-    messages.push("Passwords must match.") if repeat_password && original_password != repeat_password
 
-    unless messages.empty?
-      if repeat_password
-        fail ValidationFailed.new({"original_password" => messages.map { _1 }})
-      else
-        fail ValidationFailed.new({"password" => messages.map { _1 }})
-      end
-    end
+    repeat_message = "Passwords must match." if repeat_password && original_password != repeat_password
+
+    details = {}
+    details["password"] = messages unless messages.empty?
+    details["repeat_password"] = repeat_message if repeat_message
+    fail ValidationFailed.new(details) unless details.empty?
   end
 
   def self.validate_cidr(cidr)
