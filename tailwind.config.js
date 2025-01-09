@@ -3,6 +3,7 @@ module.exports = {
   content: [
     "./views/**/*.erb",
     "./assets/**/*.js",
+    "./helpers/web.rb",
   ],
   theme: {
     extend: {},
