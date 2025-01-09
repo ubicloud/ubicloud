@@ -6,12 +6,12 @@ class Hosting::HetznerApis
     @host = hetzner_host
   end
 
-  def reimage(server_id, hetzner_ssh_key: Config.hetzner_ssh_key, dist: "Ubuntu 22.04.2 LTS base")
-    unless hetzner_ssh_key
-      raise "hetzner_ssh_key is not set"
+  def reimage(server_id, hetzner_ssh_public_key: Config.hetzner_ssh_public_key, dist: "Ubuntu 22.04.2 LTS base")
+    unless hetzner_ssh_public_key
+      raise "hetzner_ssh_public_key is not set"
     end
 
-    key_data = hetzner_ssh_key.split(" ")[1]
+    key_data = hetzner_ssh_public_key.split(" ")[1]
     decoded_data = Base64.decode64(key_data)
     fingerprint = OpenSSL::Digest::MD5.new(decoded_data).hexdigest
     formatted_fingerprint = fingerprint.scan(/../).join(":")

@@ -92,7 +92,7 @@ module Config
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
-  override :hetzner_ssh_key, string
+  override :hetzner_ssh_public_key, string
   override :minimum_invoice_charge_threshold, 0.5, float
   optional :cloudflare_turnstile_site_key, string
   optional :cloudflare_turnstile_secret_key, string
