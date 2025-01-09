@@ -457,13 +457,14 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def wait_lb_expiry
-    unless vm.lb_expiry_started_set?
-      vm.incr_lb_expiry_started
-      vm.load_balancer.evacuate_vm(vm)
-      nap 30
+    if vm.load_balancer
+      unless vm.lb_expiry_started_set?
+        vm.incr_lb_expiry_started
+        vm.load_balancer.evacuate_vm(vm)
+        nap 30
+      end
+      vm.load_balancer.remove_vm(vm)
     end
-
-    vm.load_balancer.remove_vm(vm) if vm.load_balancer
 
     vm.vm_host.sshable.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
 
