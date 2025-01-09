@@ -54,6 +54,17 @@ class CertServerSetup
     )
   end
 
+  def setup
+    copy_server
+    create_service
+    enable_and_start_service
+  end
+
+  def stop_and_remove
+    stop_and_remove_service
+    remove_paths
+  end
+
   def copy_server
     unless File.exist?(server_main_path)
       download_server
@@ -86,6 +97,7 @@ After=network.target
 NetworkNamespacePath=/var/run/netns/#{@vm_name}
 ExecStart=#{vm_server_path}
 Restart=always
+RestartSec=15
 Type=simple
 ProtectSystem=strict
 PrivateDevices=yes
@@ -104,19 +116,19 @@ Environment=GOMEMLIMIT=9MiB
 Environment=GOMAXPROCS=1
 CPUQuota=50%
 MemoryLimit=10M
-
 CERT_SERVICE
     )
+
+    r "systemctl daemon-reload"
   end
 
   def enable_and_start_service
-    r "systemctl enable #{service_file_path}"
-    r "systemctl start #{service_name}"
+    r "systemctl enable --now #{service_name}"
   end
 
   def stop_and_remove_service
-    r "systemctl stop #{service_name}"
-    r "systemctl disable #{service_name}"
+    r "systemctl disable --now #{service_name}" if File.exist?(service_file_path)
+    r "systemctl daemon-reload"
     FileUtils.rm_f(service_file_path)
   end
 

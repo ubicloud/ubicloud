@@ -19,12 +19,9 @@ cert_server_setup = CertServerSetup.new(vm_name)
 
 case verb
 when "setup"
-  cert_server_setup.copy_server
-  cert_server_setup.create_service
-  cert_server_setup.enable_and_start_service
+  cert_server_setup.setup
 when "stop_and_remove"
-  cert_server_setup.stop_and_remove_service
-  cert_server_setup.remove_paths
+  cert_server_setup.stop_and_remove
 when "put-certificate"
   params = $stdin.read
   params_json = JSON.parse(params)
