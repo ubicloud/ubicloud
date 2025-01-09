@@ -24,6 +24,11 @@ RSpec.describe VmSetup do
     expect(upper.to_s).to eq("2a01:4f9:2b:35b:7e41::/80")
   end
 
+  it "can enable cpu.max.burst on a slice's cgroup" do
+    expect(File).to receive(:write).with("/sys/fs/cgroup/test.slice/test.service/cpu.max.burst", "42000")
+    vs.enable_bursting("test.slice", 42)
+  end
+
   describe "#write_user_data" do
     let(:vps) { instance_spy(VmPath) }
 
@@ -150,8 +155,25 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
       expect(vs).to receive(:prepare_pci_devices).with([])
       expect(vs).to receive(:start_systemd_unit)
+      expect(vs).to receive(:enable_bursting).with("some_slice.slice", 200)
 
-      vs.recreate_unpersisted("gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets", "10.0.0.2", [], multiqueue: true)
+      vs.recreate_unpersisted(
+        "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",
+        "10.0.0.2", [], "some_slice.slice", 200, multiqueue: true
+      )
+    end
+
+    it "can create unpersisted state without bursting" do
+      expect(vs).to receive(:setup_networking).with(true, "gua", "ip4", "local_ip4", "nics", false, "10.0.0.2", multiqueue: true)
+      expect(vs).to receive(:hugepages).with(4)
+      expect(vs).to receive(:storage).with("storage_params", "storage_secrets", false)
+      expect(vs).to receive(:prepare_pci_devices).with([])
+      expect(vs).to receive(:start_systemd_unit)
+
+      vs.recreate_unpersisted(
+        "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",
+        "10.0.0.2", [], "system.slice", 0, multiqueue: true
+      )
     end
   end
 
