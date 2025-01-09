@@ -116,7 +116,8 @@ class Clover
         r.post true do
           authorize("Postgres:edit", pg.id)
 
-          required_parameters = ["url", "username", "password"]
+          password_param = (api? ? "password" : "metric-destination-password")
+          required_parameters = ["url", "username", password_param]
           request_body_params = validate_request_params(required_parameters)
 
           Validation.validate_url(request_body_params["url"])
@@ -126,7 +127,7 @@ class Clover
               postgres_resource_id: pg.id,
               url: request_body_params["url"],
               username: request_body_params["username"],
-              password: request_body_params["password"]
+              password: request_body_params[password_param]
             )
             pg.servers.each(&:incr_configure_prometheus)
           end
