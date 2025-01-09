@@ -13,26 +13,26 @@ RSpec.describe Hosting::HetznerApis do
 
   describe "reimage" do
     it "can reimage a server" do
-      expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
+      expect(Config).to receive(:hetzner_ssh_public_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
       Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 200, body: ""})
       expect(hetzner_apis.reimage(123)).to be_nil
     end
 
     it "raises an error if the reimage fails" do
-      expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
+      expect(Config).to receive(:hetzner_ssh_public_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 200, body: ""})
       Excon.stub({path: "/reset/123", method: :post, body: "type=hw"}, {status: 400, body: ""})
       expect { hetzner_apis.reimage(123) }.to raise_error Excon::Error::BadRequest
     end
 
     it "raises an error if the ssh key is not set" do
-      expect(Config).to receive(:hetzner_ssh_key).and_return(nil)
-      expect { hetzner_apis.reimage(123) }.to raise_error RuntimeError, "hetzner_ssh_key is not set"
+      expect(Config).to receive(:hetzner_ssh_public_key).and_return(nil)
+      expect { hetzner_apis.reimage(123) }.to raise_error RuntimeError, "hetzner_ssh_public_key is not set"
     end
 
     it "raises an error if the boot fails" do
-      expect(Config).to receive(:hetzner_ssh_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
+      expect(Config).to receive(:hetzner_ssh_public_key).and_return("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDQ8Z9Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0Z0").at_least(:once)
       Excon.stub({path: "/boot/123/linux", method: :post}, {status: 400, body: ""})
       expect { hetzner_apis.reimage(123) }.to raise_error Excon::Error::BadRequest
     end
