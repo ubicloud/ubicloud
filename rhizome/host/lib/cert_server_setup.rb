@@ -120,6 +120,12 @@ CERT_SERVICE
     FileUtils.rm_f(service_file_path)
   end
 
+  def put_certificate(cert_payload, cert_key_payload)
+    FileUtils.mkdir_p(cert_folder)
+    safe_write_to_file(cert_path, cert_payload)
+    safe_write_to_file(key_path, cert_key_payload)
+  end
+
   def remove_paths
     FileUtils.rm_rf(cert_folder)
   end
