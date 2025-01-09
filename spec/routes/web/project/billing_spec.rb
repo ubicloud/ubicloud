@@ -282,6 +282,24 @@ RSpec.describe Clover, "billing" do
         expect(page.title).to eq("Ubicloud - #{invoice.name} Invoice")
         expect(page).to have_content invoice.name
         expect(page).to have_content "Aggregated"
+        expect(page).to have_no_content "Tax ID:"
+        expect(page.has_css?("#invoice-discount")).to be false
+        expect(page.has_css?("#invoice-credit")).to be false
+
+        content = invoice.content
+        issuer_name = content["issuer_info"].delete("name")
+        content["billing_info"]["tax_id"] = "123XYZ"
+        content["discount"] = 1
+        content["credit"] = 2
+        expect(page).to have_content issuer_name
+        invoice.this.update(content:)
+
+        page.refresh
+        expect(page).to have_content invoice.name
+        expect(page).to have_content "Tax ID: 123XYZ"
+        expect(page).to have_no_content issuer_name
+        expect(find_by_id("invoice-discount").text).to eq "-$1.00"
+        expect(find_by_id("invoice-credit").text).to eq "-$2.00"
       end
 
       it "show current invoice when no usage" do
