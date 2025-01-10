@@ -1,13 +1,18 @@
-<%# locals: (title: nil, headers:, rows:, empty_state: nil) %>
+<%# locals: (title: nil, headers:, rows:, empty_state: nil, right_items: nil) %>
 
 <div>
-  <% if title %>
+  <% if title || right_items %>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
           <%= title %>
         </h3>
       </div>
+      <% if right_items %>
+        <div class="mt-4 flex md:ml-4 md:mt-0">
+          <%== right_items.join %>
+        </div>
+      <% end %>
     </div>
   <% end %>
 
