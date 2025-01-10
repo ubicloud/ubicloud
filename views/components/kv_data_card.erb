@@ -15,8 +15,6 @@
                   revealable: opts[:revealable]
                 }
               ) %>
-            <% elsif opts && opts[:revealable] && value %>
-              <%== render("components/revealable_content", locals: { content: value }) %>
             <% elsif opts && opts[:escape] == false %>
               <%== value %>
             <% else %>
