@@ -8,7 +8,8 @@ require "optparse"
 @started_at = Time.now
 
 def main(options)
-  hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id])
+  boot_images = get_additional_boot_images(options[:test_cases])
+  hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], additional_boot_images: boot_images)
   wait_until(hetzner_server_st, "wait")
 
   tests_to_wait = []
@@ -29,6 +30,14 @@ def main(options)
   unless github_runner_test_cases.empty?
     runner_st = Prog::Test::GithubRunner.assemble(options[:vm_host_id], github_runner_test_cases)
     tests_to_wait << [runner_st, nil]
+  end
+
+  postgres_test_cases = options[:test_cases].select { _1.include?("postgres") }
+  unless postgres_test_cases.empty?
+    if postgres_test_cases.include?("postgres_standard")
+      postgres_st = Prog::Test::PostgresResource.assemble
+      tests_to_wait << [postgres_st, nil]
+    end
   end
 
   # Although wait_until will be blocked while checking the first one
@@ -67,6 +76,11 @@ def log(st, msg)
     "#{st.prog}.#{st.label}"
   end
   $stdout.write "#{((Time.now - @started_at) / 60).round(2)}m | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
+end
+
+def get_additional_boot_images(test_cases)
+  images = YAML.load_file("./config/e2e_boot_images.yml").to_h { [_1["test_case"], _1["images"]] }
+  test_cases.flat_map { |test_case| images[test_case] || [] }.compact
 end
 
 options = {test_cases: ["vm"]}
