@@ -5,8 +5,11 @@
 <form action="<%= rodauth.verify_account_resend_path %>" class="rodauth space-y-6" role="form" method="POST">
   <%== rodauth.verify_account_resend_additional_form_tags %>
   <%== rodauth.csrf_tag(rodauth.verify_account_resend_path) %>
+  <% recently_sent = rodauth.verify_account_email_recently_sent? if rodauth.account %>
 
-  <div class="leading-6 text-sm"><%== rodauth.verify_account_resend_explanatory_text %></div>
+  <% if !rodauth.account || recently_sent %>
+    <div class="leading-6 text-sm"><%== rodauth.verify_account_resend_explanatory_text %></div>
+  <% end %>
 
   <% if rodauth.param_or_nil(rodauth.login_param) %>
     <%== render("components/form/hidden", locals: { name: rodauth.login_param, value: rodauth.param(rodauth.login_param) }) %>
@@ -19,7 +22,7 @@
       "components/form/submit_button",
       locals: {
         text: "Send Verification Again",
-        attributes: rodauth.verify_account_email_recently_sent? ? { disabled: true } : {}
+        attributes: recently_sent ? { disabled: true } : {}
       }
     ) %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>

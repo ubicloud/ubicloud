@@ -57,7 +57,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
 
-    expect(page).to have_content("You need to wait at least 300 seconds before sending another verification email. If you did not receive the email, please check your spam folder.")
+    expect(page).to have_content("You need to wait at least 5 minutes before sending another verification email. If you did not receive the email, please check your spam folder.")
 
     DB[:account_verification_keys].update(email_last_sent: Time.now - 310)
 
@@ -68,10 +68,19 @@ RSpec.describe Clover, "auth" do
 
     expect(page).to have_flash_error("The account you tried to login with is currently awaiting verification")
 
+    DB.transaction(rollback: :always) do
+      click_button "Send Verification Again"
+
+      expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
+      expect(Mail::TestMailer.deliveries.length).to eq 2
+    end
+
+    visit "/verify-account-resend"
+    fill_in "Email Address", with: TEST_USER_EMAIL
     click_button "Send Verification Again"
 
     expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
-    expect(Mail::TestMailer.deliveries.length).to eq 2
+    expect(Mail::TestMailer.deliveries.length).to eq 3
   end
 
   it "can create new account, verify it, and visit project which invited" do
