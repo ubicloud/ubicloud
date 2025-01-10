@@ -77,9 +77,20 @@
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
                   <%== render(
-                    "components/form/country_select",
+                    "components/form/select",
                     locals: {
+                      name: "country",
+                      label: "Country",
+                      placeholder: "Select a Country",
                       selected: @billing_info_data[:country],
+                      options:
+                        ISO3166::Country
+                          .all
+                          .reject { Config.sanctioned_countries.include?(_1.alpha2) }
+                          .sort_by(&:common_name)
+                          .map { |c| [c.alpha2, c.common_name] }
+                          .to_h
+                          .to_a,
                       attributes: {
                         required: true
                       }
