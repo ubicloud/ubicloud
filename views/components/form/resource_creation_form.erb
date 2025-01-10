@@ -53,7 +53,7 @@ form_elements.each do |element|
   when "radio_small_cards"
     locals = {name:, label:, options:, attributes: {required:}}
   when "select"
-    locals = {name:, label:, options:, placeholder:, description: element[:description]}
+    locals = {name:, label:, options:, placeholder:, description_html: element[:description_html]}
   when "checkbox"
     locals = {name:, label:, options:, description: element[:description]}
   when "text"

@@ -1,4 +1,4 @@
-<%# locals: (name: nil, id: name, classes: nil, label: nil, options: {}, selected: nil, placeholder: nil, error: nil, description: nil, attributes: {}) %>
+<%# locals: (name: nil, id: name, classes: nil, label: nil, options: {}, selected: nil, placeholder: nil, error: nil, description_html: nil, attributes: {}) %>
 <% selected = flash.dig("old", name) || selected
 error ||= flash.dig("errors", name) %>
 
@@ -50,11 +50,5 @@ error ||= flash.dig("errors", name) %>
   <% if error %>
     <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
   <% end %>
-  <% if description %>
-    <% if description.start_with?("<p") %>
-      <%== description %>
-    <% else %>
-      <p class="text-sm text-gray-500 leading-6" id="<%= name %>-description"><%== description %></p>
-    <% end %>
-  <% end %>
+  <%== description_html %>
 </div>
