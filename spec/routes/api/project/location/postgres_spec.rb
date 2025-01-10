@@ -245,7 +245,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "failover" do
-        project.set_ff_postgresql_base_image(true)
+        pg.flavor = PostgresResource::Flavor::PARADEDB
         pg.save_changes
         rs = pg.representative_server
         rs.update(timeline_access: "push")
@@ -276,7 +276,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "failover no standby" do
-        project.set_ff_postgresql_base_image(true)
+        pg.flavor = PostgresResource::Flavor::PARADEDB
         pg.save_changes
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"

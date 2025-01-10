@@ -56,7 +56,7 @@ class Clover
           fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered during restore!")
         end
 
-        unless @project.get_ff_postgresql_base_image
+        unless [PostgresResource::Flavor::LANTERN, PostgresResource::Flavor::PARADEDB].include?(pg.flavor)
           fail CloverError.new(400, "InvalidRequest", "Failover cannot be triggered for this resource!")
         end
 
