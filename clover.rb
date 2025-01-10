@@ -308,7 +308,7 @@ class Clover < Roda
       verify_account_email_sent_redirect { login_route }
       verify_account_email_recently_sent_redirect { login_route }
       verify_account_set_password? false
-      verify_account_resend_explanatory_text { verify_account_email_recently_sent? ? "<p>You need to wait at least #{verify_account_skip_resend_email_within} seconds before sending another verification email. If you did not receive the email, please check your spam folder.</p>" : super() }
+      verify_account_resend_explanatory_text "You need to wait at least 5 minutes before sending another verification email. If you did not receive the email, please check your spam folder."
 
       send_verify_account_email do
         Util.send_email(email_to, "Welcome to Ubicloud: Please Verify Your Account",
