@@ -89,9 +89,6 @@
                  elsif has_project_permission("Project:viewaccess")
                    users_url = "#{@project_data[:path]}/user/access-control"
                    users_label = "Access Control"
-                 elsif has_project_permission("Project:token")
-                   users_url = "#{@project_data[:path]}/user/token"
-                   users_label = "Tokens"
                  end
 
                 if users_url
@@ -105,6 +102,16 @@
                     }
                   )
                 end %>
+            <%== render(
+              "layouts/sidebar/item",
+              locals: {
+                name: "Tokens",
+                url: "#{@project_data[:path]}/token",
+                is_active: request.path.start_with?("#{@project_data[:path]}/token"),
+                icon: "hero-key",
+                has_permission: has_project_permission("Project:token")
+              }
+            ) %>
             <% if Config.stripe_secret_key %>
               <%== render(
                 "layouts/sidebar/item",
