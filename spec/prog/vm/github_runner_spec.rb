@@ -388,8 +388,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
-        ([ -f "/etc/docker/daemon.json" ] && sudo cat /etc/docker/daemon.json || echo '{}') | jq '. += #{JSON.generate({"experimental" => false, "dns-opts" => ["timeout:2", "attempts:3"]})}' | sudo tee /etc/docker/daemon.json
-        sudo systemctl restart docker
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")
@@ -408,8 +406,6 @@ RSpec.describe Prog::Vm::GithubRunner do
         jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
         echo "UBICLOUD_RUNTIME_TOKEN=my_token
         UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
-        ([ -f "/etc/docker/daemon.json" ] && sudo cat /etc/docker/daemon.json || echo '{}') | jq '. += #{JSON.generate({"experimental" => false, "dns-opts" => ["timeout:2", "attempts:3"]})}' | sudo tee /etc/docker/daemon.json
-        sudo systemctl restart docker
         echo "CUSTOM_ACTIONS_CACHE_URL=http://10.0.0.1:51123/random_token/" | sudo tee -a /etc/environment
       COMMAND
 
