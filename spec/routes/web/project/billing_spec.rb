@@ -61,8 +61,8 @@ RSpec.describe Clover, "billing" do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return({"setup_intent" => "st_123456790"})
       expect(Stripe::SetupIntent).to receive(:retrieve).with("st_123456790").and_return({"customer" => "cs_1234567890", "payment_method" => "pm_1234567890"})
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).twice
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).twice
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return({"card" => {"brand" => "visa"}}).thrice
 
       visit project.path
 
@@ -79,6 +79,13 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Billing Name", with: "ACME Inc.")
       expect(billing_info.payment_methods.first.stripe_id).to eq("pm_1234567890")
       expect(page).to have_content "Visa"
+      expect(page).to have_no_content "Discount"
+      expect(page).to have_no_content "100%"
+
+      project.this.update(discount: 100)
+      page.refresh
+      expect(page).to have_content "Discount"
+      expect(page).to have_content "100%"
     end
 
     it "can not create billing info with unauthorized payment" do
@@ -263,6 +270,12 @@ RSpec.describe Clover, "billing" do
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - Project Billing")
         expect(page).to have_content invoice.name
+
+        invoice.content["cost"] = 123.45
+        invoice.content["subtotal"] = 543.21
+        invoice.this.update(content: invoice.content)
+        page.refresh
+        expect(page).to have_content("$123.45 ($543.21)")
 
         click_link invoice.name
       end
