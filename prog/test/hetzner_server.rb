@@ -5,16 +5,18 @@ require_relative "../../lib/util"
 class Prog::Test::HetznerServer < Prog::Test::Base
   semaphore :destroy
 
-  def self.assemble(vm_host_id: nil)
+  def self.assemble(vm_host_id: nil, additional_boot_images: [])
     frame = if vm_host_id
       vm_host = VmHost[vm_host_id]
       {
         vm_host_id: vm_host.id, server_id: vm_host.hetzner_host.server_identifier,
-        hostname: vm_host.sshable.host, setup_host: false
+        hostname: vm_host.sshable.host, setup_host: false,
+        additional_boot_images: additional_boot_images
       }
     else
       {
-        server_id: Config.ci_hetzner_sacrificial_server_id, setup_host: true
+        server_id: Config.ci_hetzner_sacrificial_server_id, setup_host: true,
+        additional_boot_images: additional_boot_images
       }
     end
 
@@ -60,11 +62,12 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def setup_host
+    boot_images = (Option::BootImages.map { _1.name } || []) + frame["additional_boot_images"]
     vm_host = Prog::Vm::HostNexus.assemble(
       frame["hostname"],
       provider: "hetzner",
       hetzner_server_identifier: frame["server_id"],
-      default_boot_images: Option::BootImages.map { _1.name }
+      default_boot_images: boot_images
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
 

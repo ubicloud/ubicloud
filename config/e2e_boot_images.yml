@@ -1,0 +1,1 @@
+- {test_case: "postgres_standard", images: ["postgres16-ubuntu-2204"]}

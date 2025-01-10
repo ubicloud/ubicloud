@@ -87,7 +87,7 @@ module ThawedMock
   allow_mocking(Prog::DnsZone::SetupDnsServerVm, :vms_in_sync?)
   allow_mocking(Prog::Github::DestroyGithubInstallation, :assemble)
   allow_mocking(Prog::PageNexus, :assemble)
-  allow_mocking(Prog::Postgres::PostgresResourceNexus, :dns_zone)
+  allow_mocking(Prog::Postgres::PostgresResourceNexus, :assemble, :dns_zone)
   allow_mocking(Prog::Postgres::PostgresServerNexus, :assemble)
   allow_mocking(Prog::Postgres::PostgresTimelineNexus, :assemble)
   allow_mocking(Prog::Vm::GithubRunner, :assemble)
