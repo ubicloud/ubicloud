@@ -270,7 +270,7 @@ RSpec.describe Clover, "billing" do
       it "show invoice details" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "Foo Companye Name"}}).at_least(:once)
         bi = billing_record(Time.parse("2023-06-01"), Time.parse("2023-07-01"))
-        10.times do
+        100.times do
           billing_record(Time.parse("2023-06-01"), Time.parse("2023-06-01") + 10)
         end
         InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true).run
