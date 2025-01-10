@@ -158,6 +158,13 @@ RSpec.describe Clover, "private subnet" do
         visit "#{project.path}#{private_subnet.path}"
 
         expect(page).to have_content ps2.name
+        expect(page.all("a").map(&:text)).to include ps2.name
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"], object_id: private_subnet.id)
+        page.refresh
+        expect(page).to have_content ps2.name
+        expect(page.all("a").map(&:text)).not_to include ps2.name
       end
 
       it "can disconnect connected subnet" do

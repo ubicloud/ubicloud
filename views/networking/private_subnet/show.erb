@@ -1,4 +1,14 @@
-<% @page_title = @ps[:name] %>
+<% @page_title = @ps[:name]
+
+perm_checks = {
+  "Firewall:view" => Firewall.where(id: @ps[:firewalls].map { UBID.to_uuid(_1[:id]) }),
+  "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map { UBID.to_uuid(_1[:id]) })
+}
+
+viewable_fws, viewable_subnets =
+  perm_checks.map do |perm, ds|
+    dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v)).transform_keys! { UBID.from_uuidish(_1).to_s }
+  end %>
 
 <%== render(
   "components/page_header",
@@ -64,7 +74,7 @@
           [
             [
               (
-                if has_permission?("Firewall:view", fw[:id])
+                if viewable_fws[fw[:id]]
                   [fw[:name], { link: "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" }]
                 else
                   fw[:name]
@@ -97,7 +107,7 @@
         <% @connected_subnets.each do |subnet| %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <% if has_permission?("PrivateSubnet:view", subnet[:id]) %>
+              <% if viewable_subnets[subnet[:id]] %>
                 <a
                   href="<%= "#{@project_data[:path]}/location/#{subnet[:location]}/private-subnet/#{subnet[:name]}" %>"
                   class="text-orange-600 hover:text-orange-700"
