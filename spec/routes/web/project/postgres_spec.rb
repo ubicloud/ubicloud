@@ -93,6 +93,24 @@ RSpec.describe Clover, "postgres" do
         expect(PostgresResource.first.projects.first.id).to eq(project.id)
       end
 
+      it "handles errors when creating new PostgreSQL database" do
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: "eu-central-h1"
+        choose option: "standard-60"
+        choose option: PostgresResource::HaType::NONE
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_flash_error("Validation failed for following fields: storage_size")
+        expect(page).to have_content("Storage size must be one of the following: 1024.0, 2048.0, 4096.0")
+        expect(PostgresResource.count).to eq(0)
+      end
+
       it "can create new ParadeDB PostgreSQL database" do
         expect(Config).to receive(:postgres_paradedb_notification_email).and_return("dummy@mail.com")
         expect(Util).to receive(:send_email)
