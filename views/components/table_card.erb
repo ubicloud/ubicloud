@@ -13,29 +13,35 @@
 
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <table class="min-w-full divide-y divide-gray-300">
-      <thead class="bg-gray-50">
-        <tr>
-          <% headers.each_with_index do |name, i| %>
-            <th
-              scope="col"
-              <% if i == 0 %>
-              class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900"
-              <% elsif i + 1 == headers.length %>
-              class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"
-              <% else %>
-              class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
-              <% end %>
-            >
-              <%= name %>
-            </th>
-          <% end %>
-        </tr>
-      </thead>
+      <% unless headers.empty? || rows.empty? %>
+        <thead class="bg-gray-50">
+          <tr>
+            <% headers.each_with_index do |name, i| %>
+              <th
+                scope="col"
+                <% if i == 0 %>
+                class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900"
+                <% elsif i + 1 == headers.length %>
+                class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"
+                <% else %>
+                class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
+                <% end %>
+              >
+                <%= name %>
+              </th>
+            <% end %>
+          </tr>
+        </thead>
+      <% end %>
       <tbody class="divide-y divide-gray-200 bg-white">
         <% if rows.empty? %>
           <tr>
             <td colspan="<%= headers.length %>" class="text-center py-4 px-8 lg:px-32">
-              <%== empty_state %>
+              <% if empty_state.is_a?(Hash) %>
+                <%== render("components/empty_state", { locals: empty_state }) %>
+              <% else %>
+                <%== empty_state %>
+              <% end %>
             </td>
           </tr>
         <% else %>

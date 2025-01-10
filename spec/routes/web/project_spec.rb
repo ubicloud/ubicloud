@@ -34,11 +34,13 @@ RSpec.describe Clover, "project" do
         user.projects.each { user.dissociate_with_project(_1) }
 
         visit "/project"
-
         expect(page.title).to eq("Ubicloud - Projects")
-        expect(page).to have_content "No projects"
 
-        click_link "New Project"
+        within ".empty-state" do
+          expect(page).to have_content "No projects"
+
+          click_link "Create Project"
+        end
         expect(page.title).to eq("Ubicloud - Create Project")
       end
 

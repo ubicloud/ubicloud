@@ -43,7 +43,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - Virtual Machines")
         expect(page).to have_content "No virtual machines"
 
-        click_link "New Virtual Machine"
+        click_link "Create Virtual Machine"
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
       end
 
@@ -96,7 +96,7 @@ RSpec.describe Clover, "vm" do
 
         visit "#{project.path}/vm"
         expect(page).to have_content "Get started by creating a new virtual machine."
-        click_link "New Virtual Machine"
+        click_link "Create Virtual Machine"
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
 
         click_button "Create"

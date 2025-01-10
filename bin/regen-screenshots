@@ -232,7 +232,7 @@ class RegenScreenshots
 
     resize(1800)
     click_link "Compute"
-    click_link "New Virtual Machine"
+    click_link "Create Virtual Machine"
     screenshot "quick-start/managed-services-2-screenshot.png"
 
 =begin
@@ -254,7 +254,7 @@ class RegenScreenshots
       end
     end
 
-    click_link "New Load Balancer"
+    click_link "Create Load Balancer"
 
     fill_in "Name", with: "my-blog"
     select "blog-app1-subnet"

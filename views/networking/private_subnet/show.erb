@@ -69,6 +69,7 @@ viewable_fws, viewable_subnets =
     locals: {
       title: "Attached Firewalls",
       headers: %w[Name Description],
+      empty_state: "No firewall attached",
       rows:
         @ps[:firewalls].map do |fw|
           [
