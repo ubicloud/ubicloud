@@ -50,9 +50,7 @@ class Serializers::Invoice < Serializers::Base
                    }
                  end
                end.group_by { _1[:description] }.flat_map do |description, line_items|
-                 if line_items.count <= 5 || description.end_with?("GitHub Runner")
-                   line_items
-                 else
+                 if line_items.count > 100 && description.end_with?("Address", "Virtual Machine")
                    duration_sum = line_items.sum { _1[:duration] }
                    amount_sum = line_items.sum { _1[:amount] }
                    cost_sum = line_items.sum { _1[:cost] }
@@ -65,6 +63,8 @@ class Serializers::Invoice < Serializers::Base
                      cost_humanized: humanized_cost(cost_sum),
                      usage: BillingRate.line_item_usage(line_items.first["resource_type"], line_items.first["resource_family"], amount_sum, duration_sum)
                    }
+                 else
+                   line_items
                  end
                end.sort_by { _1[:name] }
       )
