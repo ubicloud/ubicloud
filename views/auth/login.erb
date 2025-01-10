@@ -7,10 +7,7 @@
   <%== rodauth.csrf_tag %>
 
   <%== render("components/rodauth/login_field") %>
-
-  <% unless rodauth.skip_password_field_on_login? %>
-    <%== render("components/rodauth/password_field") %>
-  <% end %>
+  <%== render("components/rodauth/password_field") %>
 
   <div class="flex items-center justify-between">
     <div class="flex items-center">
