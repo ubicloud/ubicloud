@@ -187,6 +187,46 @@ RSpec.describe Clover, "postgres" do
 
         expect(page.title).to eq("Ubicloud - #{pg.name}")
         expect(page).to have_content pg.name
+        expect(page).to have_content "Waiting for host to be ready..."
+
+        expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(true)
+        page.refresh
+        expect(page).to have_content "#{pg.name}.#{pg.ubid}.postgres.ubicloud.com"
+        expect(page).to have_no_content "Waiting for host to be ready..."
+      end
+
+      it "does not show delete or edit options without the appropriate permissions" do
+        pg
+        visit "#{project.path}/postgres"
+        click_link pg.name, href: "#{project.path}#{pg.path}"
+        expect(page.title).to eq("Ubicloud - #{pg.name}")
+        expect(page.body).to include "metric-destination-password"
+        expect(page.body).to include "form-pg-md-create"
+        expect(page.body).not_to include "Lantern is a PostgreSQL-based vector database"
+        expect(page).to have_content "Danger Zone"
+
+        pg.this.update(flavor: PostgresResource::Flavor::LANTERN)
+        backup = Struct.new(:key, :last_modified)
+        restore_target = Time.now.utc
+        expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+        page.refresh
+        fill_in "New server name", with: "restored-server"
+        fill_in "Target Time (UTC)", with: restore_target.strftime("%Y-%m-%d %H:%M"), visible: false
+        click_button "Fork"
+        expect(page.body).to include "metric-destination-password"
+        expect(page.body).to include "form-pg-md-create"
+        expect(page.body).to include "Lantern is a PostgreSQL-based vector database"
+        expect(page).to have_content "Danger Zone"
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        page.refresh
+        expect(page.title).to eq("Ubicloud - restored-server")
+        expect(page.body).not_to include "metric-destination-password"
+        expect(page.body).not_to include "form-pg-md-create"
+        expect(page.body).to include "Lantern is a PostgreSQL-based vector database"
+        expect(page).to have_no_content "Danger Zone"
       end
 
       it "raises forbidden when does not have permissions" do
