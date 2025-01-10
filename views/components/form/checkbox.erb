@@ -1,5 +1,4 @@
-<%# locals: (name: nil, id_prefix: nil, label: nil, options: {}, error: nil, description: nil, attributes: {}) %>
-<% error ||= rodauth.field_error(name) || flash.dig("errors", name) %>
+<%# locals: (name: nil, id_prefix: nil, label: nil, options: {}, description: nil, attributes: {}) %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
@@ -31,9 +30,6 @@
       <% end %>
     </div>
   </fieldset>
-  <% if error %>
-    <p class="text-sm text-red-600 leading-6"><%= error %></p>
-  <% end %>
   <% if description %>
     <p class="text-sm text-gray-500 leading-6"><%== description %></p>
   <% end %>
