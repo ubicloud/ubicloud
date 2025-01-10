@@ -1,4 +1,5 @@
 <% @page_title = @firewall[:name] %>
+<% edit_perm = has_permission?("Firewall:edit", @firewall[:id]) %>
 
 <%== render(
   "components/page_header",
@@ -38,7 +39,7 @@
         <tr>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Port range</th>
-          <% if has_permission?("Firewall:edit", @firewall[:id]) %>
+          <% if edit_perm %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
         </tr>
@@ -48,7 +49,7 @@
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:port_range] %></td>
-            <% if has_permission?("Firewall:edit", @firewall[:id]) %>
+            <% if edit_perm %>
               <td
                 id="fwr-delete-<%=fwr[:id]%>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
@@ -58,7 +59,7 @@
             <% end %>
           </tr>
         <% end %>
-        <% if has_permission?("Firewall:edit", @firewall[:id]) %>
+        <% if edit_perm %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <%== render(
@@ -115,7 +116,7 @@
       <thead class="bg-gray-50">
         <tr>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
-          <% if has_permission?("Firewall:edit", @firewall[:id]) %>
+          <% if edit_perm %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
         </tr>
@@ -129,16 +130,18 @@
                 class="text-orange-600 hover:text-orange-700"
               ><%= ps[:name] %></a>
             </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <form action="<%= "#{request.path}/detach-subnet" %>" role="form" method="POST">
-                <%== csrf_tag("#{request.path}/detach-subnet") %>
-                <input type="hidden" name="private_subnet_id" value="<%= ps[:id] %>">
-                <%== render("components/form/submit_button", locals: { text: "Detach" }) %>
-              </form>
-            </td>
+            <% if edit_perm %>
+              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                <form action="<%= "#{request.path}/detach-subnet" %>" role="form" method="POST">
+                  <%== csrf_tag("#{request.path}/detach-subnet") %>
+                  <input type="hidden" name="private_subnet_id" value="<%= ps[:id] %>">
+                  <%== render("components/form/submit_button", locals: { text: "Detach" }) %>
+                </form>
+              </td>
+            <% end %>
           </tr>
         <% end %>
-        <% if has_permission?("Firewall:edit", @firewall[:id]) %>
+        <% if edit_perm %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
               <%== render(

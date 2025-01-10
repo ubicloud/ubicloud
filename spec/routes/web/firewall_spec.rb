@@ -60,6 +60,52 @@ RSpec.describe Clover, "firewall" do
         expect(page).to have_content firewall.name
         expect(page).to have_no_content fw_wo_permission.name
       end
+
+      it "does not show links to firewalls if user lacks Firewall:view access to them" do
+        firewall
+        fw = Firewall.create_with_id(name: "viewable-fw", description: "viewable-fw", location: "hetzner-fsn1")
+        fw.associate_with_project(project)
+
+        visit "#{project.path}/firewall"
+        link_texts = page.all("a").map(&:text)
+        expect(link_texts).to include fw.name
+        expect(link_texts).to include firewall.name
+        expect(link_texts).to include "Create Firewall"
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"], object_id: fw.id)
+        page.refresh
+        expect(page).to have_no_content firewall.name
+        link_texts = page.all("a").map(&:text)
+        expect(link_texts).to include fw.name
+        expect(link_texts).not_to include "Create Firewall"
+
+        click_link fw.name
+        expect(page).to have_no_content "Delete firewall"
+        expect(page.body).not_to include "form-fw-create-rule"
+
+        fw.add_firewall_rule(cidr: "127.0.0.1")
+        fw.add_private_subnet(net6: "::0/24", net4: "127.0.0.0/24", name: "dummy-ps", location: "somewhere")
+
+        page.refresh
+        expect(page.body).not_to include "private_subnet_id"
+        expect(page.body).not_to include "/detach-subnet\""
+        expect(page.body).not_to include "form-fw-create-rule-"
+        expect(page.body).not_to include "/firewall-rule/"
+      end
+
+      it "only shows New Firewall link on empty page if user has Firewall:create access" do
+        visit "#{project.path}/firewall"
+        expect(page.all("a").map(&:text)).to include "New Firewall"
+        expect(page).to have_content "Get started by creating a new firewall."
+        expect(page).to have_no_content "You don't have permission to create firewalls."
+
+        AccessControlEntry.dataset.destroy
+        page.refresh
+        expect(page.all("a").map(&:text)).not_to include "New Firewall"
+        expect(page).to have_content "You don't have permission to create firewalls."
+        expect(page).to have_no_content "Get started by creating a new firewall."
+      end
     end
 
     describe "create" do
