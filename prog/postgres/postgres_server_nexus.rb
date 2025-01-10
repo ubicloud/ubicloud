@@ -32,7 +32,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
           {encrypted: true, size_gib: 30},
           {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
         ],
-        boot_image: postgres_resource.project.get_ff_postgresql_base_image || boot_image,
+        boot_image: boot_image,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
         exclude_host_ids: exclude_host_ids
