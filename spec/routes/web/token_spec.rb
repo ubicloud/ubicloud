@@ -17,40 +17,23 @@ RSpec.describe Clover, "personal access token management" do
 
   before do
     login(user.email)
-    visit "#{project.path}/user/token"
+    visit "#{project.path}/token"
     expect(ApiKey.all).to be_empty
     click_button "Create Token"
     @api_key = ApiKey.first
   end
 
-  it "is directly accessible from dashboard if Project:user and Project:viewaccess are not allowed" do
+  it "is directly accessible from dashboard" do
     AccessControlEntry.dataset.destroy
+    visit "#{project.path}/dashboard"
+    expect(find_by_id("desktop-menu").text).not_to include("Tokens")
+
     AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
     visit "#{project.path}/dashboard"
 
     page.within("#desktop-menu") do
       click_link "Tokens"
     end
-    expect(page.title).to eq "Ubicloud - Default - Personal Access Tokens"
-  end
-
-  it "only shows token link if user has Project:token permissions" do
-    AccessControlEntry.dataset.destroy
-    visit "#{project.path}/dashboard"
-    expect(find_by_id("desktop-menu").text).not_to include("Users")
-    expect(find_by_id("desktop-menu").text).not_to include("Tokens")
-
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
-    page.refresh
-    expect(page.html).not_to include("Tokens")
-    page.within("#desktop-menu") do
-      click_link "Users"
-    end
-    expect(find_by_id("desktop-menu").text).not_to include("Tokens")
-
-    AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
-    page.refresh
-    click_link "Personal Access Tokens"
     expect(page.title).to eq "Ubicloud - Default - Personal Access Tokens"
   end
 
@@ -80,7 +63,7 @@ RSpec.describe Clover, "personal access token management" do
     expect(ApiKey.count).to eq 1
 
     ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
-    visit "#{project.path}/user/token"
+    visit "#{project.path}/token"
     ace.destroy
     btn = find(".delete-btn")
     page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
@@ -127,7 +110,7 @@ RSpec.describe Clover, "personal access token management" do
 
     page.driver.delete data_url, {_csrf:}
     expect(page.status_code).to eq(204)
-    visit "#{project.path}/user/token"
+    visit "#{project.path}/token"
     expect(page.html).not_to include("Personal access token deleted successfully")
   end
 
@@ -144,7 +127,7 @@ RSpec.describe Clover, "personal access token management" do
 
   it "cannot view token access control entries for token not associated with this project" do
     key = ApiKey.create_personal_access_token(user)
-    visit "#{project.path}/user/token/#{key.ubid}/access-control"
+    visit "#{project.path}/token/#{key.ubid}/access-control"
     expect(page.status_code).to eq 404
   end
 

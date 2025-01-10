@@ -4,16 +4,16 @@
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
-  form_action = "#{@project_data[:path]}/user/token/#{@token.ubid}/access-control"
+  form_action = "#{@project_data[:path]}/token/#{@token.ubid}/access-control"
   table_headers = %w[Action Object]
   edit_perm = true
 
   unrestricted = @token.unrestricted_token_for_project?(@project.id)
   restriction_title, restriction_path =
     if unrestricted
-      ["Restrict", "#{@project_data[:path]}/user/token/#{@token.ubid}/restrict-access"]
+      ["Restrict", "#{@project_data[:path]}/token/#{@token.ubid}/restrict-access"]
     else
-      ["Unrestrict", "#{@project_data[:path]}/user/token/#{@token.ubid}/unrestrict-access"]
+      ["Unrestrict", "#{@project_data[:path]}/token/#{@token.ubid}/unrestrict-access"]
     end
 else
   page_header = "Access Control"
@@ -27,7 +27,8 @@ else
   edit_perm = has_project_permission("Project:editaccess")
 end
 @page_title = "#{@project_data[:name]} - #{page_header}" %>
-<%== render("project/user-tabbar") %>
+
+<%== render("project/user-tabbar") unless @token %>
 
 <div class="space-y-1">
   <%== render(

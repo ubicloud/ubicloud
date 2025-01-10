@@ -1,11 +1,6 @@
 <% tabs = [
   (["User Management", @project_data[:path] + "/user"] if has_project_permission("Project:user")),
   (
-    if has_project_permission("Project:token")
-      ["Personal Access Tokens", @project_data[:path] + "/user/token", request.path.include?("/user/token")]
-    end
-  ),
-  (
     if has_project_permission("Project:viewaccess")
       ["Access Control", @project_data[:path] + "/user/access-control", request.path.include?("/user/access-control")]
     end
