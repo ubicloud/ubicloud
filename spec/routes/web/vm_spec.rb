@@ -82,6 +82,66 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be_falsey
       end
 
+      it "shows expected information on index page" do
+        project
+
+        visit "#{project.path}/vm"
+        expect(page).to have_content "Get started by creating a new virtual machine."
+        click_link "New Virtual Machine"
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+
+        click_button "Create"
+        vm_host = VmHost.new_with_id(location: "test")
+        Sshable.create { |s| s.id = vm_host.id }
+        vm_host.save_changes
+        address = Address.create(
+          cidr: "1.2.3.0/24",
+          routed_to_host_id: vm_host.id
+        )
+        vm.assigned_vm_address = AssignedVmAddress.new_with_id(
+          ip: "1.2.3.4",
+          address_id: address.id
+        )
+        spdk_installation = SpdkInstallation.create(
+          version: "1",
+          allocation_weight: 1
+        ) { |obj| obj.id = SpdkInstallation.generate_uuid }
+        storage_device = StorageDevice.create(
+          name: "t",
+          total_storage_gib: 147,
+          available_storage_gib: 24
+        )
+        storage_volume = VmStorageVolume.new(
+          boot: true,
+          size_gib: 123,
+          disk_index: 1,
+          spdk_installation_id: spdk_installation.id,
+          storage_device_id: storage_device.id
+        )
+        vm.add_vm_storage_volume(storage_volume)
+
+        visit "#{project.path}/vm"
+        page.refresh
+        expect(page).to have_content "Create Virtual Machine"
+        expect(page).to have_content "123 GB"
+        expect(page).to have_content "1.2.3.4"
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
+        storage_volume.update(size_gib: 0)
+        vm.assigned_vm_address.destroy
+        vm.update(ephemeral_net6: nil)
+        page.refresh
+        expect(page).to have_no_content "Create Virtual Machine"
+        expect(page).to have_content "Not assigned yet"
+
+        Nic.dataset.destroy
+        vm.destroy
+        page.refresh
+        expect(page).to have_no_content "New Virtual Machine"
+        expect(page).to have_content "You don't have permission to create virtual machines."
+      end
+
       it "can create new virtual machine with public ipv4" do
         project
 
