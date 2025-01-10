@@ -1,0 +1,5 @@
+- {name: "postgres16-standard-noha", postgres_version: "16", postgres_flavor: "standard", ha_type: "none"}
+- {name: "postgres17-standard-noha", postgres_version: "17", postgres_flavor: "standard", ha_type: "none"}
+- {name: "postgres16-paradedb-noha", postgres_version: "16", postgres_flavor: "paradedb", ha_type: "none"}
+- {name: "postgres17-paradedb-noha", postgres_version: "17", postgres_flavor: "paradedb", ha_type: "none"}
+- {name: "postgres17-lantern-noha", postgres_version: "17", postgres_flavor: "lantern", ha_type: "none"}

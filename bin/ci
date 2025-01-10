@@ -29,6 +29,12 @@ def main(options)
     tests_to_wait << [runner_st, nil]
   end
 
+  postgres_test_cases = options[:test_cases].select { _1.include?("postgres") }
+  unless postgres_test_cases.empty?
+    postgres_st = Prog::Test::Postgres.assemble(options[:vm_host_id], postgres_test_cases)
+    tests_to_wait << [postgres_st, nil]
+  end
+
   # Although wait_until will be blocked while checking the first one
   # it won't affect the total time as other strands will continue in parallel.
   # No need to make it parallel.
