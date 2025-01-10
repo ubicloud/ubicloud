@@ -79,6 +79,7 @@ module ThawedMock
   allow_mocking(VmHost, :[])
   allow_mocking(Vm, :[], :where)
   allow_mocking(VmPool, :[], :where)
+  allow_mocking(VmHostCpu, :create)
 
   # Progs
   allow_mocking(Prog::Ai::InferenceEndpointNexus, :assemble, :model_for_id)

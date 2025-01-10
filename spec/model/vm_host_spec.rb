@@ -365,4 +365,21 @@ RSpec.describe VmHost do
     expect(vh).to receive(:arch).and_return("nope")
     expect { vh.render_arch(arm64: "a", x64: "x") }.to raise_error RuntimeError, "BUG: inexhaustive render code"
   end
+
+  describe "#spdk_cpu_count" do
+    it "uses 2 cpus for AX161" do
+      expect(vh).to receive(:total_cpus).and_return(64)
+      expect(vh.spdk_cpu_count).to eq(2)
+    end
+
+    it "uses 4 cpus for RX220" do
+      expect(vh).to receive(:total_cpus).and_return(80)
+      expect(vh.spdk_cpu_count).to eq(4)
+    end
+
+    it "uses 4 cpus for AX162" do
+      expect(vh).to receive(:total_cpus).and_return(96)
+      expect(vh.spdk_cpu_count).to eq(4)
+    end
+  end
 end

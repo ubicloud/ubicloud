@@ -35,7 +35,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
       version: frame["version"],
       allocation_weight: 0,
       vm_host_id: vm_host.id,
-      cpu_count: spdk_cpu_count(total_host_cpus: vm_host.total_cpus),
+      cpu_count: vm_host.spdk_cpu_count,
       hugepages: 2
     ) { _1.id = SpdkInstallation.generate_uuid }
 
@@ -44,20 +44,12 @@ class Prog::Storage::SetupSpdk < Prog::Base
 
   label def install_spdk
     q_version = frame["version"].shellescape
-    cpu_count = spdk_cpu_count(total_host_cpus: vm_host.total_cpus)
+    cpu_count = vm_host.spdk_cpu_count
     # YYY: drop the default value after updating production data
     os_version = vm_host.os_version || "ubuntu-22.04"
     sshable.cmd("sudo host/bin/setup-spdk install #{q_version} #{cpu_count} #{os_version.shellescape}")
 
     hop_start_service
-  end
-
-  def spdk_cpu_count(total_host_cpus:)
-    if total_host_cpus <= 64
-      2
-    else
-      4
-    end
   end
 
   label def start_service

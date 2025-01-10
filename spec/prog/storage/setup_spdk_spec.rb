@@ -90,18 +90,4 @@ RSpec.describe Prog::Storage::SetupSpdk do
       expect(vm_host.reload.used_hugepages_1g).to eq(0)
     end
   end
-
-  describe "#spdk_cpu_count" do
-    it "uses 2 cpus for AX161" do
-      expect(setup_spdk.spdk_cpu_count(total_host_cpus: 64)).to eq(2)
-    end
-
-    it "uses 4 cpus for RX220" do
-      expect(setup_spdk.spdk_cpu_count(total_host_cpus: 80)).to eq(4)
-    end
-
-    it "uses 4 cpus for AX162" do
-      expect(setup_spdk.spdk_cpu_count(total_host_cpus: 96)).to eq(4)
-    end
-  end
 end
