@@ -92,6 +92,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    expect(page).to have_no_content "By signing up you agree to our"
     click_button "Create Account"
 
     expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
@@ -114,6 +115,7 @@ RSpec.describe Clover, "auth" do
     AccessControlEntry.create_with_id(project_id: p.id, subject_id:, action_id: ActionType::NAME_MAP["Project:view"])
     p.add_invitation(email: TEST_USER_EMAIL, policy: "Admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
+    expect(Config).to receive(:managed_service).and_return(true)
     expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("1")
     visit "/create-account"
     expect(page.find(".cf-turnstile")["data-sitekey"]).to eq "1"
@@ -122,6 +124,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Email Address", with: TEST_USER_EMAIL
     fill_in "Password", with: TEST_USER_PASSWORD
     fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    expect(page).to have_content "By signing up you agree to our"
     click_button "Create Account"
 
     expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")

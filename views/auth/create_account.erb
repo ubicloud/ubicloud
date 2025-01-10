@@ -19,15 +19,8 @@
   ) %>
 
   <%== render("components/rodauth/login_field") %>
-
-  <% if rodauth.create_account_set_password? %>
-    <%== render("components/rodauth/password_field") %>
-
-    <% if rodauth.require_password_confirmation? %>
-      <%== render("components/rodauth/password_field", locals: {confirm: true}) %>
-    <% end %>
-  <% end %>
-
+  <%== render("components/rodauth/password_field") %>
+  <%== render("components/rodauth/password_field", locals: {confirm: true}) %>
   <%== render("components/form/cloudflare_turnstile") %>
 
   <div class="flex flex-col text-center">
