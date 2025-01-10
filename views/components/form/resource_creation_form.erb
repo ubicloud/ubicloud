@@ -72,8 +72,10 @@ form_elements.each do |element|
     locals = {description:, tos_text:}
   when "section"
     locals = {label:, content: element[:content]}
+  # :nocov:
   else
     raise "Unknown element type: #{type}"
+  # :nocov:
   end %>
                 <%== container_opening_tag %>
                 <%== render("components/form/#{type}", locals:) %>
