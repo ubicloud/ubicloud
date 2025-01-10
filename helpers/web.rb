@@ -22,6 +22,12 @@ class Clover < Roda
   VM_STATE_LABEL_COLOR["deleted"] = VM_STATE_LABEL_COLOR["deleting"]
   VM_STATE_LABEL_COLOR.freeze
 
+  PG_HA_DATA = {
+    PostgresResource::HaType::NONE => "Inactive",
+    PostgresResource::HaType::ASYNC => "Active (1 standby with asynchronous replication)",
+    PostgresResource::HaType::SYNC => "Active (2 standbys with synchronous replication)"
+  }.freeze
+
   def csrf_tag(*)
     render("components/form/hidden", locals: {name: csrf_field, value: csrf_token(*)})
   end

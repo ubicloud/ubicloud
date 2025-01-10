@@ -1,4 +1,6 @@
-<% @page_title = @pg[:name] %>
+<% @page_title = @pg[:name]
+edit_perm = has_permission?("Postgres:edit", @pg[:id])
+delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
 
 <%== render(
   "components/page_header",
@@ -21,22 +23,14 @@
     ["Location", @pg[:location]],
     ["Compute", @pg[:vm_size]],
     ["Storage", "#{@pg[:storage_size_gib]} GB"],
-    ["Version", "Postgres #{@pg[:version]}"]
+    ["Version", "Postgres #{@pg[:version]}"],
+    ["High Availability", PG_HA_DATA[@pg[:ha_type]]]
   ]
   
-  case @pg[:ha_type]
-  when PostgresResource::HaType::NONE
-    data.push(["High Availability", "Inactive"])
-  when PostgresResource::HaType::ASYNC
-    data.push(["High Availability", "Active (1 standby with asynchronous replication)"])
-  when PostgresResource::HaType::SYNC
-    data.push(["High Availability", "Active (2 standbys with synchronous replication)"])
-  end
-  
-  if @pg[:connection_string] == ""
-    data.push(["Connection String", "Waiting for host to be ready..."])
-  else
+  if @pg[:connection_string]
     data.push(["Connection String", @pg[:connection_string], { copyable: true, revealable: true }])
+  else
+    data.push(["Connection String", "Waiting for host to be ready..."])
   end %>
 
   <div class="grid grid-cols-1 gap-6 md:grid-cols-6">
@@ -147,73 +141,71 @@
     </div>
   <% end %>
   <!-- Firewall Rules Card -->
-  <% if has_permission?("Postgres:view", @pg[:id]) %>
-    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-      <div class="min-w-0 flex-1">
-        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          Firewall Rules
-        </h3>
-      </div>
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        Firewall Rules
+      </h3>
     </div>
-    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead class="bg-gray-50">
+  </div>
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Port Range</th>
+          <% if edit_perm %>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @pg[:firewall_rules].each do |fwr| %>
           <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Port Range</th>
-            <% if (edit_perm = has_permission?("Postgres:edit", @pg[:id])) %>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432</td>
+            <% if edit_perm %>
+              <td
+                id="fwr-delete-<%=fwr[:id]%>"
+                class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+              >
+                <%== render("components/delete_button", locals: { url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "" }) %>
+              </td>
             <% end %>
           </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
-          <% @pg[:firewall_rules].each do |fwr| %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr[:cidr] %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">5432</td>
-              <% if edit_perm %>
-                <td
-                  id="fwr-delete-<%=fwr[:id]%>"
-                  class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
-                >
-                  <%== render("components/delete_button", locals: { url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "" }) %>
-                </td>
-              <% end %>
-            </tr>
-          <% end %>
-          <% if edit_perm %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "cidr",
-                    type: "cidr",
-                    attributes: {
-                      placeholder: "0.0.0.0/0",
-                      required: true,
-                      form: "form-pg-fwr-create"
-                    }
+        <% end %>
+        <% if edit_perm %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== render(
+                "components/form/text",
+                locals: {
+                  name: "cidr",
+                  type: "cidr",
+                  attributes: {
+                    placeholder: "0.0.0.0/0",
+                    required: true,
+                    form: "form-pg-fwr-create"
                   }
-                ) %>
-              </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                5432
-              </td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST" id="form-pg-fwr-create">
-                  <%== csrf_tag("#{request.path}/firewall-rule") %>
-                  <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "firewall-rule-create-button" }) %>
-                </form>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
-  <% end %>
+                }
+              ) %>
+            </td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              5432
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST" id="form-pg-fwr-create">
+                <%== csrf_tag("#{request.path}/firewall-rule") %>
+                <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "firewall-rule-create-button" }) %>
+              </form>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
   <!-- Metric Destination Card -->
-  <% if has_permission?("Postgres:edit", @pg[:id]) %>
+  <% if edit_perm %>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
         <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -228,9 +220,7 @@
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">URL</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Username</th>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Password</th>
-            <% if has_permission?("Postgres:edit", @pg[:id]) %>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
-            <% end %>
+            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 bg-white">
@@ -239,53 +229,49 @@
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= md[:url] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= md[:username] %></td>
               <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">●●●●●●</td>
-              <% if has_permission?("Postgres:edit", @pg[:id]) %>
-                <td
-                  id="md-delete-<%=md[:id]%>"
-                  class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
-                >
-                  <%== render("components/delete_button", locals: { url: "#{request.path}/metric-destination/#{md[:id]}", text: "" }) %>
-                </td>
-              <% end %>
-            </tr>
-          <% end %>
-          <% if has_permission?("Postgres:edit", @pg[:id]) %>
-            <tr>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== render("components/form/text", locals: { name: "url", attributes: { form: "form-pg-md-create", required: true } }) %>
-              </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== render("components/form/text", locals: { name: "username", attributes: { form: "form-pg-md-create", required: true } }) %>
-              </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "metric-destination-password",
-                    type: "password",
-                    attributes: {
-                      required: true,
-                      form: "form-pg-md-create",
-                      autocomplete: "new-password"
-                    },
-                    extra_class: "metric-destination-password"
-                  }
-                ) %>
-              </td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                <form action="<%= "#{request.path}/metric-destination" %>" role="form" method="POST" id="form-pg-md-create">
-                  <%== csrf_tag("#{request.path}/metric-destination") %>
-                  <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "metric-destination-create-button" }) %>
-                </form>
+              <td
+                id="md-delete-<%=md[:id]%>"
+                class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+              >
+                <%== render("components/delete_button", locals: { url: "#{request.path}/metric-destination/#{md[:id]}", text: "" }) %>
               </td>
             </tr>
           <% end %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== render("components/form/text", locals: { name: "url", attributes: { form: "form-pg-md-create", required: true } }) %>
+            </td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== render("components/form/text", locals: { name: "username", attributes: { form: "form-pg-md-create", required: true } }) %>
+            </td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+              <%== render(
+                "components/form/text",
+                locals: {
+                  name: "metric-destination-password",
+                  type: "password",
+                  attributes: {
+                    required: true,
+                    form: "form-pg-md-create",
+                    autocomplete: "new-password"
+                  },
+                  extra_class: "metric-destination-password"
+                }
+              ) %>
+            </td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <form action="<%= "#{request.path}/metric-destination" %>" role="form" method="POST" id="form-pg-md-create">
+                <%== csrf_tag("#{request.path}/metric-destination") %>
+                <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "metric-destination-create-button" }) %>
+              </form>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
   <% end %>
   <!-- Danger Zone -->
-  <% if has_permission?(["Postgres:view", "Postgres:edit", "Postgres:delete"], @pg[:id]) || @pg[:primary] %>
+  <% if edit_perm || delete_perm || @pg[:primary] %>
     <div>
       <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
         <div class="min-w-0 flex-1">
@@ -342,7 +328,7 @@
           </div>
         <% end %>
         <!-- Restart Card -->
-        <% if has_permission?("Postgres:edit", @pg[:id]) %>
+        <% if edit_perm %>
           <div class="px-4 py-5 sm:p-6">
             <form action="<%= "#{@project_data[:path]}#{@pg[:path]}/restart" %>" role="form" method="POST">
               <%== csrf_tag("#{@project_data[:path]}#{@pg[:path]}/restart") %>
@@ -364,7 +350,7 @@
           </div>
         <% end %>
         <!-- Delete Card -->
-        <% if has_permission?("Postgres:delete", @pg[:id]) %>
+        <% if delete_perm %>
           <div class="px-4 py-5 sm:p-6">
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
