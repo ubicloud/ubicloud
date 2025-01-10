@@ -99,6 +99,13 @@ class Prog::Vm::HostNexus < Prog::Base
           total_cpus: total_cpus
         }
         vm_host.update(**kwargs)
+        (0..total_cpus - 1).each do |cpu|
+          VmHostCpu.create(
+            vm_host_id: vm_host.id,
+            cpu_number: cpu,
+            spdk: cpu < vm_host.spdk_cpu_count
+          )
+        end
       end
     end
 
