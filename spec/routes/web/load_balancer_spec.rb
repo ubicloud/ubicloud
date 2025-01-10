@@ -49,7 +49,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - Load Balancers")
         expect(page).to have_content "No Load Balancers"
 
-        click_link "New Load Balancer"
+        click_link "Create Load Balancer"
         expect(page.title).to eq("Ubicloud - Create Load Balancer")
       end
 

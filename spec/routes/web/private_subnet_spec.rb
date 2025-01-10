@@ -48,7 +48,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - Private Subnets")
         expect(page).to have_content "No Private Subnets"
 
-        click_link "New Private Subnet"
+        click_link "Create Private Subnet"
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
       end
 
@@ -64,7 +64,7 @@ RSpec.describe Clover, "private subnet" do
 
       it "does not show new/create subnet without PrivateSubnet:create permissions" do
         visit "#{project.path}/private-subnet"
-        expect(page).to have_content "New Private Subnet"
+        expect(page).to have_content "Create Private Subnet"
         expect(page).to have_content "Get started by creating a new Private Subnet."
 
         AccessControlEntry.dataset.destroy

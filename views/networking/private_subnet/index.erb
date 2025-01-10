@@ -1,44 +1,35 @@
 <% @page_title = "Private Subnets" %>
 <%== render("networking/tabbar") %>
-<% if @pss.count > 0 %>
-  <div class="grid gap-6">
-    <%== render(
-      "components/table_card",
-      locals: {
-        headers: ["Name", "Location", "State"],
-        rows: @pss.map do |ps|
-          [
-            [
-              [ps[:name], {link: @project_data[:path] + ps[:path]}],
-              ps[:location],
-              ["ps_state_label", {component: { state: ps[:state] }}]
-            ],
-            {id: "ps-#{ps[:id]}"}
-          ]
-        end
-      }
-    ) %>
-  </div>
-  <div class="flex justify-end space-y-1 mt-6">
-    <% if has_project_permission("PrivateSubnet:create")%>
-    <%== render(
-      "components/button", locals: { text: "Create Private Subnet", link: "private-subnet/create" })
-    %>
-    <% end %>
-  </div>
-<% else %>
-  <div class="mt-6">
-    <%== render(
-    "components/empty_state",
+
+<div class="grid gap-6">
+  <%== render(
+    "components/table_card",
     locals: {
-      icon: "hero-globe-alt",
-      title: "No Private Subnets",
-      description: "You don't have permission to create Private Subnets."
-    }.merge(has_project_permission("PrivateSubnet:create") ? {
-      description: "Get started by creating a new Private Subnet.",
-      button_link: "#{@project_data[:path]}/private-subnet/create",
-      button_title: "New Private Subnet"
-    } : {})
+      headers: ["Name", "Location", "State"],
+      rows: @pss.map do |ps|
+        [
+          [
+            [ps[:name], {link: @project_data[:path] + ps[:path]}],
+            ps[:location],
+            ["ps_state_label", {component: { state: ps[:state] }}]
+          ],
+          {id: "ps-#{ps[:id]}"}
+        ]
+      end,
+      empty_state: {
+        icon: "hero-globe-alt",
+        title: "No Private Subnets",
+        description: "You don't have permission to create Private Subnets."
+      }.merge(has_project_permission("PrivateSubnet:create") ? {
+        description: "Get started by creating a new Private Subnet.",
+        button_link: "#{@project_data[:path]}/private-subnet/create",
+        button_title: "Create Private Subnet"
+      } : {})
+    }
   ) %>
+  <% if @pss.count > 0 && has_project_permission("PrivateSubnet:create") %>
+  <div class="flex justify-end">
+    <%== render("components/button", locals: { text: "Create Private Subnet", link: "private-subnet/create" }) %>
   </div>
-<% end %>
+  <% end %>
+</div>

@@ -26,7 +26,6 @@ RSpec.describe Clover, "inference-api-key" do
       expect(@api_key.used_for).to eq("inference_endpoint")
       expect(@api_key.is_valid).to be(true)
 
-      expect(page).to have_no_content "No Permission to delete"
       expect(page).to have_content "Create API Key"
     end
 
@@ -35,7 +34,7 @@ RSpec.describe Clover, "inference-api-key" do
       AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["InferenceApiKey:view"])
 
       page.refresh
-      expect(page).to have_content "No Permission to delete"
+      expect { find "#api-key-#{@api_key.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
       expect(page).to have_no_content "Create API Key"
     end
 

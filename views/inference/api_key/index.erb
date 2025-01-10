@@ -6,7 +6,11 @@
     "components/table_card",
     locals: {
       headers: ["ID", "API Key", ""],
-      empty_state: "No inference API keys",
+      empty_state: {
+        icon: "hero-key",
+        title: "No inference API keys",
+        description: "Get started using the inference endpoint by creating an API key."
+      },
       rows:
         @inference_api_keys.map do |token|
           [
@@ -25,8 +29,6 @@
                       }
                     }
                   ]
-                else
-                  "No Permission to delete"
                 end
               )
             ],

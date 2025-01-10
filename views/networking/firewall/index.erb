@@ -1,44 +1,36 @@
 <% @page_title = "Firewalls" %>
 <%== render("networking/tabbar") %>
-<% if @firewalls.count > 0 %>
-  <div class="grid gap-6">
-    <%== render(
-      "components/table_card",
-      locals: {
-        headers: ["Name", "Location", "Description"],
-        rows: @firewalls.map do |fw|
+
+<div class="grid gap-6">
+  <%== render(
+    "components/table_card",
+    locals: {
+      headers: ["Name", "Location", "Description"],
+      rows: @firewalls.map do |fw|
+        [
           [
-            [
-              [fw[:name], {link: @project_data[:path] + fw[:path]}],
-              fw[:location],
-              fw[:description]
-            ],
-            {id: "fw-#{fw[:id]}"}
-          ]
-        end
-      }
-    ) %>
-  </div>
-  <div class="flex justify-end space-y-1 mt-6">
-      <% if has_project_permission("Firewall:create")%>
-      <%== render(
-        "components/button", locals: { text: "Create Firewall", link: "firewall/create" })
-      %>
-      <% end %>
-  </div>
-<% else %>
-  <div class="mt-6">
-    <%== render(
-      "components/empty_state",
-      locals: {
-        icon: "hero-x-circle",
+            [fw[:name], {link: @project_data[:path] + fw[:path]}],
+            fw[:location],
+            fw[:description]
+          ],
+          {id: "fw-#{fw[:id]}"}
+        ]
+      end,
+      empty_state: {
+        icon: "hero-firewall",
         title: "No firewalls",
         description: "You don't have permission to create firewalls."
       }.merge(has_project_permission("Firewall:create") ? {
         description: "Get started by creating a new firewall.",
         button_link: "#{@project_data[:path]}/firewall/create",
-        button_title: "New Firewall"
+        button_title: "Create Firewall"
       } : {})
-    ) %>
-  </div>
-<% end %>
+    }
+  ) %>
+
+  <% if @firewalls.count > 0 && has_project_permission("Firewall:create") %>
+    <div class="flex justify-end">
+      <%== render("components/button", locals: { text: "Create Firewall", link: "firewall/create" }) %>
+    </div>
+  <% end %>
+</div>

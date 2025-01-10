@@ -1,43 +1,35 @@
 <% @page_title = "Load Balancers" %>
 <%== render("networking/tabbar") %>
-<% if @lbs.count > 0 %>
-  <div class="grid gap-6">
-    <%== render(
-      "components/table_card",
-      locals: {
-        headers: ["Name", "Hostname"],
-        rows: @lbs.map do |lb|
-          [
-            [
-              [lb[:name], {link: @project_data[:path] + lb[:path]}],
-              [lb[:hostname], {copyable: true}]
-            ],
-            {id: "lb-#{lb[:id]}"}
-          ]
-        end
-      }
-    ) %>
-  </div>
-  <div class="flex justify-end space-y-1 mt-6">
-    <% if has_project_permission("LoadBalancer:create")%>
-      <%== render(
-        "components/button", locals: { text: "Create Load Balancer", link: "load-balancer/create" })
-      %>
-    <% end %>
-  </div>
-<% else %>
-<div class="mt-6">
+
+<div class="grid gap-6">
   <%== render(
-    "components/empty_state",
+    "components/table_card",
     locals: {
-      icon: "hero-arrows-pointing-out",
-      title: "No Load Balancers",
-      description: "You don't have permission to create Load Balancers."
-    }.merge(has_project_permission("LoadBalancer:create") ? {
-      description: "Get started by creating a new Load Balancer.",
-      button_link: "#{@project_data[:path]}/load-balancer/create",
-      button_title: "New Load Balancer"
-    } : {})
+      headers: ["Name", "Hostname"],
+      rows: @lbs.map do |lb|
+        [
+          [
+            [lb[:name], {link: @project_data[:path] + lb[:path]}],
+            [lb[:hostname], {copyable: true}]
+          ],
+          {id: "lb-#{lb[:id]}"}
+        ]
+      end,
+      empty_state: {
+        icon: "hero-arrows-pointing-out",
+        title: "No Load Balancers",
+        description: "You don't have permission to create Load Balancers."
+      }.merge(has_project_permission("LoadBalancer:create") ? {
+        description: "Get started by creating a new Load Balancer.",
+        button_link: "#{@project_data[:path]}/load-balancer/create",
+        button_title: "Create Load Balancer"
+      } : {})
+    }
   ) %>
+
+  <% if @lbs.count > 0 && has_project_permission("LoadBalancer:create")%>
+    <div class="flex justify-end">
+      <%== render("components/button", locals: { text: "Create Load Balancer", link: "load-balancer/create" }) %>
+    </div>
+  <% end %>
 </div>
-<% end %>

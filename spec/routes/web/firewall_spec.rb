@@ -47,7 +47,7 @@ RSpec.describe Clover, "firewall" do
         expect(page.title).to eq("Ubicloud - Firewalls")
         expect(page).to have_content "No firewalls"
 
-        click_link "New Firewall"
+        click_link "Create Firewall"
         expect(page.title).to eq("Ubicloud - Create Firewall")
       end
 
@@ -96,13 +96,13 @@ RSpec.describe Clover, "firewall" do
 
       it "only shows New Firewall link on empty page if user has Firewall:create access" do
         visit "#{project.path}/firewall"
-        expect(page.all("a").map(&:text)).to include "New Firewall"
+        expect(page.all("a").map(&:text)).to include "Create Firewall"
         expect(page).to have_content "Get started by creating a new firewall."
         expect(page).to have_no_content "You don't have permission to create firewalls."
 
         AccessControlEntry.dataset.destroy
         page.refresh
-        expect(page.all("a").map(&:text)).not_to include "New Firewall"
+        expect(page.all("a").map(&:text)).not_to include "Create Firewall"
         expect(page).to have_content "You don't have permission to create firewalls."
         expect(page).to have_no_content "Get started by creating a new firewall."
       end
