@@ -880,8 +880,11 @@ RSpec.describe Clover, "access control" do
       admin = SubjectTag[project_id: project.id, name: "Admin"]
       visit "#{project.path}/user/access-control/tag/subject/#{admin.ubid}"
       check "remove[]"
-      click_button "Remove Members"
-      expect(page).to have_flash_error "Members not removed from tag: must keep at least one account in Admin subject tag"
+      2.times do
+        click_button "Remove Members"
+        expect(page).to have_flash_error "Must keep at least one account in Admin subject tag"
+        expect(page.title).to eq "Ubicloud - Default - Admin"
+      end
     end
 
     it "handles serialization failure when adding members" do

@@ -318,7 +318,6 @@ class Clover
               to_remove.reject! { UBID.class_match?(_1, ApiKey) } if @tag_type == "subject"
               to_remove.map! { UBID.to_uuid(_1) }
 
-              error = false
               num_removed = nil
               # No need for serializable isolation here, as we are removing
               # entries and that will not introduce loops
@@ -326,17 +325,11 @@ class Clover
                 num_removed = @tag.remove_members(to_remove)
 
                 if @tag_type == "subject" && @tag.name == "Admin" && !@tag.member_ids.find { UBID.uuid_class_match?(_1, Account) }
-                  error = "must keep at least one account in Admin subject tag"
-                  DB.rollback_on_exit
+                  raise Sequel::ValidationFailed, "Must keep at least one account in Admin subject tag"
                 end
               end
 
-              if error
-                flash["error"] = "Members not removed from tag: #{error}"
-              else
-                flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
-              end
-
+              flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
               r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
             end
           end
