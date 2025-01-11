@@ -213,6 +213,19 @@ RSpec.describe Clover, "auth" do
     expect(DB[:account_password_reset_keys].count).to eq 0
   end
 
+  it "can login to an account when there are no omniauth_providers" do
+    create_account(with_project: false)
+    expect(Config).to receive(:omniauth_google_id).and_return(nil)
+    expect(Config).to receive(:omniauth_github_id).and_return(nil)
+
+    visit "/login"
+    fill_in "Email Address", with: TEST_USER_EMAIL
+    fill_in "Password", with: TEST_USER_PASSWORD
+    click_button "Sign in"
+
+    expect(page.title).to eq("Ubicloud - Projects")
+  end
+
   it "can login to an account without projects" do
     create_account(with_project: false)
 
