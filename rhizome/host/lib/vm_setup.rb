@@ -78,6 +78,11 @@ class VmSetup
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
 
+  def restart(slice_name, cpu_burst_percent_limit)
+    restart_systemd_unit
+    enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
+  end
+
   def reassign_ip6(unix_user, public_keys, nics, gua, ip4, local_ip4, max_vcpus, cpu_topology,
     mem_gib, ndp_needed, storage_params, storage_secrets, swap_size_bytes, pci_devices, boot_image,
     dns_ipv4, slice_name, cpu_percent_limit, cpu_burst_percent_limit)
@@ -716,5 +721,9 @@ SERVICE
 
   def start_systemd_unit
     r "systemctl start #{q_vm}"
+  end
+
+  def restart_systemd_unit
+    r "systemctl restart #{q_vm}"
   end
 end
