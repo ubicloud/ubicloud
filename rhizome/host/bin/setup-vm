@@ -102,6 +102,8 @@ when "reassign-ip6"
     ndp_needed, storage_volumes, storage_secrets,
     swap_size_bytes, pci_devices, boot_image, dns_ipv4,
     slice_name, cpu_percent_limit, cpu_burst_percent_limit)
+when "restart"
+  vm_setup.restart(slice_name, cpu_burst_percent_limit)
 else
   puts "Invalid action #{action}"
   exit 1

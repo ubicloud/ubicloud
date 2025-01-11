@@ -179,6 +179,15 @@ RSpec.describe VmSetup do
     end
   end
 
+  describe "#restart" do
+    it "can restart a VM" do
+      expect(vs).to receive(:restart_systemd_unit)
+      expect(vs).to receive(:enable_bursting).with("some_slice.slice", 50)
+
+      vs.restart("some_slice.slice", 50)
+    end
+  end
+
   describe "#storage" do
     let(:storage_params) {
       [
@@ -347,6 +356,13 @@ NFTABLES_CONF
     it "can start systemd unit" do
       expect(vs).to receive(:r).with("systemctl start test")
       vs.start_systemd_unit
+    end
+  end
+
+  describe "#restart_systemd_unit" do
+    it "can restart systemd unit" do
+      expect(vs).to receive(:r).with("systemctl restart test")
+      vs.restart_systemd_unit
     end
   end
 
