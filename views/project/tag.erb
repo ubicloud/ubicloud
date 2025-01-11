@@ -117,7 +117,7 @@ current_members.sort! %>
                         "components/form/checkbox",
                         locals: {
                           name: "remove[]",
-                          options: [[ubid, nil, nil, ({ checked: "checked" } if remove_checked&.include?(ubid))]]
+                          options: [[ubid, nil, nil, ({ checked: "checked" } if remove_checked&.include?(UBID.to_uuid(ubid)))]]
                         }
                       ) %>
                     </td>
