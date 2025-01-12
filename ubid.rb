@@ -80,6 +80,7 @@ class UBID
   TYPE_OBJECT_TAG = "t0"
   TYPE_OBJECT_METATAG = "t2"
   TYPE_VM_HOST_SLICE = "vs"
+  TYPE_KUBERNETES_CLUSTER = "kc"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
