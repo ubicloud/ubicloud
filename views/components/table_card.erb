@@ -56,13 +56,15 @@
               <% columns.each_with_index do |(value, col_opts), i| %>
                 <% col_opts ||= {} %>
                 <td
-                  <% if i == 0 %>
-                  class="pl-4 pr-3 sm:pl-6 py-4 text-gray-900 font-medium whitespace-nowrap text-sm"
-                  <% elsif i + 1 == columns.length %>
-                  class="pl-3 pr-4 sm:pr-6 py-4 text-gray-500 whitespace-nowrap text-sm"
-                  <% else %>
-                  class="px-3 py-4 text-gray-500 whitespace-nowrap text-sm"
-                  <% end %>
+                  <% if i == 0
+                      cls="pl-4 pr-3 sm:pl-6 py-4 text-gray-900 font-medium whitespace-nowrap text-sm"
+                    elsif i + 1 == columns.length
+                      cls="pl-3 pr-4 sm:pr-6 py-4 text-gray-500 whitespace-nowrap text-sm"
+                    else
+                      cls="px-3 py-4 text-gray-500 whitespace-nowrap text-sm"
+                    end
+                  %>
+                  class="<%= cls %> <%= col_opts[:extra_class] %>"
                 >
                   <% if col_opts[:copyable] && value %>
                     <%== render("components/copyable_content", locals: { content: value, message: "Copied", revealable: col_opts[:revealable] }) %>
