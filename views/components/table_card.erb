@@ -66,19 +66,7 @@
                   %>
                   class="<%= cls %> <%= col_opts[:extra_class] %>"
                 >
-                  <% if col_opts[:copyable] && value %>
-                    <%== render("components/copyable_content", locals: { content: value, message: "Copied", revealable: col_opts[:revealable] }) %>
-                  <% elsif col_opts[:link] %>
-                    <a href="<%= col_opts[:link] %>" class="font-medium text-orange-600 hover:text-orange-700">
-                      <%= value %>
-                    </a>
-                  <% elsif col_opts[:component] %>
-                    <%== render("components/#{value}", locals: col_opts[:component]) %>
-                  <% elsif col_opts[:escape] == false %>
-                    <%== value %>
-                  <% else %>
-                    <%= value || "-" %>
-                  <% end %>
+                  <%== render("components/value_content", locals: { content: value, opts: col_opts }) %>
                 </td>
               <% end %>
             </tr>
