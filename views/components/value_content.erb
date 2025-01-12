@@ -1,0 +1,15 @@
+<%# locals: (content:, opts: nil) %>
+<% opts ||= {} %>
+<% if opts[:copyable] && content %>
+  <%== render("components/copyable_content", locals: { content:, revealable: opts[:revealable] }) %>
+<% elsif opts[:link] %>
+  <a href="<%= opts[:link] %>" class="font-medium text-orange-600 hover:text-orange-700">
+    <%= content %>
+  </a>
+<% elsif opts[:component] %>
+  <%== render("components/#{content}", locals: opts[:component]) %>
+<% elsif opts[:escape] == false %>
+  <%== content %>
+<% else %>
+  <%= content || "-" %>
+<% end %>
