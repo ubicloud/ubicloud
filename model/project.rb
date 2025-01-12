@@ -21,6 +21,7 @@ class Project < Sequel::Model
   many_to_many :firewalls, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :load_balancers, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
   many_to_many :inference_endpoints, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
+  many_to_many :kubernetes_clusters, join_table: :access_tag, left_key: :project_id, right_key: :hyper_tag_id
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: :ProjectQuota, key: :project_id
@@ -193,6 +194,7 @@ end
 #  action_tag           | action_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  github_installation  | github_installation_project_id_fkey  | (project_id) REFERENCES project(id)
 #  inference_endpoint   | inference_endpoint_project_id_fkey   | (project_id) REFERENCES project(id)
+#  kubernetes_cluster   | kubernetes_cluster_project_id_fkey   | (project_id) REFERENCES project(id)
 #  object_tag           | object_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  subject_tag          | subject_tag_project_id_fkey          | (project_id) REFERENCES project(id)
 #  usage_alert          | usage_alert_project_id_fkey          | (project_id) REFERENCES project(id)

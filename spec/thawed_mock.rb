@@ -62,6 +62,7 @@ module ThawedMock
   allow_mocking(GithubRunner, :[], :any?, :first, :join)
   allow_mocking(HetznerHost, :create)
   allow_mocking(IpsecTunnel, :[], :create)
+  allow_mocking(KubernetesCluster, :[])
   allow_mocking(MinioCluster, :[])
   allow_mocking(Nic, :[], :create)
   allow_mocking(Page, :from_tag_parts)
