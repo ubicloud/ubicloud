@@ -182,63 +182,44 @@
       </form>
     </div>
     <!-- Payment Methods Card -->
-    <div>
-      <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
-        <div class="min-w-0 flex-1">
-          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-            Payment Methods
-          </h3>
-        </div>
-        <div class="mt-4 flex md:ml-4 md:mt-0">
-          <%== render(
+    <%== render(
+      "components/table_card",
+      locals: {
+        title: "Payment Methods",
+        right_items: [
+          render(
             "components/button",
             locals: {
               text: "Add Payment Method",
               link: "#{@project_data[:path]}/billing/payment-method/create"
             }
-          ) %>
-        </div>
-      </div>
-      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-        <table class="min-w-full divide-y divide-gray-300">
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% if @payment_methods.count > 0 %>
-              <% @payment_methods.each do |pm| %>
-                <tr id="payment-method-<%= pm[:ubid]%>">
-                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                    <%= pm[:brand].capitalize %>
-                    ending in
-                    <%= pm[:last4] %>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    Expires
-                    <%= pm[:exp_month] %>/<%= pm[:exp_year] %>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    Added on
-                    <%= pm[:created_at] %>
-                  </td>
-                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex justify-end">
-                    <%== render(
-                      "components/delete_button",
-                      locals: {
-                        url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
-                        csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
-                        confirmation: pm[:last4]
-                      }
-                    ) %>
-                  </td>
-                </tr>
-              <% end %>
-            <% else %>
-              <tr>
-                <td colspan="2"><div class="text-center text-xl p-4">No payment methods. Add new payment method to able create resources in project.</div></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-    </div>
+          )
+        ],
+        rows:
+          @payment_methods.map do |pm|
+            [
+              [
+                "#{pm[:brand].capitalize} ending in #{pm[:last4]}",
+                "Expires #{pm[:exp_month]}/#{pm[:exp_year]}",
+                "Added on #{pm[:created_at]}",
+                [
+                  "delete_button",
+                  {
+                    component: {
+                      url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
+                      csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
+                      confirmation: pm[:last4]
+                    },
+                    extra_class: "flex justify-end"
+                  }
+                ]
+              ],
+              { id: "payment-method-#{pm[:ubid]}" }
+            ]
+          end,
+        empty_state: "No payment methods. Add new payment method to able create resources in project."
+      }
+    ) %>
     <!-- Invoices -->
     <div>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
