@@ -20,8 +20,9 @@ class Project < Sequel::Model
   one_to_many :firewalls
   one_to_many :load_balancers
   one_to_many :inference_endpoints
+  one_to_many :kubernetes_clusters
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers]
+  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters]
 
   one_to_many :invoices, order: Sequel.desc(:created_at)
   one_to_many :quotas, class: :ProjectQuota, key: :project_id
@@ -186,6 +187,7 @@ end
 #  firewall             | firewall_project_id_fkey             | (project_id) REFERENCES project(id)
 #  github_installation  | github_installation_project_id_fkey  | (project_id) REFERENCES project(id)
 #  inference_endpoint   | inference_endpoint_project_id_fkey   | (project_id) REFERENCES project(id)
+#  kubernetes_cluster   | kubernetes_cluster_project_id_fkey   | (project_id) REFERENCES project(id)
 #  load_balancer        | load_balancer_project_id_fkey        | (project_id) REFERENCES project(id)
 #  minio_cluster        | minio_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  object_tag           | object_tag_project_id_fkey           | (project_id) REFERENCES project(id)
