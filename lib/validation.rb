@@ -39,6 +39,10 @@ module Validation
   # - Unicode letters, numbers, hyphen, space
   ALLOWED_ACCOUNT_NAME = %r{\A\p{L}[\p{L}0-9\- ]{1,62}\z}
 
+  # Allow Kubernetes Names
+  # - Same with regular name pattern, but shorter (40 chars)
+  ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?\z}
+
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
     fail ValidationFailed.new({name: msg}) unless name&.match(ALLOWED_NAME_PATTERN)
@@ -254,5 +258,13 @@ module Validation
       Clog.emit("cloudflare turnstile validation failed") { {cf_validation_failed: response_hash["error-codes"]} }
       fail ValidationFailed.new({cloudflare_turnstile: "Validation failed. Please try again."})
     end
+  end
+
+  def self.validate_kubernetes_name(name)
+    fail ValidationFailed.new({name: "Kubernetes cluster name must only contain lowercase letters, numbers, spaces, and hyphens and have max length 40."}) unless name&.match(ALLOWED_KUBERNETES_NAME_PATTERN)
+  end
+
+  def self.validate_kubernetes_cp_node_count(count)
+    fail ValidationFailed.new({name: "Kubernetes cluster control plane can have either 1 or 3 nodes"}) unless [1, 3].include?(count)
   end
 end
