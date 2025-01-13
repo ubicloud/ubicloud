@@ -22,6 +22,11 @@ class Clover < Roda
   VM_STATE_LABEL_COLOR["deleted"] = VM_STATE_LABEL_COLOR["deleting"]
   VM_STATE_LABEL_COLOR.freeze
 
+  BUTTON_COLOR = Hash.new { |h, k| raise "unsupported button type: #{k}" }.merge!(
+    "primary" => "bg-orange-600 hover:bg-orange-700 focus-visible:outline-orange-600",
+    "danger" => "bg-rose-600 hover:bg-rose-700 focus-visible:outline-rose-600"
+  ).freeze
+
   PG_HA_DATA = {
     PostgresResource::HaType::NONE => "Inactive",
     PostgresResource::HaType::ASYNC => "Active (1 standby with asynchronous replication)",
