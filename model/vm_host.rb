@@ -136,6 +136,16 @@ class VmHost < Sequel::Model
     picked_subnet = used_subnet.cidr.nth(rand)
     # we check if the picked subnet is used by one of the vms
     return ip4_random_vm_network if vm_addresses.map { _1.ip.to_s }.include?("#{picked_subnet}/32")
+
+    # For Leaseweb, avoid using the very first and the last ips
+    if provider == "leaseweb"
+      subnet_size = 2**(32 - used_subnet.cidr.netmask.prefix_len)
+      last_ip = used_subnet.cidr.nth(subnet_size - 1).to_s
+      first_ip = used_subnet.cidr.network.to_s
+      if picked_subnet.to_s == first_ip.to_s || picked_subnet.to_s == last_ip.to_s
+        return ip4_random_vm_network
+      end
+    end
     [picked_subnet, used_subnet]
   end
 

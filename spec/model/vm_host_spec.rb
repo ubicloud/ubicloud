@@ -193,10 +193,38 @@ RSpec.describe VmHost do
     expect(r_address).to eq(address)
   end
 
-  it "returns vm_addresses" do
-    vm = instance_double(Vm, assigned_vm_address: address)
-    expect(vh).to receive(:vms).and_return([vm])
-    expect(vh.vm_addresses).to eq([address])
+  context "when provider is leaseweb" do
+    before do
+      allow(vh).to receive(:provider).and_return("leaseweb")
+    end
+
+    it "finds another address if it's already assigned" do
+      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
+      expect(vh).to receive(:vm_addresses).and_return([instance_double(AssignedVmAddress, ip: NetAddr::IPv4Net.parse("0.0.0.0"))]).at_least(:once)
+      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
+      expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
+      ip4, r_address = vh.ip4_random_vm_network
+      expect(ip4.to_s).to eq("0.0.0.1")
+      expect(r_address).to eq(address)
+    end
+
+    it "finds another address if it's the very first ip" do
+      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
+      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.2")).at_least(:once)
+      expect(SecureRandom).to receive(:random_number).with(4).and_return(0, 1)
+      ip4, r_address = vh.ip4_random_vm_network
+      expect(ip4.to_s).to eq("0.0.0.1")
+      expect(r_address).to eq(address)
+    end
+
+    it "finds another address if it's the very last ip" do
+      expect(vh).to receive(:assigned_subnets).and_return([address]).at_least(:once)
+      expect(vh).to receive(:sshable).and_return(instance_double(Sshable, host: "0.0.0.1")).at_least(:once)
+      expect(SecureRandom).to receive(:random_number).with(4).and_return(3, 2)
+      ip4, r_address = vh.ip4_random_vm_network
+      expect(ip4.to_s).to eq("0.0.0.2")
+      expect(r_address).to eq(address)
+    end
   end
 
   it "sshable_address returns the sshable address" do
