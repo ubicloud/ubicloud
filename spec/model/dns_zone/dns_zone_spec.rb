@@ -46,6 +46,13 @@ RSpec.describe DnsZone do
       expect(dns_zone.records_dataset.where(:tombstoned).count).to eq(3)
     end
 
+    it "does not insert new tombstoned records for existing tombstoned records" do
+      4.times do
+        dns_zone.delete_record(record_name: "test1")
+      end
+      expect(dns_zone.records_dataset.where(:tombstoned).count).to eq(12)
+    end
+
     it "deletes all matching records from database when record_name and type are passed" do
       dns_zone.delete_record(record_name: "test1", type: "A")
       expect(dns_zone.records_dataset.where(:tombstoned).count).to eq(2)
