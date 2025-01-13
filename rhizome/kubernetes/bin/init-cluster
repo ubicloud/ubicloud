@@ -1,0 +1,44 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+if ARGV.count != 6
+  fail "Wrong number of arguments. Expected 6, Given #{ARGV.count}"
+end
+
+cluster_name = ARGV[0]
+load_balancer_host_name = ARGV[1]
+port = ARGV[2]
+private_subnet_cidr4 = ARGV[3]
+private_subnet_cidr6 = ARGV[4]
+vm_cidr = ARGV[5]
+
+config = <<YAML
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+clusterName: #{cluster_name}
+kubernetesVersion: stable
+controlPlaneEndpoint: #{load_balancer_host_name}:#{port}
+apiServer:
+  certSANs:
+    - #{load_balancer_host_name}
+networking:
+  podSubnet: "#{private_subnet_cidr4},#{private_subnet_cidr6}"
+  dualStack: true
+controllerManager:
+  extraArgs:
+    allocate-node-cidrs: "false"
+nodeRegistration:
+  kubeletExtraArgs:
+    pod-cidr: "#{vm_cidr}"
+etcd:
+  local:
+    dataDir: "/var/lib/etcd"
+YAML
+
+config_path = "/tmp/kubeadm-config.yaml"
+
+safe_write_to_file(config_path, config)
+
+r "sudo kubeadm init --config #{config_path}"

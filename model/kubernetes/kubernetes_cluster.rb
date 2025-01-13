@@ -14,6 +14,8 @@ class KubernetesCluster < Sequel::Model
   include SemaphoreMethods
   include Authorization::HyperTagMethods
 
+  semaphore :destroy
+
   def display_location
     LocationNameConverter.to_display_name(location)
   end
@@ -24,6 +26,17 @@ class KubernetesCluster < Sequel::Model
 
   def path
     "/location/#{display_location}/kubernetes-cluster/#{name}"
+  end
+
+  def endpoint
+    api_server_lb.hostname
+  end
+
+  def disassociate_vm(vm)
+    DB[:kubernetes_clusters_vms].where(
+      kubernetes_cluster_id: id,
+      vm_id: vm.id
+    ).delete
   end
 end
 
