@@ -1,4 +1,10 @@
-<% @page_title = @vm[:name] %>
+<% @page_title = @vm[:name]
+
+viewable_fws =
+  dataset_authorize(Firewall.where(id: @vm[:firewalls].map { UBID.to_uuid(_1[:id]) }), "Firewall:view")
+    .select_hash(:id, Sequel.as(true, :v))
+    .transform_keys! { UBID.from_uuidish(_1).to_s } %>
+
 <% if @vm[:state] != "running" %>
   <div class="auto-refresh hidden" data-interval="10"></div>
 <% end %>
@@ -53,7 +59,7 @@
       empty_state: "This VM doesn't have applied firewall",
       rows:
         @vm[:firewalls].flat_map do |fw|
-          view_perm = has_permission?("Firewall:view", fw[:id])
+          view_perm = viewable_fws[fw[:id]]
           (fw[:firewall_rules] || []).map do |fwr|
             [
               [[fw[:name], view_perm ? { link: @project_data[:path] + fw[:path] } : {}], fwr[:cidr], fwr[:port_range]],
