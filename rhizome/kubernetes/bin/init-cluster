@@ -1,0 +1,58 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "yaml"
+require_relative "../../common/lib/util"
+
+params = JSON.parse($stdin.read)
+
+begin
+  cluster_name = params.fetch("cluster_name")
+  lb_hostname = params.fetch("lb_hostname")
+  port = params.fetch("port")
+  private_subnet_cidr4 = params.fetch("private_subnet_cidr4")
+  private_subnet_cidr6 = params.fetch("private_subnet_cidr6")
+  vm_cidr = params.fetch("vm_cidr")
+rescue KeyError => e
+  puts "Needed #{e.key} in parameters"
+  exit 1
+end
+
+config = {
+  "apiVersion" => "kubeadm.k8s.io/v1beta3",
+  "kind" => "ClusterConfiguration",
+  "clusterName" => cluster_name,
+  "kubernetesVersion" => "stable",
+  "controlPlaneEndpoint" => "#{lb_hostname}:#{port}",
+  "apiServer" => {
+    "certSANs" => [
+      lb_hostname
+    ]
+  },
+  "networking" => {
+    "podSubnet" => "#{private_subnet_cidr4},#{private_subnet_cidr6}",
+    "dualStack" => true
+  },
+  "controllerManager" => {
+    "extraArgs" => {
+      "allocate-node-cidrs" => "false"
+    }
+  },
+  "nodeRegistration" => {
+    "kubeletExtraArgs" => {
+      "pod-cidr" => vm_cidr
+    }
+  },
+  "etcd" => {
+    "local" => {
+      "dataDir" => "/var/lib/etcd"
+    }
+  }
+}
+
+config_path = "/tmp/kubeadm-config.yaml"
+
+safe_write_to_file(config_path, config.to_yaml)
+
+r "sudo kubeadm init --config #{config_path}"

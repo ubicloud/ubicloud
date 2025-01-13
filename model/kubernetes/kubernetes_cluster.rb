@@ -14,12 +14,18 @@ class KubernetesCluster < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
 
+  semaphore :destroy
+
   def display_location
     LocationNameConverter.to_display_name(location)
   end
 
   def path
     "/location/#{display_location}/kubernetes-cluster/#{name}"
+  end
+
+  def endpoint
+    api_server_lb.hostname
   end
 end
 
