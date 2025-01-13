@@ -61,6 +61,23 @@ RSpec.describe Clover, "private subnet" do
         expect(page).to have_content private_subnet.name
         expect(page).to have_no_content ps_wo_permission.name
       end
+
+      it "does not show new/create subnet without PrivateSubnet:create permissions" do
+        visit "#{project.path}/private-subnet"
+        expect(page).to have_content "New Private Subnet"
+        expect(page).to have_content "Get started by creating a new Private Subnet."
+
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["PrivateSubnet:view"])
+
+        page.refresh
+        expect(page).to have_content "No Private Subnets"
+        expect(page).to have_content "You don't have permission to create Private Subnets."
+
+        private_subnet
+        page.refresh
+        expect(page).to have_no_content "Create Private Subnet"
+      end
     end
 
     describe "create" do
