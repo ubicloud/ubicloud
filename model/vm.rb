@@ -261,32 +261,34 @@ end
 
 # Table: vm
 # Columns:
-#  id             | uuid                     | PRIMARY KEY
-#  ephemeral_net6 | cidr                     |
-#  vm_host_id     | uuid                     |
-#  unix_user      | text                     | NOT NULL
-#  public_key     | text                     | NOT NULL
-#  display_state  | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
-#  name           | text                     | NOT NULL
-#  location       | text                     | NOT NULL
-#  boot_image     | text                     | NOT NULL
-#  local_vetho_ip | text                     |
-#  ip4_enabled    | boolean                  | NOT NULL DEFAULT false
-#  family         | text                     | NOT NULL
-#  cores          | integer                  | NOT NULL
-#  pool_id        | uuid                     |
-#  created_at     | timestamp with time zone | NOT NULL DEFAULT now()
-#  arch           | arch                     | NOT NULL DEFAULT 'x64'::arch
-#  allocated_at   | timestamp with time zone |
-#  provisioned_at | timestamp with time zone |
-#  vcpus          | integer                  | NOT NULL
-#  memory_gib     | integer                  | NOT NULL
+#  id               | uuid                     | PRIMARY KEY
+#  ephemeral_net6   | cidr                     |
+#  vm_host_id       | uuid                     |
+#  unix_user        | text                     | NOT NULL
+#  public_key       | text                     | NOT NULL
+#  display_state    | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
+#  name             | text                     | NOT NULL
+#  location         | text                     | NOT NULL
+#  boot_image       | text                     | NOT NULL
+#  local_vetho_ip   | text                     |
+#  ip4_enabled      | boolean                  | NOT NULL DEFAULT false
+#  family           | text                     | NOT NULL
+#  cores            | integer                  | NOT NULL
+#  pool_id          | uuid                     |
+#  created_at       | timestamp with time zone | NOT NULL DEFAULT now()
+#  arch             | arch                     | NOT NULL DEFAULT 'x64'::arch
+#  allocated_at     | timestamp with time zone |
+#  provisioned_at   | timestamp with time zone |
+#  vcpus            | integer                  | NOT NULL
+#  memory_gib       | integer                  | NOT NULL
+#  vm_host_slice_id | uuid                     |
 # Indexes:
 #  vm_pkey               | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)
 # Foreign key constraints:
-#  vm_pool_id_fkey    | (pool_id) REFERENCES vm_pool(id)
-#  vm_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
+#  vm_pool_id_fkey          | (pool_id) REFERENCES vm_pool(id)
+#  vm_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
+#  vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
 # Referenced By:
 #  assigned_vm_address        | assigned_vm_address_dst_vm_id_fkey    | (dst_vm_id) REFERENCES vm(id)
 #  dns_servers_vms            | dns_servers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
