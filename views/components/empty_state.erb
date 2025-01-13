@@ -1,11 +1,9 @@
-<%# locals: (title:, icon:, description: nil, button_link: nil, button_title: nil) %>
+<%# locals: (title:, icon:, description:, button_link: nil, button_title: nil) %>
 
 <div class="text-center">
   <%== render("components/icon", locals: { name: icon, classes: "mx-auto h-12 w-12 text-gray-400" }) %>
   <h3 class="mt-2 text-sm font-semibold text-gray-900"><%= title %></h3>
-  <% if description %>
-    <p class="mt-1 text-sm text-gray-500"><%= description %></p>
-  <% end %>
+  <p class="mt-1 text-sm text-gray-500"><%= description %></p>
   <div class="mt-6">
     <% if button_link %>
       <%== render("components/button", locals: { icon: "hero-plus", link: button_link, text: button_title }) %>
