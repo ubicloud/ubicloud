@@ -10,7 +10,7 @@
           [
             [
               [lb[:name], {link: @project_data[:path] + lb[:path]}],
-              lb[:hostname] ? [lb[:hostname], {copyable: true}] : "Waiting for hostname to be ready"
+              [lb[:hostname], {copyable: true}]
             ],
             {id: "lb-#{lb[:id]}"}
           ]
