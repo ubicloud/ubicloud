@@ -142,6 +142,7 @@ end
 #  name          | text                     | NOT NULL
 #  location      | text                     | NOT NULL
 #  last_rekey_at | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id    | uuid                     |
 # Indexes:
 #  vm_private_subnet_pkey | PRIMARY KEY btree (id)
 # Referenced By:

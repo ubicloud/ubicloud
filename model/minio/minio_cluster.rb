@@ -97,6 +97,7 @@ end
 #  root_cert_2                 | text                        |
 #  root_cert_key_2             | text                        |
 #  certificate_last_checked_at | timestamp with time zone    | NOT NULL DEFAULT now()
+#  project_id                  | uuid                        |
 # Indexes:
 #  minio_cluster_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

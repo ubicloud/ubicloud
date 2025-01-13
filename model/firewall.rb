@@ -85,6 +85,7 @@ end
 #  description | text                        | NOT NULL DEFAULT 'Default firewall'::text
 #  created_at  | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  location    | text                        | NOT NULL
+#  project_id  | uuid                        |
 # Indexes:
 #  firewall_pkey | PRIMARY KEY btree (id)
 # Referenced By:
