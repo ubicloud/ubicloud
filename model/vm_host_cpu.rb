@@ -9,13 +9,14 @@ end
 VmHostCpu.unrestrict_primary_key
 
 # Table: vm_host_cpu
+# Primary Key: (vm_host_id, cpu_number)
 # Columns:
-#  id         | uuid    | PRIMARY KEY
-#  vm_host_id | uuid    | NOT NULL
-#  cpu_number | integer | NOT NULL
-#  available  | boolean | NOT NULL
+#  vm_host_id       | uuid    |
+#  cpu_number       | integer |
+#  spdk             | boolean | NOT NULL
+#  vm_host_slice_id | uuid    |
 # Indexes:
-#  vm_host_cpu_pkey                      | PRIMARY KEY btree (id)
-#  vm_host_cpu_vm_host_id_cpu_number_key | UNIQUE btree (vm_host_id, cpu_number)
+#  vm_host_cpu_pkey | PRIMARY KEY btree (vm_host_id, cpu_number)
 # Foreign key constraints:
-#  vm_host_cpu_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
+#  vm_host_cpu_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
+#  vm_host_cpu_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
