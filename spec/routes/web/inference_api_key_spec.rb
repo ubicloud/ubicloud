@@ -25,6 +25,18 @@ RSpec.describe Clover, "inference-api-key" do
       expect(@api_key.projects).to eq([project])
       expect(@api_key.used_for).to eq("inference_endpoint")
       expect(@api_key.is_valid).to be(true)
+
+      expect(page).to have_no_content "No Permission to delete"
+      expect(page).to have_content "Create API Key"
+    end
+
+    it "inference token does not show create or delete options without permissions" do
+      AccessControlEntry.dataset.destroy
+      AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["InferenceApiKey:view"])
+
+      page.refresh
+      expect(page).to have_content "No Permission to delete"
+      expect(page).to have_no_content "Create API Key"
     end
 
     it "inference api key page allows removing inference api keys" do
