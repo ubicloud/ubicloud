@@ -86,6 +86,7 @@ end
 #  used_for    | text                     | NOT NULL
 #  key         | text                     | NOT NULL
 #  is_valid    | boolean                  | NOT NULL DEFAULT true
+#  project_id  | uuid                     |
 # Indexes:
 #  api_key_pkey                       | PRIMARY KEY btree (id)
 #  api_key_owner_table_owner_id_index | btree (owner_table, owner_id)
