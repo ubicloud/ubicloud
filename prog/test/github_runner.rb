@@ -149,7 +149,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   def trigger_test_run(repo_name, workflow_name, branch_name)
-    client.workflow_dispatch(repo_name, workflow_name, branch_name)
+    client.workflow_dispatch(repo_name, workflow_name, branch_name, {inputs: {triggered_by: ENV["GITHUB_RUN_ID"]}})
   end
 
   def latest_run(repo_name, workflow_name, branch_name)

@@ -70,7 +70,9 @@ RSpec.describe Prog::Test::GithubRunner do
     it "triggers test runs" do
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client)
-      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main").and_return(true)
+      allow(ENV).to receive(:[]).and_call_original
+      expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
+      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main", {inputs: {triggered_by: "12345"}}).and_return(true)
       expect(gr_test).to receive(:sleep).with(30)
       expect { gr_test.trigger_test_runs }.to hop("check_test_runs")
     end
@@ -78,7 +80,9 @@ RSpec.describe Prog::Test::GithubRunner do
     it "can not triggers test runs" do
       client = instance_double(Octokit::Client)
       expect(gr_test).to receive(:client).and_return(client)
-      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main").and_return(false)
+      allow(ENV).to receive(:[]).and_call_original
+      expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
+      expect(client).to receive(:workflow_dispatch).with("ubicloud/github-e2e-test-workflows", "test_2204.yml", "main", {inputs: {triggered_by: "12345"}}).and_return(false)
       expect { gr_test.trigger_test_runs }.to hop("clean_resources")
     end
   end
