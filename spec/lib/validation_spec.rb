@@ -459,4 +459,49 @@ RSpec.describe Validation do
       expect { described_class.validate_load_balancer_stack("invalid") }.to raise_error described_class::ValidationFailed
     end
   end
+
+  describe "#validate_kubernetes_name" do
+    it "valid names" do
+      [
+        "abc",
+        "abc123",
+        "abc-123",
+        "123abc",
+        "abc--123",
+        "a-b-c-1-2",
+        "a" * 40
+      ].each do |name|
+        expect(described_class.validate_kubernetes_name(name)).to be_nil
+      end
+    end
+
+    it "invalid names" do
+      [
+        nil,
+        "-abc",
+        "abc-",
+        "-abc-",
+        "ABC",
+        "ABC_123",
+        "ABC$123",
+        "a" * 42
+      ].each do |name|
+        expect { described_class.validate_kubernetes_name(name) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
+
+  describe "#validate_kubernetes_cp_node_count" do
+    it "valid numbers" do
+      [1, 3].each do |count|
+        expect(described_class.validate_kubernetes_cp_node_count(count)).to be_nil
+      end
+    end
+
+    it "invalid numbers" do
+      [-37, 0, 2, 4, 5].each do |count|
+        expect { described_class.validate_kubernetes_cp_node_count(count) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
 end

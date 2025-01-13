@@ -14,6 +14,8 @@ class KubernetesCluster < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
 
+  semaphore :destroy
+
   def validate
     super
     errors.add(:cp_node_count, "must be greater than 0") if cp_node_count <= 0
@@ -26,6 +28,10 @@ class KubernetesCluster < Sequel::Model
 
   def path
     "/location/#{display_location}/kubernetes-cluster/#{name}"
+  end
+
+  def endpoint
+    api_server_lb.hostname
   end
 end
 
