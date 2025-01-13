@@ -15,7 +15,7 @@ RUN apk update --no-cache && \
     apk add build-base git curl postgresql-dev --no-cache
 WORKDIR /app
 COPY Gemfile Gemfile.lock ./
-RUN bundle config set --local without development:test
+
 RUN bundle install
 
 
