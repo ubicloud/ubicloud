@@ -14,8 +14,10 @@ class VmHost < Sequel::Model
   one_to_many :storage_devices, key: :vm_host_id
   one_to_many :pci_devices, key: :vm_host_id
   one_to_many :boot_images, key: :vm_host_id
+  one_to_many :vm_host_slices, key: :vm_host_id
+  one_to_many :vm_host_cpus, key: :vm_host_id
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, vm_host_slices: :destroy, vm_host_cpus: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -151,6 +153,14 @@ class VmHost < Sequel::Model
 
   def sshable_address
     assigned_host_addresses.find { |a| a.ip.version == 4 }
+  end
+
+  def spdk_cpu_count
+    if total_cpus <= 64
+      2
+    else
+      4
+    end
   end
 
   def create_addresses(ip_records: nil)

@@ -17,11 +17,12 @@ RSpec.describe Prog::Vm::HostNexus do
   }
 
   let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
-  let(:vm_host) { instance_double(VmHost, vms: vms) }
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { Sshable.create_with_id }
+  let(:vm_host) { VmHost.create(location: "x", total_cpus: 48) { _1.id = sshable.id } }
 
   before do
     allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+    allow(vm_host).to receive(:vms).and_return(vms)
   end
 
   describe ".assemble" do
@@ -138,6 +139,8 @@ RSpec.describe Prog::Vm::HostNexus do
       ])
 
       expect { nx.wait_prep }.to hop("setup_hugepages")
+
+      expect(vm_host.vm_host_cpus.sort_by(&:cpu_number).map(&:spdk)).to eq([true, true, false, false, false])
     end
 
     it "crashes if an expected field is not set for LearnMemory" do
