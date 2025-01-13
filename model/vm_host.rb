@@ -337,3 +337,4 @@ end
 #  spdk_installation     | spdk_installation_vm_host_id_fkey  | (vm_host_id) REFERENCES vm_host(id)
 #  storage_device        | storage_device_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)
 #  vm                    | vm_vm_host_id_fkey                 | (vm_host_id) REFERENCES vm_host(id)
+#  vm_host_slice         | vm_host_slice_vm_host_id_fkey      | (vm_host_id) REFERENCES vm_host(id)
