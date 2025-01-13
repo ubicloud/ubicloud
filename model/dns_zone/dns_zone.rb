@@ -34,18 +34,11 @@ class DnsZone < Sequel::Model
     records = records.where(type: type) if type
     records = records.where(data: data) if data
 
-    DB[:dns_record].multi_insert(
-      records.map {
-        {
-          id: DnsRecord.generate_uuid,
-          dns_zone_id: id,
-          name: _1.name,
-          type: _1.type,
-          ttl: _1.ttl,
-          data: _1.data,
-          tombstoned: true
-        }
-      }
+    DB[:dns_record].import(
+      [:id, :dns_zone_id, :name, :type, :ttl, :data, :tombstoned],
+      records.select_map([:name, :type, :ttl, :data]).map do
+        [DnsRecord.generate_uuid, id, *_1, true]
+      end
     )
 
     incr_refresh_dns_servers
