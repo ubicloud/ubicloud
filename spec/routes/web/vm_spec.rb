@@ -135,12 +135,20 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "123 GB"
         expect(page).to have_content "1.2.3.4"
 
+        click_link vm.name
+        expect(page).to have_content "123 GB"
+        expect(page.body).to include "auto-refresh hidden"
+
+        vm.this.update(display_state: "running")
+        page.refresh
+        expect(page.body).not_to include "auto-refresh hidden"
+
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
         storage_volume.update(size_gib: 0)
         vm.assigned_vm_address.destroy
         vm.update(ephemeral_net6: nil)
-        page.refresh
+        visit "#{project.path}/vm"
         expect(page).to have_no_content "Create Virtual Machine"
         expect(page).to have_content "Not assigned yet"
 
