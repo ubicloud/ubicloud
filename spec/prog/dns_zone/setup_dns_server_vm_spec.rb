@@ -49,6 +49,57 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
         described_class.assemble(ds.id)
       }.to raise_error RuntimeError, "No existing Project"
     end
+
+    it "errors out if the DNS Server VMs are not in sync" do
+      expect(described_class).to receive(:vms_in_sync?).and_return(false)
+      expect {
+        described_class.assemble(ds.id)
+      }.to raise_error RuntimeError, "Existing DNS Server VMs are not in sync, try again later"
+    end
+  end
+
+  describe ".vms_in_sync?" do
+    let(:vms) {
+      vms = [create_vm, create_vm]
+      vms[0].sshable = Sshable.new
+      vms[1].sshable = Sshable.new
+      vms
+    }
+
+    it "returns true if no VMs are given" do
+      expect(described_class.vms_in_sync?(nil)).to be true
+      expect(described_class.vms_in_sync?([])).to be true
+    end
+
+    it "returns false if the command outputs are do not match" do
+      expect(vms[0].sshable).to receive(:cmd).and_return "foo"
+      expect(vms[1].sshable).to receive(:cmd).and_return "bar"
+      expect(described_class.vms_in_sync?(vms)).to be false
+    end
+
+    it "returns true if the dns records match, irrespective of order" do
+      expect(vms[0].sshable).to receive(:cmd).and_return <<-DNS
+[zone1.] name1.zone1. 10 A 127.1.2.3
+[zone2.] zone2. 3600 NS zone2.
+[zone2.] zone2. 3600 SOA ns.zone2. zone2. 38 86400 7200 1209600 3600
+      DNS
+      expect(vms[1].sshable).to receive(:cmd).and_return <<-DNS
+[zone2.] zone2. 3600 SOA ns.zone2. zone2. 38 86400 7200 1209600 3600
+[zone1.] name1.zone1. 10 A 127.1.2.3
+[zone2.] zone2. 3600 NS zone2.
+      DNS
+      expect(described_class.vms_in_sync?(vms)).to be true
+    end
+
+    it "returns true even if the serial numbers of SOA records are different" do
+      expect(vms[0].sshable).to receive(:cmd).and_return <<-DNS
+[erentest2.ibicloud.com.] erentest2.ibicloud.com. 3600 SOA ns.erentest2.ibicloud.com. erentest2.ibicloud.com. 38 86400 7200 1209600 3600
+      DNS
+      expect(vms[1].sshable).to receive(:cmd).and_return <<-DNS
+[erentest2.ibicloud.com.] erentest2.ibicloud.com. 3600 SOA ns.erentest2.ibicloud.com. erentest2.ibicloud.com. 56 86400 7200 1209600 3600
+      DNS
+      expect(described_class.vms_in_sync?(vms)).to be true
+    end
   end
 
   describe "#start" do

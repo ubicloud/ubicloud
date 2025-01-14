@@ -12,6 +12,10 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
       fail "No existing Project"
     end
 
+    # The .assemble function is meant to be run by an operator manually. If/when we want to make this more programmatic
+    # we should move this check to a pre-validation label of the prog.
+    fail "Existing DNS Server VMs are not in sync, try again later" unless vms_in_sync?(dns_server.vms)
+
     name ||= "#{dns_server.ubid}-#{SecureRandom.alphanumeric(8).downcase}"
 
     DB.transaction do
@@ -30,6 +34,27 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
 
       Strand.create_with_id(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server_id}])
     end
+  end
+
+  def self.vms_in_sync?(vms)
+    return true if vms.nil? || vms.empty?
+
+    outputs = vms.map do |vm|
+      lines = vm.sshable.cmd("sudo -u knot knotc", stdin: "zone-read --").split("\n")
+
+      lines.map do |line|
+        parts = line.split
+        # Serial number for the SOA record can vary, and it's normal so exclude that
+        if parts[3] == "SOA"
+          parts.delete_at(6)
+          parts.join(" ")
+        else
+          line
+        end
+      end
+    end
+
+    outputs.map(&:to_set).uniq.count == 1
   end
 
   def ds
@@ -132,12 +157,7 @@ zone:
   end
 
   label def validate
-    outputs = (ds.vms + [vm]).map do |vm|
-      vm.sshable.cmd("sudo -u knot knotc", stdin: "zone-read --").split("\n").to_set
-    end
-
-    hop_sync_zones unless outputs.uniq.count == 1
-
+    hop_sync_zones unless Prog::DnsZone::SetupDnsServerVm.vms_in_sync?(ds.vms + [vm])
     ds.add_vm vm unless ds.vms.map(&:id).include? vm.id
     pop "created VM for DnsServer"
   end
