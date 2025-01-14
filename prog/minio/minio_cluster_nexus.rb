@@ -116,7 +116,6 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     DB.transaction do
       minio_cluster.private_subnet.firewalls.map(&:destroy)
       minio_cluster.private_subnet.incr_destroy
-      minio_cluster.dissociate_with_project(minio_cluster.projects.first)
       minio_cluster.destroy
     end
 

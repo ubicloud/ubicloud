@@ -165,7 +165,6 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(ps).to receive(:incr_destroy)
       expect(fw).to receive(:destroy)
       expect(nx.minio_cluster).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(nx.minio_cluster).to receive(:dissociate_with_project).with(minio_project)
       expect(nx.minio_cluster).to receive(:destroy)
       expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
     end

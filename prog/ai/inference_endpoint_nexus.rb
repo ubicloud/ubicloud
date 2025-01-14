@@ -114,7 +114,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   label def self_destroy
     nap 10 if replicas.any?
 
-    inference_endpoint.dissociate_with_project(project)
     inference_endpoint.destroy
 
     pop "inference endpoint is deleted"

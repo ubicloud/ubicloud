@@ -160,10 +160,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
 
     if private_subnet.nics.empty? && private_subnet.load_balancers.empty?
-      DB.transaction do
-        private_subnet.projects.each { |p| private_subnet.dissociate_with_project(p) }
-        private_subnet.destroy
-      end
+      private_subnet.destroy
       pop "subnet destroyed"
     else
       private_subnet.nics.map { |n| n.incr_destroy }

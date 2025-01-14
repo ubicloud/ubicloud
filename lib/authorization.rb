@@ -195,9 +195,9 @@ module Authorization
       )
     end
 
-    def dissociate_with_project(project)
-      return if project.nil?
-      hyper_tag(project).destroy
+    def before_destroy
+      AccessTag.where(hyper_tag_id: id).destroy
+      super
     end
   end
 end

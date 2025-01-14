@@ -54,13 +54,10 @@ class Firewall < Sequel::Model
     private_subnets.each(&:incr_update_firewall_rules)
   end
 
-  def destroy
-    DB.transaction do
-      private_subnets.each(&:incr_update_firewall_rules)
-      projects.each { |p| dissociate_with_project(p) }
-      FirewallsPrivateSubnets.where(firewall_id: id).all.each(&:destroy)
-      super
-    end
+  def before_destroy
+    private_subnets.each(&:incr_update_firewall_rules)
+    FirewallsPrivateSubnets.where(firewall_id: id).destroy
+    super
   end
 
   def associate_with_private_subnet(private_subnet, apply_firewalls: true)

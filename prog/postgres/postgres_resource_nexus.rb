@@ -211,7 +211,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     servers.each(&:incr_destroy)
 
     Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
-    postgres_resource.dissociate_with_project(postgres_resource.project)
     postgres_resource.destroy
 
     pop "postgres resource is deleted"

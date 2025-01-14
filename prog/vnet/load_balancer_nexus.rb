@@ -152,7 +152,6 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def wait_destroy
     reap
     if leaf?
-      load_balancer.projects.each { |prj| load_balancer.dissociate_with_project(prj) }
       load_balancer.destroy
 
       pop "load balancer deleted"

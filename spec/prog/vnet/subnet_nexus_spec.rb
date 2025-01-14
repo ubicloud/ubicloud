@@ -383,8 +383,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "deletes and pops if nics are destroyed" do
       expect(ps).to receive(:destroy).and_return(true)
       expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:projects).and_return([prj]).at_least(:once)
-      expect(ps).to receive(:dissociate_with_project).with(prj).and_return(true)
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
 
@@ -395,8 +393,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ps1.connect_subnet(ps2)
       expect(ps1.connected_subnets.map(&:id)).to eq [ps2.id]
       expect(ps2.connected_subnets.map(&:id)).to eq [ps1.id]
-      expect(ps1).to receive(:projects).and_return([prj]).at_least(:once)
-      expect(ps1).to receive(:dissociate_with_project).with(prj).and_return(true)
 
       expect(nx).to receive(:private_subnet).and_return(ps1).at_least(:once)
       expect(ps1).to receive(:disconnect_subnet).with(ps2).and_call_original

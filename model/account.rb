@@ -37,6 +37,11 @@ class Account < Sequel::Model(:accounts)
     project
   end
 
+  def dissociate_with_project(project)
+    return if project.nil?
+    hyper_tag(project).destroy
+  end
+
   def suspend
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
