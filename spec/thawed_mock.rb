@@ -83,6 +83,7 @@ module ThawedMock
   # Progs
   allow_mocking(Prog::Ai::InferenceEndpointNexus, :assemble, :model_for_id)
   allow_mocking(Prog::Ai::InferenceEndpointReplicaNexus, :assemble)
+  allow_mocking(Prog::DnsZone::SetupDnsServerVm, :vms_in_sync?)
   allow_mocking(Prog::Github::DestroyGithubInstallation, :assemble)
   allow_mocking(Prog::PageNexus, :assemble)
   allow_mocking(Prog::Postgres::PostgresResourceNexus, :dns_zone)
