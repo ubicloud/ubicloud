@@ -90,3 +90,5 @@ end
 # Indexes:
 #  api_key_pkey                       | PRIMARY KEY btree (id)
 #  api_key_owner_table_owner_id_index | btree (owner_table, owner_id)
+# Foreign key constraints:
+#  api_key_project_id_fkey | (project_id) REFERENCES project(id)

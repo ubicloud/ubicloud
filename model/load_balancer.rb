@@ -118,8 +118,9 @@ end
 #  stack                       | lb_stack       | NOT NULL DEFAULT 'dual'::lb_stack
 #  project_id                  | uuid           |
 # Indexes:
-#  load_balancer_pkey                | PRIMARY KEY btree (id)
-#  load_balancer_custom_hostname_key | UNIQUE btree (custom_hostname)
+#  load_balancer_pkey                        | PRIMARY KEY btree (id)
+#  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
+#  load_balancer_private_subnet_id_name_uidx | UNIQUE btree (private_subnet_id, name)
 # Check constraints:
 #  health_check_down_threshold_gt_0              | (health_check_down_threshold > 0)
 #  health_check_interval_gt_0                    | (health_check_interval > 0)
@@ -130,6 +131,7 @@ end
 # Foreign key constraints:
 #  load_balancer_custom_hostname_dns_zone_id_fkey | (custom_hostname_dns_zone_id) REFERENCES dns_zone(id)
 #  load_balancer_private_subnet_id_fkey           | (private_subnet_id) REFERENCES private_subnet(id)
+#  load_balancer_project_id_fkey                  | (project_id) REFERENCES project(id)
 # Referenced By:
 #  certs_load_balancers | certs_load_balancers_load_balancer_id_fkey | (load_balancer_id) REFERENCES load_balancer(id)
 #  inference_endpoint   | inference_endpoint_load_balancer_id_fkey   | (load_balancer_id) REFERENCES load_balancer(id)

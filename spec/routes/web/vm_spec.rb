@@ -277,7 +277,7 @@ RSpec.describe Clover, "vm" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
-        expect(page).to have_flash_error("project_id and name is already taken")
+        expect(page).to have_flash_error("project_id and location and name is already taken")
       end
 
       it "can not create virtual machine if project has no valid payment method" do

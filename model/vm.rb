@@ -284,10 +284,12 @@ end
 #  vm_host_slice_id | uuid                     |
 #  project_id       | uuid                     |
 # Indexes:
-#  vm_pkey               | PRIMARY KEY btree (id)
-#  vm_ephemeral_net6_key | UNIQUE btree (ephemeral_net6)
+#  vm_pkey                          | PRIMARY KEY btree (id)
+#  vm_ephemeral_net6_key            | UNIQUE btree (ephemeral_net6)
+#  vm_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
 # Foreign key constraints:
 #  vm_pool_id_fkey          | (pool_id) REFERENCES vm_pool(id)
+#  vm_project_id_fkey       | (project_id) REFERENCES project(id)
 #  vm_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
 #  vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
 # Referenced By:
