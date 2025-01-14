@@ -212,5 +212,7 @@ ExecStart=nc -l 8080 -6
   def start_listening(ipv4: true)
     vm_to_be_connected.sshable.cmd("sudo systemctl stop listening_ipv#{ipv4 ? "6" : "4"}.service")
     vm_to_be_connected.sshable.cmd("sudo systemctl start listening_ipv#{ipv4 ? "4" : "6"}.service")
+
+    nap 1 if vm_to_be_connected.sshable.cmd("sudo systemctl status listening_ipv#{ipv4 ? "4" : "6"}.service").include?("inactive")
   end
 end
