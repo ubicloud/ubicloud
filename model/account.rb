@@ -6,11 +6,11 @@ class Account < Sequel::Model(:accounts)
   one_to_many :usage_alerts, key: :user_id
   one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "accounts"}
   one_to_many :identities, class: :AccountIdentity
+  many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
 
   plugin :association_dependencies, usage_alerts: :destroy
 
   include ResourceMethods
-  include Authorization::HyperTagMethods
   include SubjectTag::Cleanup
 
   def hyper_tag_name(project = nil)
@@ -19,7 +19,6 @@ class Account < Sequel::Model(:accounts)
 
   def create_project_with_default_policy(name, default_policy: true)
     project = Project.create_with_id(name: name)
-    project.associate_with_project(project)
     associate_with_project(project)
 
     if default_policy
@@ -37,6 +36,21 @@ class Account < Sequel::Model(:accounts)
     project
   end
 
+  def hyper_tag(project)
+    AccessTag.where(project_id: project.id, hyper_tag_id: id).first
+  end
+
+  def associate_with_project(project)
+    return if project.nil?
+
+    AccessTag.create_with_id(
+      project_id: project.id,
+      name: hyper_tag_name(project),
+      hyper_tag_id: id,
+      hyper_tag_table: self.class.table_name
+    )
+  end
+
   def dissociate_with_project(project)
     return if project.nil?
     hyper_tag(project).destroy
@@ -47,6 +61,11 @@ class Account < Sequel::Model(:accounts)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
 
     projects.each { _1.billing_info&.payment_methods_dataset&.update(fraud: true) }
+  end
+
+  def before_destroy
+    AccessTag.where(hyper_tag_id: id).destroy
+    super
   end
 end
 

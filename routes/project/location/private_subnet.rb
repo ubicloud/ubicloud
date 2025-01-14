@@ -60,7 +60,7 @@ class Clover
         else
           @nics = Serializers::Nic.serialize(ps.nics)
           @connected_subnets = Serializers::PrivateSubnet.serialize(ps.connected_subnets)
-          connectable_subnets = ps.projects.first.private_subnets.select do |ps1|
+          connectable_subnets = ps.project.private_subnets.select do |ps1|
             ps1_id = ps1.id
             ps1_id != ps.id && !ps.connected_subnets.find { |cs| cs.id == ps1_id }
           end

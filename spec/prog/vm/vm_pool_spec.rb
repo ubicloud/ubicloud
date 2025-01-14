@@ -29,7 +29,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#create_new_vm" do
     let(:prj) {
-      Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      Project.create_with_id(name: "default")
     }
 
     it "creates a new vm and hops to wait" do

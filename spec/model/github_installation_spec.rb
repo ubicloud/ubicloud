@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe GithubInstallation do
   subject(:installation) {
-    project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+    project = Project.create_with_id(name: "default")
 
     described_class.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
   }

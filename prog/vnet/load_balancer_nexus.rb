@@ -32,7 +32,6 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id,
         stack: stack, project_id: ps.project_id
       )
-      lb.associate_with_project(ps.projects.first)
 
       Strand.create(prog: "Vnet::LoadBalancerNexus", label: "wait") { _1.id = lb.id }
     end

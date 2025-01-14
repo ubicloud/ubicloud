@@ -5,7 +5,6 @@
     let(:user) { Account.create_with_id(email: "auth1@example.com") }
     let(:project) do
       project = Project.create_with_id(name: "project-1")
-      project.associate_with_project(project)
       user.associate_with_project(project)
       project
     end

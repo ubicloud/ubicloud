@@ -95,7 +95,7 @@ RSpec.describe Clover, "private subnet" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few seconds")
         expect(PrivateSubnet.count).to eq(1)
-        expect(PrivateSubnet.first.projects.first.id).to eq(project.id)
+        expect(PrivateSubnet.first.project_id).to eq(project.id)
       end
 
       it "can not create private subnet with same name" do

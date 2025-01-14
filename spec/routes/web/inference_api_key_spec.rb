@@ -22,7 +22,7 @@ RSpec.describe Clover, "inference-api-key" do
       expect(ApiKey.count).to eq(1)
       expect(@api_key.owner_id).to eq(project.id)
       expect(@api_key.owner_table).to eq("project")
-      expect(@api_key.projects).to eq([project])
+      expect(@api_key.project).to eq(project)
       expect(@api_key.used_for).to eq("inference_endpoint")
       expect(@api_key.is_valid).to be(true)
 
@@ -39,9 +39,6 @@ RSpec.describe Clover, "inference-api-key" do
     end
 
     it "inference api key page allows removing inference api keys" do
-      access_tag_ds = DB[:access_tag].where(hyper_tag_id: @api_key.id)
-      expect(access_tag_ds.all).not_to be_empty
-
       btn = find(".delete-btn")
       data_url = btn["data-url"]
       _csrf = btn["data-csrf"]

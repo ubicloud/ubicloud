@@ -18,7 +18,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
   describe ".assemble" do
     it "creates github repository or updates last_job_at if the repository exists" do
-      project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      project = Project.create_with_id(name: "default")
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
       expect {

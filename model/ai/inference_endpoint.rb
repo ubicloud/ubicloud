@@ -26,10 +26,6 @@ class InferenceEndpoint < Sequel::Model
     "/location/#{display_location}/inference-endpoint/#{name}"
   end
 
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{display_location}/inference-endpoint/#{name}"
-  end
-
   def display_state
     return "running" if ["wait"].include?(strand.label)
     return "deleting" if destroy_set? || strand.label == "destroy"

@@ -31,8 +31,7 @@ RSpec.describe Clover, "inference-endpoint" do
         ["ie6", "test-model", project_wo_permissions, false, true, {capability: "Text Generation"}],
         ["ie7", "unknown-capability", project_wo_permissions, true, true, {capability: "wrong capability"}]
       ].each do |name, model_name, project, is_public, visible, tags|
-        ie = InferenceEndpoint.create_with_id(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id: lb.id, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
-        ie.associate_with_project(project)
+        InferenceEndpoint.create_with_id(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id: lb.id, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
       end
 
       visit "#{project.path}/inference-endpoint"
@@ -50,8 +49,7 @@ RSpec.describe Clover, "inference-endpoint" do
     it "does not show inference endpoints without permissions" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
       lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
-      ie = InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: project_wo_permissions.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
-      ie.associate_with_project(project_wo_permissions)
+      InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: project_wo_permissions.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
       visit "#{project_wo_permissions.path}/inference-endpoint"
 
       expect(page.title).to eq("Ubicloud - Inference Endpoints")

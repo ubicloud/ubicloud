@@ -3,7 +3,7 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Pagination do
-  let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
+  let(:project) { Project.create_with_id(name: "default") }
 
   let!(:first_vm) do
     Prog::Vm::Nexus.assemble("dummy-public-key", project.id, name: "dummy-vm-1").subject

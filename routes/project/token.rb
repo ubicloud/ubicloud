@@ -6,7 +6,7 @@ class Clover
       authorize("Project:token", @project.id)
       token_ds = current_account
         .api_keys_dataset
-        .where(id: AccessTag.where(project_id: @project.id).select(:hyper_tag_id))
+        .where(project_id: @project.id)
         .reverse(:created_at)
 
       r.is do

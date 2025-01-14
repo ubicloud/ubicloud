@@ -48,9 +48,9 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe ".assemble" do
     it "creates replica and vm with sshable" do
-      user_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
-      ie_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1", project_id: ie_project.id).tap { _1.associate_with_project(ie_project) }
+      user_project = Project.create_with_id(name: "default")
+      ie_project = Project.create_with_id(name: "default")
+      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1", project_id: ie_project.id)
 
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
       st_ie = Prog::Ai::InferenceEndpointNexus.assemble_with_model(
@@ -250,7 +250,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#ping_gateway" do
-    let(:projects) { [Project.create_with_id(name: "p1").tap { _1.associate_with_project(_1) }, Project.create_with_id(name: "p2").tap { _1.associate_with_project(_1) }] }
+    let(:projects) { [Project.create_with_id(name: "p1"), Project.create_with_id(name: "p2")] }
 
     before do
       ApiKey.create_inference_api_key(projects.first)

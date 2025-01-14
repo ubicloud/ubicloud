@@ -36,8 +36,7 @@ class SubjectTag < Sequel::Model
     when Account
       !AccessTag.where(project_id:, hyper_tag_id: subject.id).empty?
     when ApiKey
-      subject.owner_table == "accounts" &&
-        !AccessTag.where(project_id:, hyper_tag_id: subject.owner_id).empty?
+      subject.owner_table == "accounts" && subject.project_id == project_id
     end
   end
 end

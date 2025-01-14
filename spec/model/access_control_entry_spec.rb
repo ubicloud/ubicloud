@@ -6,7 +6,6 @@ RSpec.describe AccessControlEntry do
   it "enforces subject, action, and object are valid and related to project" do
     account = Account.create_with_id(email: "test@example.com", status_id: 2)
     project = Project.create_with_id(name: "Test")
-    project.associate_with_project(project)
     account.associate_with_project(project)
     project_id = project.id
 
@@ -26,7 +25,7 @@ RSpec.describe AccessControlEntry do
     expect(ace.valid?).to be false
     expect(ace.errors).to eq(subject_id: ["is not related to this project"])
 
-    ace.subject_id = ApiKey.create_personal_access_token(account).id
+    ace.subject_id = ApiKey.create_personal_access_token(account, project:).id
     expect(ace.valid?).to be true
 
     ace.subject_id = ApiKey.create_personal_access_token(account2).id
@@ -34,7 +33,6 @@ RSpec.describe AccessControlEntry do
     expect(ace.errors).to eq(subject_id: ["is not related to this project"])
 
     project2 = Project.create_with_id(name: "Test-2")
-    project2.associate_with_project(project2)
     account.associate_with_project(project2)
     ace.subject_id = SubjectTag.create_with_id(project_id: project2.id, name: "V").id
     expect(ace.valid?).to be false
@@ -70,7 +68,6 @@ RSpec.describe AccessControlEntry do
     expect(ace.errors).to eq(object_id: ["is not related to this project"])
 
     firewall.update(project_id: project.id)
-    firewall.associate_with_project(project)
     expect(ace.valid?).to be true
 
     ace.object_id = ApiKey.create_inference_api_key(project2).id

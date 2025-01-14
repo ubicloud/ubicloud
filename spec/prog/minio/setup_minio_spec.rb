@@ -7,7 +7,6 @@ RSpec.describe Prog::Minio::SetupMinio do
 
   let(:minio_server) {
     prj = Project.create_with_id(name: "default")
-    prj.associate_with_project(prj)
     ps = Prog::Vnet::SubnetNexus.assemble(
       prj.id, name: "minio-cluster-name"
     )

@@ -33,7 +33,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe ".assemble" do
     it "creates github runner and vm with sshable" do
-      project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      project = Project.create_with_id(name: "default")
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
 
       st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud")
@@ -45,7 +45,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "creates github runner with custom size" do
-      project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      project = Project.create_with_id(name: "default")
       installation = GithubInstallation.create_with_id(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
       st = described_class.assemble(installation, repository_name: "test-repo", label: "ubicloud-standard-8")
 
@@ -63,10 +63,10 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe ".pick_vm" do
-    let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
+    let(:project) { Project.create_with_id(name: "default") }
 
     before do
-      runner_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      runner_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:github_runner_service_project_id).and_return(runner_project.id)
     end
 
@@ -80,7 +80,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm.sshable.unix_user).to eq("runneradmin")
       expect(vm.family).to eq("standard")
       expect(vm.cores).to eq(2)
-      expect(vm.projects.map(&:id)).to include(Config.github_runner_service_project_id)
+      expect(vm.project_id).to eq(Config.github_runner_service_project_id)
     end
 
     it "provisions a new vm if pool is valid but there is no vm" do
@@ -116,7 +116,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   end
 
   describe ".update_billing_record" do
-    let(:project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
+    let(:project) { Project.create_with_id(name: "default") }
 
     before do
       allow(github_runner).to receive(:installation).and_return(instance_double(GithubInstallation, project: project)).at_least(:once)

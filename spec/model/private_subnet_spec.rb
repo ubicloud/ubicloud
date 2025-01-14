@@ -97,11 +97,6 @@ RSpec.describe PrivateSubnet do
     it "returns path" do
       expect(private_subnet.path).to eq "/location/eu-central-h1/private-subnet/ps"
     end
-
-    it "returns tag name" do
-      pr = instance_double(Project, ubid: "prjubid")
-      expect(private_subnet.hyper_tag_name(pr)).to eq "project/prjubid/location/eu-central-h1/private-subnet/ps"
-    end
   end
 
   describe "display_state" do
@@ -158,9 +153,7 @@ RSpec.describe PrivateSubnet do
 
   describe "connected subnets related methods" do
     let(:prj) {
-      prj = Project.create_with_id(name: "test-prj")
-      prj.associate_with_project(prj)
-      prj
+      Project.create_with_id(name: "test-prj")
     }
 
     let(:ps1) {

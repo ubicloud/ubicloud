@@ -23,7 +23,8 @@ RSpec.describe ApiKey do
 
     it "can be deleted even with applied_tag references to related access tag" do
       token = described_class.create_personal_access_token(Account.create_with_id(email: "test@example.com"), project: prj)
-      DB[:applied_tag].insert(access_tag_id: token.access_tags.first.id, tagged_id: token.id, tagged_table: "")
+      access_tag_id = AccessTag.create(project_id: prj.id, hyper_tag_id: token.id, hyper_tag_table: "", name: "").id
+      DB[:applied_tag].insert(access_tag_id:, tagged_id: token.id, tagged_table: "")
       token.destroy
       expect(token).not_to be_exists
     end

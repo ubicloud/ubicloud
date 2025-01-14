@@ -43,7 +43,7 @@ RSpec.describe Clover, "postgres" do
 
   describe "authenticated" do
     before do
-      postgres_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      postgres_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
       login(user.email)
 
@@ -90,7 +90,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
-        expect(PostgresResource.first.projects.first.id).to eq(project.id)
+        expect(PostgresResource.first.project_id).to eq(project.id)
       end
 
       it "handles errors when creating new PostgreSQL database" do
@@ -129,7 +129,7 @@ RSpec.describe Clover, "postgres" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(PostgresResource.count).to eq(1)
-        expect(PostgresResource.first.projects.first.id).to eq(project.id)
+        expect(PostgresResource.first.project_id).to eq(project.id)
       end
 
       it "can not open create page with invalid flavor" do
