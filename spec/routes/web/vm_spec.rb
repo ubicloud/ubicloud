@@ -77,7 +77,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(Vm.count).to eq(1)
-        expect(Vm.first.projects.first.id).to eq(project.id)
+        expect(Vm.first.project_id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).not_to be_nil
         expect(Vm.first.ip4_enabled).to be_falsey
 
@@ -177,7 +177,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(Vm.count).to eq(1)
-        expect(Vm.first.projects.first.id).to eq(project.id)
+        expect(Vm.first.project_id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).not_to be_nil
         expect(Vm.first.ip4_enabled).to be_truthy
       end
@@ -202,7 +202,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(Vm.count).to eq(1)
-        expect(Vm.first.projects.first.id).to eq(project.id)
+        expect(Vm.first.project_id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).to eq(ps.id)
       end
 
@@ -226,7 +226,7 @@ RSpec.describe Clover, "vm" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
         expect(Vm.count).to eq(1)
-        expect(Vm.first.projects.first.id).to eq(project.id)
+        expect(Vm.first.project_id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).not_to eq(ps.id)
         expect(Vm.first.private_subnets.first.name).to eq("default-#{LocationNameConverter.to_display_name(ps.location)}")
 

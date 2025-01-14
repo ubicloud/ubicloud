@@ -61,6 +61,7 @@ RSpec.describe Clover, "project" do
         name = "new-project"
         visit "/project/create"
 
+        expect(project.access_tags.count).to eq 1
         expect(page.title).to eq("Ubicloud - Create Project")
 
         fill_in "Name", with: name
@@ -71,7 +72,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content name
 
         project = Project[name: name]
-        expect(project.access_tags.count).to eq 2
+        expect(project.access_tags.count).to eq 1
         expect(project.access_control_entries.count).to eq 2
         expect(project.subject_tags.map(&:name).sort).to eq %w[Admin Member]
         expect(user.hyper_tag(project)).to exist

@@ -116,7 +116,6 @@ RSpec.describe Project do
 
     it "returns false if any accounts is suspended" do
       project = described_class.create_with_id(name: "test")
-      project.associate_with_project(project)
       Account.create_with_id(email: "user1@example.com").tap { _1.associate_with_project(project) }
       Account.create_with_id(email: "user2@example.com").tap { _1.associate_with_project(project) }.update(suspended_at: Time.now)
       expect(project.active?).to be false
@@ -124,7 +123,6 @@ RSpec.describe Project do
 
     it "returns true if any condition not match" do
       project = described_class.create_with_id(name: "test")
-      project.associate_with_project(project)
       Account.create_with_id(email: "user1@example.com").tap { _1.associate_with_project(project) }
       expect(project.active?).to be true
     end

@@ -7,7 +7,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   def self.assemble(project_id, cluster_name, location, admin_user,
     storage_size_gib, pool_count, server_count, drive_count, vm_size)
-    unless (project = Project[project_id])
+    unless Project[project_id]
       fail "No existing project"
     end
 
@@ -38,7 +38,6 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         root_cert_key_2: root_cert_key_2,
         project_id:
       ) { _1.id = ubid.to_uuid }
-      minio_cluster.associate_with_project(project)
 
       per_pool_server_count = server_count / pool_count
       per_pool_drive_count = drive_count / pool_count

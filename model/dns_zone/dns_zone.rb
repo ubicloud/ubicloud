@@ -15,10 +15,6 @@ class DnsZone < Sequel::Model
 
   semaphore :refresh_dns_servers
 
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/dns-zone/#{ubid}"
-  end
-
   def insert_record(record_name:, type:, ttl:, data:)
     record_name = add_dot_if_missing(record_name)
     DnsRecord.create_with_id(dns_zone_id: id, name: record_name, type: type, ttl: ttl, data: data)

@@ -3,12 +3,12 @@
 require_relative "../model"
 
 class LoadBalancer < Sequel::Model
+  many_to_one :project
   many_to_many :vms
   many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: ["up"]}
   many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: ["evacuating", "detaching"])
   one_to_one :strand, key: :id
   many_to_one :private_subnet
-  one_to_many :projects, through: :private_subnet
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
   one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
@@ -22,10 +22,6 @@ class LoadBalancer < Sequel::Model
   include ObjectTag::Cleanup
   dataset_module Pagination
   semaphore :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
-
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{private_subnet.display_location}/load-balancer/#{name}"
-  end
 
   def path
     "/location/#{private_subnet.display_location}/load-balancer/#{name}"

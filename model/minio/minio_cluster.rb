@@ -3,6 +3,7 @@
 require_relative "../../model"
 
 class MinioCluster < Sequel::Model
+  many_to_one :project
   one_to_many :pools, key: :cluster_id, class: :MinioPool do |ds|
     ds.order(:start_index)
   end
@@ -22,14 +23,6 @@ class MinioCluster < Sequel::Model
     enc.column :admin_password
     enc.column :root_cert_key_1
     enc.column :root_cert_key_2
-  end
-
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{display_location}/minio-cluster/#{name}"
-  end
-
-  def display_location
-    LocationNameConverter.to_display_name(location)
   end
 
   def generate_etc_hosts_entry

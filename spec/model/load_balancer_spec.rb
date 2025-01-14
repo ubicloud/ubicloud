@@ -4,24 +4,19 @@ require_relative "spec_helper"
 
 RSpec.describe LoadBalancer do
   subject(:lb) {
-    prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
+    prj = Project.create_with_id(name: "test-prj")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps")
     Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 80).subject
   }
 
   let(:vm1) {
-    prj = lb.private_subnet.projects.first
+    prj = lb.private_subnet.project
     Prog::Vm::Nexus.assemble("pub-key", prj.id, name: "test-vm1", private_subnet_id: lb.private_subnet.id).subject
   }
 
   describe "util funcs" do
     before do
       allow(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com")
-    end
-
-    it "returns hyper_tag_name" do
-      prj = lb.private_subnet.projects.first
-      expect(lb.hyper_tag_name(prj)).to eq("project/#{prj.ubid}/location/eu-central-h1/load-balancer/test-lb")
     end
 
     it "returns hostname" do
@@ -32,7 +27,7 @@ RSpec.describe LoadBalancer do
   describe "add_vm" do
     it "increments update_load_balancer and rewrite_dns_records" do
       expect(lb).to receive(:incr_rewrite_dns_records)
-      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.projects.first.id)
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.project_id)
       cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
       lb.add_cert(cert)
       lb.add_vm(vm1)
@@ -42,7 +37,7 @@ RSpec.describe LoadBalancer do
 
   describe "evacuate_vm" do
     let(:ce) {
-      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.projects.first.id)
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.project_id)
       Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     }
 
@@ -64,7 +59,7 @@ RSpec.describe LoadBalancer do
 
   describe "remove_vm" do
     let(:ce) {
-      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.projects.first.id)
+      dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.project_id)
       Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
     }
 
@@ -81,7 +76,7 @@ RSpec.describe LoadBalancer do
 
   describe "need_certificates?" do
     let(:dns_zone) {
-      DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.projects.first.id)
+      DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.project_id)
     }
 
     it "returns true if there are no certs" do
@@ -105,7 +100,7 @@ RSpec.describe LoadBalancer do
 
   describe "active_cert" do
     let(:dns_zone) {
-      DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.projects.first.id)
+      DnsZone.create_with_id(name: "test-dns-zone", project_id: lb.private_subnet.project_id)
     }
 
     it "returns the cert that is not expired" do

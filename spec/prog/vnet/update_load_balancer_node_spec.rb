@@ -9,7 +9,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     Strand.create_with_id(prog: "Vnet::UpdateLoadBalancerNode", stack: [{"subject_id" => vm.id, "load_balancer_id" => lb.id}], label: "update_load_balancer")
   }
   let(:lb) {
-    prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
+    prj = Project.create_with_id(name: "test-prj")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
@@ -18,10 +18,10 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     lb
   }
   let(:vm) {
-    Prog::Vm::Nexus.assemble("pub-key", lb.projects.first.id, name: "test-vm", private_subnet_id: lb.private_subnet.id).subject
+    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "test-vm", private_subnet_id: lb.private_subnet.id).subject
   }
   let(:neighbor_vm) {
-    Prog::Vm::Nexus.assemble("pub-key", lb.projects.first.id, name: "neighbor-vm", private_subnet_id: lb.private_subnet.id).subject
+    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "neighbor-vm", private_subnet_id: lb.private_subnet.id).subject
   }
 
   before do

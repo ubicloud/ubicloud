@@ -6,6 +6,7 @@ require_relative "../model"
 class Vm < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
+  many_to_one :project
   one_to_many :nics, key: :vm_id, class: :Nic
   many_to_many :private_subnets, join_table: :nic, left_key: :vm_id, right_key: :private_subnet_id
   one_to_one :sshable, key: :id
@@ -28,10 +29,6 @@ class Vm < Sequel::Model
 
   include Authorization::HyperTagMethods
   include ObjectTag::Cleanup
-
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{display_location}/vm/#{name}"
-  end
 
   def firewalls
     private_subnets.flat_map(&:firewalls)
@@ -204,7 +201,7 @@ class Vm < Sequel::Model
   def params_json(swap_size_bytes)
     topo = cloud_hypervisor_cpu_topology
 
-    project_public_keys = projects.first.get_ff_vm_public_ssh_keys || []
+    project_public_keys = project.get_ff_vm_public_ssh_keys || []
 
     # we don't write secrets to params_json, because it
     # shouldn't be stored in the host for security reasons.

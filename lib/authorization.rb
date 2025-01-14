@@ -110,16 +110,6 @@ module Authorization
           .where { level < Config.recursive_tag_limit },
         args: [:object_id, :level]).select(:object_id)
 
-    # If the model includes HyperTagMethods, look in access_tag.
-    # This is a temporary change while we populate the project_id
-    # columns for the related models.  After population, only
-    # the Account model will use access_tag.
-    project_id_match = if dataset.model < HyperTagMethods
-      DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])
-    else
-      Sequel[from][:project_id]
-    end
-
     if dataset.model == ObjectTag
       # Authorization for accessing ObjectTag itself is done by providing the metatag for the object.
       # Convert metatag id returned from the applied_object_tag lookup into tag ids, so that the correct
@@ -143,56 +133,20 @@ module Authorization
       {Sequel[from][:id] => ds},
       # or where the action is allowed for all objects in the project,
       (ds.where(object_id: nil).exists &
-        # and the object is related to the project (either with a matching project_id,
-        # or where there is a hyper tag from the object to the project.
-        {project_id => project_id_match})
+        # and the object is related to the project
+        {project_id => Sequel[from][:project_id]})
     ))
   end
 
   module HyperTagMethods
     module ClassMethods
       def filter_authorize_dataset(dataset, object_id)
-        dataset.where(project_id: DB[:access_tag].where(hyper_tag_id: object_id).select(:project_id))
+        dataset.where(project_id: where(id: object_id).select(:project_id))
       end
     end
 
     def self.included(base)
-      base.class_eval do
-        extend ClassMethods
-        many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
-      end
-    end
-
-    def hyper_tag_name(project = nil)
-      raise NoMethodError
-    end
-
-    def hyper_tag(project)
-      AccessTag.where(project_id: project.id, hyper_tag_id: id).first
-    end
-
-    def associate_with_project(project)
-      return if project.nil?
-
-      # Temporary code to ensure that project_id column already set,
-      # except for Account which doesn't have the column
-      # :nocov:
-      case self
-      when Account
-        nil
-      when Project
-        raise "Should already have id column set" unless id == project.id
-      else
-        raise "Should already have project_id column set" unless project_id == project.id
-      end
-      # :nocov:
-
-      AccessTag.create_with_id(
-        project_id: project.id,
-        name: hyper_tag_name(project),
-        hyper_tag_id: id,
-        hyper_tag_table: self.class.table_name
-      )
+      base.extend ClassMethods
     end
 
     def before_destroy

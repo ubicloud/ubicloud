@@ -80,7 +80,6 @@ RSpec.describe Firewall do
       tag = ObjectTag.create_with_id(project_id: project.id, name: "t")
       tag.add_member(fw.id)
       fw.update(project_id: project.id)
-      fw.associate_with_project(project)
       ace = AccessControlEntry.create_with_id(project_id: project.id, subject_id: account.id, object_id: fw.id)
 
       fw.destroy

@@ -45,7 +45,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     }
   }
 
-  let(:minio_project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
+  let(:minio_project) { Project.create_with_id(name: "default") }
 
   before do
     allow(Config).to receive(:minio_service_project_id).and_return(minio_project.id)

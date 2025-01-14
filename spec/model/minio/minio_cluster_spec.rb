@@ -58,9 +58,4 @@ RSpec.describe MinioCluster do
     expect(mc.servers.first.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
     expect(mc.ip4_urls).to eq(["https://1.1.1.1:9000"])
   end
-
-  it "returns hyper tag name properly" do
-    project = instance_double(Project, ubid: "project-ubid")
-    expect(mc.hyper_tag_name(project)).to eq("project/project-ubid/location/eu-central-h1/minio-cluster/minio-cluster-name")
-  end
 end

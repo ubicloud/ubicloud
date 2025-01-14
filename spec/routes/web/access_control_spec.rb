@@ -204,7 +204,7 @@ RSpec.describe Clover, "access control" do
     end
 
     it "does not show access control entries for tokens" do
-      AccessControlEntry.create_with_id(project_id: project.id, subject_id: ApiKey.create_personal_access_token(user).id)
+      AccessControlEntry.create_with_id(project_id: project.id, subject_id: ApiKey.create_personal_access_token(user, project:).id)
 
       visit "#{project.path}/user/access-control"
       expect(displayed_access_control_entries).to eq [

@@ -9,7 +9,7 @@ RSpec.describe Prog::Vnet::LoadBalancerHealthProbes do
     Strand.create_with_id(prog: "Vnet::LoadBalancerHealthProbes", stack: [{"subject_id" => lb.id, "vm_id" => vm.id}], label: "health_probe")
   }
   let(:lb) {
-    prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
+    prj = Project.create_with_id(name: "test-prj")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
@@ -18,7 +18,7 @@ RSpec.describe Prog::Vnet::LoadBalancerHealthProbes do
     lb
   }
   let(:vm) {
-    Prog::Vm::Nexus.assemble("pub-key", lb.projects.first.id, name: "test-vm", private_subnet_id: lb.private_subnet.id).subject
+    Prog::Vm::Nexus.assemble("pub-key", lb.project_id, name: "test-vm", private_subnet_id: lb.private_subnet.id).subject
   }
 
   before do

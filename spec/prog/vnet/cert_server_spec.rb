@@ -14,7 +14,7 @@ RSpec.describe Prog::Vnet::CertServer do
   }
 
   let(:lb) {
-    prj = Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
+    prj = Project.create_with_id(name: "test-prj")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps").subject
     lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080).subject
     dz = DnsZone.create_with_id(name: "test-dns-zone", project_id: prj.id)

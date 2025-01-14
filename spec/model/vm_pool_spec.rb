@@ -26,12 +26,10 @@ RSpec.describe VmPool do
 
   describe ".pick_vm" do
     let(:prj) {
-      Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      Project.create_with_id(name: "default")
     }
     let(:vm) {
-      vm = create_vm(pool_id: pool.id, display_state: "running", project_id: prj.id)
-      vm.associate_with_project(prj)
-      vm
+      create_vm(pool_id: pool.id, display_state: "running", project_id: prj.id)
     }
 
     it "returns the vm if there is one in running state" do

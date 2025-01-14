@@ -30,7 +30,6 @@ RSpec.describe Nic do
   describe ".unlock" do
     it "destroys all semaphores with name lock" do
       prj = Project.create_with_id(name: "prj")
-      prj.associate_with_project(prj)
       ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps").subject
       nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "nic").subject
       nic.incr_lock

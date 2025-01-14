@@ -38,7 +38,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "creates postgres timeline with blob storage when it exists" do
-      project = Project.create_with_id(name: "mc-project").tap { _1.associate_with_project(_1) }
+      project = Project.create_with_id(name: "mc-project")
       expect(Config).to receive(:minio_service_project_id).and_return(project.id).at_least(:once)
       expect(Config).to receive(:postgres_service_project_id).and_return(project.id)
       mc = Prog::Minio::MinioClusterNexus.assemble(project.id, "minio", "hetzner-fsn1", "minio-admin", 100, 1, 1, 1, "standard-2").subject

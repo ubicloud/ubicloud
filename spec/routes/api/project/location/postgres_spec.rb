@@ -19,7 +19,7 @@ RSpec.describe Clover, "postgres" do
 
   describe "unauthenticated" do
     it "cannot perform authenticated operations" do
-      postgres_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      postgres_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
 
       [
@@ -47,7 +47,7 @@ RSpec.describe Clover, "postgres" do
   describe "authenticated" do
     before do
       login_api(user.email)
-      postgres_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
+      postgres_project = Project.create_with_id(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
     end
 

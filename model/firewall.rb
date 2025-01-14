@@ -3,6 +3,7 @@
 require_relative "../model"
 
 class Firewall < Sequel::Model
+  many_to_one :project
   one_to_many :firewall_rules, key: :firewall_id
   many_to_many :private_subnets
 
@@ -11,9 +12,6 @@ class Firewall < Sequel::Model
   include ResourceMethods
   include Authorization::HyperTagMethods
   include ObjectTag::Cleanup
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{display_location}/firewall/#{name}"
-  end
 
   dataset_module Pagination
 

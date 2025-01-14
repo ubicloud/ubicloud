@@ -7,7 +7,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   let(:st) { Strand.new }
   let(:project) {
-    Project.create_with_id(name: "test-prj").tap { _1.associate_with_project(_1) }
+    Project.create_with_id(name: "test-prj")
   }
   let(:dns_zone) {
     DnsZone.create_with_id(name: "test-dns-zone", project_id: project.id)

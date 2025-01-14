@@ -18,7 +18,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         parent_id: parent_id,
         access_key: SecureRandom.hex(16),
         secret_key: SecureRandom.hex(32),
-        blob_storage_id: MinioCluster.where(location: location).all.find { _1.projects.map(&:id).include?(Config.postgres_service_project_id) }&.id
+        blob_storage_id: MinioCluster.first(project_id: Config.postgres_service_project_id, location: location)&.id
       )
       Strand.create(prog: "Postgres::PostgresTimelineNexus", label: "start") { _1.id = postgres_timeline.id }
     end

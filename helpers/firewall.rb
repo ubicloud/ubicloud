@@ -33,7 +33,6 @@ class Clover
       location: @location,
       project_id: @project.id
     )
-    firewall.associate_with_project(@project)
 
     if api?
       Serializers::Firewall.serialize(firewall)

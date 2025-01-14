@@ -10,15 +10,11 @@ RSpec.describe Clover, "firewall" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:firewall) do
-    fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1", project_id: project.id)
-    fw.associate_with_project(project)
-    fw
+    Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1", project_id: project.id)
   end
 
   let(:fw_wo_permission) {
-    fw = Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location: "hetzner-fsn1", project_id: project_wo_permissions.id)
-    fw.associate_with_project(project_wo_permissions)
-    fw
+    Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location: "hetzner-fsn1", project_id: project_wo_permissions.id)
   }
 
   describe "unauthenticated" do
@@ -64,7 +60,6 @@ RSpec.describe Clover, "firewall" do
       it "does not show links to firewalls if user lacks Firewall:view access to them" do
         firewall
         fw = Firewall.create_with_id(name: "viewable-fw", description: "viewable-fw", location: "hetzner-fsn1", project_id: project.id)
-        fw.associate_with_project(project)
 
         visit "#{project.path}/firewall"
         link_texts = page.all("a").map(&:text)
@@ -123,7 +118,7 @@ RSpec.describe Clover, "firewall" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' is created")
         expect(Firewall.count).to eq(1)
-        expect(Firewall.first.projects.first.id).to eq(project.id)
+        expect(Firewall.first.project_id).to eq(project.id)
       end
 
       it "can create new firewall with private subnet" do

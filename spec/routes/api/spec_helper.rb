@@ -21,7 +21,6 @@ RSpec.configure do |config|
     if @pat
       SubjectTag.first(project_id: project.id, name: "Admin").add_subject(@pat.id)
       @pat.update(project_id: project.id)
-      @pat.associate_with_project(project)
     end
 
     project

@@ -39,10 +39,6 @@ class PostgresResource < Sequel::Model
     "/location/#{display_location}/postgres/#{name}"
   end
 
-  def hyper_tag_name(project)
-    "project/#{project.ubid}/location/#{display_location}/postgres/#{name}"
-  end
-
   def display_state
     return "unavailable" if representative_server&.strand&.label == "unavailable"
     return "running" if ["wait", "refresh_certificates", "refresh_dns_record"].include?(strand.label) && !initial_provisioning_set?

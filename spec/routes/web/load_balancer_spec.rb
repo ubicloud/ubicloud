@@ -11,16 +11,12 @@ RSpec.describe Clover, "load balancer" do
 
   let(:lb) do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
-    lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project.id)
-    lb.associate_with_project(project)
-    lb
+    LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project.id)
   end
 
   let(:lb_wo_permission) {
     ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
-    lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project_wo_permissions.id)
-    lb.associate_with_project(project_wo_permissions)
-    lb
+    LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project_wo_permissions.id)
   }
 
   describe "unauthenticated" do
@@ -104,7 +100,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' is created")
         expect(LoadBalancer.count).to eq(1)
-        expect(LoadBalancer.first.projects.first.id).to eq(project.id)
+        expect(LoadBalancer.first.project_id).to eq(project.id)
       end
 
       it "can not create load balancer with invalid name" do

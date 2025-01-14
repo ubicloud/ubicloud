@@ -39,7 +39,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
 
   def self.assemble(project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:, model_name:,
     engine:, engine_params:, replica_count:, is_public:, gpu_count:, tags:)
-    unless (project = Project[project_id])
+    unless Project[project_id]
       fail "No existing project"
     end
 
@@ -68,7 +68,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         model_name:, engine:, engine_params:, replica_count:, is_public:,
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count:, tags:
       ) { _1.id = ubid.to_uuid }
-      inference_endpoint.associate_with_project(project)
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { _1.id = inference_endpoint.id }
     end

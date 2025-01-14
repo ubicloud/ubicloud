@@ -14,7 +14,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
 
-    unless (project = Project[project_id])
+    unless Project[project_id]
       fail "No existing project"
     end
 
@@ -54,10 +54,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         superuser_password: superuser_password, ha_type: ha_type, version: version, flavor: flavor,
         parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
       )
-      postgres_resource.associate_with_project(project)
 
       firewall = Firewall.create_with_id(name: "#{postgres_resource.ubid}-firewall", location: location, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
-      firewall.associate_with_project(Project[Config.postgres_service_project_id])
 
       private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location, firewall_id: firewall.id).id
       postgres_resource.update(private_subnet_id: private_subnet_id)

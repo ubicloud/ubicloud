@@ -43,8 +43,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe ".assemble" do
-    let(:customer_project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
-    let(:postgres_project) { Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) } }
+    let(:customer_project) { Project.create_with_id(name: "default") }
+    let(:postgres_project) { Project.create_with_id(name: "default") }
 
     it "validates input" do
       expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
