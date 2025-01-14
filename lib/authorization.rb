@@ -110,10 +110,14 @@ module Authorization
           .where { level < Config.recursive_tag_limit },
         args: [:object_id, :level]).select(:object_id)
 
-    project_id_match = if dataset.model.columns.include?(:project_id)
-      Sequel[from][:project_id]
-    else
+    # If the model includes HyperTagMethods, look in access_tag.
+    # This is a temporary change while we populate the project_id
+    # columns for the related models.  After population, only
+    # the Account model will use access_tag.
+    project_id_match = if dataset.model < HyperTagMethods
       DB[:access_tag].select(:project_id).where(hyper_tag_id: Sequel[from][:id])
+    else
+      Sequel[from][:project_id]
     end
 
     if dataset.model == ObjectTag
