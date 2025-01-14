@@ -84,7 +84,10 @@ end
 #  location    | text                        | NOT NULL
 #  project_id  | uuid                        |
 # Indexes:
-#  firewall_pkey | PRIMARY KEY btree (id)
+#  firewall_pkey                          | PRIMARY KEY btree (id)
+#  firewall_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
+# Foreign key constraints:
+#  firewall_project_id_fkey | (project_id) REFERENCES project(id)
 # Referenced By:
 #  firewall_rule             | firewall_rule_firewall_id_fkey             | (firewall_id) REFERENCES firewall(id)
 #  firewalls_private_subnets | firewalls_private_subnets_firewall_id_fkey | (firewall_id) REFERENCES firewall(id)

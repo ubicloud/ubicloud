@@ -110,7 +110,7 @@ RSpec.describe Clover, "private subnet" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - Create Private Subnet")
-        expect(page).to have_flash_error("project_id and name is already taken")
+        expect(page).to have_flash_error("project_id and location and name is already taken")
       end
     end
 

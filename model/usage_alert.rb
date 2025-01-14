@@ -38,6 +38,7 @@ end
 #  last_triggered_at | timestamp with time zone | NOT NULL DEFAULT (now() - '42 days'::interval)
 # Indexes:
 #  usage_alert_pkey                    | PRIMARY KEY btree (id)
+#  usage_alert_project_id_name_uidx    | UNIQUE btree (project_id, name)
 #  usage_alert_last_triggered_at_index | btree (last_triggered_at)
 # Foreign key constraints:
 #  usage_alert_project_id_fkey | (project_id) REFERENCES project(id)

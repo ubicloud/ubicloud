@@ -96,6 +96,13 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
         expect(st.subject.load_balancer.stack).to eq("ipv4")
       }.not_to raise_error
 
+      Firewall.dataset.destroy
+      InferenceEndpointReplica.dataset.destroy
+      InferenceEndpoint.dataset.destroy
+      LoadBalancer.dataset.destroy
+      Nic.dataset.destroy
+      PrivateSubnet.dataset.destroy
+      Vm.dataset.destroy
       expect {
         ie_project.destroy
         described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
