@@ -22,8 +22,7 @@ RSpec.describe Clover, "project" do
 
     it "does not recognize invalid personal access tokens" do
       account = Account[email: user.email]
-      pat = ApiKey.create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api")
-      project
+      pat = ApiKey.create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
 
       header "Authorization", "Bearer pat-#{pat.ubid[0...-1]}-#{pat.key}"
       get "/project"
@@ -141,6 +140,7 @@ RSpec.describe Clover, "project" do
         if use_pat
           it "success with authorized personal access token" do
             project = user.create_project_with_default_policy("project-1")
+            @pat.update(project_id: project.id)
             @pat.associate_with_project(project)
             AccessControlEntry.create_with_id(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:view"])
 
@@ -152,6 +152,7 @@ RSpec.describe Clover, "project" do
 
           it "failure with unauthorized personal access token" do
             project = user.create_project_with_default_policy("project-1")
+            @pat.update(project_id: project.id)
             @pat.associate_with_project(project)
             AccessControlEntry.create_with_id(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:edit"])
 

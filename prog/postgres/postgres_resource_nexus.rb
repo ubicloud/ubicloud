@@ -56,7 +56,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       )
       postgres_resource.associate_with_project(project)
 
-      firewall = Firewall.create_with_id(name: "#{postgres_resource.ubid}-firewall", location: location, description: "Postgres default firewall")
+      firewall = Firewall.create_with_id(name: "#{postgres_resource.ubid}-firewall", location: location, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
       firewall.associate_with_project(Project[Config.postgres_service_project_id])
 
       private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location: location, firewall_id: firewall.id).id

@@ -146,6 +146,7 @@ RSpec.describe Clover, "load-balancer" do
         nic = Nic.create_with_id(name: "nic-1", private_subnet_id: lb.private_subnet.id, mac: "00:00:00:00:00:01", private_ipv4: "1.1.1.1", private_ipv6: "2001:db8::1")
         vm = create_vm
         nic.update(vm_id: vm.id)
+        vm.update(project_id: project.id)
         vm.associate_with_project(project)
         vm
       }
@@ -238,6 +239,7 @@ RSpec.describe Clover, "load-balancer" do
       }
 
       it "success" do
+        vm.update(project_id: project.id)
         vm.associate_with_project(project)
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
 
@@ -260,6 +262,7 @@ RSpec.describe Clover, "load-balancer" do
       }
 
       it "success" do
+        vm.update(project_id: project.id)
         vm.associate_with_project(project)
         lb.add_vm(vm)
 

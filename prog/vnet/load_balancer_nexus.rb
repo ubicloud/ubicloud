@@ -30,7 +30,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         health_check_timeout: health_check_timeout, health_check_up_threshold: health_check_up_threshold,
         health_check_down_threshold: health_check_down_threshold, health_check_protocol: health_check_protocol,
         custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id,
-        stack: stack
+        stack: stack, project_id: ps.project_id
       )
       lb.associate_with_project(ps.projects.first)
 

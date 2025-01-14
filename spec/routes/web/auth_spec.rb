@@ -443,6 +443,7 @@ RSpec.describe Clover, "auth" do
     it "can not close account if the project has some resources" do
       vm = create_vm
       project = Account[email: TEST_USER_EMAIL].projects.first
+      vm.update(project_id: project.id)
       vm.associate_with_project(project)
 
       visit "/account/close-account"

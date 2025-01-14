@@ -11,14 +11,14 @@ RSpec.describe Clover, "load balancer" do
 
   let(:lb) do
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
-    lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
+    lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project.id)
     lb.associate_with_project(project)
     lb
   end
 
   let(:lb_wo_permission) {
     ps = Prog::Vnet::SubnetNexus.assemble(project_wo_permissions.id, name: "dummy-ps-2", location: "hetzner-fsn1").subject
-    lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up")
+    lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-2", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project_wo_permissions.id)
     lb.associate_with_project(project_wo_permissions)
     lb
   }

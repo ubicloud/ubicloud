@@ -10,13 +10,13 @@ RSpec.describe Clover, "firewall" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:firewall) do
-    fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1")
+    fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1", project_id: project.id)
     fw.associate_with_project(project)
     fw
   end
 
   let(:fw_wo_permission) {
-    fw = Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location: "hetzner-fsn1")
+    fw = Firewall.create_with_id(name: "dummy-fw-2", description: "dummy-fw-2", location: "hetzner-fsn1", project_id: project_wo_permissions.id)
     fw.associate_with_project(project_wo_permissions)
     fw
   }
@@ -63,7 +63,7 @@ RSpec.describe Clover, "firewall" do
 
       it "does not show links to firewalls if user lacks Firewall:view access to them" do
         firewall
-        fw = Firewall.create_with_id(name: "viewable-fw", description: "viewable-fw", location: "hetzner-fsn1")
+        fw = Firewall.create_with_id(name: "viewable-fw", description: "viewable-fw", location: "hetzner-fsn1", project_id: project.id)
         fw.associate_with_project(project)
 
         visit "#{project.path}/firewall"
