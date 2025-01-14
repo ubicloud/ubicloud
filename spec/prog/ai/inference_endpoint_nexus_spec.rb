@@ -53,7 +53,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
 
     it "validates input" do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(ie_project) }
+      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1", project_id: ie_project.id).tap { _1.associate_with_project(ie_project) }
       DnsZone.create_with_id(name: "ai.ubicloud.com", project_id: ie_project.id)
 
       expect {
@@ -104,7 +104,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
 
     it "works without dns zone" do
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(ie_project) }
+      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1", project_id: ie_project.id).tap { _1.associate_with_project(ie_project) }
       expect {
         described_class.assemble(project_id: customer_project.id, location: "hetzner-fsn1", boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {})
       }.not_to raise_error

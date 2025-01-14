@@ -90,7 +90,7 @@ class Prog::Vm::Nexus < Prog::Base
 
       vm = Vm.create(public_key: public_key, unix_user: unix_user,
         name: name, family: vm_size.family, cores: vm_size.cores, vcpus: vm_size.vcpus, memory_gib: vm_size.memory_gib, location: location,
-        boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch) { _1.id = ubid.to_uuid }
+        boot_image: boot_image, ip4_enabled: enable_ip4, pool_id: pool_id, arch: arch, project_id:) { _1.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
       vm.associate_with_project(project)

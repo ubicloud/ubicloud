@@ -7,7 +7,7 @@ RSpec.describe Clover, "firewall" do
 
   let(:project) { project_with_default_policy(user) }
 
-  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(project) } }
+  let(:firewall) { Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1", project_id: project.id).tap { _1.associate_with_project(project) } }
 
   let(:firewall_rule) { FirewallRule.create_with_id(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(80..5432)) }
 

@@ -35,7 +35,8 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         root_cert_1: root_cert_1,
         root_cert_key_1: root_cert_key_1,
         root_cert_2: root_cert_2,
-        root_cert_key_2: root_cert_key_2
+        root_cert_key_2: root_cert_key_2,
+        project_id:
       ) { _1.id = ubid.to_uuid }
       minio_cluster.associate_with_project(project)
 

@@ -29,7 +29,7 @@ RSpec.describe VmPool do
       Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
     }
     let(:vm) {
-      vm = create_vm(pool_id: pool.id, display_state: "running")
+      vm = create_vm(pool_id: pool.id, display_state: "running", project_id: prj.id)
       vm.associate_with_project(prj)
       vm
     }

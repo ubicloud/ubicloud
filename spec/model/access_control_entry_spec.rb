@@ -69,6 +69,7 @@ RSpec.describe AccessControlEntry do
     expect(ace.valid?).to be false
     expect(ace.errors).to eq(object_id: ["is not related to this project"])
 
+    firewall.update(project_id: project.id)
     firewall.associate_with_project(project)
     expect(ace.valid?).to be true
 

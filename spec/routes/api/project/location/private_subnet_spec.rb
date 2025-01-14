@@ -104,7 +104,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "with valid firewall" do
-        fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(project) }
+        fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1", project_id: project.id).tap { _1.associate_with_project(project) }
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/private-subnet/test-ps", {firewall_id: fw.ubid}.to_json
 
         expect(last_response.status).to eq(200)

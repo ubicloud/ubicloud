@@ -28,24 +28,24 @@ class ApiKey < Sequel::Model
   end
 
   def self.create_personal_access_token(account, project: nil)
-    pat = create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api")
+    pat = create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project&.id)
     pat.associate_with_project(project) if project
     pat
   end
 
   def self.create_inference_api_key(project)
-    token = ApiKey.create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint")
+    token = ApiKey.create_with_id(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
     token.associate_with_project(project)
     token
   end
 
-  def self.create_with_id(owner_table:, owner_id:, used_for:)
+  def self.create_with_id(owner_table:, owner_id:, used_for:, project_id:)
     unless %w[project inference_endpoint accounts].include?(owner_table.to_s)
       fail "Invalid owner_table: #{owner_table}"
     end
 
     key = SecureRandom.alphanumeric(32)
-    super(owner_table:, owner_id:, key:, used_for:)
+    super(owner_table:, owner_id:, key:, used_for:, project_id:)
   end
 
   def unrestricted_token_for_project?(project_id)

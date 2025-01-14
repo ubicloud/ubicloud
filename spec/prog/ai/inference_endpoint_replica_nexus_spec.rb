@@ -50,7 +50,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     it "creates replica and vm with sshable" do
       user_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
       ie_project = Project.create_with_id(name: "default").tap { _1.associate_with_project(_1) }
-      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1").tap { _1.associate_with_project(ie_project) }
+      Firewall.create_with_id(name: "inference-endpoint-firewall", location: "hetzner-fsn1", project_id: ie_project.id).tap { _1.associate_with_project(ie_project) }
 
       expect(Config).to receive(:inference_endpoint_service_project_id).and_return(ie_project.id).at_least(:once)
       st_ie = Prog::Ai::InferenceEndpointNexus.assemble_with_model(

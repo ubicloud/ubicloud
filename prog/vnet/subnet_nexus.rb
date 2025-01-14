@@ -20,7 +20,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     ipv6_range ||= random_private_ipv6(location, project).to_s
     ipv4_range ||= random_private_ipv4(location, project).to_s
     DB.transaction do
-      ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting") { _1.id = ubid.to_uuid }
+      ps = PrivateSubnet.create(name: name, location: location, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:) { _1.id = ubid.to_uuid }
       ps.associate_with_project(project)
 
       firewall = if firewall_id
@@ -29,7 +29,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
         existing_fw
       else
         port_range = allow_only_ssh ? 22..22 : 0..65535
-        new_fw = Firewall.create_with_id(name: "#{name}-default", location: location)
+        new_fw = Firewall.create_with_id(name: "#{name}-default", location: location, project_id:)
         new_fw.associate_with_project(project)
         ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create_with_id(firewall_id: new_fw.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
         new_fw

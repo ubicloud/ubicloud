@@ -174,6 +174,19 @@ module Authorization
     def associate_with_project(project)
       return if project.nil?
 
+      # Temporary code to ensure that project_id column already set,
+      # except for Account which doesn't have the column
+      # :nocov:
+      case self
+      when Account
+        nil
+      when Project
+        raise "Should already have id column set" unless id == project.id
+      else
+        raise "Should already have project_id column set" unless project_id == project.id
+      end
+      # :nocov:
+
       AccessTag.create_with_id(
         project_id: project.id,
         name: hyper_tag_name(project),
