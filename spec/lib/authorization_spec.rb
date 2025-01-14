@@ -272,32 +272,22 @@ RSpec.describe Authorization do
       expect { c.new.hyper_tag_name }.to raise_error NoMethodError
     end
 
-    it "hyper_tag methods" do
+    it "hyper_tag, associate, and dissociate with project methods" do
+      user = users[0]
       project = Project.create_with_id(name: "test")
-      expect(project.hyper_tag(project)).to be_nil
+      expect(user.hyper_tag(project)).to be_nil
 
-      project.associate_with_project(project)
-      expect(project.hyper_tag(project)).to exist
+      user.associate_with_project(project)
+      expect(user.hyper_tag(project)).to exist
 
-      project.dissociate_with_project(project)
-      expect(project.hyper_tag(project)).to be_nil
-    end
-
-    it "associate/dissociate with project" do
-      project = Project.create_with_id(name: "test")
-      expect(users[0].hyper_tag(project)).to be_nil
-      users[0].associate_with_project(project)
-      expect(users[0].hyper_tag(project)).to exist
-      users[0].dissociate_with_project(project)
-      expect(users[0].hyper_tag(project)).to be_nil
+      user.dissociate_with_project(project)
+      expect(user.hyper_tag(project)).to be_nil
     end
 
     it "does not associate/dissociate with nil project" do
-      project = Project.create_with_id(name: "test")
-      expect(project.associate_with_project(nil)).to be_nil
-      expect(users[0].hyper_tag(project)).to be_nil
-      expect(project.dissociate_with_project(nil)).to be_nil
-      expect(users[0].hyper_tag(project)).to be_nil
+      user = users[0]
+      expect(user.associate_with_project(nil)).to be_nil
+      expect(user.dissociate_with_project(nil)).to be_nil
     end
   end
 end

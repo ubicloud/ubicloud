@@ -479,7 +479,6 @@ class Prog::Vm::Nexus < Prog::Base
         nic.update(vm_id: nil)
         nic.incr_destroy
       end
-      vm.projects.map { vm.dissociate_with_project(_1) }
       vm.destroy
     end
   end

@@ -173,8 +173,6 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
 
     it "destroys the inference_endpoint" do
       allow(nx).to receive(:replicas).and_return([])
-      expect(nx).to receive(:project)
-      expect(inference_endpoint).to receive(:dissociate_with_project)
       expect(inference_endpoint).to receive(:destroy)
       expect { nx.self_destroy }.to exit({"msg" => "inference endpoint is deleted"})
     end

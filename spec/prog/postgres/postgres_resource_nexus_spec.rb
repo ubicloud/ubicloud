@@ -352,7 +352,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       expect(postgres_resource).to receive(:hostname)
       expect(dns_zone).to receive(:delete_record)
-      expect(postgres_resource).to receive(:dissociate_with_project)
       expect(postgres_resource).to receive(:destroy)
 
       expect { nx.destroy }.to exit({"msg" => "postgres resource is deleted"})
