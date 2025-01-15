@@ -59,7 +59,7 @@ class Clover
             {
               resource_type: _1,
               current_resource_usage: @project.current_resource_usage(_1),
-              quota: @project.effective_quota_value(_1) * 2
+              quota: @project.effective_quota_value(_1)
             }
           }
 
