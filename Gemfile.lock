@@ -8,30 +8,6 @@ GIT
       rodauth (~> 2.36)
 
 GIT
-  remote: https://github.com/jeremyevans/roda.git
-  revision: b1aaa04873858fc5b18c6c7a58e2d7dc048bf5ed
-  ref: b1aaa04873858fc5b18c6c7a58e2d7dc048bf5ed
-  specs:
-    roda (3.87.0)
-      rack
-
-GIT
-  remote: https://github.com/jeremyevans/rodauth.git
-  revision: b32a4e32c0315d17f9bc457ba0469f6356d79765
-  ref: b32a4e32c0315d17f9bc457ba0469f6356d79765
-  specs:
-    rodauth (2.37.0)
-      roda (>= 2.6.0)
-      sequel (>= 4)
-
-GIT
-  remote: https://github.com/jeremyevans/tilt.git
-  revision: cc4f43c6d75ac8c556a3004a9ecfda61552c5ac9
-  ref: cc4f43c6d75ac8c556a3004a9ecfda61552c5ac9
-  specs:
-    tilt (2.5.0)
-
-GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: a9ff0001a1eb028e2186b222aeb02b07c04f9808
   ref: a9ff0001a1eb028e2186b222aeb02b07c04f9808
@@ -312,6 +288,11 @@ GEM
     refrigerator (1.8.0)
     regexp_parser (2.10.0)
     rexml (3.4.0)
+    roda (3.88.0)
+      rack
+    rodauth (2.38.0)
+      roda (>= 2.6.0)
+      sequel (>= 4)
     rotp (6.3.0)
     rqrcode (2.2.0)
       chunky_png (~> 1.0)
@@ -397,6 +378,7 @@ GEM
     stripe (12.6.0)
     syntax_tree (6.2.0)
       prettier_print (>= 1.2.0)
+    tilt (2.6.0)
     timeout (0.4.3)
     tpm-key_attestation (0.12.1)
       bindata (~> 2.4)
@@ -485,8 +467,8 @@ DEPENDENCIES
   rackup
   rake
   refrigerator (>= 1)
-  roda!
-  rodauth!
+  roda (>= 3.88)
+  rodauth (>= 2.38)
   rodauth-omniauth!
   rotp
   rqrcode
@@ -504,7 +486,7 @@ DEPENDENCIES
   simplecov
   standard (>= 1.24.3)
   stripe
-  tilt!
+  tilt (>= 2.6)
   turbo_tests
   warning
   webauthn (~> 3.2)
