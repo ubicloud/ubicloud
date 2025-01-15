@@ -19,8 +19,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     )
 
     lb = LoadBalancer.create_with_id(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo")
-    kc.add_vm(create_vm)
-    kc.add_vm(create_vm)
+    kc.add_cp_vm(create_vm)
+    kc.add_cp_vm(create_vm)
     kc.update(api_server_lb_id: lb.id)
     kc
   }
@@ -96,7 +96,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
     it "hops wait if the target number of CP vms is reached" do
       expect(kubernetes_cluster.api_server_lb).to receive(:hostname).and_return "endpoint"
-      expect(kubernetes_cluster).to receive(:vms).and_return [1, 2, 3]
+      expect(kubernetes_cluster).to receive(:cp_vms).and_return [1, 2, 3]
       expect { nx.bootstrap_control_plane_vms }.to hop("wait")
     end
 
@@ -117,9 +117,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     it "triggers deletion of associated resources" do
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
 
-      kubernetes_cluster.vms.all do |vm|
-        expect(vm).to receive(:incr_destroy)
-      end
+      expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
 
       expect(kubernetes_cluster).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})

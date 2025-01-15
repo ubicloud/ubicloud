@@ -20,8 +20,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     subnet.associate_with_project(project)
 
     lb = LoadBalancer.create_with_id(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo")
-    kc.add_vm(create_vm)
-    kc.add_vm(create_vm)
+    kc.add_cp_vm(create_vm)
+    kc.add_cp_vm(create_vm)
 
     kc.update(api_server_lb_id: lb.id)
     kc
@@ -54,7 +54,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(Config).to receive(:development?).and_return(true)
 
       expect(sshable).to receive(:cmd).with("sudo cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster.vms.first).to receive(:ephemeral_net4).and_return("SOMEIP")
+      expect(kubernetes_cluster.cp_vms.first).to receive(:ephemeral_net4).and_return("SOMEIP")
       expect(sshable).to receive(:cmd).with(/echo 'SOMEIP somelb.*' \| sudo tee -a \/etc\/hosts/)
 
       prog.write_hosts_file_if_needed
@@ -66,7 +66,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(Config).to receive(:development?).and_return(true)
 
       expect(sshable).to receive(:cmd).with("sudo cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster.vms.first).not_to receive(:ephemeral_net4)
+      expect(kubernetes_cluster.cp_vms.first).not_to receive(:ephemeral_net4)
       expect(sshable).to receive(:cmd).with(/echo 'ANOTHERIP somelb.*' \| sudo tee -a \/etc\/hosts/)
 
       prog.write_hosts_file_if_needed "ANOTHERIP"
@@ -75,14 +75,14 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   describe "#start" do
     it "creates a VM and hops" do
-      expect(kubernetes_cluster.vms.count).to eq(2)
+      expect(kubernetes_cluster.cp_vms.count).to eq(2)
       expect(kubernetes_cluster.api_server_lb).to receive(:add_vm)
 
       expect { prog.start }.to hop("install_software")
 
-      expect(kubernetes_cluster.vms.count).to eq(3)
+      expect(kubernetes_cluster.cp_vms.count).to eq(3)
 
-      new_vm = kubernetes_cluster.vms.last
+      new_vm = kubernetes_cluster.cp_vms.last
       expect(new_vm.name).to start_with("k8scluster-control-plane-")
       expect(new_vm.sshable).not_to be_nil
     end
@@ -132,12 +132,12 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   describe "#assign_role" do
     it "hops to init_cluster if this is the first vm of the cluster" do
       expect(prog).to receive(:write_hosts_file_if_needed)
-      expect(prog.kubernetes_cluster.vms).to receive(:count).and_return(1)
+      expect(prog.kubernetes_cluster.cp_vms).to receive(:count).and_return(1)
       expect { prog.assign_role }.to hop("init_cluster")
     end
 
     it "hops to join_control_plane if this is the not the first vm of the cluster" do
-      expect(prog.kubernetes_cluster.vms.count).to eq(2)
+      expect(prog.kubernetes_cluster.cp_vms.count).to eq(2)
       expect { prog.assign_role }.to hop("join_control_plane")
     end
   end
@@ -181,7 +181,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("NotStarted")
 
       sshable = instance_double(Sshable)
-      allow(kubernetes_cluster.vms.first).to receive(:sshable).and_return(sshable)
+      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication").and_return("\njt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs").and_return("something\ncertificate key:\nck")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command").and_return("discovery-token-ca-cert-hash dtcch")

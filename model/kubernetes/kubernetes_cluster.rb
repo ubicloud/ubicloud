@@ -7,7 +7,7 @@ class KubernetesCluster < Sequel::Model
   one_to_one :api_server_lb, class: :LoadBalancer, key: :id, primary_key: :api_server_lb_id
   many_to_one :private_subnet
   many_to_one :project
-  many_to_many :vms, order: :created_at
+  many_to_many :cp_vms, join_table: :kubernetes_clusters_cp_vms, class: :Vm, order: :created_at
 
   dataset_module Pagination
 
@@ -33,10 +33,10 @@ class KubernetesCluster < Sequel::Model
     api_server_lb.hostname
   end
 
-  def disassociate_vm(vm)
-    DB[:kubernetes_clusters_vms].where(
+  def disassociate_cp_vm(vm)
+    DB[:kubernetes_clusters_cp_vms].where(
       kubernetes_cluster_id: id,
-      vm_id: vm.id
+      cp_vm_id: vm.id
     ).delete
   end
 end

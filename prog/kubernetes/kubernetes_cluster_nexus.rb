@@ -66,7 +66,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def bootstrap_control_plane_vms
     nap 5 unless kubernetes_cluster.endpoint
 
-    hop_wait if kubernetes_cluster.vms.count >= kubernetes_cluster.cp_node_count
+    hop_wait if kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count
 
     push Prog::Kubernetes::ProvisionKubernetesNode
   end
@@ -77,8 +77,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def destroy
     kubernetes_cluster.api_server_lb.incr_destroy
-    kubernetes_cluster.vms.each { kubernetes_cluster.disassociate_vm(_1) }
-    kubernetes_cluster.vms.each(&:incr_destroy)
+    kubernetes_cluster.cp_vms.each(&:incr_destroy)
+    kubernetes_cluster.cp_vms.each { kubernetes_cluster.disassociate_cp_vm(_1) }
     kubernetes_cluster.destroy
     pop "kubernetes cluster is deleted"
   end

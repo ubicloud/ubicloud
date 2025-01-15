@@ -16,11 +16,11 @@ Sequel.migration do
       foreign_key :api_server_lb_id, :load_balancer, type: :uuid, null: true
     end
 
-    create_table(:kubernetes_clusters_vms) do
+    create_table(:kubernetes_clusters_cp_vms) do
       foreign_key :kubernetes_cluster_id, :kubernetes_cluster, type: :uuid, null: false
-      foreign_key :vm_id, :vm, type: :uuid, null: false
+      foreign_key :cp_vm_id, :vm, type: :uuid, null: false
 
-      index [:kubernetes_cluster_id, :vm_id], unique: true
+      index [:kubernetes_cluster_id, :cp_vm_id], unique: true
     end
 
     create_table(:kubernetes_nodepool) do

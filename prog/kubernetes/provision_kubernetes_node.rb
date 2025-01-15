@@ -10,7 +10,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   def write_hosts_file_if_needed(ip = nil)
     return unless Config.development?
     return if vm.sshable.cmd("sudo cat /etc/hosts").match?(/#{kubernetes_cluster.endpoint}/)
-    ip = kubernetes_cluster.vms.first.ephemeral_net4 if ip.nil?
+    ip = kubernetes_cluster.cp_vms.first.ephemeral_net4 if ip.nil?
 
     vm.sshable.cmd("echo '#{ip} #{kubernetes_cluster.endpoint}' | sudo tee -a /etc/hosts")
   end
@@ -34,7 +34,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     current_frame["vm_id"] = vm_st.id
     strand.modified!(:stack)
 
-    kubernetes_cluster.add_vm(vm_st.subject)
+    kubernetes_cluster.add_cp_vm(vm_st.subject)
     kubernetes_cluster.api_server_lb.add_vm(vm_st.subject)
 
     hop_install_software
@@ -86,7 +86,7 @@ BASH
   label def assign_role
     write_hosts_file_if_needed
 
-    hop_init_cluster if kubernetes_cluster.vms.count == 1
+    hop_init_cluster if kubernetes_cluster.cp_vms.count == 1
 
     hop_join_control_plane
   end
@@ -115,7 +115,7 @@ BASH
     when "Succeeded"
       pop vm_id: vm.id
     when "NotStarted"
-      cp_sshable = kubernetes_cluster.vms.first.sshable
+      cp_sshable = kubernetes_cluster.cp_vms.first.sshable
       join_token = cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
       certificate_key = cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]
       discovery_token_ca_cert_hash = cp_sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
