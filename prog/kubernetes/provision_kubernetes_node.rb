@@ -97,7 +97,7 @@ BASH
       pop vm_id: vm.id
     when "NotStarted"
       ps = kubernetes_cluster.private_subnet
-      vm.sshable.cmd("common/bin/daemonizer 'sudo /home/ubi/kubernetes/bin/init-cluster #{kubernetes_cluster.name} #{kubernetes_cluster.endpoint} 443 #{ps.net4} #{ps.net6} #{vm.nics.first.private_ipv4}' init_kubernetes_cluster")
+      vm.sshable.cmd("common/bin/daemonizer '/home/ubi/kubernetes/bin/init-cluster #{kubernetes_cluster.name} #{kubernetes_cluster.endpoint} 443 #{ps.net4} #{ps.net6} #{vm.nics.first.private_ipv4}' init_kubernetes_cluster")
       nap 30
     when "InProgress"
       nap 10
@@ -120,7 +120,7 @@ BASH
       certificate_key = cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1]
       discovery_token_ca_cert_hash = cp_sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
 
-      vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:443 #{join_token} #{discovery_token_ca_cert_hash} #{certificate_key}' join_control_plane")
+      vm.sshable.cmd("common/bin/daemonizer 'kubernetes/bin/join-control-plane-node #{kubernetes_cluster.endpoint}:443 #{join_token} #{discovery_token_ca_cert_hash} #{certificate_key}' join_control_plane")
       nap 15
     when "InProgress"
       nap 10

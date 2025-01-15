@@ -148,7 +148,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "runs the init_cluster script if it's not started" do
       expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("NotStarted")
       expect(prog.vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: "10.0.0.37")])
-      expect(prog.vm.sshable).to receive(:cmd).with(/.*daemonizer 'sudo .*init-cluster k8scluster somelb.* 443 127.0.0.0\/8 ::\/16 10.0.0.37' init_kubernetes_cluster/)
+      expect(prog.vm.sshable).to receive(:cmd).with(/.*daemonizer '.*init-cluster k8scluster somelb.* 443 127.0.0.0\/8 ::\/16 10.0.0.37' init_kubernetes_cluster/)
 
       expect { prog.init_cluster }.to nap(30)
     end
@@ -185,7 +185,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication").and_return("\njt\n")
       expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs").and_return("something\ncertificate key:\nck")
       expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command").and_return("discovery-token-ca-cert-hash dtcch")
-      expect(prog.vm.sshable).to receive(:cmd).with(/.*daemonizer 'sudo .*join-control-plane-node somelb.*:443 jt dtcch ck' join_control_plane/)
+      expect(prog.vm.sshable).to receive(:cmd).with(/.*daemonizer '.*join-control-plane-node somelb.*:443 jt dtcch ck' join_control_plane/)
 
       expect { prog.join_control_plane }.to nap(15)
     end
