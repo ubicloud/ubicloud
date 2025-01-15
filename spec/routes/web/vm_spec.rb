@@ -82,13 +82,13 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.ip4_enabled).to be_falsey
 
         visit project.path
-        expect(page).to have_content("2/64 (3%)")
-        Vm.first.update(vcpus: 50)
+        expect(page).to have_content("2/32 (6%)")
+        Vm.first.update(vcpus: 25)
         page.refresh
-        expect(page).to have_content("50/64 (78%)")
-        Vm.first.update(vcpus: 59)
+        expect(page).to have_content("25/32 (78%)")
+        Vm.first.update(vcpus: 31)
         page.refresh
-        expect(page).to have_content("59/64 (92%)")
+        expect(page).to have_content("31/32 (96%)")
       end
 
       it "shows expected information on index page" do
