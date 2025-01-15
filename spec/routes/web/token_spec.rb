@@ -83,7 +83,7 @@ RSpec.describe Clover, "personal access token management" do
   end
 
   it "user page only shows tokens related to project" do
-    key = ApiKey.create_personal_access_token(user)
+    key = ApiKey.create_personal_access_token(user, project: Project.create(name: "test2"))
     page.refresh
     expect(page).to have_content(@api_key.ubid)
     expect(page).to have_no_content(key.ubid)
@@ -123,7 +123,7 @@ RSpec.describe Clover, "personal access token management" do
   end
 
   it "cannot view token access control entries for token not associated with this project" do
-    key = ApiKey.create_personal_access_token(user)
+    key = ApiKey.create_personal_access_token(user, project: Project.create(name: "test2"))
     visit "#{project.path}/token/#{key.ubid}/access-control"
     expect(page.status_code).to eq 404
   end

@@ -80,7 +80,7 @@ RSpec.describe Clover, "firewall" do
         expect(page.body).not_to include "form-fw-create-rule"
 
         fw.add_firewall_rule(cidr: "127.0.0.1")
-        fw.add_private_subnet(net6: "::0/24", net4: "127.0.0.0/24", name: "dummy-ps", location: "somewhere")
+        fw.add_private_subnet(net6: "::0/24", net4: "127.0.0.0/24", name: "dummy-ps", location: "somewhere", project_id: project.id)
 
         page.refresh
         expect(page.body).not_to include "private_subnet_id"

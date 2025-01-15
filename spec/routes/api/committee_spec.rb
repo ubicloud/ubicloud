@@ -26,11 +26,13 @@ RSpec.describe Clover, "committee infrastructure" do
     end
 
     expect {
+      project
       post "/project/#{UBID.generate(UBID::TYPE_PROJECT)}/location/#{TEST_LOCATION}/vm/test-vm"
     }.to raise_error ex
   end
 
   it "rejects paths that cannot be found in the schema" do
+    project
     post "/not-a-prefix/"
     expect(JSON.parse(last_response.body).dig("error", "message")).to eq("Sorry, we couldn’t find the resource you’re looking for.")
   end

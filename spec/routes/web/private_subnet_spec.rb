@@ -155,7 +155,7 @@ RSpec.describe Clover, "private subnet" do
     describe "show firewalls" do
       it "can show attached firewalls" do
         private_subnet
-        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1")
+        fw = Firewall.create_with_id(name: "dummy-fw", description: "dummy-fw", location: "hetzner-fsn1", project_id: project.id)
         fw.associate_with_private_subnet(private_subnet)
 
         visit "#{project.path}#{private_subnet.path}"

@@ -7,7 +7,8 @@ RSpec.describe Clover do
     unless (@show_errors = ENV["SHOW_ERRORS"])
       ENV["SHOW_ERRORS"] = "1"
     end
-    login_api(create_account.email)
+    @account = create_account
+    login_api(@account.email)
   end
 
   after do
@@ -15,6 +16,7 @@ RSpec.describe Clover do
   end
 
   it "supports SHOW_ERRORS environment variable when testing" do
+    project_with_default_policy(@account, name: "project-1")
     expect { post "/project", {}.to_json }.to raise_error Committee::InvalidRequest
   end
 end

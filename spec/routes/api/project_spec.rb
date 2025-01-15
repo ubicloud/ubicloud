@@ -79,6 +79,7 @@ RSpec.describe Clover, "project" do
 
       describe "create" do
         it "success" do
+          project
           post "/project", {
             name: "test-project"
           }.to_json
@@ -89,24 +90,19 @@ RSpec.describe Clover, "project" do
       end
 
       describe "delete" do
-        # You cannot currently delete a project using a personal access token,
-        # because the access/applied tags are considered dependencies, so an
-        # authorized request will return 409, and an unauthorized request will
-        # return 403.
-        unless use_pat
-          it "success" do
-            delete "/project/#{project.ubid}"
+        it "success" do
+          delete "/project/#{project.ubid}"
 
-            expect(last_response.status).to eq(204)
+          expect(last_response.status).to eq(204)
 
-            expect(Project[project.id].visible).to be_falsey
-            expect(AccessTag.where(project_id: project.id).count).to eq(0)
-            expect(SubjectTag.where(project_id: project.id).count).to eq(0)
-            expect(AccessControlEntry.where(project_id: project.id).count).to eq(0)
-          end
+          expect(Project[project.id].visible).to be_falsey
+          expect(AccessTag.where(project_id: project.id).count).to eq(0)
+          expect(SubjectTag.where(project_id: project.id).count).to eq(0)
+          expect(AccessControlEntry.where(project_id: project.id).count).to eq(0)
         end
 
         it "success with non-existing project" do
+          project_with_default_policy(user)
           delete "/project/pj000000000000000000000000"
 
           expect(last_response.status).to eq(204)
@@ -121,8 +117,8 @@ RSpec.describe Clover, "project" do
         end
 
         it "not authorized" do
-          u = create_account("test@test.com")
-          p = u.create_project_with_default_policy("project-1")
+          project_with_default_policy(user)
+          p = create_account("test@test.com").create_project_with_default_policy("project-1")
           delete "/project/#{p.ubid}"
 
           expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
@@ -138,20 +134,9 @@ RSpec.describe Clover, "project" do
         end
 
         if use_pat
-          it "success with authorized personal access token" do
-            project = user.create_project_with_default_policy("project-1")
-            @pat.update(project_id: project.id)
-            AccessControlEntry.create_with_id(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:view"])
-
-            get "/project/#{project.ubid}"
-
-            expect(last_response.status).to eq(200)
-            expect(JSON.parse(last_response.body)["name"]).to eq(project.name)
-          end
-
           it "failure with unauthorized personal access token" do
-            project = user.create_project_with_default_policy("project-1")
-            @pat.update(project_id: project.id)
+            project
+            AccessControlEntry.dataset.destroy
             AccessControlEntry.create_with_id(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:edit"])
 
             get "/project/#{project.ubid}"
@@ -160,12 +145,14 @@ RSpec.describe Clover, "project" do
         end
 
         it "not found" do
+          project
           get "/project/pj000000000000000000000000"
 
           expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
         end
 
         it "not authorized" do
+          project
           u = create_account("test@test.com")
           p = u.create_project_with_default_policy("project-1")
           get "/project/#{p.ubid}"

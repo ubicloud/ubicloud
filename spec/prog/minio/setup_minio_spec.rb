@@ -20,7 +20,8 @@ RSpec.describe Prog::Minio::SetupMinio do
       root_cert_1: "root_cert_1",
       root_cert_key_1: "root_cert_key_1",
       root_cert_2: "root_cert_2",
-      root_cert_key_2: "root_cert_key_2"
+      root_cert_key_2: "root_cert_key_2",
+      project_id: prj.id
     )
 
     mp = MinioPool.create_with_id(

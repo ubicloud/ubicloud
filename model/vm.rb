@@ -279,7 +279,7 @@ end
 #  vcpus            | integer                  | NOT NULL
 #  memory_gib       | integer                  | NOT NULL
 #  vm_host_slice_id | uuid                     |
-#  project_id       | uuid                     |
+#  project_id       | uuid                     | NOT NULL
 # Indexes:
 #  vm_pkey                          | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key            | UNIQUE btree (ephemeral_net6)

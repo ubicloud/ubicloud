@@ -22,8 +22,8 @@ class ApiKey < Sequel::Model
     ubid
   end
 
-  def self.create_personal_access_token(account, project: nil)
-    create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project&.id)
+  def self.create_personal_access_token(account, project:)
+    create_with_id(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
   end
 
   def self.create_inference_api_key(project)
@@ -77,7 +77,7 @@ end
 #  used_for    | text                     | NOT NULL
 #  key         | text                     | NOT NULL
 #  is_valid    | boolean                  | NOT NULL DEFAULT true
-#  project_id  | uuid                     |
+#  project_id  | uuid                     | NOT NULL
 # Indexes:
 #  api_key_pkey                       | PRIMARY KEY btree (id)
 #  api_key_owner_table_owner_id_index | btree (owner_table, owner_id)
