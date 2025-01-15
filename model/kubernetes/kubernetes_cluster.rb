@@ -6,6 +6,7 @@ class KubernetesCluster < Sequel::Model
   one_to_one :strand, key: :id
   one_to_one :api_server_lb, class: :LoadBalancer, key: :id, primary_key: :api_server_lb_id
   many_to_one :private_subnet
+  many_to_one :project
   many_to_many :vms, order: :created_at
 
   dataset_module Pagination

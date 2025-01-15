@@ -14,7 +14,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       kubernetes_version: "v1.32",
       cp_node_count: 3,
       private_subnet_id: subnet.id,
-      location: "hetzner-fsn1"
+      location: "hetzner-fsn1",
+      project_id: project.id
     )
 
     lb = LoadBalancer.create_with_id(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo")

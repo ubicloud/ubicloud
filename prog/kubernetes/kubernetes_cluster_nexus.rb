@@ -25,7 +25,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         kubernetes_version: kubernetes_version,
         cp_node_count: cp_node_count,
         private_subnet_id: private_subnet_id,
-        location: location
+        location: location,
+        project_id: project.id
       )
 
       kc.associate_with_project(project)
@@ -78,7 +79,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     kubernetes_cluster.api_server_lb.incr_destroy
     kubernetes_cluster.vms.each { kubernetes_cluster.disassociate_vm(_1) }
     kubernetes_cluster.vms.each(&:incr_destroy)
-    kubernetes_cluster.projects.each { kubernetes_cluster.dissociate_with_project(_1) }
     kubernetes_cluster.destroy
     pop "kubernetes cluster is deleted"
   end
