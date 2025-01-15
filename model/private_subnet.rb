@@ -140,7 +140,7 @@ end
 #  name          | text                     | NOT NULL
 #  location      | text                     | NOT NULL
 #  last_rekey_at | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id    | uuid                     |
+#  project_id    | uuid                     | NOT NULL
 # Indexes:
 #  vm_private_subnet_pkey                       | PRIMARY KEY btree (id)
 #  private_subnet_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)

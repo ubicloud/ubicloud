@@ -230,7 +230,9 @@ end
 
 def create_vm(**args)
   defaults = {unix_user: "ubi", public_key: "ssh-ed25519 key", name: "test-vm", family: "standard", cores: 1, vcpus: 2, memory_gib: 8, arch: "x64", location: "hetzner-fsn1", boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: false, created_at: Time.now}
-  Vm.create_with_id(**defaults.merge(args))
+  args = defaults.merge(args)
+  args[:project_id] = Project.create(name: "create-vm-project").id
+  Vm.create(**args)
 end
 
 # Autoload helper files that may have expensive startup.

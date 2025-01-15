@@ -15,6 +15,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       admin_user: "minio-admin",
       admin_password: "dummy-password",
       private_subnet_id: ps.id,
+      project_id: minio_project.id,
       root_cert_1: "root_cert_1",
       root_cert_key_1: "root_cert_key_1",
       root_cert_2: "root_cert_2",

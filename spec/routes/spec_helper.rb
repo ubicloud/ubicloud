@@ -22,6 +22,7 @@ RSpec.configure do |config|
     details_path = nested_error ? ["error", "details"] : ["details"]
 
     match do |response|
+      return false if response.body.empty?
       parsed_body = JSON.parse(response.body)
       response.status == expected_state &&
         (expected_message.nil? || parsed_body.dig(*message_path) == expected_message) &&
@@ -29,7 +30,7 @@ RSpec.configure do |config|
     end
 
     failure_message do |response|
-      parsed_body = JSON.parse(response.body)
+      parsed_body = response.body.empty? ? {} : JSON.parse(response.body)
       <<~MESSAGE
         #{"expected: ".rjust(16)}#{expected_state}#{expected_message && " - #{expected_message}"}#{expected_details && " - #{expected_details}"}
         #{"got: ".rjust(16)}#{response.status}#{expected_message && " - #{parsed_body.dig(*message_path)}"}#{expected_details && " - #{parsed_body.dig(*details_path)}"}

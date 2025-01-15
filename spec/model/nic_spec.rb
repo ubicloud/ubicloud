@@ -11,7 +11,7 @@ RSpec.describe Nic do
   end
 
   describe "ubid_to_tap_name" do
-    let(:subnet) { PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x") }
+    let(:subnet) { PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x", project_id: Project.create(name: "test").id) }
 
     it "returns tap name from ubid" do
       nic = described_class.create_with_id(

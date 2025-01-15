@@ -7,6 +7,8 @@ RSpec.describe Prog::Vm::VmPool do
 
   let(:st) { Strand.new }
 
+  let(:project_id) { Project.create(name: "test-project").id }
+
   describe ".assemble" do
     it "creates the entity and strand properly" do
       st = described_class.assemble(
@@ -78,7 +80,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 4, vcpus: 2, memory_gib: 8) { _1.id = Sshable.create_with_id.id }
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 4, vcpus: 2, memory_gib: 8, project_id:) { _1.id = Sshable.create_with_id.id }
 
       expect { nx.wait }.to hop("create_new_vm")
     end
@@ -87,7 +89,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 2, memory_gib: 8) { _1.id = Sshable.create_with_id.id }
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 2, memory_gib: 8, project_id:) { _1.id = Sshable.create_with_id.id }
 
       expect { nx.wait }.to nap(30)
     end

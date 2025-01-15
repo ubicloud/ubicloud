@@ -9,12 +9,12 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   let(:prj) { Project.create_with_id(name: "default") }
   let(:ps) {
     PrivateSubnet.create_with_id(name: "ps", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "1.1.1.0/26", state: "waiting")
+      net4: "1.1.1.0/26", state: "waiting", project_id: prj.id)
   }
 
   let(:ps2) {
     PrivateSubnet.create_with_id(name: "ps2", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fcc::/64",
-      net4: "1.1.1.128/26", state: "waiting")
+      net4: "1.1.1.128/26", state: "waiting", project_id: prj.id)
   }
 
   before do
@@ -66,7 +66,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
 
     it "fails if firewall is not in the project" do
-      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1")
+      fw = Firewall.create_with_id(name: "default-firewall", location: "hetzner-fsn1", project_id: Project.create(name: "t2").id)
       expect {
         described_class.assemble(prj.id, firewall_id: fw.id)
       }.to raise_error RuntimeError, "Firewall with id #{fw.id} and location hetzner-fsn1 does not exist"

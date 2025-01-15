@@ -97,6 +97,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "not authorized" do
+        project
         post "/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.location}/private-subnet/foo_subnet"
 
         expect(last_response.content_type).to eq("application/json")
@@ -149,6 +150,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "not authorized" do
+        project
         get "/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.display_location}/private-subnet/#{ps_wo_permission.name}"
 
         expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
@@ -220,6 +222,7 @@ RSpec.describe Clover, "private_subnet" do
       end
 
       it "not authorized" do
+        project
         delete "/project/#{project_wo_permissions.ubid}/location/#{ps_wo_permission.display_location}/private-subnet/#{ps_wo_permission.name}"
 
         expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")

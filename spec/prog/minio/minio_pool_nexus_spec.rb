@@ -11,7 +11,8 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",
-      private_subnet_id: ps.id
+      private_subnet_id: ps.id,
+      project_id: minio_project.id
     )
   }
   let(:ps) {

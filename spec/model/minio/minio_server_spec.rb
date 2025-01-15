@@ -4,13 +4,15 @@ require_relative "../spec_helper"
 
 RSpec.describe MinioServer do
   subject(:ms) {
+    vm = create_vm(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
     mc = MinioCluster.create_with_id(
       location: "hetzner-fsn1",
       name: "minio-cluster-name",
       admin_user: "minio-admin",
       admin_password: "dummy-password",
       root_cert_1: "dummy-root-cert-1",
-      root_cert_2: "dummy-root-cert-2"
+      root_cert_2: "dummy-root-cert-2",
+      project_id: vm.project_id
     )
     mp = MinioPool.create_with_id(
       cluster_id: mc.id,
@@ -20,7 +22,6 @@ RSpec.describe MinioServer do
       storage_size_gib: 100,
       vm_size: "standard-2"
     )
-    vm = create_vm(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
 
     described_class.create_with_id(
       minio_pool_id: mp.id,

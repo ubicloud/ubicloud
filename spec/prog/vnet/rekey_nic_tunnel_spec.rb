@@ -8,7 +8,7 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
   let(:st) { Strand.new }
   let(:ps) {
     PrivateSubnet.create_with_id(name: "ps", location: "hetzner-fsn1", net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "1.1.1.0/26", state: "waiting")
+      net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id)
   }
   let(:tunnel) {
     sa = Sshable.create_with_id(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)

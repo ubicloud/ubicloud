@@ -10,7 +10,8 @@ RSpec.describe MinioCluster do
       admin_user: "minio-admin",
       admin_password: "dummy-password",
       root_cert_1: "root_cert_1",
-      root_cert_2: "root_cert_2"
+      root_cert_2: "root_cert_2",
+      project_id: Project.create(name: "test").id
     )
     mp = MinioPool.create_with_id(
       cluster_id: mc.id,

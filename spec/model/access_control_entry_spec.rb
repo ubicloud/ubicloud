@@ -28,11 +28,11 @@ RSpec.describe AccessControlEntry do
     ace.subject_id = ApiKey.create_personal_access_token(account, project:).id
     expect(ace.valid?).to be true
 
-    ace.subject_id = ApiKey.create_personal_access_token(account2).id
+    project2 = Project.create_with_id(name: "Test-2")
+    ace.subject_id = ApiKey.create_personal_access_token(account2, project: project2).id
     expect(ace.valid?).to be false
     expect(ace.errors).to eq(subject_id: ["is not related to this project"])
 
-    project2 = Project.create_with_id(name: "Test-2")
     account.associate_with_project(project2)
     ace.subject_id = SubjectTag.create_with_id(project_id: project2.id, name: "V").id
     expect(ace.valid?).to be false
@@ -62,7 +62,7 @@ RSpec.describe AccessControlEntry do
     ace.object_id = project.id
     expect(ace.valid?).to be true
 
-    firewall = Firewall.create_with_id(location: "F")
+    firewall = Firewall.create_with_id(location: "F", project_id: project2.id)
     ace.object_id = firewall.id
     expect(ace.valid?).to be false
     expect(ace.errors).to eq(object_id: ["is not related to this project"])
@@ -81,6 +81,7 @@ RSpec.describe AccessControlEntry do
       name: "",
       net6: "fd1b:9793:dcef:cd0a:c::/79",
       net4: "10.9.39.5/32",
+      project_id: project2.id,
       location: ""
     ).id
     load_balancer_id = LoadBalancer.create_with_id(
@@ -88,6 +89,7 @@ RSpec.describe AccessControlEntry do
       src_port: 1024,
       dst_port: 1025,
       private_subnet_id:,
+      project_id: project2.id,
       health_check_endpoint: ""
     ).id
     inference_endpoint = InferenceEndpoint.create_with_id(

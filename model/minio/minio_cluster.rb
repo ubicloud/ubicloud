@@ -90,7 +90,7 @@ end
 #  root_cert_2                 | text                        |
 #  root_cert_key_2             | text                        |
 #  certificate_last_checked_at | timestamp with time zone    | NOT NULL DEFAULT now()
-#  project_id                  | uuid                        |
+#  project_id                  | uuid                        | NOT NULL
 # Indexes:
 #  minio_cluster_pkey                          | PRIMARY KEY btree (id)
 #  minio_cluster_project_id_location_name_uidx | UNIQUE btree (project_id, location, name)
