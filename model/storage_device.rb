@@ -20,6 +20,7 @@ end
 #  available_storage_gib | integer | NOT NULL
 #  enabled               | boolean | NOT NULL DEFAULT true
 #  vm_host_id            | uuid    |
+#  unix_device_list      | text[]  |
 # Indexes:
 #  storage_device_pkey                | PRIMARY KEY btree (id)
 #  storage_device_vm_host_id_name_key | UNIQUE btree (vm_host_id, name)
