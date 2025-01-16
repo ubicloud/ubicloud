@@ -7,18 +7,17 @@ RSpec.describe Prog::LearnStorage do
     it "exits, saving StorageDevice model instances" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
-      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/                            205520896     99571712
-/var/storage/devices/stor1   205520896     99571712
-/var/storage/devices/stor2  3331416064   3331276800
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sda       /                            205520896     99571712
+/dev/sdb       /var/storage/devices/stor1   205520896     99571712
+/dev/sdc       /var/storage/devices/stor2  3331416064   3331276800
 EOS
-      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/var/storage/devices/stor1   205520896     99571712
-/var/storage/devices/stor2  3331416064   3331276800
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sda       /var/storage/devices/stor1   205520896     99571712
+/dev/sdb       /var/storage/devices/stor2  3331416064   3331276800
 EOS
-
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.map(&:name).sort
       }.from([]).to(%w[DEFAULT stor1 stor2])
@@ -27,18 +26,19 @@ EOS
     it "exits, updating existing StorageDevice model instances" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       ls = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
-      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/                           6205520896     99571712
-/var/storage/devices/stor1  6205520896   3099571712
-/var/storage/devices/stor2  3331416064   1531276800
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sda       /                           6205520896     99571712
+/dev/sdb       /var/storage/devices/stor1  6205520896   3099571712
+/dev/sdc       /var/storage/devices/stor2  3331416064   1531276800
 EOS
-      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/var/storage/devices/stor1  6205520896   3099571712
-/var/storage/devices/stor2  3331416064   1531276800
+      expect(ls.sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sdb       /var/storage/devices/stor1  6205520896   3099571712
+/dev/sdc       /var/storage/devices/stor2  3331416064   1531276800
 EOS
-      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+
+      StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100, unix_device_list: ["sda"])
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.map { |sd|
           sd.values.slice(
@@ -72,22 +72,22 @@ EOS
     end
 
     it "can parse multiple file systems in /var/storage/NAME" do
-      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/run                        3331420160   3328692224
-/                         452564664320 381456842752
-/dev/shm                   16657084416  16605118464
-/run/lock                      5242880      5234688
-/sys/firmware/efi/efivars       448412        74256
-/boot                       2024529920   1641877504
-/var/storage/devices/stor1   205520896     99571712
-/var/storage/devices/stor2  3331416064   3331276800
+      expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+tmpfs          /run                        3331420160   3328692224
+/dev/sda       /                         452564664320 381456842752
+tmpfs          /dev/shm                   16657084416  16605118464
+tmpfs          /run/lock                      5242880      5234688
+tmpfs          /sys/firmware/efi/efivars       448412        74256
+/dev/aaa       /boot                       2024529920   1641877504
+/dev/sdb       /var/storage/devices/stor1   205520896     99571712
+/dev/sdc       /var/storage/devices/stor2  3331416064   3331276800
 EOS
 
-      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/var/storage/devices/stor1   205520896     99571712
-/var/storage/devices/stor2  3331416064   3331276800
+      expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sdb       /var/storage/devices/stor1   205520896     99571712
+/dev/sdc       /var/storage/devices/stor2  3331416064   3331276800
 EOS
 
       expect(ls.make_model_instances.map(&:name)).to eq(%w[DEFAULT stor1 stor2])
@@ -97,39 +97,56 @@ EOS
       # First, the sshable is scanned for any file systems in
       # /var/storage/devices. Iff there are none, a second command is
       # sent to fill in the "DEFAULT" storage device.
-      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail ").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/run                        3331420160   3328692224
-/                         452564664320 381456842752
-/dev/shm                   16657084416  16605118464
-/run/lock                      5242880      5234688
-/sys/firmware/efi/efivars       448412        74256
-/boot                       2024529920   1641877504
+      expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+tmpfs          /run                        3331420160   3328692224
+/dev/sda       /                         452564664320 381456842752
+tmpfs          /dev/shm                   16657084416  16605118464
+tmpfs          /run/lock                      5242880      5234688
+tmpfs          /sys/firmware/efi/efivars       448412        74256
+/dev/aaa       /boot                       2024529920   1641877504
 EOS
 
-      expect(sshable).to receive(:cmd).with("df -B1 --output=target,size,avail /var/storage").and_return(<<EOS)
-Mounted on                   1B-blocks        Avail
-/                         452564664320 381456842752
+      expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/sda       /                         452564664320 381456842752
 EOS
 
       expect(ls.make_model_instances.map(&:name)).to eq(%w[DEFAULT])
     end
-  end
 
-  describe Prog::LearnStorage::DfRecord do
-    it "can raise a header parse error" do
-      expect {
-        described_class.parse_all("")
-      }.to raise_error RuntimeError, "BUG: df header parse failed"
-    end
+    it "can find underlying unix devices for raided disks" do
+      expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail ").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+tmpfs          /run                        3331420160   3328692224
+/dev/sda       /                         452564664320 381456842752
+tmpfs          /dev/shm                   16657084416  16605118464
+tmpfs          /run/lock                      5242880      5234688
+tmpfs          /sys/firmware/efi/efivars       448412        74256
+/dev/aaa       /boot                       2024529920   1641877504
+EOS
 
-    it "can raise a data parse error" do
-      expect {
-        described_class.parse_all(<<DF)
-Mounted on                   1B-blocks        Avail
-nope
-DF
-      }.to raise_error RuntimeError, "BUG: df data parse failed"
+      expect(sshable).to receive(:cmd).with("cat /proc/mdstat").and_return(<<EOS)
+Personalities : [raid1] [linear] [multipath] [raid0] [raid6] [raid5] [raid4] [raid10]
+md2 : active raid1 nvme1n1p3[1] nvme0n1p3[0]
+      465370432 blocks super 1.2 [2/2] [UU]
+      bitmap: 3/4 pages [12KB], 65536KB chunk
+
+md0 : active raid1 nvme1n1p1[1] nvme0n1p1[0]
+      33520640 blocks super 1.2 [2/2] [UU]
+
+md1 : active raid1 nvme1n1p2[1] nvme0n1p2[0]
+      1046528 blocks super 1.2 [2/2] [UU]
+
+unused devices: <none>
+EOS
+
+      expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return(<<EOS)
+Filesystem     Mounted on                   1B-blocks        Avail
+/dev/md2       /                         452564664320 381456842752
+EOS
+
+      expect(ls.make_model_instances.map(&:unix_device_list)).to eq([["nvme1n1", "nvme0n1"]])
     end
   end
 end

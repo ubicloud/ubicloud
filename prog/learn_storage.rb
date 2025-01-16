@@ -1,37 +1,19 @@
 # frozen_string_literal: true
 
+require_relative "../lib/system_parser"
+
 class Prog::LearnStorage < Prog::Base
   subject_is :sshable, :vm_host
 
-  DfRecord = Struct.new(:optional_name, :size_gib, :avail_gib) do
-    def self.parse_all(str)
-      s = StringScanner.new(str)
-      fail "BUG: df header parse failed" unless s.scan(/\AMounted on\s+1B-blocks\s+Avail\n/)
-      out = []
-
-      until s.eos?
-        fail "BUG: df data parse failed" unless s.scan(/(.*?)\s+(\d+)\s+(\d+)\s*\n/)
-        optional_name = if s.captures.first =~ %r{/var/storage/devices/(.*)?}
-          $1
-        end
-        size_gib, avail_gib = s.captures[1..].map { Integer(_1) / 1073741824 }
-        out << DfRecord.new(optional_name, size_gib, avail_gib)
-      end
-
-      out.freeze
-    end
-  end
-
-  def df_command(path = "") = "df -B1 --output=target,size,avail #{path}"
-
   def make_model_instances
-    devices = DfRecord.parse_all(sshable.cmd(df_command))
-    rec = DfRecord.parse_all(sshable.cmd(df_command("/var/storage"))).first
+    devices = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command))
+    rec = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command("/var/storage"))).first
     sds = [StorageDevice.new_with_id(
       vm_host_id: vm_host.id, name: "DEFAULT",
       # reserve 5G the host.
       available_storage_gib: [rec.avail_gib - 5, 0].max,
-      total_storage_gib: rec.size_gib
+      total_storage_gib: rec.size_gib,
+      unix_device_list: find_underlying_unix_devices(rec.unix_device)
     )]
 
     devices.each do |rec|
@@ -39,11 +21,17 @@ class Prog::LearnStorage < Prog::Base
       sds << StorageDevice.new_with_id(
         vm_host_id: vm_host.id, name: name,
         available_storage_gib: rec.avail_gib,
-        total_storage_gib: rec.size_gib
+        total_storage_gib: rec.size_gib,
+        unix_device_list: find_underlying_unix_devices(rec.unix_device)
       )
     end
 
     sds
+  end
+
+  def find_underlying_unix_devices(unix_device)
+    return [unix_device] unless unix_device.start_with?("/dev/md")
+    SystemParser.extract_underlying_raid_devices_from_mdstat(sshable.cmd("cat /proc/mdstat"), unix_device)
   end
 
   label def start
