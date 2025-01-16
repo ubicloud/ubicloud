@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require_relative "../lib/system_parser"
 
 class StorageDevice < Sequel::Model
   include ResourceMethods
@@ -9,6 +10,21 @@ class StorageDevice < Sequel::Model
 
   def self.ubid_type
     UBID::TYPE_ETC
+  end
+
+  def set_underlying_unix_devices
+    df_command_path = (name == "DEFAULT") ? "/var/storage" : "/var/storage/devices/#{name}"
+    df_command_output = vm_host.sshable.cmd(SystemParser.df_command(df_command_path))
+
+    unix_device_name = SystemParser.extract_disk_info_from_df(df_command_output).first.unix_device
+    if unix_device_name.start_with?("/dev/md") # we are dealing with raided disk
+      mdstat_file_content = vm_host.sshable.cmd("cat /proc/mdstat")
+      self.unix_device_list = SystemParser.extract_underlying_raid_devices_from_mdstat(mdstat_file_content, unix_device_name)
+    else
+      self.unix_device_list = [unix_device_name.delete_prefix("/dev/")]
+    end
+
+    save_changes
   end
 end
 
