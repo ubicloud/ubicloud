@@ -223,6 +223,32 @@ class Prog::Vm::GithubRunner < Prog::Base
       UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment
     COMMAND
 
+    if (mirror_vm = Vm[Config.docker_mirror_server_vm_id]) && vm.vm_host_id == mirror_vm.vm_host_id
+      mirror_address = "#{mirror_vm.load_balancer.hostname}:5000"
+      command += <<~COMMAND
+        # Configure Docker daemon with registry mirror
+        if [ -f /etc/docker/daemon.json ] && [ -s /etc/docker/daemon.json ]; then
+          sudo jq '. + {"registry-mirrors": ["https://#{mirror_address}"]}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp
+          sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+        else
+          echo '{"registry-mirrors": ["https://#{mirror_address}"]}' | sudo tee /etc/docker/daemon.json
+        fi
+
+        # Configure BuildKit to use the mirror
+        sudo mkdir -p /etc/buildkit
+        echo '
+          [registry."docker.io"]
+            mirrors = ["#{mirror_address}"]
+
+          [registry."#{mirror_address}"]
+            http = false
+            insecure = false' | sudo tee -a /etc/buildkit/buildkitd.toml
+
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker
+      COMMAND
+    end
+
     if github_runner.installation.cache_enabled
       local_ip = vm.nics.first.private_ipv4.network.to_s
       command += <<~COMMAND

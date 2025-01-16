@@ -377,7 +377,43 @@ RSpec.describe Prog::Vm::GithubRunner do
 
   describe "#setup_environment" do
     it "hops to register_runner" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(Config).to receive(:docker_mirror_server_vm_id).and_return(vm.id).at_least(:once)
+      expect(Vm).to receive(:[]).with(vm.id).and_return(vm).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
+      expect(vm).to receive(:runtime_token).and_return("my_token")
+      expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer, hostname: "test.lb.ubicloud.com"))
+      expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
+      expect(github_runner.installation).to receive(:cache_enabled).and_return(false)
+      expect(sshable).to receive(:cmd).with(<<~COMMAND)
+        set -ueo pipefail
+        echo "image version: $ImageVersion"
+        sudo usermod -a -G sudo,adm runneradmin
+        jq '. += [{"group":"Ubicloud Managed Runner","detail":"Name: #{github_runner.ubid}\\nLabel: ubicloud-standard-4\\nArch: \\nImage: \\nVM Host: vhfdmbbtdz3j3h8hccf8s9wz94\\nVM Pool: \\nLocation: hetzner-fsn1\\nDatacenter: FSN1-DC8\\nProject: pjwnadpt27b21p81d7334f11rx\\nConsole URL: http://localhost:9292/project/pjwnadpt27b21p81d7334f11rx/github"}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info
+        echo "UBICLOUD_RUNTIME_TOKEN=my_token
+        UBICLOUD_CACHE_URL=http://localhost:9292/runtime/github/" | sudo tee -a /etc/environment
+        if [ -f /etc/docker/daemon.json ] && [ -s /etc/docker/daemon.json ]; then
+          sudo jq '. + {"registry-mirrors": ["https://test.lb.ubicloud.com:5000"]}' /etc/docker/daemon.json | sudo tee /etc/docker/daemon.json.tmp
+          sudo mv /etc/docker/daemon.json.tmp /etc/docker/daemon.json
+        else
+          echo '{"registry-mirrors": ["https://test.lb.ubicloud.com:5000"]}' | sudo tee /etc/docker/daemon.json
+        fi
+        sudo mkdir -p /etc/buildkit
+        echo '
+          [registry."docker.io"]
+            mirrors = ["test.lb.ubicloud.com:5000"]
+          [registry."test.lb.ubicloud.com:5000"]
+            http = false
+            insecure = false' | sudo tee -a /etc/buildkit/buildkitd.toml
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
+    it "hops to register_runner without setting up registry mirror" do
+      expect(Config).to receive(:docker_mirror_server_vm_id).and_return(nil)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(github_runner.installation).to receive(:cache_enabled).and_return(false)
@@ -394,7 +430,7 @@ RSpec.describe Prog::Vm::GithubRunner do
     end
 
     it "hops to register_runner with after enabling transparent cache" do
-      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8")).at_least(:once)
+      expect(vm).to receive(:vm_host).and_return(instance_double(VmHost, ubid: "vhfdmbbtdz3j3h8hccf8s9wz94", location: "hetzner-fsn1", data_center: "FSN1-DC8", id: "788525ed-d6f0-4937-a844-323d4fd91946")).at_least(:once)
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(github_runner.installation).to receive(:project).and_return(instance_double(Project, ubid: "pjwnadpt27b21p81d7334f11rx", path: "/project/pjwnadpt27b21p81d7334f11rx")).at_least(:once)
       expect(github_runner.installation).to receive(:cache_enabled).and_return(true)
