@@ -30,10 +30,6 @@ class ObjectMetatag < DelegateClass(ObjectTag)
     ObjectTag[from_meta_uuid(id)]&.metatag
   end
 
-  def self.filter_authorize_dataset(dataset, object_id)
-    dataset.where(project_id: ObjectTag.dataset.where(id: from_meta_uuid(object_id)).select(:project_id))
-  end
-
   def id = metatag_uuid
 
   def ubid = metatag_ubid

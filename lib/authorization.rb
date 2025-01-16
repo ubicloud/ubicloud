@@ -84,7 +84,15 @@ module Authorization
         # This is probably a redundant check, but I think it helps to have defense in depth
         # here.  This makes it so if a project-level restriction is missed before the
         # authorization call, this will make authorization fail.
-        dataset = klass.filter_authorize_dataset(dataset, object_id)
+        check_project_id = if klass == Project
+          object_id
+        elsif klass == ObjectMetatag
+          ObjectTag.dataset.where(id: klass.from_meta_uuid(object_id)).select(:project_id)
+        else
+          klass.where(id: object_id).select(:project_id)
+        end
+
+        dataset = dataset.where(project_id: check_project_id)
       end
 
       dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }))
@@ -139,16 +147,6 @@ module Authorization
   end
 
   module HyperTagMethods
-    module ClassMethods
-      def filter_authorize_dataset(dataset, object_id)
-        dataset.where(project_id: where(id: object_id).select(:project_id))
-      end
-    end
-
-    def self.included(base)
-      base.extend ClassMethods
-    end
-
     def before_destroy
       AccessTag.where(hyper_tag_id: id).destroy
       super

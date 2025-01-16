@@ -1,16 +1,8 @@
 # frozen_string_literal: true
 
 module AccessControlModelTag
-  module ClassMethods
-    def filter_authorize_dataset(dataset, object_id)
-      dataset.where(project_id: self.dataset.where(id: object_id).select(:project_id))
-    end
-  end
-
   def self.included(model)
     model.class_eval do
-      extend ClassMethods
-
       base = name.delete_suffix("Tag").downcase
       table = :"applied_#{base}_tag"
       column = :"#{base}_id"
