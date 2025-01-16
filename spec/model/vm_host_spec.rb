@@ -3,6 +3,15 @@
 require_relative "spec_helper"
 require_relative "../../model/address"
 
+class MockStringWithExitstatus < String
+  attr_accessor :exitstatus
+
+  def initialize(str, exitstatus = 0)
+    super(str)
+    self.exitstatus = exitstatus
+  end
+end
+
 RSpec.describe VmHost do
   subject(:vh) {
     described_class.new(
@@ -370,6 +379,23 @@ RSpec.describe VmHost do
     vh.init_health_monitor_session
   end
 
+  it "returns disk devices when StorageDevice has unix_device_list" do
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda", "sdb"])
+    allow(vh).to receive(:storage_devices).and_return([sd])
+    expect(vh.disk_devices).to eq(["sda", "sdb"])
+  end
+
+  it "finds and returns disk devices when StorageDevice doesn't have unix_device_list" do
+    sd = StorageDevice.create_with_id(vm_host_id: vh.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100)
+    sshable = instance_double(Sshable)
+    expect(sd).to receive(:vm_host).and_return(vh)
+    expect(sshable).to receive(:cmd).with("df -B1 --output=source,target,size,avail /var/storage").and_return("Filesystem     Mounted on    1B-blocks        Avail\n" \
+    "/dev/sda       /             467909804032    433234698240\n")
+    expect(vh).to receive(:sshable).and_return(sshable)
+    allow(vh).to receive(:storage_devices).and_return([sd])
+    expect(vh.disk_devices).to eq(["sda"])
+  end
+
   it "checks pulse" do
     session = {
       ssh_session: instance_double(Net::SSH::Connection::Session)
@@ -380,12 +406,122 @@ RSpec.describe VmHost do
       reading_chg: Time.now - 30
     }
 
-    expect(session[:ssh_session]).to receive(:exec!).and_return("true\n")
+    allow(vh).to receive(:disk_devices).and_return(["sda"])
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("true\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /test-file\"").and_return(MockStringWithExitstatus.new("", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sha256sum /test-file").and_return(MockStringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  /test-file\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo rm /test-file").and_return(MockStringWithExitstatus.new("", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(MockStringWithExitstatus.new("random ok logs", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
     expect(vh).to receive(:reload).and_return(vh)
     expect(vh).to receive(:incr_checkup)
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
+
+  it "checks pulse on a non-default mountpoint with kernel errors" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+    allow(vh).to receive(:disk_devices).and_return(["sda"])
+
+    expect(vh).to receive(:check_storage_smartctl).and_return(true)
+    expect(vh).to receive(:check_storage_read_write).and_return(true)
+    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(MockStringWithExitstatus.new("Nov 04 12:18:04 ubuntu kernel: Buffer I/O error on dev sda, logical block 1032, lost async page write", 0))
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
+
+  it "checks pulse with kernel errors" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+    allow(vh).to receive(:disk_devices).and_return(["sda"])
+
+    expect(vh).to receive(:check_storage_smartctl).and_return(true)
+    expect(vh).to receive(:check_storage_nvme).and_return(true)
+    expect(vh).to receive(:check_storage_read_write).and_return(true)
+    allow(session[:ssh_session]).to receive(:exec!).with("journalctl -kS -1min --no-pager").and_return(MockStringWithExitstatus.new("exit code 1", 1))
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
+
+  it "checks pulse with smartctl errors" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+    allow(vh).to receive(:disk_devices).and_return(["sda"])
+
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo smartctl -j -H /dev/sda | jq .smart_status.passed").and_return(MockStringWithExitstatus.new("false\n", 0))
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
+
+  it "checks pulse with nvme errors" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+    allow(vh).to receive(:disk_devices).and_return(["nvme0n1"])
+
+    expect(vh).to receive(:check_storage_smartctl).and_return(true)
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(MockStringWithExitstatus.new("1\n", 0))
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+  end
+
+  it "checks pulse with no nvme errors" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+    allow(vh).to receive(:disk_devices).and_return(["nvme0n1"])
+
+    expect(vh).to receive(:check_storage_smartctl).and_return(true)
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(MockStringWithExitstatus.new("0\n", 0))
+    expect(vh).to receive(:check_storage_read_write).and_return(true)
+    expect(vh).to receive(:check_storage_kernel_logs).and_return(true)
+    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+  end
+
+  it "checks pulse on a non-default mountpoint with faulty read/write on disk" do
+    session = {
+      ssh_session: instance_double(Net::SSH::Connection::Session)
+    }
+    pulse = {
+      reading: "up",
+      reading_rpt: 5,
+      reading_chg: Time.now - 30
+    }
+    allow(vh).to receive(:disk_devices).and_return(["sda"])
+
+    expect(vh).to receive(:check_storage_smartctl).and_return(true)
+    expect(vh).to receive(:check_storage_nvme).and_return(true)
+    allow(session[:ssh_session]).to receive(:exec!).with("lsblk --json").and_return(MockStringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/random-mountpoint"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo bash -c \"head -c 1M </dev/zero > /random-mountpoint/test-file\"").and_return(MockStringWithExitstatus.new("", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sha256sum /random-mountpoint/test-file").and_return(MockStringWithExitstatus.new("wrong-hash  /test-file\n", 0))
+    allow(session[:ssh_session]).to receive(:exec!).with("sudo rm /random-mountpoint/test-file").and_return(MockStringWithExitstatus.new("", 0))
     expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
   end
 

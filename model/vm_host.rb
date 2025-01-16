@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
+require "shellwords"
 require_relative "../model"
 require_relative "../lib/hosting/apis"
+require_relative "../lib/system_parser"
 
 class VmHost < Sequel::Model
   one_to_one :strand, key: :id
@@ -283,16 +285,75 @@ class VmHost < Sequel::Model
     Hosting::Apis.hardware_reset_server(self)
   end
 
+  def check_storage_smartctl(ssh_session, devices)
+    devices.map do |device_name|
+      passed = ssh_session.exec!("sudo smartctl -j -H /dev/#{device_name} | jq .smart_status.passed").strip == "true"
+      Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}") unless passed
+      passed
+    end.all?(true)
+  end
+
+  def check_storage_nvme(ssh_session, devices)
+    devices.reject { |device_name| !device_name.start_with?("nvme") }.map do |device_name|
+      passed = ssh_session.exec!("sudo nvme smart-log /dev/#{device_name} | grep \"critical_warning\" | awk '{print $3}'").strip == "0"
+      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}") unless passed
+      passed
+    end.all?(true)
+  end
+
+  def check_storage_read_write(ssh_session, devices)
+    lsblk_json_info = ssh_session.exec!("lsblk --json")
+    devices_with_mount_points = devices.map { |device| SystemParser.get_device_mount_points_from_lsblk_json(lsblk_json_info, device) }
+
+    all_mount_points = []
+    devices_with_mount_points.each do |device_mount_points|
+      device_mount_points.each_value do |mount_points|
+        all_mount_points.concat(mount_points)
+      end
+    end
+
+    all_mount_points.uniq.all? do |mount_point|
+      file_name = (mount_point == "/") ? "/test-file" : Shellwords.escape("#{mount_point}/test-file")
+      write_status = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"").exitstatus == 0
+      hash_status = ssh_session.exec!("sha256sum #{file_name}").strip == "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_name}"
+      delete_status = ssh_session.exec!("sudo rm #{file_name}").exitstatus == 0
+
+      working = write_status && hash_status && delete_status
+      Clog.emit("failed to perform read/write on mountpoint #{mount_point} on VmHost #{ubid}") unless working
+      working
+    end
+  end
+
+  def check_storage_kernel_logs(ssh_session, devices)
+    kernel_logs = ssh_session.exec!("journalctl -kS -1min --no-pager")
+    return false unless kernel_logs.exitstatus == 0
+
+    error_count = kernel_logs.scan(/Buffer I\/O error on dev (\w+)/).tally
+    Clog.emit("found error on kernel logs. devices with error_count: #{error_count} on VmHost #{ubid}") unless error_count.empty?
+    error_count.empty?
+  end
+
   def init_health_monitor_session
     {
       ssh_session: sshable.start_fresh_session
     }
   end
 
+  def disk_devices
+    storage_devices.each { |sd| sd.set_underlying_unix_devices if sd.unix_device_list.nil? || sd.unix_device_list.empty? }
+    storage_devices.flat_map { |sd| sd.unix_device_list }
+  end
+
+  def perform_health_checks(ssh_session)
+    check_storage_smartctl(ssh_session, disk_devices) &&
+      check_storage_nvme(ssh_session, disk_devices) &&
+      check_storage_read_write(ssh_session, disk_devices) &&
+      check_storage_kernel_logs(ssh_session, disk_devices)
+  end
+
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:ssh_session].exec!("true")
-      "up"
+      perform_health_checks(session[:ssh_session]) ? "up" : "down"
     rescue
       "down"
     end
