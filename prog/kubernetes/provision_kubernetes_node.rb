@@ -93,7 +93,7 @@ BASH
   label def init_cluster
     case vm.sshable.cmd("common/bin/daemonizer --check init_kubernetes_cluster")
     when "Succeeded"
-      pop vm_id: vm.id
+      hop_install_cni
     when "NotStarted"
       params = {
         cluster_name: kubernetes_cluster.name,
@@ -119,7 +119,7 @@ BASH
   label def join_control_plane
     case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
     when "Succeeded"
-      pop vm_id: vm.id
+      hop_install_cni
     when "NotStarted"
       cp_sshable = kubernetes_cluster.cp_vms.first.sshable
       params = {
@@ -139,5 +139,38 @@ BASH
     end
 
     nap 65536
+  end
+
+  label def install_cni
+    script = <<BASH_SCRIPT
+#!/bin/bash
+cd /home/ubi || {
+  echo "Failed to change directory to /home/ubi" >&2
+  exit 1
+}
+exec ./kubernetes/bin/ubicni
+BASH_SCRIPT
+
+    cni_config = <<CONFIG
+{
+  "cniVersion": "1.0.0",
+  "name": "ubicni-network",
+  "type": "ubicni",
+  "ranges":{
+      "subnet_ipv6": "#{vm.ephemeral_net6.network}/80",
+      "subnet_ula_ipv6": "#{vm.nics.first.private_ipv6}",
+      "subnet_ipv4": "#{vm.nics.first.private_ipv4}"
+  }
+}
+CONFIG
+
+    sshable = vm.sshable
+    sshable.cmd("sudo tee /opt/cni/bin/ubicni", stdin: script)
+    sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+
+    sshable.cmd("sudo chmod +x /opt/cni/bin/ubicni")
+    sshable.cmd("sudo iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
+
+    pop vm_id: vm.id
   end
 end
