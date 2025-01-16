@@ -79,7 +79,9 @@ module Authorization
         object_id = UBID.parse(object_id).to_uuid
       end
 
-      if (klass = UBID.class_for_ubid(ubid))
+      klass = UBID.class_for_ubid(ubid)
+      klass = ApiKey if ubid.start_with?("et")
+      in_project_cond = if klass
         # This checks that the object being authorized is actually related to the project.
         # This is probably a redundant check, but I think it helps to have defense in depth
         # here.  This makes it so if a project-level restriction is missed before the
@@ -92,10 +94,12 @@ module Authorization
           klass.where(id: object_id).select(:project_id)
         end
 
-        dataset = dataset.where(project_id: check_project_id)
+        {project_id: check_project_id}
+      else
+        false
       end
 
-      dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }))
+      dataset = dataset.where(Sequel.or([nil, object_id, recursive_tag_query(:object, object_id)].map { [:object_id, _1] }) & in_project_cond)
     end
 
     dataset
