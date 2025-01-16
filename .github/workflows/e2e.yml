@@ -118,32 +118,19 @@ jobs:
       if: ${{ failure() && github.ref_name == 'main' }}
       uses: slackapi/slack-github-action@v2.0.0
       with:
+        webhook: ${{ secrets.SLACK_WEBHOOK_PAGER_URL }}
+        webhook-type: incoming-webhook
         payload: |
-          {
-            "text": "*E2E Tests Failed* :this-is-fine-fire:",
-            "attachments": [
-              {
-                "color": "E33122",
-                "fields": [
-                  {
-                    "title": "Event",
-                    "short": true,
-                    "value": "${{ github.event_name }}"
-                  },
-                  {
-                    "title": "Reference",
-                    "short": true,
-                    "value": "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.ref_name }}>"
-                  },
-                  {
-                    "title": "Action",
-                    "short": false,
-                    "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
-                  }
-                ]
-              }
-            ]
-          }
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_PAGER_URL }}
-        SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          text: "*E2E Tests Failed* :this-is-fine-fire:"
+          attachments:
+            - color: "E33122"
+              fields:
+                - title: "Event"
+                  short: true
+                  value: "${{ github.event_name }}"
+                - title: "Reference"
+                  short: true
+                  value: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.ref_name }}>"
+                - title: "Action"
+                  short: false
+                  value: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
