@@ -89,6 +89,9 @@ r "apt-get -y install qemu-utils mtools acl"
 # debugging crashes.
 r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 
+# We need smartmontools, nvme-cli and jq in order to probe the disk status of VmHosts
+r "apt-get -y install smartmontools nvme-cli jq"
+
 SpdkSetup.prep
 
 # cron job to store serial.log files
