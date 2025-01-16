@@ -17,12 +17,12 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       location: "hetzner-fsn1",
       project_id: project.id
     )
+    KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id)
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: project.id)
     kc.add_cp_vm(create_vm)
     kc.add_cp_vm(create_vm)
     kc.update(api_server_lb_id: lb.id)
-    kc
   }
 
   before do
@@ -126,12 +126,25 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#destroy" do
-    it "triggers deletion of associated resources" do
+    it "triggers deletion of associated resources and naps until all nodepools are gone" do
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
 
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
 
-      expect(kubernetes_cluster).to receive(:destroy)
+      expect(kubernetes_cluster).not_to receive(:destroy)
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "completes destroy when nodepools are gone" do
+      kubernetes_cluster.nodepools.first.destroy
+      kubernetes_cluster.reload
+
+      expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
+      expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
+
+      expect(kubernetes_cluster.nodepools).to be_empty
+
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end
   end

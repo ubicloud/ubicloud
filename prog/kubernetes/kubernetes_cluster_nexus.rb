@@ -23,14 +23,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       # TODO: Move resources (vms, subnet, LB, etc.) into own project
       # TODO: Validate node count
 
-      kc = KubernetesCluster.create_with_id(
-        name: name,
-        version: version,
-        cp_node_count: cp_node_count,
-        private_subnet_id: private_subnet_id,
-        location: location,
-        project_id: project.id
-      )
+      kc = KubernetesCluster.create_with_id(name:, version:, cp_node_count:, private_subnet_id:, location:, project_id: project.id)
 
       Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = kc.id }
     end
@@ -81,6 +74,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     kubernetes_cluster.api_server_lb.incr_destroy
     kubernetes_cluster.cp_vms.each(&:incr_destroy)
     kubernetes_cluster.remove_all_cp_vms
+    kubernetes_cluster.nodepools.each { _1.incr_destroy }
+    nap 5 unless kubernetes_cluster.nodepools.empty?
     kubernetes_cluster.destroy
     pop "kubernetes cluster is deleted"
   end
