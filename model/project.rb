@@ -35,10 +35,6 @@ class Project < Sequel::Model
 
   include ResourceMethods
 
-  def self.filter_authorize_dataset(dataset, object_id)
-    dataset.where(project_id: object_id)
-  end
-
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
     !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
