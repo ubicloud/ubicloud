@@ -37,4 +37,5 @@ end
 # Foreign key constraints:
 #  vm_host_slice_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:
-#  vm | vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
+#  vm          | vm_vm_host_slice_id_fkey          | (vm_host_slice_id) REFERENCES vm_host_slice(id)
+#  vm_host_cpu | vm_host_cpu_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
