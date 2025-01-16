@@ -7,6 +7,10 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     @vm ||= Vm[frame.fetch("vm_id", nil)] || nil
   end
 
+  def kubernetes_nodepool
+    @kubernetes_nodepool ||= KubernetesNodepool[frame.fetch("nodepool_id", nil)] || nil
+  end
+
   def write_hosts_file_if_needed(ip = nil)
     return unless Config.development?
     return if vm.sshable.cmd("sudo cat /etc/hosts").match?(/#{kubernetes_cluster.endpoint}/)
@@ -16,7 +20,11 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   label def start
-    name = "#{kubernetes_cluster.name.downcase}-control-plane-#{SecureRandom.alphanumeric(5).downcase}"
+    name = if kubernetes_nodepool
+      "#{kubernetes_nodepool.name}-#{SecureRandom.alphanumeric(5).downcase}"
+    else
+      "#{kubernetes_cluster.name.downcase}-control-plane-#{SecureRandom.alphanumeric(5).downcase}"
+    end
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi",
@@ -34,8 +42,12 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     current_frame["vm_id"] = vm_st.id
     strand.modified!(:stack)
 
-    kubernetes_cluster.add_cp_vm(vm_st.subject)
-    kubernetes_cluster.api_server_lb.add_vm(vm_st.subject)
+    if kubernetes_nodepool
+      kubernetes_nodepool.add_vm(vm_st.subject)
+    else
+      kubernetes_cluster.add_cp_vm(vm_st.subject)
+      kubernetes_cluster.api_server_lb.add_vm(vm_st.subject)
+    end
 
     hop_install_software
   end
@@ -86,6 +98,8 @@ BASH
   label def assign_role
     write_hosts_file_if_needed
 
+    hop_join_worker if kubernetes_nodepool
+
     hop_init_cluster if kubernetes_cluster.cp_vms.count == 1
 
     hop_join_control_plane
@@ -126,7 +140,29 @@ BASH
       nap 10
     when "Failed"
       # TODO: Create a page
-      Clog.emit("JOIN CLUSTER FAILED")
+      Clog.emit("JOIN CP NODE TO CLUSTER FAILED")
+      nap 65536
+    end
+
+    nap 65536
+  end
+
+  label def join_worker
+    case vm.sshable.cmd("common/bin/daemonizer --check join_worker")
+    when "Succeeded"
+      hop_install_cni
+    when "NotStarted"
+      cp_sshable = kubernetes_cluster.cp_vms.first.sshable
+      join_token = cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", "")
+      discovery_token_ca_cert_hash = cp_sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
+
+      vm.sshable.cmd("common/bin/daemonizer 'sudo kubernetes/bin/join-worker-node #{kubernetes_nodepool.kubernetes_cluster.endpoint}:443 #{join_token} #{discovery_token_ca_cert_hash}' join_worker")
+      nap 15
+    when "InProgress"
+      nap 10
+    when "Failed"
+      # TODO: Create a page
+      Clog.emit("JOIN WORKER NODE TO CLUSTER FAILED")
       nap 65536
     end
 

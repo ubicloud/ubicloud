@@ -27,6 +27,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     kc
   }
 
+  let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id) }
+
   before do
     allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"vm_id" => create_vm.id})
   end
@@ -74,7 +76,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#start" do
-    it "creates a VM and hops" do
+    it "creates a CP VM and hops if a nodepool is not given" do
+      expect(prog.kubernetes_nodepool).to be_nil
       expect(kubernetes_cluster.cp_vms.count).to eq(2)
       expect(kubernetes_cluster.api_server_lb).to receive(:add_vm)
 
@@ -84,6 +87,19 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
       new_vm = kubernetes_cluster.cp_vms.last
       expect(new_vm.name).to start_with("k8scluster-control-plane-")
+      expect(new_vm.sshable).not_to be_nil
+    end
+
+    it "creates a worker VM and hops if a nodepool is given" do
+      expect(prog).to receive(:frame).and_return({"nodepool_id" => kubernetes_nodepool.id})
+      expect(kubernetes_nodepool.vms.count).to eq(0)
+
+      expect { prog.start }.to hop("install_software")
+
+      expect(kubernetes_nodepool.reload.vms.count).to eq(1)
+
+      new_vm = kubernetes_nodepool.vms.last
+      expect(new_vm.name).to start_with("k8stest-np-")
       expect(new_vm.sshable).not_to be_nil
     end
   end
@@ -139,6 +155,11 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "hops to join_control_plane if this is the not the first vm of the cluster" do
       expect(prog.kubernetes_cluster.cp_vms.count).to eq(2)
       expect { prog.assign_role }.to hop("join_control_plane")
+    end
+
+    it "hops to join_worker if a nodepool is specified to the prog" do
+      expect(prog).to receive(:kubernetes_nodepool).and_return(kubernetes_nodepool)
+      expect { prog.assign_role }.to hop("join_worker")
     end
   end
 
@@ -208,6 +229,45 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     it "naps forever if the daemonizer check returns something unknown" do
       expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("Unknown")
       expect { prog.join_control_plane }.to nap(65536)
+    end
+  end
+
+  describe "#join_worker" do
+    before {
+      allow(prog.vm).to receive(:sshable).and_return(instance_double(Sshable))
+      allow(prog).to receive(:kubernetes_nodepool).and_return(kubernetes_nodepool)
+    }
+
+    it "runs the join-worker-node script if it's not started" do
+      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("NotStarted")
+
+      sshable = instance_double(Sshable)
+      allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
+      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication").and_return("\njt\n")
+      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command").and_return("discovery-token-ca-cert-hash dtcch")
+      expect(prog.vm.sshable).to receive(:cmd).with(/.*daemonizer '.*join-worker-node somelb.*:443 jt dtcch' join_worker/)
+
+      expect { prog.join_worker }.to nap(15)
+    end
+
+    it "naps if the join-worker-node script is in progress" do
+      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("InProgress")
+      expect { prog.join_worker }.to nap(10)
+    end
+
+    it "naps and does nothing (for now) if the join-worker-node script is failed" do
+      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("Failed")
+      expect { prog.join_worker }.to nap(65536)
+    end
+
+    it "pops if the join-worker-node script is successful" do
+      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("Succeeded")
+      expect { prog.join_worker }.to hop("install_cni")
+    end
+
+    it "naps for a long time if the daemonizer check returns something unknown" do
+      expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_worker").and_return("Unknown")
+      expect { prog.join_worker }.to nap(65536)
     end
   end
 

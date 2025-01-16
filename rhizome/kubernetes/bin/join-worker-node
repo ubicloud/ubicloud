@@ -1,0 +1,14 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+if ARGV.count != 3
+  fail "Wrong number of arguments. Expected 3, Given #{ARGV.count}"
+end
+
+cluster_endpoint = ARGV[0]
+token = ARGV[1]
+discovery_token_ca_cert_hash = ARGV[2]
+
+r "kubeadm join #{cluster_endpoint} --token #{token} --discovery-token-ca-cert-hash #{discovery_token_ca_cert_hash}"
