@@ -77,7 +77,31 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def wait
+    when_upgrade_set? do
+      hop_upgrade
+    end
     nap 6 * 60 * 60
+  end
+
+  label def upgrade
+    decr_upgrade
+
+    node_to_upgrade = kubernetes_nodepool.vms.find do |vm|
+      # TODO: Put another check here to make sure the version we receive is either one version old or the correct version, just in case
+      vm_version = kubernetes_nodepool.cluster.client(session: vm.sshable.start_fresh_session).version
+      vm_version != kubernetes_nodepool.cluster.version
+    end
+
+    hop_wait unless node_to_upgrade
+
+    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => node_to_upgrade.id, "nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.cluster.id}
+    hop_wait_upgrade
+  end
+
+  label def wait_upgrade
+    reap
+    hop_upgrade if leaf?
+    donate
   end
 
   label def destroy

@@ -128,6 +128,9 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     when_sync_kubernetes_services_set? do
       hop_sync_kubernetes_services
     end
+    when_upgrade_set? do
+      hop_upgrade
+    end
     nap 6 * 60 * 60
   end
 
@@ -136,6 +139,27 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     # TODO: timeout or other logic to avoid apoptosis should be added
     kubernetes_cluster.client.sync_kubernetes_services
     hop_wait
+  end
+
+  label def upgrade
+    decr_upgrade
+
+    node_to_upgrade = kubernetes_cluster.cp_vms.find do |vm|
+      # TODO: Put another check here to make sure the version we receive is either one version old or the correct version, just in case
+      vm_version = kubernetes_cluster.client(session: vm.sshable.start_fresh_session).version
+      vm_version != kubernetes_cluster.version
+    end
+
+    hop_wait unless node_to_upgrade
+
+    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => node_to_upgrade.id}
+    hop_wait_upgrade
+  end
+
+  label def wait_upgrade
+    reap
+    hop_upgrade if leaf?
+    donate
   end
 
   label def destroy

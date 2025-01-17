@@ -202,6 +202,20 @@ RSpec.describe Kubernetes::Client do
     end
   end
 
+  describe "version" do
+    it "runs a version command on kubectl" do
+      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf version --client").and_return("Client Version: v1.33.0\nKustomize Version: v5.6.0")
+      expect(kubernetes_client.version).to eq("v1.33")
+    end
+  end
+
+  describe "delete_node" do
+    it "deletes a node" do
+      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node asdf")
+      kubernetes_client.delete_node("asdf")
+    end
+  end
+
   describe "set_load_balancer_hostname" do
     it "calls kubectl function with right inputs" do
       svc = {
