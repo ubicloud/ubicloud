@@ -114,7 +114,16 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
-      run: timeout 40m foreman start
+      run: timeout 40m foreman start | tee foreman.log | grep "e2e.1"
+
+    - name: Print logs
+      run: grep -h -v -E "sleep_duration_sec|monitor.1" foreman.log
+
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: e2e-${{ github.run_id }}-logs
+        path: foreman.log
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
