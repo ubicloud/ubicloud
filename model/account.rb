@@ -8,7 +8,7 @@ class Account < Sequel::Model(:accounts)
   one_to_many :identities, class: :AccountIdentity
   many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
 
-  plugin :association_dependencies, usage_alerts: :destroy
+  plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
 
   include ResourceMethods
   include SubjectTag::Cleanup
@@ -50,11 +50,6 @@ class Account < Sequel::Model(:accounts)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
 
     projects.each { _1.billing_info&.payment_methods_dataset&.update(fraud: true) }
-  end
-
-  def before_destroy
-    AccessTag.where(hyper_tag_id: id).destroy
-    super
   end
 end
 
