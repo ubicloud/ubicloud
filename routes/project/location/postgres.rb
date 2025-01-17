@@ -210,6 +210,16 @@ class Clover
           r.redirect "#{@project.path}#{pg.path}"
         end
       end
+
+      r.get "ca-certificates" do
+        authorize("Postgres:view", pg.id)
+
+        return 404 unless (certs = pg.ca_certificates)
+
+        response.headers["Content-Disposition"] = "attachment; filename=\"#{pg.name}.pem\""
+        response.headers["Content-Type"] = "application/x-pem-file"
+        certs
+      end
     end
 
     # 204 response for invalid names

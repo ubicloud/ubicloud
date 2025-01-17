@@ -9,6 +9,9 @@
     <%= atr_key %>="<%= atr_value %>"
     <% end%>
   >
+    <% if icon %>
+      <%== render("components/icon", locals: { name: icon, classes: "h-5 w-5" }) %>
+    <% end %>
     <%= text %>
   </a>
 <% else %>

@@ -31,6 +31,18 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
     data.push(["Connection String", @pg[:connection_string], { copyable: true, revealable: true }])
   else
     data.push(["Connection String", "Waiting for host to be ready..."])
+  end
+  
+  if @pg[:ca_certificates]
+    data.push(
+      [
+        "CA Certificates",
+        render("components/download_button", locals: { link: "#{request.path}/ca-certificates" }),
+        { escape: false }
+      ]
+    )
+  else
+    data.push(["CA Certificates", "Waiting for host to be ready..."])
   end %>
 
   <div class="grid grid-cols-1 gap-6 md:grid-cols-6">
