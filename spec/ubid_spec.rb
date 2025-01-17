@@ -214,9 +214,6 @@ RSpec.describe UBID do
 
     expect(ActionType.first.ubid).to start_with UBID::TYPE_ACTION_TYPE
 
-    atag = AccessTag.create_with_id(project_id: prj.id, hyper_tag_table: "x", name: "x")
-    expect(atag.ubid).to start_with UBID::TYPE_ACCESS_TAG
-
     subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x", project_id: prj.id)
     expect(subnet.ubid).to start_with UBID::TYPE_PRIVATE_SUBNET
 
@@ -272,7 +269,6 @@ RSpec.describe UBID do
     ot = ObjectTag.create_with_id(project_id:, name: "T")
     ace = AccessControlEntry.create_with_id(project_id:, subject_id: st.id)
     a_type = ActionType.first
-    atag = AccessTag.create_with_id(project_id:, hyper_tag_table: "x", name: "x")
     subnet = PrivateSubnet.create_with_id(net6: "0::0", net4: "127.0.0.1", name: "x", location: "x", project_id:)
     nic = Nic.create_with_id(private_ipv6: "fd10:9b0b:6b4b:8fbb::/128", private_ipv4: "10.0.0.12/32", mac: "00:11:22:33:44:55", encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065", private_subnet_id: subnet.id, name: "def-nic")
     tun = IpsecTunnel.create_with_id(src_nic_id: nic.id, dst_nic_id: nic.id)
@@ -293,7 +289,6 @@ RSpec.describe UBID do
     expect(described_class.decode(ot.ubid)).to eq(ot)
     expect(described_class.decode(ace.ubid)).to eq(ace)
     expect(described_class.decode(a_type.ubid)).to eq(a_type)
-    expect(described_class.decode(atag.ubid)).to eq(atag)
     expect(described_class.decode(tun.ubid)).to eq(tun)
     expect(string_kv(described_class.decode(subnet.ubid))).to eq(string_kv(subnet))
     expect(described_class.decode(sshable.ubid)).to eq(sshable)
