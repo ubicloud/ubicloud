@@ -6,6 +6,46 @@ class Prog::LearnNetwork < Prog::Base
   subject_is :sshable, :vm_host
 
   label def start
+    if vm_host.provider == "leaseweb"
+      payload = JSON.generate(vm_host.assigned_subnets.map do |as|
+        {
+          cidr: if as.cidr.version == 4
+                  as.cidr.network.to_s
+                else
+                  NetAddr::IPv6Net.new(as.cidr.network, NetAddr::Mask128.new(as.mask)).nth(2).to_s
+                end,
+          gateway: as.gateway,
+          mask: as.mask
+        }
+      end)
+
+      puts "payload: #{payload}"
+      sshable.cmd("sudo host/bin/setup-leaseweb-networking #{payload.shellescape}")
+      hop_leaseweb_verify_networking
+    end
+
+    hop_learn_network_info
+  end
+
+  label def leaseweb_verify_networking
+    unless sshable.cmd("sudo pkill -SIGUSR1 -f 'netplan try'")
+      Clog.error("netplan try failed")
+      raise "netplan try failed"
+    end
+
+    hop_learn_network_info
+  end
+
+  label def learn_network_info
+    if vm_host.provider == "leaseweb"
+      adr = vm_host.assigned_subnets.find { |as| as.cidr.version == 6 && as.mask == 64 }
+      vm_host.update(
+        ip6: NetAddr::IPv6Net.new(NetAddr.parse_ip(adr.cidr.network), NetAddr::Mask128.new(adr.mask)).nth(2).to_s,
+        net6: NetAddr::IPv6Net.new(adr.cidr.network, NetAddr::Mask128.new(adr.mask)).to_s
+      )
+
+      pop "learned network information"
+    end
     ip6 = parse_ip_addr_j(sshable.cmd("/usr/sbin/ip -j -6 addr show scope global"))
 
     # While it would be ideal for NetAddr's IPv6 support to convey
@@ -34,7 +74,7 @@ class Prog::LearnNetwork < Prog::Base
     case JSON.parse(s)
     in [iface]
       case iface.fetch("addr_info").filter_map { |info|
-             if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 112
+             if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 64
                Ip6.new(local, prefixlen)
              end
            }

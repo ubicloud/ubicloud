@@ -16,6 +16,9 @@ class Prog::Vm::HostNexus < Prog::Base
         vmh.set_data_center
         # Avoid overriding custom server names for development hosts.
         vmh.set_server_name unless Config.development?
+      elsif provider == LeasewebHost::PROVIDER_NAME
+        LeasewebHost.create(server_identifier: vmh.id) { _1.id = vmh.id }
+        vmh.create_addresses
       else
         Address.create(cidr: sshable_hostname, routed_to_host_id: vmh.id) { _1.id = vmh.id }
         AssignedHostAddress.create_with_id(ip: sshable_hostname, address_id: vmh.id, host_id: vmh.id)

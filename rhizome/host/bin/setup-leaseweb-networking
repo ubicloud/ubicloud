@@ -1,0 +1,52 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "fileutils"
+require "json"
+require "yaml"
+unless (subnets = ARGV.shift)
+  puts "subnets didn't get passed"
+  exit 1
+end
+
+netplan_path = "/etc/netplan/01-netcfg.yaml"
+netplan_yaml = YAML.load_file(netplan_path)
+ethernets = netplan_yaml.dig("network", "ethernets")
+interface_name = ethernets.keys.first
+
+subnets = JSON.parse(subnets)
+
+# Build the new netplan config
+addresses = subnets.map do |subnet|
+  if subnet["mask"]
+    "#{subnet["cidr"]}/#{subnet["mask"]}"
+  else
+    "#{subnet["cidr"]}/32"
+  end
+end
+
+routes = subnets.select { |s| s["gateway"] }.map do |subnet|
+  gateway = subnet["gateway"].split("/").first
+  {
+    "to" => "default",
+    "via" => gateway,
+    "metric" => 100,
+    "on-link" => true
+  }
+end
+netplan_yaml["network"]["ethernets"][interface_name]["addresses"] = addresses
+netplan_yaml["network"]["ethernets"][interface_name]["routes"] = routes
+
+# Write the new netplan config
+safe_write_to_file(netplan_path, YAML.dump(netplan_yaml))
+
+# Verify the yaml is valid
+output = r "sudo netplan generate --debug"
+if output.include?("Invalid YAML")
+  puts "Invalid YAML"
+  exit 1
+end
+
+# Apply the new netplan config
+r "sudo netplan try --timeout 120 &"

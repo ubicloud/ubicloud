@@ -36,15 +36,16 @@ RSpec.describe Prog::LearnNetwork do
 JSON
   end
 
-  describe "#start" do
+  describe "#learn_network_info" do
     it "exits, saving the ip6 address" do
       sshable = instance_double(Sshable)
       expect(sshable).to receive(:cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return(ip6_interface_output)
       vm_host = instance_double(VmHost)
       expect(vm_host).to receive(:update).with(ip6: "2a01:4f8:173:1ed3::2", net6: "2a01:4f8:173:1ed3::/64")
+      expect(vm_host).to receive(:provider).and_return("hetzner")
       expect(lm).to receive(:sshable).and_return(sshable)
-      expect(lm).to receive(:vm_host).and_return(vm_host)
-      expect { lm.start }.to exit({"msg" => "learned network information"})
+      expect(lm).to receive(:vm_host).and_return(vm_host).at_least(:once)
+      expect { lm.learn_network_info }.to exit({"msg" => "learned network information"})
     end
   end
 

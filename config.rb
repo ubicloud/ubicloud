@@ -85,6 +85,8 @@ module Config
   override :versioning, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
+  optional :leaseweb_api_key, string, clear: true
+  optional :leaseweb_connection_string, string
   override :ci_hetzner_sacrificial_server_id, string
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
   override :managed_service, false, bool

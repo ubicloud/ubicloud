@@ -9,13 +9,14 @@ class VmHost < Sequel::Model
   one_to_many :vms
   one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address
   one_to_one :hetzner_host, key: :id
+  one_to_one :leaseweb_host, key: :id
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
   one_to_many :spdk_installations, key: :vm_host_id
   one_to_many :storage_devices, key: :vm_host_id
   one_to_many :pci_devices, key: :vm_host_id
   one_to_many :boot_images, key: :vm_host_id
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, leaseweb_host: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -31,7 +32,11 @@ class VmHost < Sequel::Model
   end
 
   def provider
-    hetzner_host ? HetznerHost::PROVIDER_NAME : nil
+    if hetzner_host
+      HetznerHost::PROVIDER_NAME
+    else
+      leaseweb_host ? LeasewebHost::PROVIDER_NAME : nil
+    end
   end
 
   # Compute the IPv6 Subnet that can be used to address the host
@@ -153,10 +158,37 @@ class VmHost < Sequel::Model
     assigned_host_addresses.find { |a| a.ip.version == 4 }
   end
 
+  def create_leaseweb_addresses(ip_records: nil)
+    ip_records.each do |ip_record|
+      next if Address.find(cidr: ip_record.ip_address)
+
+      adr = Address.create_with_id(
+        cidr: ip_record.ip_address,
+        routed_to_host_id: id,
+        is_failover_ip: false,
+        gateway: ip_record.gateway,
+        mask: ip_record.mask
+      )
+
+      if ip_record.gateway
+        AssignedHostAddress.create_with_id(
+          host_id: id,
+          ip: ip_record.ip_address,
+          address_id: adr.id
+        )
+      end
+    end
+
+    Strand.create_with_id(prog: "SetupNftables", label: "start", stack: [{subject_id: id}])
+  end
+
   def create_addresses(ip_records: nil)
     ip_records ||= Hosting::Apis.pull_ips(self)
-    return if ip_records.nil? || ip_records.empty?
+    if leaseweb_host
+      return create_leaseweb_addresses(ip_records:)
+    end
 
+    return if ip_records.nil? || ip_records.empty?
     DB.transaction do
       ip_records.each do |ip_record|
         ip_addr = ip_record.ip_address
