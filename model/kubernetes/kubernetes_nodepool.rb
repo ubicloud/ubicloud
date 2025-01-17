@@ -10,7 +10,7 @@ class KubernetesNodepool < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
 
-  semaphore :destroy, :start_bootstrapping
+  semaphore :destroy, :start_bootstrapping, :upgrade
 end
 
 # Table: kubernetes_nodepool

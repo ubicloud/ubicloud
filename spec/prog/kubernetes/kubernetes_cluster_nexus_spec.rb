@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
-  subject(:nx) { described_class.new(Strand.new) }
+  subject(:nx) { described_class.new(Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77")) }
 
   let(:customer_project) { Project.create(name: "default") }
   let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id) }
@@ -237,8 +237,56 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("sync_kubernetes_services")
     end
 
-    it "naps until sync_kubernetes_service is set" do
+    it "hops to upgrade when semaphore is set" do
+      expect(nx).to receive(:when_upgrade_set?).and_yield
+      expect { nx.wait }.to hop("upgrade")
+    end
+
+    it "naps until sync_kubernetes_service or upgrade is set" do
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+  end
+
+  describe "#upgrade" do
+    let(:first_vm) { create_vm }
+    let(:second_vm) { create_vm }
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      sshable0, sshable1 = instance_double(Sshable), instance_double(Sshable)
+      expect(kubernetes_cluster).to receive(:cp_vms).and_return([first_vm, second_vm])
+      expect(first_vm).to receive(:sshable).and_return(sshable0)
+      expect(second_vm).to receive(:sshable).and_return(sshable1)
+      expect(sshable0).to receive(:start_fresh_session)
+      expect(sshable1).to receive(:start_fresh_session)
+
+      expect(kubernetes_cluster).to receive(:client).and_return(client).twice
+    end
+
+    it "picks a CP VM to upgrade and pushes UpgradeKubernetesNode prog with it" do
+      expect(client).to receive(:version).and_return("v1.32")
+      expect(client).to receive(:version).and_return("v1.31")
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => second_vm.id})
+      expect { nx.upgrade }.to hop("wait_upgrade")
+    end
+
+    it "hops to wait when all cp vms are upgraded" do
+      expect(client).to receive(:version).and_return("v1.32")
+      expect(client).to receive(:version).and_return("v1.32")
+      expect { nx.upgrade }.to hop("wait")
+    end
+  end
+
+  describe "#wait_upgrade" do
+    it "hops back to upgrade if there are no sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return true
+      expect { nx.wait_upgrade }.to hop("upgrade")
+    end
+
+    it "donates if there are sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+      expect { nx.wait_upgrade }.to nap(1)
     end
   end
 

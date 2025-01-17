@@ -132,8 +132,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   end
 
   describe "#wait_worker_node" do
-    before { expect(nx).to receive(:reap) }
-
     it "hops back to bootstrap_worker_vms if there are no sub-programs running" do
       expect(nx).to receive(:leaf?).and_return true
 
@@ -151,6 +149,54 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   describe "#wait" do
     it "naps for 6 hours" do
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "hops to upgrade when semaphore is set" do
+      expect(nx).to receive(:when_upgrade_set?).and_yield
+      expect { nx.wait }.to hop("upgrade")
+    end
+  end
+
+  describe "#upgrade" do
+    let(:first_vm) { create_vm }
+    let(:second_vm) { create_vm }
+    let(:client) { instance_double(Kubernetes::Client) }
+
+    before do
+      sshable0, sshable1 = instance_double(Sshable), instance_double(Sshable)
+      expect(kn).to receive(:vms).and_return([first_vm, second_vm])
+      expect(first_vm).to receive(:sshable).and_return(sshable0)
+      expect(second_vm).to receive(:sshable).and_return(sshable1)
+      expect(sshable0).to receive(:start_fresh_session)
+      expect(sshable1).to receive(:start_fresh_session)
+
+      expect(kn.cluster).to receive(:client).and_return(client).twice
+    end
+
+    it "picks a node to upgrade and pushes UpgradeKubernetesNode prog with it" do
+      expect(client).to receive(:version).and_return("v1.32")
+      expect(client).to receive(:version).and_return("v1.31")
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_vm_id" => second_vm.id, "subject_id" => kc.id})
+      expect { nx.upgrade }.to hop("wait_upgrade")
+    end
+
+    it "returns to wait if all nodes are in desired version" do
+      expect(client).to receive(:version).and_return("v1.32")
+      expect(client).to receive(:version).and_return("v1.32")
+      expect { nx.upgrade }.to hop("wait")
+    end
+  end
+
+  describe "#wait_upgrade" do
+    it "hops back to upgrade if there are no sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return true
+      expect { nx.wait_upgrade }.to hop("upgrade")
+    end
+
+    it "donates if there are sub-programs running" do
+      expect(nx).to receive(:leaf?).and_return false
+      expect(nx).to receive(:donate).and_call_original
+      expect { nx.wait_upgrade }.to nap(1)
     end
   end
 

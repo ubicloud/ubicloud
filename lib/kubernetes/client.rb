@@ -34,6 +34,14 @@ class Kubernetes::Client
     @session.exec!("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
   end
 
+  def version
+    kubectl("version --client")[/Client Version: (v1\.\d\d)\.\d/, 1]
+  end
+
+  def delete_node(node_name)
+    kubectl("delete node #{node_name.shellescape}")
+  end
+
   def set_load_balancer_hostname(svc, hostname)
     patch_data = JSON.generate({
       "status" => {
