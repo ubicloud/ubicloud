@@ -5,6 +5,8 @@ require_relative "../loader"
 require "time"
 require "optparse"
 
+@started_at = Time.now
+
 def main(options)
   hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id])
   wait_until(hetzner_server_st, "wait")
@@ -64,7 +66,7 @@ def log(st, msg)
   else
     "#{st.prog}.#{st.label}"
   end
-  $stdout.write "#{Time.now.utc.iso8601} | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
+  $stdout.write "#{((Time.now - @started_at) / 60).round(2)}m | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
 end
 
 options = {test_cases: ["vm"]}
