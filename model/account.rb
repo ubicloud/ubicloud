@@ -40,11 +40,6 @@ class Account < Sequel::Model(:accounts)
     AccessTag.where(project_id: project.id, hyper_tag_id: id).first
   end
 
-  def dissociate_with_project(project)
-    return if project.nil?
-    hyper_tag(project).destroy
-  end
-
   def suspend
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)

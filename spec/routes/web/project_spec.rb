@@ -31,7 +31,7 @@ RSpec.describe Clover, "project" do
 
     describe "list" do
       it "can list no projects" do
-        user.projects.each { user.dissociate_with_project(_1) }
+        user.remove_all_projects
 
         visit "/project"
         expect(page.title).to eq("Ubicloud - Projects")
@@ -579,7 +579,7 @@ RSpec.describe Clover, "project" do
         DB.transaction(rollback: :always) do
           within "form#managed-policy" do
             select "SecondTag", from: "user_policies[#{user2.ubid}]"
-            user2.dissociate_with_project(project)
+            user2.remove_project(project)
             click_button "Update"
           end
           expect(page).to have_flash_notice("No change in user policies")

@@ -356,7 +356,7 @@ class Clover
         end
 
         @project.disassociate_subject(user.id)
-        user.dissociate_with_project(@project)
+        user.remove_project(@project)
 
         # Javascript refreshes page
         flash["notice"] = "Removed #{user.email} from #{@project.name}"
