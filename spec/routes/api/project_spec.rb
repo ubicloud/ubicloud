@@ -96,7 +96,7 @@ RSpec.describe Clover, "project" do
           expect(last_response.status).to eq(204)
 
           expect(Project[project.id].visible).to be_falsey
-          expect(AccessTag.where(project_id: project.id).count).to eq(0)
+          expect(DB[:access_tag].where(project_id: project.id).count).to eq(0)
           expect(SubjectTag.where(project_id: project.id).count).to eq(0)
           expect(AccessControlEntry.where(project_id: project.id).count).to eq(0)
         end

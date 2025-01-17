@@ -436,7 +436,7 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_flash_notice("Your account has been closed")
 
         expect(Account[email: TEST_USER_EMAIL]).to be_nil
-        expect(AccessTag.where(name: "user/#{TEST_USER_EMAIL}").count).to eq 0
+        expect(DB[:access_tag].where(hyper_tag_id: account.id).count).to eq 0
       end
     end
 

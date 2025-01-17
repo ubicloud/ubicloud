@@ -3,7 +3,6 @@
 require_relative "../model"
 
 class Project < Sequel::Model
-  one_to_many :access_tags
   one_to_many :access_control_entries
   one_to_many :subject_tags, order: :name
   one_to_many :action_tags, order: :name
@@ -31,7 +30,7 @@ class Project < Sequel::Model
 
   dataset_module Pagination
 
-  plugin :association_dependencies, access_tags: :destroy, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy
+  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy
 
   include ResourceMethods
 
@@ -70,7 +69,7 @@ class Project < Sequel::Model
 
   def soft_delete
     DB.transaction do
-      access_tags_dataset.destroy
+      DB[:access_tag].where(project_id: id).delete
       access_control_entries_dataset.destroy
       %w[subject action object].each do |tag_type|
         dataset = send(:"#{tag_type}_tags_dataset")

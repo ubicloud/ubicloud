@@ -26,14 +26,20 @@ RSpec.describe ResourceMethods do
   end
 
   it "inspect should show foreign keys as ubids, and exclude subseconds and timezones from times" do
-    access_tag = AccessTag.new(project_id: UBID.parse("pjhahqe5e90j3j6kfjtwtxpsps").to_uuid, created_at: Time.new(2024, 11, 13, 9, 16, 56.123456, 3600))
-    expect(access_tag.inspect).to eq "#<AccessTag @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :created_at=>\"2024-11-13 09:16:56\"}>"
+    project = Project.new
+    expect(project.inspect).to eq "#<Project @values={}>"
 
-    access_tag.id = UBID.parse("tgx1y9wja1064pncxffe7aw4s4").to_uuid
-    expect(access_tag.inspect).to eq "#<AccessTag[\"tgx1y9wja1064pncxffe7aw4s4\"] @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :created_at=>\"2024-11-13 09:16:56\"}>"
+    project.created_at = Time.new(2024, 11, 13, 9, 16, 56.123456, 3600)
+    expect(project.inspect).to eq "#<Project @values={:created_at=>\"2024-11-13 09:16:56\"}>"
 
-    access_tag.created_at = nil
-    expect(access_tag.inspect).to eq "#<AccessTag[\"tgx1y9wja1064pncxffe7aw4s4\"] @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :created_at=>nil}>"
+    project.id = UBID.parse("pjhahqe5e90j3j6kfjtwtxpsps").to_uuid
+    expect(project.inspect).to eq "#<Project[\"pjhahqe5e90j3j6kfjtwtxpsps\"] @values={:created_at=>\"2024-11-13 09:16:56\"}>"
+
+    subject_tag = SubjectTag.new(project_id: project.id, name: nil)
+    expect(subject_tag.inspect).to eq "#<SubjectTag @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :name=>nil}>"
+
+    subject_tag.name = "a"
+    expect(subject_tag.inspect).to eq "#<SubjectTag @values={:project_id=>\"pjhahqe5e90j3j6kfjtwtxpsps\", :name=>\"a\"}>"
   end
 
   it "Model.[] allows lookup using both uuid and ubid" do
