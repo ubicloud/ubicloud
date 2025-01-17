@@ -13,10 +13,6 @@ class Account < Sequel::Model(:accounts)
   include ResourceMethods
   include SubjectTag::Cleanup
 
-  def hyper_tag_name(project = nil)
-    "user/#{email}"
-  end
-
   def create_project_with_default_policy(name, default_policy: true)
     project = Project.create(name: name)
     add_project(project)
@@ -34,10 +30,6 @@ class Account < Sequel::Model(:accounts)
     end
 
     project
-  end
-
-  def hyper_tag(project)
-    AccessTag.where(project_id: project.id, hyper_tag_id: id).first
   end
 
   def suspend
