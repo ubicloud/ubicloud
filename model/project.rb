@@ -180,7 +180,6 @@ end
 #  project_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
 # Referenced By:
 #  access_control_entry | access_control_entry_project_id_fkey | (project_id) REFERENCES project(id)
-#  access_policy        | access_policy_project_id_fkey        | (project_id) REFERENCES project(id)
 #  access_tag           | access_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  action_tag           | action_tag_project_id_fkey           | (project_id) REFERENCES project(id)
 #  api_key              | api_key_project_id_fkey              | (project_id) REFERENCES project(id)
