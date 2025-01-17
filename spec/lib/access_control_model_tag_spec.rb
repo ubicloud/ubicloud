@@ -68,7 +68,7 @@
       tag.applied_dataset.delete
       expect(tag.check_members_to_add([tag1.id, tag1.id])).to eq [[tag1.id], []]
 
-      expect(tag.check_members_to_add([AccessTag.first.id])).to eq [[], ["1 members not valid"]]
+      expect(tag.check_members_to_add([Page.create(tag: "t").id])).to eq [[], ["1 members not valid"]]
     end
 
     if model == SubjectTag
