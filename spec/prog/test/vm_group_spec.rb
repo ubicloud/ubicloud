@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::VmGroup do
-  subject(:vg_test) { described_class.new(described_class.assemble(boot_images: ["ubuntu-noble"])) }
+  subject(:vg_test) { described_class.new(described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"])) }
 
   describe "#start" do
     it "hops to setup_vms" do
@@ -15,6 +15,16 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to wait_children_ready" do
       expect(vg_test).to receive(:update_stack).and_call_original
       expect { vg_test.setup_vms }.to hop("wait_vms")
+      vm_images = vg_test.strand.stack.first["vms"].map { Vm[_1].boot_image }
+      expect(vm_images).to eq(["ubuntu-noble", "debian-12", "ubuntu-noble"])
+    end
+
+    it "provisions at least one vm for each boot image" do
+      expect(vg_test).to receive(:update_stack).and_call_original
+      expect(vg_test).to receive(:frame).and_return({"boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]}).at_least(:once)
+      expect { vg_test.setup_vms }.to hop("wait_vms")
+      vm_images = vg_test.strand.stack.first["vms"].map { Vm[_1].boot_image }
+      expect(vm_images).to eq(["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"])
     end
   end
 
@@ -34,13 +44,25 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#verify_vms" do
     it "runs tests for the first vm" do
-      expect(vg_test).to receive(:frame).and_return({"vms" => ["111"]})
-      expect { vg_test.verify_vms }.to hop("start", "Test::Vm")
+      expect(vg_test).to receive(:frame).and_return({"vms" => ["111", "222"]})
+      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "111"})
+      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "222"})
+      expect { vg_test.verify_vms }.to hop("wait_verify_vms")
+    end
+  end
+
+  describe "#wait_verify_vms" do
+    it "hops to hop_wait_verify_vms" do
+      expect(vg_test).to receive(:reap)
+      expect(vg_test).to receive(:leaf?).and_return(true)
+      expect { vg_test.wait_verify_vms }.to hop("verify_firewall_rules")
     end
 
-    it "hops to verify_firewall_rules if tests are done" do
-      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM!"})
-      expect { vg_test.verify_vms }.to hop("verify_firewall_rules")
+    it "stays in wait_verify_vms" do
+      expect(vg_test).to receive(:reap)
+      expect(vg_test).to receive(:leaf?).and_return(false)
+      expect(vg_test).to receive(:donate).and_call_original
+      expect { vg_test.wait_verify_vms }.to nap(1)
     end
   end
 
