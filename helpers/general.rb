@@ -34,7 +34,7 @@ class Clover < Roda
     account = Account[account_id]
     account.create_project_with_default_policy("Default")
     ProjectInvitation.where(email: account.email).all do |inv|
-      account.associate_with_project(inv.project)
+      account.add_project(inv.project)
       inv.project.subject_tags_dataset.first(name: inv.policy)&.add_subject(account_id)
       inv.destroy
     end

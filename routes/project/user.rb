@@ -42,7 +42,7 @@ class Clover
           end
 
           if (user = Account.exclude(status_id: 3)[email: email])
-            user.associate_with_project(@project)
+            user.add_project(@project)
             tag&.add_subject(user.id)
             Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
               greeting: "Hello,",

@@ -18,8 +18,8 @@ class Account < Sequel::Model(:accounts)
   end
 
   def create_project_with_default_policy(name, default_policy: true)
-    project = Project.create_with_id(name: name)
-    associate_with_project(project)
+    project = Project.create(name: name)
+    add_project(project)
 
     if default_policy
       # Grant user Admin access
@@ -38,17 +38,6 @@ class Account < Sequel::Model(:accounts)
 
   def hyper_tag(project)
     AccessTag.where(project_id: project.id, hyper_tag_id: id).first
-  end
-
-  def associate_with_project(project)
-    return if project.nil?
-
-    AccessTag.create_with_id(
-      project_id: project.id,
-      name: hyper_tag_name(project),
-      hyper_tag_id: id,
-      hyper_tag_table: self.class.table_name
-    )
   end
 
   def dissociate_with_project(project)
