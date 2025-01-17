@@ -378,7 +378,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "requires Project:user permissions to remove users from project" do
-        user2.associate_with_project(project)
+        user2.add_project(project)
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
         btn = find "#user-#{user2.ubid} .delete-btn"
@@ -393,7 +393,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "can remove user from project" do
-        user2.associate_with_project(project)
+        user2.add_project(project)
         project.subject_tags_dataset.first(name: "Admin").add_subject(user2.id)
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user2.id)
 
@@ -559,7 +559,7 @@ RSpec.describe Clover, "project" do
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: tag2.id)
         AccessControlEntry.create_with_id(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:remove"], object_id: tag2.id)
 
-        user2.associate_with_project(project)
+        user2.add_project(project)
         tag1.add_subject(user2.id)
 
         visit "#{project.path}/user"
