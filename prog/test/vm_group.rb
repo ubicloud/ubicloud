@@ -2,10 +2,8 @@
 
 require "net/ssh"
 
-DEFAULT_BOOT_IMAGE_NAMES = Option::BootImages.map { _1.name }.freeze
-
 class Prog::Test::VmGroup < Prog::Test::Base
-  def self.assemble(storage_encrypted: true, test_reboot: true, boot_images: DEFAULT_BOOT_IMAGE_NAMES)
+  def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",

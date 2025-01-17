@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::GithubRunner do
-  subject(:gr_test) { described_class.new(described_class.assemble(12345, ["github_runner_ubuntu_2204"])) }
+  subject(:gr_test) { described_class.new(described_class.assemble([{"name" => "github_runner_ubuntu_2204", "images" => ["github-ubuntu-2204"], "details" => {"repo_name" => "ubicloud/github-e2e-test-workflows", "workflow_name" => "test_2204.yml", "branch_name" => "main"}}])) }
 
   let(:client) { instance_double(Octokit::Client) }
 
@@ -15,30 +15,8 @@ RSpec.describe Prog::Test::GithubRunner do
   end
 
   describe "#start" do
-    it "hops to hop_download_boot_images" do
-      expect { gr_test.start }.to hop("download_boot_images")
-    end
-  end
-
-  describe "#download_boot_images" do
-    it "hops to hop_wait_download_boot_images" do
-      expect(gr_test).to receive(:bud).with(Prog::DownloadBootImage, {"subject_id" => 12345, "image_name" => "github-ubuntu-2204"})
-      expect { gr_test.download_boot_images }.to hop("wait_download_boot_images")
-    end
-  end
-
-  describe "#wait_download_boot_images" do
-    it "hops to hop_wait_download_boot_images" do
-      expect(gr_test).to receive(:reap)
-      expect(gr_test).to receive(:leaf?).and_return(true)
-      expect { gr_test.wait_download_boot_images }.to hop("create_vm_pool")
-    end
-
-    it "stays in wait_download_boot_images" do
-      expect(gr_test).to receive(:reap)
-      expect(gr_test).to receive(:leaf?).and_return(false)
-      expect(gr_test).to receive(:donate).and_call_original
-      expect { gr_test.wait_download_boot_images }.to nap(1)
+    it "hops to hop_create_vm_pool" do
+      expect { gr_test.start }.to hop("create_vm_pool")
     end
   end
 
@@ -136,7 +114,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(GithubRunner).to receive(:any?).and_return(false)
       expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [instance_double(Vm)], incr_destroy: nil))
       expect(Project).to receive(:[]).with(anything).and_return(nil).at_least(:once)
-      expect(gr_test).to receive(:frame).and_return({"fail_message" => "Failed test", "test_cases" => ["github_runner_ubuntu_2204"]}).at_least(:once)
+      expect(gr_test).to receive(:frame).and_return({"fail_message" => "Failed test", "test_cases" => gr_test.frame["test_cases"]}).at_least(:once)
       expect { gr_test.clean_resources }.to hop("failed")
     end
 
