@@ -56,6 +56,7 @@ end
 # Foreign key constraints:
 #  accounts_status_id_fkey | (status_id) REFERENCES account_statuses(id)
 # Referenced By:
+#  access_tag                        | access_tag_hyper_tag_id_fkey                      | (hyper_tag_id) REFERENCES accounts(id)
 #  account_active_session_keys       | account_active_session_keys_account_id_fkey       | (account_id) REFERENCES accounts(id)
 #  account_activity_times            | account_activity_times_id_fkey                    | (id) REFERENCES accounts(id)
 #  account_authentication_audit_logs | account_authentication_audit_logs_account_id_fkey | (account_id) REFERENCES accounts(id)
