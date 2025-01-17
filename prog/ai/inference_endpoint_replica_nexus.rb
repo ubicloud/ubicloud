@@ -104,7 +104,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     hop_unavailable unless available?
     ping_gateway
 
-    nap 60
+    nap 120
   end
 
   label def destroy
