@@ -23,52 +23,28 @@ class Prog::Test::VmGroup < Prog::Test::Base
   label def setup_vms
     project = Project.create_with_id(name: "project-1")
 
-    subnet1_s = Prog::Vnet::SubnetNexus.assemble(
-      project.id, name: "the-first-subnet", location: "hetzner-fsn1"
-    )
-
-    subnet2_s = Prog::Vnet::SubnetNexus.assemble(
-      project.id, name: "the-second-subnet", location: "hetzner-fsn1"
-    )
-
-    storage_encrypted = frame.fetch("storage_encrypted", true)
+    subnets = Array.new(2) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-#{_1}", location: "hetzner-fsn1") }
+    encrypted = frame.fetch("storage_encrypted", true)
     boot_images = frame.fetch("boot_images")
-
-    vm1_s = Prog::Vm::Nexus.assemble_with_sshable(
-      "ubi", project.id,
-      private_subnet_id: subnet1_s.id,
-      storage_volumes: [
-        {encrypted: storage_encrypted, skip_sync: true},
-        {encrypted: storage_encrypted, size_gib: 5}
-      ],
-      boot_image: boot_images.sample,
-      enable_ip4: true
-    )
-
-    vm2_s = Prog::Vm::Nexus.assemble_with_sshable(
-      "ubi", project.id,
-      private_subnet_id: subnet1_s.id,
-      storage_volumes: [{
-        encrypted: storage_encrypted, skip_sync: false,
-        max_read_mbytes_per_sec: 200,
-        max_write_mbytes_per_sec: 150,
-        max_ios_per_sec: 25600
-      }],
-      boot_image: boot_images.sample,
-      enable_ip4: true
-    )
-
-    vm3_s = Prog::Vm::Nexus.assemble_with_sshable(
-      "ubi", project.id,
-      private_subnet_id: subnet2_s.id,
-      storage_volumes: [{encrypted: storage_encrypted, skip_sync: false}],
-      boot_image: boot_images.sample,
-      enable_ip4: true
-    )
+    storage_options = [
+      [{encrypted:, skip_sync: true}, {encrypted:, size_gib: 5}],
+      [{encrypted:, skip_sync: false, max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150, max_ios_per_sec: 25600}],
+      [{encrypted:, skip_sync: false}]
+    ]
+    vm_count = [boot_images.size, storage_options.size].max
+    vms = Array.new(vm_count) do |index|
+      Prog::Vm::Nexus.assemble_with_sshable(
+        "ubi", project.id,
+        private_subnet_id: subnets[index % subnets.size].id,
+        storage_volumes: storage_options[index % storage_options.size],
+        boot_image: boot_images[index % boot_images.size],
+        enable_ip4: true
+      )
+    end
 
     update_stack({
-      "vms" => [vm1_s.id, vm2_s.id, vm3_s.id],
-      "subnets" => [subnet1_s.id, subnet2_s.id],
+      "vms" => vms.map(&:id),
+      "subnets" => subnets.map(&:id),
       "project_id" => project.id
     })
 
@@ -81,11 +57,14 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_vms
-    if retval&.dig("msg") == "Verified VM!"
-      hop_verify_firewall_rules
-    end
+    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: _1}) }
+    hop_wait_verify_vms
+  end
 
-    push Prog::Test::Vm, {subject_id: frame["vms"].first}
+  label def wait_verify_vms
+    reap
+    hop_verify_firewall_rules if leaf?
+    donate
   end
 
   label def verify_firewall_rules
