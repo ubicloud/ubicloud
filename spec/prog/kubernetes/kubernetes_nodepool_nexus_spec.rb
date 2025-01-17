@@ -96,11 +96,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   describe "#destroy" do
     it "destroys the nodepool and its vms" do
       vms = [create_vm, create_vm]
-      expect(kn).to receive(:vms).and_return(vms).twice
+      expect(kn).to receive(:vms).and_return(vms)
 
       expect(vms).to all(receive(:incr_destroy))
-      expect(kn).to receive(:remove_vm).with(vms[0])
-      expect(kn).to receive(:remove_vm).with(vms[1])
+      expect(kn).to receive(:remove_all_vms)
       expect(kn).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
     end
