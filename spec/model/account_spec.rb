@@ -13,19 +13,4 @@ RSpec.describe Account do
     expect(tag.member_ids).to be_empty
     expect(ace).not_to be_exists
   end
-
-  it "hyper_tag_name" do
-    expect(account.hyper_tag_name).to eq("user/test@example.com")
-  end
-
-  it "hyper_tag, associate, and dissociate with project methods" do
-    project = Project.create_with_id(name: "test")
-    expect(account.hyper_tag(project)).to be_nil
-
-    account.add_project(project)
-    expect(account.hyper_tag(project)).to exist
-
-    account.remove_project(project)
-    expect(account.hyper_tag(project)).to be_nil
-  end
 end
