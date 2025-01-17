@@ -123,7 +123,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to wait_resources_destroyed" do
       allow(vg_test).to receive(:frame).and_return({"vms" => ["vm_id"], "subnets" => ["subnet_id"]}).twice
       expect(Vm).to receive(:[]).with("vm_id").and_return(instance_double(Vm, incr_destroy: nil))
-      expect(PrivateSubnet).to receive(:[]).with("subnet_id").and_return(instance_double(PrivateSubnet, incr_destroy: nil))
+      expect(PrivateSubnet).to receive(:[]).with("subnet_id").and_return(instance_double(PrivateSubnet, incr_destroy: nil, firewalls: []))
       expect { vg_test.destroy_resources }.to hop("wait_resources_destroyed")
     end
   end

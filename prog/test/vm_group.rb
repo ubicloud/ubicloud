@@ -129,7 +129,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def destroy_resources
     frame["vms"].each { Vm[_1].incr_destroy }
-    frame["subnets"].each { PrivateSubnet[_1].incr_destroy }
+    frame["subnets"].each { PrivateSubnet[_1].tap { |ps| ps.firewalls.each { |fw| fw.destroy } }.incr_destroy }
 
     hop_wait_resources_destroyed
   end
