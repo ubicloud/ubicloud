@@ -44,7 +44,7 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
 
   label def destroy
     kubernetes_nodepool.vms.each(&:incr_destroy)
-    kubernetes_nodepool.vms.each { kubernetes_nodepool.remove_vm(_1) }
+    kubernetes_nodepool.remove_all_vms
     kubernetes_nodepool.destroy
     pop "kubernetes nodepool is deleted"
   end
