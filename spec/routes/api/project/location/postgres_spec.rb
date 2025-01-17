@@ -35,7 +35,8 @@ RSpec.describe Clover, "postgres" do
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/restore"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/reset-superuser-password"],
-        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"]
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/_#{pg.ubid}/failover"],
+        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"]
       ].each do |method, path|
         send method, path
 
@@ -322,6 +323,23 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"][0]["cidr"]).to eq("0.0.0.0/0")
         expect(JSON.parse(last_response.body)["count"]).to eq(1)
+      end
+    end
+
+    describe "ca-certificates" do
+      it "cannot download ca-certificates if not ready" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"
+        expect(last_response.status).to eq(404)
+      end
+
+      it "can download ca-certificates when ready" do
+        pg.update(root_cert_1: "root_cert_1", root_cert_2: "root_cert_2")
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"
+        expect(last_response.status).to eq(200)
+        header "Content-Type", "application/x-pem-file"
+        header "Content-Disposition", "attachment; filename=\"#{pg.name}.pem\""
+        expect(last_response.body).to eq("root_cert_1\nroot_cert_2")
       end
     end
 

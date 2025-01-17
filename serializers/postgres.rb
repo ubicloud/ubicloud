@@ -11,7 +11,8 @@ class Serializers::Postgres < Serializers::Base
       storage_size_gib: pg.target_storage_size_gib,
       version: pg.version,
       ha_type: pg.ha_type,
-      flavor: pg.flavor
+      flavor: pg.flavor,
+      ca_certificates: pg.ca_certificates
     }
 
     if options[:include_path]

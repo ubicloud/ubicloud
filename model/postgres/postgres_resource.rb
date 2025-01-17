@@ -94,6 +94,10 @@ class PostgresResource < Sequel::Model
     private_subnet.firewalls.first.replace_firewall_rules(vm_firewall_rules)
   end
 
+  def ca_certificates
+    [root_cert_1, root_cert_2].join("\n") if root_cert_1 && root_cert_2
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"

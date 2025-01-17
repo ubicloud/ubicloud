@@ -190,9 +190,11 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Waiting for host to be ready..."
 
         expect(Prog::Postgres::PostgresResourceNexus).to receive(:dns_zone).and_return(true)
+        pg.update(root_cert_1: "root_cert_1", root_cert_2: "root_cert_2")
         page.refresh
         expect(page).to have_content "#{pg.name}.#{pg.ubid}.postgres.ubicloud.com"
         expect(page).to have_no_content "Waiting for host to be ready..."
+        expect(page).to have_content "Download"
       end
 
       it "does not show delete or edit options without the appropriate permissions" do
