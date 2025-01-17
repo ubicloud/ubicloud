@@ -25,11 +25,7 @@ RSpec.describe Account do
     account.add_project(project)
     expect(account.hyper_tag(project)).to exist
 
-    account.dissociate_with_project(project)
+    account.remove_project(project)
     expect(account.hyper_tag(project)).to be_nil
-  end
-
-  it "does not associate/dissociate with nil project" do
-    expect(account.dissociate_with_project(nil)).to be_nil
   end
 end
