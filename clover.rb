@@ -486,9 +486,7 @@ class Clover < Roda
 
     delete_account_on_close? true
     delete_account do
-      account = Account[account_id]
-      account.projects.each { account.dissociate_with_project(_1) }
-      account.destroy
+      Account[account_id].destroy
     end
 
     argon2_secret { Config.clover_session_secret }
