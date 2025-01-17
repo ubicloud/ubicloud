@@ -16,7 +16,7 @@ class KubernetesCluster < Sequel::Model
   include SemaphoreMethods
   include Authorization::HyperTagMethods
 
-  semaphore :destroy
+  semaphore :destroy, :upgrade
 
   def display_location
     LocationNameConverter.to_display_name(location)
@@ -39,6 +39,14 @@ class KubernetesCluster < Sequel::Model
       kubernetes_cluster_id: id,
       cp_vm_id: vm.id
     ).delete
+  end
+
+  def kubectl(cmd)
+    cp_vms.first.sshable.cmd("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+  end
+
+  def all_vms
+    cp_vms + kubernetes_nodepools.flat_map(&:vms)
   end
 end
 

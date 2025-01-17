@@ -39,7 +39,25 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
   end
 
   label def wait
+    when_upgrade_set? do
+      hop_upgrade
+    end
     nap 30
+  end
+
+  label def upgrade
+    decr_upgrade
+
+    # Pick a node to upgrade
+    node_to_upgrade = kubernetes_nodepool.vms.find do |vm|
+      # TODO: Put another check here to make sure the version we receive is either one version old or the correct version, just in case
+      res = vm.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/kubelet.conf version")
+      res.match(/Client Version: (v1\.\d\d)\.\d/).captures.first != kubernetes_nodepool.kubernetes_cluster.kubernetes_version
+    end
+
+    hop_wait unless node_to_upgrade
+
+    push Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => node_to_upgrade.id, "nodepool_id" => kubernetes_nodepool.id, "subject_id" => kubernetes_nodepool.kubernetes_cluster.id}
   end
 
   label def destroy

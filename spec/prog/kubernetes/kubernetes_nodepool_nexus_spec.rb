@@ -25,7 +25,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     kc
   }
 
-  let(:kn) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id) }
+  let(:kn) {
+    kn = KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id)
+    kn.add_vm(create_vm)
+    kn.add_vm(create_vm)
+    kn
+  }
 
   before do
     allow(nx).to receive(:kubernetes_nodepool).and_return(kn)
@@ -77,19 +82,52 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
   describe "#bootstrap_worker_vms" do
     it "hops wait if the target number of vms is reached" do
-      expect(kn).to receive(:vms).and_return [1, 2]
       expect { nx.bootstrap_worker_vms }.to hop("wait")
     end
 
     it "pushes ProvisionKubernetesNode prog to create VMs" do
+      expect(kn).to receive(:vms).and_return ["just one vm"]
       expect(nx).to receive(:push).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.kubernetes_cluster.id})
       nx.bootstrap_worker_vms
     end
   end
 
   describe "#wait" do
-    it "just naps for 30 seconds for now" do
+    it "naps by default" do
       expect { nx.wait }.to nap(30)
+    end
+
+    it "hops to upgrade when semaphore is set" do
+      expect(nx).to receive(:when_upgrade_set?).and_yield
+      expect { nx.wait }.to hop("upgrade")
+    end
+  end
+
+  describe "#upgrade" do
+    it "picks a node to upgrade and pushes UpgradeKubernetesNode prog with it" do
+      ssh0 = instance_double(Sshable)
+      expect(ssh0).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/kubelet.conf version").and_return("Client Version: v1.32.1")
+      expect(kn.vms[0]).to receive(:sshable).and_return(ssh0)
+
+      ssh1 = instance_double(Sshable)
+      expect(ssh1).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/kubelet.conf version").and_return("Client Version: v1.31.3")
+      expect(kn.vms[1]).to receive(:sshable).and_return(ssh1)
+
+      expect(nx).to receive(:push).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_vm_id" => kn.vms[1].id, "subject_id" => kc.id})
+
+      nx.upgrade
+    end
+
+    it "returns to wait if all nodes are in desired version" do
+      ssh0 = instance_double(Sshable)
+      expect(ssh0).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/kubelet.conf version").and_return("Client Version: v1.32.1")
+      expect(kn.vms[0]).to receive(:sshable).and_return(ssh0)
+
+      ssh1 = instance_double(Sshable)
+      expect(ssh1).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/kubelet.conf version").and_return("Client Version: v1.32.3")
+      expect(kn.vms[1]).to receive(:sshable).and_return(ssh1)
+
+      expect { nx.upgrade }.to hop("wait")
     end
   end
 
