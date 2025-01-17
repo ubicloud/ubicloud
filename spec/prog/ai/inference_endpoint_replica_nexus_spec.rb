@@ -183,7 +183,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     it "pings the inference gateway and naps" do
       expect(nx).to receive(:available?).and_return(true)
       expect(nx).to receive(:ping_gateway)
-      expect { nx.wait }.to nap(60)
+      expect { nx.wait }.to nap(120)
     end
 
     it "hops to unavailable if the replica is not available" do
