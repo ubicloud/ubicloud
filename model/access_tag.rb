@@ -3,7 +3,8 @@
 require_relative "../model"
 
 class AccessTag < Sequel::Model
-  set_primary_key :id
+  set_primary_key [:project_id, :hyper_tag_id]
+  unrestrict_primary_key
   many_to_one :project
 
   include ResourceMethods
