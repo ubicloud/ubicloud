@@ -7,7 +7,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   FAIL_CONCLUSIONS = ["action_required", "cancelled", "failure", "skipped", "stale", "timed_out"]
   IN_PROGRESS_CONCLUSIONS = ["in_progress", "queued", "requested", "waiting", "pending", "neutral"]
 
-  def self.assemble(vm_host_id, test_cases)
+  def self.assemble(test_cases)
     github_service_project = Project.create(name: "Github-Runner-Service-Project") { _1.id = Config.github_runner_service_project_id }
 
     vm_pool_service_project = Project.create(name: "Vm-Pool-Service-Project") { _1.id = Config.vm_pool_project_id }
@@ -25,7 +25,6 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       label: "start",
       stack: [{
         "created_at" => Time.now.utc,
-        "vm_host_id" => vm_host_id,
         "test_cases" => test_cases,
         "github_service_project_id" => github_service_project.id,
         "vm_pool_service_project" => vm_pool_service_project.id,
@@ -35,21 +34,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   end
 
   label def start
-    hop_download_boot_images
-  end
-
-  label def download_boot_images
-    frame["test_cases"].each do |test_case|
-      bud Prog::DownloadBootImage, {"subject_id" => vm_host_id, "image_name" => tests[test_case]["image_name"]}
-    end
-
-    hop_wait_download_boot_images
-  end
-
-  label def wait_download_boot_images
-    reap
-    hop_create_vm_pool if leaf?
-    donate
+    hop_create_vm_pool
   end
 
   label def create_vm_pool
@@ -169,16 +154,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     end
   end
 
-  def tests
-    @tests ||= YAML.load_file("config/github_runner_e2e_tests.yml").to_h { [_1["name"], _1] }
-  end
-
   def test_runs
-    @test_runs ||= frame["test_cases"].flat_map { tests[_1]["runs"] }
-  end
-
-  def vm_host_id
-    @vm_host_id ||= frame["vm_host_id"] || VmHost.first.id
+    @test_runs ||= frame["test_cases"].map { _1["details"] }
   end
 
   def client

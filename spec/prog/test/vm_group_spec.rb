@@ -3,7 +3,7 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::VmGroup do
-  subject(:vg_test) { described_class.new(described_class.assemble) }
+  subject(:vg_test) { described_class.new(described_class.assemble(boot_images: ["ubuntu-noble"])) }
 
   describe "#start" do
     it "hops to setup_vms" do
