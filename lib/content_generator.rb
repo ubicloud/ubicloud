@@ -3,7 +3,7 @@
 module ContentGenerator
   module Vm
     def self.location(location)
-      Option.locations.find { _1.display_name == location }.ui_name
+      Option.locations(only_visible: false).find { _1.display_name == location }.ui_name
     end
 
     def self.private_subnet(location, private_subnet)

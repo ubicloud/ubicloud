@@ -82,7 +82,7 @@ class Clover
     options = OptionTreeGenerator.new
 
     options.add_option(name: "name")
-    options.add_option(name: "location", values: Option.locations.map(&:display_name))
+    options.add_option(name: "location", values: Option.locations(feature_flags: @project.feature_flags).map(&:display_name))
 
     subnets = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map {
       {
