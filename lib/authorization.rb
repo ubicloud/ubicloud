@@ -152,7 +152,7 @@ module Authorization
 
   module HyperTagMethods
     def before_destroy
-      AccessTag.where(hyper_tag_id: id).destroy
+      DB[:access_tag].where(hyper_tag_id: id).delete
       super
     end
   end

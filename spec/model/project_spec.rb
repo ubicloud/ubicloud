@@ -98,7 +98,6 @@ RSpec.describe Project do
     it "deletes github installations" do
       SubjectTag.create_with_id(project_id: project.id, name: "test").add_subject(project.id)
       AccessControlEntry.new_with_id(project_id: project.id, subject_id: project.id).save_changes(validate: false)
-      expect(project).to receive(:access_tags_dataset).and_return(instance_double(AccessTag.dataset.class, destroy: nil))
       expect(project).to receive(:github_installations).and_return([instance_double(GithubInstallation)])
       expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble)
       expect(project).to receive(:update).with(visible: false)
