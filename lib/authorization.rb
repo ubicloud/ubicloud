@@ -149,11 +149,4 @@ module Authorization
         {project_id => Sequel[from][:project_id]})
     ))
   end
-
-  module HyperTagMethods
-    def before_destroy
-      DB[:access_tag].where(hyper_tag_id: id).delete
-      super
-    end
-  end
 end

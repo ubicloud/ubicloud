@@ -6,7 +6,6 @@ class ApiKey < Sequel::Model
   many_to_one :project
 
   include ResourceMethods
-  include Authorization::HyperTagMethods
   include SubjectTag::Cleanup # personal access tokens
   include ObjectTag::Cleanup # inference tokens
 

@@ -15,7 +15,6 @@ class MinioCluster < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  include Authorization::HyperTagMethods
 
   semaphore :destroy, :reconfigure
 
