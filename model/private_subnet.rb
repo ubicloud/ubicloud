@@ -23,7 +23,6 @@ class PrivateSubnet < Sequel::Model
   ].freeze
 
   dataset_module Pagination
-  include Authorization::HyperTagMethods
   include ObjectTag::Cleanup
 
   def connected_subnets

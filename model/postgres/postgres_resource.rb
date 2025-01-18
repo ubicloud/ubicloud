@@ -19,7 +19,6 @@ class PostgresResource < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  include Authorization::HyperTagMethods
   include ObjectTag::Cleanup
 
   semaphore :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :destroy

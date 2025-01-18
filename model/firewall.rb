@@ -10,7 +10,6 @@ class Firewall < Sequel::Model
   plugin :association_dependencies, firewall_rules: :destroy
 
   include ResourceMethods
-  include Authorization::HyperTagMethods
   include ObjectTag::Cleanup
 
   dataset_module Pagination

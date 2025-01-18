@@ -13,7 +13,6 @@ class InferenceEndpoint < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  include Authorization::HyperTagMethods
   include ObjectTag::Cleanup
 
   semaphore :destroy, :maintenance
