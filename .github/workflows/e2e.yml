@@ -84,7 +84,7 @@ jobs:
       run: |
         echo "e2e: bin/ci --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm,github_runner_ubuntu_2204,github_runner_ubuntu_2004' || inputs.test_cases }}" >> Procfile
 
-    - name: Run services
+    - name: Run tests
       env:
         RACK_ENV: production
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
@@ -119,9 +119,11 @@ jobs:
         timeout 40m foreman start | tee foreman.log | grep "e2e.1"
 
     - name: Print logs
+      if: always()
       run: grep -h -v -E "sleep_duration_sec|monitor.1" foreman.log
 
     - name: Upload logs
+      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: e2e-${{ github.run_id }}-logs
