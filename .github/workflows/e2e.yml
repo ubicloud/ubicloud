@@ -114,7 +114,9 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
-      run: timeout 40m foreman start | tee foreman.log | grep "e2e.1"
+      run: |
+        set -o pipefail
+        timeout 40m foreman start | tee foreman.log | grep "e2e.1"
 
     - name: Print logs
       run: grep -h -v -E "sleep_duration_sec|monitor.1" foreman.log
