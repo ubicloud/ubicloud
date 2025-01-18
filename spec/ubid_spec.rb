@@ -92,7 +92,7 @@ RSpec.describe UBID do
   end
 
   it "can convert to and from uuid" do
-    ubid1 = described_class.generate(UBID::TYPE_ACCESS_TAG)
+    ubid1 = described_class.generate(UBID::TYPE_VM)
     ubid2 = described_class.from_uuidish(ubid1.to_uuid)
     expect(ubid2.to_s).to eq(ubid1.to_s)
   end

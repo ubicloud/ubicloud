@@ -36,7 +36,7 @@ class UBID
   TYPE_VM_HOST = "vh"
   TYPE_STORAGE_KEY_ENCRYPTION_KEY = "ke"
   TYPE_PROJECT = "pj"
-  TYPE_ACCESS_TAG = "tg"
+  # TYPE_ACCESS_TAG = "tg"
   # TYPE_ACCESS_POLICY = "pc"
   TYPE_ACCOUNT = "ac"
   TYPE_IPSEC_TUNNEL = "tn"
