@@ -49,24 +49,29 @@ def wait_until(st, label = nil)
       st.destroy
       exit 1
     end
-    log(st.reload, "waiting #{label ? "for #{label}" : "exit"}")
+    log(st.reload, "waiting #{label ? "for '#{label}' label" : "exit"}")
     sleep 10
   end
   log(st, "reached")
 end
 
+def resource_label(id)
+  if (st = Strand[id])
+    "#{st.subject || st}.#{st.label}"
+  end
+end
+
 def log(st, msg)
   resources = case st.prog
   when "Test::HetznerServer"
-    "VmHost.#{Strand[st.stack.first["vm_host_id"]]&.label}"
+    resource_label(st.stack.first["vm_host_id"])
   when "Test::VmGroup"
-    st.stack.first["vms"].map { "Vm.#{Strand[_1]&.label}" }.join(", ")
-  when "Test::Vm"
-    "Vm.#{Strand[st.stack.first["subject_id"]]&.label}"
+    st.stack.first["vms"].map { resource_label(_1) }.compact!&.join(", ")
   else
-    "#{st.prog}.#{st.label}"
+    resource_label(st.stack.first["subject_id"])
   end
-  $stdout.write "#{((Time.now - @started_at) / 60).round(2)}m | #{st.id} | #{st.prog}.#{st.label} | #{msg} | #{resources}\n"
+
+  $stdout.write [("%.2fm" % ((Time.now - @started_at) / 60)).rjust(6), "#{st.prog}.#{st.label}", msg, resources].compact.join(" | ") + "\n"
 end
 
 options = {test_cases: ["vm"]}
