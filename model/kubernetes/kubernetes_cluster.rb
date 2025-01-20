@@ -15,7 +15,7 @@ class KubernetesCluster < Sequel::Model
   include ResourceMethods
   include SemaphoreMethods
 
-  semaphore :destroy
+  semaphore :destroy, :upgrade
 
   def display_location
     LocationNameConverter.to_display_name(location)
@@ -27,6 +27,14 @@ class KubernetesCluster < Sequel::Model
 
   def endpoint
     api_server_lb.hostname
+  end
+
+  def kubectl(cmd)
+    cp_vms.first.sshable.cmd("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+  end
+
+  def all_vms
+    cp_vms + kubernetes_nodepools.flat_map(&:vms)
   end
 end
 

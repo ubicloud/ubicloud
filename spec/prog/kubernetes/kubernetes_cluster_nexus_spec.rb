@@ -109,8 +109,43 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#wait" do
-    it "naps forever for now" do
+    it "naps forever by default" do
       expect { nx.wait }.to nap(65536)
+    end
+
+    it "hops to upgrade when semaphore is set" do
+      expect(nx).to receive(:when_upgrade_set?).and_yield
+      expect { nx.wait }.to hop("upgrade")
+    end
+  end
+
+  describe "#upgrade" do
+    it "picks a CP VM to upgrade and pushes UpgradeKubernetesNode prog with it" do
+      ssh0 = instance_double(Sshable)
+      expect(ssh0).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version").and_return("Client Version: v1.32.1")
+      expect(kubernetes_cluster.cp_vms[0]).to receive(:sshable).and_return(ssh0)
+
+      ssh1 = instance_double(Sshable)
+      expect(ssh1).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version").and_return("Client Version: v1.31.3")
+      expect(kubernetes_cluster.cp_vms[1]).to receive(:sshable).and_return(ssh1)
+
+      expect(nx).to receive(:push).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => kubernetes_cluster.cp_vms[1].id})
+
+      nx.upgrade
+    end
+
+    it "notifies the nodepools if all CP VMs are in the desired version and returns to wait" do
+      ssh0 = instance_double(Sshable)
+      expect(ssh0).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version").and_return("Client Version: v1.32.1")
+      expect(kubernetes_cluster.cp_vms[0]).to receive(:sshable).and_return(ssh0)
+
+      ssh1 = instance_double(Sshable)
+      expect(ssh1).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf version").and_return("Client Version: v1.32.3")
+      expect(kubernetes_cluster.cp_vms[1]).to receive(:sshable).and_return(ssh1)
+
+      expect(kubernetes_cluster.kubernetes_nodepools).to all(receive(:incr_upgrade))
+
+      expect { nx.upgrade }.to hop("wait")
     end
   end
 
