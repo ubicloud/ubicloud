@@ -44,6 +44,45 @@ RSpec.describe VmHostSlice do
     }
   end
 
+  describe "enforce object is valid" do
+    it "validates name and family" do
+      slice = described_class.new
+      slice.enabled = true
+      slice.is_shared = false
+      slice.cores = 1
+      slice.total_cpu_percent = 200
+      slice.used_cpu_percent = 0
+      slice.total_memory_gib = 8
+      slice.used_memory_gib = 0
+      slice.vm_host_id = vm_host.id
+
+      expect(slice.valid?).to be false
+      expect(slice.errors).to eq(name: ["is not present"], family: ["is not present"])
+
+      slice.name = ""
+      slice.family = ""
+      expect(slice.valid?).to be false
+      expect(slice.errors).to eq(name: ["is not present"], family: ["is not present"])
+
+      slice.family = "standard"
+
+      slice.name = "user"
+      expect(slice.valid?).to be false
+      expect(slice.errors).to eq(name: ["cannot be 'user' or 'system'"])
+
+      slice.name = "system"
+      expect(slice.valid?).to be false
+      expect(slice.errors).to eq(name: ["cannot be 'user' or 'system'"])
+
+      slice.name = "system-standard"
+      expect(slice.valid?).to be false
+      expect(slice.errors).to eq(name: ["cannot contain a hyphen (-)"])
+
+      slice.name = "standard"
+      expect(slice.valid?).to be true
+    end
+  end
+
   describe "#allowed_cpus_cgroup" do
     it "returns the correct allowed_cpus_cgroup" do
       expect(vm_host_slice.allowed_cpus_cgroup).to eq("2-3")
@@ -77,6 +116,48 @@ RSpec.describe VmHostSlice do
       expect {
         vm_host_slice.set_allowed_cpus([2, 3, 4])
       }.to raise_error("Not enough CPUs available.")
+    end
+  end
+
+  describe "#inhost_name" do
+    it "returns the correct inhost_name" do
+      expect(vm_host_slice.inhost_name).to eq("standard.slice")
+    end
+  end
+
+  describe "availability monitoring" do
+    it "initiates a new health monitor session" do
+      allow(vm_host_slice).to receive_messages(vm_host: vm_host)
+      expect(sshable).to receive(:start_fresh_session)
+      vm_host_slice.init_health_monitor_session
+    end
+
+    it "checks pulse" do
+      session = {
+        ssh_session: instance_double(Net::SSH::Connection::Session)
+      }
+      pulse = {
+        reading: "down",
+        reading_rpt: 5,
+        reading_chg: Time.now - 30
+      }
+      allow(vm_host_slice).to receive_messages(vm_host: vm_host)
+
+      expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice").at_least(:once)
+      expect(session[:ssh_session]).to receive(:exec!).with("systemctl is-active standard.slice").and_return("active\nactive\n").once
+      expect(session[:ssh_session]).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.effective").and_return("2-3\n").once
+      expect(session[:ssh_session]).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("root\n").once
+      expect(vm_host_slice.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+
+      expect(session[:ssh_session]).to receive(:exec!).with("systemctl is-active standard.slice").and_return("active\ninactive\n").once
+      expect(vm_host_slice).to receive(:reload).and_return(vm_host_slice)
+      expect(vm_host_slice).to receive(:incr_checkup)
+      expect(vm_host_slice.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+
+      expect(session[:ssh_session]).to receive(:exec!).and_raise Sshable::SshError
+      expect(vm_host_slice).to receive(:reload).and_return(vm_host_slice)
+      expect(vm_host_slice).to receive(:incr_checkup)
+      expect(vm_host_slice.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
     end
   end
 end
