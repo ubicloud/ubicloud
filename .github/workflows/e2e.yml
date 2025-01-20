@@ -82,7 +82,12 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
-        echo "e2e: bin/ci --test-cases=${{ github.event_name != 'workflow_dispatch' && 'vm,github_runner_ubuntu_2204,github_runner_ubuntu_2004' || inputs.test_cases }}" >> Procfile
+        test_cases="$(yq -r '[.[].name] | join(",")' config/e2e_test_cases.yml)"
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          test_cases="${{ inputs.test_cases }}"
+        fi
+        echo "Running e2e test cases: $test_cases"
+        echo "e2e: bin/ci --test-cases=$test_cases" >> Procfile
 
     - name: Run tests
       env:
