@@ -10,6 +10,7 @@ class VmHostSlice < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
+  include HealthMonitorMethods
   semaphore :destroy, :start_after_host_reboot, :checkup
 
   plugin :association_dependencies, cpus: :nullify
@@ -39,6 +40,47 @@ class VmHostSlice < Sequel::Model
     threads_per_core = vm_host.total_cpus / vm_host.total_cores
 
     update(cores: allocated_cpus / threads_per_core, total_cpu_percent: allocated_cpus * 100)
+  end
+
+  # Returns the name as used by systemctl and cgroup
+  def inhost_name
+    name + ".slice"
+  end
+
+  def init_health_monitor_session
+    {
+      ssh_session: vm_host.sshable.start_fresh_session
+    }
+  end
+
+  def up?(session)
+    # We let callers handle exceptions, as each calling method may have opt to handle them differently
+    session.exec!("systemctl is-active #{inhost_name}").split("\n").all?("active") &&
+      (session.exec!("cat /sys/fs/cgroup/#{inhost_name}/cpuset.cpus.effective").chomp == allowed_cpus_cgroup) &&
+      (session.exec!("cat /sys/fs/cgroup/#{inhost_name}/cpuset.cpus.partition").chomp == "root")
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      up?(session[:ssh_session]) ? "up" : "down"
+    rescue
+      "down"
+    end
+    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
+      incr_checkup
+    end
+
+    pulse
+  end
+
+  def validate
+    super
+    errors.add(:name, "is not present") if name && name.empty?
+    errors.add(:family, "is not present") if family && family.empty?
+    errors.add(:name, "cannot be 'user' or 'system'") if name == "user" || name == "system"
+    errors.add(:name, "cannot contain a hyphen (-)") if name&.include?("-")
   end
 end
 
