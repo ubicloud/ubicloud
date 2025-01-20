@@ -13,6 +13,8 @@ port = ARGV[2]
 private_subnet_cidr4 = ARGV[3]
 private_subnet_cidr6 = ARGV[4]
 vm_cidr = ARGV[5]
+service_account_name = "k8s-access"
+secret_name = service_account_name
 
 config = <<YAML
 apiVersion: kubeadm.k8s.io/v1beta3
@@ -42,3 +44,19 @@ config_path = "/tmp/kubeadm-config.yaml"
 safe_write_to_file(config_path, config)
 
 r "sudo kubeadm init --config #{config_path}"
+
+# write a for loop to check for the api server availability
+
+r "kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system create serviceaccount #{service_account_name}"
+r "kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system create clusterrolebinding #{service_account_name}-binding --clusterrole=cluster-admin --serviceaccount=kube-system:#{service_account_name}"
+r "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: #{secret_name}
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: #{service_account_name}
+type: kubernetes.io/service-account-token
+EOF
+"
