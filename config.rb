@@ -165,7 +165,7 @@ module Config
   override :postgres17_paradedb_ubuntu_2204_version, "20250103.1.0", string
   override :postgres16_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :postgres17_lantern_ubuntu_2204_version, "20250103.1.0", string
-  override :ai_ubuntu_2404_nvidia_version, "20250118.1.0", string
+  override :ai_ubuntu_2404_nvidia_version, "20250121.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.55, float
