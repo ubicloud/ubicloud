@@ -14,7 +14,7 @@ RSpec.describe Clover, "Kubernetes" do
       name: "myk8s",
       version: "v1.32",
       project_id: project.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
       location_id: Location::HETZNER_FSN1_ID
     ).subject
   end
@@ -24,12 +24,13 @@ RSpec.describe Clover, "Kubernetes" do
       name: "not-my-k8s",
       version: "v1.32",
       project_id: project_wo_permissions.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
       location_id: Location::HETZNER_FSN1_ID
     ).subject
   end
 
   before do
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
     project.set_ff_kubernetes true
     project_wo_permissions.set_ff_kubernetes true
   end
@@ -157,7 +158,7 @@ RSpec.describe Clover, "Kubernetes" do
         expect(new_kc.project_id).to eq(project.id)
         expect(new_kc.cp_node_count).to eq(3)
         expect(new_kc.nodepools.first.node_count).to eq(2)
-        expect(new_kc.private_subnet.name).to eq("k8stest-k8s-subnet")
+        expect(new_kc.private_subnet.name).to eq("#{new_kc.ubid}-subnet")
       end
 
       it "can not create kubernetes cluster with invalid name" do

@@ -7,7 +7,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   let(:kubernetes_cluster) {
     project = Project.create(name: "default")
-    subnet = PrivateSubnet.create(net6: "0::0/16", net4: "127.0.0.0/8", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
+    subnet = PrivateSubnet.create(net6: "0::0/16", net4: "127.0.0.0/8", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
     kc = KubernetesCluster.create(
       name: "k8scluster",
       version: "v1.32",
@@ -19,7 +19,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       target_node_storage_size_gib: 37
     )
 
-    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)
+    lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
     kc.add_cp_vm(create_vm)
     kc.add_cp_vm(create_vm)
@@ -31,6 +31,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78) }
 
   before do
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
     allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"vm_id" => create_vm.id})
   end
 
