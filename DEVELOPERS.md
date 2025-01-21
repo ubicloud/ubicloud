@@ -503,7 +503,7 @@ We show cloudifying a host from Hetzner, but the principles should work everywhe
     ```ruby
     VM_HOST_IP = "" 
     VM_HOST_ID = ""  
-    default_boot_images = ["ubuntu-noble", "ubuntu-jammy", "almalinux-9", "almalinux-8"]
+    default_boot_images = ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
 
     st = Prog::Vm::HostNexus.assemble(VM_HOST_IP, provider: "hetzner", location: "hetzner-fsn1", hetzner_server_identifier: VM_HOST_ID, default_boot_images: default_boot_images)
     vmh = st.subject

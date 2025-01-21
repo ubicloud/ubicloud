@@ -67,7 +67,7 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test).to receive(:vm2).and_return(private_subnet_1.vms.last).at_least(:once)
       expect(firewall_test).to receive(:vm_outside).and_return(ps.vms.first).at_least(:once)
 
-      expect(firewall_test.vm1).to receive(:boot_image).and_return("almalinux-8")
+      expect(firewall_test.vm1).to receive(:boot_image).and_return("almalinux-9")
       expect(firewall_test.vm2).to receive(:boot_image).and_return("ubuntu-jammy")
       expect(sshable).to receive(:cmd).with("sudo yum install -y nc")
       expect(sshable).to receive(:cmd).with("sudo apt-get update && sudo apt-get install -y netcat-openbsd")
