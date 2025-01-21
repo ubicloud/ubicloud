@@ -16,26 +16,24 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       Validation.validate_kubernetes_name(name)
       Validation.validate_kubernetes_cp_node_count(cp_node_count)
 
+      ubid = KubernetesCluster.generate_ubid
       subnet = if private_subnet_id
-        project.private_subnets_dataset.first(id: private_subnet_id) || fail("Given subnet is not available in the given project")
+        PrivateSubnet[id: private_subnet_id, project_id: Config.kubernetes_service_project_id] || fail("Given subnet is not available in the k8s project")
       else
-        subnet_name = name + "-k8s-subnet"
-        ps = project.private_subnets_dataset.first(:location_id => location_id, Sequel[:private_subnet][:name] => subnet_name)
-        ps || Prog::Vnet::SubnetNexus.assemble(
-          project_id,
-          name: subnet_name,
+        Prog::Vnet::SubnetNexus.assemble(
+          Config.kubernetes_service_project_id,
+          name: "#{ubid}-subnet",
           location_id:,
           ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[location_id], project, 18).to_s
         ).subject
       end
 
       # TODO: Validate location
-      # TODO: Move resources (vms, subnet, LB, etc.) into our own project
       # TODO: Validate node count
 
-      kc = KubernetesCluster.create_with_id(name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id)
+      KubernetesCluster.create(name:, version:, cp_node_count:, location_id:, target_node_size:, target_node_storage_size_gib:, project_id: project.id, private_subnet_id: subnet.id) { _1.id = ubid.to_uuid }
 
-      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = kc.id }
+      Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = ubid.to_uuid }
     end
   end
 

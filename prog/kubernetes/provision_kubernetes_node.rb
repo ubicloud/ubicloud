@@ -41,7 +41,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
     boot_image = "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}"
 
     vm = Prog::Vm::Nexus.assemble_with_sshable(
-      kubernetes_cluster.project.id,
+      Config.kubernetes_service_project_id,
       sshable_unix_user: "ubi",
       name: name,
       location_id: kubernetes_cluster.location.id,
