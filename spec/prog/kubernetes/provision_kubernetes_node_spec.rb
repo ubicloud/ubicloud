@@ -7,7 +7,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   let(:kubernetes_cluster) {
     project = Project.create_with_id(name: "default")
-    subnet = PrivateSubnet.create_with_id(net6: "0::0/16", net4: "127.0.0.0/8", name: "x", location: "x", project_id: project.id)
+    subnet = PrivateSubnet.create_with_id(net6: "0::0/16", net4: "127.0.0.0/8", name: "x", location: "x", project_id: Config.kubernetes_service_project_id)
     kc = KubernetesCluster.create_with_id(
       name: "k8scluster",
       kubernetes_version: "v1.32",
@@ -17,7 +17,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       project_id: project.id
     )
 
-    lb = LoadBalancer.create_with_id(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: project.id)
+    lb = LoadBalancer.create_with_id(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     kc.add_cp_vm(create_vm)
     kc.add_cp_vm(create_vm)
 
@@ -26,6 +26,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   }
 
   before do
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
     allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"vm_id" => create_vm.id})
   end
 
@@ -83,6 +84,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       new_vm = kubernetes_cluster.cp_vms.last
       expect(new_vm.name).to start_with("k8scluster-control-plane-")
       expect(new_vm.sshable).not_to be_nil
+      expect(new_vm.project_id).to eq(Config.kubernetes_service_project_id)
     end
   end
 

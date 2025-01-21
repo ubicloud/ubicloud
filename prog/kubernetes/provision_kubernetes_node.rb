@@ -20,7 +20,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi",
-      kubernetes_cluster.project.id,
+      Config.kubernetes_service_project_id,
       # we should reiterate how we name the vm. some how correlate it to the vm's info.
       name: name,
       location: kubernetes_cluster.location,

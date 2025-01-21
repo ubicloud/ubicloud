@@ -191,4 +191,7 @@ module Config
 
   # DNS
   optional :dns_service_project_id, string
+
+  # Kubernetes
+  optional :kubernetes_service_project_id, string
 end

@@ -3,7 +3,7 @@
 class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   subject_is :kubernetes_cluster
 
-  def self.assemble(name:, kubernetes_version:, private_subnet_id:, project_id:, location:, cp_node_count: 3)
+  def self.assemble(name:, kubernetes_version:, project_id:, location:, cp_node_count: 3)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing project"
@@ -12,6 +12,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       unless ["v1.32", "v1.31"].include?(kubernetes_version)
         fail "Invalid Kubernetes Version"
       end
+
+      subnet = Prog::Vnet::SubnetNexus.assemble(
+        Config.kubernetes_service_project_id,
+        location: location,
+        ipv4_range: "10.10.0.0/16" # TODO: a better way?
+      ).subject
 
       # TODO: Validate subnet location if given
       # TODO: Validate subnet size if given
@@ -24,7 +30,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         name: name,
         kubernetes_version: kubernetes_version,
         cp_node_count: cp_node_count,
-        private_subnet_id: private_subnet_id,
+        private_subnet_id: subnet.id,
         location: location,
         project_id: project.id
       )
@@ -43,10 +49,12 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   label def start
     register_deadline("wait", 120 * 60)
-    hop_create_load_balancer
+    hop_setup_network
   end
 
-  label def create_load_balancer
+  label def setup_network
+    # TODO: Set FW rules and wait
+
     load_balancer_st = Prog::Vnet::LoadBalancerNexus.assemble(
       kubernetes_cluster.private_subnet_id,
       name: "#{kubernetes_cluster.name}-apiserver",
