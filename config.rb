@@ -161,8 +161,8 @@ module Config
   override :github_gpu_ubuntu_2204_version, "20250105.1.1", string
   override :postgres16_ubuntu_2204_version, "20250103.1.0", string
   override :postgres17_ubuntu_2204_version, "20250103.1.0", string
-  override :postgres16_paradedb_ubuntu_2204_version, "20250103.1.0", string
-  override :postgres17_paradedb_ubuntu_2204_version, "20250103.1.0", string
+  override :postgres16_paradedb_ubuntu_2204_version, "20250114.1.0", string
+  override :postgres17_paradedb_ubuntu_2204_version, "20250114.1.0", string
   override :postgres16_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :postgres17_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :ai_ubuntu_2404_nvidia_version, "20250121.1.0", string
