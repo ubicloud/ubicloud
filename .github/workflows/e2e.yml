@@ -6,7 +6,7 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,github_runner_ubuntu_2004'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,github_runner_ubuntu_2004,postgres_standard'
         type: string
 
   schedule:
