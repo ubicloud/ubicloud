@@ -28,7 +28,7 @@ end
 #  name            | text    | NOT NULL
 #  type            | text    | NOT NULL
 #  project_id      | uuid    |
-#  cache_enabled   | boolean | NOT NULL DEFAULT false
+#  cache_enabled   | boolean | NOT NULL DEFAULT true
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
