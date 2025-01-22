@@ -26,6 +26,22 @@ class VmPath
     write(dnsmasq_service, s)
   end
 
+  def stats_collector_service
+    "/etc/systemd/system/#{@vm_name}-stats-collector.service"
+  end
+
+  def write_stats_collector_service(s)
+    write(stats_collector_service, s)
+  end
+
+  def stats_collector_timer
+    "/etc/systemd/system/#{@vm_name}-stats-collector.timer"
+  end
+
+  def write_stats_collector_timer(s)
+    write(stats_collector_timer, s)
+  end
+
   def systemd_service
     File.join("/etc/systemd/system",
       IO.popen(["systemd-escape", @vm_name + ".service"]) { _1.read.chomp })

@@ -159,6 +159,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   def purge_without_network
     FileUtils.rm_f(vp.systemd_service)
     FileUtils.rm_f(vp.dnsmasq_service)
+    FileUtils.rm_f(vp.stats_collector_service)
+    FileUtils.rm_f(vp.stats_collector_timer)
     r "systemctl daemon-reload"
 
     purge_storage
@@ -553,8 +555,40 @@ users:
 
 ssh_pwauth: False
 
+write_files:
+  - path: /usr/local/bin/dump_memory_usage.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      while true; do
+        MEM_TOTAL=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+        MEM_FREE=$(grep MemFree /proc/meminfo | awk '{print $2}')
+        TIMESTAMP=$(TZ=UTC date +"%Y-%m-%d %H:%M:%S")
+
+        echo "memory-stats: {\\"time_utc\\": \\"${TIMESTAMP}\\", \\"total\\": ${MEM_TOTAL}, \\"free\\": ${MEM_FREE}}" > /dev/console
+
+        sleep 60
+      done
+
+  - path: /etc/systemd/system/dump_memory_usage.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Dump memory usage to serial console
+      After=network.target
+
+      [Service]
+      ExecStart=/usr/local/bin/dump_memory_usage.sh
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
 runcmd:
   - [systemctl, daemon-reload]
+  - [systemctl, enable, dump_memory_usage.service]
+  - [systemctl, start, dump_memory_usage.service]
+
 #{nft_safe_sudo_allow_inst}
 
 bootcmd:
@@ -616,6 +650,38 @@ NoNewPrivileges=yes
 ReadOnlyPaths=/
 DNSMASQ_SERVICE
 
+    vp.write_stats_collector_service <<STATS_COLLECTOR_SERVICE
+[Unit]
+Description=Collect stats for #{@vm_name}
+After=network.target
+
+[Service]
+Slice=#{slice_name}
+Type=oneshot
+ExecStart=/home/rhizome/host/bin/collect-stats #{@vm_name} #{slice_name}
+User=root
+Group=root
+
+# Ensure full access to the filesystem
+PrivateTmp=false
+ProtectSystem=false
+ProtectHome=false
+ReadWritePaths=/
+STATS_COLLECTOR_SERVICE
+
+    vp.write_stats_collector_timer <<STATS_COLLECTOR_TIMER
+[Unit]
+Description=Run Collect Stats every minute for #{@vm_name}
+PartOf=#{@vm_name}.service
+
+[Timer]
+OnCalendar=*:00/1
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+STATS_COLLECTOR_TIMER
+
     storage_volumes = storage_params.map { |params| StorageVolume.new(@vm_name, params) }
 
     disk_params = storage_volumes.map { |volume|
@@ -647,6 +713,7 @@ After=network.target
 After=#{@vm_name}-dnsmasq.service
 #{spdk_requires}
 Wants=#{@vm_name}-dnsmasq.service
+Wants=#{@vm_name}-stats-collector.timer
 
 [Service]
 Slice=#{slice_name}
