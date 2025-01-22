@@ -69,11 +69,11 @@ class UBICNI
     container_id = ENV["CNI_CONTAINERID"]
     cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
 
-    inner_mac = gen_mac.shellescape
+    inner_mac = gen_mac
     inner_link_local = mac_to_ipv6_link_local(inner_mac)
     inner_ifname = ENV["CNI_IFNAME"]
 
-    outer_mac = gen_mac.shellescape
+    outer_mac = gen_mac
     outer_link_local = mac_to_ipv6_link_local(outer_mac)
     outer_ifname = "veth_#{container_id[0, 8]}"
 
@@ -92,7 +92,7 @@ options ndots:5
     ipv4_ips = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
     ipv4_container_ip, ipv4_gateway_ip = ipv4_ips[:container_ip], ipv4_ips[:gateway_ip]
 
-    @ipam_store["allocated_ips"][container_id] = [ipv4_container_ip.to_s, ipv4_gateway_ip.to_s, container_ula_ipv6.to_s, container_ipv6.to_s]
+    @ipam_store["allocated_ips"][container_id] = [ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6].map!(&:to_s)
     save_state
 
     response = {
@@ -139,14 +139,14 @@ options ndots:5
   def setup_ipv6(subnet, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: false)
     container_ip = find_random_available_ip(IPAddr.new(subnet))
 
-    r "ip -6 -n #{cni_netns} addr add #{container_ip}/#{container_ip.prefix} dev #{inner_ifname}"
+    r "ip -6 -n #{cni_netns} addr replace #{container_ip}/#{container_ip.prefix} dev #{inner_ifname}"
     r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
     if setup_default_route
-      r "ip -6 -n #{cni_netns} route add default via #{outer_link_local} dev #{inner_ifname}"
+      r "ip -6 -n #{cni_netns} route replace default via #{outer_link_local} dev #{inner_ifname}"
     end
 
     r "ip -6 link set #{outer_ifname} mtu #{@mtu} up"
-    r "ip -6 route add #{container_ip}/#{container_ip.prefix} via #{inner_link_local} dev #{outer_ifname} mtu #{@mtu}"
+    r "ip -6 route replace #{container_ip}/#{container_ip.prefix} via #{inner_link_local} dev #{outer_ifname} mtu #{@mtu}"
 
     container_ip
   end
@@ -155,14 +155,14 @@ options ndots:5
     container_ip = find_random_available_ip(IPAddr.new(subnet))
     gateway_ip = find_random_available_ip(IPAddr.new(subnet))
 
-    r "ip addr add #{gateway_ip}/24 dev #{outer_ifname}"
+    r "ip addr replace #{gateway_ip}/24 dev #{outer_ifname}"
     r "ip link set #{outer_ifname} mtu #{@mtu} up"
 
-    r "ip -n #{cni_netns} addr add #{container_ip}/24 dev #{inner_ifname}"
+    r "ip -n #{cni_netns} addr replace #{container_ip}/24 dev #{inner_ifname}"
     r "ip -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
-    r "ip -n #{cni_netns} route add default via #{gateway_ip}"
+    r "ip -n #{cni_netns} route replace default via #{gateway_ip}"
 
-    r "ip route add #{container_ip}/#{container_ip.prefix} via #{gateway_ip} dev #{outer_ifname}"
+    r "ip route replace #{container_ip}/#{container_ip.prefix} via #{gateway_ip} dev #{outer_ifname}"
     r "echo 1 > /proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
 
     {container_ip: container_ip, gateway_ip: gateway_ip}
@@ -233,18 +233,15 @@ options ndots:5
 
   def find_random_available_ip(subnet)
     allocated_ips = @ipam_store["allocated_ips"].values.flatten
-    retries = 0
     max_retries = 100
 
-    loop do
+    max_retries.times do
       ip = generate_random_ip(subnet)
       unless allocated_ips.include?(ip.to_s)
         return ip
       end
-
-      retries += 1
-      raise "Could not find an available IP after #{max_retries} retries" if retries >= max_retries
     end
+    raise "Could not find an available IP after #{max_retries} retries"
   end
 
   def generate_random_ip(subnet)

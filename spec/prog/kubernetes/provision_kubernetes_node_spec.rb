@@ -218,15 +218,21 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   describe "#install_cni" do
     it "configures ubicni" do
       sshable = instance_double(Sshable)
-      expect(prog.vm).to receive(:sshable).and_return(sshable)
       expect(prog.vm).to receive(:ephemeral_net6).and_return(NetAddr::IPv6Net.parse("fe80::/64"))
-      allow(prog.vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")])
+      allow(prog.vm).to receive_messages(
+        sshable: sshable,
+        nics: [instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")]
+      )
 
       expect(sshable).to receive(:cmd).with("sudo tee /opt/cni/bin/ubicni", stdin: /exec .\/kubernetes\/bin\/ubicni/)
       expect(sshable).to receive(:cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
       expect(sshable).to receive(:cmd).with("sudo chmod +x /opt/cni/bin/ubicni")
-      expect(sshable).to receive(:cmd).with("sudo iptables -t nat -A POSTROUTING -s 10.0.0.37 -o ens3 -j MASQUERADE")
-
+      expect(sshable).to receive(:cmd).with(<<~CMD)
+set -ueo pipefail
+sudo nft add table ip nat
+sudo nft add chain ip nat POSTROUTING { type nat hook postrouting priority 100';' }
+sudo nft add rule ip nat POSTROUTING ip saddr 10.0.0.37 oifname ens3 masquerade
+      CMD
       expect { prog.install_cni }.to exit({vm_id: prog.vm.id})
     end
   end
