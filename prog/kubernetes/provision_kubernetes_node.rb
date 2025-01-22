@@ -144,10 +144,7 @@ BASH
   label def install_cni
     script = <<BASH_SCRIPT
 #!/bin/bash
-cd /home/ubi || {
-  echo "Failed to change directory to /home/ubi" >&2
-  exit 1
-}
+cd /home/ubi
 exec ./kubernetes/bin/ubicni
 BASH_SCRIPT
 
@@ -169,7 +166,12 @@ CONFIG
     sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
 
     sshable.cmd("sudo chmod +x /opt/cni/bin/ubicni")
-    sshable.cmd("sudo iptables -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE")
+    vm.sshable.cmd <<~BASH
+      set -ueo pipefail
+      sudo nft add table ip nat
+      sudo nft add chain ip nat POSTROUTING { type nat hook postrouting priority 100';' }
+      sudo nft add rule ip nat POSTROUTING ip saddr #{vm.nics.first.private_ipv4} oifname ens3 masquerade
+    BASH
 
     pop vm_id: vm.id
   end
