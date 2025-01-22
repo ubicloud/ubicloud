@@ -177,11 +177,13 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     selected_addr
   end
 
-  def self.random_private_ipv4(location, project)
+  def self.random_private_ipv4(location, project, cidr_size = 26)
+    raise ArgumentError, "CIDR size must be between 0 and 32" unless cidr_size.between?(0, 32)
+
     private_range = PrivateSubnet.random_subnet
     addr = NetAddr::IPv4Net.parse(private_range)
 
-    selected_addr = addr.nth_subnet(26, SecureRandom.random_number(2**(26 - addr.netmask.prefix_len) - 1).to_i + 1)
+    selected_addr = addr.nth_subnet(cidr_size, SecureRandom.random_number(2**(cidr_size - addr.netmask.prefix_len) - 1).to_i + 1)
 
     selected_addr = random_private_ipv4(location, project) if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { _1.rel(selected_addr) } || project.private_subnets_dataset[Sequel[:net4] => selected_addr.to_s, :location => location]
 
