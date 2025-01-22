@@ -484,6 +484,7 @@ dns-forward-max=10000
 dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
 listen-address=#{dnsmasq_address_ip6}
 all-servers
+neg-ttl=30
 DNSMASQ_CONF
 
     ethernets = nics.map do |nic|
