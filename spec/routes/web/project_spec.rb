@@ -132,7 +132,7 @@ RSpec.describe Clover, "project" do
           end
           expect(page).to have_content "Create Managed Database"
           expect(page).to have_content "Add User to Project"
-          expect(page).to have_content "Distribute Your Traffic"
+          expect(page).to have_content "Load Balance Your Traffic"
           expect(page).to have_content "Create Access Token"
           expect(page).to have_content "Documentation"
           expect(page).to have_content "Get Support"
