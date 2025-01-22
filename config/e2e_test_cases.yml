@@ -3,3 +3,4 @@
 - { name: github_runner_ubuntu_2204, images: ["github-ubuntu-2204"], details: {repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2204.yml, branch_name: main} }
 - { name: github_runner_ubuntu_2004, images: ["github-ubuntu-2004"], details: {repo_name: ubicloud/github-e2e-test-workflows, workflow_name: test_2004.yml, branch_name: main} }
 - { name: postgres_standard,         images: ["postgres16-ubuntu-2204"] }
+- { name: postgres_ha,               images: ["postgres16-ubuntu-2204", "ubuntu-jammy"] }

@@ -88,6 +88,7 @@ module ThawedMock
   allow_mocking(Prog::Ai::InferenceEndpointReplicaNexus, :assemble)
   allow_mocking(Prog::DnsZone::SetupDnsServerVm, :vms_in_sync?)
   allow_mocking(Prog::Github::DestroyGithubInstallation, :assemble)
+  allow_mocking(Prog::Minio::MinioClusterNexus, :assemble)
   allow_mocking(Prog::PageNexus, :assemble)
   allow_mocking(Prog::Postgres::PostgresResourceNexus, :assemble, :dns_zone)
   allow_mocking(Prog::Postgres::PostgresServerNexus, :assemble)

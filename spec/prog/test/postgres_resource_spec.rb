@@ -11,7 +11,7 @@ RSpec.describe Prog::Test::PostgresResource do
 
   describe ".assemble" do
     it "creates a strand and service projects" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_service_project_id)
+      expect(Config).to receive(:postgres_service_project_id).exactly(2).and_return(postgres_service_project_id)
       st = described_class.assemble
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
@@ -39,12 +39,12 @@ RSpec.describe Prog::Test::PostgresResource do
 
   describe "#test_postgres" do
     it "fails if the basic connectivity test fails" do
-      expect(pgr_test).to receive(:postgres_server).and_return(faulty_representative_server)
+      expect(pgr_test).to receive(:representative_server).and_return(faulty_representative_server)
       expect { pgr_test.test_postgres }.to hop("destroy_postgres")
     end
 
     it "hops to test_table_create if the basic connectivity test passes" do
-      expect(pgr_test).to receive(:postgres_server).and_return(working_representative_server)
+      expect(pgr_test).to receive(:representative_server).and_return(working_representative_server)
       expect { pgr_test.test_postgres }.to hop("destroy_postgres")
     end
   end
@@ -61,14 +61,14 @@ RSpec.describe Prog::Test::PostgresResource do
 
   describe "#destroy" do
     it "increments the destroy count and exits if no failure happened" do
-      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, destroy: nil))
-      expect(pgr_test).to receive(:frame).exactly(4).and_return({})
+      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, id: "1234", destroy: nil))
+      expect(pgr_test).to receive(:frame).exactly(3).and_return({"project_created" => false})
       expect { pgr_test.destroy }.to exit({"msg" => "Postgres tests are finished!"})
     end
 
     it "increments the destroy count and hops to failed if a failure happened" do
-      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, destroy: nil))
-      expect(pgr_test).to receive(:frame).exactly(4).and_return({"fail_message" => "Test failed"})
+      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, id: "1234", destroy: nil))
+      expect(pgr_test).to receive(:frame).exactly(3).and_return({"fail_message" => "Test failed", "project_created" => true})
       expect { pgr_test.destroy }.to hop("failed")
     end
   end
@@ -79,11 +79,11 @@ RSpec.describe Prog::Test::PostgresResource do
     end
   end
 
-  describe ".postgres_server" do
+  describe ".representative_server" do
     it "returns the representative server" do
       postgres_resource = instance_double(Prog::Postgres::PostgresResourceNexus, representative_server: working_representative_server)
       expect(pgr_test).to receive(:postgres_resource).and_return(postgres_resource)
-      expect(pgr_test.postgres_server).to eq(working_representative_server)
+      expect(pgr_test.representative_server).to eq(working_representative_server)
     end
   end
 end

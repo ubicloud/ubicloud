@@ -6,16 +6,21 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   semaphore :destroy
 
   def self.assemble
-    postgres_service_project = Project.create(name: "Postgres-Service-Project") { _1.id = Config.postgres_service_project_id }
     postgres_test_project = Project.create(name: "Postgres-Test-Project")
+    postgres_service_project = Project[Config.postgres_service_project_id] ||
+      Project.create(name: "Postgres-Service-Project") do |project|
+        project.id = Config.postgres_service_project_id
+      end
+
+    frame = {
+      "postgres_service_project_id" => postgres_service_project.id,
+      "postgres_test_project_id" => postgres_test_project.id
+    }
 
     Strand.create_with_id(
       prog: "Test::PostgresResource",
       label: "start",
-      stack: [{
-        "postgres_service_project_id" => postgres_service_project.id,
-        "postgres_test_project_id" => postgres_test_project.id
-      }]
+      stack: [frame]
     )
   end
 
@@ -34,7 +39,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
 
   label def wait_postgres_resource
     if postgres_resource.strand.label == "wait" &&
-        postgres_server.run_query("SELECT 1") == "1"
+        representative_server.run_query("SELECT 1") == "1"
       hop_test_postgres
     else
       nap 10
@@ -42,7 +47,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def test_postgres
-    unless postgres_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
+    unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run test queries"})
     end
 
@@ -55,7 +60,6 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def destroy
-    postgres_service_project.destroy
     postgres_test_project.destroy
 
     fail_test(frame["fail_message"]) if frame["fail_message"]
@@ -71,16 +75,12 @@ class Prog::Test::PostgresResource < Prog::Test::Base
     @postgres_test_project ||= Project[frame["postgres_test_project_id"]]
   end
 
-  def postgres_service_project
-    @postgres_service_project ||= Project[frame["postgres_service_project_id"]]
-  end
-
   def postgres_resource
     @postgres_resource ||= PostgresResource[frame["postgres_resource_id"]]
   end
 
-  def postgres_server
-    @postgres_server ||= postgres_resource.representative_server
+  def representative_server
+    @representative_server ||= postgres_resource.representative_server
   end
 
   def test_queries_sql
