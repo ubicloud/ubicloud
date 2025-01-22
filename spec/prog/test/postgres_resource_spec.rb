@@ -11,7 +11,7 @@ RSpec.describe Prog::Test::PostgresResource do
 
   describe ".assemble" do
     it "creates a strand and service projects" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_service_project_id)
+      expect(Config).to receive(:postgres_service_project_id).exactly(2).and_return(postgres_service_project_id)
       st = described_class.assemble
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
@@ -61,14 +61,14 @@ RSpec.describe Prog::Test::PostgresResource do
 
   describe "#destroy" do
     it "increments the destroy count and exits if no failure happened" do
-      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, destroy: nil))
-      expect(pgr_test).to receive(:frame).exactly(4).and_return({})
+      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, id: "1234", destroy: nil))
+      expect(pgr_test).to receive(:frame).exactly(3).and_return({"project_created" => false})
       expect { pgr_test.destroy }.to exit({"msg" => "Postgres tests are finished!"})
     end
 
     it "increments the destroy count and hops to failed if a failure happened" do
-      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, destroy: nil))
-      expect(pgr_test).to receive(:frame).exactly(4).and_return({"fail_message" => "Test failed"})
+      expect(Project).to receive(:[]).exactly(2).and_return(instance_double(Project, id: "1234", destroy: nil))
+      expect(pgr_test).to receive(:frame).exactly(3).and_return({"fail_message" => "Test failed", "project_created" => true})
       expect { pgr_test.destroy }.to hop("failed")
     end
   end
