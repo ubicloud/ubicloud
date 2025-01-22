@@ -80,10 +80,18 @@ class PrivateSubnet < Sequel::Model
   # use it in future for some other purpose. AWS also does that. Here
   # is the source;
   # https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html
+
+  # Requirements:
+  # - The parent subnet mask can range from /16 to /26.
+  # - The VM's assigned subnet must allow:
+  #   - A maximum of 256 IPs (/24) for the largest parent subnet (/16).
+  #   - A minimum of 1 IP (/32) for the smallest parent subnet (/26).
   def random_private_ipv4
-    total_hosts = 2**(32 - net4.netmask.prefix_len) - 5
+    cidr_size = [32, (net4.netmask.prefix_len + 8)].min
+
+    total_hosts = 2**(cidr_size - net4.netmask.prefix_len) - 5
     random_offset = SecureRandom.random_number(total_hosts) + 4
-    addr = net4.nth_subnet(32, random_offset)
+    addr = net4.nth_subnet(cidr_size, random_offset)
     return random_private_ipv4 if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
 
     addr
