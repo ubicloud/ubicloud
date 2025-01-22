@@ -59,6 +59,7 @@ class VmSetup
     prepare_pci_devices(pci_devices)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     start_systemd_unit
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -71,6 +72,7 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
     prepare_pci_devices(pci_devices)
     start_systemd_unit
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -84,6 +86,7 @@ class VmSetup
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -333,6 +336,25 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{nic.tap}/proxy_arp'"
+    end
+  end
+
+  def update_via_routes(nics)
+    success = false
+    5.times do
+      if r("ip -n #{q_vm} link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").chomp == "UP"
+        success = true
+        break
+      end
+      sleep 5
+    end
+    unless success
+      raise "VM #{q_vm} link not ready after 5 retries."
+    end
+
+    nics.each do |nic|
+      local_ip4 = NetAddr::IPv4Net.parse(nic.net4)
+      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(0).to_s.shellescape} dev #{nic.tap}"
     end
   end
 
