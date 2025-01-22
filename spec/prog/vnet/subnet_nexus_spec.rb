@@ -332,6 +332,11 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       allow(SecureRandom).to receive(:random_number).with(2**(26 - 8) - 1).and_return(1)
       expect(described_class.random_private_ipv4("hetzner-fsn1", project).to_s).to eq("10.0.0.128/26")
     end
+
+    it "raises an error when invalid CIDR is given" do
+      project = Project.create_with_id(name: "test-project")
+      expect { described_class.random_private_ipv4("hetzner-fsn1", project, 33) }.to raise_error(ArgumentError)
+    end
   end
 
   describe ".random_private_ipv6" do
