@@ -5,7 +5,6 @@ require_relative "../model"
 class LoadBalancer < Sequel::Model
   many_to_one :project
   many_to_many :vms
-  many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: ["up"]}
   many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: ["evacuating", "detaching"])
   one_to_one :strand, key: :id
   many_to_one :private_subnet
@@ -24,6 +23,10 @@ class LoadBalancer < Sequel::Model
 
   def path
     "/location/#{private_subnet.display_location}/load-balancer/#{name}"
+  end
+
+  def active_vms
+    vms_to_dns.select { |vm| vm.load_balancers_vms.node_state == "up" }
   end
 
   def add_vm(vm)

@@ -45,6 +45,25 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     end
   end
 
+  describe ".vm_load_balancer_state" do
+    it "returns the node state of the VM" do
+      lb.load_balancers_vms_dataset.update(state: "up", state_counter: 1)
+      expect(nx.vm_load_balancer_state).to eq("down")
+
+      lb.load_balancers_vms_dataset.update(state: "down", state_counter: 1)
+      expect(nx.vm_load_balancer_state).to eq("up")
+
+      lb.load_balancers_vms_dataset.update(state: "up", state_counter: 4)
+      expect(nx.vm_load_balancer_state).to eq("up")
+
+      lb.load_balancers_vms_dataset.update(state: "down", state_counter: 4)
+      expect(nx.vm_load_balancer_state).to eq("down")
+
+      lb.load_balancers_vms_dataset.update(state: "detaching", state_counter: 0)
+      expect(nx.vm_load_balancer_state).to eq("detaching")
+    end
+  end
+
   describe "#update_load_balancer" do
     context "when no healthy vm exists" do
       it "hops to remove load balancer" do

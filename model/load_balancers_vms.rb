@@ -4,6 +4,18 @@ require_relative "../model"
 
 class LoadBalancersVms < Sequel::Model
   include ResourceMethods
+  many_to_one :load_balancer
+
+  def node_state
+    case state
+    when "up"
+      (state_counter >= load_balancer.health_check_up_threshold) ? "up" : "down"
+    when "down"
+      (state_counter >= load_balancer.health_check_down_threshold) ? "down" : "up"
+    else
+      state
+    end
+  end
 end
 
 # Table: load_balancers_vms

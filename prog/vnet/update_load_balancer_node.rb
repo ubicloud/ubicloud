@@ -8,7 +8,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   def vm_load_balancer_state
-    load_balancer.load_balancers_vms_dataset[vm_id: vm.id].state
+    load_balancer.load_balancers_vms_dataset[vm_id: vm.id].node_state
   end
 
   def before_run
