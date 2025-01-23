@@ -8,7 +8,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   def kubernetes_nodepool
-    @kubernetes_nodepool ||= KubernetesNodepool[frame.fetch("nodepool_id", nil)] || nil
+    @kubernetes_nodepool ||= KubernetesNodepool[frame["nodepool_id"]]
   end
 
   def write_hosts_file_if_needed(ip = nil)

@@ -23,14 +23,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       # TODO: Move resources (vms, subnet, LB, etc.) into own project
       # TODO: Validate node count
 
-      kc = KubernetesCluster.create_with_id(
-        name: name,
-        version: version,
-        cp_node_count: cp_node_count,
-        private_subnet_id: private_subnet_id,
-        location: location,
-        project_id: project.id
-      )
+      kc = KubernetesCluster.create_with_id(name:, version:, cp_node_count:, private_subnet_id:, location:, project_id: project.id)
 
       Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = kc.id }
     end
