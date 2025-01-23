@@ -248,6 +248,16 @@ RSpec.configure do |config|
     args[:project_id] ||= Project.create(name: "create-vm-project").id
     Vm.create(**args)
   end
+
+  def add_ipv4_to_vm(vm, ipv4)
+    host = VmHost.new_with_id(allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3)
+    Sshable.create(id: host.id)
+    host.save_changes
+    cidr = IPAddr.new(ipv4)
+    cidr.prefix = 24
+    addr = Address.create(cidr: cidr.to_s, routed_to_host_id: host.id)
+    AssignedVmAddress.create(ip: ipv4, address_id: addr.id, dst_vm_id: vm.id)
+  end
 end
 
 # Autoload helper files that may have expensive startup.
