@@ -64,12 +64,12 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
   describe "#start" do
     it "naps if the kubernetes cluster is not ready" do
-      expect(kn.kubernetes_cluster).to receive(:strand).and_return(Strand.new(label: "not-wait"))
+      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "not-wait"))
       expect { nx.start }.to nap(30)
     end
 
     it "registers a deadline and hops if the cluster is ready" do
-      expect(kn.kubernetes_cluster).to receive(:strand).and_return(Strand.new(label: "wait"))
+      expect(kn.cluster).to receive(:strand).and_return(Strand.new(label: "wait"))
       expect(nx).to receive(:register_deadline)
       expect { nx.start }.to hop("bootstrap_worker_vms")
     end
@@ -82,7 +82,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
 
     it "pushes ProvisionKubernetesNode prog to create VMs" do
-      expect(nx).to receive(:push).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.kubernetes_cluster.id})
+      expect(nx).to receive(:push).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
       nx.bootstrap_worker_vms
     end
   end

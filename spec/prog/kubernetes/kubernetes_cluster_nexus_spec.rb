@@ -131,20 +131,20 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
 
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
-      expect(kubernetes_cluster.kubernetes_nodepools).to all(receive(:incr_destroy))
+      expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))
 
       expect(kubernetes_cluster).not_to receive(:destroy)
       expect { nx.destroy }.to nap(5)
     end
 
     it "completes destroy when nodepools are gone" do
-      kubernetes_cluster.kubernetes_nodepools.first.destroy
+      kubernetes_cluster.nodepools.first.destroy
       kubernetes_cluster.reload
 
       expect(kubernetes_cluster.api_server_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
 
-      expect(kubernetes_cluster.kubernetes_nodepools).to be_empty
+      expect(kubernetes_cluster.nodepools).to be_empty
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
     end

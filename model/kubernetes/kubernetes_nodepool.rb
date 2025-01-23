@@ -4,7 +4,7 @@ require_relative "../../model"
 
 class KubernetesNodepool < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :kubernetes_cluster
+  many_to_one :cluster, key: :kubernetes_cluster_id, class: :KubernetesCluster
   many_to_many :vms, order: :created_at
 
   include ResourceMethods

@@ -81,8 +81,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     kubernetes_cluster.api_server_lb.incr_destroy
     kubernetes_cluster.cp_vms.each(&:incr_destroy)
     kubernetes_cluster.remove_all_cp_vms
-    kubernetes_cluster.kubernetes_nodepools.each { _1.incr_destroy }
-    nap 5 unless kubernetes_cluster.kubernetes_nodepools.empty?
+    kubernetes_cluster.nodepools.each { _1.incr_destroy }
+    nap 5 unless kubernetes_cluster.nodepools.empty?
     kubernetes_cluster.destroy
     pop "kubernetes cluster is deleted"
   end
