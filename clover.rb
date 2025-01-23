@@ -627,6 +627,11 @@ class Clover < Roda
 
   route do |r|
     if api?
+      if r.path_info == "/cli" && (!/\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s) || !rodauth.authenticated?)
+        response["content-type"] = "text/plain"
+        response.status = 400
+        next "Invalid request: No valid personal access token provided"
+      end
       response.json = true
       response.skip_content_security_policy!
       rodauth.check_active_session unless rodauth.use_pat?
@@ -662,7 +667,7 @@ class Clover < Roda
     r.rodauth
     rodauth.require_authentication
 
-    if api?
+    if api? && r.path_info != "/cli"
       # Validate request against OpenAPI schema, after authenticating
       # (which is thought to be cheaper)
       begin
