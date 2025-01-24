@@ -34,6 +34,7 @@ class Scheduling::Dispatcher
     notify_r, notify_w = IO.pipe
 
     Thread.new do
+      Thread.current[:created_at] = Time.now
       ready, _, _ = IO.select([apoptosis_r], nil, nil, @apoptosis_timeout)
 
       if ready.nil?
@@ -51,6 +52,7 @@ class Scheduling::Dispatcher
     end.tap { _1.name = "apoptosis:" + strand_ubid }
 
     Thread.new do
+      Thread.current[:created_at] = Time.now
       strand.run Strand::LEASE_EXPIRATION / 4
     rescue => ex
       Clog.emit("exception terminates thread") { Util.exception_to_hash(ex) }
