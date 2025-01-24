@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, enable_diagnostics: false)
     Al::Request.new(
       vm.id,
       vm.cores,
@@ -34,7 +34,8 @@ RSpec.describe Al do
       location_filter,
       location_preference,
       vm.family,
-      use_slices
+      use_slices,
+      enable_diagnostics
     )
   end
 
@@ -59,7 +60,8 @@ RSpec.describe Al do
 
     before do
       allow(project).to receive_messages(
-        get_ff_use_slices_for_allocation: nil
+        get_ff_use_slices_for_allocation: nil,
+        get_ff_enable_diagnostics: nil
       )
       allow(vm).to receive_messages(project: project)
     end
