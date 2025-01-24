@@ -410,4 +410,18 @@ RSpec.describe VmHost do
       expect(vh.spdk_cpu_count).to eq(4)
     end
   end
+
+  describe "#allow_slices" do
+    it "allows slices" do
+      expect(vh).to receive(:update).with(accepts_slices: true)
+      vh.allow_slices
+    end
+  end
+
+  describe "#disallow_slices" do
+    it "disallows slices" do
+      expect(vh).to receive(:update).with(accepts_slices: false)
+      vh.disallow_slices
+    end
+  end
 end

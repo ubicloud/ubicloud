@@ -255,6 +255,14 @@ class VmHost < Sequel::Model
     update(data_center: Hosting::Apis.pull_data_center(self))
   end
 
+  def allow_slices
+    update(accepts_slices: true)
+  end
+
+  def disallow_slices
+    update(accepts_slices: false)
+  end
+
   def set_server_name
     Hosting::Apis.set_server_name(self)
   end
