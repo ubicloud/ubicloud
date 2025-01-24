@@ -31,7 +31,8 @@ module Scheduling::Allocator
       location_filter,
       location_preference,
       vm.family,
-      vm.project.get_ff_use_slices_for_allocation || false
+      vm.project.get_ff_use_slices_for_allocation || false,
+      vm.project.get_ff_enable_diagnostics || false
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -58,11 +59,13 @@ module Scheduling::Allocator
     :location_filter,
     :location_preference,
     :family,
-    :use_slices
+    :use_slices,
+    :enable_diagnostics
   ) do
     def initialize(*args)
       super
       self.use_slices ||= false
+      self.enable_diagnostics ||= false
     end
 
     def memory_gib_for_cores
@@ -173,6 +176,12 @@ module Scheduling::Allocator
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       # Match the slice allocation to the hosts that can accept it
       ds = ds.where(accepts_slices: request.use_slices)
+
+      # For debugging purposes, write the full SQL query, with expanded parameters, to a file,
+      # so it can be run directly against the DB server
+      # :nocov:
+      Clog.emit("Allocator query for vm id: #{request.vm_id}: #{ds.no_auto_parameterize.sql}") if request.enable_diagnostics
+      # :nocov:
 
       ds.all
     end
