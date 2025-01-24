@@ -23,7 +23,13 @@
     ["Location", @kc.display_location],
     ["Kubernetes Version", @kc.version],
     ["Control Plane Nodes", @kc.cp_node_count]
-  ] %>
+  ]
+  
+  if @kc.display_state == "running"
+    data.push(["Kubeconfig", part("components/download_button", link: "#{request.path}/kubeconfig"), { escape: false }])
+  else
+    data.push(["Kubeconfig", "Waiting for cluster to be ready..."])
+  end %>
 
   <%== part("components/kv_data_card", data: data) %>
   <!-- Nodes Card -->

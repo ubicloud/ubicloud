@@ -278,12 +278,16 @@ RSpec.describe Clover, "Kubernetes" do
         expect(kc.display_state).to eq("creating")
         expect(page.body).to include "auto-refresh hidden"
         expect(page.body).to include "creating"
+        expect(page).to have_content "Waiting for cluster to be ready..."
+        expect(page).to have_no_content "Download"
 
         kc.strand.update(label: "wait")
         kn.strand.update(label: "wait")
         page.refresh
         expect(page.body).not_to include "auto-refresh hidden"
         expect(page.body).to include "running"
+        expect(page).to have_no_content "Waiting for cluster to be ready..."
+        expect(page).to have_content "Download"
 
         kc.incr_destroy
         kc.reload
@@ -328,6 +332,55 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
         expect(page).to have_content "ResourceNotFound"
+      end
+    end
+
+    describe "kubeconfig" do
+      before do
+        kc
+      end
+
+      it "returns kubeconfig content for authorized users" do
+        expect(KubernetesCluster).to receive(:kubeconfig).and_return "kubeconfig content"
+
+        visit "#{project.path}#{kc.path}/kubeconfig"
+
+        expect(page.response_headers["Content-Type"]).to eq("text/plain")
+        expect(page.response_headers["Content-Disposition"]).to include("attachment; filename=\"#{kc.name}-kubeconfig.yaml\"")
+        expect(page.body).to eq("kubeconfig content")
+      end
+
+      it "raises forbidden error when user does not have permission" do
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+
+        visit "#{project.path}#{kc.path}/kubeconfig"
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content("Forbidden")
+      end
+
+      it "raises not found when Kubernetes cluster does not exist" do
+        visit "#{project.path}/kubernetes-cluster/_nonexistent/kubeconfig"
+
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content("ResourceNotFound")
+      end
+
+      it "returns proper content headers and content" do
+        expect(KubernetesCluster).to receive(:kubeconfig).and_return "mocked kubeconfig content"
+
+        visit "#{project.path}#{kc.path}/kubeconfig"
+        expect(page.response_headers["Content-Type"]).to eq("text/plain")
+        expect(page.response_headers["Content-Disposition"]).to include("attachment; filename=\"#{kc.name}-kubeconfig.yaml\"")
+        expect(page.body).to eq("mocked kubeconfig content")
+      end
+
+      it "does not allow unauthorized access" do
+        AccessControlEntry.dataset.destroy
+        visit "#{project.path}#{kc.path}/kubeconfig"
+
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content("Forbidden")
       end
     end
 
