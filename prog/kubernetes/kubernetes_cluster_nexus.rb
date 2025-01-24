@@ -14,6 +14,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       end
 
       Validation.validate_kubernetes_name(name)
+      Validation.validate_kubernetes_cp_node_count(cp_node_count)
 
       # TODO: Validate subnet location if given
       # TODO: Validate subnet size if given

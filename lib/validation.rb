@@ -263,4 +263,8 @@ module Validation
   def self.validate_kubernetes_name(name)
     fail ValidationFailed.new({name: "Kubernetes cluster name must only contain lowercase letters, numbers, spaces, and hyphens and have max length 40."}) unless name&.match(ALLOWED_KUBERNETES_NAME_PATTERN)
   end
+
+  def self.validate_kubernetes_cp_node_count(count)
+    fail ValidationFailed.new({name: "Kubernetes cluster control plane can have either 1 or 3 nodes"}) unless [1, 3].include?(count)
+  end
 end
