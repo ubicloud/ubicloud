@@ -16,6 +16,7 @@ class Vm < Sequel::Model
   one_to_many :pci_devices, key: :vm_id, class: :PciDevice
   one_through_one :load_balancer, left_key: :vm_id, right_key: :load_balancer_id, join_table: :load_balancers_vms
   one_to_one :load_balancers_vms, key: :vm_id, class: :LoadBalancersVms
+  many_to_one :vm_host_slice
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancers_vms: :destroy
 
@@ -62,13 +63,6 @@ class Vm < Sequel::Model
       return "waiting for capacity"
     end
     super
-  end
-
-  def mem_gib_ratio
-    return 3.2 if arch == "arm64"
-    # Special case for GPUs
-    return 10.68 if family == "standard-gpu"
-    8
   end
 
   # cloud-hypervisor takes topology information in this format:
@@ -124,29 +118,16 @@ class Vm < Sequel::Model
     CloudHypervisorCpuTopo.new(*topo)
   end
 
+  # Reverse look-up the vm_size instance that was used to create this VM
+  # and use its name as a display name.
   def display_size
-    # With additional product families, it is likely that we hit a
-    # case where this conversion wouldn't work. We can use map or
-    # when/case block at that time.
-
-    # Define suffix integer as 2 * numcores. This coincides with
-    # SMT-enabled x86 processors, to give people the right idea if
-    # they compare the product code integer to the preponderance of
-    # spec sheets on the web.
-    #
-    # With non-SMT processors, maybe we'll keep it that way too,
-    # even though it doesn't describe any attribute about the
-    # processor.  But, it does allow "standard-2" is compared to
-    # another "standard-2" variant regardless of SMT,
-    # e.g. "standard-2-arm", instead of making people interpreting
-    # the code adjust the scale factor to do the comparison
-    # themselves.
-    #
-    # Another weakness of this approach, besides it being indirect
-    # in description of non-SMT processors, is having "standard-2"
-    # be the smallest unit of product is also noisier than
-    # "standard-1".
-    "#{family}-#{cores * 2}"
+    vm_size = Option::VmSizes.find {
+      _1.family == family &&
+        _1.arch == arch &&
+        _1.vcpus == vcpus &&
+        _1.cpu_percent_limit == cpu_percent_limit
+    }
+    vm_size.name
   end
 
   # Various names in linux, like interface names, are obliged to be
@@ -220,7 +201,10 @@ class Vm < Sequel::Model
       "ndp_needed" => vm_host.ndp_needed,
       "storage_volumes" => storage_volumes,
       "swap_size_bytes" => swap_size_bytes,
-      "pci_devices" => pci_devices.map { [_1.slot, _1.iommu_group] }
+      "pci_devices" => pci_devices.map { [_1.slot, _1.iommu_group] },
+      "slice_name" => vm_host_slice&.inhost_name || "system.slice",
+      "cpu_percent_limit" => cpu_percent_limit || 0,
+      "cpu_burst_percent_limit" => cpu_burst_percent_limit || 0
     })
   end
 

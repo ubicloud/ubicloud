@@ -93,6 +93,12 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
     decr_destroy
 
     host.sshable.cmd("sudo host/bin/setup-slice delete #{vm_host_slice.inhost_name}")
+
+    VmHost.dataset.where(id: host.id).update(
+      used_cores: Sequel[:used_cores] - vm_host_slice.cores,
+      used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_gib
+    )
+
     vm_host_slice.destroy
 
     pop "vm_host_slice destroyed"

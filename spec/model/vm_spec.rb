@@ -37,28 +37,11 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#mem_gib_ratio" do
-    it "returns the correct ratio for arm64" do
-      expect(vm).to receive(:arch).and_return("arm64")
-      expect(vm.mem_gib_ratio).to eq(3.2)
-    end
-
-    it "returns the correct ratio for x64" do
-      expect(vm).to receive(:arch).and_return("x64")
-      expect(vm.mem_gib_ratio).to eq(8)
-    end
-
-    it "returns correct ratio for standard-gpu" do
-      expect(vm).to receive(:arch).and_return("x64")
-      expect(vm).to receive(:family).and_return("standard-gpu")
-      expect(vm.mem_gib_ratio).to eq(10.68)
-    end
-  end
-
   describe "#cloud_hypervisor_cpu_topology" do
     it "scales a single-socket hyperthreaded system" do
       vm.family = "standard"
       vm.cores = 2
+      vm.vcpus = 4
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 12,
@@ -72,6 +55,7 @@ RSpec.describe Vm do
     it "scales a dual-socket hyperthreaded system" do
       vm.family = "standard"
       vm.cores = 2
+      vm.vcpus = 4
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
         total_cpus: 24,
@@ -107,6 +91,7 @@ RSpec.describe Vm do
     it "crashes if cores allocated per die is not uniform number" do
       vm.family = "standard"
       vm.cores = 2
+      vm.vcpus = 4
 
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
@@ -222,5 +207,25 @@ RSpec.describe Vm do
        "max_ios_per_sec" => 100, "max_read_mbytes_per_sec" => 200,
        "max_write_mbytes_per_sec" => 300}
     ])
+  end
+
+  describe "#VmSize options" do
+    it "no burstable cpu allowed for Standard VMs" do
+      expect(Option::VmSizes.map { _1.name.include?("standard-") == (_1.cpu_burst_percent_limit == 0) }.all?(true)).to be true
+    end
+
+    it "no gpu allowed for non-GPU VMs" do
+      expect(Option::VmSizes.map { _1.name.include?("gpu") == _1.gpu }.all?(true)).to be true
+    end
+
+    it "cpu limit set correctly for each architecture" do
+      expect(Option::VmSizes.map {
+        if _1.arch == "x64"
+          _1.cpu_percent_limit == _1.vcpus * 100 && _1.cores == _1.vcpus / 2
+        elsif _1.arch == "arm64"
+          _1.cpu_percent_limit == _1.vcpus * 100 && _1.cores == _1.vcpus
+        end
+      }.all?(true)).to be true
+    end
   end
 end
