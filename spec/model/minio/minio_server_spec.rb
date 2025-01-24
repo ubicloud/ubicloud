@@ -26,7 +26,8 @@ RSpec.describe MinioServer do
     described_class.create_with_id(
       minio_pool_id: mp.id,
       vm_id: vm.id,
-      index: 0
+      index: 0,
+      cert: "cert"
     )
   }
 
