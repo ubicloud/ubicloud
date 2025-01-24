@@ -27,6 +27,17 @@ class Clover
           kc.incr_destroy
           204
         end
+
+        r.on "kubeconfig" do
+          r.get do
+            authorize("KubernetesCluster:create", kc.id)
+
+            content = kc.kubeconfig
+            response["Content-Type"] = "text/plain"
+            response["Content-Disposition"] = "attachment; filename=\"#{kc.name}-kubeconfig.yaml\""
+            response.write(content)
+          end
+        end
       end
     end
   end

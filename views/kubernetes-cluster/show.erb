@@ -19,18 +19,27 @@
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <%== render(
-    "components/kv_data_card",
-    locals: {
-      data: [
-        ["ID", @kc[:id]],
-        ["Name", @kc[:name]],
-        ["Location", @kc[:location]],
-        ["Kubernetes Version", @kc[:version]],
-        ["Control Plane Nodes", @kc[:cp_node_count]]
+  <% data = [
+    ["ID", @kc[:id]],
+    ["Name", @kc[:name]],
+    ["Location", @kc[:location]],
+    ["Kubernetes Version", @kc[:version]],
+    ["Control Plane Nodes", @kc[:cp_node_count]]
+  ]
+  
+  if @kc[:state] == "running"
+    data.push(
+      [
+        "Kubeconfig",
+        render("components/download_button", locals: { link: "#{request.path}/kubeconfig" }),
+        { escape: false }
       ]
-    }
-  ) %>
+    )
+  else
+    data.push(["CA Certificates", "Waiting for cluster to be ready..."])
+  end %>
+
+  <%== render("components/kv_data_card", locals: { data: data }) %>
   <!-- Nodes Card -->
   <% @nodes = @kc[:cp_vms].map { |vm| { name: vm[:name], role: "Controller", state: vm[:state], hostname: vm[:hostname] } }
   @nodes +=
