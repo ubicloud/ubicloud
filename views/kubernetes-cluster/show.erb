@@ -13,7 +13,10 @@
       ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
       [@kc[:name], "#"]
     ],
-    right_items: [render("components/kubernetes_state_label", locals: { state: @kc[:state], extra_class: "text-md" })]
+    right_items: [
+      render("components/kubernetes_state_label", locals: { state: @kc[:state], extra_class: "text-md" }),
+      render("components/button", locals: { text: "Download kubeconfig", link: "#{request.path}/kubeconfig" })
+    ]
   }
 ) %>
 

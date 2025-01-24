@@ -41,4 +41,31 @@ RSpec.describe KubernetesCluster do
       expect(kc.valid?).to be true
     end
   end
+
+  describe "#kubeconfig" do
+    kubeconfig = <<~YAML
+      apiVersion: v1
+      kind: Config
+      users:
+        - name: admin
+          user:
+            client-certificate-data: "mocked_cert_data"
+            client-key-data: "mocked_key_data"
+    YAML
+    let(:sshable) { instance_double(Sshable) }
+    let(:vm) { instance_double(Vm, sshable: sshable) }
+    let(:cp_vms) { [vm] }
+
+    it "removes client certificate and key data from users and adds an RBAC token to users" do
+      expect(kc).to receive(:cp_vms).and_return(cp_vms).twice
+      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d").and_return("mocked_rbac_token")
+      expect(sshable).to receive(:cmd).with("sudo cat /etc/kubernetes/admin.conf").and_return(kubeconfig)
+      customer_config = kc.kubeconfig
+      YAML.safe_load(customer_config)["users"].each do |user|
+        expect(user["user"]).not_to have_key("client-certificate-data")
+        expect(user["user"]).not_to have_key("client-key-data")
+        expect(user["user"]["token"]).to eq("mocked_rbac_token")
+      end
+    end
+  end
 end

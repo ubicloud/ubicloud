@@ -40,6 +40,18 @@ class KubernetesCluster < Sequel::Model
   def endpoint
     api_server_lb.hostname
   end
+
+  def kubeconfig
+    rbac_token = cp_vms.first.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d")
+    admin_kubeconfig = cp_vms.first.sshable.cmd("sudo cat /etc/kubernetes/admin.conf")
+    kubeconfig = YAML.safe_load(admin_kubeconfig)
+    kubeconfig["users"].each do |user|
+      user["user"].delete("client-certificate-data")
+      user["user"].delete("client-key-data")
+      user["user"]["token"] = rbac_token
+    end
+    kubeconfig.to_yaml
+  end
 end
 
 # Table: kubernetes_cluster

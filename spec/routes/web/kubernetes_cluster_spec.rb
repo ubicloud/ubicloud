@@ -298,6 +298,54 @@ RSpec.describe Clover, "Kubernetes" do
       end
     end
 
+    describe "kubeconfig" do
+      before do
+        kc
+      end
+
+      it "returns kubeconfig content for authorized users" do
+        allow_any_instance_of(KubernetesCluster).to receive(:kubeconfig).and_return("kubeconfig content")
+        visit "#{project.path}#{kc.path}/kubeconfig"
+
+        expect(page.response_headers["Content-Type"]).to eq("text/plain")
+        expect(page.response_headers["Content-Disposition"]).to include("attachment; filename=\"#{kc.name}-kubeconfig.yaml\"")
+        expect(page.body).to eq("kubeconfig content")
+      end
+
+      it "raises forbidden error when user does not have permission" do
+        AccessControlEntry.dataset.destroy
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+
+        visit "#{project.path}#{kc.path}/kubeconfig"
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content("Forbidden")
+      end
+
+      it "raises not found when Kubernetes cluster does not exist" do
+        visit "#{project.path}/kubernetes-cluster/_nonexistent/kubeconfig"
+
+        expect(page.status_code).to eq(404)
+        expect(page).to have_content("ResourceNotFound")
+      end
+
+      it "returns proper content headers and content" do
+        allow_any_instance_of(KubernetesCluster).to receive(:kubeconfig).and_return("mocked kubeconfig content")
+
+        visit "#{project.path}#{kc.path}/kubeconfig"
+        expect(page.response_headers["Content-Type"]).to eq("text/plain")
+        expect(page.response_headers["Content-Disposition"]).to include("attachment; filename=\"#{kc.name}-kubeconfig.yaml\"")
+        expect(page.body).to eq("mocked kubeconfig content")
+      end
+
+      it "does not allow unauthorized access" do
+        AccessControlEntry.dataset.destroy
+        visit "#{project.path}#{kc.path}/kubeconfig"
+
+        expect(page.status_code).to eq(403)
+        expect(page).to have_content("Forbidden")
+      end
+    end
+
     describe "delete" do
       it "can delete kubernetes cluster" do
         visit "#{project.path}#{kc.path}"
