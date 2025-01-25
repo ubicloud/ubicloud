@@ -101,7 +101,7 @@ r "systemctl enable cron"
 r "systemctl start cron"
 
 # Taken from https://infosec.mozilla.org/guidelines/openssh
-safe_write_to_file("/etc/ssh/ssh_config.d/10-clover.conf", <<~SSHD_CONFIG)
+safe_write_to_file("/etc/ssh/sshd_config.d/10-clover.conf", <<~SSHD_CONFIG)
 # Supported HostKey algorithms by order of preference.
 HostKey /etc/ssh/ssh_host_ed25519_key
 HostKey /etc/ssh/ssh_host_rsa_key
