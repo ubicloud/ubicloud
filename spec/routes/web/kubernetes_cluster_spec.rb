@@ -225,11 +225,11 @@ RSpec.describe Clover, "Kubernetes" do
         kc.add_cp_vm(create_vm(name: "cp1"))
         kc.add_cp_vm(create_vm(name: "cp2"))
 
-        kn = KubernetesNodepool.create(
+        kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
           name: "kn",
           node_count: 2,
           kubernetes_cluster_id: kc.id
-        )
+        ).subject
 
         kn.add_vm(create_vm(name: "node1"))
 
@@ -239,6 +239,26 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content "cp1"
         expect(page).to have_content "cp2"
         expect(page).to have_content "node1"
+
+        expect(kc.display_state).to eq("creating")
+        expect(page.body).to include "auto-refresh hidden"
+        expect(page.body).to include "creating"
+
+        kc.strand.update(label: "wait")
+        kn.strand.update(label: "wait")
+        page.refresh
+        expect(page.body).not_to include "auto-refresh hidden"
+        expect(page.body).to include "running"
+
+        kc.incr_destroy
+        kc.reload
+        puts kc.destroy_set?
+        puts kc.display_state
+
+        expect(kc.display_state).to eq("deleting")
+        page.refresh
+        expect(page.body).to include "deleting"
+        expect(page.body).to include "auto-refresh hidden"
       end
 
       it "works with ubid" do

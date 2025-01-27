@@ -13,13 +13,14 @@
   <%== render(
     "components/table_card",
     locals: {
-      headers: ["Name", "Location", "Kubernetes Version"],
+      headers: ["Name", "Location", "Kubernetes Version", "State"],
       rows: @kcs.map do |kc|
         [
           [
             [kc[:name], {link: @project_data[:path] + kc[:path]}],
             kc[:location],
             kc[:version],
+            ["kubernetes_state_label", {component: { state: kc[:state] }}]
           ],
           {id: "kc-#{kc[:id]}"}
         ]

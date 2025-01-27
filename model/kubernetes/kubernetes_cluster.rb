@@ -23,6 +23,12 @@ class KubernetesCluster < Sequel::Model
     errors.add(:version, "must be a valid Kubernetes version") unless ["v1.32", "v1.31"].include?(version)
   end
 
+  def display_state
+    return "deleting" if destroy_set? || strand.label == "destroy"
+    return "running" if strand.label == "wait" && nodepools.all? { _1.strand.label == "wait" }
+    "creating"
+  end
+
   def display_location
     LocationNameConverter.to_display_name(location)
   end
