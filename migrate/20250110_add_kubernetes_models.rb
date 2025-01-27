@@ -2,13 +2,11 @@
 
 Sequel.migration do
   change do
-    create_enum(:kubernetes_version, %w[v1.32 v1.31])
-
     create_table(:kubernetes_cluster) do
       column :id, :uuid, primary_key: true
       column :name, :text, null: false
       column :cp_node_count, :integer, null: false
-      column :version, :kubernetes_version, null: false
+      column :version, :text, null: false
       column :location, :text, collate: '"C"', null: false
       column :created_at, Time, null: false, default: Sequel::CURRENT_TIMESTAMP
 

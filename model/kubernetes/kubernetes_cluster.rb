@@ -16,6 +16,12 @@ class KubernetesCluster < Sequel::Model
 
   semaphore :destroy
 
+  def validate
+    super
+    errors.add(:cp_node_count, "must be greater than 0") if cp_node_count <= 0
+    errors.add(:version, "must be a valid Kubernetes version") unless ["v1.32", "v1.31"].include?(version)
+  end
+
   def display_location
     LocationNameConverter.to_display_name(location)
   end
@@ -34,7 +40,7 @@ end
 #  id                | uuid                     | PRIMARY KEY
 #  name              | text                     | NOT NULL
 #  cp_node_count     | integer                  | NOT NULL
-#  version           | kubernetes_version       | NOT NULL
+#  version           | text                     | NOT NULL
 #  location          | text                     | NOT NULL
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  project_id        | uuid                     | NOT NULL
