@@ -91,9 +91,11 @@ jobs:
 
     - name: Run tests
       env:
+        BASE_URL: https://${{ secrets.NGROK_ADDRESS }}
         RACK_ENV: production
         CLOVER_DATABASE_URL: postgres://${{ env.DB_USER }}:${{ env.DB_PASSWORD }}@localhost:5432/${{ env.DB_NAME }}
         CLOVER_SESSION_SECRET: kbaf1V3biZ+R2QqFahgDLB5/lSomwxQusA4PwROUkFS1srn0xM/I47IdLW7HjbQoxWri6/aVgtkqTLFiP65h9g==
+        CLOVER_RUNTIME_TOKEN_SECRET: r3rV5RzYVpDMlXxY1VnrHlmoMnXdUVt5ABec/TWXnmO7Ok/riFRDNATAMmDWTvtH+cSyXAniH3hHL6EetHj/FA==
         CLOVER_COLUMN_ENCRYPTION_KEY: TtlY0+hd4lvedPkNbu5qsj5H7giPKJSRX9KDBrvid7c=
         CI_HETZNER_SACRIFICIAL_SERVER_ID: ${{ secrets.CI_HETZNER_SACRIFICIAL_SERVER_ID }}
         HETZNER_USER: ${{ secrets.HETZNER_USER }}
