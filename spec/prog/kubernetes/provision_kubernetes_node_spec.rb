@@ -166,7 +166,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
     it "pops if the init_cluster script is successful" do
       expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check init_kubernetes_cluster").and_return("Succeeded")
-      expect { prog.init_cluster }.to exit({vm_id: prog.vm.id})
+      expect { prog.init_cluster }.to hop("install_cni")
     end
 
     it "naps forever if the daemonizer check returns something unknown" do
@@ -206,12 +206,37 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
     it "pops if the join_control_plane script is successful" do
       expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("Succeeded")
-      expect { prog.join_control_plane }.to exit({vm_id: prog.vm.id})
+      expect { prog.join_control_plane }.to hop("install_cni")
     end
 
     it "naps forever if the daemonizer check returns something unknown" do
       expect(prog.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check join_control_plane").and_return("Unknown")
       expect { prog.join_control_plane }.to nap(65536)
+    end
+  end
+
+  describe "#install_cni" do
+    it "configures ubicni" do
+      sshable = instance_double(Sshable)
+      allow(prog.vm).to receive_messages(
+        sshable: sshable,
+        nics: [instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")],
+        ephemeral_net6: NetAddr::IPv6Net.new(NetAddr::IPv6.parse("2001:db8::"), NetAddr::Mask128.new(64))
+      )
+
+      expect(sshable).to receive(:cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)
+      expect(sshable).to receive(:cmd).with("sudo nft -f -", stdin: <<~BASH)
+      add table ip nat;
+
+      table ip nat {
+        chain POSTROUTING {
+          type nat hook postrouting priority 100;
+          policy accept;
+          ip saddr 10.0.0.37 oifname ens3 masquerade;
+        }
+      }
+      BASH
+      expect { prog.install_cni }.to exit({vm_id: prog.vm.id})
     end
   end
 end

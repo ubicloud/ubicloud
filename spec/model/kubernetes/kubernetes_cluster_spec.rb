@@ -38,9 +38,6 @@ RSpec.describe KubernetesCluster do
       expect(kc.errors[:version]).to eq(["must be a valid Kubernetes version"])
 
       kc.version = "v1.32"
-      puts kc.valid?
-      puts kc.errors
-
       expect(kc.valid?).to be true
     end
   end
