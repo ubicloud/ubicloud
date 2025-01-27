@@ -123,4 +123,26 @@ module ContentGenerator
       select_option[:display_name]
     end
   end
+
+  module KubernetesCluster
+    def self.location(location)
+      Option.kubernetes_locations.find { _1.display_name == location }.ui_name
+    end
+
+    def self.version(version)
+      version
+    end
+
+    def self.private_subnet(location, private_subnet)
+      private_subnet[:display_name]
+    end
+
+    def self.cp_nodes(cp_nodes)
+      cp_nodes.to_s
+    end
+
+    def self.worker_nodes(worker_nodes)
+      worker_nodes[:display_name]
+    end
+  end
 end

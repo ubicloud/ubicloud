@@ -1,0 +1,29 @@
+<% @page_title = "Create Kubernetes Cluster" %>
+
+<%== render(
+  "components/page_header",
+  locals: {
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
+      %w[Create #]
+    ]
+  }
+) %>
+
+
+<%
+  form_elements = [
+    {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name"},
+    {name: "version", type: "radio_small_cards", label: "Kubernetes Version", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:version)},
+    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:location)},
+    {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Please select a subnet", content_generator: ContentGenerator::KubernetesCluster.method(:private_subnet), opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "cp_nodes", type: "radio_small_cards", label: "Control Plane Nodes", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:cp_nodes)},
+    {name: "worker_nodes", type: "select", label: "Worker Nodes", required: "required", content_generator: ContentGenerator::KubernetesCluster.method(:worker_nodes), opening_tag: "<div class='sm:col-span-3'>"},
+  ]
+
+  action = "#{@project_data[:path]}/kubernetes-cluster"
+%>
+
+<%==render("components/form/resource_creation_form", locals: {action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents})%>
