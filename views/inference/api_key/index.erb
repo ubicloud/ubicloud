@@ -1,4 +1,9 @@
 <% @page_title = "Inference API Keys" %>
+
+<% unless @has_free_inference_tokens %>
+  <%== render("components/billing_warning") %>
+<% end %>
+
 <%== render("inference/tabbar") %>
 
 <div>

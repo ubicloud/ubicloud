@@ -5,6 +5,7 @@ class Clover
     r.web do
       r.get true do
         @inference_api_keys = Serializers::InferenceApiKey.serialize(inference_api_key_ds.all)
+        @has_free_inference_tokens = @project.has_free_inference_tokens?
         view "inference/api_key/index"
       end
 

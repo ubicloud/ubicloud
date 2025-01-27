@@ -324,10 +324,12 @@ function setupPlayground() {
 
     try {
       const response = await fetch(`${endpoint}/v1/chat/completions`, {
+        // const response = await fetch(`${endpoint}/v1/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${api_key}`,
+          // Authorization: `Bearer ${api_key}`,
         },
         body: JSON.stringify({
           model: $('#inference_endpoint option:selected').text().trim(),
