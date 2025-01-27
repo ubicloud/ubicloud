@@ -1,0 +1,295 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "/home/ubi/common/lib/util"
+require "json"
+require "logger"
+require "ipaddr"
+require "fileutils"
+require "securerandom"
+
+LOG = Logger.new("/opt/cni/bin/cni_plugin.log")
+LOG.level = Logger::INFO
+
+class UBICNI
+  def initialize
+    @stdin_data = read_stdin
+    @cni_command = ENV["CNI_COMMAND"]
+    @ipam_store_file = "/opt/cni/bin/ubicni-ipam-store"
+    @ipam_store = {}
+    @mtu = 1400
+    load_ipam_store
+  end
+
+  def load_ipam_store
+    @ipam_store = if File.exist?(@ipam_store_file)
+      JSON.parse(File.read(@ipam_store_file))
+    else
+      {"allocated_ips" => {}}
+    end
+  end
+
+  def save_state
+    File.write(@ipam_store_file, JSON.pretty_generate(@ipam_store))
+  end
+
+  def read_stdin
+    input = $stdin.read
+    JSON.parse(input)
+  rescue JSON::ParserError => e
+    error_exit("Failed to parse input JSON: #{e.message}")
+  end
+
+  def run
+    LOG.info "-------------------------------------------------------"
+    LOG.info "Handling new command: #{ENV["CNI_COMMAND"]}"
+    LOG.info "ENV[CNI_CONTAINERID] #{ENV["CNI_CONTAINERID"]}"
+    LOG.info "ENV[CNI_NETNS] #{ENV["CNI_NETNS"]}"
+    LOG.info "ENV[CNI_IFNAME] #{ENV["CNI_IFNAME"]}"
+    LOG.info "ENV[CNI_ARGS] #{ENV["CNI_ARGS"]}"
+    LOG.info "ENV[CNI_PATH] #{ENV["CNI_PATH"]}"
+    LOG.info "-------------------------------------------------------"
+    case @cni_command
+    when "ADD"
+      handle_add
+    when "DEL"
+      handle_del
+    when "GET"
+      handle_get
+    else
+      error_exit("Unsupported CNI command: #{@cni_command}")
+    end
+  end
+
+  def handle_add
+    subnet_ula_ipv6 = @stdin_data["ranges"]["subnet_ula_ipv6"]
+    subnet_ipv6 = @stdin_data["ranges"]["subnet_ipv6"]
+    subnet_ipv4 = @stdin_data["ranges"]["subnet_ipv4"]
+
+    container_id = ENV["CNI_CONTAINERID"]
+    cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
+
+    inner_mac = gen_mac.shellescape
+    inner_link_local = mac_to_ipv6_link_local(inner_mac)
+    inner_ifname = ENV["CNI_IFNAME"]
+
+    outer_mac = gen_mac.shellescape
+    outer_link_local = mac_to_ipv6_link_local(outer_mac)
+    outer_ifname = "veth_#{container_id[0, 8]}"
+
+    FileUtils.mkdir_p("/etc/netns/#{cni_netns}")
+    dns_config = <<~EOF
+nameserver 10.96.0.10
+search default.svc.cluster.local svc.cluster.local cluster.local
+options ndots:5
+    EOF
+    File.write("/etc/netns/#{cni_netns}/resolv.conf", dns_config)
+
+    r "ip link add #{outer_ifname} addr #{outer_mac} type veth peer name #{inner_ifname} addr #{inner_mac} netns #{cni_netns}"
+
+    container_ipv6 = setup_ipv6(subnet_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: true)
+    container_ula_ipv6 = setup_ipv6(subnet_ula_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
+    ipv4_ips = setup_ipv4(subnet_ipv4, cni_netns, inner_ifname, outer_ifname)
+    ipv4_container_ip, ipv4_gateway_ip = ipv4_ips[:container_ip], ipv4_ips[:gateway_ip]
+
+    @ipam_store["allocated_ips"][container_id] = [ipv4_container_ip.to_s, ipv4_gateway_ip.to_s, container_ula_ipv6.to_s, container_ipv6.to_s]
+    save_state
+
+    response = {
+      cniVersion: "1.0.0",
+      interfaces: [
+        {
+          name: inner_ifname,
+          mac: inner_mac,
+          sandbox: "/var/run/netns/#{cni_netns}"
+        }
+      ],
+      ips: [
+        {
+          address: "#{ipv4_container_ip}/#{ipv4_container_ip.prefix}",
+          gateway: ipv4_gateway_ip.to_s,
+          interface: 0
+        },
+        {
+          address: "#{container_ula_ipv6}/#{container_ula_ipv6.prefix}",
+          gateway: outer_link_local,
+          interface: 0
+        },
+        {
+          address: "#{container_ipv6}/#{container_ipv6.prefix}",
+          gateway: outer_link_local,
+          interface: 0
+        }
+      ],
+      routes: [
+        {
+          dst: "0.0.0.0/0"
+        }
+      ],
+      dns: {
+        nameservers: ["10.96.0.10"],
+        search: ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
+        options: ["ndots:5"]
+      }
+    }
+    LOG.info "add response: #{JSON.generate(response)}"
+    puts JSON.generate(response)
+  end
+
+  def setup_ipv6(subnet, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname, setup_default_route: false)
+    container_ip = find_random_available_ip(IPAddr.new(subnet))
+
+    r "ip -6 -n #{cni_netns} addr add #{container_ip}/#{container_ip.prefix} dev #{inner_ifname}"
+    r "ip -6 -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
+    if setup_default_route
+      r "ip -6 -n #{cni_netns} route add default via #{outer_link_local} dev #{inner_ifname}"
+    end
+
+    r "ip -6 link set #{outer_ifname} mtu #{@mtu} up"
+    r "ip -6 route add #{container_ip}/#{container_ip.prefix} via #{inner_link_local} dev #{outer_ifname} mtu #{@mtu}"
+
+    container_ip
+  end
+
+  def setup_ipv4(subnet, cni_netns, inner_ifname, outer_ifname)
+    container_ip = find_random_available_ip(IPAddr.new(subnet))
+    gateway_ip = find_random_available_ip(IPAddr.new(subnet))
+
+    r "ip addr add #{gateway_ip}/24 dev #{outer_ifname}"
+    r "ip link set #{outer_ifname} mtu #{@mtu} up"
+
+    r "ip -n #{cni_netns} addr add #{container_ip}/24 dev #{inner_ifname}"
+    r "ip -n #{cni_netns} link set #{inner_ifname} mtu #{@mtu} up"
+    r "ip -n #{cni_netns} route add default via #{gateway_ip}"
+
+    r "ip route add #{container_ip}/#{container_ip.prefix} via #{gateway_ip} dev #{outer_ifname}"
+    r "echo 1 > /proc/sys/net/ipv4/conf/#{outer_ifname}/proxy_arp"
+
+    {container_ip: container_ip, gateway_ip: gateway_ip}
+  end
+
+  def handle_del
+    container_id = ENV["CNI_CONTAINERID"]
+
+    if @ipam_store["allocated_ips"].key?(container_id)
+      @ipam_store["allocated_ips"].delete(container_id)
+      save_state
+    end
+
+    puts "{}"
+  end
+
+  def handle_get
+    cni_netns = ENV["CNI_NETNS"].sub("/var/run/netns/", "")
+    inner_ifname = ENV["CNI_IFNAME"]
+
+    inner_mac = r("ip -n #{cni_netns} link show #{inner_ifname}").match(/link\/ether ([0-9a-f:]+)/)[1]
+    container_ip = r("ip -n #{cni_netns} -6 addr show dev #{inner_ifname}").match(/inet6 ([0-9a-f:\/]+)/)[1]
+
+    dns_config_path = "/etc/netns/#{cni_netns}/resolv.conf"
+    dns_servers = []
+    search_domains = []
+    if File.exist?(dns_config_path)
+      File.readlines(dns_config_path).each do |line|
+        if line.start_with?("nameserver")
+          dns_servers << line.split[1]
+        elsif line.start_with?("search")
+          search_domains = line.split.drop(1)
+        end
+      end
+    end
+
+    response = {
+      cniVersion: @stdin_data["cniVersion"],
+      interfaces: [
+        {
+          name: inner_ifname,
+          mac: inner_mac,
+          sandbox: "/var/run/netns/#{cni_netns}"
+        }
+      ],
+      ips: [
+        {
+          address: container_ip,
+          gateway: nil,
+          interface: 0
+        }
+      ],
+      dns: {
+        nameservers: dns_servers,
+        search: search_domains,
+        options: ["ndots:5"]
+      }
+    }
+
+    puts JSON.generate(response)
+  end
+
+  def error_exit(message)
+    LOG.error message
+    puts JSON.generate({code: 100, msg: message})
+    exit 1
+  end
+
+  def find_random_available_ip(subnet)
+    allocated_ips = @ipam_store["allocated_ips"].values.flatten
+    retries = 0
+    max_retries = 100
+
+    loop do
+      ip = generate_random_ip(subnet)
+      unless allocated_ips.include?(ip.to_s)
+        return ip
+      end
+
+      retries += 1
+      raise "Could not find an available IP after #{max_retries} retries" if retries >= max_retries
+    end
+  end
+
+  def generate_random_ip(subnet)
+    subnet_size = calculate_subnet_size(subnet)
+
+    base = subnet.to_i & subnet.mask(subnet.prefix).to_i
+    random_offset = SecureRandom.random_number(subnet_size - 2) + 1
+    IPAddr.new(base + random_offset, subnet.ipv4? ? Socket::AF_INET : Socket::AF_INET6)
+  end
+
+  def calculate_subnet_size(subnet)
+    if subnet.ipv4?
+      2**(32 - subnet.prefix)
+    else
+      2**(128 - subnet.prefix)
+    end
+  end
+
+  def gen_mac
+    ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
+      "%0.2X" % _1
+    }.join(":").downcase
+  end
+
+  # By reading the mac address from an interface, compute its ipv6
+  # link local address that it would have if its device state were set
+  # to up.
+  def mac_to_ipv6_link_local(mac)
+    eui = mac.split(":").map(&:hex)
+    eui.insert(3, 0xff, 0xfe)
+    eui[0] ^= 0x02
+
+    "fe80::" + eui.each_slice(2).map { |pair|
+      pair.map { format("%02x", _1) }.join
+    }.join(":")
+  end
+end
+
+if __FILE__ == $PROGRAM_NAME
+  begin
+    cni = UBICNI.new
+    cni.run
+  rescue => e
+    LOG.fatal "Unexpected error: #{e.message}, #{e.backtrace}"
+    puts JSON.generate({code: 999, msg: "Unexpected error: #{e.message}"})
+    exit 1
+  end
+end
