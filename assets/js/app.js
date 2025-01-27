@@ -286,6 +286,34 @@ function setupPlayground() {
   $('#inference_tab_preview').hide();
 
   let controller = null;
+  const thinkingExtension = {
+    name: "thinking",
+    level: "block",
+    tokenizer(src) {
+      const match = src.match(/^<think>([\s\S]+?)(?:<\/think>|$)/);
+      if (match) {
+        return {
+          type: "thinking",
+          raw: match[0],
+          text: match[1].trim(),
+        };
+      }
+      return false;
+    },
+    renderer(token) {
+      if (token.type === "thinking") {
+        const text = token.text.trim().replace(/\n+/g, '<br>');
+        if (text.length > 0) {
+          return `
+            <div class="text-sm italic p-4 bg-gray-50 ">
+              <div class="font-bold mb-4">Thinking Process</div>
+              ${text}
+            </div>`;
+        }
+      }
+    }
+  };
+  marked.use({ extensions: [thinkingExtension] });
 
   const generate = async () => {
     if (controller) {
