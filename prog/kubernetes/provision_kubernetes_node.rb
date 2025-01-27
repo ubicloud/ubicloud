@@ -93,7 +93,7 @@ BASH
   label def init_cluster
     case vm.sshable.cmd("common/bin/daemonizer --check init_kubernetes_cluster")
     when "Succeeded"
-      pop vm_id: vm.id
+      hop_install_cni
     when "NotStarted"
       params = {
         cluster_name: kubernetes_cluster.name,
@@ -119,7 +119,7 @@ BASH
   label def join_control_plane
     case vm.sshable.cmd("common/bin/daemonizer --check join_control_plane")
     when "Succeeded"
-      pop vm_id: vm.id
+      hop_install_cni
     when "NotStarted"
       cp_sshable = kubernetes_cluster.cp_vms.first.sshable
       params = {
@@ -139,5 +139,29 @@ BASH
     end
 
     nap 65536
+  end
+
+  label def install_cni
+    cni_config = <<CONFIG
+{
+  "cniVersion": "1.0.0",
+  "name": "ubicni-network",
+  "type": "ubicni",
+  "ranges":{
+      "subnet_ipv6": "#{NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(80))}",
+      "subnet_ula_ipv6": "#{vm.nics.first.private_ipv6}",
+      "subnet_ipv4": "#{vm.nics.first.private_ipv4}"
+  }
+}
+CONFIG
+    vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
+    vm.sshable.cmd <<~BASH
+      set -ueo pipefail
+      sudo nft add table ip nat
+      sudo nft add chain ip nat POSTROUTING { type nat hook postrouting priority 100';' }
+      sudo nft add rule ip nat POSTROUTING ip saddr #{vm.nics.first.private_ipv4} oifname ens3 masquerade
+    BASH
+
+    pop vm_id: vm.id
   end
 end
