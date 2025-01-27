@@ -1,5 +1,9 @@
 <% @page_title = @kc[:name] %>
 
+<% if @kc[:state] != "running" %>
+  <div class="auto-refresh hidden" data-interval="10"></div>
+<% end %>
+
 <%== render(
   "components/page_header",
   locals: {
@@ -8,7 +12,8 @@
       [@project_data[:name], @project_data[:path]],
       ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
       [@kc[:name], "#"]
-    ]
+    ],
+    right_items: [render("components/kubernetes_state_label", locals: { state: @kc[:state], extra_class: "text-md" })]
   }
 ) %>
 
