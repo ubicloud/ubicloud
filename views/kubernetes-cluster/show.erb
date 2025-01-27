@@ -1,5 +1,9 @@
 <% @page_title = @kc.name %>
 
+<% if @kc.display_state != "running" %>
+  <div class="auto-refresh hidden" data-interval="10"></div>
+<% end %>
+
 <%== part(
   "components/page_header",
   breadcrumbs: [
@@ -7,7 +11,8 @@
     [@project_data[:name], @project_data[:path]],
     ["Kubernetes Clusters", "#{@project_data[:path]}/kubernetes-cluster"],
     [@kc.name, "#"]
-  ]
+  ],
+  left_items: [part("components/kubernetes_state_label", state: @kc.display_state, extra_class: "text-md")]
 ) %>
 
 <div class="grid gap-6">
