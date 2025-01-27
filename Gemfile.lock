@@ -351,7 +351,7 @@ GEM
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
     securerandom (0.4.1)
-    sequel (5.88.0)
+    sequel (5.89.0)
       bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
@@ -485,7 +485,7 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
-  sequel (>= 5.88)
+  sequel (>= 5.89)
   sequel-annotate
   sequel_pg (>= 1.8)
   shellwords
