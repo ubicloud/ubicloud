@@ -20,6 +20,7 @@ class Project < Sequel::Model
   one_to_many :firewalls
   one_to_many :load_balancers
   one_to_many :inference_endpoints
+  one_to_many :free_quotas
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers]
 
@@ -37,6 +38,11 @@ class Project < Sequel::Model
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
     !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
+  end
+
+  def has_free_inference_tokens?
+    return true unless Config.stripe_secret_key
+    free_inference_tokens > 0
   end
 
   def default_location
@@ -160,16 +166,18 @@ end
 
 # Table: project
 # Columns:
-#  id              | uuid                     | PRIMARY KEY
-#  name            | text                     | NOT NULL
-#  visible         | boolean                  | NOT NULL DEFAULT true
-#  billing_info_id | uuid                     |
-#  credit          | numeric                  | NOT NULL DEFAULT 0
-#  discount        | integer                  | NOT NULL DEFAULT 0
-#  created_at      | timestamp with time zone | NOT NULL DEFAULT now()
-#  feature_flags   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
-#  billable        | boolean                  | NOT NULL DEFAULT true
-#  reputation      | project_reputation       | NOT NULL DEFAULT 'new'::project_reputation
+#  id                               | uuid                        | PRIMARY KEY
+#  name                             | text                        | NOT NULL
+#  visible                          | boolean                     | NOT NULL DEFAULT true
+#  billing_info_id                  | uuid                        |
+#  credit                           | numeric                     | NOT NULL DEFAULT 0
+#  discount                         | integer                     | NOT NULL DEFAULT 0
+#  created_at                       | timestamp with time zone    | NOT NULL DEFAULT now()
+#  feature_flags                    | jsonb                       | NOT NULL DEFAULT '{}'::jsonb
+#  billable                         | boolean                     | NOT NULL DEFAULT true
+#  reputation                       | project_reputation          | NOT NULL DEFAULT 'new'::project_reputation
+#  free_inference_tokens            | integer                     | NOT NULL DEFAULT 0
+#  free_inference_tokens_updated_at | timestamp without time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 # Indexes:
 #  project_pkey                      | PRIMARY KEY btree (id)
 #  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))

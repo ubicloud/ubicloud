@@ -169,7 +169,9 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       .exists
 
     eligible_projects_ds = Project.where(api_key_ds)
-    eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
+    eligible_projects_ds = eligible_projects_ds
+      .exclude(billing_info_id: nil, credit: 0.0)
+      .where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
 
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
