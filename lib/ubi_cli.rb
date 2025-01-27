@@ -80,7 +80,7 @@ class UbiCli
   end
 
   def _req(env)
-    res = Clover.call(env)
+    res = _submit_req(env)
 
     case res[0]
     when 200
@@ -115,4 +115,28 @@ class UbiCli
     res[1]["content-type"] = "text/plain"
     res
   end
+
+  def _submit_req(env)
+    Clover.call(env)
+  end
+
+  # :nocov:
+  if Config.test? && ENV["CLOVER_FREEZE"] == "1"
+    singleton_class.prepend(Module.new do
+      def process(argv, env)
+        DB.block_queries do
+          super
+        end
+      end
+    end)
+
+    prepend(Module.new do
+      def _submit_req(env)
+        DB.allow_queries do
+          super
+        end
+      end
+    end)
+  end
+  # :nocov:
 end
