@@ -31,6 +31,11 @@ RSpec.describe Clover, "Kubernetes" do
     ).subject
   end
 
+  before do
+    project.set_ff_kubernetes true
+    project_wo_permissions.set_ff_kubernetes true
+  end
+
   describe "unauthenticated" do
     it "can not list without login" do
       visit "#{project.path}/kubernetes-cluster"
@@ -47,6 +52,17 @@ RSpec.describe Clover, "Kubernetes" do
   describe "authenticated" do
     before do
       login(user.email)
+    end
+
+    describe "feature disabled" do
+      before do
+        project.set_ff_kubernetes(false)
+        visit "#{project.path}/kubernetes-cluster"
+      end
+
+      it "kubernetes page is not accessible" do
+        expect(page.status_code).to eq(404)
+      end
     end
 
     describe "list" do
