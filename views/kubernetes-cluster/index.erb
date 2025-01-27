@@ -1,0 +1,34 @@
+<% @page_title = "Kubernetes Clusters" %>
+
+<%== part(
+  "components/page_header",
+  right_items: (!@kcs.empty? && has_project_permission("KubernetesCluster:create")) ? [
+    part("components/button", text: "Create Kubernetes Cluster", link: "kubernetes-cluster/create")
+  ] : []
+) %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Location", "Kubernetes Version"],
+    rows: @kcs.map do |kc|
+      [
+        [
+          [kc.name, {link: @project_data[:path] + kc.path}],
+          kc.location,
+          kc.version,
+        ],
+        {id: "kc-#{kc[:id]}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-arrows-pointing-out",
+      title: "No Kubernetes Clusters",
+      description: "You don't have permission to create kubernetes clusters."
+    }.merge(has_project_permission("KubernetesCluster:create") ? {
+      description: "Get started by creating a new kubernetes cluster.",
+      button_link: "#{@project_data[:path]}/kubernetes-cluster/create",
+      button_title: "Create Kubernetes Cluster"
+    } : {})
+  ) %>
+</div>
