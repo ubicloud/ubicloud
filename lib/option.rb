@@ -40,6 +40,10 @@ module Option
     Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
   end
 
+  def self.kubernetes_locations
+    Option::LOCATIONS.select { _1.name == "hetzner-fsn1" || _1.name == "leaseweb-wdc02" }
+  end
+
   BootImage = Struct.new(:name, :display_name)
   BootImages = [
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
