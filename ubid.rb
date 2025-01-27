@@ -123,6 +123,7 @@ class UBID
     SubjectTag: ts
     ActionTag: ta
     ObjectTag: t0
+    KubernetesCluster: kc
   TYPES
   def self.generate_vanity_action_type(action)
     prefix, suffix = action.split(":")
