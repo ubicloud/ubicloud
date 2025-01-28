@@ -162,7 +162,7 @@ GEM
     json_schema (0.21.0)
     jwt (2.10.1)
       base64
-    language_server-protocol (3.17.0.3)
+    language_server-protocol (3.17.0.4)
     lint_roller (1.1.0)
     logger (1.6.4)
     loofah (2.24.0)
@@ -321,7 +321,7 @@ GEM
       rubocop-ast (>= 1.36.2, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 4.0)
-    rubocop-ast (1.37.0)
+    rubocop-ast (1.38.0)
       parser (>= 3.3.1.0)
     rubocop-capybara (2.21.0)
       rubocop (~> 1.41)
