@@ -77,7 +77,7 @@ end
 
 gem "webauthn", "~> 3.2"
 
-gem "aws-sdk-s3", "~> 1.177"
+gem "aws-sdk-s3", "~> 1.178"
 
 gem "acme-client", "~> 2.0"
 
