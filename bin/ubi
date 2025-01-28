@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+begin
+  require_relative "../.env"
+rescue LoadError
+end
+
+require "net/http"
+require "json"
+
+unless (token = ENV["UBI_TOKEN"])
+  warn "Personal access token must be provided in UBI_TOKEN env variable for use"
+  exit 1
+end
+
+url = ENV["UBI_URL"] || "http://api.localhost:9292/cli"
+progs = {
+  "ssh" => ENV["UBI_SSH"] || "ssh",
+  "psql" => ENV["UBI_PSQL"] || "psql"
+}
+
+uri = URI(url)
+data = {"argv" => ARGV}.to_json
+headers = {
+  "authorization" => "Bearer: #{token}",
+  "content-type" => "application/json",
+  "accept" => "text/plain",
+  "connection" => "close"
+}
+
+response = Net::HTTP.post(uri, data, headers)
+
+case response.code.to_i
+when 200...300
+  if (prog = response["ubi-command-execute"])
+    if (arg = response["ubi-command-arg"])
+      if (prog = progs[prog])
+        args = [prog, "--", arg]
+        if (index = Integer(response["ubi-command-argv-tail"], 10, exception: false) || 0) > 0
+          args.concat(ARGV[-index...])
+        end
+        system(*args)
+        exit $?.exitstatus
+      else
+        warn "Invalid server response, unsupported ubi-command-execute header"
+        exit 1
+      end
+    else
+      warn "Invalid server response, no ubi-command-arg header"
+      exit 1
+    end
+  else
+    $stdout.puts response.body
+  end
+else
+  warn response.body
+  exit 1
+end
