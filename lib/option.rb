@@ -52,6 +52,13 @@ module Option
     ["almalinux-9", "AlmaLinux 9"]
   ].map { |args| BootImage.new(*args) }.freeze
 
+  VmFamily = Data.define(:name, :require_shared_slice)
+  VmFamilies = [
+    ["standard", false],
+    ["standard-gpu", false],
+    ["burstable", true]
+  ].map { |args| VmFamily.new(*args) }
+
   IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
   NO_IO_LIMITS = IoLimits.new(nil, nil, nil).freeze
 
@@ -66,6 +73,14 @@ module Option
     VmSize.new("standard-#{_1}", "standard", _1, _1 * 100, 0, (_1 * 3.2).to_i, storage_size_options, NO_IO_LIMITS, false, false, "arm64")
   }).concat([6].map {
     VmSize.new("standard-gpu-#{_1}", "standard-gpu", _1, _1 * 100, 0, (_1 * 5.34).to_i, [_1 * 30], NO_IO_LIMITS, false, true, "x64")
+  }).concat([1, 2].map {
+    storage_size_options = [_1 * 10, _1 * 20]
+    io_limits = IoLimits.new(nil, _1 * 50, _1 * 50)
+    VmSize.new("burstable-#{_1}", "burstable", _1, _1 * 50, _1 * 50, _1 * 2, storage_size_options, io_limits, false, false, "x64")
+  }).concat([1, 2].map {
+    storage_size_options = [_1 * 10, _1 * 20]
+    io_limits = IoLimits.new(nil, _1 * 50, _1 * 50)
+    VmSize.new("burstable-#{_1}", "burstable", _1, _1 * 50, _1 * 50, (_1 * 1.6).to_i, storage_size_options, io_limits, false, false, "arm64")
   }).freeze
 
   PostgresSize = Struct.new(:location, :name, :vm_size, :family, :vcpu, :memory, :storage_size_options) do
