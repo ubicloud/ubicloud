@@ -226,6 +226,13 @@ RSpec.configure do |config|
     require "ripper"
     require "coderay"
   end
+
+  def create_vm_host(**args)
+    args = {location: "hetzner-fns1", allocation_state: "accepting", arch: "x64", total_cores: 48, used_cores: 2}.merge(args)
+    ubid = VmHost.generate_ubid
+    Sshable.create { _1.id = ubid.to_uuid }
+    VmHost.create(**args) { _1.id = ubid.to_uuid }
+  end
 end
 
 def create_vm(**args)

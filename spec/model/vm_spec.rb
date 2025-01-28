@@ -106,10 +106,7 @@ RSpec.describe Vm do
   end
 
   describe "#update_spdk_version" do
-    let(:vmh) {
-      sshable = Sshable.create_with_id
-      VmHost.create(location: "a") { _1.id = sshable.id }
-    }
+    let(:vmh) { create_vm_host }
 
     before do
       expect(vm).to receive(:vm_host).and_return(vmh)

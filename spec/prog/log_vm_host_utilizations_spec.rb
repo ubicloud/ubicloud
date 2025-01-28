@@ -8,14 +8,13 @@ RSpec.describe Prog::LogVmHostUtilizations do
   describe "#wait" do
     it "logs vm host utilizations every minute" do
       [
-        ["1.1.1.1", "hetzner-fsn1", "x64", "accepting", 3, 10, 20, 80],
-        ["2.2.2.2", "hetzner-fsn1", "x64", "draining", 5, 20, 50, 150],
-        ["3.3.3.3", "hetzner-fsn1", "arm64", "accepting", 10, 80, 30, 200],
-        ["4.4.4.4", "hetzner-hel1", "x64", "accepting", 2, 10, 20, 100],
-        ["5.5.5.5", "hetzner-hel1", "x64", "accepting", 0, nil, 0, 0]
-      ].each do |host, location, arch, allocation_state, used_cores, total_cores, used_hugepages_1g, total_hugepages_1g|
-        sshable = Sshable.create_with_id(host:)
-        VmHost.create(location:, arch:, allocation_state:, used_cores:, total_cores:, used_hugepages_1g:, total_hugepages_1g:) { _1.id = sshable.id }
+        ["hetzner-fsn1", "x64", "accepting", 3, 10, 20, 80],
+        ["hetzner-fsn1", "x64", "draining", 5, 20, 50, 150],
+        ["hetzner-fsn1", "arm64", "accepting", 10, 80, 30, 200],
+        ["hetzner-hel1", "x64", "accepting", 2, 10, 20, 100],
+        ["hetzner-hel1", "x64", "accepting", 0, nil, 0, 0]
+      ].each do |location, arch, allocation_state, used_cores, total_cores, used_hugepages_1g, total_hugepages_1g|
+        create_vm_host(location:, arch:, allocation_state:, used_cores:, total_cores:, used_hugepages_1g:, total_hugepages_1g:)
       end
 
       expect(Clog).to receive(:emit).with("location utilization") do |&blk|

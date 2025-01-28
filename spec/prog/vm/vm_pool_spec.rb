@@ -53,7 +53,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#wait" do
     before do
-      VmHost.create(location: "github-runners", allocation_state: "accepting", arch: "x64", total_cores: 2, used_cores: 0) { _1.id = Sshable.create_with_id.id }
+      create_vm_host(location: "github-runners", total_cores: 2, used_cores: 0)
     end
 
     let(:pool) {

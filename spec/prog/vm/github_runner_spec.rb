@@ -292,8 +292,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#wait_concurrency_limit" do
     before do
       [["hetzner-fsn1", "x64"], ["github-runners", "x64"], ["github-runners", "arm64"]].each_with_index do |(location, arch), i|
-        ssh = Sshable.create_with_id(host: "0.0.0.#{i}")
-        VmHost.create(location: location, allocation_state: "accepting", arch: arch, total_cores: 16, used_cores: 16) { _1.id = ssh.id }
+        create_vm_host(location:, arch:, total_cores: 16, used_cores: 16)
       end
     end
 

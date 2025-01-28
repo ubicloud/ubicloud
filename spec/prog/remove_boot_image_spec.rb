@@ -5,14 +5,13 @@ require_relative "../model/spec_helper"
 RSpec.describe Prog::RemoveBootImage do
   subject(:rbi) { described_class.new(Strand.new(stack: [{}])) }
 
-  let(:sshable) { Sshable.create_with_id }
-  let(:vm_host) { VmHost.create(location: "hetzner-fsn1") { _1.id = sshable.id } }
+  let(:sshable) { vm_host.sshable }
+  let(:vm_host) { create_vm_host }
   let(:boot_image) { BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14) }
 
   before do
     allow(rbi).to receive(:boot_image).and_return(boot_image)
     allow(boot_image).to receive(:vm_host).and_return(vm_host)
-    allow(vm_host).to receive(:sshable).and_return(sshable)
   end
 
   describe "#start" do
