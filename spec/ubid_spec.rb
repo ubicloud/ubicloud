@@ -180,7 +180,7 @@ RSpec.describe UBID do
     sshable = Sshable.create_with_id
     expect(sshable.ubid).to start_with UBID::TYPE_SSHABLE
 
-    host = VmHost.create(location: "x") { _1.id = sshable.id }
+    host = create_vm_host
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
 
     vm = create_vm
@@ -255,7 +255,7 @@ RSpec.describe UBID do
 
   it "can decode ids" do
     sshable = Sshable.create_with_id
-    host = VmHost.create(location: "x") { _1.id = sshable.id }
+    host = create_vm_host
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: host.id) { _1.id = host.id }
     vm = create_vm
     dev = StorageDevice.create(name: "x", available_storage_gib: 1, total_storage_gib: 1, vm_host_id: host.id) { _1.id = host.id }

@@ -4,9 +4,9 @@ require_relative "spec_helper"
 
 RSpec.describe GithubRunner do
   subject(:github_runner) {
-    vmh = VmHost.create(location: "hetzner-fsn1") { _1.id = Sshable.create_with_id.id }
     ins = GithubInstallation.create_with_id(installation_id: 123, name: "test-installation", type: "User")
-    vm = Vm.create(vm_host: vmh, unix_user: "ubi", public_key: "ssh-key", name: "runner-vm", location: "hetzner-fsn1", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 1, vcpus: 2, memory_gib: 8, project_id: Project.create(name: "test").id) { _1.id = Sshable.create_with_id.id }
+    vm = create_vm(vm_host: create_vm_host, boot_image: "github-ubuntu-2204")
+    Sshable.create { _1.id = vm.id }
     described_class.create_with_id(repository_name: "test-repo", label: "ubicloud", vm_id: vm.id, installation_id: ins.id)
   }
 
