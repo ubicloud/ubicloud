@@ -58,7 +58,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       dst_port: 6443,
       health_check_endpoint: "/healthz",
       health_check_protocol: "tcp",
-      stack: LoadBalancer::Stack::DUAL
+      stack: LoadBalancer::Stack::IPV4
     )
     kubernetes_cluster.update(api_server_lb_id: load_balancer_st.id)
 
