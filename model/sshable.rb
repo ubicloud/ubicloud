@@ -82,9 +82,7 @@ class Sshable < Sequel::Model
     if log
       Clog.emit("ssh cmd execution") do
         finish = Time.now
-        embed = {start: start, finish: finish, duration: finish - start,
-                 cmd: cmd,
-                 exit_code: exit_code, exit_signal: exit_signal}
+        embed = {start:, finish:, cmd:, exit_code:, exit_signal:, duration: finish - start}
 
         # Suppress large outputs to avoid annoyance in duplication
         # when in the REPL.  In principle, the user of the REPL could
