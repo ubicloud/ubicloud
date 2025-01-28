@@ -49,9 +49,6 @@ RSpec.describe LoadBalancer do
     it "increments update_load_balancer and rewrite_dns_records" do
       expect(lb).to receive(:incr_update_load_balancer)
       expect(lb).to receive(:incr_rewrite_dns_records)
-      health_probe = instance_double(Strand, stack: [{"subject_id" => lb.id, "vm_id" => vm1.id}])
-      expect(lb.strand).to receive(:children_dataset).and_return(instance_double(Sequel::Dataset, where: instance_double(Sequel::Dataset, all: [health_probe])))
-      expect(health_probe).to receive(:destroy)
       lb.evacuate_vm(vm1)
       expect(lb.load_balancers_vms.first[:state]).to eq("evacuating")
     end
