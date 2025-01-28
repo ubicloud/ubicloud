@@ -30,7 +30,21 @@ class Sshable < Sequel::Model
       @exit_signal = exit_signal
       @stdout = stdout
       @stderr = stderr
-      super("command exited with an error: " + cmd)
+      super(message_prefix + cmd)
+    end
+
+    private
+
+    def message_prefix
+      "command exited with an error: "
+    end
+  end
+
+  class SshTimeout < SshError
+    private
+
+    def message_prefix
+      "command timed out: "
     end
   end
 
@@ -48,7 +62,9 @@ class Sshable < Sequel::Model
     self.class.repl?
   end
 
-  def cmd(cmd, stdin: nil, log: true)
+  MAX_TIMEOUT = Strand::LEASE_EXPIRATION - 39
+
+  def cmd(cmd, stdin: nil, log: true, timeout: :default)
     start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
@@ -56,8 +72,20 @@ class Sshable < Sequel::Model
     exit_signal = nil
     channel_duration = nil
 
+    if timeout == :default
+      timeout = if (apoptosis_at = Thread.current[:apoptosis_at])
+        (apoptosis_at - start - 2).to_i.clamp(1, MAX_TIMEOUT)
+      else
+        MAX_TIMEOUT
+      end
+    end
+
+    wait_deadline = if timeout
+      start + timeout + 0.5
+    end
+
     begin
-      connect.open_channel do |ch|
+      ch = connect.open_channel do |ch|
         channel_duration = Time.now - start
         ch.exec(cmd) do |ch, success|
           ch.on_data do |ch, data|
@@ -79,9 +107,9 @@ class Sshable < Sequel::Model
           end
           ch.send_data stdin
           ch.eof!
-          ch.wait
         end
-      end.wait
+      end
+      channel_wait(ch, wait_deadline)
     rescue
       invalidate_cache_entry
       raise
@@ -93,7 +121,8 @@ class Sshable < Sequel::Model
     if log
       Clog.emit("ssh cmd execution") do
         finish = Time.now
-        embed = {start:, finish:, cmd:, exit_code:, exit_signal:, ubid:, duration: finish - start}
+        embed = {ubid:, start:, finish:, timeout:, duration: finish - start,
+                 cmd:, exit_code:, exit_signal:}
 
         # Suppress large outputs to avoid annoyance in duplication
         # when in the REPL.  In principle, the user of the REPL could
@@ -111,7 +140,7 @@ class Sshable < Sequel::Model
       end
     end
 
-    fail SshError.new(cmd, stdout_str, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
+    fail (exit_code ? SshError : SshTimeout).new(cmd, stdout_str, stderr_str, exit_code, exit_signal) unless exit_code&.zero?
     stdout_str
   end
 
@@ -210,6 +239,19 @@ LOCK
       e
     ensure
       cache.delete(key)
+    end
+  end
+
+  private
+
+  def channel_wait(ch, wait_deadline)
+    if wait_deadline
+      ch.connection.loop do
+        ch.active? && Time.now < wait_deadline
+      end
+      ch.close
+    else
+      ch.wait
     end
   end
 end

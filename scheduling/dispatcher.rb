@@ -461,6 +461,12 @@ class Scheduling::Dispatcher
   def run_strand(strand, start_queue, finish_queue)
     strand_ubid = strand.ubid.freeze
     Thread.current.name = strand_ubid
+
+    # Provide information for the apoptosis deadline to other timeout
+    # code that takes places during consecutive strand invocations
+    # within `STRAND_RUNTIME`.
+    Thread.current[:apoptosis_at] = Time.now + @apoptosis_timeout
+
     start_queue.push(strand_ubid)
     strand.run(STRAND_RUNTIME)
   rescue => ex
@@ -473,6 +479,8 @@ class Scheduling::Dispatcher
     end
     ex
   ensure
+    Thread.current[:apoptosis_at] = nil
+
     # Always signal apoptosis thread that the strand has finished,
     # even for non-StandardError exits
     finish_queue.push(true)
