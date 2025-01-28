@@ -66,14 +66,13 @@ class LoadBalancersVms < Sequel::Model
 end
 
 # Table: load_balancers_vms
-# Primary Key: (load_balancer_id, vm_id)
 # Columns:
-#  id               | uuid          |
-#  load_balancer_id | uuid          |
-#  vm_id            | uuid          |
+#  load_balancer_id | uuid          | NOT NULL
+#  vm_id            | uuid          | NOT NULL
 #  state            | lb_node_state | NOT NULL DEFAULT 'down'::lb_node_state
+#  id               | uuid          | PRIMARY KEY
 # Indexes:
-#  load_balancers_vms_pkey      | PRIMARY KEY btree (load_balancer_id, vm_id)
+#  load_balancers_vms_pkey      | PRIMARY KEY btree (id)
 #  load_balancers_vms_vm_id_key | UNIQUE btree (vm_id)
 # Foreign key constraints:
 #  load_balancers_vms_load_balancer_id_fkey | (load_balancer_id) REFERENCES load_balancer(id)
