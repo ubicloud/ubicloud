@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, diagnostics: false)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: false, require_shared_slice: false, diagnostics: false)
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -34,7 +34,9 @@ RSpec.describe Al do
       location_filter,
       location_preference,
       vm.family,
+      vm.cpu_percent_limit,
       use_slices,
+      require_shared_slice,
       diagnostics
     )
   end
@@ -79,11 +81,16 @@ RSpec.describe Al do
           [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
             [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
           "ubuntu-jammy", false, 0, true, Config.allocator_target_host_utilization, "x64", ["accepting"], [], [], [], [],
-          "standard"
+          "standard", 200
         )).and_return(al)
       expect(al).to receive(:update)
 
       described_class.allocate(vm, storage_volumes)
+    end
+
+    it "handles non-existing family" do
+      vm.family = "non-existing-family"
+      expect { described_class.allocate(vm, storage_volumes) }.to raise_error RuntimeError, /no space left on any eligible host/
     end
   end
 
@@ -94,7 +101,7 @@ RSpec.describe Al do
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [],
-        "standard"
+        "standard", 400
       )
     }
 
@@ -322,7 +329,7 @@ RSpec.describe Al do
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, true, 0.65, "x64", ["accepting"], [], [], [], [],
-        "standard"
+        "standard", 400
       )
     }
     let(:vmhds) {
@@ -474,7 +481,7 @@ RSpec.describe Al do
         [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], [],
-        "standard"
+        "standard", 200
       )
     }
     let(:vmhds) {
@@ -895,7 +902,7 @@ RSpec.describe Al do
     end
 
     before do
-      vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "hetzner-fsn1", total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fbb::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { _1.id = Sshable.create_with_id.id }
+      vmh = create_vm_host(total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fbb::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { _1.id = Sshable.create_with_id.id }
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
@@ -995,7 +1002,126 @@ RSpec.describe Al do
       expect(slice.allowed_cpus_cgroup).to eq("6-7,12-13")
     end
 
-    it "allocates with no slice if no host available" do
+    it "places a burstable vm in an new slice" do
+      vh = VmHost.first
+      first_slice = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "burstable", allowed_cpus: (2..3), memory_gib: 8, is_shared: true).subject
+      first_slice.update(used_cpu_percent: 200, used_memory_gib: 8, enabled: true)
+      vh.update(total_cores: 4, total_cpus: 8, used_cores: 2, total_hugepages_1g: 27, used_hugepages_1g: 10)
+      vh.reload
+      used_cores = vh.used_cores
+      used_hugepages_1g = vh.used_hugepages_1g
+
+      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
+      expect(al).not_to be_nil
+
+      al.update(vm)
+      vh.reload
+
+      expect(vm.vcpus).to eq(1)
+      expect(vm.cores).to eq(0)
+      expect(vm.memory_gib).to eq(2)
+
+      slice = vm.vm_host_slice
+      expect(slice).not_to be_nil
+      expect(slice.id).not_to eq(first_slice.id)
+      expect(slice.allowed_cpus_cgroup).to eq("4-5")
+      expect(slice.cores).to eq(1)
+      expect(slice.total_cpu_percent).to eq(200)
+      expect(slice.used_cpu_percent).to eq(50)
+      expect(slice.total_memory_gib).to eq(8)
+      expect(slice.used_memory_gib).to eq(2)
+      expect(vh.slices.size).to eq(2)
+      expect(vh.used_cores).to eq(used_cores + slice.cores)
+      expect(vh.used_hugepages_1g).to eq(used_hugepages_1g + slice.total_memory_gib)
+    end
+
+    it "places a burstable vm in an existing slice" do
+      vh = VmHost.first
+      slice1 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: (2..5), memory_gib: 16, is_shared: false).subject
+      slice2 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "burstable", allowed_cpus: (6..7), memory_gib: 8, is_shared: true).subject
+      slice1.update(used_cpu_percent: 400, used_memory_gib: 16, enabled: true)
+      slice2.update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)
+      vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
+      vh.reload
+      used_cores = vh.used_cores
+      used_hugepages_1g = vh.used_hugepages_1g
+
+      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 2, memory_gib: 4, cpu_percent_limit: 100, cpu_burst_percent_limit: 100)
+      req = create_req(vm, vol, use_slices: true, require_shared_slice: true)
+
+      candidates = Al::Allocation.candidate_hosts(req)
+      expect(candidates.size).to eq(1)
+
+      al = Al::Allocation.new(candidates[0], req)
+      expect(al.is_valid).to be_truthy
+
+      al.update(vm)
+      vh.reload
+
+      slice = vm.vm_host_slice
+      expect(slice).not_to be_nil
+      expect(slice.id).to eq(slice2.id)
+      expect(vh.used_cores).to eq(used_cores)
+      expect(vh.used_hugepages_1g).to eq(used_hugepages_1g)
+    end
+
+    it "prefers a host with available slice for burstables" do
+      vh1 = VmHost.first
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh1, family: "standard", allowed_cpus: (2..5), memory_gib: 16, is_shared: false)
+        .subject
+        .update(used_cpu_percent: 400, used_memory_gib: 16, enabled: true) # Full
+      Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh1, family: "burstable", allowed_cpus: (6..7), memory_gib: 8, is_shared: true)
+        .subject
+        .update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)  # Partially filled in
+      vh1.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
+      vh1.reload
+
+      # Create a second host
+      vh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "hetzner-fsn1", total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fcc::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2, accepts_slices: true) { _1.id = Sshable.create_with_id.id }
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vh2.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vh2.id, version: "v1", allocation_weight: 100) { _1.id = vh2.id }
+      Address.create_with_id(cidr: "1.1.2.0/30", routed_to_host_id: vh2.id)
+      PciDevice.create_with_id(vm_host_id: vh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      vh2.update(used_cores: 4, used_hugepages_1g: 26)
+      vh2.reload
+
+      # Expect the first host to be picked, to fill in the available slice
+      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
+      expect(al).not_to be_nil
+
+      al.update(vm)
+      expect(vm.vm_host.id).to eq(vh1.id)
+    end
+
+    it "fails if slice is not enabled" do
+      vh = VmHost.first
+      slice1 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl1", vh, family: "standard", allowed_cpus: (2..5), memory_gib: 16, is_shared: false).subject
+      slice2 = Prog::Vm::VmHostSliceNexus.assemble_with_host("sl2", vh, family: "burstable", allowed_cpus: (6..7), memory_gib: 8, is_shared: true).subject
+      slice1.update(used_cpu_percent: 400, used_memory_gib: 16, enabled: true)
+      slice2.update(used_cpu_percent: 100, used_memory_gib: 4, enabled: true)
+      vh.update(total_cores: 4, total_cpus: 8, used_cores: 4, total_hugepages_1g: 27, used_hugepages_1g: 26)
+
+      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      req = create_req(vm, vol, use_slices: true, require_shared_slice: true)
+
+      candidates = Al::Allocation.candidate_hosts(req)
+      expect(candidates.size).to eq(1)
+
+      al = Al::Allocation.new(candidates[0], req)
+      expect(al.is_valid).to be_truthy
+
+      # simulate the slice going away while being allocated
+      slice2.update(enabled: false, used_cpu_percent: 0, used_memory_gib: 0)
+
+      expect { al.update(vm) }.to raise_error RuntimeError, "failed to update slice"
+    end
+
+    it "allocates with no slice if no host available for standard" do
       # mark the first host as full
       vmh1 = VmHost.first
       vmh1.update(used_cores: vmh1.total_cores, used_hugepages_1g: vmh1.total_hugepages_1g)
@@ -1021,6 +1147,29 @@ RSpec.describe Al do
       expect(vm.vm_host.id).to eq(vmh2.id)
       expect(vm.vm_host_slice).to be_nil
       expect(vm.cores).to eq(1)
+    end
+
+    it "fails if no host with accepts_slices is available for burstable" do
+      # mark the first host as full
+      vmh1 = VmHost.first
+      vmh1.update(used_cores: vmh1.total_cores, used_hugepages_1g: vmh1.total_hugepages_1g)
+
+      # create a second host
+      vmh2 = create_vm_host(accepts_slices: false, net6: "2001:db8::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { _1.id = vmh2.id }
+      Address.create_with_id(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      (0..16).each do |i|
+        VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2)
+      end
+
+      vm = create_vm_with_use_slice_enabled(family: "burstable", vcpus: 1, memory_gib: 2, cpu_percent_limit: 50, cpu_burst_percent_limit: 50)
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true, require_shared_slice: true))
+      expect(al).to be_nil
     end
 
     it "allocates VMs in slice correctly on arm64 host" do
@@ -1062,6 +1211,51 @@ RSpec.describe Al do
 
       expect(vmh.used_cores).to eq(used_cores + slice.cores)
       expect(vmh.used_hugepages_1g).to eq(used_memory + slice.total_memory_gib)
+
+      # Create a burstable VM in a slice
+      vm_b1 = create_vm_from_size("burstable-1", "arm64")
+      vm_b1.project.set_ff_use_slices_for_allocation(true)
+      described_class.allocate(vm_b1, [{"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      vmh.reload
+      vm_b1.reload
+
+      # Verify everything
+      expect(vm_b1.vcpus).to eq(1)
+      expect(vm_b1.cores).to eq(0)
+      expect(vm_b1.memory_gib).to eq(1)
+      slice_b = vm_b1.vm_host_slice
+      slice_b.update(enabled: true) # we don't have a proc to do that
+      expect(slice_b).not_to be_nil
+      expect(slice_b.cores).to eq(2)
+      expect(slice_b.total_memory_gib).to eq(6)
+      expect(slice_b.total_cpu_percent).to eq(200)
+      expect(slice_b.used_cpu_percent).to eq(50)
+      expect(slice_b.used_memory_gib).to eq(1)
+
+      expect(vmh.used_cores).to eq(used_cores + slice.cores + slice_b.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_memory + slice.total_memory_gib + slice_b.total_memory_gib)
+
+      # Create a second burstable VM in a slice. It should go to the same slice
+      vm_b2 = create_vm_from_size("burstable-2", "arm64")
+      vm_b2.project.set_ff_use_slices_for_allocation(true)
+      described_class.allocate(vm_b2, [{"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      vmh.reload
+      vm_b2.reload
+      slice_b.reload
+
+      # Verify everything
+      expect(vm_b2.vcpus).to eq(2)
+      expect(vm_b2.cores).to eq(0)
+      expect(vm_b2.memory_gib).to eq(3)
+      expect(vm_b2.vm_host_slice.id).to eq(slice_b.id)
+      expect(slice_b.used_cpu_percent).to eq(150)
+      expect(slice_b.used_memory_gib).to eq(4)
+
+      # No change at the host level
+      expect(vmh.used_cores).to eq(used_cores + slice.cores + slice_b.cores)
+      expect(vmh.used_hugepages_1g).to eq(used_memory + slice.total_memory_gib + slice_b.total_memory_gib)
     end
 
     it "memory_gib_for_vcpus handles standard family" do
