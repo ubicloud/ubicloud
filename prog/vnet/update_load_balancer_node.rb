@@ -18,6 +18,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   label def update_load_balancer
     if vm_load_balancer_state == "detaching"
       load_balancer.remove_vm(vm)
+      hop_remove_load_balancer
     end
 
     # if there is literally no up resources to balance for, we simply not do

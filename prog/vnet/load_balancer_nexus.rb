@@ -187,6 +187,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     end
 
     load_balancer.private_subnet.incr_update_firewall_rules
+    load_balancer.incr_update_load_balancer
     hop_wait
   end
 end
