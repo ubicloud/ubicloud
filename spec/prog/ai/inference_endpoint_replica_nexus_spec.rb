@@ -165,14 +165,14 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#wait_endpoint_up" do
     it "naps if vm is not up" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 1)
+      lb_vm = instance_double(LoadBalancersVms, state: "down")
       expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
       expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.wait_endpoint_up }.to nap(5)
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      lb_vm = instance_double(LoadBalancersVms, state: "up", state_counter: 1)
+      lb_vm = instance_double(LoadBalancersVms, state: "up")
       expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
       expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.wait_endpoint_up }.to hop("wait")
@@ -194,28 +194,19 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#unavailable" do
     it "creates a page if replica is unavailable" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 5)
+      lb_vm = instance_double(LoadBalancersVms, state: "down")
       expect(Prog::PageNexus).to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm).twice
+      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm).at_least(:once)
       expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.unavailable }.to nap(30)
     end
 
     it "does not create a page if replica is in maintenance mode" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 5)
+      lb_vm = instance_double(LoadBalancersVms, state: "down")
       expect(Prog::PageNexus).not_to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(true)
       expect(nx).to receive(:load_balancers_vm).and_return(lb_vm)
-      expect(lb_vm).to receive(:reload).and_return(lb_vm)
-      expect { nx.unavailable }.to nap(30)
-    end
-
-    it "does not create a page if replica has been down briefly" do
-      lb_vm = instance_double(LoadBalancersVms, state: "down", state_counter: 1)
-      expect(Prog::PageNexus).not_to receive(:assemble)
-      expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
-      expect(nx).to receive(:load_balancers_vm).and_return(lb_vm).twice
       expect(lb_vm).to receive(:reload).and_return(lb_vm)
       expect { nx.unavailable }.to nap(30)
     end

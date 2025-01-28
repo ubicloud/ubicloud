@@ -126,7 +126,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       hop_wait
     end
 
-    create_page unless inference_endpoint.maintenance_set? || load_balancers_vm.state_counter <= inference_endpoint.load_balancer.health_check_down_threshold
+    create_page unless inference_endpoint.maintenance_set?
     nap 30
   end
 
