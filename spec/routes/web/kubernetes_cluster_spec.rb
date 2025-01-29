@@ -304,7 +304,8 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "returns kubeconfig content for authorized users" do
-        allow_any_instance_of(KubernetesCluster).to receive(:kubeconfig).and_return("kubeconfig content")
+        expect(KubernetesCluster).to receive(:kubeconfig).and_return "kubeconfig content"
+
         visit "#{project.path}#{kc.path}/kubeconfig"
 
         expect(page.response_headers["Content-Type"]).to eq("text/plain")
@@ -329,7 +330,7 @@ RSpec.describe Clover, "Kubernetes" do
       end
 
       it "returns proper content headers and content" do
-        allow_any_instance_of(KubernetesCluster).to receive(:kubeconfig).and_return("mocked kubeconfig content")
+        expect(KubernetesCluster).to receive(:kubeconfig).and_return "mocked kubeconfig content"
 
         visit "#{project.path}#{kc.path}/kubeconfig"
         expect(page.response_headers["Content-Type"]).to eq("text/plain")
