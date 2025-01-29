@@ -35,8 +35,8 @@ RSpec.describe Prog::Test::ConnectedSubnets do
       expect(connected_subnets_test).to receive(:update_firewall_rules).with(ps_single, ps_multiple, config: :perform_tests_public_blocked)
       expect(connected_subnets_test).to receive(:update_firewall_rules).with(ps_multiple, ps_single, config: :perform_tests_public_blocked)
       expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
-      vm1 = instance_double(Vm, sshable: sshable, ephemeral_net4: NetAddr::IPv4Net.parse("0.0.0.0"), boot_image: "debian-12")
-      vm2 = instance_double(Vm, sshable: sshable, boot_image: "almalinux-9")
+      vm1 = instance_double(Vm, id: "1ae5f1c2-2f48-4eac-84e3-cfe35b2a9865", sshable: sshable, ephemeral_net4: NetAddr::IPv4Net.parse("0.0.0.0"), boot_image: "debian-12")
+      vm2 = instance_double(Vm, id: "3f2f4ed0-88b1-49c6-b66a-0d2ed4910ad0", sshable: sshable, boot_image: "almalinux-9")
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo yum install -y nc")
       expect(sshable).to receive(:cmd).with("sudo apt-get update && sudo apt-get install -y netcat-openbsd")
@@ -59,12 +59,12 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv4.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv6.service")
-      expect(connected_subnets_test).to receive(:update_stack).with({"connected" => true})
+      expect(connected_subnets_test).to receive(:update_stack).with({"vm_to_be_connected_id" => vm1.id})
       expect { connected_subnets_test.start }.to nap(5)
     end
 
     it "hops to perform_tests_public_blocked" do
-      expect(connected_subnets_test).to receive(:frame).and_return({"connected" => true})
+      expect(connected_subnets_test).to receive(:frame).and_return({"vm_to_be_connected_id" => true})
       ps_multiple.strand.update(label: "wait")
       ps_single.strand.update(label: "wait")
       Semaphore.all.map(&:destroy)
@@ -250,6 +250,15 @@ ExecStart=nc -l 8080 -6
       vm2 = instance_double(Vm)
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
       expect(connected_subnets_test.vm_to_be_connected).to eq(vm1)
+    end
+
+    it "returns the vm to be connected when already connected" do
+      expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
+      vm1 = instance_double(Vm, id: "vm1")
+      vm2 = instance_double(Vm, id: "vm2")
+      expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
+      expect(connected_subnets_test).to receive(:frame).and_return({"vm_to_be_connected_id" => vm2.id})
+      expect(connected_subnets_test.vm_to_be_connected).to eq(vm2)
     end
   end
 
