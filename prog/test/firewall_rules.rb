@@ -121,7 +121,7 @@ ExecStart=nc -l 8080 -6
 
     vm1.sshable.cmd("sudo systemctl stop listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl start listening_ipv6.service")
-    test_connection(vm1.nics.first.private_ipv6.nth(2), vm2, should_fail: false, ipv4: false, hop_method_symbol: nil)
+    test_connection(vm1.private_ipv6, vm2, should_fail: false, ipv4: false, hop_method_symbol: nil)
     test_connection(vm1.ephemeral_net6.nth(2), vm2, should_fail: true, ipv4: false, hop_method_symbol: :hop_finish)
     fail_test "#{vm2.inhost_name} should not be able to connect to #{vm1.ephemeral_net6.nth(2)} on port 8080"
   end
@@ -150,7 +150,7 @@ ExecStart=nc -l 8080 -6
     when :perform_tests_private_ipv4
       {cidr: vm2.nics.first.private_ipv4.to_s, port_range: Sequel.pg_range(8080..8080)}
     when :perform_tests_private_ipv6
-      {cidr: vm2.nics.first.private_ipv6.nth(2).to_s, port_range: Sequel.pg_range(8080..8080)}
+      {cidr: vm2.private_ipv6.to_s, port_range: Sequel.pg_range(8080..8080)}
     else
       raise "Unknown config: #{config}"
     end

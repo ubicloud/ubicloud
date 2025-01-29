@@ -50,6 +50,14 @@ class Vm < Sequel::Model
     assigned_vm_address&.ip
   end
 
+  def private_ipv4
+    nics.first.private_ipv4.network
+  end
+
+  def private_ipv6
+    nics.first.private_ipv6.nth(2)
+  end
+
   def runtime_token
     JWT.encode({sub: ubid, iat: Time.now.to_i}, Config.clover_runtime_token_secret, "HS256")
   end

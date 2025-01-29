@@ -94,8 +94,8 @@ ExecStart=nc -l 8080 -6
 
     start_listening(ipv4: false)
 
-    test_connection(vm_to_be_connected.nics.first.private_ipv6.nth(2).to_s, vm_to_connect_outside, should_fail: false, ipv4: false)
-    test_connection(vm_to_be_connected.nics.first.private_ipv6.nth(2).to_s, vm_to_connect, should_fail: true, ipv4: false)
+    test_connection(vm_to_be_connected.private_ipv6.to_s, vm_to_connect_outside, should_fail: false, ipv4: false)
+    test_connection(vm_to_be_connected.private_ipv6.to_s, vm_to_connect, should_fail: true, ipv4: false)
 
     hop_perform_blocked_private_ipv4
   end
@@ -132,8 +132,8 @@ ExecStart=nc -l 8080 -6
     end
 
     start_listening(ipv4: false)
-    test_connection(vm_to_be_connected.nics.first.private_ipv6.nth(2).to_s, vm_to_connect, should_fail: false, ipv4: false)
-    test_connection(vm_to_be_connected.nics.first.private_ipv6.nth(2).to_s, vm_to_connect_outside, should_fail: true, ipv4: false)
+    test_connection(vm_to_be_connected.private_ipv6.to_s, vm_to_connect, should_fail: false, ipv4: false)
+    test_connection(vm_to_be_connected.private_ipv6.to_s, vm_to_connect_outside, should_fail: true, ipv4: false)
 
     hop_finish
   end
