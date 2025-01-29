@@ -57,6 +57,17 @@
                 icon: "tabler-robot"
               }
             ) %>
+            <% if @project.get_ff_kubernetes %>
+              <%== render(
+                "layouts/sidebar/item",
+                locals: {
+                  name: "Kubernetes",
+                  url: "#{@project_data[:path]}/kubernetes-cluster",
+                  is_active: request.path.start_with?("#{@project_data[:path]}/kubernetes-cluster"),
+                  icon: "kubernetes"
+                }
+              ) %>
+            <% end %>
           <% else %>
             <%== render(
               "layouts/sidebar/item",
