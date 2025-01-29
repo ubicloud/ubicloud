@@ -29,7 +29,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   label def remove_load_balancer
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.nics.first.private_ipv4.network.to_s))
+    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: generate_nat_rules(vm.ephemeral_net4.to_s, vm.private_ipv4.to_s))
 
     pop "load balancer is removed"
   end
@@ -37,8 +37,8 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   def generate_lb_based_nat_rules
     public_ipv4 = vm.ephemeral_net4.to_s
     public_ipv6 = vm.ephemeral_net6.nth(2).to_s
-    private_ipv4 = vm.nics.first.private_ipv4.network
-    private_ipv6 = vm.nics.first.private_ipv6.nth(2)
+    private_ipv4 = vm.private_ipv4
+    private_ipv6 = vm.private_ipv6
     neighbor_vms = load_balancer.active_vms.reject { _1.id == vm.id }
     neighbor_ips_v4_set, neighbor_ips_v6_set = generate_lb_ip_set_definition(neighbor_vms)
     modulo = load_balancer.active_vms.count
@@ -110,18 +110,18 @@ TEMPLATE
   def generate_lb_ip_set_definition(neighbor_vms)
     return ["", ""] if neighbor_vms.empty?
 
-    ["elements = {#{neighbor_vms.map { _1.nics.first.private_ipv4.network }.join(", ")}}",
-      "elements = {#{neighbor_vms.map { _1.nics.first.private_ipv6.nth(2) }.join(", ")}}"]
+    ["elements = {#{neighbor_vms.map(&:private_ipv4).join(", ")}}",
+      "elements = {#{neighbor_vms.map(&:private_ipv6).join(", ")}}"]
   end
 
   def generate_lb_map_defs
     [load_balancer.active_vms.map.with_index do |active_vm, i|
       port = (active_vm.id == vm.id) ? load_balancer.dst_port : load_balancer.src_port
-      "#{i} : #{active_vm.nics.first.private_ipv4.network} . #{port}"
+      "#{i} : #{active_vm.private_ipv4} . #{port}"
     end.join(", "),
       load_balancer.active_vms.map.with_index do |active_vm, i|
         port = (active_vm.id == vm.id) ? load_balancer.dst_port : load_balancer.src_port
-        address = (active_vm.id == vm.id) ? vm.ephemeral_net6.nth(2) : active_vm.nics.first.private_ipv6.nth(2)
+        address = (active_vm.id == vm.id) ? vm.ephemeral_net6.nth(2) : active_vm.private_ipv6
         "#{i} : #{address} . #{port}"
       end.join(", ")]
   end

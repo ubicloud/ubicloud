@@ -13,7 +13,7 @@ RSpec.describe Prog::Vnet::UpdateFirewallRules do
     vmh = instance_double(VmHost, sshable: instance_double(Sshable, cmd: nil))
     nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::1/128"), ubid_to_tap_name: "tap0")
     ephemeral_net6 = NetAddr::IPv6Net.parse("fd00::1/79")
-    instance_double(Vm, private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6, load_balancer: nil)
+    instance_double(Vm, private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6, load_balancer: nil, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32").network)
   }
 
   describe "#before_run" do
@@ -195,7 +195,7 @@ ADD_RULES
         instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("fd00::2/64"), port_range: Sequel.pg_range(80..10000))
       ])])
       expect(vm).to receive(:id).and_return(1).at_least(:once)
-      vm2 = instance_double(Vm, id: 2, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::/124"))])
+      vm2 = instance_double(Vm, id: 2, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::/124"))], private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32").network, private_ipv6: NetAddr::IPv6.parse("fd00::2"))
       lb = instance_double(LoadBalancer, name: "lb_table", src_port: 443, dst_port: 8443, vms: [vm, vm2])
       expect(vm).to receive(:load_balancer).and_return(lb).at_least(:once)
       expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec x nft --file -", stdin: <<ADD_RULES)

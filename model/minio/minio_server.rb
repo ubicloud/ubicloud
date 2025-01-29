@@ -26,7 +26,7 @@ class MinioServer < Sequel::Model
   end
 
   def private_ipv4_address
-    vm.nics.first.private_ipv4.network.to_s
+    vm.private_ipv4.to_s
   end
 
   def minio_volumes

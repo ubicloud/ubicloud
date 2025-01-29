@@ -14,8 +14,8 @@ RSpec.describe Prog::Test::FirewallRules do
 
   let(:private_subnet_1) {
     nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
-    vm_1 = instance_double(Vm, id: "vm_1", sshable: sshable, boot_image: "ubuntu-noble", ephemeral_net4: "1.1.1.1", ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a1::/64"), inhost_name: "vm1", nics: [nic])
-    vm_2 = instance_double(Vm, id: "vm_2", sshable: sshable, boot_image: "almalinux-9", ephemeral_net4: "1.1.1.2", ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a2::/64"), inhost_name: "vm2", nics: [nic])
+    vm_1 = instance_double(Vm, id: "vm_1", sshable: sshable, boot_image: "ubuntu-noble", ephemeral_net4: "1.1.1.1", ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a1::/64"), inhost_name: "vm1", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"))
+    vm_2 = instance_double(Vm, id: "vm_2", sshable: sshable, boot_image: "almalinux-9", ephemeral_net4: "1.1.1.2", ephemeral_net6: NetAddr::IPv6Net.parse("2001:0db8:85a2::/64"), inhost_name: "vm2", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"))
     instance_double(PrivateSubnet, id: "subnet_1", vms: [vm_1, vm_2])
   }
 
@@ -483,7 +483,7 @@ ExecStart=nc -l 8080 -6
       expect(firewall_test.firewall).to receive(:replace_firewall_rules).with([{cidr: "100.100.100.100/32", port_range: "22..22"}, {cidr: "192.168.0.1/32", port_range: "8080..8080"}])
       firewall_test.update_firewall_rules(config: :perform_tests_private_ipv4)
 
-      expect(firewall_test.firewall).to receive(:replace_firewall_rules).with([{cidr: "100.100.100.100/32", port_range: "22..22"}, {cidr: "fd01:db8:85a1::2", port_range: "8080..8080"}])
+      expect(firewall_test.firewall).to receive(:replace_firewall_rules).with([{cidr: "100.100.100.100/32", port_range: "22..22"}, {cidr: "fd01:db8:85a2::2", port_range: "8080..8080"}])
       firewall_test.update_firewall_rules(config: :perform_tests_private_ipv6)
 
       expect { firewall_test.update_firewall_rules(config: :unknown) }.to raise_error("Unknown config: unknown")

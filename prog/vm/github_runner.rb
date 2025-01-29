@@ -250,9 +250,8 @@ class Prog::Vm::GithubRunner < Prog::Base
     end
 
     if github_runner.installation.cache_enabled
-      local_ip = vm.nics.first.private_ipv4.network.to_s
       command += <<~COMMAND
-        echo "CUSTOM_ACTIONS_CACHE_URL=http://#{local_ip}:51123/random_token/" | sudo tee -a /etc/environment
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://#{vm.private_ipv4}:51123/random_token/" | sudo tee -a /etc/environment
       COMMAND
     end
 

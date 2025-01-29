@@ -32,7 +32,8 @@ RSpec.describe PostgresServer do
       ],
       nics: [
         instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32"))
-      ]
+      ],
+      private_ipv4: NetAddr::IPv4Net.parse("10.70.205.205/32").network
     )
   }
 

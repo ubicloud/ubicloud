@@ -18,8 +18,8 @@ class Prog::Vnet::UpdateFirewallRules < Prog::Base
     globally_blocked_ipv4s, globally_blocked_ipv6s = generate_globally_blocked_lists
 
     load_balancer_allow_rule = if vm.load_balancer
-      allow_ipv4_lb_neigh_incoming = "ip saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { _1.nics.first.private_ipv4.network.to_s + " . " + vm.load_balancer.src_port.to_s }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
-      allow_ipv6_lb_neigh_incoming = "ip6 saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { _1.nics.first.private_ipv6.nth(2).to_s + " . " + vm.load_balancer.src_port.to_s }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
+      allow_ipv4_lb_neigh_incoming = "ip saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { "#{_1.private_ipv4} . #{vm.load_balancer.src_port}" }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
+      allow_ipv6_lb_neigh_incoming = "ip6 saddr . tcp sport { #{vm.load_balancer.vms.reject { _1.id == vm.id }.map { "#{_1.private_ipv6} . #{vm.load_balancer.src_port}" }.join(", ")} } ct state established,related,new counter accept" if vm.load_balancer.vms.reject { _1.id == vm.id }.any?
       <<~LOAD_BALANCER_ALLOW_RULE
 #{allow_ipv4_lb_neigh_incoming}
 #{allow_ipv6_lb_neigh_incoming}
