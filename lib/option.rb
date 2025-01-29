@@ -51,8 +51,12 @@ module Option
   IoLimits = Struct.new(:max_ios_per_sec, :max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
   NO_IO_LIMITS = IoLimits.new(nil, nil, nil).freeze
 
-  VmSize = Struct.new(:name, :family, :cores, :vcpus, :cpu_percent_limit, :cpu_burst_percent_limit, :memory_gib, :storage_size_options, :io_limits, :visible, :gpu, :arch) do
+  VmSize = Struct.new(:name, :family, :cores, :vcpus, :cpu_percent_limit, :cpu_burst_percent_limit, :memory_gib, :storage_size_options, :io_limits, :visible, :arch) do
     alias_method :display_name, :name
+
+    def gpu
+      family == "standard-gpu"
+    end
   end
   VmSizes = YAML.load_file("config/vm_sizes.yml").map do |row|
     row["io_limits"] = row["io_limits"].any? ? IoLimits.new(*row["io_limits"]) : NO_IO_LIMITS
