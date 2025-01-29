@@ -125,7 +125,7 @@ class Vm < Sequel::Model
       _1.family == family &&
         _1.arch == arch &&
         _1.vcpus == vcpus &&
-        _1.cpu_percent_limit == cpu_percent_limit
+        (cpu_percent_limit.nil? || _1.cpu_percent_limit == cpu_percent_limit)
     }
     vm_size.name
   end
