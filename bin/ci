@@ -23,6 +23,17 @@ def main(options)
     # on when the host is rebooted and can cause flaky issues for github runner tests.
     wait_until(encrypted_vms_st)
 
+    # Testing slices is not parallel with other tests as it requires a specific host state
+    Semaphore.incr(hetzner_server_st.id, "allow_slices")
+    wait_until(hetzner_server_st, "wait")
+
+    sliced_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: true, test_reboot: false, test_slices: true)
+    log(sliced_vms_st, "test_slices: true")
+    wait_until(sliced_vms_st)
+
+    Semaphore.incr(hetzner_server_st.id, "disallow_slices")
+    wait_until(hetzner_server_st, "wait")
+
     unencrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: false, test_reboot: false)
     log(unencrypted_vms_st, "storage_encrypted: false")
     tests_to_wait << unencrypted_vms_st
@@ -52,7 +63,7 @@ def wait_until(st, label = nil)
       st.destroy
       exit 1
     end
-    log(st.reload, "waiting #{label ? "for #{label}" : "exit"}")
+    log(st.reload, "waiting for #{label || "exit"}")
     sleep 10
   end
   log(st, "reached")

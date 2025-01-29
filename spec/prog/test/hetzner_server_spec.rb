@@ -141,8 +141,32 @@ RSpec.describe Prog::Test::HetznerServer do
       expect { hs_test.wait }.to hop("destroy")
     end
 
+    it "hops to allow_slices when signaled" do
+      expect(hs_test).to receive(:when_allow_slices_set?).and_yield
+      expect { hs_test.wait }.to hop("allow_slices")
+    end
+
+    it "hops to disallow_slices when signaled" do
+      expect(hs_test).to receive(:when_disallow_slices_set?).and_yield
+      expect { hs_test.wait }.to hop("disallow_slices")
+    end
+
     it "naps" do
       expect { hs_test.wait }.to nap(15)
+    end
+  end
+
+  describe "#allow_slices" do
+    it "allows slices" do
+      expect(vm_host).to receive(:allow_slices)
+      expect { hs_test.allow_slices }.to hop("wait")
+    end
+  end
+
+  describe "#disallow_slices" do
+    it "disallows slices" do
+      expect(vm_host).to receive(:disallow_slices)
+      expect { hs_test.disallow_slices }.to hop("wait")
     end
   end
 
