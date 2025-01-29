@@ -156,7 +156,7 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :access_all_cache_scopes, :use_slices_for_allocation, :enable_diagnostics, :kubernetes
+  feature_flag :vm_public_ssh_keys, :transparent_cache, :location_latitude_fra, :access_all_cache_scopes, :use_slices_for_allocation, :allocator_diagnostics, :kubernetes
 end
 
 # Table: project
