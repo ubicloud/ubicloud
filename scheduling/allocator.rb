@@ -32,7 +32,7 @@ module Scheduling::Allocator
       location_preference,
       vm.family,
       vm.project.get_ff_use_slices_for_allocation || false,
-      vm.project.get_ff_enable_diagnostics || false
+      vm.project.get_ff_allocator_diagnostics || false
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -60,12 +60,12 @@ module Scheduling::Allocator
     :location_preference,
     :family,
     :use_slices,
-    :enable_diagnostics
+    :diagnostics
   ) do
     def initialize(*args)
       super
       self.use_slices ||= false
-      self.enable_diagnostics ||= false
+      self.diagnostics ||= false
     end
 
     def memory_gib_for_cores
@@ -179,7 +179,7 @@ module Scheduling::Allocator
 
       # Emit the allocation query if the project is flagged for
       # diagnostics.
-      if request.enable_diagnostics
+      if request.diagnostics
         Clog.emit("Allocator query for vm") do
           {allocator_query: {vm_id: request.vm_id,
                              sql: ds.no_auto_parameterize.sql}}
