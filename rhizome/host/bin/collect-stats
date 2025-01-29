@@ -1,0 +1,17 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/stats_collection"
+
+unless (vm_name = ARGV.shift)
+  puts "expected path to vm_name as argument"
+  exit 1
+end
+
+unless (slice_name = ARGV.shift)
+  puts "expected slice name as argument"
+  exit 1
+end
+
+stats_collection = StatsCollection.new(vm_name, slice_name)
+stats_collection.record_stats
