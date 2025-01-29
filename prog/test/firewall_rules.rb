@@ -34,6 +34,9 @@ ExecStart=nc -l 8080 -6
     vm1.sshable.cmd("sudo systemctl daemon-reload")
     vm1.sshable.cmd("sudo systemctl enable listening_ipv4.service")
     vm1.sshable.cmd("sudo systemctl enable listening_ipv6.service")
+    update_stack({
+      "vm_to_be_connected_id" => vm1.id
+    })
 
     hop_perform_tests_none
   end
@@ -159,7 +162,12 @@ ExecStart=nc -l 8080 -6
   end
 
   def vm1
-    @vm1 ||= firewall.private_subnets.first.vms.first
+    connected_id = frame["vm_to_be_connected_id"]
+    @vm1 ||= if connected_id.nil?
+      firewall.private_subnets.first.vms.first
+    else
+      firewall.private_subnets.first.vms.find { |vm| vm.id == connected_id }
+    end
   end
 
   def vm2

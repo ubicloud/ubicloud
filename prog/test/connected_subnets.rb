@@ -5,7 +5,7 @@ require "uri"
 
 class Prog::Test::ConnectedSubnets < Prog::Test::Base
   label def start
-    unless frame["connected"]
+    unless frame["vm_to_be_connected_id"]
       pss.map(&:vms).flatten.each do |vm|
         vm.sshable.cmd("sudo yum install -y nc") if vm.boot_image.include?("almalinux")
         vm.sshable.cmd("sudo apt-get update && sudo apt-get install -y netcat-openbsd") if vm.boot_image.include?("debian")
@@ -36,7 +36,7 @@ ExecStart=nc -l 8080 -6
       update_firewall_rules(ps_single, ps_multiple, config: :perform_tests_public_blocked)
       ps_multiple.connect_subnet(ps_single)
       update_stack({
-        "connected" => true
+        "vm_to_be_connected_id" => vm_to_be_connected.id
       })
     end
 
@@ -189,7 +189,12 @@ ExecStart=nc -l 8080 -6
   end
 
   def vm_to_be_connected
-    @vm_to_be_connected ||= ps_multiple.vms.first
+    connected_id = frame["vm_to_be_connected_id"]
+    @vm_to_be_connected ||= if connected_id.nil?
+      ps_multiple.vms.first
+    else
+      ps_multiple.vms.find { |vm| vm.id == connected_id }
+    end
   end
 
   def vm_to_connect

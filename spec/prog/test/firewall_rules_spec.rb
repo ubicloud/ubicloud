@@ -56,6 +56,8 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv4.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv6.service")
 
+      expect(firewall_test).to receive(:update_stack).with({"vm_to_be_connected_id" => "vm_1"})
+
       expect { firewall_test.start }.to hop("perform_tests_none")
     end
 
@@ -90,13 +92,15 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv4.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl enable listening_ipv6.service")
 
+      expect(firewall_test).to receive(:update_stack).with({"vm_to_be_connected_id" => "vm_1"})
+
       expect { firewall_test.start }.to hop("perform_tests_none")
     end
   end
 
   describe "#perform_tests_none" do
     it "updates firewall rules when the frame is not set to none and naps if firewall rules are not updated" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => nil})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => nil, "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_none)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
@@ -105,7 +109,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "doesn't update firewall rules when the frame is set to none and naps if firewall rules are not updated" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "none"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
@@ -115,7 +119,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "doesn't update firewall rules and tests connectivity and hops when the fw update is done" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "none"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
@@ -133,7 +137,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "updates firewall rules and tests connectivity and fails when the fw update is done" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "none"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "none"})
 
@@ -154,7 +158,7 @@ ExecStart=nc -l 8080 -6
 
   describe "#perform_tests_public_ipv4" do
     it "updates firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "none"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "none", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv4)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
@@ -163,7 +167,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
@@ -174,7 +178,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
@@ -188,7 +192,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "updates firewall rules and tests connectivity and fails when the VM2 can connect to VM1 but also the vm_outside can connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv4)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
@@ -205,7 +209,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "updates firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1 but not the vm_outside" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv4)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv4"})
 
@@ -225,7 +229,7 @@ ExecStart=nc -l 8080 -6
 
   describe "#perform_tests_public_ipv6" do
     it "updates firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
@@ -234,7 +238,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
@@ -245,7 +249,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
@@ -262,7 +266,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "updates firewall rules and tests connectivity and fails when the VM2 can connect to VM1 but also the vm_outside can connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
@@ -281,7 +285,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "updates firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1 but not the vm_outside" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "public_ipv6"})
 
@@ -302,7 +306,7 @@ ExecStart=nc -l 8080 -6
 
   describe "#perform_tests_private_ipv4" do
     it "updates firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "public_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
@@ -311,7 +315,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
@@ -322,7 +326,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
@@ -338,7 +342,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
@@ -357,7 +361,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and tests connectivity and fails when the vm_outside can connect to VM1 publicly" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv4)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv4"})
 
@@ -379,7 +383,7 @@ ExecStart=nc -l 8080 -6
 
   describe "#perform_tests_private_ipv6" do
     it "updates firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv4"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
@@ -399,7 +403,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules but tests connectivity and fails when the VM2 cannot connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
@@ -415,7 +419,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and tests connectivity and succeeds when the VM2 can connect to VM1" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
@@ -431,7 +435,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and tests connectivity and fails when the vm2 can connect to VM1 publicly" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv6", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).not_to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 
@@ -488,6 +492,7 @@ ExecStart=nc -l 8080 -6
 
   describe ".vm1" do
     it "returns the first vm" do
+      expect(firewall_test).to receive_messages(frame: {"vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test.vm1).to eq(firewall_test.firewall.private_subnets.first.vms.first)
     end
   end
