@@ -98,6 +98,14 @@ RSpec.describe Al do
       )
     }
 
+    it "prints diagnostics if flagged" do
+      expect(req).to receive(:enable_diagnostics).and_return(true)
+      expect(Clog).to receive(:emit).with("Allocator query for vm") do |&blk|
+        expect(blk.call[:allocator_query].keys).to eq([:vm_id, :sql])
+      end
+      Al::Allocation.best_allocation(req)
+    end
+
     it "selects the best allocation candidate" do
       candidates = [[0.1, false], [5, true], [0.9, true], [99, true]]
       candidates.each { expect(Al::Allocation).to receive(:new).once.ordered.with(_1, req).and_return TestAllocation.new(_1[0], _1[1]) }

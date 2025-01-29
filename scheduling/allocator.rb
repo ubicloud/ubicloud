@@ -177,11 +177,14 @@ module Scheduling::Allocator
       # Match the slice allocation to the hosts that can accept it
       ds = ds.where(accepts_slices: request.use_slices)
 
-      # For debugging purposes, write the full SQL query, with expanded parameters, to a file,
-      # so it can be run directly against the DB server
-      # :nocov:
-      Clog.emit("Allocator query for vm id: #{request.vm_id}: #{ds.no_auto_parameterize.sql}") if request.enable_diagnostics
-      # :nocov:
+      # Emit the allocation query if the project is flagged for
+      # diagnostics.
+      if request.enable_diagnostics
+        Clog.emit("Allocator query for vm") do
+          {allocator_query: {vm_id: request.vm_id,
+                             sql: ds.no_auto_parameterize.sql}}
+        end
+      end
 
       ds.all
     end
