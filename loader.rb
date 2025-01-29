@@ -171,11 +171,7 @@ def clover_freeze
 
   # Aws SDK started to autoload modules when used, so we need to load them
   # before freezing. https://github.com/aws/aws-sdk-ruby/pull/3105
-  # rubocop:disable Lint/Void
-  Aws::S3::Client
-  Aws::S3::Presigner
-  Aws::S3::Errors
-  # rubocop:enable Lint/Void
+  [:Client, :Presigner, :Errors].each { Aws::S3.const_get(_1) }
 
   # A standard library method that edits/creates a module variable as
   # a side effect.  We encountered it when using rubygems for its tar
