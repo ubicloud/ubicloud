@@ -190,10 +190,10 @@ ExecStart=nc -l 8080 -6
 
   def vm_to_be_connected
     connected_id = frame["vm_to_be_connected_id"]
-    @vm_to_be_connected ||= if connected_id.nil?
-      ps_multiple.vms.first
-    else
+    @vm_to_be_connected ||= if connected_id
       ps_multiple.vms.find { |vm| vm.id == connected_id }
+    else
+      ps_multiple.vms.first
     end
   end
 

@@ -163,10 +163,10 @@ ExecStart=nc -l 8080 -6
 
   def vm1
     connected_id = frame["vm_to_be_connected_id"]
-    @vm1 ||= if connected_id.nil?
-      firewall.private_subnets.first.vms.first
-    else
+    @vm1 ||= if connected_id
       firewall.private_subnets.first.vms.find { |vm| vm.id == connected_id }
+    else
+      firewall.private_subnets.first.vms.first
     end
   end
 

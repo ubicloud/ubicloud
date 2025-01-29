@@ -21,10 +21,25 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "provisions at least one vm for each boot image" do
       expect(vg_test).to receive(:update_stack).and_call_original
-      expect(vg_test).to receive(:frame).and_return({"boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]}).at_least(:once)
+      expect(vg_test).to receive(:frame).and_return({
+        "test_slices" => true,
+        "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
+      }).at_least(:once)
       expect { vg_test.setup_vms }.to hop("wait_vms")
       vm_images = vg_test.strand.stack.first["vms"].map { Vm[_1].boot_image }
       expect(vm_images).to eq(["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"])
+    end
+
+    it "hops to wait_children_ready if test_slices" do
+      expect(vg_test).to receive(:update_stack).and_call_original
+      expect(vg_test).to receive(:frame).and_return({
+        "storage_encrypted" => true,
+        "test_reboot" => true,
+        "test_slices" => true,
+        "vms" => [],
+        "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
+      }).at_least(:once)
+      expect { vg_test.setup_vms }.to hop("wait_vms")
     end
   end
 
@@ -55,7 +70,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to hop_wait_verify_vms" do
       expect(vg_test).to receive(:reap)
       expect(vg_test).to receive(:leaf?).and_return(true)
-      expect { vg_test.wait_verify_vms }.to hop("verify_firewall_rules")
+      expect { vg_test.wait_verify_vms }.to hop("verify_vm_host_slices")
     end
 
     it "stays in wait_verify_vms" do
@@ -63,6 +78,25 @@ RSpec.describe Prog::Test::VmGroup do
       expect(vg_test).to receive(:leaf?).and_return(false)
       expect(vg_test).to receive(:donate).and_call_original
       expect { vg_test.wait_verify_vms }.to nap(1)
+    end
+  end
+
+  describe "#verify_vm_host_slices" do
+    it "runs tests on vm host slices" do
+      expect(vg_test).to receive(:frame).and_return({"test_slices" => true, "vms" => ["111", "222", "333"]}).at_least(:once)
+      slice1 = instance_double(VmHostSlice, id: "456")
+      slice2 = instance_double(VmHostSlice, id: "789")
+      expect(Vm).to receive(:[]).with("111").and_return(instance_double(Vm, vm_host_slice: slice1))
+      expect(Vm).to receive(:[]).with("222").and_return(instance_double(Vm, vm_host_slice: slice2))
+      expect(Vm).to receive(:[]).with("333").and_return(instance_double(Vm, vm_host_slice: slice2))
+
+      expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
+    end
+
+    it "hops to verify_firewall_rules if tests are done" do
+      expect(vg_test).to receive(:frame).and_return({"test_slices" => true})
+      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM Host Slices!"})
+      expect { vg_test.verify_vm_host_slices }.to hop("verify_firewall_rules")
     end
   end
 

@@ -3,13 +3,14 @@
 require "net/ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
-  def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true)
+  def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true, test_slices: false)
     Strand.create_with_id(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
         "storage_encrypted" => storage_encrypted,
         "test_reboot" => test_reboot,
+        "test_slices" => test_slices,
         "vms" => [],
         "boot_images" => boot_images
       }]
@@ -22,6 +23,8 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def setup_vms
     project = Project.create_with_id(name: "project-1")
+    test_slices = frame.fetch("test_slices")
+    project.set_ff_use_slices_for_allocation(test_slices)
 
     subnets = Array.new(2) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-#{_1}", location: "hetzner-fsn1") }
     encrypted = frame.fetch("storage_encrypted", true)
@@ -63,8 +66,19 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def wait_verify_vms
     reap
-    hop_verify_firewall_rules if leaf?
+    hop_verify_vm_host_slices if leaf?
     donate
+  end
+
+  label def verify_vm_host_slices
+    test_slices = frame.fetch("test_slices")
+
+    if !test_slices || (retval&.dig("msg") == "Verified VM Host Slices!")
+      hop_verify_firewall_rules
+    end
+
+    slices = frame["vms"].map { Vm[_1].vm_host_slice.id }
+    push Prog::Test::VmHostSlices, {"slices" => slices}
   end
 
   label def verify_firewall_rules
