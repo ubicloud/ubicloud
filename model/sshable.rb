@@ -11,6 +11,14 @@ class Sshable < Sequel::Model
     enc.column :raw_private_key_2
   end
 
+  SSH_CONNECTION_ERRORS = [
+    Net::SSH::Disconnect,
+    Net::SSH::ConnectionTimeout,
+    Errno::ECONNRESET,
+    Errno::ECONNREFUSED,
+    IOError
+  ].freeze
+
   class SshError < StandardError
     attr_reader :stdout, :stderr, :exit_code, :exit_signal
 
@@ -138,7 +146,7 @@ class Sshable < Sequel::Model
 
   def available?
     cmd("true") && true
-  rescue Net::SSH::Disconnect, Net::SSH::ConnectionTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, IOError
+  rescue *SSH_CONNECTION_ERRORS
     false
   end
 
