@@ -258,14 +258,40 @@ RSpec.describe Prog::Vm::Nexus do
     end
   end
 
+  describe "#prep_failed" do
+    it "naps" do
+      expect { nx.prep_failed }.to nap(300)
+    end
+  end
+
   describe "#prep" do
-    it "hops to run if prep command is succeeded" do
+    it "hops to wait_sshable if prep command is succeeded" do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
       expect(sshable).to receive(:cmd).with(/common\/bin\/daemonizer --clean prep_/)
       vmh = instance_double(VmHost, sshable: sshable)
       expect(vm).to receive(:vm_host).and_return(vmh)
       expect { nx.prep }.to hop("wait_sshable")
+    end
+
+    it "sets recreate and hops to destroy if prep command is failed" do
+      sshable = instance_spy(Sshable)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Failed")
+      vmh = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vmh)
+      expect(nx).to receive(:incr_recreate)
+      expect(nx).to receive(:frame).and_return("attempt" => 1)
+      expect { nx.prep }.to hop("destroy")
+    end
+
+    it "sets recreate and hops to prep_failed if prep command is failed and this is the 3rd attempt" do
+      sshable = instance_spy(Sshable)
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Failed")
+      vmh = instance_double(VmHost, sshable: sshable)
+      expect(vm).to receive(:vm_host).and_return(vmh)
+      expect(Prog::PageNexus).to receive(:assemble).with("VM prep has failed for #{vm.ubid} (attempt: 3", ["VmPrepFailed", vm.ubid], vm.ubid)
+      expect(nx).to receive(:frame).and_return("attempt" => 3).at_least(:once)
+      expect { nx.prep }.to hop("prep_failed")
     end
 
     it "generates and passes a params json if prep command is not started yet" do
@@ -932,12 +958,44 @@ RSpec.describe Prog::Vm::Nexus do
     it "detaches from nic" do
       nic = instance_double(Nic)
       expect(nic).to receive(:update).with(vm_id: nil)
+      expect(nic).to receive(:id).and_return(true)
       expect(nic).to receive(:incr_destroy)
       expect(vm).to receive(:nics).and_return([nic])
       expect(vm).to receive(:destroy).and_return(true)
       allow(vm).to receive(:vm_storage_volumes).and_return([])
 
       expect { nx.destroy_slice }.to exit({"msg" => "vm deleted"})
+    end
+
+    it "#destroy_slice with recreate set calls Prog::Vm::Nexus.assemble to create new VM after destroying current VM" do
+      expect(vm).to receive(:vm_host_slice).and_return(nil)
+      expect(nx).to receive(:when_recreate_set?).and_yield.twice
+      expect(vm).to receive(:destroy).and_return(true)
+      expect(described_class).to receive(:assemble) do |*, attempt:, strand:, storage_volumes:, **kw|
+        expect(attempt).to eq 2
+        expect(strand).to eq st
+        expect(storage_volumes).to eq [{size_gib: 1}]
+      end.and_return(true)
+      expect(nx).to receive(:frame).and_return("attempt" => 1, "storage_volumes" => [{"size_gib" => 1}]).at_least(:once)
+      expect { nx.destroy_slice }.to hop("start")
+    end
+
+    it "#destroy_slice with recreate set does not destroy nic with specific nic_id requested" do
+      nic = instance_double(Nic)
+      nic_id = Nic.generate_uuid
+      expect(nic).to receive(:update).with(vm_id: nil)
+      expect(nic).to receive(:id).and_return(nic_id)
+      expect(nic).not_to receive(:incr_destroy)
+      expect(vm).to receive(:nics).and_return([nic])
+      expect(vm).to receive(:destroy).and_return(true)
+      expect(vm).to receive(:vm_host_slice).and_return(nil)
+      expect(nx).to receive(:when_recreate_set?).and_yield.twice
+      expect(described_class).to receive(:assemble) do |*, attempt:, strand:, **kw|
+        expect(attempt).to eq 2
+        expect(strand).to eq st
+      end.and_return(true)
+      expect(nx).to receive(:frame).and_return("attempt" => 1, "nic_id" => nic_id).at_least(:once)
+      expect { nx.destroy_slice }.to hop("start")
     end
   end
 
