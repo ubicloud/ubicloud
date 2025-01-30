@@ -161,7 +161,7 @@ class Clover < Roda
     end
 
     case e
-    when Sequel::ValidationFailed, Roda::RodaPlugins::InvalidRequestBody::Error
+    when Sequel::ValidationFailed, Sequel::UniqueConstraintViolation, Roda::RodaPlugins::InvalidRequestBody::Error
       code = 400
       type = "InvalidRequest"
       message = e.to_s
@@ -216,7 +216,7 @@ class Clover < Roda
       @error = error
 
       case e
-      when Sequel::ValidationFailed, DependencyError
+      when Sequel::ValidationFailed, Sequel::UniqueConstraintViolation, DependencyError
         flash["error"] = message
         redirect_back_with_inputs
       when Sequel::SerializationFailure
