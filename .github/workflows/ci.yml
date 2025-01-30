@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - dependabot/npm_and_yarn/js-dependencies-f5e670e435
   pull_request:
 
 jobs:
