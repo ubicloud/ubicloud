@@ -79,7 +79,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runneradmin")
       expect(vm.family).to eq("standard")
-      expect(vm.cores).to eq(2)
+      expect(vm.vcpus).to eq(4)
       expect(vm.project_id).to eq(Config.github_runner_service_project_id)
     end
 
@@ -97,7 +97,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(vm).not_to be_nil
       expect(vm.sshable.unix_user).to eq("runneradmin")
       expect(vm.family).to eq("standard")
-      expect(vm.cores).to eq(2)
+      expect(vm.vcpus).to eq(4)
     end
 
     it "uses the existing vm if pool can pick one" do
