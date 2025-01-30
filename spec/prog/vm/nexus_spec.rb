@@ -35,8 +35,8 @@ RSpec.describe Prog::Vm::Nexus do
       boot_image: "ubuntu-jammy",
       family: "standard",
       cores: 1,
-      vcpus: 1,
-      cpu_percent_limit: 100,
+      vcpus: 2,
+      cpu_percent_limit: 200,
       cpu_burst_percent_limit: 0,
       memory_gib: 8,
       arch: "x64",
@@ -52,7 +52,7 @@ RSpec.describe Prog::Vm::Nexus do
         project_id: "50089dcf-b472-8ad2-9ca6-b3e70d12759d",
         resource_name: _1.name,
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", _1.family, _1.location)["id"],
-        amount: _1.cores
+        amount: _1.vcpus
       )])
     }
     vm
@@ -180,7 +180,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "creates arm64 vm with double core count and 3.2GB memory per core" do
       st = described_class.assemble("some_ssh_key", prj.id, size: "standard-4", arch: "arm64")
-      expect(st.subject.cores).to eq(4)
+      expect(st.subject.vcpus).to eq(4)
       expect(st.subject.memory_gib).to eq(12)
     end
 
@@ -280,7 +280,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nic).to receive(:ubid_to_tap_name).and_return("tap4ncdd56m")
       expect(vm).to receive(:nics).and_return([nic]).at_least(:once)
       expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(1, 1, 1, 1))
+      expect(vm).to receive(:cloud_hypervisor_cpu_topology).and_return(Vm::CloudHypervisorCpuTopo.new(2, 1, 1, 1))
       expect(vm).to receive(:pci_devices).and_return([pci]).at_least(:once)
       prj.set_ff_vm_public_ssh_keys(["operator_ssh_key"])
       expect(vm).to receive(:project).and_return(prj).at_least(:once)
@@ -288,7 +288,7 @@ RSpec.describe Prog::Vm::Nexus do
       sshable = instance_spy(Sshable)
       expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
       vmh = instance_double(VmHost, sshable: sshable,
-        total_cpus: 80, total_cores: 40, total_sockets: 10, ndp_needed: false, arch: "arm64")
+        total_cpus: 80, total_cores: 80, total_sockets: 10, ndp_needed: false, arch: "arm64")
       expect(vm).to receive(:vm_host).and_return(vmh).at_least(:once)
 
       expect(sshable).to receive(:cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
@@ -298,15 +298,15 @@ RSpec.describe Prog::Vm::Nexus do
           "public_ipv6" => "fe80::/64",
           "unix_user" => "test_user",
           "ssh_public_keys" => ["test_ssh_key", "operator_ssh_key"],
-          "max_vcpus" => 1,
-          "cpu_topology" => "1:1:1:1",
+          "max_vcpus" => 2,
+          "cpu_topology" => "2:1:1:1",
           "mem_gib" => 8,
           "local_ipv4" => "169.254.0.0",
           "nics" => [["fd10:9b0b:6b4b:8fbb::/64", "10.0.0.3/32", "tap4ncdd56m", "5a:0f:75:80:c3:64", "10.0.0.1/26"]],
           "swap_size_bytes" => nil,
           "pci_devices" => [["01:00.0", 23]],
           "slice_name" => "system.slice",
-          "cpu_percent_limit" => 100,
+          "cpu_percent_limit" => 200,
           "cpu_burst_percent_limit" => 0
         })
       end
@@ -425,7 +425,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "considers all locations for standard-60 runners" do
       vm.location = "github-runners"
-      vm.cores = 30
+      vm.vcpus = 60
       expect(Scheduling::Allocator).to receive(:allocate).with(
         vm, :storage_volumes,
         allocation_state_filter: ["accepting"],
@@ -887,6 +887,14 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:vm_host_slice).and_return(vm_host_slice)
       expect(vm).to receive(:update).with(display_state: "deleting")
       expect { nx.destroy }.to hop("destroy_slice")
+    end
+
+    it "fails if VM cores is 0" do
+      expect(vm).to receive(:update).with(display_state: "deleting")
+      allow(vm).to receive(:vm_storage_volumes).and_return([])
+      expect(vm).to receive(:vm_host_slice).and_return(nil)
+      expect(vm).to receive(:cores).and_return(0)
+      expect { nx.destroy }.to raise_error(RuntimeError, "BUG: Number of cores cannot be zero when VM is runing without a slice")
     end
 
     it "#destroy_slice when no slice" do
