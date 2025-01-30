@@ -15,9 +15,10 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location: "hetzner-fsn1",
-      project_id: project.id
+      project_id: project.id,
+      target_node_size: "standard-2"
     )
-    KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id)
+    KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: project.id)
     kc.add_cp_vm(create_vm)
@@ -53,16 +54,25 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "creates a kubernetes cluster" do
-      st = described_class.assemble(name: "k8stest", version: "v1.32", private_subnet_id: subnet.id, project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3)
+      st = described_class.assemble(name: "k8stest", version: "v1.32", private_subnet_id: subnet.id, project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
 
-      expect(st.subject.name).to eq "k8stest"
-      expect(st.subject.ubid).to start_with("kc")
-      expect(st.subject.version).to eq "v1.32"
-      expect(st.subject.location).to eq "hetzner-fsn1"
-      expect(st.subject.cp_node_count).to eq 3
-      expect(st.subject.private_subnet.id).to eq subnet.id
-      expect(st.subject.project.id).to eq project.id
-      expect(st.subject.strand.label).to eq "start"
+      kc = st.subject
+      expect(kc.name).to eq "k8stest"
+      expect(kc.ubid).to start_with("kc")
+      expect(kc.version).to eq "v1.32"
+      expect(kc.location).to eq "hetzner-fsn1"
+      expect(kc.cp_node_count).to eq 3
+      expect(kc.private_subnet.id).to eq subnet.id
+      expect(kc.project.id).to eq project.id
+      expect(kc.strand.label).to eq "start"
+      expect(kc.target_node_size).to eq "standard-8"
+      expect(kc.target_node_storage_size_gib).to eq 100
+    end
+
+    it "can have null as storage size" do
+      st = described_class.assemble(name: "k8stest", version: "v1.32", private_subnet_id: subnet.id, project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: nil)
+
+      expect(st.subject.target_node_storage_size_gib).to be_nil
     end
   end
 
