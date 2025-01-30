@@ -610,7 +610,7 @@ RSpec.describe Prog::Vm::Nexus do
 
     it "does not hop to destroy if already in the destroy state" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect { nx.before_run }.not_to hop("destroy")
     end
 

@@ -75,18 +75,20 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx).to receive(:destroying_set?).and_return(false)
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if already in the destroy state" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops additional operations from stack" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect(nx.strand.stack).to receive(:count).and_return(2)
       expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the inference endpoint replica"})
     end

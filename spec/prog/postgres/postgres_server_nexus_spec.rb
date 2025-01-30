@@ -102,13 +102,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "does not hop to destroy if already in the destroy state" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops additional operations from stack" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect(nx.strand.stack).to receive(:count).and_return(2)
       expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the postgres server"})
     end

@@ -162,7 +162,7 @@ class Prog::Vm::Nexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      unless ["destroy", "wait_lb_expiry", "destroy_slice"].include?(strand.label)
+      unless destroying_set?
         vm.active_billing_records.each(&:finalize)
         vm.assigned_vm_address&.active_billing_record&.finalize
         register_deadline(nil, 5 * 60)
