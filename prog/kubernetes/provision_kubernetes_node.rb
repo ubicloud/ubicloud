@@ -20,19 +20,25 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   label def start
-    name = if kubernetes_nodepool
-      "#{kubernetes_nodepool.name}-#{SecureRandom.alphanumeric(5).downcase}"
+    name, vm_size, storage_size_gib = if kubernetes_nodepool
+      ["#{kubernetes_nodepool.name}-#{SecureRandom.alphanumeric(5).downcase}",
+        kubernetes_nodepool.target_node_size,
+        kubernetes_nodepool.target_node_storage_size_gib]
     else
-      "#{kubernetes_cluster.name.downcase}-control-plane-#{SecureRandom.alphanumeric(5).downcase}"
+      ["#{kubernetes_cluster.name.downcase}-control-plane-#{SecureRandom.alphanumeric(5).downcase}",
+        kubernetes_cluster.target_node_size,
+        kubernetes_cluster.target_node_storage_size_gib]
     end
+
+    storage_volumes = [{encrypted: true, size_gib: storage_size_gib}] if storage_size_gib
 
     vm = Prog::Vm::Nexus.assemble_with_sshable(
       "ubi",
       kubernetes_cluster.project.id,
-      # we should reiterate how we name the vm. some how correlate it to the vm's info.
       name: name,
       location: kubernetes_cluster.location,
-      size: "standard-2",
+      size: vm_size,
+      storage_volumes: storage_volumes,
       boot_image: "ubuntu-jammy",
       private_subnet_id: kubernetes_cluster.private_subnet_id,
       enable_ip4: true
