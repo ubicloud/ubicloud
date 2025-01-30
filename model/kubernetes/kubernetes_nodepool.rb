@@ -15,11 +15,13 @@ end
 
 # Table: kubernetes_nodepool
 # Columns:
-#  id                    | uuid                     | PRIMARY KEY
-#  name                  | text                     | NOT NULL
-#  node_count            | integer                  | NOT NULL
-#  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  kubernetes_cluster_id | uuid                     | NOT NULL
+#  id                           | uuid                     | PRIMARY KEY
+#  name                         | text                     | NOT NULL
+#  node_count                   | integer                  | NOT NULL
+#  created_at                   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  kubernetes_cluster_id        | uuid                     | NOT NULL
+#  target_node_size             | text                     | NOT NULL
+#  target_node_storage_size_gib | bigint                   |
 # Indexes:
 #  kubernetes_nodepool_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
