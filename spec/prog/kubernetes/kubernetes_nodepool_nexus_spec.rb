@@ -15,7 +15,8 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location: "hetzner-fsn1",
-      project_id: project.id
+      project_id: project.id,
+      target_node_size: "standard-2"
     )
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: project.id)
@@ -25,7 +26,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     kc
   }
 
-  let(:kn) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id) }
+  let(:kn) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2") }
 
   before do
     allow(nx).to receive(:kubernetes_nodepool).and_return(kn)
@@ -39,13 +40,22 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
 
     it "creates a kubernetes nodepool" do
-      st = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id)
+      st = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-4", target_node_storage_size_gib: 37)
+      kn = st.subject
 
-      expect(st.subject.name).to eq "k8stest-np"
-      expect(st.subject.ubid).to start_with("kn")
-      expect(st.subject.kubernetes_cluster_id).to eq kc.id
-      expect(st.subject.node_count).to eq 2
+      expect(kn.name).to eq "k8stest-np"
+      expect(kn.ubid).to start_with("kn")
+      expect(kn.kubernetes_cluster_id).to eq kc.id
+      expect(kn.node_count).to eq 2
       expect(st.label).to eq "start"
+      expect(kn.target_node_size).to eq "standard-4"
+      expect(kn.target_node_storage_size_gib).to eq 37
+    end
+
+    it "can have null as storage size" do
+      st = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-4", target_node_storage_size_gib: nil)
+
+      expect(st.subject.target_node_storage_size_gib).to be_nil
     end
   end
 
