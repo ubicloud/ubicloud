@@ -236,6 +236,7 @@ RSpec.describe Prog::Vm::GithubRunner do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx).to receive(:destroying_set?).and_return(false)
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:update_billing_record)
       expect(nx).to receive(:incr_destroying)
@@ -244,13 +245,7 @@ RSpec.describe Prog::Vm::GithubRunner do
 
     it "does not hop to destroy if already in the destroy state" do
       expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the wait_vm_destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("wait_vm_destroy")
+      expect(nx).to receive(:destroying_set?).and_return(true)
       expect { nx.before_run }.not_to hop("destroy")
     end
   end
