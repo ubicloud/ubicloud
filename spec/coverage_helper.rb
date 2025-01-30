@@ -10,17 +10,25 @@ if (suite = ENV.delete("COVERAGE"))
 
     command_name "#{suite}#{ENV["TEST_ENV_NUMBER"]}"
 
-    # rhizome (dataplane) and controlplane should have separate coverage reports.
-    # They will have different coverage suites in future.
-    add_filter "/rhizome"
+    if suite == "rhizome"
+      require "pathname"
+      LOCKED_FILES = ["rhizome/kubernetes/lib/ubi_cni.rb"].map do |file|
+        Pathname.new(File.expand_path("..", __dir__)).join(file).to_s
+      end
 
-    # No need to check coverage for them
-    add_filter "/migrate/"
-    add_filter "/spec/"
-    add_filter "/db.rb"
-    add_filter "/model.rb"
-    add_filter "/loader.rb"
-    add_filter "/.env.rb"
+      add_filter do |file|
+        !LOCKED_FILES.include?(file.filename)
+      end
+    else
+      add_filter "/rhizome"
+      # No need to check coverage for them
+      add_filter "/migrate/"
+      add_filter "/spec/"
+      add_filter "/db.rb"
+      add_filter "/model.rb"
+      add_filter "/loader.rb"
+      add_filter "/.env.rb"
+    end
 
     add_group("Missing") { |src| src.covered_percent < 100 }
     add_group("Covered") { |src| src.covered_percent == 100 }
