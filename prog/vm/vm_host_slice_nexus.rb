@@ -82,7 +82,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
         # resolution in different states can be handled properly.
         register_deadline("wait", 0)
       end
-    rescue Net::SSH::Disconnect, Net::SSH::ConnectionTimeout, Errno::ECONNRESET, Errno::ECONNREFUSED, IOError
+    rescue *Sshable::SSH_CONNECTION_ERRORS
       # Host is likely to be down, which will be handled by HostNexus. No need
       # to create a page for this case.
     end
