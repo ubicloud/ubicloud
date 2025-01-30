@@ -39,13 +39,22 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
 
     it "creates a kubernetes nodepool" do
-      st = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id)
+      st = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-4", target_node_storage_size_gib: 37)
+      kn = st.subject
 
-      expect(st.subject.name).to eq "k8stest-np"
-      expect(st.subject.ubid).to start_with("kn")
-      expect(st.subject.kubernetes_cluster_id).to eq kc.id
-      expect(st.subject.node_count).to eq 2
+      expect(kn.name).to eq "k8stest-np"
+      expect(kn.ubid).to start_with("kn")
+      expect(kn.kubernetes_cluster_id).to eq kc.id
+      expect(kn.node_count).to eq 2
       expect(st.label).to eq "start"
+      expect(kn.target_node_size).to eq "standard-4"
+      expect(kn.target_node_storage_size_gib).to eq 37
+    end
+
+    it "can have null as storage size" do
+      st = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-4", target_node_storage_size_gib: nil)
+
+      expect(st.subject.target_node_storage_size_gib).to be_nil
     end
   end
 

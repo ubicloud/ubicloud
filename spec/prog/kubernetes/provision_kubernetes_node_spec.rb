@@ -14,7 +14,9 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location: "hetzner-fsn1",
-      project_id: project.id
+      project_id: project.id,
+      target_node_size: "standard-4",
+      target_node_storage_size_gib: 37
     )
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", src_port: 123, dst_port: 456, health_check_endpoint: "/foo", project_id: project.id)
@@ -25,7 +27,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     kc
   }
 
-  let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id) }
+  let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78) }
 
   before do
     allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"vm_id" => create_vm.id})
@@ -86,6 +88,8 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       new_vm = kubernetes_cluster.cp_vms.last
       expect(new_vm.name).to start_with("k8scluster-control-plane-")
       expect(new_vm.sshable).not_to be_nil
+      expect(new_vm.vcpus).to eq(4)
+      expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(37)
     end
 
     it "creates a worker VM and hops if a nodepool is given" do
@@ -99,6 +103,22 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       new_vm = kubernetes_nodepool.vms.last
       expect(new_vm.name).to start_with("k8stest-np-")
       expect(new_vm.sshable).not_to be_nil
+      expect(new_vm.vcpus).to eq(8)
+      expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq(78)
+    end
+
+    it "assigns the default storage size if not specified" do
+      kubernetes_cluster.update(target_node_storage_size_gib: nil)
+      expect(kubernetes_cluster.api_server_lb).to receive(:add_vm)
+
+      expect(kubernetes_cluster.cp_vms.count).to eq(2)
+
+      expect { prog.start }.to hop("install_software")
+
+      expect(kubernetes_cluster.cp_vms.count).to eq(3)
+
+      new_vm = kubernetes_cluster.cp_vms.last
+      expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq 80
     end
   end
 

@@ -3,7 +3,7 @@
 class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   subject_is :kubernetes_cluster
 
-  def self.assemble(name:, version:, private_subnet_id:, project_id:, location:, cp_node_count: 3)
+  def self.assemble(name:, version:, private_subnet_id:, project_id:, location:, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing project"
@@ -23,7 +23,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       # TODO: Move resources (vms, subnet, LB, etc.) into own project
       # TODO: Validate node count
 
-      kc = KubernetesCluster.create_with_id(name:, version:, cp_node_count:, private_subnet_id:, location:, project_id: project.id)
+      kc = KubernetesCluster.create_with_id(name:, version:, cp_node_count:, private_subnet_id:, location:, target_node_size:, target_node_storage_size_gib:, project_id: project.id)
 
       Strand.create(prog: "Kubernetes::KubernetesClusterNexus", label: "start") { _1.id = kc.id }
     end
