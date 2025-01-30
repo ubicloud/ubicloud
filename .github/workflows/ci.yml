@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - dependabot/npm_and_yarn/js-dependencies-f5e670e435
   pull_request:
 
 jobs:
@@ -62,7 +62,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-         node-version: "22"
+         node-version-file: "package.json"
 
     - name: Install node packages
       run: npm ci
