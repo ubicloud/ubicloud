@@ -18,6 +18,8 @@ rescue KeyError => e
   puts "Needed #{e.key} in parameters"
   exit 1
 end
+service_account_name = "k8s-access"
+secret_name = service_account_name
 
 config = {
   "apiVersion" => "kubeadm.k8s.io/v1beta3",
@@ -58,3 +60,31 @@ safe_write_to_file(config_path, config.to_yaml)
 r "sudo kubeadm init --config #{config_path}"
 
 r("sudo /home/ubi/kubernetes/bin/setup-cni")
+
+api_server_up = false
+5.times do
+  r("kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw='/healthz'")
+  api_server_up = true
+  break
+rescue CommandFail
+  puts "API server is not up yet, retrying in 5 seconds..."
+  sleep 5
+end
+unless api_server_up
+  puts "API server is not healthy. Could not create customer credentials."
+  exit 1
+end
+
+r "kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system create serviceaccount #{service_account_name}"
+r "kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-system create clusterrolebinding #{service_account_name}-binding --clusterrole=cluster-admin --serviceaccount=kube-system:#{service_account_name}"
+r "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: #{secret_name}
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: #{service_account_name}
+type: kubernetes.io/service-account-token
+EOF
+"

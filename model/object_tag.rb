@@ -25,6 +25,7 @@ class ObjectTag < Sequel::Model
       "LoadBalancer" => project.load_balancers,
       "InferenceApiKey" => project.api_keys,
       "InferenceEndpoint" => project.inference_endpoints,
+      "KubernetesCluster" => project.kubernetes_clusters,
       "SubjectTag" => project.subject_tags,
       "ActionTag" => project.action_tags,
       {"label" => "ObjectTag (grants access to tag itself)", "id" => "object-metatag-group"} => project.object_tags.map(&:metatag)

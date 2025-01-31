@@ -23,6 +23,12 @@ class KubernetesCluster < Sequel::Model
     errors.add(:version, "must be a valid Kubernetes version") unless ["v1.32", "v1.31"].include?(version)
   end
 
+  def display_state
+    return "deleting" if destroy_set? || strand.label == "destroy"
+    return "running" if strand.label == "wait" && nodepools.all? { _1.strand.label == "wait" }
+    "creating"
+  end
+
   def display_location
     LocationNameConverter.to_display_name(location)
   end
@@ -37,6 +43,22 @@ class KubernetesCluster < Sequel::Model
 
   def sshable
     cp_vms.first.sshable
+  end
+
+  def self.kubeconfig(vm)
+    rbac_token = vm.sshable.cmd("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d")
+    admin_kubeconfig = vm.sshable.cmd("sudo cat /etc/kubernetes/admin.conf")
+    kubeconfig = YAML.safe_load(admin_kubeconfig)
+    kubeconfig["users"].each do |user|
+      user["user"].delete("client-certificate-data")
+      user["user"].delete("client-key-data")
+      user["user"]["token"] = rbac_token
+    end
+    kubeconfig.to_yaml
+  end
+
+  def kubeconfig
+    self.class.kubeconfig(cp_vms.first)
   end
 end
 
