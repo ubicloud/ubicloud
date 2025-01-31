@@ -8,6 +8,7 @@ class KubernetesCluster < Sequel::Model
   many_to_one :private_subnet
   many_to_one :project
   many_to_many :cp_vms, join_table: :kubernetes_clusters_cp_vms, class: :Vm, order: :created_at
+  one_to_many :nodepools, class: :KubernetesNodepool
 
   dataset_module Pagination
 
@@ -32,6 +33,10 @@ class KubernetesCluster < Sequel::Model
 
   def endpoint
     api_server_lb.hostname
+  end
+
+  def sshable
+    cp_vms.first.sshable
   end
 end
 
