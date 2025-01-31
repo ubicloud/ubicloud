@@ -34,6 +34,10 @@ class KubernetesCluster < Sequel::Model
   def endpoint
     api_server_lb.hostname
   end
+
+  def sshable
+    cp_vms.first.sshable
+  end
 end
 
 # Table: kubernetes_cluster

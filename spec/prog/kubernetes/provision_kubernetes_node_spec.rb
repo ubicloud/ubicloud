@@ -54,7 +54,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(Config).to receive(:development?).and_return(true)
 
       expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster.cp_vms.first).to receive(:ephemeral_net4).and_return("SOMEIP")
+      expect(kubernetes_cluster).to receive(:sshable).and_return(instance_double(Sshable, host: "SOMEIP"))
       expect(sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", {stdin: /SOMEIP somelb\..*\n/})
 
       prog.write_hosts_file_if_needed
@@ -66,7 +66,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(Config).to receive(:development?).and_return(true)
 
       expect(sshable).to receive(:cmd).with("cat /etc/hosts").and_return("nothing relevant")
-      expect(kubernetes_cluster.cp_vms.first).not_to receive(:ephemeral_net4)
+      expect(kubernetes_cluster).not_to receive(:sshable)
       expect(sshable).to receive(:cmd).with("sudo tee -a /etc/hosts", {stdin: /ANOTHERIP somelb\..*\n/})
 
       prog.write_hosts_file_if_needed "ANOTHERIP"

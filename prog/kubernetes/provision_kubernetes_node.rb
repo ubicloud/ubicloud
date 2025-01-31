@@ -14,7 +14,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   def write_hosts_file_if_needed(ip = nil)
     return unless Config.development?
     return if vm.sshable.cmd("cat /etc/hosts").include?(kubernetes_cluster.endpoint.to_s)
-    ip ||= kubernetes_cluster.cp_vms.first.ephemeral_net4
+    ip ||= kubernetes_cluster.sshable.host
 
     vm.sshable.cmd("sudo tee -a /etc/hosts", stdin: "#{ip} #{kubernetes_cluster.endpoint}\n")
   end
@@ -135,7 +135,7 @@ BASH
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
-      cp_sshable = kubernetes_cluster.cp_vms.first.sshable
+      cp_sshable = kubernetes_cluster.sshable
       params = {
         cluster_endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").chomp,
@@ -160,7 +160,7 @@ BASH
     when "Succeeded"
       hop_install_cni
     when "NotStarted"
-      cp_sshable = kubernetes_cluster.cp_vms.first.sshable
+      cp_sshable = kubernetes_cluster.sshable
       params = {
         endpoint: "#{kubernetes_cluster.endpoint}:443",
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", ""),
