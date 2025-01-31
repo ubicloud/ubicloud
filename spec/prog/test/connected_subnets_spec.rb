@@ -84,9 +84,25 @@ ExecStart=nc -l 8080 -6
       expect(sshable).to receive(:cmd).with("ping -c 2 google.com").at_least(:once)
       expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl status listening_ipv4.service").and_return("active")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.ephemeral_net4, vm2, should_fail: true, ipv4: true)
 
       expect { connected_subnets_test.perform_tests_public_blocked }.to hop("perform_tests_private_ipv4")
+    end
+
+    it "naps if the service is not active yet" do
+      expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
+      expect(connected_subnets_test).to receive(:ps_single).and_return(ps_single).at_least(:once)
+      vm1 = instance_double(Vm, sshable: sshable, ephemeral_net4: NetAddr::IPv4Net.parse("0.0.0.0"))
+      vm2 = instance_double(Vm, sshable: sshable)
+      expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
+      expect(ps_single).to receive(:vms).and_return([vm2]).at_least(:once)
+      expect(sshable).to receive(:cmd).with("ping -c 2 google.com").at_least(:once)
+      expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl status listening_ipv4.service").and_return("inactive")
+
+      expect { connected_subnets_test.perform_tests_public_blocked }.to nap(1)
     end
   end
 
@@ -111,6 +127,7 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl status listening_ipv4.service").and_return("active")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: false, ipv4: true)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: true, ipv4: true)
 
@@ -137,6 +154,7 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv6.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv4.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl status listening_ipv6.service").and_return("active")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: false, ipv4: false)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: true, ipv4: false)
 
@@ -163,6 +181,7 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv4.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv6.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl status listening_ipv4.service").and_return("active")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: false, ipv4: true)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv4.nth(0).to_s, vm2, should_fail: true, ipv4: true)
 
@@ -189,10 +208,23 @@ ExecStart=nc -l 8080 -6
 
       expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv6.service")
       expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv4.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl status listening_ipv6.service").and_return("active")
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: false, ipv4: false)
       expect(connected_subnets_test).to receive(:test_connection).with(vm1.nics.first.private_ipv6.nth(2).to_s, vm2, should_fail: true, ipv4: false)
 
       expect { connected_subnets_test.perform_blocked_private_ipv6 }.to hop("finish")
+    end
+
+    it "naps if the service is not active yet" do
+      expect(connected_subnets_test).to receive(:frame).and_return({"firewalls" => "blocked_private_ipv6"})
+      vm1 = instance_double(Vm, sshable: sshable, nics: [instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("2001:db8::/64"))])
+      expect(connected_subnets_test).to receive(:vm_to_be_connected).and_return(vm1).at_least(:once)
+
+      expect(sshable).to receive(:cmd).with("sudo systemctl start listening_ipv6.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl stop listening_ipv4.service")
+      expect(sshable).to receive(:cmd).with("sudo systemctl status listening_ipv6.service").and_return("inactive")
+
+      expect { connected_subnets_test.perform_blocked_private_ipv6 }.to nap(1)
     end
   end
 
