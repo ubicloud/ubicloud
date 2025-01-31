@@ -7,15 +7,15 @@ class Clover
     required_parameters = ["name", "location", "version", "private_subnet_id", "cp_nodes", "worker_nodes"]
     request_body_params = validate_request_params(required_parameters)
 
-    private_subnet = PrivateSubnet.from_ubid(request_body_params["private_subnet_id"])
+    private_subnet_id = request_body_params["private_subnet_id"]
 
-    unless private_subnet && private_subnet.location == @location
+    authorize("PrivateSubnet:edit", private_subnet_id)
+
+    private_subnet = PrivateSubnet.from_ubid(private_subnet_id)
+
+    unless private_subnet.location == @location
       fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{request_body_params["private_subnet_id"]}\" and the location \"#{@location}\" is not found"})
     end
-
-    authorize("PrivateSubnet:edit", private_subnet.id)
-
-    kc = nil
 
     DB.transaction do
       kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
@@ -32,10 +32,10 @@ class Clover
         node_count: request.params["worker_nodes"].to_i,
         kubernetes_cluster_id: kc.id
       )
-    end
 
-    flash["notice"] = "'#{name}' will be ready in a few minutes"
-    request.redirect "#{@project.path}#{kc.path}"
+      flash["notice"] = "'#{name}' will be ready in a few minutes"
+      request.redirect "#{@project.path}#{kc.path}"
+    end
   end
 
   def kubernetes_cluster_list
