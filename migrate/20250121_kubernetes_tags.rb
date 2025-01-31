@@ -6,15 +6,15 @@ Sequel.migration do
       INSERT INTO
         action_type (id, name)
       VALUES
-        ('ffffffff-ff00-835a-87ff-f04d80d85dc0', 'KubernetesCluster:view'),
-        ('ffffffff-ff00-835a-87c1-36019872b4e0', 'KubernetesCluster:create'),
-        ('ffffffff-ff00-835a-87ff-f04d807343a0', 'KubernetesCluster:edit'),
-        ('ffffffff-ff00-835a-87c1-3601ae0bb4e0', 'KubernetesCluster:delete');
+        ('ffffffff-ff00-835a-87ff-f04d80d85dc0', 'KubernetesCluster:view'),   -- ttzzzzzzzz021gzzz0kc0v1ew0
+        ('ffffffff-ff00-835a-87c1-36019872b4e0', 'KubernetesCluster:create'), -- ttzzzzzzzz021gz0kc0create0
+        ('ffffffff-ff00-835a-87ff-f04d807343a0', 'KubernetesCluster:edit'),   -- ttzzzzzzzz021gzzz0kc0ed1t1
+        ('ffffffff-ff00-835a-87c1-3601ae0bb4e0', 'KubernetesCluster:delete'); -- ttzzzzzzzz021gz0kc0de1ete1
 
       INSERT INTO
         action_tag (id, name)
       VALUES
-        ('ffffffff-ff00-834a-87ff-ff826c028210', 'KubernetesCluster:all');
+        ('ffffffff-ff00-834a-87ff-ff826c028210', 'KubernetesCluster:all');    -- tazzzzzzzz021gzzzz0kc0a110
 
       INSERT INTO
         applied_action_tag (tag_id, action_id)
