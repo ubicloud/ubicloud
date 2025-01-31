@@ -6,16 +6,21 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   semaphore :destroy
 
   def self.assemble
-    postgres_service_project = Project.create(name: "Postgres-Service-Project") { _1.id = Config.postgres_service_project_id }
     postgres_test_project = Project.create(name: "Postgres-Test-Project")
+    postgres_service_project = Project[Config.postgres_service_project_id] ||
+      Project.create(name: "Postgres-Service-Project") do |project|
+        project.id = Config.postgres_service_project_id
+      end
+
+    frame = {
+      "postgres_service_project_id" => postgres_service_project.id,
+      "postgres_test_project_id" => postgres_test_project.id
+    }
 
     Strand.create_with_id(
       prog: "Test::PostgresResource",
       label: "start",
-      stack: [{
-        "postgres_service_project_id" => postgres_service_project.id,
-        "postgres_test_project_id" => postgres_test_project.id
-      }]
+      stack: [frame]
     )
   end
 
@@ -55,7 +60,6 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def destroy
-    postgres_service_project.destroy
     postgres_test_project.destroy
 
     fail_test(frame["fail_message"]) if frame["fail_message"]
@@ -69,10 +73,6 @@ class Prog::Test::PostgresResource < Prog::Test::Base
 
   def postgres_test_project
     @postgres_test_project ||= Project[frame["postgres_test_project_id"]]
-  end
-
-  def postgres_service_project
-    @postgres_service_project ||= Project[frame["postgres_service_project_id"]]
   end
 
   def postgres_resource

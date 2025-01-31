@@ -46,6 +46,9 @@ def main(options)
   if options[:test_cases].include?("postgres_standard")
     tests_to_wait << Prog::Test::PostgresResource.assemble
   end
+  if options[:test_cases].include?("postgres_ha")
+    tests_to_wait << Prog::Test::HaPostgresResource.assemble
+  end
 
   # Although wait_until will be blocked while checking the first one
   # it won't affect the total time as other strands will continue in parallel.
