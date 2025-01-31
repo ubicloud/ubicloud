@@ -10,11 +10,12 @@ class LoadBalancer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
+  one_to_many :load_balancers_ports, key: :load_balancer_id, class: :LoadBalancerPorts
   many_to_many :certs, join_table: :certs_load_balancers, left_key: :load_balancer_id, right_key: :cert_id
   one_to_many :certs_load_balancers, key: :load_balancer_id, class: :CertsLoadBalancers
   many_to_one :custom_hostname_dns_zone, class: :DnsZone, key: :custom_hostname_dns_zone_id
 
-  plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy
+  plugin :association_dependencies, load_balancers_vms: :destroy, certs_load_balancers: :destroy, load_balancer_ports: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -93,15 +94,7 @@ end
 #  id                          | uuid           | PRIMARY KEY
 #  name                        | text           | NOT NULL
 #  algorithm                   | lb_algorithm   | NOT NULL DEFAULT 'round_robin'::lb_algorithm
-#  src_port                    | integer        | NOT NULL
-#  dst_port                    | integer        | NOT NULL
 #  private_subnet_id           | uuid           | NOT NULL
-#  health_check_endpoint       | text           | NOT NULL
-#  health_check_interval       | integer        | NOT NULL DEFAULT 10
-#  health_check_timeout        | integer        | NOT NULL DEFAULT 5
-#  health_check_up_threshold   | integer        | NOT NULL DEFAULT 5
-#  health_check_down_threshold | integer        | NOT NULL DEFAULT 3
-#  health_check_protocol       | lb_hc_protocol | NOT NULL DEFAULT 'http'::lb_hc_protocol
 #  custom_hostname             | text           |
 #  custom_hostname_dns_zone_id | uuid           |
 #  stack                       | lb_stack       | NOT NULL DEFAULT 'dual'::lb_stack
