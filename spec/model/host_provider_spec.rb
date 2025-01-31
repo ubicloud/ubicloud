@@ -2,15 +2,13 @@
 
 require_relative "spec_helper"
 
-RSpec.describe HetznerHost do
-  subject(:hetzner_host) { described_class.new }
-
-  let(:vm_host) {
-    instance_double(
-      VmHost,
-      provider: HetznerHost::PROVIDER_NAME,
-      hetzner_host: hetzner_host
-    )
+RSpec.describe HostProvider do
+  subject(:hetzner_host) {
+    described_class.new do |hp|
+      hp.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+      hp.server_identifier = "123"
+      hp.id = "1d422893-2955-4c2c-b41c-f2ec70bcd60d"
+    end
   }
 
   describe "connection_string" do

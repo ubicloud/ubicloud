@@ -9,14 +9,14 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     frame = if vm_host_id
       vm_host = VmHost[vm_host_id]
       {
-        vm_host_id: vm_host.id, server_id: vm_host.hetzner_host.server_identifier,
+        vm_host_id: vm_host.id, server_id: vm_host.provider.server_identifier,
         hostname: vm_host.sshable.host, setup_host: false,
-        default_boot_images:
+        default_boot_images:, provider_name: vm_host.provider_name
       }
     else
       {
         server_id: Config.ci_hetzner_sacrificial_server_id, setup_host: true,
-        default_boot_images:
+        default_boot_images:, provider_name: HostProvider::HETZNER_PROVIDER_NAME
       }
     end
 
@@ -64,8 +64,8 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   label def setup_host
     vm_host = Prog::Vm::HostNexus.assemble(
       frame["hostname"],
-      provider: "hetzner",
-      hetzner_server_identifier: frame["server_id"],
+      provider_name: HostProvider::HETZNER_PROVIDER_NAME,
+      server_identifier: frame["server_id"],
       default_boot_images: frame["default_boot_images"]
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
@@ -162,7 +162,11 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   def hetzner_api
     @hetzner_api ||= Hosting::HetznerApis.new(
-      HetznerHost.new(server_identifier: frame["server_id"])
+      HostProvider.new do |hp|
+        hp.server_identifier = frame["server_id"]
+        hp.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+        hp.id = frame["vm_host_id"]
+      end
     )
   end
 

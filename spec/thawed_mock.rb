@@ -60,7 +60,7 @@ module ThawedMock
   allow_mocking(FirewallRule, :create_with_id)
   allow_mocking(Github, :app_client, :failed_deliveries, :installation_client, :oauth_client, :redeliver_failed_deliveries)
   allow_mocking(GithubRunner, :[], :any?, :first, :join)
-  allow_mocking(HetznerHost, :create)
+  allow_mocking(HostProvider, :create)
   allow_mocking(IpsecTunnel, :[], :create)
   allow_mocking(KubernetesCluster, :[])
   allow_mocking(MinioCluster, :[])

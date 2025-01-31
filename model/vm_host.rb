@@ -8,7 +8,7 @@ class VmHost < Sequel::Model
   one_to_one :sshable, key: :id
   one_to_many :vms
   one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address
-  one_to_one :hetzner_host, key: :id
+  one_to_one :provider, key: :id, class: :HostProvider
   one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
   one_to_many :spdk_installations, key: :vm_host_id
   one_to_many :storage_devices, key: :vm_host_id
@@ -17,7 +17,7 @@ class VmHost < Sequel::Model
   one_to_many :slices, class: :VmHostSlice, key: :vm_host_id
   one_to_many :cpus, class: :VmHostCpu, key: :vm_host_id
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, hetzner_host: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy
 
   include ResourceMethods
   include SemaphoreMethods
@@ -32,8 +32,8 @@ class VmHost < Sequel::Model
     vms.filter_map(&:assigned_vm_address)
   end
 
-  def provider
-    hetzner_host ? HetznerHost::PROVIDER_NAME : nil
+  def provider_name
+    provider&.provider_name
   end
 
   # Compute the IPv6 Subnet that can be used to address the host
@@ -246,7 +246,7 @@ class VmHost < Sequel::Model
 
   def hetznerify(server_id)
     DB.transaction do
-      HetznerHost.create(server_identifier: server_id) { _1.id = id }
+      HostProvider.create(provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: server_id) { _1.id = id }
       create_addresses
     end
   end
@@ -361,7 +361,7 @@ end
 #  address               | address_routed_to_host_id_fkey     | (routed_to_host_id) REFERENCES vm_host(id)
 #  assigned_host_address | assigned_host_address_host_id_fkey | (host_id) REFERENCES vm_host(id)
 #  boot_image            | boot_image_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
-#  hetzner_host          | hetzner_host_id_fkey               | (id) REFERENCES vm_host(id)
+#  host_provider         | host_provider_id_fkey              | (id) REFERENCES vm_host(id)
 #  pci_device            | pci_device_vm_host_id_fkey         | (vm_host_id) REFERENCES vm_host(id)
 #  spdk_installation     | spdk_installation_vm_host_id_fkey  | (vm_host_id) REFERENCES vm_host(id)
 #  storage_device        | storage_device_vm_host_id_fkey     | (vm_host_id) REFERENCES vm_host(id)

@@ -3,15 +3,22 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
 
-  def self.assemble(sshable_hostname, location: "hetzner-fsn1", net6: nil, ndp_needed: false, provider: nil, hetzner_server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
+  def self.assemble(sshable_hostname, location: "hetzner-fsn1", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
     DB.transaction do
       ubid = VmHost.generate_ubid
 
       Sshable.create(host: sshable_hostname) { _1.id = ubid.to_uuid }
       vmh = VmHost.create(location: location, net6: net6, ndp_needed: ndp_needed) { _1.id = ubid.to_uuid }
 
-      if provider == HetznerHost::PROVIDER_NAME
-        HetznerHost.create(server_identifier: hetzner_server_identifier) { _1.id = vmh.id }
+      if provider_name == HostProvider::HETZNER_PROVIDER_NAME || provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+        HostProvider.create do |hp|
+          hp.id = vmh.id
+          hp.provider_name = provider_name
+          hp.server_identifier = server_identifier
+        end
+      end
+
+      if provider_name == HostProvider::HETZNER_PROVIDER_NAME
         vmh.create_addresses
         vmh.set_data_center
         # Avoid overriding custom server names for development hosts.

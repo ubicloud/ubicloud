@@ -234,7 +234,7 @@ RSpec.describe VmHost do
 
   it "hetznerifies a host" do
     expect(vh).to receive(:create_addresses).at_least(:once)
-    expect(HetznerHost).to receive(:create).with(server_identifier: "12").and_return(true)
+    expect(HostProvider).to receive(:create).with(server_identifier: "12", provider_name: HostProvider::HETZNER_PROVIDER_NAME).and_return(true)
 
     vh.hetznerify("12")
   end
@@ -422,6 +422,18 @@ RSpec.describe VmHost do
     it "disallows slices" do
       expect(vh).to receive(:update).with(accepts_slices: false)
       vh.disallow_slices
+    end
+  end
+
+  describe "#provider_name" do
+    it "returns the provider name" do
+      expect(vh).to receive(:provider).and_return(instance_double(HostProvider, provider_name: "hetzner"))
+      expect(vh.provider_name).to eq("hetzner")
+    end
+
+    it "returns nil if there is no provider" do
+      expect(vh).to receive(:provider).and_return(nil)
+      expect(vh.provider_name).to be_nil
     end
   end
 end

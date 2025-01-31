@@ -5,19 +5,20 @@ RSpec.describe Hosting::Apis do
     instance_double(
       VmHost,
       ubid: "vhgkz40v22ny2qkf4maddr8xv1",
-      provider: HetznerHost::PROVIDER_NAME,
-      hetzner_host: hetzner_host
+      provider: hetzner_host,
+      provider_name: HostProvider::HETZNER_PROVIDER_NAME
     )
   }
   let(:connection) { instance_double(Excon::Connection) }
   let(:hetzner_apis) { instance_double(Hosting::HetznerApis, pull_ips: []) }
   let(:hetzner_host) {
     instance_double(
-      HetznerHost,
+      HostProvider,
       connection_string: "str",
       user: "user1", password: "pass",
       api: hetzner_apis,
-      server_identifier: 123
+      server_identifier: 123,
+      provider_name: HostProvider::HETZNER_PROVIDER_NAME
     )
   }
 
@@ -28,7 +29,7 @@ RSpec.describe Hosting::Apis do
     end
 
     it "raises an error if the provider is unknown" do
-      expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
+      expect(vm_host).to receive(:provider_name).and_return("unknown").at_least(:once)
       expect { described_class.pull_ips(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
     end
   end
@@ -40,7 +41,7 @@ RSpec.describe Hosting::Apis do
     end
 
     it "raises an error if the provider is unknown" do
-      expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
+      expect(vm_host).to receive(:provider_name).and_return("unknown").at_least(:once)
       expect { described_class.reimage_server(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
     end
   end
@@ -52,7 +53,7 @@ RSpec.describe Hosting::Apis do
     end
 
     it "raises an error if the provider is unknown" do
-      expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
+      expect(vm_host).to receive(:provider_name).and_return("unknown").at_least(:once)
       expect { described_class.hardware_reset_server(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
     end
   end
@@ -64,7 +65,7 @@ RSpec.describe Hosting::Apis do
     end
 
     it "raises an error if the provider is unknown" do
-      expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
+      expect(vm_host).to receive(:provider_name).and_return("unknown").at_least(:once)
       expect { described_class.pull_data_center(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
     end
   end
@@ -76,7 +77,7 @@ RSpec.describe Hosting::Apis do
     end
 
     it "raises an error if the provider is unknown" do
-      expect(vm_host).to receive(:provider).and_return("unknown").at_least(:once)
+      expect(vm_host).to receive(:provider_name).and_return("unknown").at_least(:once)
       expect { described_class.set_server_name(vm_host) }.to raise_error RuntimeError, "unknown provider unknown"
     end
   end
