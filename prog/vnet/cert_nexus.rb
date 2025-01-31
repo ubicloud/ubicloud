@@ -16,7 +16,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     DB.transaction do
       cert = Cert.create_with_id(hostname: hostname, dns_zone_id: dns_zone_id)
 
-      Strand.create(prog: "Vnet::CertNexus", label: "start") { _1.id = cert.id }
+      Strand.create(prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}]) { _1.id = cert.id }
     end
   end
 
@@ -72,7 +72,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     else
       Clog.emit("DNS validation failed") { {order_status: dns_challenge.status} }
       dns_zone.delete_record(record_name: dns_record_name)
-      hop_start
+      hop_restart
     end
   end
 
@@ -88,7 +88,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     else
       Clog.emit("Certificate finalization failed") { {order_status: acme_order.status} }
       dns_zone.delete_record(record_name: dns_record_name)
-      hop_start
+      hop_restart
     end
   end
 
@@ -99,6 +99,17 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
 
     nap 60 * 60 * 24 * 30 # 1 month
+  end
+
+  label def restart
+    when_restarted_set? do
+      decr_restarted
+      update_stack_restart_counter
+      hop_start
+    end
+
+    cert.incr_restarted
+    nap [60 * (strand.stack.first["restarted"] + 1), 60 * 10].min
   end
 
   label def destroy
@@ -125,6 +136,13 @@ class Prog::Vnet::CertNexus < Prog::Base
     dns_zone.delete_record(record_name: dns_record_name) if dns_challenge
     cert.destroy
     pop "certificate revoked and destroyed"
+  end
+
+  def update_stack_restart_counter
+    current_frame = strand.stack.first
+    current_frame["restarted"] += 1
+    strand.modified!(:stack)
+    strand.save_changes
   end
 
   def acme_client

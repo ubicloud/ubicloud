@@ -11,7 +11,7 @@ class Cert < Sequel::Model
 
   include ResourceMethods
   include SemaphoreMethods
-  semaphore :destroy
+  semaphore :destroy, :restarted
 
   plugin :column_encryption do |enc|
     enc.column :account_key

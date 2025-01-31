@@ -112,12 +112,12 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.wait_dns_validation }.to nap(10)
     end
 
-    it "returns back to start if dns_challenge validation fails" do
+    it "hops to restart if dns_challenge validation fails" do
       expect(challenge).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("DNS validation failed")
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
-      expect { nx.wait_dns_validation }.to hop("start")
+      expect { nx.wait_dns_validation }.to hop("restart")
     end
 
     it "finalizes the certificate when dns_challenge is valid" do
@@ -148,14 +148,14 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.wait_cert_finalization }.to nap(10)
     end
 
-    it "returns back to start if certificate finalization fails" do
+    it "hops to restart if certificate finalization fails" do
       challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, status: "pending", record_name: "test-record-name", record_content: "content")
       expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
       expect(acme_order).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("Certificate finalization failed")
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
-      expect { nx.wait_cert_finalization }.to hop("start")
+      expect { nx.wait_cert_finalization }.to hop("restart")
     end
 
     it "updates the certificate when certificate is valid" do
@@ -183,6 +183,27 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(Time).to receive(:now).and_return(created_at + 60 * 60 * 24 * 30 * 3 + 1)
       expect(cert).to receive(:incr_destroy)
       expect { nx.wait }.to nap(0)
+    end
+  end
+
+  describe "#restart" do
+    it "increments the restart counter and naps according to the restart counter" do
+      nx.strand.stack.first["restarted"] = 3
+
+      expect { nx.restart }.to nap(60 * 4)
+    end
+
+    it "naps at most 10 minutes" do
+      nx.strand.stack.first["restarted"] = 20
+
+      expect { nx.restart }.to nap(60 * 10)
+    end
+
+    it "hops to start if restarted semaphore is set" do
+      expect(nx).to receive(:when_restarted_set?).and_yield
+      expect(nx).to receive(:decr_restarted)
+      expect(nx).to receive(:update_stack_restart_counter)
+      expect { nx.restart }.to hop("start")
     end
   end
 
@@ -276,6 +297,18 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate is not authorized"))
 
       expect { nx.destroy }.to raise_error(Acme::Client::Error::Unauthorized)
+    end
+  end
+
+  describe "#update_stack_restart_counter" do
+    it "increments the restart counter" do
+      strand = instance_double(Strand, stack: [{"restarted" => 3}])
+      expect(nx).to receive(:strand).and_return(strand).at_least(:once)
+      expect(strand).to receive(:modified!).with(:stack)
+      expect(strand).to receive(:save_changes)
+
+      nx.update_stack_restart_counter
+      expect(strand.stack.first["restarted"]).to eq 4
     end
   end
 
