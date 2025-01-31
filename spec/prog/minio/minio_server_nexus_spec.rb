@@ -424,6 +424,10 @@ RSpec.describe Prog::Minio::MinioServerNexus do
   end
 
   describe "#available?" do
+    before do
+      allow(nx.minio_server).to receive(:cert).and_return("cert")
+    end
+
     it "returns true if initial provisioning is set" do
       expect(nx.minio_server).to receive(:initial_provisioning_set?).and_return(true)
       expect(nx.available?).to be(true)
