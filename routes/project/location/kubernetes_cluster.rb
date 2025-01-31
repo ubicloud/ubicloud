@@ -28,15 +28,12 @@ class Clover
           204
         end
 
-        r.on "kubeconfig" do
-          r.get do
-            authorize("KubernetesCluster:create", kc.id)
+        r.get "kubeconfig" do
+          authorize("KubernetesCluster:edit", kc.id)
 
-            content = kc.kubeconfig
-            response["Content-Type"] = "text/plain"
-            response["Content-Disposition"] = "attachment; filename=\"#{kc.name}-kubeconfig.yaml\""
-            response.write(content)
-          end
+          response["Content-Type"] = "text/plain"
+          response["Content-Disposition"] = "attachment; filename=\"#{kc.name}-kubeconfig.yaml\""
+          kc.kubeconfig
         end
       end
     end
