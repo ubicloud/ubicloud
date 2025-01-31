@@ -429,8 +429,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def apply_nftables
-    r "ip netns exec #{q_vm} bash -c 'nft flush ruleset'"
-    r "ip netns exec #{q_vm} bash -c 'nft -f #{vp.q_nftables_conf}'"
+    r "ip netns exec #{q_vm} nft flush ruleset"
+    r "ip netns exec #{q_vm} nft -f #{vp.q_nftables_conf}"
   end
 
   def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4)
