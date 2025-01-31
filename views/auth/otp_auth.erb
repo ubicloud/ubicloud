@@ -9,7 +9,7 @@
   <%== render("components/rodauth/otp_auth_code_field") %>
 
   <div class="flex flex-col text-center">
-    <%== render("components/form/submit_button", locals: { text: rodauth.otp_auth_button }) %>
+    <%== part("components/form/submit_button", text: rodauth.otp_auth_button) %>
     <p class="mt-10 text-center text-sm text-gray-400">
       Can't access your authentication app?
       <br>

@@ -1,6 +1,6 @@
 <% @page_title = "Create Project" %>
 
-<%== render("components/page_header", locals: { breadcrumbs: [%w[Projects /project], %w[Create #]] }) %>
+<%== part("components/page_header", breadcrumbs: [%w[Projects /project], %w[Create #]]) %>
 
 <div class="grid gap-6">
   <form action="/project" method="POST">
@@ -10,15 +10,13 @@
       <div class="px-4 py-5 sm:p-6">
         <div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
           <div class="sm:col-span-3">
-            <%== render(
+            <%== part(
               "components/form/text",
-              locals: {
-                name: "name",
-                label: "Name",
-                attributes: {
-                  required: true,
-                  placeholder: "Enter name"
-                }
+              name: "name",
+              label: "Name",
+              attributes: {
+                required: true,
+                placeholder: "Enter name"
               }
             ) %>
           </div>
@@ -28,7 +26,7 @@
       <div class="px-4 py-5 sm:p-6">
         <div class="flex items-center justify-end gap-x-6">
           <a href="/project" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+          <%== part("components/form/submit_button", text: "Create") %>
         </div>
       </div>
     </div>

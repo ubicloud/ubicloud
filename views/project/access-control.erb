@@ -31,12 +31,10 @@ end
 <%== render("project/user-tabbar") unless @token %>
 
 <div class="space-y-1">
-  <%== render(
+  <%== part(
     "components/page_header",
-    locals: {
-      title: page_header,
-      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]]
-    }
+    title: page_header,
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]]
   ) %>
 </div>
 
@@ -87,29 +85,20 @@ end
                   <% ace_options.each_with_index do | (name, options), index| %>
                     <% attributes = (!@token && index == 0 && ubid != "template") ? { required: "required" } : {} %>
                     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      <%== render(
+                      <%== part(
                         "components/form/select",
-                        locals: {
-                          id: "ace-#{ubid}-#{index}",
-                          name:,
-                          selected: tags[index]&.ubid,
-                          options:,
-                          classes: table_headers[index].downcase,
-                          attributes:
-                        }
+                        id: "ace-#{ubid}-#{index}",
+                        name:,
+                        selected: tags[index]&.ubid,
+                        options:,
+                        classes: table_headers[index].downcase,
+                        attributes:
                       ) %>
                     </td>
                   <% end %>
                   <td class="py-4 px-3 text-right">
-                    <%== render("components/form/hidden", locals: { name: "aces[][ubid]", value: ubid }) %>
-                    <%== render(
-                      "components/form/checkbox",
-                      locals: {
-                        id_prefix: "ace-#{ubid}-",
-                        name: "aces[][deleted]",
-                        options: [%w[true Delete]]
-                      }
-                    ) %>
+                    <%== part("components/form/hidden", name: "aces[][ubid]", value: ubid) %>
+                    <%== part("components/form/checkbox", id_prefix: "ace-#{ubid}-", name: "aces[][deleted]", options: [%w[true Delete]]) %>
                   </td>
                 <% else %>
                   <% tags.each do |tag| %>
@@ -139,17 +128,8 @@ end
         </table>
         <% if edit_perm %>
           <div class="px-3 py-4 flex justify-between">
-            <%== render(
-              "components/button",
-              locals: {
-                icon: "hero-plus",
-                text: "New Access Control Entry",
-                attributes: {
-                  id: "new-ace-btn"
-                }
-              }
-            ) %>
-            <%== render("components/button", locals: { text: "Save All" }) %>
+            <%== part("components/button", icon: "hero-plus", text: "New Access Control Entry", attributes: { id: "new-ace-btn" }) %>
+            <%== part("components/button", text: "Save All") %>
           </div>
         <% end %>
       </div>
@@ -182,7 +162,7 @@ end
             </div>
             <div id="restrict-<%=@token.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== render("components/form/submit_button", locals: { text: "#{restriction_title} Token Access" }) %>
+                <%== part("components/form/submit_button", text: "#{restriction_title} Token Access") %>
               </div>
             </div>
           </div>

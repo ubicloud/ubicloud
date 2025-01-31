@@ -1,30 +1,26 @@
 <% @page_title = @firewall[:name] %>
 <% edit_perm = has_permission?("Firewall:edit", @firewall[:id]) %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["Firewall", "#{@project_data[:path]}/firewall"],
-      [@firewall[:name], "#"]
-    ]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["Firewall", "#{@project_data[:path]}/firewall"],
+    [@firewall[:name], "#"]
+  ]
 ) %>
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <%== render(
+  <%== part(
     "components/kv_data_card",
-    locals: {
-      data: [
-        ["ID", @firewall[:id]],
-        ["Name", @firewall[:name]],
-        ["Location", @firewall[:location]],
-        ["Description", @firewall[:description]]
-      ]
-    }
+    data: [
+      ["ID", @firewall[:id]],
+      ["Name", @firewall[:name]],
+      ["Location", @firewall[:location]],
+      ["Description", @firewall[:description]]
+    ]
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
@@ -54,7 +50,7 @@
                 id="fwr-delete-<%=fwr[:id]%>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
               >
-                <%== render("components/delete_button", locals: { url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "" }) %>
+                <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
               </td>
             <% end %>
           </tr>
@@ -62,29 +58,25 @@
         <% if edit_perm %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render(
+              <%== part(
                 "components/form/text",
-                locals: {
-                  name: "cidr",
-                  type: "cidr",
-                  attributes: {
-                    placeholder: "0.0.0.0/0",
-                    required: true,
-                    form: "form-fw-create-rule-#{@firewall[:id]}"
-                  }
+                name: "cidr",
+                type: "cidr",
+                attributes: {
+                  placeholder: "0.0.0.0/0",
+                  required: true,
+                  form: "form-fw-create-rule-#{@firewall[:id]}"
                 }
               ) %>
             </td>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render(
+              <%== part(
                 "components/form/text",
-                locals: {
-                  name: "port_range",
-                  type: "text",
-                  attributes: {
-                    placeholder: "0..65536",
-                    form: "form-fw-create-rule-#{@firewall[:id]}"
-                  }
+                name: "port_range",
+                type: "text",
+                attributes: {
+                  placeholder: "0..65536",
+                  form: "form-fw-create-rule-#{@firewall[:id]}"
                 }
               ) %>
             </td>
@@ -96,7 +88,7 @@
                 id="form-fw-create-rule-<%= @firewall[:id] %>"
               >
                 <%== csrf_tag("#{request.path}/firewall-rule") %>
-                <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+                <%== part("components/form/submit_button", text: "Create") %>
               </form>
             </td>
           </tr>
@@ -135,7 +127,7 @@
                 <form action="<%= "#{request.path}/detach-subnet" %>" role="form" method="POST">
                   <%== csrf_tag("#{request.path}/detach-subnet") %>
                   <input type="hidden" name="private_subnet_id" value="<%= ps[:id] %>">
-                  <%== render("components/form/submit_button", locals: { text: "Detach" }) %>
+                  <%== part("components/form/submit_button", text: "Detach") %>
                 </form>
               </td>
             <% end %>
@@ -144,16 +136,14 @@
         <% if edit_perm %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render(
+              <%== part(
                 "components/form/select",
-                locals: {
-                  name: "private_subnet_id",
-                  placeholder: "Select a subnet",
-                  options: @attachable_subnets.map { |s| [s[:id], s[:name]] },
-                  attributes: {
-                    required: true,
-                    form: "form-fw-attach-#{@firewall[:id]}"
-                  }
+                name: "private_subnet_id",
+                placeholder: "Select a subnet",
+                options: @attachable_subnets.map { |s| [s[:id], s[:name]] },
+                attributes: {
+                  required: true,
+                  form: "form-fw-attach-#{@firewall[:id]}"
                 }
               ) %>
             </td>
@@ -165,7 +155,7 @@
                 id="form-fw-attach-<%= @firewall[:id] %>"
               >
                 <%== csrf_tag("#{request.path}/attach-subnet") %>
-                <%== render("components/form/submit_button", locals: { text: "Attach" }) %>
+                <%== part("components/form/submit_button", text: "Attach") %>
               </form>
             </td>
           </tr>
@@ -186,13 +176,7 @@
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                confirmation: @firewall[:name],
-                redirect: "#{@project_data[:path]}/firewall"
-              }
-            ) %>
+            <%== part("components/delete_button", confirmation: @firewall[:name], redirect: "#{@project_data[:path]}/firewall") %>
           </div>
         </div>
       </div>

@@ -4,10 +4,10 @@
       type="button"
       class="sidebar-group-btn w-full text-orange-100 hover:text-white hover:bg-orange-700 flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
     >
-      <%== render("components/icon", locals: { name: icon, classes: "text-white h-6 w-6 shrink-0" }) %>
+      <%== part("components/icon", name: icon, classes: "text-white h-6 w-6 shrink-0") %>
       <%= name %>
       <div class="ml-auto shrink-0 group-[.active]:rotate-90">
-        <%== render("components/icon", locals: { name: "hero-chevron-right" }) %>
+        <%== part("components/icon", name: "hero-chevron-right") %>
       </div>
     </button>
     <ul class="mt-1 px-2 hidden group-[.active]:block space-y-1">

@@ -12,18 +12,16 @@
   <% end %>
 
   <% if rodauth.param_or_nil(rodauth.login_param) %>
-    <%== render("components/form/hidden", locals: { name: rodauth.login_param, value: rodauth.param(rodauth.login_param) }) %>
+    <%== part("components/form/hidden", name: rodauth.login_param, value: rodauth.param(rodauth.login_param)) %>
   <% else %>
     <%== render("components/rodauth/login_field") %>
   <% end %>
 
   <div class="flex flex-col text-center">
-    <%== render(
+    <%== part(
       "components/form/submit_button",
-      locals: {
-        text: "Send Verification Again",
-        attributes: recently_sent ? { disabled: true } : {}
-      }
+      text: "Send Verification Again",
+      attributes: recently_sent ? { disabled: true } : {}
     ) %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
   </div>

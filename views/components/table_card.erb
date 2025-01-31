@@ -43,7 +43,7 @@
           <tr>
             <td colspan="<%= headers.length %>" class="text-center py-4 px-8 lg:px-32">
               <% if empty_state.is_a?(Hash) %>
-                <%== render("components/empty_state", { locals: empty_state }) %>
+                <%== part("components/empty_state", **empty_state) %>
               <% else %>
                 <%== empty_state %>
               <% end %>
@@ -66,7 +66,7 @@
                   %>
                   class="<%= cls %> <%= col_opts[:extra_class] %>"
                 >
-                  <%== render("components/value_content", locals: { content: value, opts: col_opts }) %>
+                  <%== part("components/value_content", content: value, opts: col_opts) %>
                 </td>
               <% end %>
             </tr>

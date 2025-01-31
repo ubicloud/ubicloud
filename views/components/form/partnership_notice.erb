@@ -7,6 +7,6 @@
         <p><%== desc %></p>
       <% end %>
     </div>
-    <%== render("components/form/checkbox", locals: { options: [["1", tos_text, {}, { required: true }]] }) %>
+    <%== part("components/form/checkbox", options: [["1", tos_text, {}, { required: true }]]) %>
   </div>
 </div>

@@ -97,7 +97,7 @@ cards = [
   ]
 ].select(&check_perms) %>
 
-<%== render("components/page_header", locals: { title: "Hi, #{current_account.name}" }) %>
+<%== part("components/page_header", title: "Hi, #{current_account.name}") %>
 
 <div id="tiles" class="grid gap-6">
   <div
@@ -127,7 +127,7 @@ cards = [
       >
         <div>
           <span class="inline-flex rounded-lg p-3 bg-orange-50 text-orange-700 ring-4 ring-white">
-            <%== render("components/icon", locals: { name: icon }) %>
+            <%== part("components/icon", name: icon) %>
           </span>
         </div>
         <div class="mt-8">
@@ -141,7 +141,7 @@ cards = [
           <p class="mt-2 text-sm text-gray-500"><%= description %></p>
         </div>
         <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
-          <%== render("components/icon", locals: { name: "hero-arrow-up-right" }) %>
+          <%== part("components/icon", name: "hero-arrow-up-right") %>
         </span>
       </div>
     <% end %>

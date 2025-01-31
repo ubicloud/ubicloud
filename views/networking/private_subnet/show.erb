@@ -10,83 +10,75 @@ viewable_fws, viewable_subnets =
     dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v)).transform_keys! { UBID.from_uuidish(_1).to_s }
   end %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["Private Subnet", "#{@project_data[:path]}/private-subnet"],
-      [@ps[:name], "#"]
-    ],
-    right_items: [render("components/ps_state_label", locals: { state: @ps[:state], extra_class: "text-md" })]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["Private Subnet", "#{@project_data[:path]}/private-subnet"],
+    [@ps[:name], "#"]
+  ],
+  right_items: [part("components/ps_state_label", state: @ps[:state], extra_class: "text-md")]
 ) %>
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <%== render(
+  <%== part(
     "components/kv_data_card",
-    locals: {
-      data: [
-        ["ID", @ps[:id]],
-        ["Name", @ps[:name]],
-        ["Location", @ps[:location]],
-        ["IPv6 block", @ps[:net6]],
-        ["IPv4 block", @ps[:net4]]
-      ]
-    }
+    data: [
+      ["ID", @ps[:id]],
+      ["Name", @ps[:name]],
+      ["Location", @ps[:location]],
+      ["IPv6 block", @ps[:net6]],
+      ["IPv4 block", @ps[:net4]]
+    ]
   ) %>
   <!-- Nic List -->
-  <%== render(
+  <%== part(
     "components/table_card",
-    locals: {
-      title: "Attached VMs",
-      headers: ["VM", "Private IPv4", "Private IPv6"],
-      empty_state: "No VM attached",
-      rows:
-        @nics.map do |nic|
+    title: "Attached VMs",
+    headers: ["VM", "Private IPv4", "Private IPv6"],
+    empty_state: "No VM attached",
+    rows:
+      @nics.map do |nic|
+        [
           [
-            [
-              (
-                if nic[:vm_name]
-                  [nic[:vm_name], { link: "#{@project_data[:path]}/location/#{@ps[:location]}/vm/#{nic[:vm_name]}" }]
-                else
-                  "-"
-                end
-              ),
-              [nic[:private_ipv4], { copyable: true }],
-              [nic[:private_ipv6], { copyable: true }]
-            ],
-            { id: "nic-#{nic[:id]}" }
-          ]
-        end
-    }
+            (
+              if nic[:vm_name]
+                [nic[:vm_name], { link: "#{@project_data[:path]}/location/#{@ps[:location]}/vm/#{nic[:vm_name]}" }]
+              else
+                "-"
+              end
+            ),
+            [nic[:private_ipv4], { copyable: true }],
+            [nic[:private_ipv6], { copyable: true }]
+          ],
+          { id: "nic-#{nic[:id]}" }
+        ]
+      end
   ) %>
   <!-- Attached Firewall List -->
-  <%== render(
+  <%== part(
     "components/table_card",
-    locals: {
-      title: "Attached Firewalls",
-      headers: %w[Name Description],
-      empty_state: "No firewall attached",
-      rows:
-        @ps[:firewalls].map do |fw|
+    title: "Attached Firewalls",
+    headers: %w[Name Description],
+    empty_state: "No firewall attached",
+    rows:
+      @ps[:firewalls].map do |fw|
+        [
           [
-            [
-              (
-                if viewable_fws[fw[:id]]
-                  [fw[:name], { link: "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" }]
-                else
-                  fw[:name]
-                end
-              ),
-              fw[:description]
-            ],
-            { id: "fw-#{fw[:id]}" }
-          ]
-        end
-    }
+            (
+              if viewable_fws[fw[:id]]
+                [fw[:name], { link: "#{@project_data[:path]}/location/#{fw[:location]}/firewall/#{fw[:name]}" }]
+              else
+                fw[:name]
+              end
+            ),
+            fw[:description]
+          ],
+          { id: "fw-#{fw[:id]}" }
+        ]
+      end
   ) %>
   <!-- Connected Private Subnets List -->
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -121,38 +113,34 @@ viewable_fws, viewable_subnets =
               id="cps-delete-<%=subnet[:id]%>"
               class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
             >
-              <%== render(
+              <%== part(
                 "components/delete_button",
-                locals: {
-                  url: "#{request.path}/disconnect/#{subnet[:id]}",
-                  confirmation_message: "Are you sure to disconnect?",
-                  redirect: request.path,
-                  method: "POST",
-                  text: ""
-                }
+                url: "#{request.path}/disconnect/#{subnet[:id]}",
+                confirmation_message: "Are you sure to disconnect?",
+                redirect: request.path,
+                method: "POST",
+                text: ""
               ) %>
             </td>
           </tr>
         <% end %>
         <tr>
           <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-            <%== render(
+            <%== part(
               "components/form/select",
-              locals: {
-                name: "connected-subnet-ubid",
-                label: "",
-                placeholder: "Pick a subnet to connect",
-                options: @connectable_subnets.map { |s| [s[:id], s[:name]] },
-                attributes: {
-                  form: "form-connect-subnet"
-                }
+              name: "connected-subnet-ubid",
+              label: "",
+              placeholder: "Pick a subnet to connect",
+              options: @connectable_subnets.map { |s| [s[:id], s[:name]] },
+              attributes: {
+                form: "form-connect-subnet"
               }
             ) %>
           </td>
           <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
             <form action="<%= "#{request.path}/connect" %>" role="form" method="POST" id="form-connect-subnet">
               <%== csrf_tag("#{request.path}/connect") %>
-              <%== render("components/form/submit_button", locals: { text: "Connect" }) %>
+              <%== part("components/form/submit_button", text: "Connect") %>
             </form>
           </td>
         </tr>
@@ -172,13 +160,7 @@ viewable_fws, viewable_subnets =
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                confirmation: @ps[:name],
-                redirect: "#{@project_data[:path]}/private-subnet"
-              }
-            ) %>
+            <%== part("components/delete_button", confirmation: @ps[:name], redirect: "#{@project_data[:path]}/private-subnet") %>
           </div>
         </div>
       </div>

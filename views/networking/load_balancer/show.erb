@@ -1,38 +1,34 @@
 <% @page_title = @lb[:name] %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
-      [@lb[:name], "#"]
-    ]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["Load Balancer", "#{@project_data[:path]}/load-balancer"],
+    [@lb[:name], "#"]
+  ]
 ) %>
 
 <div class="grid gap-6">
   <!-- Detail Card -->
-  <%== render(
+  <%== part(
     "components/kv_data_card",
-    locals: {
-      data: [
-        ["ID", @lb[:id]],
-        ["Name", @lb[:name]],
-        ["Connection String", @lb[:hostname], { copyable: true }],
-        [
-          "Private Subnet",
-          "<a href='#{@project_data[:path]}/location/#{@lb[:location]}/private-subnet/#{@lb[:subnet]}' class='text-rose-500 hover:underline'>#{@lb[:subnet]}</a>",
-          { escape: false }
-        ],
-        ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
-        ["Stack", @lb[:stack].gsub("ip", "IP")],
-        ["Load Balancer Port", @lb[:src_port]],
-        ["Application Port", @lb[:dst_port]],
-        ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
-      ]
-    }
+    data: [
+      ["ID", @lb[:id]],
+      ["Name", @lb[:name]],
+      ["Connection String", @lb[:hostname], { copyable: true }],
+      [
+        "Private Subnet",
+        "<a href='#{@project_data[:path]}/location/#{@lb[:location]}/private-subnet/#{@lb[:subnet]}' class='text-rose-500 hover:underline'>#{@lb[:subnet]}</a>",
+        { escape: false }
+      ],
+      ["Algorithm", (@lb[:algorithm] == "round_robin") ? "Round Robin" : "Hash Based"],
+      ["Stack", @lb[:stack].gsub("ip", "IP")],
+      ["Load Balancer Port", @lb[:src_port]],
+      ["Application Port", @lb[:dst_port]],
+      ["HTTP Health Check Endpoint", @lb[:health_check_endpoint]]
+    ]
   ) %>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
@@ -68,7 +64,7 @@
               <form action="<%= "#{request.path}/detach-vm" %>" role="form" method="POST">
                 <%== csrf_tag("#{request.path}/detach-vm") %>
                 <input type="hidden" name="vm_id" value="<%= vm[:id] %>">
-                <%== render("components/form/submit_button", locals: { text: "Detach" }) %>
+                <%== part("components/form/submit_button", text: "Detach") %>
               </form>
             </td>
           </tr>
@@ -76,16 +72,14 @@
         <% if has_permission?("LoadBalancer:edit", @lb[:id]) %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-2 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render(
+              <%== part(
                 "components/form/select",
-                locals: {
-                  name: "vm_id",
-                  placeholder: "Select a VM",
-                  options: @attachable_vms.map { |s| [s[:id], s[:name]] },
-                  attributes: {
-                    required: true,
-                    form: "form-lb-#{@lb[:id]}"
-                  }
+                name: "vm_id",
+                placeholder: "Select a VM",
+                options: @attachable_vms.map { |s| [s[:id], s[:name]] },
+                attributes: {
+                  required: true,
+                  form: "form-lb-#{@lb[:id]}"
                 }
               ) %>
             </td>
@@ -94,7 +88,7 @@
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <form action="<%= "#{request.path}/attach-vm" %>" role="form" method="POST" id="form-lb-<%= @lb[:id] %>">
                 <%== csrf_tag("#{request.path}/attach-vm") %>
-                <%== render("components/form/submit_button", locals: { text: "Attach" }) %>
+                <%== part("components/form/submit_button", text: "Attach") %>
               </form>
             </td>
           </tr>
@@ -115,13 +109,7 @@
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render(
-              "components/delete_button",
-              locals: {
-                confirmation: @lb[:name],
-                redirect: "#{@project_data[:path]}/load-balancer"
-              }
-            ) %>
+            <%== part("components/delete_button", confirmation: @lb[:name], redirect: "#{@project_data[:path]}/load-balancer") %>
           </div>
         </div>
       </div>

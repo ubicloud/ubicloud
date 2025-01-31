@@ -5,46 +5,44 @@
 <%== render("github/tabbar") %>
 
 <div class="grid gap-6">
-  <%== render(
+  <%== part(
     "components/table_card",
-    locals: {
-      headers: ["Runner", "Repository", "Label", "State", "Branch", "Workflow Job"],
-      rows:
-        @runners.map do |runner|
+    headers: ["Runner", "Repository", "Label", "State", "Branch", "Workflow Job"],
+    rows:
+      @runners.map do |runner|
+        [
           [
-            [
-              [runner[:ubid], { link: runner[:runner_url] }],
-              runner[:repository_name],
-              runner[:label],
-              ["vm_state_label", { component: { state: runner[:state] } }],
-              runner.dig(:workflow_job, :head_branch),
-              if (workflow_job = runner[:workflow_job])
-                [<<~CONTENT, {escape: false}]
-                  <a href="#{workflow_job[:run_url]}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job[:workflow_name]}</a>
-                  -
-                  <a href="#{workflow_job[:job_url]}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job[:job_name]}</a>
-                CONTENT
-              else
-                "Runner doesn't have a job yet"
-              end
-            ],
-            { id: "runner-#{runner[:id]}" }
-          ]
-        end,
-      empty_state: <<~EMPTY
-        <h3 class="text-xl leading-10 font-medium mb-2">No active runners</h3>
-        <p class="leading-6">
-          To use Ubicloud runners, you need to change
-          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
-          line to one of our labels such as
-          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
-          in your workflow file. Then, trigger your workflow to start a runner.
-          <br>
-          Check out
-          <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
-          for using larger runners, using arm64, enabling GPU.
-        </p>
-      EMPTY
-    }
+            [runner[:ubid], { link: runner[:runner_url] }],
+            runner[:repository_name],
+            runner[:label],
+            ["vm_state_label", { component: { state: runner[:state] } }],
+            runner.dig(:workflow_job, :head_branch),
+            if (workflow_job = runner[:workflow_job])
+              [<<~CONTENT, {escape: false}]
+                <a href="#{workflow_job[:run_url]}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job[:workflow_name]}</a>
+                -
+                <a href="#{workflow_job[:job_url]}" class="text-orange-600 hover:text-orange-700" target="_blank">#{workflow_job[:job_name]}</a>
+              CONTENT
+            else
+              "Runner doesn't have a job yet"
+            end
+          ],
+          { id: "runner-#{runner[:id]}" }
+        ]
+      end,
+    empty_state: <<~EMPTY
+      <h3 class="text-xl leading-10 font-medium mb-2">No active runners</h3>
+      <p class="leading-6">
+        To use Ubicloud runners, you need to change
+        <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
+        line to one of our labels such as
+        <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
+        in your workflow file. Then, trigger your workflow to start a runner.
+        <br>
+        Check out
+        <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
+        for using larger runners, using arm64, enabling GPU.
+      </p>
+    EMPTY
   ) %>
 </div>

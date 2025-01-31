@@ -1,6 +1,6 @@
 <% @page_title = "Recovery Codes" %>
 
-<%== render("components/page_header", locals: { title: "My Account" }) %>
+<%== part("components/page_header", title: "My Account") %>
 
 <main>
   <div class="max-w-screen-xl pb-6 lg:pb-16">
@@ -18,7 +18,7 @@
                     <%== render("components/rodauth/password_field") %>
                   </div>
                   <div class="col-span-6">
-                    <%== render("components/form/submit_button", locals: { text: rodauth.view_recovery_codes_button }) %>
+                    <%== part("components/form/submit_button", text: rodauth.view_recovery_codes_button) %>
                   </div>
                 </div>
               </form>
@@ -56,13 +56,7 @@
                   <%== rodauth.csrf_tag("/" + rodauth.recovery_codes_route) %>
                   <div class="mt-6 grid grid-cols-6 gap-6">
                     <div class="col-span-6">
-                      <%== render(
-                        "components/form/submit_button",
-                        locals: {
-                          text: rodauth.add_recovery_codes_button,
-                          name: rodauth.add_recovery_codes_param
-                        }
-                      ) %>
+                      <%== part("components/form/submit_button", text: rodauth.add_recovery_codes_button, name: rodauth.add_recovery_codes_param) %>
                     </div>
                   </div>
                 </form>

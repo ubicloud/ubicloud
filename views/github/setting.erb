@@ -15,13 +15,7 @@
           </h3>
         </div>
         <div class="mt-4 flex md:ml-4 md:mt-0">
-          <%== render(
-            "components/button",
-            locals: {
-              text: "Connect New Account",
-              link: "#{@project_data[:path]}/github/installation/create"
-            }
-          ) %>
+          <%== part("components/button", text: "Connect New Account", link: "#{@project_data[:path]}/github/installation/create") %>
         </div>
       </div>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
@@ -36,21 +30,20 @@
                   <div class="flex items-center justify-end space-x-4">
                     <form action="<%= "#{@project_data[:path]}/github/installation/#{ins[:ubid]}" %>" role="form" method="POST">
                       <%== csrf_tag("#{@project_data[:path]}/github/installation/#{ins[:ubid]}") %>
-                      <%== render("components/form/hidden", locals: { name: "cache_enabled", value: !ins[:cache_enabled] }) %>
-                      <%== render(
+                      <%== part("components/form/hidden", name: "cache_enabled", value: !ins[:cache_enabled]) %>
+                      <%== part(
                         "components/button",
-                        locals:
-                          (
-                            if ins[:cache_enabled]
-                              { text: "Disable Ubicloud Cache", type: "danger" }
-                            else
-                              { text: "Enable Ubicloud Cache", type: "primary" }
-                            end
-                          )
+                        **(
+                          if ins[:cache_enabled]
+                            { text: "Disable Ubicloud Cache", type: "danger" }
+                          else
+                            { text: "Enable Ubicloud Cache", type: "primary" }
+                          end
+                        )
                       ) %>
                     </form>
 
-                    <%== render("components/button", locals: { text: "Configure", link: ins[:installation_url] }) %>
+                    <%== part("components/button", text: "Configure", link: ins[:installation_url]) %>
                   </div>
                 </td>
               </tr>
@@ -63,26 +56,22 @@
 <% elsif !@project.has_valid_payment_method? %>
   <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
     <%== csrf_tag("#{@project_data[:path]}/billing") %>
-    <%== render(
+    <%== part(
       "components/empty_state",
-      locals: {
-        icon: "hero-banknotes",
-        title: "No billing information",
-        description:
-          "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
-        button_title: "New Billing Information"
-      }
+      icon: "hero-banknotes",
+      title: "No billing information",
+      description:
+        "Project doesn't have valid billing information. First, you need to update the project's billing details to use GitHub Runners.",
+      button_title: "New Billing Information"
     ) %>
   </form>
 <% else %>
-  <%== render(
+  <%== part(
     "components/empty_state",
-    locals: {
-      icon: "github",
-      title: "No Connected Accounts",
-      description: "Get started by installing our GitHub app to your user or organization account.",
-      button_link: "#{@project_data[:path]}/github/installation/create",
-      button_title: "Connect New Account"
-    }
+    icon: "github",
+    title: "No Connected Accounts",
+    description: "Get started by installing our GitHub app to your user or organization account.",
+    button_link: "#{@project_data[:path]}/github/installation/create",
+    button_title: "Connect New Account"
   ) %>
 <% end %>

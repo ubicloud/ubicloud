@@ -2,34 +2,32 @@
 <%== render("networking/tabbar") %>
 
 <div class="grid gap-6">
-  <%== render(
+  <%== part(
     "components/table_card",
-    locals: {
-      headers: ["Name", "Location", "State"],
-      rows: @pss.map do |ps|
+    headers: ["Name", "Location", "State"],
+    rows: @pss.map do |ps|
+      [
         [
-          [
-            [ps[:name], {link: @project_data[:path] + ps[:path]}],
-            ps[:location],
-            ["ps_state_label", {component: { state: ps[:state] }}]
-          ],
-          {id: "ps-#{ps[:id]}"}
-        ]
-      end,
-      empty_state: {
-        icon: "hero-globe-alt",
-        title: "No Private Subnets",
-        description: "You don't have permission to create Private Subnets."
-      }.merge(has_project_permission("PrivateSubnet:create") ? {
-        description: "Get started by creating a new Private Subnet.",
-        button_link: "#{@project_data[:path]}/private-subnet/create",
-        button_title: "Create Private Subnet"
-      } : {})
-    }
+          [ps[:name], {link: @project_data[:path] + ps[:path]}],
+          ps[:location],
+          ["ps_state_label", {component: { state: ps[:state] }}]
+        ],
+        {id: "ps-#{ps[:id]}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-globe-alt",
+      title: "No Private Subnets",
+      description: "You don't have permission to create Private Subnets."
+    }.merge(has_project_permission("PrivateSubnet:create") ? {
+      description: "Get started by creating a new Private Subnet.",
+      button_link: "#{@project_data[:path]}/private-subnet/create",
+      button_title: "Create Private Subnet"
+    } : {})
   ) %>
   <% if @pss.count > 0 && has_project_permission("PrivateSubnet:create") %>
   <div class="flex justify-end">
-    <%== render("components/button", locals: { text: "Create Private Subnet", link: "private-subnet/create" }) %>
+    <%== part("components/button", text: "Create Private Subnet", link: "private-subnet/create") %>
   </div>
   <% end %>
 </div>

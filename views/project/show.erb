@@ -1,12 +1,10 @@
 <% @page_title = @project_data[:name] %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    title: "Project Settings",
-    back: "/project",
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
-  }
+  title: "Project Settings",
+  back: "/project",
+  breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Settings #]]
 ) %>
 
 <div class="grid gap-6">
@@ -14,34 +12,30 @@
   <form action="<%= (@project_data[:path]) %>" method="POST">
     <%== csrf_tag((@project_data[:path])) %>
 
-    <%== render(
+    <%== part(
       "components/kv_data_card",
-      locals: {
-        data: [
-          ["ID", @project_data[:id]],
-          (
-            if has_permission?("Project:edit", @project_data[:id])
-              [
-                "Name",
-                render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    value: @project_data[:name],
-                    button_title: "Save",
-                    attributes: {
-                      required: true
-                    }
-                  }
-                ),
-                { escape: false }
-              ]
-            else
-              ["Name", @project_data[:name]]
-            end
-          )
-        ]
-      }
+      data: [
+        ["ID", @project_data[:id]],
+        (
+          if has_permission?("Project:edit", @project_data[:id])
+            [
+              "Name",
+              part(
+                "components/form/text",
+                name: "name",
+                value: @project_data[:name],
+                button_title: "Save",
+                attributes: {
+                  required: true
+                }
+              ),
+              { escape: false }
+            ]
+          else
+            ["Name", @project_data[:name]]
+          end
+        )
+      ]
     ) %>
   </form>
   <!-- Quota Card -->
@@ -57,13 +51,11 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <% @quotas.each do |quota| %>
         <div class="p-6">
-          <%== render(
+          <%== part(
             "components/progress_bar",
-            locals: {
-              title: quota[:resource_type],
-              numerator: quota[:current_resource_usage],
-              denominator: quota[:quota]
-            }
+            title: quota[:resource_type],
+            numerator: quota[:current_resource_usage],
+            denominator: quota[:quota]
           ) %>
         </div>
       <% end %>
@@ -82,7 +74,7 @@
             </div>
           </div>
           <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== render("components/delete_button", locals: { confirmation: @project_data[:name], redirect: "/project" }) %>
+            <%== part("components/delete_button", confirmation: @project_data[:name], redirect: "/project") %>
           </div>
         </div>
       </div>

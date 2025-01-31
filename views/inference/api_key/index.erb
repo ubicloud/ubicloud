@@ -2,48 +2,46 @@
 <%== render("inference/tabbar") %>
 
 <div>
-  <%== render(
+  <%== part(
     "components/table_card",
-    locals: {
-      headers: ["ID", "API Key", ""],
-      empty_state: {
-        icon: "hero-key",
-        title: "No inference API keys",
-        description: "Get started using the inference endpoint by creating an API key."
-      },
-      rows:
-        @inference_api_keys.map do |token|
+    headers: ["ID", "API Key", ""],
+    empty_state: {
+      icon: "hero-key",
+      title: "No inference API keys",
+      description: "Get started using the inference endpoint by creating an API key."
+    },
+    rows:
+      @inference_api_keys.map do |token|
+        [
           [
-            [
-              token[:id],
-              [token[:key], { revealable: true, copyable: true }],
-              (
-                if has_project_permission("InferenceApiKey:delete")
-                  [
-                    "delete_button",
-                    {
-                      component: {
-                        text: "Delete",
-                        url: "#{@project_data[:path]}/inference-api-key/#{token[:id]}",
-                        confirmation: "delete api key"
-                      },
-                      extra_class: "flex justify-end"
-                    }
-                  ]
-                end
-              )
-            ],
-            { id: "api-key-#{token[:id]}" }
-          ]
-        end
-    }
+            token[:id],
+            [token[:key], { revealable: true, copyable: true }],
+            (
+              if has_project_permission("InferenceApiKey:delete")
+                [
+                  "delete_button",
+                  {
+                    component: {
+                      text: "Delete",
+                      url: "#{@project_data[:path]}/inference-api-key/#{token[:id]}",
+                      confirmation: "delete api key"
+                    },
+                    extra_class: "flex justify-end"
+                  }
+                ]
+              end
+            )
+          ],
+          { id: "api-key-#{token[:id]}" }
+        ]
+      end
   ) %>
 
   <% if has_project_permission("InferenceApiKey:create") && @inference_api_keys.size < 10 %>
   <div class="flex justify-end space-y-1 mt-6">
     <form id="create-inference-api-key" action="<%= "#{@project_data[:path]}/inference-api-key" %>" role="form" method="POST">
       <%== csrf_tag("#{@project_data[:path]}/inference-api-key") %>
-      <%== render("components/form/submit_button", locals: { text: "Create API Key" }) %>
+      <%== part("components/form/submit_button", text: "Create API Key") %>
     </form>
   </div>
   <% end %>

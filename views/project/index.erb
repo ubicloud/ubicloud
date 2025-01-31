@@ -1,34 +1,30 @@
 <% @page_title = "Projects" %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    right_items: (@projects.count > 0) ? [
-      render("components/button", locals: { text: "Create Project", link: "/project/create" })
-    ] : []
-  }
+  right_items: (@projects.count > 0) ? [
+    part("components/button", text: "Create Project", link: "/project/create")
+  ] : []
 ) %>
 
 <div class="grid gap-6">
-  <%== render(
+  <%== part(
       "components/table_card",
-      locals: {
-        headers: ["Name"],
-        rows: @projects.map do |p|
+      headers: ["Name"],
+      rows: @projects.map do |p|
+         [
            [
-             [
-               [p[:name], {link: p[:path] + "/dashboard"}]
-             ],
-             { id: "project-#{p[:id]}" }
-           ]
-        end,
-        empty_state: {
-          icon: "hero-folder-open",
-          title: "No projects",
-          description: "Get started by creating a new project.",
-          button_link: "/project/create",
-          button_title: "Create Project"
-        }
+             [p[:name], {link: p[:path] + "/dashboard"}]
+           ],
+           { id: "project-#{p[:id]}" }
+         ]
+      end,
+      empty_state: {
+        icon: "hero-folder-open",
+        title: "No projects",
+        description: "Get started by creating a new project.",
+        button_link: "/project/create",
+        button_title: "Create Project"
       }
     ) %>
 </div>

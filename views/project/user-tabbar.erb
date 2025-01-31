@@ -7,4 +7,4 @@
   )
 ]
 tabs.compact! %>
-<%== render("components/tabbar", locals: { tabs: tabs }) if tabs.length >= 2 %>
+<%== part("components/tabbar", tabs:) if tabs.length >= 2 %>
