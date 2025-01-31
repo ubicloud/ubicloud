@@ -11,6 +11,11 @@ RSpec.describe Vm do
       expect(vm.display_state).to eq("deleting")
     end
 
+    it "does not return deleting if recreate semaphore increased" do
+      expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "recreate")]).at_least(:once)
+      expect(vm.display_state).to eq("creating")
+    end
+
     it "returns restarting if restart semaphore increased" do
       expect(vm).to receive(:semaphores).and_return([instance_double(Semaphore, name: "restart")]).at_least(:once)
       expect(vm.display_state).to eq("restarting")
