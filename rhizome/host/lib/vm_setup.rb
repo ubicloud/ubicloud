@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../common/lib/util"
+require_relative "../../common/lib/network"
 
 require "fileutils"
 require "netaddr"
@@ -59,6 +60,7 @@ class VmSetup
     prepare_pci_devices(pci_devices)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     start_systemd_unit
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -71,6 +73,7 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
     prepare_pci_devices(pci_devices)
     start_systemd_unit
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -84,6 +87,7 @@ class VmSetup
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -297,6 +301,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       # Allocate ::1 in the guest network for DHCPv6.
       r "ip -n #{q_vm} addr replace #{ip6.nth(1)}/#{ip6.netmask.prefix_len} dev #{nic.tap}"
       r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
+      r "ip -n #{q_vm} route del #{ip6.to_s.shellescape} dev #{nic.tap}"
     end
 
     r "ip -n #{q_vm} addr replace fd00:0b1c:100d:5AFE:CE::/56 dev #{nics.first.tap}"
@@ -332,6 +337,29 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/vethi#{q_vm}/proxy_arp'"
       r "ip netns exec #{q_vm} bash -c 'echo 1 > /proc/sys/net/ipv4/conf/#{nic.tap}/proxy_arp'"
+    end
+  end
+
+  def update_via_routes(nics)
+    # we create tap devices in "interfaces" function in this file. but
+    # code execution happens faster than linux taking care of the device creation.
+    # that's why by the time we reach this function, we need to check whether the
+    # device is created or not and then proceed to modify the routes.
+    success = false
+    5.times do
+      if r("ip -n #{q_vm} link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").chomp == "UP"
+        success = true
+        break
+      end
+      sleep 0.1
+    end
+    unless success
+      raise "VM #{q_vm} tap device not ready after 5 retries."
+    end
+
+    nics.each do |nic|
+      local_ip4 = NetAddr::IPv4Net.parse(nic.net4)
+      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(0).to_s.shellescape} dev #{nic.tap}"
     end
   end
 
@@ -688,29 +716,5 @@ SERVICE
 
   def start_systemd_unit
     r "systemctl start #{q_vm}"
-  end
-
-  # Generate a MAC with the "local" (generated, non-manufacturer) bit
-  # set and the multicast bit cleared in the first octet.
-  #
-  # Accuracy here is not a formality: otherwise assigning a ipv6 link
-  # local address errors out.
-  def gen_mac
-    ([rand(256) & 0xFE | 0x02] + Array.new(5) { rand(256) }).map {
-      "%0.2X" % _1
-    }.join(":").downcase
-  end
-
-  # By reading the mac address from an interface, compute its ipv6
-  # link local address that it would have if its device state were set
-  # to up.
-  def mac_to_ipv6_link_local(mac)
-    eui = mac.split(":").map(&:hex)
-    eui.insert(3, 0xff, 0xfe)
-    eui[0] ^= 0x02
-
-    "fe80::" + eui.each_slice(2).map { |pair|
-      pair.map { format("%02x", _1) }.join
-    }.join(":")
   end
 end

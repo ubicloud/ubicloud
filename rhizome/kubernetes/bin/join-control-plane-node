@@ -17,3 +17,5 @@ rescue KeyError => e
 end
 
 r "kubeadm join #{cluster_endpoint} --control-plane --token #{join_token} --discovery-token-ca-cert-hash #{discovery_token_ca_cert_hash} --certificate-key #{certificate_key}"
+
+r("sudo /home/ubi/kubernetes/bin/setup-cni")
