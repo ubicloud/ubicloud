@@ -133,6 +133,7 @@ task :refresh_sequel_caches do
      DB.dump_schema_cache("cache/schema.cache")
      DB.dump_index_cache("cache/index.cache")
      Sequel::Model.dump_static_cache_cache
+     Sequel::Model.dump_pg_auto_constraint_validations_cache
   END
 end
 
