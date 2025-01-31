@@ -22,12 +22,12 @@ class HostProvider < Sequel::Model
 end
 
 # Table: host_provider
+# Primary Key: (server_identifier, provider_name)
 # Columns:
 #  id                | uuid |
-#  server_identifier | text | NOT NULL
-#  provider_name     | text | NOT NULL
+#  server_identifier | text |
+#  provider_name     | text |
 # Indexes:
-#  host_provider_provider_name_server_identifier_index | UNIQUE btree (provider_name, server_identifier)
-#  host_provider_server_identifier_key                 | UNIQUE btree (server_identifier)
+#  host_provider_pkey | PRIMARY KEY btree (provider_name, server_identifier)
 # Foreign key constraints:
 #  host_provider_id_fkey | (id) REFERENCES vm_host(id)
