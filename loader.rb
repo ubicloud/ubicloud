@@ -216,6 +216,8 @@ def clover_freeze
     Scheduling::Allocator::StorageAllocation,
     Scheduling::Allocator::StorageAllocation::StorageDeviceAllocation,
     Scheduling::Allocator::VmHostAllocation,
+    Scheduling::Allocator::VmHostCpuAllocation,
+    Scheduling::Allocator::VmHostSliceAllocation,
     SemaphoreMethods,
     SemaphoreMethods::ClassMethods,
     Sequel::Database,
