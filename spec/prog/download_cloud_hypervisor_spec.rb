@@ -5,8 +5,8 @@ require_relative "../model/spec_helper"
 RSpec.describe Prog::DownloadCloudHypervisor do
   subject(:df) { described_class.new(Strand.new(stack: [{"version" => "35.1", "sha256_ch_bin" => "thesha", "sha256_ch_remote" => "anothersha"}])) }
 
-  let(:sshable) { Sshable.create_with_id }
-  let(:vm_host) { VmHost.create(location: "hetzner-fsn1", arch: "x64") { _1.id = sshable.id } }
+  let(:sshable) { vm_host.sshable }
+  let(:vm_host) { create_vm_host }
 
   before do
     allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)

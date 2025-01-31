@@ -129,12 +129,14 @@ RSpec.describe Project do
 
   describe ".default_location" do
     it "returns the location with the highest available core capacity" do
-      VmHost.create(allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3) { _1.id = Sshable.create_with_id.id }
-      VmHost.create(allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3) { _1.id = Sshable.create_with_id.id }
-      VmHost.create(allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 1) { _1.id = Sshable.create_with_id.id }
-      VmHost.create(allocation_state: "accepting", location: "leaseweb-wdc02", total_cores: 100, used_cores: 99) { _1.id = Sshable.create_with_id.id }
-      VmHost.create(allocation_state: "draining", location: "location-4", total_cores: 100, used_cores: 0) { _1.id = Sshable.create_with_id.id }
-      VmHost.create(allocation_state: "accepting", location: "github-runners", total_cores: 100, used_cores: 0) { _1.id = Sshable.create_with_id.id }
+      [
+        {allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3},
+        {allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 3},
+        {allocation_state: "accepting", location: "hetzner-fsn1", total_cores: 10, used_cores: 1},
+        {allocation_state: "accepting", location: "leaseweb-wdc02", total_cores: 100, used_cores: 99},
+        {allocation_state: "draining", location: "location-4", total_cores: 100, used_cores: 0},
+        {allocation_state: "accepting", location: "github-runners", total_cores: 100, used_cores: 0}
+      ].each { create_vm_host(**_1) }
 
       expect(project.default_location).to eq("hetzner-fsn1")
     end

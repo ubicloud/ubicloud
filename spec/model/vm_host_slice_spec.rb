@@ -17,23 +17,10 @@ RSpec.describe VmHostSlice do
     )
   end
 
-  let(:sshable) {
-    Sshable.create_with_id
-  }
-
-  let(:vm_host) {
-    sshable = Sshable.create_with_id
-    VmHost.create(
-      location: "x",
-      total_cores: 4,
-      total_cpus: 8,
-      used_cores: 1
-    ) { _1.id = sshable.id }
-  }
+  let(:vm_host) { create_vm_host(total_cores: 4, total_cpus: 8, used_cores: 1) }
 
   before do
     allow(vm_host_slice).to receive(:vm_host).and_return(vm_host)
-    allow(vm_host).to receive(:sshable).and_return(sshable)
     (0..15).each { |i|
       VmHostCpu.create(
         vm_host_id: vm_host.id,
@@ -128,7 +115,7 @@ RSpec.describe VmHostSlice do
   describe "availability monitoring" do
     it "initiates a new health monitor session" do
       allow(vm_host_slice).to receive_messages(vm_host: vm_host)
-      expect(sshable).to receive(:start_fresh_session)
+      expect(vm_host.sshable).to receive(:start_fresh_session)
       vm_host_slice.init_health_monitor_session
     end
 

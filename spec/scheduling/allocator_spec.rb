@@ -116,11 +116,11 @@ RSpec.describe Al do
     end
 
     it "disqualifies invalid candidates" do
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 6, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "draining", arch: "x64", location: "loc1", total_cores: 8, used_cores: 1, total_hugepages_1g: 8, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh3 = VmHost.create(allocation_state: "accepting", arch: "arm64", location: "loc1", total_cores: 8, used_cores: 0, total_hugepages_1g: 8, used_hugepages_1g: 0) { _1.id = Sshable.create_with_id.id }
-      vmh4 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 8, used_cores: 6, total_hugepages_1g: 8, used_hugepages_1g: 5) { _1.id = Sshable.create_with_id.id }
-      vmh5 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "github-runners", total_cores: 8, used_cores: 6, total_hugepages_1g: 80, used_hugepages_1g: 5) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 6, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(allocation_state: "draining", arch: "x64", location: "loc1", total_cores: 8, used_cores: 1, total_hugepages_1g: 8, used_hugepages_1g: 2)
+      vmh3 = create_vm_host(allocation_state: "accepting", arch: "arm64", location: "loc1", total_cores: 8, used_cores: 0, total_hugepages_1g: 8, used_hugepages_1g: 0)
+      vmh4 = create_vm_host(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 8, used_cores: 6, total_hugepages_1g: 8, used_hugepages_1g: 5)
+      vmh5 = create_vm_host(allocation_state: "accepting", arch: "x64", location: "github-runners", total_cores: 8, used_cores: 6, total_hugepages_1g: 80, used_hugepages_1g: 5)
 
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
@@ -139,7 +139,7 @@ RSpec.describe Al do
     end
 
     it "retrieves correct values" do
-      vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh = create_vm_host(total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
       sd2 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 12, total_storage_gib: 99)
@@ -166,7 +166,7 @@ RSpec.describe Al do
     end
 
     it "retrieves provisioning count" do
-      vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh = create_vm_host(total_cores: 7, used_cores: 3, total_hugepages_1g: 10, used_hugepages_1g: 2)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh.id)
       sd1 = StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 123, total_storage_gib: 345)
       create_vm(vm_host_id: vmh.id, location: vmh.location, boot_image: "", display_state: "creating")
@@ -193,8 +193,8 @@ RSpec.describe Al do
     end
 
     it "applies host filter" do
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
@@ -210,8 +210,8 @@ RSpec.describe Al do
     end
 
     it "applies host exclusion filter" do
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
@@ -227,8 +227,8 @@ RSpec.describe Al do
     end
 
     it "applies location filter" do
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc2", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(location: "loc2", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
@@ -244,8 +244,8 @@ RSpec.describe Al do
     end
 
     it "retrieves candidates with enough storage devices" do
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 100, total_storage_gib: 100)
@@ -261,8 +261,8 @@ RSpec.describe Al do
     end
 
     it "retrieves candidates with available ipv4 addresses if ip4_enabled" do
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
@@ -277,8 +277,8 @@ RSpec.describe Al do
 
     it "retrieves candidates without available ipv4 addresses if not ip4_enabled" do
       req.ip4_enabled = false
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
@@ -291,8 +291,8 @@ RSpec.describe Al do
     end
 
     it "retrieves candidates with gpu if gpu_count > 0" do
-      vmh1 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
-      vmh2 = VmHost.create(allocation_state: "accepting", arch: "x64", location: "loc1", total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh1 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       StorageDevice.create_with_id(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       Address.create_with_id(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
@@ -526,7 +526,7 @@ RSpec.describe Al do
     }
 
     before do
-      vmh = VmHost.create(allocation_state: "accepting", arch: "x64", location: "hetzner-fsn1", total_mem_gib: 64, total_sockets: 2, total_dies: 2, net6: "fd10:9b0b:6b4b:8fbb::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2) { _1.id = Sshable.create_with_id.id }
+      vmh = create_vm_host(net6: "fd10:9b0b:6b4b:8fbb::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2)
       BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh.id, activated_at: Time.now, size_gib: 3)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
       StorageDevice.create_with_id(vm_host_id: vmh.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)

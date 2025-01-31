@@ -13,20 +13,8 @@ RSpec.describe Prog::Storage::SetupSpdk do
   }
 
   let(:spdk_version) { "v23.09-ubi-0.2" }
-  let(:sshable) {
-    instance_double(Sshable)
-  }
-  let(:vm_host) {
-    Sshable.create { _1.id = "adec2977-74a9-8b71-8473-cf3940a45ac5" }
-    VmHost.create(
-      location: "xyz",
-      arch: "x64",
-      used_hugepages_1g: 0,
-      total_hugepages_1g: 20,
-      total_cpus: 96,
-      os_version: "ubuntu-24.04"
-    ) { _1.id = "adec2977-74a9-8b71-8473-cf3940a45ac5" }
-  }
+  let(:sshable) { vm_host.sshable }
+  let(:vm_host) { create_vm_host(used_hugepages_1g: 0, total_hugepages_1g: 20, total_cpus: 96, os_version: "ubuntu-24.04") }
 
   before do
     allow(setup_spdk).to receive_messages(sshable: sshable, vm_host: vm_host)

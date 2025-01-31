@@ -7,17 +7,9 @@ require_relative "../../../prog/vm/host_nexus"
 RSpec.describe Prog::Vm::VmHostSliceNexus do
   subject(:nx) { described_class.new(Strand.create(id: "b231a172-8f56-8b10-bbed-8916ea4e5c28", prog: "Prog::Vm::VmHostSliceNexus", label: "create")) }
 
-  let(:sshable) {
-    Sshable.create
-  }
+  let(:sshable) { vm_host.sshable }
 
-  let(:vm_host) {
-    VmHost.create(
-      location: "x",
-      total_cores: 4,
-      used_cores: 1
-    ) { _1.id = sshable.id }
-  }
+  let(:vm_host) { create_vm_host(total_cores: 4, used_cores: 1) }
 
   let(:vm_host_slice) {
     VmHostSlice.create(
@@ -36,7 +28,6 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   before do
     allow(nx).to receive_messages(vm_host_slice: vm_host_slice)
     allow(vm_host_slice).to receive_messages(vm_host: vm_host)
-    allow(vm_host).to receive_messages(sshable: sshable)
     (0..15).each { |i|
       VmHostCpu.create(
         spdk: i < 2,
