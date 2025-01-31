@@ -18,6 +18,7 @@ Sequel::Model.plugin :many_through_many
 Sequel::Model.plugin :insert_conflict
 Sequel::Model.plugin :inspect_pk
 Sequel::Model.plugin :static_cache_cache, "cache/static_cache.cache"
+Sequel::Model.plugin :pg_auto_constraint_validations, cache_file: "cache/pg_auto_constraint_validations.cache"
 
 if (level = Config.database_logger_level)
   require "logger"
