@@ -42,7 +42,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
       expect(Hosting::Apis).to receive(:pull_data_center).and_return("fsn1-dc14")
       expect(Hosting::Apis).to receive(:set_server_name).and_return(nil)
-      st = described_class.assemble("127.0.0.1", provider: "hetzner", hetzner_server_identifier: "1")
+      st = described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
       expect(st.subject.assigned_subnets.count).to eq(3)
@@ -50,7 +50,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
       expect(st.subject.assigned_host_addresses.count).to eq(1)
       expect(st.subject.assigned_host_addresses.first.ip.to_s).to eq("127.0.0.1/32")
-      expect(st.subject.provider).to eq("hetzner")
+      expect(st.subject.provider_name).to eq(HostProvider::HETZNER_PROVIDER_NAME)
       expect(st.subject.data_center).to eq("fsn1-dc14")
     end
 
@@ -60,7 +60,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(Hosting::Apis).to receive(:pull_data_center).and_return("fsn1-dc14")
       expect(Hosting::Apis).not_to receive(:set_server_name)
 
-      described_class.assemble("127.0.0.1", provider: "hetzner", hetzner_server_identifier: "1")
+      described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
     end
   end
 

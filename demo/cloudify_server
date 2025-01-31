@@ -54,8 +54,8 @@ puts "\n\nCloudifying '#{hostname}' server for '#{LOCATIONS[location]}' \n\n"
 
 strand = Prog::Vm::HostNexus.assemble(
   hostname,
-  provider: location.provider.name,
-  hetzner_server_identifier: host_id,
+  provider_name: location.provider.name,
+  server_identifier: host_id,
   location: location.name,
   default_boot_images: ["ubuntu-jammy"]
 )

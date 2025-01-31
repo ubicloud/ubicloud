@@ -487,7 +487,7 @@ We show cloudifying a host from Hetzner, but the principles should work everywhe
 
 1. Set the environment variables in `.env.rb`;
     ```ruby
-    ENV["HETZNER_USER"] ||= HETZNER_ACCOUNT_ID 
+    ENV["HETZNER_USER"] ||= HETZNER_ACCOUNT_ID
     ENV["HETZNER_PASSWORD"] ||= HETZNER_ACCOUNT_PASS
     ENV["HETZNER_SSH_PUBLIC_KEY"] ||= YOUR_PUBLIC_SSH_KEY
     ENV["HETZNER_SSH_PRIVATE_KEY"] ||= YOUR_PRIVATE_SSH_KEY
@@ -501,11 +501,11 @@ We show cloudifying a host from Hetzner, but the principles should work everywhe
 
 3. In **terminal 2**, connect to REPL console running `./bin/pry` and start cloudification:
     ```ruby
-    VM_HOST_IP = "" 
-    VM_HOST_ID = ""  
+    VM_HOST_IP = ""
+    VM_HOST_ID = ""
     default_boot_images = ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
 
-    st = Prog::Vm::HostNexus.assemble(VM_HOST_IP, provider: "hetzner", location: "hetzner-fsn1", hetzner_server_identifier: VM_HOST_ID, default_boot_images: default_boot_images)
+    st = Prog::Vm::HostNexus.assemble(VM_HOST_IP, provider_name: "hetzner", location: "hetzner-fsn1", server_identifier: VM_HOST_ID, default_boot_images: default_boot_images)
     vmh = st.subject
     ```
 

@@ -24,7 +24,11 @@ RSpec.describe Prog::Test::HetznerServer do
     end
 
     it "uses exiting vm host if given" do
-      HetznerHost.create(server_identifier: "1234") { _1.id = vm_host.id }
+      HostProvider.create do |hp|
+        hp.server_identifier = "1234"
+        hp.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+        hp.id = vm_host.id
+      end
       st = described_class.assemble(vm_host_id: vm_host.id)
       expect(st.stack.first["vm_host_id"]).to eq(vm_host.id)
       expect(st.stack.first["hostname"]).to eq("1.1.1.1")
