@@ -2,17 +2,15 @@
 edit_perm = has_permission?("Postgres:edit", @pg[:id])
 delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-      [@pg[:name], "#"]
-    ],
-    right_items: [render("components/pg_state_label", locals: { state: @pg[:state], extra_class: "text-md" })]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
+    [@pg[:name], "#"]
+  ],
+  right_items: [part("components/pg_state_label", state: @pg[:state], extra_class: "text-md")]
 ) %>
 
 <div class="grid gap-6">
@@ -35,11 +33,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
   
   if @pg[:ca_certificates]
     data.push(
-      [
-        "CA Certificates",
-        render("components/download_button", locals: { link: "#{request.path}/ca-certificates" }),
-        { escape: false }
-      ]
+      ["CA Certificates", part("components/download_button", link: "#{request.path}/ca-certificates"), { escape: false }]
     )
   else
     data.push(["CA Certificates", "Waiting for host to be ready..."])
@@ -47,7 +41,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
 
   <div class="grid grid-cols-1 gap-6 md:grid-cols-6">
     <div class="<%= (@pg[:flavor] == PostgresResource::Flavor::STANDARD) ? "col-span-6" : "md:col-span-3" %>">
-      <%== render("components/kv_data_card", locals: { data: data }) %>
+      <%== part("components/kv_data_card", data:) %>
     </div>
     <% if @pg[:flavor] == PostgresResource::Flavor::PARADEDB %>
       <div class="md:col-span-3">
@@ -129,22 +123,20 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
             </div>
             <div class="grid grid-cols-12 gap-6">
               <div class="col-span-12 sm:col-span-5">
-                <%== render("components/form/text", locals: { label: "New server name", name: "name", attributes: { required: true } }) %>
+                <%== part("components/form/text", label: "New server name", name: "name", attributes: { required: true }) %>
               </div>
               <div class="col-span-12 sm:col-span-5">
-                <%== render(
+                <%== part(
                   "components/form/datepicker",
-                  locals: {
-                    label: "Target Time (UTC)",
-                    name: "restore_target",
-                    default_date: @pg[:latest_restore_time],
-                    max_date: @pg[:latest_restore_time],
-                    min_date: @pg[:earliest_restore_time]
-                  }
+                  label: "Target Time (UTC)",
+                  name: "restore_target",
+                  default_date: @pg[:latest_restore_time],
+                  max_date: @pg[:latest_restore_time],
+                  min_date: @pg[:earliest_restore_time]
                 ) %>
               </div>
               <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== render("components/form/submit_button", locals: { text: "Fork" }) %>
+                <%== part("components/form/submit_button", text: "Fork") %>
               </div>
             </div>
           </div>
@@ -181,7 +173,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                 id="fwr-delete-<%=fwr[:id]%>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
               >
-                <%== render("components/delete_button", locals: { url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "" }) %>
+                <%== part("components/delete_button", url: "#{request.path}/firewall-rule/#{fwr[:id]}", text: "") %>
               </td>
             <% end %>
           </tr>
@@ -189,16 +181,14 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
         <% if edit_perm %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render(
+              <%== part(
                 "components/form/text",
-                locals: {
-                  name: "cidr",
-                  type: "cidr",
-                  attributes: {
-                    placeholder: "0.0.0.0/0",
-                    required: true,
-                    form: "form-pg-fwr-create"
-                  }
+                name: "cidr",
+                type: "cidr",
+                attributes: {
+                  placeholder: "0.0.0.0/0",
+                  required: true,
+                  form: "form-pg-fwr-create"
                 }
               ) %>
             </td>
@@ -208,7 +198,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <form action="<%= "#{request.path}/firewall-rule" %>" role="form" method="POST" id="form-pg-fwr-create">
                 <%== csrf_tag("#{request.path}/firewall-rule") %>
-                <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "firewall-rule-create-button" }) %>
+                <%== part("components/form/submit_button", text: "Create", extra_class: "firewall-rule-create-button") %>
               </form>
             </td>
           </tr>
@@ -245,36 +235,34 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                 id="md-delete-<%=md[:id]%>"
                 class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
               >
-                <%== render("components/delete_button", locals: { url: "#{request.path}/metric-destination/#{md[:id]}", text: "" }) %>
+                <%== part("components/delete_button", url: "#{request.path}/metric-destination/#{md[:id]}", text: "") %>
               </td>
             </tr>
           <% end %>
           <tr>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render("components/form/text", locals: { name: "url", attributes: { form: "form-pg-md-create", required: true } }) %>
+              <%== part("components/form/text", name: "url", attributes: { form: "form-pg-md-create", required: true }) %>
             </td>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render("components/form/text", locals: { name: "username", attributes: { form: "form-pg-md-create", required: true } }) %>
+              <%== part("components/form/text", name: "username", attributes: { form: "form-pg-md-create", required: true }) %>
             </td>
             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== render(
+              <%== part(
                 "components/form/text",
-                locals: {
-                  name: "metric-destination-password",
-                  type: "password",
-                  attributes: {
-                    required: true,
-                    form: "form-pg-md-create",
-                    autocomplete: "new-password"
-                  },
-                  extra_class: "metric-destination-password"
-                }
+                name: "metric-destination-password",
+                type: "password",
+                attributes: {
+                  required: true,
+                  form: "form-pg-md-create",
+                  autocomplete: "new-password"
+                },
+                extra_class: "metric-destination-password"
               ) %>
             </td>
             <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
               <form action="<%= "#{request.path}/metric-destination" %>" role="form" method="POST" id="form-pg-md-create">
                 <%== csrf_tag("#{request.path}/metric-destination") %>
-                <%== render("components/form/submit_button", locals: { text: "Create", extra_class: "metric-destination-create-button" }) %>
+                <%== part("components/form/submit_button", text: "Create", extra_class: "metric-destination-create-button") %>
               </form>
             </td>
           </tr>
@@ -304,35 +292,31 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                 </div>
                 <div class="grid grid-cols-12 gap-6">
                   <div class="col-span-12 sm:col-span-5">
-                    <%== render(
+                    <%== part(
                       "components/form/text",
-                      locals: {
-                        label: "New password",
-                        name: "password",
-                        type: "password",
-                        attributes: {
-                          required: true
-                        },
-                        extra_class: "reset-superuser-password-new-password"
-                      }
+                      label: "New password",
+                      name: "password",
+                      type: "password",
+                      attributes: {
+                        required: true
+                      },
+                      extra_class: "reset-superuser-password-new-password"
                     ) %>
                   </div>
                   <div class="col-span-12 sm:col-span-5">
-                    <%== render(
+                    <%== part(
                       "components/form/text",
-                      locals: {
-                        label: "New password (repeat)",
-                        name: "repeat_password",
-                        type: "password",
-                        attributes: {
-                          required: true
-                        },
-                        extra_class: "reset-superuser-password-new-password-repeat"
-                      }
+                      label: "New password (repeat)",
+                      name: "repeat_password",
+                      type: "password",
+                      attributes: {
+                        required: true
+                      },
+                      extra_class: "reset-superuser-password-new-password-repeat"
                     ) %>
                   </div>
                   <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                    <%== render("components/form/submit_button", locals: { text: "Reset" }) %>
+                    <%== part("components/form/submit_button", text: "Reset") %>
                   </div>
                 </div>
               </div>
@@ -354,7 +338,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                 </div>
                 <div id="postgres-restart-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                   <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                    <%== render("components/form/submit_button", locals: { text: "Restart", extra_class: "restart-btn" }) %>
+                    <%== part("components/form/submit_button", text: "Restart", extra_class: "restart-btn") %>
                   </div>
                 </div>
               </div>
@@ -372,7 +356,7 @@ delete_perm = has_permission?("Postgres:delete", @pg[:id]) %>
                 </div>
               </div>
               <div id="postgres-delete-<%=@pg[:id]%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-                <%== render("components/delete_button", locals: { confirmation: @pg[:name], redirect: "#{@project_data[:path]}/postgres" }) %>
+                <%== part("components/delete_button", confirmation: @pg[:name], redirect: "#{@project_data[:path]}/postgres") %>
               </div>
             </div>
           </div>

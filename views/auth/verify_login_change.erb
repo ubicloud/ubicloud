@@ -1,7 +1,7 @@
 <% @page_title = "Verify New Email" %>
 
 <% if rodauth.authenticated? %>
-  <%== render("components/page_header", locals: { title: "My Account" }) %>
+  <%== part("components/page_header", title: "My Account") %>
 
   <main>
     <div class="max-w-screen-xl pb-6 lg:pb-16">
@@ -15,7 +15,7 @@
                 <%== rodauth.csrf_tag("/" + rodauth.verify_login_change_route) %>
                 <div class="mt-6 grid grid-cols-6 gap-6">
                   <div class="col-span-6">
-                    <%== render("components/form/submit_button", locals: { text: "Click to Verify New Email" }) %>
+                    <%== part("components/form/submit_button", text: "Click to Verify New Email") %>
                   </div>
                 </div>
               </form>
@@ -32,7 +32,7 @@
     <%== rodauth.csrf_tag %>
 
     <div class="flex flex-col text-center">
-      <%== render("components/form/submit_button", locals: { text: "Click to Verify New Email" }) %>
+      <%== part("components/form/submit_button", text: "Click to Verify New Email") %>
       <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
     </div>
   </form>

@@ -1,23 +1,19 @@
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    title: "GitHub Runners Integration",
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["GitHub Runners", "#{@project_data[:path]}/github"],
-      [@page_title, "#"]
-    ]
-  }
+  title: "GitHub Runners Integration",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["GitHub Runners", "#{@project_data[:path]}/github"],
+    [@page_title, "#"]
+  ]
 ) %>
 
-<%== render(
+<%== part(
   "components/tabbar",
-  locals: {
-    tabs: [
-      ["Active Runners", "#{@project_data[:path]}/github/runner"],
-      ["Caches", "#{@project_data[:path]}/github/cache"],
-      ["Settings", "#{@project_data[:path]}/github/setting"]
-    ]
-  }
+  tabs: [
+    ["Active Runners", "#{@project_data[:path]}/github/runner"],
+    ["Caches", "#{@project_data[:path]}/github/cache"],
+    ["Settings", "#{@project_data[:path]}/github/setting"]
+  ]
 ) %>

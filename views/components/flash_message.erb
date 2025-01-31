@@ -7,7 +7,7 @@
     <div class="rounded-md <%= bg_color %> p-4">
       <div class="flex">
         <div class="flex-shrink-0">
-          <%== render("components/icon", locals: { name: icon, classes: "h-5 w-5 #{icon_color}" }) %>
+          <%== part("components/icon", name: icon, classes: "h-5 w-5 #{icon_color}") %>
         </div>
         <div class="ml-3">
           <h3 id="flash-<%= type %>" class="text-sm font-medium <%= text_color %>"><%= flash[type] %></h3>

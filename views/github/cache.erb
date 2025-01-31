@@ -11,7 +11,7 @@
             <tr class="cache-group-row cursor-pointer group" data-repository="<%= repository_id %>">
               <th scope="colgroup" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 w-full group-[.active]:bg-gray-50">
                 <div class="flex">
-                  <%== render("components/icon", locals: { name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90" }) %>
+                  <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 group-[.active]:rotate-90") %>
                   <%= entries.first[:repository][:name] %>
                 </div>
               </th>
@@ -45,12 +45,10 @@
                   <% end %>
                 </td>
                 <td class="whitespace-nowrap py-3 pl-3 pr-4 text-sm text-right">
-                  <%== render(
+                  <%== part(
                     "components/delete_button",
-                    locals: {
-                      url: "#{@project_data[:path]}/github/cache/#{entry[:id]}",
-                      text: ""
-                    }
+                    url: "#{@project_data[:path]}/github/cache/#{entry[:id]}",
+                    text: ""
                   ) %>
                 </td>
               </tr>

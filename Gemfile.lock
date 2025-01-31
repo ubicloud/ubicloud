@@ -8,6 +8,14 @@ GIT
       rodauth (~> 2.36)
 
 GIT
+  remote: https://github.com/jeremyevans/roda.git
+  revision: 67fc63f683b2f7cc95a2443257756b7d5cbce18f
+  ref: 67fc63f683b2f7cc95a2443257756b7d5cbce18f
+  specs:
+    roda (3.88.0)
+      rack
+
+GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: a9ff0001a1eb028e2186b222aeb02b07c04f9808
   ref: a9ff0001a1eb028e2186b222aeb02b07c04f9808
@@ -288,8 +296,6 @@ GEM
     refrigerator (1.8.0)
     regexp_parser (2.10.0)
     rexml (3.4.0)
-    roda (3.88.0)
-      rack
     rodauth (2.38.0)
       roda (>= 2.6.0)
       sequel (>= 4)
@@ -467,7 +473,7 @@ DEPENDENCIES
   rackup
   rake
   refrigerator (>= 1)
-  roda (>= 3.88)
+  roda!
   rodauth (>= 2.38)
   rodauth-omniauth!
   rotp

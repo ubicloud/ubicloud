@@ -2,34 +2,32 @@
 <%== render("networking/tabbar") %>
 
 <div class="grid gap-6">
-  <%== render(
+  <%== part(
     "components/table_card",
-    locals: {
-      headers: ["Name", "Hostname"],
-      rows: @lbs.map do |lb|
+    headers: ["Name", "Hostname"],
+    rows: @lbs.map do |lb|
+      [
         [
-          [
-            [lb[:name], {link: @project_data[:path] + lb[:path]}],
-            [lb[:hostname], {copyable: true}]
-          ],
-          {id: "lb-#{lb[:id]}"}
-        ]
-      end,
-      empty_state: {
-        icon: "hero-arrows-pointing-out",
-        title: "No Load Balancers",
-        description: "You don't have permission to create Load Balancers."
-      }.merge(has_project_permission("LoadBalancer:create") ? {
-        description: "Get started by creating a new Load Balancer.",
-        button_link: "#{@project_data[:path]}/load-balancer/create",
-        button_title: "Create Load Balancer"
-      } : {})
-    }
+          [lb[:name], {link: @project_data[:path] + lb[:path]}],
+          [lb[:hostname], {copyable: true}]
+        ],
+        {id: "lb-#{lb[:id]}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-arrows-pointing-out",
+      title: "No Load Balancers",
+      description: "You don't have permission to create Load Balancers."
+    }.merge(has_project_permission("LoadBalancer:create") ? {
+      description: "Get started by creating a new Load Balancer.",
+      button_link: "#{@project_data[:path]}/load-balancer/create",
+      button_title: "Create Load Balancer"
+    } : {})
   ) %>
 
   <% if @lbs.count > 0 && has_project_permission("LoadBalancer:create")%>
     <div class="flex justify-end">
-      <%== render("components/button", locals: { text: "Create Load Balancer", link: "load-balancer/create" }) %>
+      <%== part("components/button", text: "Create Load Balancer", link: "load-balancer/create") %>
     </div>
   <% end %>
 </div>

@@ -1,6 +1,6 @@
 <% @page_title = "Setup One-Time Password" %>
 
-<%== render("components/page_header", locals: { title: "My Account" }) %>
+<%== part("components/page_header", title: "My Account") %>
 
 <main>
   <div class="max-w-screen-xl pb-6 lg:pb-16">
@@ -28,7 +28,7 @@
                   <% if rodauth.two_factor_modifications_require_password? %>
                     <%== render("components/rodauth/password_field") %>
                   <% end %>
-                  <%== render("components/form/submit_button", locals: { text: rodauth.otp_setup_button }) %>
+                  <%== part("components/form/submit_button", text: rodauth.otp_setup_button) %>
                 </div>
               </div>
             </form>

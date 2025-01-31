@@ -81,11 +81,11 @@
         <div class="mt-10 flex justify-center space-x-5">
           <a href="https://github.com/ubicloud/ubicloud" target="_blank" class="text-gray-400 hover:text-gray-500">
             <span class="sr-only">GitHub</span>
-            <%== render("components/icon", locals: { name: "github" }) %>
+            <%== part("components/icon", name: "github") %>
           </a>
           <a href="mailto:support@ubicloud.com" class="text-gray-400 hover:text-gray-500">
             <span class="sr-only">Support</span>
-            <%== render("components/icon", locals: { name: "hero-envelope" }) %>
+            <%== part("components/icon", name: "hero-envelope") %>
           </a>
         </div>
         <% if Config.managed_service %>

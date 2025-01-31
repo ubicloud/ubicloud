@@ -1,18 +1,16 @@
 <% @page_title = "#{@invoice_data[:name]} Invoice" %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["Billing", "#{@project_data[:path]}/billing"],
-      ["#{@invoice_data[:name]} Invoice", "#"]
-    ],
-    right_items: [
-      render("components/button", locals: { text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"} })
-    ]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["Billing", "#{@project_data[:path]}/billing"],
+    ["#{@invoice_data[:name]} Invoice", "#"]
+  ],
+  right_items: [
+    part("components/button", text: "View PDF", link: "#{request.url}?pdf=1", attributes: {target: "_blank"})
+  ]
 ) %>
 
 <div class="grid gap-6">

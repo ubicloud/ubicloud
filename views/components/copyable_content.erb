@@ -2,7 +2,7 @@
 
 <span class="copyable-content inline-flex items-center" data-content="<%= content %>" data-message="<%= message %>">
   <% if revealable %>
-    <%== render("components/revealable_content", locals: { content: content }) %>
+    <%== part("components/revealable_content", content:) %>
   <% else %>
     <%= content %>
   <% end %>

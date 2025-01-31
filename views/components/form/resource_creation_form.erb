@@ -78,7 +78,7 @@ form_elements.each do |element|
   # :nocov:
   end %>
                 <%== container_opening_tag %>
-                <%== render("components/form/#{type}", locals:) %>
+                <%== part("components/form/#{type}", **locals) %>
                 <%== container_closing_tag %>
               <% end %>
             </div>
@@ -88,7 +88,7 @@ form_elements.each do |element|
       <div class="px-4 py-5 sm:p-6">
         <div class="flex items-center justify-end gap-x-6">
           <a href="<%= action %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
-          <%== render("components/form/submit_button", locals: { text: "Create" }) %>
+          <%== part("components/form/submit_button", text: "Create") %>
         </div>
       </div>
     </div>

@@ -5,17 +5,15 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
 <%== render("project/user-tabbar") %>
 
 <div class="space-y-1">
-  <%== render(
+  <%== part(
     "components/page_header",
-    locals: {
-      title: page_title,
-      breadcrumbs: [
-        %w[Projects /project],
-        [@project_data[:name], @project_data[:path]],
-        ["Access Control", "#{@project_data[:path]}/user/access-control"],
-        [page_title, "#"]
-      ]
-    }
+    title: page_title,
+    breadcrumbs: [
+      %w[Projects /project],
+      [@project_data[:name], @project_data[:path]],
+      ["Access Control", "#{@project_data[:path]}/user/access-control"],
+      [page_title, "#"]
+    ]
   ) %>
 </div>
 
@@ -50,17 +48,7 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
             <%== csrf_tag("#{@project_data[:path]}/user/access-control/tag/#{@tag_type}") %>
             <div class="grid grid-cols-12 gap-3">
               <div class="col-span-12 md:col-span-5">
-                <%== render(
-                  "components/form/text",
-                  locals: {
-                    name: "name",
-                    button_title: "Create",
-                    attributes: {
-                      required: true,
-                      placeholder: "Name"
-                    }
-                  }
-                ) %>
+                <%== part("components/form/text", name: "name", button_title: "Create", attributes: { required: true, placeholder: "Name" }) %>
               </div>
             </div>
           </form>
@@ -86,24 +74,20 @@ modification_allowed = has_project_permission("Project:#{@tag_type.sub(/(ect|ion
                   <%= tag.name %>
                 </td>
                 <td class="pl-3 pr-4 sm:pr-6 py-4 flex items-center space-x-2 justify-end">
-                  <%== render(
+                  <%== part(
                     "components/button",
-                    locals: {
-                      text: "Manage",
-                      link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
-                      attributes: {
-                        id: "#{tag.ubid}-edit"
-                      }
+                    text: "Manage",
+                    link: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
+                    attributes: {
+                      id: "#{tag.ubid}-edit"
                     }
                   ) %>
                   <% if editable %>
-                    <%== render(
+                    <%== part(
                       "components/delete_button",
-                      locals: {
-                        text: "Remove",
-                        url: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
-                        confirmation: tag.name
-                      }
+                      text: "Remove",
+                      url: "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{tag.ubid}",
+                      confirmation: tag.name
                     ) %>
                   <% end %>
                 </td>

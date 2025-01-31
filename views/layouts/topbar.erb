@@ -3,7 +3,7 @@
 >
   <button type="button" class="toggle-mobile-menu -m-2.5 p-2.5 text-gray-700 lg:hidden">
     <span class="sr-only">Open sidebar</span>
-    <%== render("components/icon", locals: { name: "hero-bars-3" }) %>
+    <%== part("components/icon", name: "hero-bars-3") %>
   </button>
   <!-- Separator -->
   <div class="h-6 w-px bg-gray-900/10 lg:hidden"></div>
@@ -15,10 +15,10 @@
       <!-- Profile dropdown -->
       <div class="relative group dropdown text-sm leading-6 text-gray-900">
         <button type="button" class="-m-1.5 flex items-center p-1.5" title="<%= current_account.email %>">
-          <%== render("components/icon", locals: { name: "hero-user-circle", classes: "h-8 w-8 rounded-full bg-gray-50" }) %>
+          <%== part("components/icon", name: "hero-user-circle", classes: "h-8 w-8 rounded-full bg-gray-50") %>
           <span class="hidden lg:flex lg:items-center">
             <span class="ml-3 font-semibold" aria-hidden="true"><%= current_account.name %></span>
-            <%== render("components/icon", locals: { name: "hero-chevron-down", classes: "h-5 w-5 ml-2 text-gray-400" }) %>
+            <%== part("components/icon", name: "hero-chevron-down", classes: "h-5 w-5 ml-2 text-gray-400") %>
           </span>
         </button>
         <div

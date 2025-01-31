@@ -1,13 +1,11 @@
 <%# locals: (name:, selected:, id: name) %>
 
-<%== render(
+<%== part(
   "components/form/select",
-  locals: {
-    name:,
-    id:,
-    options: [["", "No access", nil, {}]].concat(
-      @allowed_view_tag_names.map { [_1, _1, nil, @allowed_add_tag_names_map.include?(_1) ? {} : { disabled: true }] }
-    ),
-    selected:
-  }
+  name:,
+  id:,
+  options: [["", "No access", nil, {}]].concat(
+    @allowed_view_tag_names.map { [_1, _1, nil, @allowed_add_tag_names_map.include?(_1) ? {} : { disabled: true }] }
+  ),
+  selected:
 ) %>

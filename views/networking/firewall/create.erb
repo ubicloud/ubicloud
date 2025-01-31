@@ -1,15 +1,13 @@
 <% @page_title = "Create Firewall" %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["Firewalls", "#{@project_data[:path]}/firewall"],
-      %w[Create #]
-    ]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["Firewalls", "#{@project_data[:path]}/firewall"],
+    %w[Create #]
+  ]
 ) %>
 
 <%
@@ -23,4 +21,4 @@
   action = "#{@project_data[:path]}/firewall"
 %>
 
-<%==render("components/form/resource_creation_form", locals: {action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents})%>
+<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents)%>

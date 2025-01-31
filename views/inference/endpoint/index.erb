@@ -37,7 +37,7 @@ curl #{ie[:url]}#{path} \\
       <div>
         <h3 class="text-sm font-semibold text-gray-900">Capability</h3>
         <div class="flex items-center gap-1 text-gray-500">
-          <%== render("components/icon", locals: { name: model_icon, classes: "w-5 h-5 text-gray-400" }) %>
+          <%== part("components/icon", name: model_icon, classes: "w-5 h-5 text-gray-400") %>
           <%= ie[:tags]["capability"] %>
         </div>
       </div>
@@ -61,7 +61,7 @@ curl #{ie[:url]}#{path} \\
       </div>
       <div class="sm:col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">URL</h3>
-        <p class="text-gray-500"><%== render("components/copyable_content", locals: { content: ie[:url], message: "Copied URL" }) %></p>
+        <p class="text-gray-500"><%== part("components/copyable_content", content: ie[:url], message: "Copied URL") %></p>
       </div>
       <div class="sm:col-span-2">
         <h3 class="text-sm font-semibold text-gray-900">

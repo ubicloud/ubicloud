@@ -1,11 +1,9 @@
 <% @page_title = "Project Billing" %>
 
 <% if @billing_info_data %>
-  <%== render(
+  <%== part(
     "components/page_header",
-    locals: {
-      breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
-    }
+    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
   ) %>
 
   <div class="grid gap-6">
@@ -48,125 +46,102 @@
             <div>
               <div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-8">
                 <div class="sm:col-span-4">
-                  <%== render(
+                  <%== part(
                     "components/form/text",
-                    locals: {
-                      name: "name",
-                      label: "Billing Name",
-                      value: @billing_info_data[:name],
-                      attributes: {
-                        required: true,
-                        placeholder: "Individual or Company Name"
-                      }
+                    name: "name",
+                    label: "Billing Name",
+                    value: @billing_info_data[:name],
+                    attributes: {
+                      required: true,
+                      placeholder: "Individual or Company Name"
                     }
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
-                  <%== render(
+                  <%== part(
                     "components/form/text",
-                    locals: {
-                      name: "email",
-                      label: "Billing Email",
-                      value: @billing_info_data[:email],
-                      attributes: {
-                        required: true,
-                        placeholder: "Billing Email"
-                      }
+                    name: "email",
+                    label: "Billing Email",
+                    value: @billing_info_data[:email],
+                    attributes: {
+                      required: true,
+                      placeholder: "Billing Email"
                     }
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== render(
+                  <%== part(
                     "components/form/select",
-                    locals: {
-                      name: "country",
-                      label: "Country",
-                      placeholder: "Select a Country",
-                      selected: @billing_info_data[:country],
-                      options:
-                        ISO3166::Country
-                          .all
-                          .reject { Config.sanctioned_countries.include?(_1.alpha2) }
-                          .sort_by(&:common_name)
-                          .map { |c| [c.alpha2, c.common_name] }
-                          .to_h
-                          .to_a,
-                      attributes: {
-                        required: true
-                      }
+                    name: "country",
+                    label: "Country",
+                    placeholder: "Select a Country",
+                    selected: @billing_info_data[:country],
+                    options:
+                      ISO3166::Country
+                        .all
+                        .reject { Config.sanctioned_countries.include?(_1.alpha2) }
+                        .sort_by(&:common_name)
+                        .map { |c| [c.alpha2, c.common_name] }
+                        .to_h
+                        .to_a,
+                    attributes: {
+                      required: true
                     }
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== render(
+                  <%== part(
                     "components/form/text",
-                    locals: {
-                      name: "state",
-                      label: "State",
-                      value: @billing_info_data[:state],
-                      attributes: {
-                        placeholder: "State"
-                      }
+                    name: "state",
+                    label: "State",
+                    value: @billing_info_data[:state],
+                    attributes: {
+                      placeholder: "State"
                     }
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== render(
+                  <%== part(
                     "components/form/text",
-                    locals: {
-                      name: "city",
-                      label: "City",
-                      value: @billing_info_data[:city],
-                      attributes: {
-                        placeholder: "City"
-                      }
+                    name: "city",
+                    label: "City",
+                    value: @billing_info_data[:city],
+                    attributes: {
+                      placeholder: "City"
                     }
                   ) %>
                 </div>
                 <div class="sm:col-span-4 md:col-span-2">
-                  <%== render(
+                  <%== part(
                     "components/form/text",
-                    locals: {
-                      name: "postal_code",
-                      label: "Postal Code",
-                      value: @billing_info_data[:postal_code],
-                      attributes: {
-                        placeholder: "Postal Code"
-                      }
+                    name: "postal_code",
+                    label: "Postal Code",
+                    value: @billing_info_data[:postal_code],
+                    attributes: {
+                      placeholder: "Postal Code"
                     }
                   ) %>
                 </div>
                 <div class="col-span-full">
-                  <%== render(
+                  <%== part(
                     "components/form/textarea",
-                    locals: {
-                      name: "address",
-                      label: "Address",
-                      value: @billing_info_data[:address],
-                      attributes: {
-                        required: true
-                      }
+                    name: "address",
+                    label: "Address",
+                    value: @billing_info_data[:address],
+                    attributes: {
+                      required: true
                     }
                   ) %>
                 </div>
                 <div class="sm:col-span-4">
-                  <%== render(
-                    "components/form/text",
-                    locals: {
-                      name: "tax_id",
-                      label: "Tax ID (Optional)",
-                      value: @billing_info_data[:tax_id]
-                    }
-                  ) %>
+                  <%== part("components/form/text", name: "tax_id", label: "Tax ID (Optional)", value: @billing_info_data[:tax_id]) %>
                 </div>
                 <div class="sm:col-span-4">
-                  <%== render(
+                  <%== part(
                     "components/form/text",
-                    locals: {
-                      name: "company_name",
-                      label: "Company Name (Optional)",
-                      value: @billing_info_data[:company_name]
-                    }
+                    name: "company_name",
+                    label: "Company Name (Optional)",
+                    value: @billing_info_data[:company_name]
                   ) %>
                 </div>
               </div>
@@ -176,49 +151,41 @@
 
         <div class="px-4 py-5 sm:p-6">
           <div class="flex items-center justify-end gap-x-6">
-            <%== render("components/form/submit_button", locals: { text: "Update" }) %>
+            <%== part("components/form/submit_button", text: "Update") %>
           </div>
         </div>
       </form>
     </div>
     <!-- Payment Methods Card -->
-    <%== render(
+    <%== part(
       "components/table_card",
-      locals: {
-        title: "Payment Methods",
-        right_items: [
-          render(
-            "components/button",
-            locals: {
-              text: "Add Payment Method",
-              link: "#{@project_data[:path]}/billing/payment-method/create"
-            }
-          )
-        ],
-        rows:
-          @payment_methods.map do |pm|
+      title: "Payment Methods",
+      right_items: [
+        part("components/button", text: "Add Payment Method", link: "#{@project_data[:path]}/billing/payment-method/create")
+      ],
+      rows:
+        @payment_methods.map do |pm|
+          [
             [
+              "#{pm[:brand].capitalize} ending in #{pm[:last4]}",
+              "Expires #{pm[:exp_month]}/#{pm[:exp_year]}",
+              "Added on #{pm[:created_at]}",
               [
-                "#{pm[:brand].capitalize} ending in #{pm[:last4]}",
-                "Expires #{pm[:exp_month]}/#{pm[:exp_year]}",
-                "Added on #{pm[:created_at]}",
-                [
-                  "delete_button",
-                  {
-                    component: {
-                      url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
-                      csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
-                      confirmation: pm[:last4]
-                    },
-                    extra_class: "flex justify-end"
-                  }
-                ]
-              ],
-              { id: "payment-method-#{pm[:ubid]}" }
-            ]
-          end,
-        empty_state: "No payment methods. Add new payment method to able create resources in project."
-      }
+                "delete_button",
+                {
+                  component: {
+                    url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}?project_id=#{@project.ubid}",
+                    csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm[:ubid]}",
+                    confirmation: pm[:last4]
+                  },
+                  extra_class: "flex justify-end"
+                }
+              ]
+            ],
+            { id: "payment-method-#{pm[:ubid]}" }
+          ]
+        end,
+      empty_state: "No payment methods. Add new payment method to able create resources in project."
     ) %>
     <!-- Invoices -->
     <div>
@@ -281,14 +248,12 @@
   <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
     <%== csrf_tag("#{@project_data[:path]}/billing") %>
 
-    <%== render(
+    <%== part(
       "components/empty_state",
-      locals: {
-        icon: "hero-banknotes",
-        title: "No billing information",
-        description: "Get started by adding new billing information.",
-        button_title: "Add new billing information"
-      }
+      icon: "hero-banknotes",
+      title: "No billing information",
+      description: "Get started by adding new billing information.",
+      button_title: "Add new billing information"
     ) %>
   </form>
 <% end %>
@@ -321,37 +286,33 @@
             </div>
             <div class="grid grid-cols-12 gap-6">
               <div class="col-span-5 sm:col-span-3">
-                <%== render(
+                <%== part(
                   "components/form/text",
-                  locals: {
-                    name: "alert_name",
-                    label: "Alert Name",
-                    type: "text",
-                    attributes: {
-                      required: true,
-                      placeholder: "Alert Name"
-                    },
-                    extra_class: "pr-3"
-                  }
+                  name: "alert_name",
+                  label: "Alert Name",
+                  type: "text",
+                  attributes: {
+                    required: true,
+                    placeholder: "Alert Name"
+                  },
+                  extra_class: "pr-3"
                 ) %>
               </div>
               <div class="col-span-5 sm:col-span-3">
-                <%== render(
+                <%== part(
                   "components/form/text",
-                  locals: {
-                    name: "limit",
-                    label: "Limit",
-                    type: "number",
-                    attributes: {
-                      required: true,
-                      placeholder: "100"
-                    },
-                    extra_class: "pr-3"
-                  }
+                  name: "limit",
+                  label: "Limit",
+                  type: "number",
+                  attributes: {
+                    required: true,
+                    placeholder: "100"
+                  },
+                  extra_class: "pr-3"
                 ) %>
               </div>
               <div class="col-span-2 sm:col-span-3 flex justify-begin items-end">
-                <%== render("components/form/submit_button", locals: { text: "Add" }) %>
+                <%== part("components/form/submit_button", text: "Add") %>
               </div>
             </div>
           </div>
@@ -378,13 +339,11 @@
                 <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:limit] %></td>
                 <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:email] %></td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                  <%== render(
+                  <%== part(
                     "components/delete_button",
-                    locals: {
-                      text: "Remove",
-                      url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
-                      confirmation: alert[:name]
-                    }
+                    text: "Remove",
+                    url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
+                    confirmation: alert[:name]
                   ) %>
                 </td>
               </tr>

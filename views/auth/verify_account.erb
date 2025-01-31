@@ -7,7 +7,7 @@
   <%== rodauth.csrf_tag %>
 
   <div class="flex flex-col text-center">
-    <%== render("components/form/submit_button", locals: { text: "Verify Account" }) %>
+    <%== part("components/form/submit_button", text: "Verify Account") %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
   </div>
 </form>

@@ -20,7 +20,7 @@ error = rodauth.field_error(name) || flash.dig("errors", name) %>
       <% end%>
     >
     <% if button_title %>
-      <%== render("components/form/submit_button", locals: { text: button_title }) %>
+      <%== part("components/form/submit_button", text: button_title) %>
     <% end %>
   </div>
   <% if error %>

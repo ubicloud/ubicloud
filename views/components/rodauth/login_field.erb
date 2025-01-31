@@ -1,14 +1,12 @@
 <%# locals: (label: "#{rodauth.login_label}#{rodauth.input_field_label_suffix}") %>
 
-<%== render(
+<%== part(
   "components/form/text",
-  locals: {
-    name: rodauth.login_param,
-    type: rodauth.login_input_type,
-    label: label,
-    attributes: {
-      required: true,
-      autocomplete: rodauth.login_field_autocomplete_value
-    }
+  name: rodauth.login_param,
+  type: rodauth.login_input_type,
+  label: label,
+  attributes: {
+    required: true,
+    autocomplete: rodauth.login_field_autocomplete_value
   }
 ) %>

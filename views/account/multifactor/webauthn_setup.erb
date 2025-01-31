@@ -1,6 +1,6 @@
 <% @page_title = "Setup Security Key" %>
 
-<%== render("components/page_header", locals: { title: "My Account" }) %>
+<%== part("components/page_header", title: "My Account") %>
 
 <main>
   <div class="max-w-screen-xl pb-6 lg:pb-16">
@@ -19,18 +19,16 @@
             >
               <%== rodauth.webauthn_setup_additional_form_tags %>
               <%== rodauth.csrf_tag("/" + rodauth.webauthn_setup_route) %>
-              <%== render("components/form/hidden", locals: { name: rodauth.webauthn_setup_challenge_param, value: cred.challenge }) %>
-              <%== render(
+              <%== part("components/form/hidden", name: rodauth.webauthn_setup_challenge_param, value: cred.challenge) %>
+              <%== part(
                 "components/form/hidden",
-                locals: {
-                  name: rodauth.webauthn_setup_challenge_hmac_param,
-                  value: rodauth.compute_hmac(cred.challenge)
-                }
+                name: rodauth.webauthn_setup_challenge_hmac_param,
+                value: rodauth.compute_hmac(cred.challenge)
               ) %>
               <input id="webauthn-setup" class="hidden" type="text" name="<%= rodauth.webauthn_setup_param %>" value="" hidden/>
               <div class="mt-6 grid grid-cols-6 gap-6">
                 <div class="col-span-6 sm:col-span-3 xl:col-span-2">
-                  <%== render("components/form/text", locals: { name: "name", label: "Key Name", attributes: { required: true } }) %>
+                  <%== part("components/form/text", name: "name", label: "Key Name", attributes: { required: true }) %>
                 </div>
                 <% if rodauth.two_factor_modifications_require_password? %>
                   <div class="col-span-6 sm:col-span-3 xl:col-span-2">
@@ -39,7 +37,7 @@
                 <% end %>
                 <div class="col-span-6">
                   <div id="webauthn-setup-button">
-                    <%== render("components/form/submit_button", locals: { text: rodauth.webauthn_setup_button }) %>
+                    <%== part("components/form/submit_button", text: rodauth.webauthn_setup_button) %>
                   </div>
                 </div>
               </div>

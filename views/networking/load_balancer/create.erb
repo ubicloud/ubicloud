@@ -1,15 +1,13 @@
 <% @page_title = "Create Load Balancer" %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["Load Balancers", "#{@project_data[:path]}/load-balancer"],
-      %w[Create #]
-    ]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["Load Balancers", "#{@project_data[:path]}/load-balancer"],
+    %w[Create #]
+  ]
 ) %>
 
 <%
@@ -29,4 +27,4 @@
   action = "#{@project_data[:path]}/load-balancer"
 %>
 
-<%==render("components/form/resource_creation_form", locals: {action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents})%>
+<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

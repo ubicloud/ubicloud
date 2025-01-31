@@ -34,7 +34,7 @@ class Clover < Roda
   }.freeze
 
   def csrf_tag(*)
-    render("components/form/hidden", locals: {name: csrf_field, value: csrf_token(*)})
+    part("components/form/hidden", name: csrf_field, value: csrf_token(*))
   end
 
   def redirect_back_with_inputs

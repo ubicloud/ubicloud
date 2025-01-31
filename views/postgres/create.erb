@@ -10,17 +10,15 @@
 
 <%== render("components/billing_warning") %>
 
-<%== render(
+<%== part(
   "components/page_header",
-  locals: {
-    breadcrumbs: [
-      %w[Projects /project],
-      [@project_data[:name], @project_data[:path]],
-      ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
-      %w[Create #]
-    ],
-    right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
-  }
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project_data[:name], @project_data[:path]],
+    ["PostgreSQL Databases", "#{@project_data[:path]}/postgres"],
+    %w[Create #]
+  ],
+  right_items: [logo ? "<img src=\"/#{logo}\" class=\"h-6 object-contain\"/>" : nil]
 ) %>
 
 <%
@@ -41,4 +39,4 @@
   action = "#{@project_data[:path]}/postgres"
 %>
 
-<%==render("components/form/resource_creation_form", locals: {action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents})%>
+<%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

@@ -6,7 +6,7 @@
       <nav class="sm:hidden" aria-label="Back">
         <a href="<%= back %>" class="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700">
           <div class="-ml-1 mr-1 flex-shrink-0 text-gray-400">
-            <%== render("components/icon", locals: { name: "hero-chevron-left", classes: "w-5 h-5" }) %>
+            <%== part("components/icon", name: "hero-chevron-left", classes: "w-5 h-5") %>
           </div>
           Back
         </a>
@@ -17,7 +17,7 @@
             <li>
               <div class="flex items-center">
                 <% if index > 0 %>
-                  <%== render("components/icon", locals: { name: "hero-chevron-right", classes: "w-5 h-5 flex-shrink-0 text-gray-400 mr-4" }) %>
+                  <%== part("components/icon", name: "hero-chevron-right", classes: "w-5 h-5 flex-shrink-0 text-gray-400 mr-4") %>
                 <% end %>
                 <a href="<%= url %>" class="text-sm font-medium text-gray-500 hover:text-gray-700"><%= name %></a>
               </div>

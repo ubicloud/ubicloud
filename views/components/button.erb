@@ -10,7 +10,7 @@
     <% end%>
   >
     <% if icon %>
-      <%== render("components/icon", locals: { name: icon, classes: "h-5 w-5" }) %>
+      <%== part("components/icon", name: icon, classes: "h-5 w-5") %>
     <% end %>
     <%= text %>
   </a>
@@ -22,17 +22,11 @@
     <% end%>
   >
     <% if icon %>
-      <%== render(
-        "components/icon",
-        locals: {
-          name: icon,
-          classes: "h-5 w-5 #{(text && !text.empty?) ? "ml-0.5 mr-1.5" : "mx-0"}"
-        }
-      ) %>
+      <%== part("components/icon", name: icon, classes: "h-5 w-5 #{(text && !text.empty?) ? "ml-0.5 mr-1.5" : "mx-0"}") %>
     <% end %>
     <%= text %>
     <% if right_icon %>
-      <%== render("components/icon", locals: { name: right_icon, classes: "ml-1.5 -mr-1 h-5 w-5" }) %>
+      <%== part("components/icon", name: right_icon, classes: "ml-1.5 -mr-1 h-5 w-5") %>
     <% end %>
   </button>
 <% end %>
