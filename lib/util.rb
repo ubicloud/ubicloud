@@ -83,32 +83,7 @@ module Util
     end
   end
 
-  def self.send_email(receiver, subject, greeting: nil, body: nil, button_title: nil, button_link: nil, cc: nil, attachments: [])
-    html = EmailRenderer.new.render "email/layout", locals: {subject: subject, greeting: greeting, body: body, button_title: button_title, button_link: button_link}
-    Mail.deliver do
-      from Config.mail_from
-      to receiver
-      subject subject
-      cc cc
-
-      attachments.each do |name, file|
-        add_file filename: name, content: file
-      end
-
-      text_part do
-        body "#{greeting}\n#{Array(body).join("\n")}\n#{button_link}"
-      end
-
-      html_part do
-        content_type "text/html; charset=UTF-8"
-        body html
-      end
-    end
-  end
-end
-
-class EmailRenderer
-  def render(template, locals: {})
-    Tilt::ErubiTemplate.new("views/#{template}.erb", escape: true, chain_appends: true, freeze: true, skip_compiled_encoding_detection: true).render(self, locals)
+  def self.send_email(...)
+    EmailRenderer.sendmail("/", ...)
   end
 end
