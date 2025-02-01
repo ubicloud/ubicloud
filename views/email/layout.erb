@@ -1,4 +1,4 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+<%# locals: (subject:, greeting:, body:, button_title:, button_link:) %><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
@@ -7,9 +7,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     <meta name="color-scheme" content="light">
     <meta name="supported-color-schemes" content="light">
-    <style>
-    </style>
-    <%== render("email/style") %>
+    <%== File.read("views/email/style.html") %>
   </head>
   <body>
 
@@ -33,7 +31,7 @@
                       <% end %>
 
                       <% if button_link %>
-                        <%== render("email/button", locals: { title: button_title, link: button_link }) %>
+                        <%== part("email/button", title: button_title, link: button_link) %>
                       <% end %>
                       <p>
                         Regards,<br>

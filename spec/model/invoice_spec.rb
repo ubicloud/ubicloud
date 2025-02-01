@@ -70,7 +70,7 @@ RSpec.describe Invoice do
     end
 
     it "not charge if all payment methods fails" do
-      invoice.content["billing_info"] = {"id" => billing_info.id}
+      invoice.content["billing_info"] = {"id" => billing_info.id, "email" => "foo@example.com"}
       payment_method1 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       payment_method2 = PaymentMethod.create_with_id(billing_info_id: billing_info.id, stripe_id: "pm_2", order: 2)
 
