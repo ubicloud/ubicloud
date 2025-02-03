@@ -175,7 +175,7 @@ class UBID
       ubid.start_with?("et") ? ApiKey : class_for_ubid(ubid)
     end.each do |model, model_uuids|
       next unless model
-      model.where(id: model_uuids).each do
+      model.where(id: Sequel.any_uuid(model_uuids)).each do
         uuids[_1.id] = _1
       end
     end

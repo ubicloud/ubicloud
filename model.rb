@@ -19,6 +19,19 @@ Sequel::Model.plugin :insert_conflict
 Sequel::Model.plugin :inspect_pk
 Sequel::Model.plugin :static_cache_cache, "cache/static_cache.cache"
 Sequel::Model.plugin :pg_auto_constraint_validations, cache_file: "cache/pg_auto_constraint_validations.cache"
+Sequel::Model.plugin :pg_eager_any_typed_array
+
+def Sequel.any_type(array, type)
+  Sequel.function(:ANY, Sequel.pg_array(array, type))
+end
+
+def Sequel.any_uuid(array)
+  if array.is_a?(Array)
+    any_type(array, :uuid)
+  else
+    array
+  end
+end
 
 if (level = Config.database_logger_level) || Config.test?
   require "logger"

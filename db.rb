@@ -9,7 +9,7 @@ db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "db_ca_bundle.cr
 Util.safe_write_to_file(db_ca_bundle_filename, Config.clover_database_root_certs)
 max_connections = Config.db_pool - 1
 max_connections = 1 if ENV["SHARED_CONNECTION"] == "1"
-DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout: Config.database_timeout).tap do |db|
+DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout: Config.database_timeout, treat_string_list_as_text_array: true).tap do |db|
   # Replace dangerous (for cidrs) Ruby IPAddr type that is otherwise
   # used by sequel_pg.  Has come up more than once in the bug tracker:
   #
@@ -30,7 +30,7 @@ end
 
 # Load Sequel Database/Global extensions here
 # DB.extension :date_arithmetic
-DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_timestamptz, :pg_range
+DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_auto_parameterize_in_array, :pg_timestamptz, :pg_range
 Sequel.extension :pg_range_ops, :pg_json_ops
 
 DB.extension :pg_schema_caching

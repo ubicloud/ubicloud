@@ -5,8 +5,8 @@ require_relative "../model"
 class LoadBalancer < Sequel::Model
   many_to_one :project
   many_to_many :vms
-  many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: ["up"]}
-  many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: ["evacuating", "detaching"])
+  many_to_many :active_vms, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: {state: "up"}
+  many_to_many :vms_to_dns, class: :Vm, left_key: :load_balancer_id, right_key: :vm_id, join_table: :load_balancers_vms, conditions: Sequel.~(state: Sequel.any_type(["evacuating", "detaching"], :lb_node_state))
   one_to_one :strand, key: :id
   many_to_one :private_subnet
   one_to_many :load_balancers_vms, key: :load_balancer_id, class: :LoadBalancersVms
@@ -36,14 +36,14 @@ class LoadBalancer < Sequel::Model
   end
 
   def detach_vm(vm)
-    load_balancers_vms_dataset.where(vm_id: vm.id, state: ["up", "down", "evacuating"]).update(state: "detaching")
+    load_balancers_vms_dataset.where(vm_id: vm.id, state: Sequel.any_type(["up", "down", "evacuating"], :lb_node_state)).update(state: "detaching")
     Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
     incr_update_load_balancer
   end
 
   def evacuate_vm(vm)
     DB.transaction do
-      load_balancers_vms_dataset.where(vm_id: vm.id, state: ["up", "down"]).update(state: "evacuating")
+      load_balancers_vms_dataset.where(vm_id: vm.id, state: Sequel.any_type(["up", "down"], :lb_node_state)).update(state: "evacuating")
       Strand.create_with_id(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id)
       incr_update_load_balancer
       incr_rewrite_dns_records
