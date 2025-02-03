@@ -227,6 +227,14 @@ RSpec.configure do |config|
     require "coderay"
   end
 
+  def log
+    level = LOGGER.level
+    LOGGER.level = "info"
+    yield
+  ensure
+    LOGGER.level = level
+  end
+
   def create_vm_host(**args)
     args = {location: "hetzner-fns1", allocation_state: "accepting", arch: "x64", total_cores: 48, used_cores: 2}.merge(args)
     ubid = VmHost.generate_ubid

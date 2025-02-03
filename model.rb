@@ -20,9 +20,10 @@ Sequel::Model.plugin :inspect_pk
 Sequel::Model.plugin :static_cache_cache, "cache/static_cache.cache"
 Sequel::Model.plugin :pg_auto_constraint_validations, cache_file: "cache/pg_auto_constraint_validations.cache"
 
-if (level = Config.database_logger_level)
+if (level = Config.database_logger_level) || Config.test?
   require "logger"
-  DB.loggers << Logger.new($stdout, level: level)
+  LOGGER = Logger.new($stdout, level: level || "fatal")
+  DB.loggers << LOGGER
 end
 
 module SequelExtensions
