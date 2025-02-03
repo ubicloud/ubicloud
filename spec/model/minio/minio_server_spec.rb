@@ -35,8 +35,8 @@ RSpec.describe MinioServer do
   end
 
   it "returns private ipv4 address properly" do
-    nic = instance_double(Nic, private_ipv4: instance_double(NetAddr::IPv4Net, network: "192.168.0.0"))
-    expect(ms.vm).to receive(:nics).and_return([nic])
+    nic = instance_double(Nic, private_ipv4: instance_double(NetAddr::IPv4Net, network: "192.168.0.0", netmask: "/32"))
+    expect(ms.vm).to receive(:nics).and_return([nic]).at_least(:once)
     expect(ms.private_ipv4_address).to eq("192.168.0.0")
   end
 
