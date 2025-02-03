@@ -60,6 +60,7 @@ class VmSetup
     prepare_pci_devices(pci_devices)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
     start_systemd_unit
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -72,6 +73,7 @@ class VmSetup
     storage(storage_params, storage_secrets, false)
     prepare_pci_devices(pci_devices)
     start_systemd_unit
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -85,6 +87,7 @@ class VmSetup
     hugepages(mem_gib)
     storage(storage_params, storage_secrets, false)
     install_systemd_unit(max_vcpus, cpu_topology, mem_gib, storage_params, nics, pci_devices, slice_name, cpu_percent_limit)
+    update_via_routes(nics)
 
     enable_bursting(slice_name, cpu_burst_percent_limit) unless cpu_burst_percent_limit == 0
   end
@@ -336,6 +339,29 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     end
   end
 
+  def update_via_routes(nics)
+    # we create tap devices in "interfaces" function in this file. but
+    # code execution happens faster than linux taking care of the device creation.
+    # that's why by the time we reach this function, we need to check whether the
+    # device is created or not and then proceed to modify the routes.
+    success = false
+    5.times do
+      if r("ip -n #{q_vm} link | grep -E '^[0-9]+: nc[^:]+:' | grep -q 'state UP' && echo UP || echo DOWN").chomp == "UP"
+        success = true
+        break
+      end
+      sleep 0.5
+    end
+    unless success
+      raise "VM #{q_vm} tap device not ready after 5 retries."
+    end
+
+    nics.each do |nic|
+      local_ip4 = NetAddr::IPv4Net.parse(nic.net4)
+      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(1).to_s.shellescape} dev #{nic.tap}" unless local_ip4.netmask.to_s == "/32"
+    end
+  end
+
   def write_nftables_conf(ip4, gua, nics)
     config = build_nftables_config(gua, nics, ip4)
     vp.write_nftables_conf(config)
@@ -346,8 +372,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     return unless ip4
 
     public_ipv4 = NetAddr::IPv4Net.parse(ip4).network.to_s
-    private_ipv4 = NetAddr::IPv4Net.parse(private_ip).network.to_s
-
+    private_ipv4_addr = NetAddr::IPv4Net.parse(private_ip)
+    private_ipv4 = (private_ipv4_addr.netmask.to_s == "/32") ? private_ipv4_addr.network.to_s : private_ipv4_addr.nth(1).to_s
     <<~NAT4_RULES
     table ip nat {
       chain prerouting {
@@ -443,10 +469,12 @@ EOS
     guest_network = subdivide_network(NetAddr.parse_net(gua)).first
     private_ip_dhcp = nics.map do |nic|
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
-      vm_sub_4 = NetAddr::IPv4Net.parse(nic.net4)
+      vm_net4 = NetAddr::IPv4Net.parse(nic.net4)
+      vm_sub_4 = (vm_net4.netmask.to_s == "/32") ? vm_net4.nth(0) : vm_net4.nth(1)
       <<DHCP
-dhcp-range=#{nic.tap},#{vm_sub_4.nth(0)},#{vm_sub_4.nth(0)},6h
+dhcp-range=#{nic.tap},#{vm_sub_4},#{vm_sub_4},6h
 dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
+dhcp-option=#{nic.tap},option:router,#{vm_sub_4}
 DHCP
     end.join("\n")
 

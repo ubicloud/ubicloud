@@ -138,6 +138,16 @@ RSpec.describe Vm do
     it "can compute nil if ipv4 is not assigned" do
       expect(vm.ephemeral_net4).to be_nil
     end
+
+    it "returns the right private_ipv4 based on the netmask" do
+      nic = instance_double(Nic, private_ipv4: instance_double(NetAddr::IPv4Net, network: "192.168.12.13", netmask: "/32"))
+      expect(vm).to receive(:nics).and_return([nic]).twice
+      expect(vm.private_ipv4.to_s).to eq("192.168.12.13")
+
+      nic = instance_double(Nic, private_ipv4: NetAddr.parse_net("10.10.240.0/24"))
+      expect(vm).to receive(:nics).and_return([nic]).twice
+      expect(vm.private_ipv4.to_s).to eq("10.10.240.1")
+    end
   end
 
   it "initiates a new health monitor session" do
