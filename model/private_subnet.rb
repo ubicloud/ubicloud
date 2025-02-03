@@ -4,8 +4,8 @@ require_relative "../model"
 
 class PrivateSubnet < Sequel::Model
   many_to_one :project
-  many_to_many :vms, join_table: :nic, left_key: :private_subnet_id, right_key: :vm_id
-  one_to_many :nics, key: :private_subnet_id
+  many_to_many :vms, join_table: :nic
+  one_to_many :nics
   one_to_one :strand, key: :id
   many_to_many :firewalls
   one_to_many :load_balancers
