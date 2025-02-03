@@ -27,7 +27,7 @@ class PrivateSubnet < Sequel::Model
 
   def connected_subnets
     PrivateSubnet.where(
-      id: DB[:connected_subnet].where(subnet_id_1: id).or(subnet_id_2: id).select(Sequel.case({{subnet_id_1: id} => :subnet_id_2}, :subnet_id_1)).all.map(&:values).flatten
+      id: DB[:connected_subnet].where(subnet_id_1: id).or(subnet_id_2: id).select(Sequel.case({{subnet_id_1: id} => :subnet_id_2}, :subnet_id_1))
     ).all
   end
 
