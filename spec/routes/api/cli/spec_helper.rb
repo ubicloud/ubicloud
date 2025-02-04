@@ -10,9 +10,12 @@ RSpec.configure do |config|
     last_response.body
   end
 
-  def cli_exec(argv, env: {})
+  def cli_exec(argv, env: {}, tail: true, initial: false)
     expect(cli(argv, env:)).to eq ""
-    last_response.headers.values_at(*%w[ubi-command-execute ubi-command-arg ubi-command-argv-tail])
+    keys = %w[ubi-command-execute ubi-command-arg]
+    keys << "ubi-command-argv-initial" if initial
+    keys << "ubi-command-argv-tail" if tail
+    last_response.headers.values_at(*keys)
   end
 
   config.define_derived_metadata(file_path: %r{\A\./spec/routes/api/cli/}) do |metadata|
