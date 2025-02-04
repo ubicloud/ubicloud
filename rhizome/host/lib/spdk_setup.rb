@@ -59,8 +59,8 @@ class SpdkSetup
     end
 
     case @spdk_version
-    when "v23.09-ubi-0.2"
-      "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.2b/ubicloud-spdk-#{os_version}-#{arch}.tar.gz"
+    when "v23.09-ubi-0.3"
+      "https://github.com/ubicloud/bdev_ubi/releases/download/spdk-23.09-ubi-0.3/ubicloud-spdk-#{os_version}-#{arch}.tar.gz"
     else
       fail "BUG: unsupported SPDK version"
     end
@@ -133,7 +133,7 @@ Description=SPDK hugepages mount #{@spdk_version}
 What=hugetlbfs
 Where=#{hugepages_dir}
 Type=hugetlbfs
-Options=uid=#{user},size=2G
+Options=uid=#{user},size=4G
 
 [Install]
 WantedBy=#{spdk_service}
@@ -155,10 +155,10 @@ SPDK_HUGEPAGES_MOUNT
         #
         # So, small_pool_count must be at least #Volumes-per-host*3*128, and
         # large_pool_count must be at least #Volumes-per-host*3*16. This config,
-        # which modifies the defaults, is enough for 100 encrypted volumes in a
+        # which modifies the defaults, is enough for 200 encrypted volumes in a
         # host.
-        small_pool_count: 38400,
-        large_pool_count: 4800,
+        small_pool_count: 76800,
+        large_pool_count: 9600,
         small_bufsize: 8192,
         large_bufsize: 135168
       }
