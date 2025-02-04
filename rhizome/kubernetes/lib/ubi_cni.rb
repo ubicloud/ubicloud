@@ -236,7 +236,13 @@ options ndots:5
     subnet_size = calculate_subnet_size(subnet)
 
     base = subnet.to_i & subnet.mask(subnet.prefix).to_i
-    random_offset = SecureRandom.random_number(subnet_size - 2) + 1
+    # We subtract 3 from subnet_size:
+    #   - 1 for the network address (offset 0)
+    #   - 1 for the first usable IP (offset 1)
+    #   - 1 for the broadcast address (offset = subnet_size - 1)
+    #
+    # Then we add 2 to the result of random_number so offsets start at 2.
+    random_offset = SecureRandom.random_number(subnet_size - 3) + 2
     IPAddr.new(base + random_offset, subnet.ipv4? ? Socket::AF_INET : Socket::AF_INET6)
   end
 
