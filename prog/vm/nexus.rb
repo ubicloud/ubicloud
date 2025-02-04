@@ -93,7 +93,7 @@ class Prog::Vm::Nexus < Prog::Base
         unix_user: unix_user,
         name: name,
         family: vm_size.family,
-        cores: vm_size.cores,
+        cores: 0, # this will be updated after allocation is complete based on the host's topology
         vcpus: vm_size.vcpus,
         cpu_percent_limit: vm_size.cpu_percent_limit,
         cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
@@ -181,7 +181,7 @@ class Prog::Vm::Nexus < Prog::Base
         if frame["force_host_id"]
           [[], [], [], [frame["force_host_id"]]]
         elsif vm.location == "github-runners"
-          runner_locations = (vm.cores == 30) ? [] : ["github-runners", "hetzner-fsn1", "hetzner-hel1"]
+          runner_locations = (vm.vcpus == 60) ? [] : ["github-runners", "hetzner-fsn1", "hetzner-hel1"]
           [["accepting"], runner_locations, ["github-runners"], []]
         else
           [["accepting"], [vm.location], [], []]
@@ -465,6 +465,7 @@ class Prog::Vm::Nexus < Prog::Base
       end
 
       if vm.vm_host_slice.nil?
+        fail "BUG: Number of cores cannot be zero when VM is runing without a slice" if vm.cores == 0
         # If there is no slice, we need to update the host utilization directly
         VmHost.dataset.where(id: vm.vm_host_id).update(
           used_cores: Sequel[:used_cores] - vm.cores,

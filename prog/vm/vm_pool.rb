@@ -61,10 +61,10 @@ class Prog::Vm::VmPool < Prog::Base
 
   label def wait
     if vm_pool.size - vm_pool.vms.count > 0
-      idle_cores = VmHost.where(allocation_state: "accepting", arch: vm_pool.arch, location: ["github-runners", "hetzner-hel1", "hetzner-fsn1"]).select_map { sum(:total_cores) - sum(:used_cores) }.first.to_i
-      waiting_cores = Vm.where(Sequel.like(:boot_image, "github%")).where(allocated_at: nil, arch: vm_pool.arch).sum(:cores).to_i
-      pool_vm_core = Validation.validate_vm_size(vm_pool.vm_size, vm_pool.arch).cores
-      hop_create_new_vm if idle_cores - waiting_cores - pool_vm_core >= 0
+      idle_cpus = VmHost.where(allocation_state: "accepting", arch: vm_pool.arch, location: ["github-runners", "hetzner-hel1", "hetzner-fsn1"]).select_map { sum((total_cores - used_cores) * total_cpus / total_cores) }.first.to_i
+      waiting_cpus = Vm.where(Sequel.like(:boot_image, "github%")).where(allocated_at: nil, arch: vm_pool.arch).sum(:vcpus).to_i
+      pool_vm_cpus = Validation.validate_vm_size(vm_pool.vm_size, vm_pool.arch).vcpus
+      hop_create_new_vm if idle_cpus - waiting_cpus - pool_vm_cpus >= 0
     end
     nap 30
   end

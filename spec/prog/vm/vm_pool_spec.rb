@@ -53,7 +53,7 @@ RSpec.describe Prog::Vm::VmPool do
 
   describe "#wait" do
     before do
-      create_vm_host(location: "github-runners", total_cores: 2, used_cores: 0)
+      create_vm_host(location: "github-runners", total_cores: 2, total_cpus: 4, used_cores: 0)
     end
 
     let(:pool) {
@@ -80,7 +80,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 4, vcpus: 2, memory_gib: 8, project_id:) { _1.id = Sshable.create_with_id.id }
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "arm64", cores: 2, vcpus: 2, memory_gib: 8, project_id:) { _1.id = Sshable.create_with_id.id }
 
       expect { nx.wait }.to hop("create_new_vm")
     end
@@ -89,7 +89,7 @@ RSpec.describe Prog::Vm::VmPool do
       pool.update(size: 1)
 
       expect(nx).to receive(:vm_pool).and_return(pool).at_least(:once)
-      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 2, memory_gib: 8, project_id:) { _1.id = Sshable.create_with_id.id }
+      Vm.create(vm_host: VmHost.first, unix_user: "ubi", public_key: "key", name: "vm1", location: "github-runners", boot_image: "github-ubuntu-2204", family: "standard", arch: "x64", cores: 2, vcpus: 4, memory_gib: 8, project_id:) { _1.id = Sshable.create_with_id.id }
 
       expect { nx.wait }.to nap(30)
     end
