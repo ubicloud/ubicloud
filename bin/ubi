@@ -15,10 +15,12 @@ unless (token = ENV["UBI_TOKEN"])
 end
 
 url = ENV["UBI_URL"] || "http://api.localhost:9292/cli"
-progs = {
-  "ssh" => ENV["UBI_SSH"] || "ssh",
-  "psql" => ENV["UBI_PSQL"] || "psql"
-}
+allowed_progs = %w[ssh scp sftp psql]
+
+get_prog = lambda do |prog|
+  return unless allowed_progs.include?(prog)
+  ENV["UBI_#{prog.upcase}"] || prog
+end
 
 uri = URI(url)
 data = {"argv" => ARGV}.to_json
@@ -35,13 +37,16 @@ case response.code.to_i
 when 200...300
   if (prog = response["ubi-command-execute"])
     if (arg = response["ubi-command-arg"])
-      if (prog = progs[prog])
-        args = [prog, "--", arg]
+      if (prog = get_prog[prog])
+        args = [prog, "--"]
+        if (index = Integer(response["ubi-command-argv-initial"], 10, exception: false) || 0) > 0
+          args << ARGV[-index]
+        end
+        args << arg
         if (index = Integer(response["ubi-command-argv-tail"], 10, exception: false) || 0) > 0
           args.concat(ARGV[-index...])
         end
-        system(*args)
-        exit $?.exitstatus
+        Process.exec(*args)
       else
         warn "Invalid server response, unsupported ubi-command-execute header"
         exit 1
@@ -52,6 +57,7 @@ when 200...300
     end
   else
     $stdout.puts response.body
+    exit 0
   end
 else
   warn response.body
