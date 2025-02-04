@@ -104,7 +104,8 @@ class Prog::DownloadBootImage < Prog::Base
       ["ai-model-llama-3-3-70b-it", "x64", "20241209.1.0"] => "b5a77810de7f01df5b76b6362fc5b4514cc16c6926ee203ecc8643233c6d2704",
       ["ai-model-qwen-2-5-14b-it", "x64", "20250118.1.0"] => "51a7fe8c520f39b8197c88426c8f37199bd3bd2afdae579b8877a604cd474021",
       ["ai-model-qwq-32b-preview", "x64", "20241209.1.0"] => "38ca4912134ed9b115726eff258666d68ce6df92330a3585d47494099821f9b1",
-      ["ai-model-ds-r1-qwen-32b", "x64", "20250121.1.0"] => "38b0d2fa870c90196e016ac69a89f5decd1ad3ea1258ae11ca039f212326f5c5"
+      ["ai-model-ds-r1-qwen-32b", "x64", "20250121.1.0"] => "38b0d2fa870c90196e016ac69a89f5decd1ad3ea1258ae11ca039f212326f5c5",
+      ["ai-model-ds-r1-qwen-1-5b", "x64", "20250129.1.0"] => "9135a2e81fc6129d6d12bd633b5a30d4bfe2fd219ec5e370404758dda1159001"
     }
 
     # YYY: In future all images should be checked for sha256 sum, so the nil
