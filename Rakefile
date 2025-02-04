@@ -244,6 +244,13 @@ end
 
 # Other
 
+desc "Check generated SQL for parameterization"
+task "check_query_parameterization" do
+  require "rbconfig"
+  system({"CHECK_LOGGED_SQL" => "1"}, RbConfig.ruby, "-S", "rake", "frozen_sspec")
+  system(RbConfig.ruby, "bin/check_for_parameters", out: "sql_query_parameterization_analysis.txt")
+end
+
 desc "Check that model files work when required separately"
 task "check_separate_requires" do
   require "rbconfig"
