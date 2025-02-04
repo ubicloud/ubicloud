@@ -79,6 +79,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       hop_wait_endpoint_up
     when "Failed", "NotStarted"
       params = {
+        gpu_count: inference_endpoint.gpu_count,
         inference_engine: inference_endpoint.engine,
         inference_engine_params: inference_endpoint.engine_params,
         model: inference_endpoint.model_name,
