@@ -8,6 +8,7 @@ replica_setup = ReplicaSetup.new
 params = JSON.parse($stdin.read)
 
 begin
+  gpu_count = params.fetch("gpu_count")
   inference_engine = params.fetch("inference_engine")
   inference_engine_params = params.fetch("inference_engine_params")
   model = params.fetch("model")
@@ -21,11 +22,12 @@ rescue KeyError => e
 end
 
 replica_setup.prep(
-  inference_engine: inference_engine,
-  inference_engine_params: inference_engine_params,
-  model: model,
-  replica_ubid: replica_ubid,
-  ssl_crt_path: ssl_crt_path,
-  ssl_key_path: ssl_key_path,
-  gateway_port: gateway_port
+  gpu_count:,
+  inference_engine:,
+  inference_engine_params:,
+  model:,
+  replica_ubid:,
+  ssl_crt_path:,
+  ssl_key_path:,
+  gateway_port:
 )

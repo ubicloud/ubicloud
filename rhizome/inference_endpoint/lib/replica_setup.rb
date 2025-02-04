@@ -10,8 +10,8 @@ require "base64"
 require "uri"
 
 class ReplicaSetup
-  def prep(inference_engine:, inference_engine_params:, model:, replica_ubid:, ssl_crt_path:, ssl_key_path:, gateway_port:)
-    engine_start_cmd = engine_start_command(inference_engine: inference_engine, inference_engine_params: inference_engine_params, model: model)
+  def prep(gpu_count:, inference_engine:, inference_engine_params:, model:, replica_ubid:, ssl_crt_path:, ssl_key_path:, gateway_port:)
+    engine_start_cmd = engine_start_command(gpu_count:, inference_engine:, inference_engine_params:, model:)
     write_config_files(replica_ubid, ssl_crt_path, ssl_key_path, gateway_port)
     install_systemd_units(engine_start_cmd)
     start_systemd_units
@@ -92,10 +92,11 @@ KeyringMode=private
 SETTINGS
   end
 
-  def engine_start_command(inference_engine:, inference_engine_params:, model:)
+  def engine_start_command(gpu_count:, inference_engine:, inference_engine_params:, model:)
     case inference_engine
     when "vllm"
-      "/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name #{model} --disable-log-requests --host 127.0.0.1 #{inference_engine_params}"
+      env = (gpu_count == 0) ? "vllm-cpu" : "vllm"
+      "/opt/miniconda/envs/#{env}/bin/vllm serve /ie/models/model --served-model-name #{model} --disable-log-requests --host 127.0.0.1 #{inference_engine_params}"
     else
       fail "BUG: unsupported inference engine"
     end
