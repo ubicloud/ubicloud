@@ -15,7 +15,7 @@ module Scheduling::Allocator
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [])
     request = Request.new(
       vm.id,
-      vm.cores,
+      vm.vcpus,
       vm.memory_gib,
       storage_volumes.map { _1["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
@@ -43,7 +43,7 @@ module Scheduling::Allocator
 
   Request = Struct.new(
     :vm_id,
-    :cores,
+    :vcpus,
     :memory_gib,
     :storage_gib,
     :storage_volumes,
@@ -68,7 +68,7 @@ module Scheduling::Allocator
       self.diagnostics ||= false
     end
 
-    def memory_gib_for_cores
+    def memory_gib_for_cores(cores)
       memory_gib_ratio = if arch_filter == "arm64"
         3.2
       elsif family == "standard-gpu"
@@ -78,6 +78,10 @@ module Scheduling::Allocator
       end
 
       (cores * memory_gib_ratio).to_i
+    end
+
+    def cores_for_vcpus(threads_per_core)
+      [1, vcpus / threads_per_core].max
     end
   end
 
@@ -111,6 +115,7 @@ module Scheduling::Allocator
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
         .select(
           Sequel[:vm_host][:id].as(:vm_host_id),
+          :total_cpus,
           :total_cores,
           :used_cores,
           :total_hugepages_1g,
@@ -129,7 +134,7 @@ module Scheduling::Allocator
         )
         .where(arch: request.arch_filter)
         .where { (total_hugepages_1g - used_hugepages_1g >= request.memory_gib) }
-        .where { (total_cores - used_cores >= request.cores) }
+        .where { (total_cores - used_cores >= Sequel.function(:greatest, 1, (request.vcpus * total_cores / total_cpus))) }
         .with(:total_ipv4, DB[:address]
           .select_group(:routed_to_host_id)
           .select_append { round(sum(power(2, 32 - masklen(cidr)))).cast(:integer).as(total_ipv4) }
@@ -205,8 +210,11 @@ module Scheduling::Allocator
     def initialize(candidate_host, request)
       @candidate_host = candidate_host
       @request = request
-      @vm_host_allocations = [VmHostAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request.cores),
-        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.memory_gib_for_cores)]
+      request_cores = request.cores_for_vcpus(candidate_host[:total_cpus] / candidate_host[:total_cores])
+      request_memory = request.memory_gib_for_cores(request_cores)
+
+      @vm_host_allocations = [VmHostCpuAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request_cores),
+        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request_memory)]
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
 
@@ -233,7 +241,7 @@ module Scheduling::Allocator
     end
 
     def to_s
-      "#{UBID.from_uuidish(@request.vm_id)} (arch=#{@request.arch_filter}, cores=#{@request.cores}, mem=#{@request.memory_gib}, storage=#{@request.storage_gib}) -> #{UBID.from_uuidish(@candidate_host[:vm_host_id])} (cpu=#{@candidate_host[:used_cores]}/#{@candidate_host[:total_cores]}, mem=#{@candidate_host[:used_hugepages_1g]}/#{@candidate_host[:total_hugepages_1g]}, storage=#{@candidate_host[:total_storage_gib] - @candidate_host[:available_storage_gib]}/#{@candidate_host[:total_storage_gib]}), score=#{@score}"
+      "#{UBID.from_uuidish(@request.vm_id)} (arch=#{@request.arch_filter}, vcpus=#{@request.vcpus}, mem=#{@request.memory_gib}, storage=#{@request.storage_gib}) -> #{UBID.from_uuidish(@candidate_host[:vm_host_id])} (cpu=#{@candidate_host[:used_cores]}/#{@candidate_host[:total_cores]}, mem=#{@candidate_host[:used_hugepages_1g]}/#{@candidate_host[:total_hugepages_1g]}, storage=#{@candidate_host[:total_storage_gib] - @candidate_host[:available_storage_gib]}/#{@candidate_host[:total_storage_gib]}), score=#{@score}"
     end
 
     private
@@ -291,6 +299,15 @@ module Scheduling::Allocator
     end
   end
 
+  class VmHostCpuAllocation < VmHostAllocation
+    # in addition to updating the host, also update the number of cores allocated
+    # for the VM. Only do this when we do not host the VM inside a slice.
+    def update(vm, vm_host)
+      super
+      vm.update(cores: requested) unless vm.vm_host_slice_id
+    end
+  end
+
   # The VmHostSliceAllocation is used when system is configured
   # to allocate VMs inside VmHostSlice. It wraps around the VmHostAllocation class
   # used otherwise.
@@ -315,18 +332,14 @@ module Scheduling::Allocator
 
     def update(vm, vm_host)
       DB.transaction do
-        # Update the host utilization
-        VmHost.dataset.where(id: vm_host.id).update(@vm_host_allocations.map(&:get_vm_host_update).reduce(&:merge))
-
-        requested_cpus = (vm_host.total_cpus / vm_host.total_cores) * @request.cores
-        cpus = select_cpuset(vm_host.id, requested_cpus)
+        cpus = select_cpuset(vm_host.id, @request.vcpus)
 
         st = Prog::Vm::VmHostSliceNexus.assemble_with_host(
           "#{vm.family}_#{vm.inhost_name}",
           vm_host,
           family: vm.family,
           allowed_cpus: cpus,
-          memory_gib: @request.memory_gib_for_cores,
+          memory_gib: @request.memory_gib_for_cores(@request.cores_for_vcpus(vm_host.total_cpus / vm_host.total_cores)),
           is_shared: false
         )
 
@@ -339,6 +352,10 @@ module Scheduling::Allocator
           used_cpu_percent: Sequel[:used_cpu_percent] + vm.cpu_percent_limit,
           used_memory_gib: Sequel[:used_memory_gib] + vm.memory_gib
         )
+
+        # Update the host utilization
+        # This needs to be done after the slice is created and assigned to the VM
+        @vm_host_allocations.each { _1.update(vm, vm_host) }
       end
     end
 

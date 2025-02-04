@@ -40,7 +40,6 @@ RSpec.describe Vm do
   describe "#cloud_hypervisor_cpu_topology" do
     it "scales a single-socket hyperthreaded system" do
       vm.family = "standard"
-      vm.cores = 2
       vm.vcpus = 4
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
@@ -54,7 +53,6 @@ RSpec.describe Vm do
 
     it "scales a dual-socket hyperthreaded system" do
       vm.family = "standard"
-      vm.cores = 2
       vm.vcpus = 4
       expect(vm).to receive(:vm_host).and_return(instance_double(
         VmHost,
@@ -90,7 +88,6 @@ RSpec.describe Vm do
 
     it "crashes if cores allocated per die is not uniform number" do
       vm.family = "standard"
-      vm.cores = 2
       vm.vcpus = 4
 
       expect(vm).to receive(:vm_host).and_return(instance_double(
@@ -102,6 +99,59 @@ RSpec.describe Vm do
       )).at_least(:once)
 
       expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
+    end
+
+    it "crashes if the vcpus is an odd number" do
+      vm.family = "burstable"
+      vm.vcpus = 5
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 6,
+        total_dies: 1,
+        total_sockets: 1
+      )).at_least(:once)
+
+      expect { vm.cloud_hypervisor_cpu_topology }.to raise_error RuntimeError, "BUG: need uniform number of cores allocated per die"
+    end
+
+    it "scales a single-socket hyperthreaded system for burstable family for 1 vcpu" do
+      vm.family = "burstable"
+      vm.vcpus = 1
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 6,
+        total_dies: 1,
+        total_sockets: 1
+      )).at_least(:once)
+      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
+    end
+
+    it "scales a double-socket hyperthreaded system for burstable family for 1 vcpu" do
+      vm.family = "burstable"
+      vm.vcpus = 1
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 24,
+        total_cores: 12,
+        total_dies: 2,
+        total_sockets: 2
+      )).at_least(:once)
+      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
+    end
+
+    it "scales a single-socket non-hyperthreaded system for burstable family for 1 vcpu" do
+      vm.family = "burstable"
+      vm.vcpus = 1
+      expect(vm).to receive(:vm_host).and_return(instance_double(
+        VmHost,
+        total_cpus: 12,
+        total_cores: 12,
+        total_dies: 1,
+        total_sockets: 1
+      )).at_least(:once)
+      expect(vm.cloud_hypervisor_cpu_topology.to_s).to eq("1:1:1:1")
     end
   end
 
@@ -225,14 +275,8 @@ RSpec.describe Vm do
       expect(Option::VmSizes.map { _1.name.include?("gpu") == _1.gpu }.all?(true)).to be true
     end
 
-    it "cpu limit set correctly for each architecture" do
-      expect(Option::VmSizes.map {
-        if _1.arch == "x64"
-          _1.cpu_percent_limit == _1.vcpus * 100 && _1.cores == _1.vcpus / 2
-        elsif _1.arch == "arm64"
-          _1.cpu_percent_limit == _1.vcpus * 100 && _1.cores == _1.vcpus
-        end
-      }.all?(true)).to be true
+    it "no odd number of vcpus allowed, except for 1" do
+      expect(Option::VmSizes.all? { _1.vcpus == 1 || _1.vcpus.even? }).to be true
     end
   end
 end

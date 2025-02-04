@@ -104,10 +104,17 @@ class Vm < Sequel::Model
     total_packages = vm_host.total_sockets
 
     # Computed all-system statistics, now scale it down to meet VM needs.
-    proportion = Rational(cores) / vm_host.total_cores
+    if vcpus == 1 && threads_per_core > 1
+      # special case for single-threaded VMs
+      cores_from_cpus = Rational(vcpus)
+      threads_per_core = 1
+    else
+      cores_from_cpus = Rational(vcpus) / threads_per_core
+    end
+    proportion = cores_from_cpus / vm_host.total_cores
     packages = (total_packages * proportion).ceil
     dies_per_package = (total_dies_per_package * proportion).ceil
-    cores_per_die = Rational(cores) / (packages * dies_per_package)
+    cores_per_die = cores_from_cpus / (packages * dies_per_package)
     fail "BUG: need uniform number of cores allocated per die" unless cores_per_die.denominator == 1
 
     topo = [threads_per_core, cores_per_die, dies_per_package, packages].map { |num|
@@ -118,7 +125,7 @@ class Vm < Sequel::Model
     }
 
     # :nocov:
-    unless topo.reduce(&:*) == threads_per_core * cores
+    unless topo.reduce(&:*) == vcpus
       fail "BUG: arithmetic does not result in the correct number of vcpus"
     end
     # :nocov:

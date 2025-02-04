@@ -109,6 +109,7 @@ module ThawedMock
   allow_mocking(Scheduling::Allocator, :allocate)
   allow_mocking(Scheduling::Allocator::Allocation, :best_allocation, :candidate_hosts, :new, :random_score, :update_vm)
   allow_mocking(Scheduling::Allocator::StorageAllocation, :new)
+  allow_mocking(Scheduling::Allocator::VmHostCpuAllocation, :new)
   allow_mocking(Scheduling::Allocator::VmHostAllocation, :new)
   allow_mocking(Serializers::Vm, :serialize_internal)
   allow_mocking(SshKey, :generate)
