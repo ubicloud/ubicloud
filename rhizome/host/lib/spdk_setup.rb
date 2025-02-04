@@ -133,7 +133,7 @@ Description=SPDK hugepages mount #{@spdk_version}
 What=hugetlbfs
 Where=#{hugepages_dir}
 Type=hugetlbfs
-Options=uid=#{user},size=2G
+Options=uid=#{user},size=3G
 
 [Install]
 WantedBy=#{spdk_service}
@@ -155,10 +155,10 @@ SPDK_HUGEPAGES_MOUNT
         #
         # So, small_pool_count must be at least #Volumes-per-host*3*128, and
         # large_pool_count must be at least #Volumes-per-host*3*16. This config,
-        # which modifies the defaults, is enough for 100 encrypted volumes in a
+        # which modifies the defaults, is enough for 150 encrypted volumes in a
         # host.
-        small_pool_count: 38400,
-        large_pool_count: 4800,
+        small_pool_count: 57600,
+        large_pool_count: 7200,
         small_bufsize: 8192,
         large_bufsize: 135168
       }
