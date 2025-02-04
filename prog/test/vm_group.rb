@@ -66,8 +66,18 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def wait_verify_vms
     reap
-    hop_verify_vm_host_slices if leaf?
+    hop_verify_host_capacity if leaf?
     donate
+  end
+
+  label def verify_host_capacity
+    vm_cores = vm_host.vms.sum(&:cores)
+    slice_cores = vm_host.slices.sum(&:cores)
+    spdk_cores = vm_host.cpus.count { _1.spdk } * vm_host.total_cores / vm_host.total_cpus
+
+    fail_test "Host used cores does not match the allocated VMs cores" if vm_cores + slice_cores + spdk_cores != vm_host.used_cores
+
+    hop_verify_vm_host_slices
   end
 
   label def verify_vm_host_slices
@@ -77,7 +87,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       hop_verify_firewall_rules
     end
 
-    slices = frame["vms"].map { Vm[_1].vm_host_slice.id }
+    slices = frame["vms"].map { Vm[_1].vm_host_slice&.id }.reject(&:nil?)
     push Prog::Test::VmHostSlices, {"slices" => slices}
   end
 
