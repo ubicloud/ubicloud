@@ -70,7 +70,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to hop_wait_verify_vms" do
       expect(vg_test).to receive(:reap)
       expect(vg_test).to receive(:leaf?).and_return(true)
-      expect { vg_test.wait_verify_vms }.to hop("verify_vm_host_slices")
+      expect { vg_test.wait_verify_vms }.to hop("verify_host_capacity")
     end
 
     it "stays in wait_verify_vms" do
@@ -81,6 +81,37 @@ RSpec.describe Prog::Test::VmGroup do
     end
   end
 
+  describe "#verify_host_capacity" do
+    it "hops to verify_vm_host_slices" do
+      vm_host = instance_double(VmHost,
+        total_cpus: 16,
+        total_cores: 8,
+        used_cores: 3,
+        vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
+        slices: [instance_double(VmHostSlice, cores: 1)],
+        cpus: [])
+      expect(vg_test).to receive_messages(vm_host: vm_host)
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
+    end
+
+    it "fails if used cores do not match allocated VMs" do
+      vm_host = instance_double(VmHost,
+        total_cpus: 16,
+        total_cores: 8,
+        used_cores: 5,
+        vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
+        slices: [instance_double(VmHostSlice, cores: 1)],
+        cpus: [])
+      expect(vg_test).to receive_messages(vm_host: vm_host)
+
+      strand = instance_double(Strand)
+      allow(vg_test).to receive_messages(strand: strand)
+      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores"})
+
+      expect { vg_test.verify_host_capacity }.to hop("failed")
+    end
+  end
+
   describe "#verify_vm_host_slices" do
     it "runs tests on vm host slices" do
       expect(vg_test).to receive(:frame).and_return({"test_slices" => true, "vms" => ["111", "222", "333"]}).at_least(:once)
@@ -88,7 +119,7 @@ RSpec.describe Prog::Test::VmGroup do
       slice2 = instance_double(VmHostSlice, id: "789")
       expect(Vm).to receive(:[]).with("111").and_return(instance_double(Vm, vm_host_slice: slice1))
       expect(Vm).to receive(:[]).with("222").and_return(instance_double(Vm, vm_host_slice: slice2))
-      expect(Vm).to receive(:[]).with("333").and_return(instance_double(Vm, vm_host_slice: slice2))
+      expect(Vm).to receive(:[]).with("333").and_return(instance_double(Vm, vm_host_slice: nil))
 
       expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
     end
