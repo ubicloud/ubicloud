@@ -163,7 +163,8 @@ RSpec.describe Al do
                  available_gpus: 0,
                  available_iommu_groups: nil,
                  used_ipv4: 1,
-                 vm_provisioning_count: 0}])
+                 vm_provisioning_count: 0,
+                 accepts_slices: false}])
     end
 
     it "retrieves provisioning count" do
@@ -191,7 +192,8 @@ RSpec.describe Al do
                  available_gpus: 0,
                  available_iommu_groups: nil,
                  used_ipv4: 1,
-                 vm_provisioning_count: 2}])
+                 vm_provisioning_count: 2,
+                 accepts_slices: false}])
     end
 
     it "applies host filter" do
@@ -873,6 +875,34 @@ RSpec.describe Al do
       slice = vm.vm_host_slice
       expect(slice).not_to be_nil
       expect(slice.allowed_cpus_cgroup).to eq("6-7,12-13")
+    end
+
+    it "allocates with no slice if no host available" do
+      # mark the first host as full
+      vmh1 = VmHost.first
+      vmh1.update(used_cores: vmh1.total_cores, used_hugepages_1g: vmh1.total_hugepages_1g)
+
+      # create a second host
+      vmh2 = create_vm_host(accepts_slices: false, net6: "2001:db8::/64", total_cpus: 16, total_cores: 8, used_cores: 1, total_hugepages_1g: 54, used_hugepages_1g: 2)
+      BootImage.create_with_id(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create_with_id(vm_host_id: vmh2.id, name: "stor2", available_storage_gib: 90, total_storage_gib: 90)
+      SpdkInstallation.create(vm_host_id: vmh2.id, version: "v1", allocation_weight: 100) { _1.id = vmh2.id }
+      Address.create_with_id(cidr: "1.2.1.0/30", routed_to_host_id: vmh2.id)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.0", device_class: "0300", vendor: "vd", device: "dv1", numa_node: 0, iommu_group: 3)
+      PciDevice.create_with_id(vm_host_id: vmh2.id, slot: "01:00.1", device_class: "0420", vendor: "vd", device: "dv2", numa_node: 0, iommu_group: 3)
+      (0..16).each do |i|
+        VmHostCpu.create(vm_host_id: vmh2.id, cpu_number: i, spdk: i < 2)
+      end
+
+      vm = create_vm_with_use_slice_enabled
+      al = Al::Allocation.best_allocation(create_req(vm, vol, use_slices: true))
+      expect(al).not_to be_nil
+      al.update(vm)
+
+      expect(vm.vm_host.id).to eq(vmh2.id)
+      expect(vm.vm_host_slice).to be_nil
+      expect(vm.cores).to eq(1)
     end
 
     it "memory_gib_for_cores handles standard family" do
