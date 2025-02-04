@@ -130,7 +130,8 @@ module Scheduling::Allocator
           Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus),
           Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus),
           :available_iommu_groups,
-          Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count)
+          Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count),
+          :accepts_slices
         )
         .where(arch: request.arch_filter)
         .where { (total_hugepages_1g - used_hugepages_1g >= request.memory_gib) }
@@ -179,8 +180,6 @@ module Scheduling::Allocator
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
-      # Match the slice allocation to the hosts that can accept it
-      ds = ds.where(accepts_slices: request.use_slices)
 
       # Emit the allocation query if the project is flagged for
       # diagnostics.
@@ -218,7 +217,7 @@ module Scheduling::Allocator
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
 
-      if request.use_slices
+      if request.use_slices && candidate_host[:accepts_slices]
         # Wrap around and replace the host allocations. That way we can control that logic from the slice POV
         @vm_host_allocations = [VmHostSliceAllocation.new(candidate_host, request, @vm_host_allocations)]
       end
