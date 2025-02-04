@@ -92,7 +92,7 @@ class Prog::DownloadBootImage < Prog::Base
       ["postgres17-paradedb-ubuntu-2204", "x64", "20250114.1.0"] => "fe2ad6c6a39747970ed19f3019f465116685fbe677b9875fe0675f3971cf2226",
       ["postgres16-lantern-ubuntu-2204", "x64", "20250103.1.0"] => "bfb56867513045bc88396d529a3cc186dc44ba4d691acb51dbf45fc5a0eeb7e6",
       ["postgres17-lantern-ubuntu-2204", "x64", "20250103.1.0"] => "a95b2e5d03291783dc1753228d7a87949257a06c7b1eca2c94502ab21ffdecdb",
-      ["ai-ubuntu-2404-nvidia", "x64", "20250121.1.0"] => "4bc21d1bb7fc9e860aa07aab11571b7d99e546f077330f55e97502a3281211a1",
+      ["ai-ubuntu-2404-nvidia", "x64", "20250203.1.0"] => "b74869ebce8831a7beb04220287f69ad5d99c27cbabeb0ecc6fb3bda4428bebf",
       ["ai-model-gemma-2-2b-it", "x64", "20240918.1.0"] => "b726ead6d5f48fb8e6de7efb48fb22367c9a7c155cfee71a3a7e5527be5df08e",
       ["ai-model-llama-3-1-8b-it", "x64", "20250118.1.0"] => "7296f70a861c364f59c38b816e1210152ebafbec85ce797888c16b4d48a15e8f",
       ["ai-model-llama-3-1-405b-it", "x64", "20241029.1.0"] => "54680b8b18ed501956a78c63b94576b7200fbd8fbe025eccb90152d13478882e",
