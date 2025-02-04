@@ -6,6 +6,8 @@
 /tmp/*
 /assets/css/app.css
 /.auto-parallel-tests
+/sql.log
+/sql_query_parameterization_analysis.txt
 
 # Used by rake by
 /bin/by

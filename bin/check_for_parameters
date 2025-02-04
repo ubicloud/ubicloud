@@ -1,0 +1,42 @@
+#!/usr/local/bin/ruby
+# frozen_string_literal: true
+
+parameterized_sql = Hash.new(0)
+other_sql = Hash.new(0)
+
+File.open("sql.log").each("\0") do |line|
+  if /\AINFO -- : \(\d\.\d*s\) (.*)\0\z/m =~ line
+    sql = $1
+
+    sql, params = sql.split("; [", 2)
+    if params || sql.start_with?("PREPARE")
+      parameterized_sql[sql] += 1
+    else
+      other_sql[sql] += 1
+    end
+  end
+end
+
+missed_params, no_expected_params = other_sql.keys.partition do |sql|
+  next if sql.match?(/ROLLBACK|BEGIN|SAVEPOINT|LIMIT 0|DEFAULT VALUES|DELETE FROM "[a-z_]*"$|SELECT \* FROM "[a-z_]*"( ORDER BY "[a-z_]*")?$|SELECT count\(\*\) AS "count" FROM'/)
+  next unless sql.match?(/SELECT|INSERT|UPDATE|DELETE/)
+
+  sql.gsub(/LIMIT \d+/, "").gsub(/OFFSET \d+/, "").match?(/[^a-z0-9_][0-9]|'/)
+end
+
+print "Summary: "
+print "Missed: #{missed_params.size}|#{missed_params.sum { |s| other_sql[s] }}, "
+print "Parameterized: #{parameterized_sql.size}|#{parameterized_sql.values.sum}, "
+puts "Not Parameterized: #{no_expected_params.size}|#{no_expected_params.sum { |s| other_sql[s] }}"
+puts
+
+puts "SQL with missed parameters:"
+puts missed_params.sort
+puts
+
+puts "Parameterized SQL:"
+puts parameterized_sql.keys.sort
+puts
+
+puts "SQL with no expected parameters:"
+puts no_expected_params.sort
