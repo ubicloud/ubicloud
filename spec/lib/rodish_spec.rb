@@ -65,6 +65,33 @@ RSpec.describe Rodish do
         end
       end
 
+      on "g" do
+        args(2...)
+
+        is "j" do
+          push :j
+        end
+
+        run_is "h" do
+          push :h
+        end
+
+        run_on "i" do
+          is "k" do
+            push :k
+          end
+
+          run do
+            push :i
+          end
+        end
+
+        run do |(x, *argv), opts, command|
+          push [:g, x]
+          command.run(self, opts, argv)
+        end
+      end
+
       run do
         push :empty
       end
@@ -95,6 +122,23 @@ RSpec.describe Rodish do
         expect(res).to eq [:top, [:d, "5"]]
         app.process(%w[e f], context: res.clear)
         expect(res).to eq [:top, :f]
+      end
+
+      it "supports run_on/run_is for subcommands dispatched to during run" do
+        res = []
+        app.process(%w[g j], context: res.clear)
+        expect(res).to eq [:top, :j]
+        app.process(%w[g 1 h], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], :h]
+        app.process(%w[g 1 i], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], :i]
+        app.process(%w[g 1 i k], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], :k]
+      end
+
+      it "handles invalid subcommands dispatched to during run" do
+        res = []
+        expect { app.process(%w[g 1 l], context: res) }.to raise_error(Rodish::CommandFailure, "invalid post subcommand l, valid post subcommands for g subcommand are: h i")
       end
 
       it "handles options at any level they are defined" do
@@ -168,7 +212,7 @@ RSpec.describe Rodish do
                   --version                    show program version
                   --help                       show program help
 
-          Subcommands: a c d e
+          Subcommands: a c d e g
         USAGE
       end
 
@@ -183,7 +227,7 @@ RSpec.describe Rodish do
                   --version                    show program version
                   --help                       show program help
 
-          Subcommands: a c d e
+          Subcommands: a c d e g
         USAGE
         expect(usages["a"]).to eq <<~USAGE
           Usage: example a [options] [subcommand [subcommand_options] [...]]
@@ -204,31 +248,31 @@ RSpec.describe Rodish do
       unless frozen
         it "supports adding subcommands after initialization" do
           res = []
-          expect { app.process(%w[g], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
+          expect { app.process(%w[z], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
           expect(res).to be_empty
 
-          app.on("g") do
+          app.on("z") do
             args 1
             run do |arg|
-              push [:g, arg]
+              push [:z, arg]
             end
           end
-          app.process(%w[g h], context: res.clear)
-          expect(res).to eq [:top, [:g, "h"]]
+          app.process(%w[z h], context: res.clear)
+          expect(res).to eq [:top, [:z, "h"]]
 
-          app.on("g", "h") do
+          app.on("z", "y") do
             run do
-              push :h
+              push :y
             end
           end
-          app.process(%w[g h], context: res.clear)
-          expect(res).to eq [:top, :h]
+          app.process(%w[z y], context: res.clear)
+          expect(res).to eq [:top, :y]
 
-          app.is("g", "h", "i", args: 1) do |arg|
-            push [:i, arg]
+          app.is("z", "y", "x", args: 1) do |arg|
+            push [:x, arg]
           end
-          app.process(%w[g h i j], context: res.clear)
-          expect(res).to eq [:top, [:i, "j"]]
+          app.process(%w[z y x j], context: res.clear)
+          expect(res).to eq [:top, [:x, "j"]]
         end
 
         it "supports autoloading" do

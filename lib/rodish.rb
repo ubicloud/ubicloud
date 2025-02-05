@@ -82,8 +82,11 @@ module Rodish
     end
 
     def on(command_name, &block)
-      command_path = @command.command_path + [command_name]
-      @command.subcommands[command_name] = DSL.command(command_path.freeze, &block)
+      _on(@command.subcommands, command_name, &block)
+    end
+
+    def run_on(command_name, &block)
+      _on(@command.post_subcommands, command_name, &block)
     end
 
     def run(&block)
@@ -91,15 +94,31 @@ module Rodish
     end
 
     def is(command_name, args: 0, &block)
-      on(command_name) do
+      _is(:on, command_name, args:, &block)
+    end
+
+    def run_is(command_name, args: 0, &block)
+      _is(:run_on, command_name, args:, &block)
+    end
+
+    private
+
+    def _is(meth, command_name, args:, &block)
+      public_send(meth, command_name) do
         args args
         run(&block)
       end
+    end
+
+    def _on(hash, command_name, &block)
+      command_path = @command.command_path + [command_name]
+      hash[command_name] = DSL.command(command_path.freeze, &block)
     end
   end
 
   class Command
     attr_reader :subcommands
+    attr_reader :post_subcommands
 
     attr_accessor :run_block
     attr_accessor :command_path
@@ -115,15 +134,27 @@ module Rodish
       @command_path = command_path
       @command_name = command_path.join(" ").freeze
       @subcommands = {}
+      @post_subcommands = {}
       @num_args = 0
     end
 
     def freeze
       @subcommands.each_value(&:freeze)
       @subcommands.freeze
+      @post_subcommands.each_value(&:freeze)
+      @post_subcommands.freeze
       @option_parser.freeze
       super
     end
+
+    def run_post_subcommand(context, options, argv)
+      if argv[0] && @post_subcommands[argv[0]]
+        process_subcommand(@post_subcommands, context, options, argv)
+      else
+        raise CommandFailure, "invalid post subcommand #{argv[0]}, valid post subcommands#{subcommand_name} are: #{@post_subcommands.keys.sort.join(" ")}"
+      end
+    end
+    alias_method :run, :run_post_subcommand
 
     def process(context, options, argv)
       if @option_parser
@@ -139,26 +170,16 @@ module Rodish
         DEFAULT_OPTION_PARSER.order!(argv)
       end
 
-      if argv[0] && (subcommand = @subcommands[argv[0]])
-        if subcommand.is_a?(String)
-          require subcommand
-          subcommand = @subcommands[argv[0]]
-          unless subcommand.is_a?(Command)
-            raise CommandFailure, "program bug, autoload of subcommand #{argv[0]} failed"
-          end
-        end
-
-        argv.shift
-        context.instance_exec(argv, options, &before) if before
-        subcommand.process(context, options, argv)
+      if argv[0] && @subcommands[argv[0]]
+        process_subcommand(@subcommands, context, options, argv)
       elsif run_block
         if valid_args?(argv)
           context.instance_exec(argv, options, &before) if before
 
           if @num_args.is_a?(Integer)
-            context.instance_exec(*argv, options, &run_block)
+            context.instance_exec(*argv, options, self, &run_block)
           else
-            context.instance_exec(argv, options, &run_block)
+            context.instance_exec(argv, options, self, &run_block)
           end
         else
           raise CommandFailure, "invalid number of arguments#{subcommand_name} (accepts: #{@num_args}, given: #{argv.length})"
@@ -184,6 +205,22 @@ module Rodish
     end
 
     private
+
+    def process_subcommand(subcommands, context, options, argv)
+      subcommand = subcommands[argv[0]]
+
+      if subcommand.is_a?(String)
+        require subcommand
+        subcommand = subcommands[argv[0]]
+        unless subcommand.is_a?(Command)
+          raise CommandFailure, "program bug, autoload of subcommand #{argv[0]} failed"
+        end
+      end
+
+      argv.shift
+      context.instance_exec(argv, options, &before) if before
+      subcommand.process(context, options, argv)
+    end
 
     def subcommand_name
       if @command_name.empty?
