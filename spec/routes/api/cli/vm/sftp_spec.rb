@@ -11,15 +11,15 @@ RSpec.describe Clover, "cli vm sftp" do
   end
 
   it "provides headers to connect to vm via sftp" do
-    expect(cli_exec(["vm", "sftp", @vm.display_location, @vm.name])).to eq %w[sftp -- ubi@[128:1234::2]]
+    expect(cli_exec(["vm", @vm.display_location, @vm.name, "sftp"])).to eq %w[sftp -- ubi@[128:1234::2]]
   end
 
   it "IPv4 address is used by default if available" do
     add_ipv4_to_vm(@vm, "128.0.0.1")
-    expect(cli_exec(["vm", "sftp", @vm.display_location, @vm.name])).to eq %w[sftp -- ubi@128.0.0.1]
+    expect(cli_exec(["vm", @vm.display_location, @vm.name, "sftp"])).to eq %w[sftp -- ubi@128.0.0.1]
   end
 
   it "supports sftp options" do
-    expect(cli_exec(["vm", "sftp", @vm.display_location, @vm.name, "-A"])).to eq %w[sftp -A -- ubi@[128:1234::2]]
+    expect(cli_exec(["vm", @vm.display_location, @vm.name, "sftp", "--", "-A"])).to eq %w[sftp -A -- ubi@[128:1234::2]]
   end
 end
