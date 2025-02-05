@@ -340,6 +340,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def update_via_routes(nics)
+    return if NetAddr::IPv4Net.parse(nics.first.net4).netmask.to_s == "/32"
+
     # we create tap devices in "interfaces" function in this file. but
     # code execution happens faster than linux taking care of the device creation.
     # that's why by the time we reach this function, we need to check whether the
