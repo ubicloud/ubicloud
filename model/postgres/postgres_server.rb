@@ -22,7 +22,7 @@ class PostgresServer < Sequel::Model
   def configure_hash
     configs = {
       "listen_addresses" => "'*'",
-      "max_connections" => (vm.memory_gib * 25).to_s,
+      "max_connections" => "500",
       "superuser_reserved_connections" => "3",
       "shared_buffers" => "#{vm.memory_gib * 1024 / 4}MB",
       "work_mem" => "#{vm.memory_gib / 8}MB",
