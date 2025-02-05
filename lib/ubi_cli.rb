@@ -21,8 +21,8 @@ class UbiCli
     @project_ubid ||= @env["clover.project_ubid"]
   end
 
-  def handle_ssh(location, name, opts)
-    get(project_path("location/#{location}/vm/#{name}")) do |data, res|
+  def handle_ssh(opts)
+    get(project_path("location/#{@location}/vm/#{@vm_name}")) do |data, res|
       if (opts = opts[:vm_ssh])
         user = opts[:user]
         if opts[:ip4]
