@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiRodish.on("vm").run_on("ssh") do
-  options("ubi vm location-name (vm-name|_vm-ubid) ssh [options] [-- ssh-options --] [cmd [arg, ...]]", key: :vm_ssh, &UbiCli::SSHISH_OPTS)
+  options("ubi vm location-name/(vm-name|_vm-ubid) ssh [options] [-- ssh-options --] [cmd [arg, ...]]", key: :vm_ssh, &UbiCli::SSHISH_OPTS)
 
   args(0...)
 
