@@ -76,9 +76,11 @@ module Rodish
     end
 
     def autoload_subcommand_dir(base)
-      Dir.glob("*.rb", base:).each do |filename|
-        @command.subcommands[filename.chomp(".rb")] = File.expand_path(File.join(base, filename))
-      end
+      _autoload_subcommand_dir(@command.subcommands, base)
+    end
+
+    def autoload_post_subcommand_dir(base)
+      _autoload_subcommand_dir(@command.post_subcommands, base)
     end
 
     def on(command_name, &block)
@@ -102,6 +104,12 @@ module Rodish
     end
 
     private
+
+    def _autoload_subcommand_dir(hash, base)
+      Dir.glob("*.rb", base:).each do |filename|
+        hash[filename.chomp(".rb")] = File.expand_path(File.join(base, filename))
+      end
+    end
 
     def _is(meth, command_name, args:, &block)
       public_send(meth, command_name) do
@@ -250,8 +258,13 @@ module Rodish
       @command.process(context, options, argv)
     end
 
-    def on(*command_names, command_name, &block)
-      dsl(command_names).on(command_name, &block)
+    def on(*command_names, &block)
+      if block
+        command_name = command_names.pop
+        dsl(command_names).on(command_name, &block)
+      else
+        dsl(command_names)
+      end
     end
 
     def is(*command_names, command_name, args: 0, &block)
