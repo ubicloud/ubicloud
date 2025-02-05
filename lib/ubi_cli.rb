@@ -82,29 +82,47 @@ class UbiCli
 
   def format_rows(keys, rows, headers: false)
     results = []
-    tab = false
+
+    sizes = Hash.new(0)
+    string_keys = keys.map(&:to_s)
+    string_keys.each do |key|
+      sizes[key] = key.size
+    end
+    rows = rows.map do |row|
+      row.transform_values(&:to_s)
+    end
+    rows.each do |row|
+      keys.each do |key|
+        size = row[key].size
+        sizes[key] = size if size > sizes[key]
+      end
+    end
+    sizes.transform_values! do |size|
+      "%-#{size}s"
+    end
 
     if headers
-      keys.each do |key|
-        if tab
-          results << "\t"
+      sep = false
+      string_keys.each do |key|
+        if sep
+          results << " "
         else
-          tab = true
+          sep = true
         end
-        results << key.to_s
+        results << (sizes[key] % key)
       end
       results << "\n"
     end
 
     rows.each do |row|
-      tab = false
+      sep = false
       keys.each do |key|
-        if tab
-          results << "\t"
+        if sep
+          results << " "
         else
-          tab = true
+          sep = true
         end
-        results << row[key].to_s
+        results << (sizes[key] % row[key])
       end
       results << "\n"
     end
