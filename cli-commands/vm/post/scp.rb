@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
-UbiRodish.on("vm", "scp") do
-  options("ubi vm scp [options] location-name (vm-name|_vm-ubid) (local-path :remote-path|:remote-path local-path) [scp-options]", key: :vm_ssh, &UbiCli::SSHISH_OPTS)
+UbiRodish.on("vm").run_on("scp") do
+  options("ubi vm location-name (vm-name|_vm-ubid) scp [options] (local-path :remote-path|:remote-path local-path) [scp-options]", key: :vm_ssh, &UbiCli::SSHISH_OPTS)
 
-  args(4...)
+  args(2...)
 
-  run do |(location, name, path1, path2, *argv), opts|
+  run do |(path1, path2, *argv), opts|
     remote_path1 = path1[0] == ":"
     remote_path2 = path2[0] == ":"
 
     if remote_path1 ^ remote_path2
-      handle_ssh(location, name, opts) do |user:, address:|
+      handle_ssh(opts) do |user:, address:|
         address = "[#{address}]" if address.include?(":")
         remote = "#{user}@#{address}"
 
