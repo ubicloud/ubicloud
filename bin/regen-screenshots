@@ -113,15 +113,6 @@ class RegenScreenshots
     screenshot "github-actions-integration/quickstart-2-screenshot.png"
 
     project = Project.first
-    GithubInstallation.create_with_id(
-      name: "github-actions-integration",
-      project_id: project.id,
-      installation_id: 1234567890,
-      type: "user"
-    )
-    click_link "GitHub Runners"
-    click_link "Settings"
-    screenshot "github-actions-integration/transparent-cache-enable-screenshot.png"
 
     resize(650)
     click_link "PostgreSQL"
