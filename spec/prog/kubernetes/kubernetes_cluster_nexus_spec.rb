@@ -51,15 +51,21 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect {
         described_class.assemble(name: "onetoolongnameforatestkubernetesclustername", version: "v1.32", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
+
+      p = Project.create(name: "another")
+      subnet.update(project_id: p.id)
+      expect {
+        described_class.assemble(name: "normalname", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, private_subnet_id: subnet.id)
+      }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
     it "creates a kubernetes cluster" do
-      st = described_class.assemble(name: "k8stest", version: "v1.32", private_subnet_id: subnet.id, project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
+      st = described_class.assemble(name: "k8stest", version: "v1.31", private_subnet_id: subnet.id, project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: 100)
 
       kc = st.subject
       expect(kc.name).to eq "k8stest"
       expect(kc.ubid).to start_with("kc")
-      expect(kc.version).to eq "v1.32"
+      expect(kc.version).to eq "v1.31"
       expect(kc.location).to eq "hetzner-fsn1"
       expect(kc.cp_node_count).to eq 3
       expect(kc.private_subnet.id).to eq subnet.id
@@ -69,10 +75,15 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kc.target_node_storage_size_gib).to eq 100
     end
 
-    it "can have null as storage size" do
-      st = described_class.assemble(name: "k8stest", version: "v1.32", private_subnet_id: subnet.id, project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3, target_node_size: "standard-8", target_node_storage_size_gib: nil)
+    it "has defaults for node size, storage size, version and subnet" do
+      st = described_class.assemble(name: "k8stest", project_id: project.id, location: "hetzner-fsn1", cp_node_count: 3)
+      kc = st.subject
 
-      expect(st.subject.target_node_storage_size_gib).to be_nil
+      expect(kc.version).to eq "v1.32"
+      expect(kc.private_subnet.net4.to_s[-3..]).to eq "/18"
+      expect(kc.private_subnet.name).to eq "k8stest-k8s-subnet"
+      expect(kc.target_node_size).to eq "standard-2"
+      expect(kc.target_node_storage_size_gib).to be_nil
     end
   end
 
