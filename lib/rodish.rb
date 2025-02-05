@@ -4,7 +4,7 @@ require "optparse"
 
 module Rodish
   def self.processor(&block)
-    Processor.new(DSL.command([].freeze, [].freeze, &block))
+    Processor.new(DSL.command([].freeze, &block))
   end
 
   class CommandExit < StandardError
@@ -46,8 +46,8 @@ module Rodish
   option_parser.freeze
 
   class DSL
-    def self.command(command_path, befores, &block)
-      command = Command.new(command_path, befores)
+    def self.command(command_path, &block)
+      command = Command.new(command_path)
       new(command).instance_exec(&block)
       command
     end
@@ -83,7 +83,7 @@ module Rodish
 
     def on(command_name, &block)
       command_path = @command.command_path + [command_name]
-      @command.subcommands[command_name] = DSL.command(command_path.freeze, @command.befores, &block)
+      @command.subcommands[command_name] = DSL.command(command_path.freeze, &block)
     end
 
     def run(&block)
@@ -108,24 +108,18 @@ module Rodish
     attr_accessor :before
     attr_accessor :num_args
 
-    def initialize(command_path, befores)
+    def initialize(command_path)
       # Development assertions:
       # raise "command path not frozen" unless command_path.frozen?
       # raise "befores not frozen" unless befores.frozen?
       @command_path = command_path
       @command_name = command_path.join(" ").freeze
-      @befores = befores
       @subcommands = {}
       @num_args = 0
     end
 
     def freeze
       @subcommands.each_value(&:freeze)
-      if @before
-        @befores += [@before]
-        @befores.freeze
-        @before = nil
-      end
       @subcommands.freeze
       @option_parser.freeze
       super
@@ -155,12 +149,11 @@ module Rodish
         end
 
         argv.shift
+        context.instance_exec(argv, options, &before) if before
         subcommand.process(context, options, argv)
       elsif run_block
         if valid_args?(argv)
-          befores.each do |before|
-            context.instance_exec(argv, options, &before)
-          end
+          context.instance_exec(argv, options, &before) if before
 
           if @num_args.is_a?(Integer)
             context.instance_exec(*argv, options, &run_block)
@@ -180,14 +173,6 @@ module Rodish
         raise CommandFailure, @option_parser.to_s
       else
         raise
-      end
-    end
-
-    def befores
-      if @before
-        (@befores + [@before]).freeze
-      else
-        @befores
       end
     end
 
