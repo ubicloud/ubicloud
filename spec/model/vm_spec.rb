@@ -140,7 +140,7 @@ RSpec.describe Vm do
     end
 
     it "returns the right private_ipv4 based on the netmask" do
-      nic = instance_double(Nic, private_ipv4: instance_double(NetAddr::IPv4Net, network: "192.168.12.13", netmask: "/32"))
+      nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("192.168.12.13/32"))
       expect(vm).to receive(:nics).and_return([nic]).twice
       expect(vm.private_ipv4.to_s).to eq("192.168.12.13")
 

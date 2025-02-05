@@ -358,7 +358,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     nics.each do |nic|
       local_ip4 = NetAddr::IPv4Net.parse(nic.net4)
-      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(1).to_s.shellescape} dev #{nic.tap}" unless local_ip4.netmask.to_s == "/32"
+      r "ip -n #{q_vm} route replace #{local_ip4.to_s.shellescape} via #{local_ip4.nth(1).to_s.shellescape} dev #{nic.tap}" unless local_ip4.netmask.prefix_len == 32
     end
   end
 
@@ -373,7 +373,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     public_ipv4 = NetAddr::IPv4Net.parse(ip4).network.to_s
     private_ipv4_addr = NetAddr::IPv4Net.parse(private_ip)
-    private_ipv4 = (private_ipv4_addr.netmask.to_s == "/32") ? private_ipv4_addr.network.to_s : private_ipv4_addr.nth(1).to_s
+    private_ipv4 = (private_ipv4_addr.netmask.prefix_len == 32) ? private_ipv4_addr.network.to_s : private_ipv4_addr.nth(1).to_s
     <<~NAT4_RULES
     table ip nat {
       chain prerouting {
@@ -470,7 +470,7 @@ EOS
     private_ip_dhcp = nics.map do |nic|
       vm_sub_6 = NetAddr::IPv6Net.parse(nic.net6)
       vm_net4 = NetAddr::IPv4Net.parse(nic.net4)
-      vm_sub_4 = (vm_net4.netmask.to_s == "/32") ? vm_net4.nth(0) : vm_net4.nth(1)
+      vm_sub_4 = (vm_net4.netmask.prefix_len == 32) ? vm_net4.nth(0) : vm_net4.nth(1)
       <<DHCP
 dhcp-range=#{nic.tap},#{vm_sub_4},#{vm_sub_4},6h
 dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
