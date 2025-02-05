@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiRodish.on("vm").run_on("scp") do
-  options("ubi vm location-name (vm-name|_vm-ubid) scp [options] (local-path :remote-path|:remote-path local-path) [scp-options]", key: :vm_ssh, &UbiCli::SSHISH_OPTS)
+  options("ubi vm location-name/(vm-name|_vm-ubid) scp [options] (local-path :remote-path|:remote-path local-path) [scp-options]", key: :vm_ssh, &UbiCli::SSHISH_OPTS)
 
   args(2...)
 

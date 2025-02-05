@@ -8,11 +8,11 @@ UbiRodish.on("vm") do
   end
   # :nocov:
 
-  args(3...)
+  args(2...)
 
-  run do |(location, vm_name, *argv), opts, command|
-    @location = location
-    @vm_name = vm_name
+  run do |(vm_ref, *argv), opts, command|
+    @location, @vm_name, extra = vm_ref.split("/", 3)
+    raise Rodish::CommandFailure, "invalid vm reference, should be in location/(vm-name|_vm-ubid) format" if extra
     command.run(self, opts, argv)
   end
 end
