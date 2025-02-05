@@ -129,10 +129,6 @@ module ContentGenerator
       Option.kubernetes_locations.find { _1.display_name == location }.ui_name
     end
 
-    def self.private_subnet(location, private_subnet)
-      private_subnet[:display_name]
-    end
-
     def self.cp_nodes(cp_nodes)
       cp_nodes.to_s
     end

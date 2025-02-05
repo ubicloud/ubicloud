@@ -130,7 +130,6 @@ RSpec.describe Clover, "Kubernetes" do
       it "can create new kubernetes cluster" do
         fill_in "Name", with: "k8stest"
         choose option: "eu-central-h1"
-        select "mysubnet", from: "private_subnet_id"
         choose option: 3
         select 2, from: "worker_nodes"
 
@@ -144,12 +143,12 @@ RSpec.describe Clover, "Kubernetes" do
         expect(new_kc.project_id).to eq(project.id)
         expect(new_kc.cp_node_count).to eq(3)
         expect(new_kc.nodepools.first.node_count).to eq(2)
+        expect(new_kc.private_subnet.name).to eq("k8stest-k8s-subnet")
       end
 
       it "can not create kubernetes cluster with invalid name" do
         fill_in "Name", with: "invalid name"
         choose option: "eu-central-h1"
-        select "mysubnet", from: "private_subnet_id"
         choose option: 3
         select 2, from: "worker_nodes"
 
@@ -159,62 +158,9 @@ RSpec.describe Clover, "Kubernetes" do
         expect((find "input[name=name]")["value"]).to eq("invalid name")
       end
 
-      it "can not create a cluster with invalid subnet" do
-        kc
-        csrf_token = find("form[action='#{project.path}/kubernetes-cluster'] input[name='_csrf']", visible: false).value
-
-        expect(KubernetesCluster.count).to eq(1)
-
-        params = {
-          name: "dummy",
-          location: "eu-central-h1",
-          private_subnet_id: UBID.generate_random("ps"),
-          cp_nodes: 3,
-          worker_nodes: 2,
-          _csrf: csrf_token
-        }
-        page.driver.post "#{project.path}/kubernetes-cluster", params
-        expect(KubernetesCluster.count).to eq(1)
-
-        visit "#{project.path}/kubernetes-cluster/create"
-        csrf_token = find("form[action='#{project.path}/kubernetes-cluster'] input[name='_csrf']", visible: false).value
-        params[:private_subnet_id] = kc.private_subnet.ubid
-        params[:_csrf] = csrf_token
-
-        page.driver.post "#{project.path}/kubernetes-cluster", params
-        expect(KubernetesCluster.count).to eq(2)
-      end
-
-      it "can not create a cluster with a subnet in a different location" do
-        kc
-        csrf_token = find("form[action='#{project.path}/kubernetes-cluster'] input[name='_csrf']", visible: false).value
-
-        expect(KubernetesCluster.count).to eq(1)
-
-        params = {
-          name: "dummy",
-          location: "us-east-a2",
-          private_subnet_id: kc.private_subnet.ubid,
-          cp_nodes: 3,
-          worker_nodes: 2,
-          _csrf: csrf_token
-        }
-        page.driver.post "#{project.path}/kubernetes-cluster", params
-        expect(KubernetesCluster.count).to eq(1)
-
-        visit "#{project.path}/kubernetes-cluster/create"
-        csrf_token = find("form[action='#{project.path}/kubernetes-cluster'] input[name='_csrf']", visible: false).value
-        params[:_csrf] = csrf_token
-        kc.private_subnet.update(location: "leaseweb-wdc02")
-
-        page.driver.post "#{project.path}/kubernetes-cluster", params
-        expect(KubernetesCluster.count).to eq(2)
-      end
-
       it "can not create kubernetes cluster with same name in same project & location" do
         fill_in "Name", with: "myk8s"
         choose option: "eu-central-h1"
-        select "mysubnet", from: "private_subnet_id"
         choose option: 3
         select 2, from: "worker_nodes"
 
