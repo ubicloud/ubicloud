@@ -42,8 +42,9 @@ class UbiCli
 
       if address
         user ||= data["unix_user"]
-        yield(user:, address:, headers: res[1])
-        [""]
+        args = yield(user:, address:)
+        res[1]["ubi-command-execute"] = args.shift
+        [args.join("\0")]
       else
         res[0] = 400
         ["No valid IPv4 address for requested VM"]
