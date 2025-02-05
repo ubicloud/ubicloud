@@ -246,11 +246,11 @@ GEM
     parallel (1.26.3)
     parallel_tests (4.9.0)
       parallel
-    parser (3.3.7.0)
+    parser (3.3.7.1)
       ast (~> 2.4.1)
       racc
     pdf-core (0.10.0)
-    pdf-reader (2.14.0)
+    pdf-reader (2.14.1)
       Ascii85 (>= 1.0, < 3.0, != 2.0.0)
       afm (~> 0.2.1)
       hashery (~> 2.0)
