@@ -62,8 +62,7 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
       expect(runner).to receive(:incr_destroy)
       expect(github_installation).to receive(:repositories).and_return([repository])
       expect(github_installation).to receive(:runners).and_return([runner])
-
-      expect { dgi.destroy_resources }.to hop("destroy")
+      expect { dgi.destroy_resources }.to hop("wait_resource_destroy")
     end
   end
 

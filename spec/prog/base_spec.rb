@@ -372,6 +372,7 @@ RSpec.describe Prog::Base do
     it "does not hop to destroy if strand is destroy" do
       st.update(label: "destroy")
       Semaphore.incr(st.id, :destroy)
+      Semaphore.incr(st.id, :destroying)
       expect {
         st.unsynchronized_run
       }.to change(st, :exitval).from(nil).to({"msg" => "destroyed"})

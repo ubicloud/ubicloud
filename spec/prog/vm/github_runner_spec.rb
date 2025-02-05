@@ -238,6 +238,7 @@ RSpec.describe Prog::Vm::GithubRunner do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:update_billing_record)
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
 

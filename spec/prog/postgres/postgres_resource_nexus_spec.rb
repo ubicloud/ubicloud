@@ -125,6 +125,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(br).to receive(:finalize).twice
       expect(postgres_resource).to receive(:active_billing_records).and_return([br, br])
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
 

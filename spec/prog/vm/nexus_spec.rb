@@ -604,6 +604,7 @@ RSpec.describe Prog::Vm::Nexus do
   describe "#before_run" do
     it "hops to destroy when needed" do
       expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -620,6 +621,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(instance_double(BillingRecord)).at_least(:once)
       expect(assigned_adr.active_billing_record).to receive(:finalize)
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -627,6 +629,7 @@ RSpec.describe Prog::Vm::Nexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(vm).to receive(:active_billing_records).and_return([])
       expect(vm).to receive(:assigned_vm_address).and_return(nil)
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
 
@@ -636,7 +639,7 @@ RSpec.describe Prog::Vm::Nexus do
       assigned_adr = instance_double(AssignedVmAddress)
       expect(vm).to receive(:assigned_vm_address).and_return(assigned_adr)
       expect(assigned_adr).to receive(:active_billing_record).and_return(nil)
-
+      expect(nx).to receive(:incr_destroying)
       expect { nx.before_run }.to hop("destroy")
     end
   end
