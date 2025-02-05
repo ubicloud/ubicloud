@@ -2,7 +2,7 @@
 
 UbiRodish.on("vm", "list") do
   options("ubi vm list [options]", key: :vm_list) do
-    on("-h", "--headers", "show headers")
+    on("-N", "--no-headers", "do not show headers")
     on("-i", "--id", "show id")
     on("-n", "--name", "show name")
     on("-l", "--location", "show location")
@@ -15,10 +15,11 @@ UbiRodish.on("vm", "list") do
   run do |opts|
     get(project_path("vm")) do |data|
       keys = fields
+      headers = true
       if (opts = opts[:vm_list])
         keys = keys.select { opts[_1.to_sym] }
         keys = fields if keys.empty?
-        headers = opts[:headers]
+        headers = false if opts[:"no-headers"] == false
       end
 
       format_rows(keys, data["items"], headers:)
