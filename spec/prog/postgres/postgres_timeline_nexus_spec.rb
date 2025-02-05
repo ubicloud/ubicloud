@@ -76,6 +76,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   describe "#wait_leader" do
     it "hops to destroy if leader is missing" do
       expect(postgres_timeline).to receive(:leader).and_return(nil)
+      expect(nx).to receive(:incr_destroying)
       expect { nx.wait_leader }.to hop("destroy")
     end
 
