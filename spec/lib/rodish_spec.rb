@@ -110,30 +110,30 @@ RSpec.describe Rodish do
         expect { app.process(%w[6], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for command (accepts: 0, given: 1)")
         expect(res).to be_empty
         expect { app.process(%w[a b], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a b subcommand (accepts: 1..., given: 0)")
-        expect(res).to be_empty
-        expect { app.process(%w[a], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 0)")
-        expect(res).to be_empty
-        expect { app.process(%w[a 1], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 1)")
-        expect(res).to be_empty
-        expect { app.process(%w[a 1 2 3], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 3)")
-        expect(res).to be_empty
-        expect { app.process(%w[c 1], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for c subcommand (accepts: 0, given: 1)")
-        expect(res).to be_empty
-        expect { app.process(%w[d], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 0)")
-        expect(res).to be_empty
-        expect { app.process(%w[d 1 2], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 2)")
-        expect(res).to be_empty
+        expect(res).to eq [:top, :before_a]
+        expect { app.process(%w[a], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 0)")
+        expect(res).to eq [:top]
+        expect { app.process(%w[a 1], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 1)")
+        expect(res).to eq [:top]
+        expect { app.process(%w[a 1 2 3], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 3)")
+        expect(res).to eq [:top]
+        expect { app.process(%w[c 1], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for c subcommand (accepts: 0, given: 1)")
+        expect(res).to eq [:top]
+        expect { app.process(%w[d], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 0)")
+        expect(res).to eq [:top]
+        expect { app.process(%w[d 1 2], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for d subcommand (accepts: 1, given: 2)")
+        expect(res).to eq [:top]
       end
 
       it "raises CommandFailure for invalid subcommand" do
         res = []
         expect { app.process(%w[e g], context: res) }.to raise_error(Rodish::CommandFailure, "invalid subcommand g, valid subcommands for e subcommand are: f")
-        expect(res).to be_empty
+        expect(res).to eq [:top]
 
         app = described_class.processor do
           on("f") {}
         end
-        expect { app.process(%w[g], context: res) }.to raise_error(Rodish::CommandFailure, "invalid subcommand g, valid subcommands for command are: f")
+        expect { app.process(%w[g], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid subcommand g, valid subcommands for command are: f")
         expect(res).to be_empty
       end
 
@@ -151,11 +151,11 @@ RSpec.describe Rodish do
         expect { app.process(%w[-d], context: res) }.to raise_error(Rodish::CommandFailure, /top verbose output/)
         expect(res).to be_empty
         expect { app.process(%w[a -d], context: res) }.to raise_error(Rodish::CommandFailure, /a verbose output/)
-        expect(res).to be_empty
-        expect { app.process(%w[a b -d], context: res) }.to raise_error(Rodish::CommandFailure, /b verbose output/)
-        expect(res).to be_empty
-        expect { app.process(%w[d -d 1 2], context: res) }.to raise_error(Rodish::CommandFailure, /top verbose output/)
-        expect(res).to be_empty
+        expect(res).to eq [:top]
+        expect { app.process(%w[a b -d], context: res.clear) }.to raise_error(Rodish::CommandFailure, /b verbose output/)
+        expect(res).to eq [:top, :before_a]
+        expect { app.process(%w[d -d 1 2], context: res.clear) }.to raise_error(Rodish::CommandFailure, /top verbose output/)
+        expect(res).to eq [:top]
       end
 
       it "raises CommandExit for blocks that use halt" do
