@@ -129,7 +129,6 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can create new kubernetes cluster" do
         fill_in "Name", with: "k8stest"
-        choose option: "v1.32"
         choose option: "eu-central-h1"
         select "mysubnet", from: "private_subnet_id"
         choose option: 3
@@ -149,7 +148,6 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can not create kubernetes cluster with invalid name" do
         fill_in "Name", with: "invalid name"
-        choose option: "v1.32"
         choose option: "eu-central-h1"
         select "mysubnet", from: "private_subnet_id"
         choose option: 3
@@ -170,7 +168,6 @@ RSpec.describe Clover, "Kubernetes" do
         params = {
           name: "dummy",
           location: "eu-central-h1",
-          version: "v1.32",
           private_subnet_id: UBID.generate_random("ps"),
           cp_nodes: 3,
           worker_nodes: 2,
@@ -197,7 +194,6 @@ RSpec.describe Clover, "Kubernetes" do
         params = {
           name: "dummy",
           location: "us-east-a2",
-          version: "v1.32",
           private_subnet_id: kc.private_subnet.ubid,
           cp_nodes: 3,
           worker_nodes: 2,
@@ -217,7 +213,6 @@ RSpec.describe Clover, "Kubernetes" do
 
       it "can not create kubernetes cluster with same name in same project & location" do
         fill_in "Name", with: "myk8s"
-        choose option: "v1.32"
         choose option: "eu-central-h1"
         select "mysubnet", from: "private_subnet_id"
         choose option: 3
