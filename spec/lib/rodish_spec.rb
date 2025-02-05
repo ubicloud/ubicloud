@@ -280,11 +280,21 @@ RSpec.describe Rodish do
           main.instance_variable_set(:@ExampleRodish, app)
           app.on("k") do
             autoload_subcommand_dir("spec/lib/rodish-example")
+            autoload_post_subcommand_dir("spec/lib/rodish-example-post")
+
+            args(2...)
+            run do |(x, *argv), opts, command|
+              push [:k, x]
+              command.run(self, opts, argv)
+            end
           end
 
           res = []
           app.process(%w[k m], context: res.clear)
           expect(res).to eq [:top, :m]
+
+          app.process(%w[k 1 o], context: res.clear)
+          expect(res).to eq [:top, [:k, "1"], :o]
 
           expect { app.process(%w[k n], context: res) }.to raise_error(Rodish::CommandFailure, "program bug, autoload of subcommand n failed")
         ensure
