@@ -9,7 +9,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         fail "No existing project"
       end
 
-      unless ["v1.32"].include?(version)
+      unless ["v1.32", "v1.31"].include?(version)
         fail "Invalid Kubernetes Version"
       end
 
