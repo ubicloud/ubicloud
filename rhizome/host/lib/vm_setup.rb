@@ -476,7 +476,6 @@ EOS
       <<DHCP
 dhcp-range=#{nic.tap},#{vm_sub_4},#{vm_sub_4},6h
 dhcp-range=#{nic.tap},#{vm_sub_6.nth(2)},#{vm_sub_6.nth(2)},#{vm_sub_6.netmask.prefix_len}
-dhcp-option=#{nic.tap},option:router,#{vm_sub_4}
 DHCP
     end.join("\n")
 
