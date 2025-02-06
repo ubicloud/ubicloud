@@ -63,6 +63,7 @@ echo \#\ Supported\ HostKey\ algorithms\ by\ order\ of\ preference.'
 'LogLevel\ VERBOSE'
 ' | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
 echo test\ key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+sync
 FIXTURE
 
       expect { br.setup }.to hop("start", "InstallRhizome")
