@@ -270,13 +270,14 @@ class Prog::Vm::Nexus < Prog::Base
       vm.private_subnets.each(&:incr_add_new_nic)
       # To simulate failure case in development:
       # if frame["attempt"] < 3
-      #   Clog.emit("VM prep forced fail for #{vm.ubid}, attempt: #{frame["attempt"]}")
+      #   puts "VM prep forced fail for #{vm.ubid}, attempt: #{frame["attempt"]}"
       #   incr_recreate
       #   hop_destroy
       # end
       hop_wait_sshable
     when "Failed"
       if frame["attempt"] >= 3
+        register_deadline("prep_failed", 24 * 60 * 60)
         Prog::PageNexus.assemble("VM prep has failed for #{vm.ubid} (attempt: #{frame["attempt"]}", ["VmPrepFailed", vm.ubid], vm.ubid)
         hop_prep_failed
       end
@@ -449,7 +450,7 @@ class Prog::Vm::Nexus < Prog::Base
   end
 
   label def prep_failed
-    nap(5 * 60)
+    nap(60 * 60 * 24 * 365 * 1000)
   end
 
   label def prevent_destroy
@@ -575,7 +576,7 @@ class Prog::Vm::Nexus < Prog::Base
         enable_ip4: vm.ip4_enabled, arch: vm.arch, ubid: UBID.parse(vm.ubid),
         nic_id: frame["nic_id"],
         private_subnet_id: frame["private_subnet_id"],
-        storage_volumes: frame["storage_volumes"]&.map { _1.transform_keys(&:to_sym) },
+        storage_volumes: frame["assemble_storage_volumes"]&.map { _1.transform_keys(&:to_sym) },
         distinct_storage_devices: frame["distinct_storage_devices"],
         swap_size_bytes: frame["swap_size_bytes"],
         pool_id: frame["pool_id"],

@@ -260,7 +260,7 @@ RSpec.describe Prog::Vm::Nexus do
 
   describe "#prep_failed" do
     it "naps" do
-      expect { nx.prep_failed }.to nap(300)
+      expect { nx.prep_failed }.to nap(31536000000)
     end
   end
 
@@ -976,7 +976,7 @@ RSpec.describe Prog::Vm::Nexus do
         expect(strand).to eq st
         expect(storage_volumes).to eq [{size_gib: 1}]
       end.and_return(true)
-      expect(nx).to receive(:frame).and_return("attempt" => 1, "storage_volumes" => [{"size_gib" => 1}]).at_least(:once)
+      expect(nx).to receive(:frame).and_return("attempt" => 1, "assemble_storage_volumes" => [{"size_gib" => 1}]).at_least(:once)
       expect { nx.destroy_slice }.to hop("start")
     end
 
