@@ -24,14 +24,6 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
-    end
-  end
-
   label def start
     setup_blob_storage if postgres_timeline.blob_storage
     hop_wait_leader

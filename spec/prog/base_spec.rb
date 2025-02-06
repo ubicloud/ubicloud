@@ -350,4 +350,31 @@ RSpec.describe Prog::Base do
       expect(page.details["data_center"]).to eq(vm.vm_host.data_center)
     end
   end
+
+  describe "#before_run" do
+    let(:st) { Strand.create(prog: "Test", label: "napper") }
+
+    it "hops to destroy if destroy semaphore incremented" do
+      Semaphore.incr(st.id, :destroy)
+
+      expect {
+        st.unsynchronized_run
+      }.to change(st, :label).from("napper").to("destroy")
+    end
+
+    it "hops to destroy if destroy semaphore not incremented" do
+      expect(Semaphore.where(strand_id: st.id).empty?).to be(true)
+      expect {
+        st.unsynchronized_run
+      }.not_to change(st, :label)
+    end
+
+    it "does not hop to destroy if strand is destroy" do
+      st.update(label: "destroy")
+      Semaphore.incr(st.id, :destroy)
+      expect {
+        st.unsynchronized_run
+      }.to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
+    end
+  end
 end
