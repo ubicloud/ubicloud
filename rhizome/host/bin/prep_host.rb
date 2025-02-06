@@ -99,23 +99,3 @@ CRON
 
 r "systemctl enable cron"
 r "systemctl start cron"
-
-# Taken from https://infosec.mozilla.org/guidelines/openssh
-safe_write_to_file("/etc/ssh/sshd_config.d/10-clover.conf", <<~SSHD_CONFIG)
-# Supported HostKey algorithms by order of preference.
-HostKey /etc/ssh/ssh_host_ed25519_key
-HostKey /etc/ssh/ssh_host_rsa_key
-HostKey /etc/ssh/ssh_host_ecdsa_key
-
-KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256
-
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
-
-MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com
-
-# Password based logins are disabled - only public key based logins are allowed.
-AuthenticationMethods publickey
-
-# LogLevel VERBOSE logs user's key fingerprint on login. Needed to have a clear audit track of which key was using to log in.
-LogLevel VERBOSE
-SSHD_CONFIG
