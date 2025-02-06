@@ -73,14 +73,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "self_destroy"].include?(strand.label)
-        hop_destroy
-      end
-    end
-  end
-
   label def start
     reconcile_replicas
     register_deadline("wait", 10 * 60)
