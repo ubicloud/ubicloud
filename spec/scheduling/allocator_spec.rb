@@ -311,7 +311,7 @@ RSpec.describe Al do
       cand = Al::Allocation.candidate_hosts(req)
       expect(cand.size).to eq(1)
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
-      expect(cand.first[:available_iommu_groups]).to eq([3, 9])
+      expect(cand.first[:available_iommu_groups].sort).to eq([3, 9])
     end
   end
 
