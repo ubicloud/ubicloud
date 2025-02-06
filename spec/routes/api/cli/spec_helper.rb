@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.configure do |config|
   def cli(argv, status: 200, env: {})
     post("/cli", {"argv" => argv}.to_json, env)
-    expect(last_response.status).to eq(status)
+    expect(last_response.status).to eq(status), "status is #{last_response.status} not #{status}, body for failing status: #{last_response.body}"
     expect(last_response["content-type"]).to eq("text/plain")
     last_response.body
   end
