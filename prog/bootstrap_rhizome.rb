@@ -48,6 +48,7 @@ sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
 sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
 echo #{SSHD_CONFIG.shellescape} | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
 echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+sync
 SH
 
     push Prog::InstallRhizome, {"target_folder" => frame["target_folder"]}
