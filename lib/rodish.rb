@@ -71,8 +71,9 @@ module Rodish
       @command.before = block
     end
 
-    def args(args)
+    def args(args, invalid_args_message: nil)
       @command.num_args = args
+      @command.invalid_args_message = invalid_args_message
     end
 
     def autoload_subcommand_dir(base)
@@ -95,12 +96,12 @@ module Rodish
       @command.run_block = block
     end
 
-    def is(command_name, args: 0, &block)
-      _is(:on, command_name, args:, &block)
+    def is(command_name, args: 0, invalid_args_message: nil, &block)
+      _is(:on, command_name, args:, invalid_args_message:, &block)
     end
 
-    def run_is(command_name, args: 0, &block)
-      _is(:run_on, command_name, args:, &block)
+    def run_is(command_name, args: 0, invalid_args_message: nil, &block)
+      _is(:run_on, command_name, args:, invalid_args_message:, &block)
     end
 
     private
@@ -111,9 +112,9 @@ module Rodish
       end
     end
 
-    def _is(meth, command_name, args:, &block)
+    def _is(meth, command_name, args:, invalid_args_message: nil, &block)
       public_send(meth, command_name) do
-        args args
+        args(args, invalid_args_message:)
         run(&block)
       end
     end
@@ -134,6 +135,7 @@ module Rodish
     attr_accessor :option_key
     attr_accessor :before
     attr_accessor :num_args
+    attr_accessor :invalid_args_message
 
     def initialize(command_path)
       # Development assertions:
@@ -189,6 +191,8 @@ module Rodish
           else
             context.instance_exec(argv, options, self, &run_block)
           end
+        elsif @invalid_args_message
+          raise CommandFailure, "invalid arguments#{subcommand_name} (#{@invalid_args_message})"
         else
           raise CommandFailure, "invalid number of arguments#{subcommand_name} (accepts: #{@num_args}, given: #{argv.length})"
         end
