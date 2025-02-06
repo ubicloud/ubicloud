@@ -13,8 +13,7 @@ class Prog::Vm::Nexus < Prog::Base
     unix_user: "ubi", location: "hetzner-fsn1", boot_image: Config.default_boot_image_name,
     private_subnet_id: nil, nic_id: nil, storage_volumes: nil, boot_disk_index: 0,
     enable_ip4: false, pool_id: nil, arch: "x64", swap_size_bytes: nil,
-    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0,
-    ubid: nil, vm_size: nil, attempt: 1, strand: nil)
+    distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -23,9 +22,8 @@ class Prog::Vm::Nexus < Prog::Base
       fail "Cannot force and exclude the same host"
     end
     Validation.validate_location(location)
-    vm_size ||= Validation.validate_vm_size(size, arch)
+    vm_size = Validation.validate_vm_size(size, arch)
 
-    assemble_storage_volumes = storage_volumes
     storage_volumes ||= [{
       size_gib: vm_size.storage_size_options.first,
       encrypted: true
@@ -51,7 +49,7 @@ class Prog::Vm::Nexus < Prog::Base
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
 
-    ubid ||= Vm.generate_ubid
+    ubid = Vm.generate_ubid
     name ||= Vm.ubid_to_name(ubid)
 
     Validation.validate_name(name)
@@ -110,26 +108,18 @@ class Prog::Vm::Nexus < Prog::Base
       nic.update(vm_id: vm.id)
 
       gpu_count = 1 if gpu_count == 0 && vm_size.gpu
-
-      strand ||= Strand.new { _1.id = vm.id }
-      frame = strand.stack[-1] || {}
-      strand.update(
+      Strand.create(
         prog: "Vm::Nexus",
         label: "start",
-        stack: [frame.merge(
-          "assemble_storage_volumes" => assemble_storage_volumes,
+        stack: [{
           "storage_volumes" => storage_volumes.map { |v| v.transform_keys(&:to_s) },
           "swap_size_bytes" => swap_size_bytes,
           "distinct_storage_devices" => distinct_storage_devices,
           "force_host_id" => force_host_id,
           "exclude_host_ids" => exclude_host_ids,
-          "private_subnet_id" => private_subnet_id,
-          "nic_id" => nic_id,
-          "pool_id" => pool_id,
-          "attempt" => attempt,
           "gpu_count" => gpu_count
-        )]
-      )
+        }]
+      ) { _1.id = vm.id }
     end
   end
 
@@ -268,21 +258,8 @@ class Prog::Vm::Nexus < Prog::Base
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
       vm.private_subnets.each(&:incr_add_new_nic)
-      # To simulate failure case in development:
-      # if frame["attempt"] < 3
-      #   Clog.emit("VM prep forced fail for #{vm.ubid}, attempt: #{frame["attempt"]}")
-      #   incr_recreate
-      #   hop_destroy
-      # end
       hop_wait_sshable
-    when "Failed"
-      if frame["attempt"] >= 3
-        Prog::PageNexus.assemble("VM prep has failed for #{vm.ubid} (attempt: #{frame["attempt"]}", ["VmPrepFailed", vm.ubid], vm.ubid)
-        hop_prep_failed
-      end
-      incr_recreate
-      hop_destroy
-    when "NotStarted"
+    when "NotStarted", "Failed"
       secrets_json = JSON.generate({
         storage: vm.storage_secrets
       })
@@ -448,10 +425,6 @@ class Prog::Vm::Nexus < Prog::Base
     nap 30
   end
 
-  label def prep_failed
-    nap(5 * 60)
-  end
-
   label def prevent_destroy
     register_deadline("destroy", 24 * 60 * 60)
     nap 30
@@ -532,14 +505,9 @@ class Prog::Vm::Nexus < Prog::Base
 
   label def destroy_slice
     slice = vm.vm_host_slice
-    skip_nic_destroy_for_id = nil
-
-    when_recreate_set? do
-      skip_nic_destroy_for_id = frame["nic_id"]
-    end
 
     # Remove the VM before we destroy the slice
-    final_clean_up(skip_nic_destroy_for_id:)
+    final_clean_up
 
     # Trigger the slice deletion if there are no
     # VMs using it.
@@ -560,43 +528,17 @@ class Prog::Vm::Nexus < Prog::Base
       end
     end
 
-    when_recreate_set? do
-      decr_recreate
-
-      # This does not pass boot_index_id, as the information contained in it is
-      # encoded in the storage_volumes argument.
-      #
-      # It's possible to add the VM's current host to exclude_host_ids, but that will
-      # break cases where it is the only available host. Could extend the allocator
-      # to prefer a different host without excluding it if we really want to try another
-      # host.
-      self.class.assemble(vm.public_key, vm.project_id, name: vm.name, vm_size: vm.vm_size,
-        unix_user: vm.unix_user, location: vm.location, boot_image: vm.boot_image,
-        enable_ip4: vm.ip4_enabled, arch: vm.arch, ubid: UBID.parse(vm.ubid),
-        nic_id: frame["nic_id"],
-        private_subnet_id: frame["private_subnet_id"],
-        storage_volumes: frame["storage_volumes"]&.map { _1.transform_keys(&:to_sym) },
-        distinct_storage_devices: frame["distinct_storage_devices"],
-        swap_size_bytes: frame["swap_size_bytes"],
-        pool_id: frame["pool_id"],
-        gpu_count: frame["gpu_count"] || 0,
-        force_host_id: frame["force_host_id"],
-        exclude_host_ids: frame["exclude_host_ids"],
-        attempt: frame["attempt"] + 1,
-        strand:)
-
-      hop_start
-    end
-
     pop "vm deleted"
   end
 
-  def final_clean_up(skip_nic_destroy_for_id: nil)
-    vm.nics.map do |nic|
-      nic.update(vm_id: nil)
-      nic.incr_destroy unless nic.id == skip_nic_destroy_for_id
+  def final_clean_up
+    DB.transaction do
+      vm.nics.map do |nic|
+        nic.update(vm_id: nil)
+        nic.incr_destroy
+      end
+      vm.destroy
     end
-    vm.destroy
   end
 
   label def start_after_host_reboot
