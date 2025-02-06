@@ -104,15 +104,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        register_deadline(nil, 5 * 60)
-        hop_destroy
-      end
-    end
-  end
-
   label def wait
     cleanup_cache if github_repository.access_key
     nap 15 * 60 if Time.now - github_repository.last_job_at > 6 * 60 * 60
@@ -134,6 +125,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
   label def destroy
     decr_destroy
+    register_deadline(nil, 5 * 60)
 
     unless github_repository.runners.empty?
       Clog.emit("Cannot destroy repository with active runners") { {not_destroyed_repository: {repository_name: github_repository.name}} }

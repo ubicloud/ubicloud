@@ -39,14 +39,6 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
-    end
-  end
-
   label def start
     register_deadline("wait", 120 * 60)
     hop_create_load_balancer

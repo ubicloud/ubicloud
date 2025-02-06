@@ -20,12 +20,6 @@ class Prog::Vnet::NicNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy if strand.label != "destroy"
-    end
-  end
-
   label def wait_allocation
     when_vm_allocated_set? do
       hop_wait_setup

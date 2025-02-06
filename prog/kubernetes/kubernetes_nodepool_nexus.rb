@@ -15,14 +15,6 @@ class Prog::Kubernetes::KubernetesNodepoolNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
-    end
-  end
-
   label def start
     nap 30 unless kubernetes_nodepool.cluster.strand.label == "wait"
     register_deadline("wait", 120 * 60)

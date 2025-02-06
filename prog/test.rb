@@ -3,7 +3,7 @@
 # A no-operation prog for testing.
 class Prog::Test < Prog::Base
   subject_is :sshable
-  semaphore :test_semaphore
+  semaphore :test_semaphore, :destroy
 
   label def start
   end
@@ -120,6 +120,10 @@ class Prog::Test < Prog::Base
 
   label def push_subject_id
     push Prog::Test, {"subject_id" => "70b633b7-1d24-4526-a47f-d2580597d53f"}
+  end
+
+  label def destroy
+    pop "destroyed"
   end
 end
 

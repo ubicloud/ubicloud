@@ -38,15 +38,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        register_deadline(nil, 10 * 60)
-        hop_destroy
-      end
-    end
-  end
-
   label def wait
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
@@ -141,6 +132,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   label def destroy
+    register_deadline(nil, 10 * 60)
+
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
       register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
 

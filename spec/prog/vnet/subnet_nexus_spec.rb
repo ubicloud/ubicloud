@@ -112,25 +112,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy if when_destroy_set?" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "hops to destroy if when_destroy_set? from wait_fw_rules" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("wait_fw_rules").at_least(:once)
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if strand is destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#wait" do
     it "hops to refresh_keys if when_refresh_keys_set?" do
       expect(nx).to receive(:when_refresh_keys_set?).and_yield
@@ -369,6 +350,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       vm = Vm.new(family: "standard", cores: 1, name: "dummy-vm", location: "dummy-location").tap {
         _1.id = "788525ed-d6f0-4937-a844-323d4fd91946"
       }
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
       expect(ps).to receive(:nics).and_return([nic]).twice
       expect(nic).to receive(:vm_id).and_return("vm-id")
       expect(nic).to receive(:vm).and_return(vm)

@@ -35,19 +35,6 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx).to receive(:strand).and_return(Strand.new(label: "destroy"))
-      expect { nx.before_run }.not_to hop
-    end
-  end
-
   describe "#start" do
     let(:order) {
       dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content")
