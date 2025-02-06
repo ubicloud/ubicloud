@@ -45,6 +45,11 @@ sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
 sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
 sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
+sudo mkdir -p /etc/systemd/logind.conf.d
+echo \[Login\]'
+'KillOnlyUsers\=rhizome'
+'KillUserProcesses\=yes'
+' | sudo tee /etc/systemd/logind.conf.d/rhizome.conf > /dev/null
 echo \#\ Supported\ HostKey\ algorithms\ by\ order\ of\ preference.'
 'HostKey\ /etc/ssh/ssh_host_ed25519_key'
 'HostKey\ /etc/ssh/ssh_host_rsa_key'
@@ -61,6 +66,10 @@ echo \#\ Supported\ HostKey\ algorithms\ by\ order\ of\ preference.'
 ''
 '\#\ LogLevel\ VERBOSE\ logs\ user\'s\ key\ fingerprint\ on\ login.\ Needed\ to\ have\ a\ clear\ audit\ track\ of\ which\ key\ was\ using\ to\ log\ in.'
 'LogLevel\ VERBOSE'
+''
+'\#\ Terminate\ sessions\ with\ clients\ that\ cannot\ return\ packets\ rapidly.'
+'ClientAliveInterval\ 2'
+'ClientAliveCountMax\ 4'
 ' | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
 echo test\ key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 sync
