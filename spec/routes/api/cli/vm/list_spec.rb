@@ -41,6 +41,14 @@ RSpec.describe Clover, "cli vm list" do
     END
   end
 
+  it "handles case where header size is larger than largest column size" do
+    @vm.update(name: "Abc")
+    expect(cli(%w[vm list])).to eq <<~END
+      location      name #{id_headr} ip4       ip6        
+      eu-central-h1 Abc  #{@vm.ubid} 128.0.0.1 128:1234::2
+    END
+  end
+
   it "handles multiple options" do
     expect(cli(%w[vm list -Nflocation,name,id])).to eq "eu-central-h1 test-vm #{@vm.ubid}\n"
     expect(cli(%w[vm list -flocation,name,id])).to eq <<~END
