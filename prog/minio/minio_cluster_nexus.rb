@@ -51,14 +51,6 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "wait_pools_destroyed"].include?(strand.label)
-        hop_destroy
-      end
-    end
-  end
-
   label def wait_pools
     register_deadline("wait", 10 * 60)
     if minio_cluster.pools.all? { _1.strand.label == "wait" }
