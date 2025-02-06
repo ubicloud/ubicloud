@@ -17,7 +17,7 @@ RSpec.describe Clover, "inference-api-key" do
     end
 
     it "inference api key page allows creating inference api key" do
-      expect(page).to have_flash_notice("Created Inference API Key with id #{@api_key.ubid}")
+      expect(page).to have_flash_notice("Created Inference API Key with id #{@api_key.ubid}. It may take a few minutes to sync.")
 
       expect(ApiKey.count).to eq(1)
       expect(@api_key.owner_id).to eq(project.id)

@@ -11,7 +11,7 @@ class Clover
       r.post true do
         authorize("InferenceApiKey:create", @project.id)
         iak = DB.transaction { ApiKey.create_inference_api_key(@project) }
-        flash["notice"] = "Created Inference API Key with id #{iak.ubid}"
+        flash["notice"] = "Created Inference API Key with id #{iak.ubid}. It may take a few minutes to sync."
         r.redirect "#{@project.path}/inference-api-key"
       end
 
