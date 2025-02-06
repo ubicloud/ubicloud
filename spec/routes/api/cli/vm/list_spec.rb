@@ -15,23 +15,23 @@ RSpec.describe Clover, "cli vm list" do
   end
 
   it "-i option includes VM ubid" do
-    expect(cli(%w[vm list -Ni])).to eq "#{@vm.ubid}\n"
+    expect(cli(%w[vm list -Nfid])).to eq "#{@vm.ubid}\n"
   end
 
   it "-n option includes VM name" do
-    expect(cli(%w[vm list -Nn])).to eq "test-vm\n"
+    expect(cli(%w[vm list -Nfname])).to eq "test-vm\n"
   end
 
   it "-l option includes VM location" do
-    expect(cli(%w[vm list -Nl])).to eq "eu-central-h1\n"
+    expect(cli(%w[vm list -Nflocation])).to eq "eu-central-h1\n"
   end
 
   it "-4 option includes VM IPv4 address" do
-    expect(cli(%w[vm list -N4])).to eq "128.0.0.1\n"
+    expect(cli(%w[vm list -Nfip4])).to eq "128.0.0.1\n"
   end
 
   it "-6 option includes VM IPv6 address" do
-    expect(cli(%w[vm list -N6])).to eq "128:1234::2\n"
+    expect(cli(%w[vm list -Nfip6])).to eq "128:1234::2\n"
   end
 
   it "headers are shown by default" do
@@ -42,10 +42,22 @@ RSpec.describe Clover, "cli vm list" do
   end
 
   it "handles multiple options" do
-    expect(cli(%w[vm list -Ninl])).to eq "eu-central-h1 test-vm #{@vm.ubid}\n"
-    expect(cli(%w[vm list -inl])).to eq <<~END
+    expect(cli(%w[vm list -Nflocation,name,id])).to eq "eu-central-h1 test-vm #{@vm.ubid}\n"
+    expect(cli(%w[vm list -flocation,name,id])).to eq <<~END
       location      name    #{id_headr}
       eu-central-h1 test-vm #{@vm.ubid}
     END
+  end
+
+  it "shows error for empty fields" do
+    expect(cli(%w[vm list -Nf] + [""], status: 400)).to eq "no fields given in vm list -f option"
+  end
+
+  it "shows error for duplicate fields" do
+    expect(cli(%w[vm list -Nfid,id], status: 400)).to eq "duplicate field(s) in vm list -f option"
+  end
+
+  it "shows error for invalid fields" do
+    expect(cli(%w[vm list -Nffoo], status: 400)).to eq "invalid field(s) given vm list -f option: foo"
   end
 end
