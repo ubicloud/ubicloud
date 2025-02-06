@@ -43,7 +43,7 @@ RSpec.describe Rodish do
           end
         end
 
-        args 2
+        args 2, invalid_args_message: "accepts: x y"
         run do |x, y|
           push [:a, x, y]
         end
@@ -155,11 +155,11 @@ RSpec.describe Rodish do
         expect(res).to be_empty
         expect { app.process(%w[a b], context: res) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a b subcommand (accepts: 1..., given: 0)")
         expect(res).to eq [:top, :before_a]
-        expect { app.process(%w[a], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 0)")
+        expect { app.process(%w[a], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
         expect(res).to eq [:top]
-        expect { app.process(%w[a 1], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 1)")
+        expect { app.process(%w[a 1], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
         expect(res).to eq [:top]
-        expect { app.process(%w[a 1 2 3], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for a subcommand (accepts: 2, given: 3)")
+        expect { app.process(%w[a 1 2 3], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid arguments for a subcommand (accepts: x y)")
         expect(res).to eq [:top]
         expect { app.process(%w[c 1], context: res.clear) }.to raise_error(Rodish::CommandFailure, "invalid number of arguments for c subcommand (accepts: 0, given: 1)")
         expect(res).to eq [:top]
