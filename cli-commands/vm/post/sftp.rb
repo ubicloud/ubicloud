@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 UbiRodish.on("vm").run_on("sftp") do
-  options("ubi vm location-name/(vm-name|_vm-ubid) sftp [options] [-- sftp-options]", key: :vm_ssh, &UbiCli::SSHISH_OPTS)
+  skip_option_parsing
 
   args(0...)
 

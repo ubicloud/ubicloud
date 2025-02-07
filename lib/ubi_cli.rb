@@ -7,12 +7,6 @@ class UbiCli
     [e.failure? ? 400 : 200, {"content-type" => "text/plain"}, [e.message]]
   end
 
-  SSHISH_OPTS = proc do
-    on("-4", "--ip4", "use IPv4 address")
-    on("-6", "--ip6", "use IPv6 address")
-    on("-u", "--user user", "override username")
-  end
-
   def initialize(env)
     @env = env
   end
