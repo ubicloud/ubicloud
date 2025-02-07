@@ -46,26 +46,16 @@ class UbiCli
     end
   end
 
+  def delete(path, params = {}, &block)
+    _req(_req_env("DELETE", path, params), &block)
+  end
+
   def post(path, params = {}, &block)
-    env = _req_env("POST", path)
-    env["rack.input"] = StringIO.new(params.to_json.force_encoding(Encoding::BINARY))
-    env.delete("roda.json_params")
-    _req(env, &block)
+    _req(_req_env("POST", path, params), &block)
   end
 
   def get(path, &block)
-    env = _req_env("GET", path)
-    env["rack.input"] = StringIO.new("".b)
-    _req(env, &block)
-  end
-
-  def _req_env(method, path)
-    @env.merge(
-      "REQUEST_METHOD" => method,
-      "PATH_INFO" => path,
-      "rack.request.form_input" => nil,
-      "rack.request.form_hash" => nil
-    )
+    _req(_req_env("GET", path, nil), &block)
   end
 
   def project_path(rest)
@@ -126,6 +116,21 @@ class UbiCli
     @env["puma.socket"]&.local_address&.ipv6?
   end
 
+  private
+
+  def _req_env(method, path, params)
+    env = @env.merge(
+      "REQUEST_METHOD" => method,
+      "PATH_INFO" => path,
+      "rack.request.form_input" => nil,
+      "rack.request.form_hash" => nil
+    )
+    params &&= params.to_json.force_encoding(Encoding::BINARY)
+    env["rack.input"] = StringIO.new(params || "".b)
+    env.delete("roda.json_params")
+    env
+  end
+
   def _req(env)
     res = _submit_req(env)
 
@@ -140,11 +145,10 @@ class UbiCli
         res[2] = yield(JSON.parse(body), res)
         res[1]["content-length"] = res[2].sum(&:bytesize).to_s
       end
-    # Temporary nocov until cli command that deletes
-    # :nocov:
     when 204
-      # :nocov:
-      # nothing, body should be empty
+      res[0] = 200
+      res[2] = yield(nil, res)
+      res[1]["content-length"] = res[2].sum(&:bytesize).to_s
     else
       body = +""
       res[2].each { body << _1 }
