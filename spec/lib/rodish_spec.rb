@@ -30,7 +30,6 @@ RSpec.describe Rodish do
           before do
             push :before_b
           end
-          # rubocop:enable RSpec/ScatteredSetup
 
           options "example a b [options] arg [...]", key: :b do
             on("-v", "b verbose output")
@@ -66,17 +65,28 @@ RSpec.describe Rodish do
       end
 
       on "g" do
+        post_options "example g arg [options] [subcommand [subcommand_options] [...]]", key: :g do
+          on("-v", "g verbose output")
+          on("-k", "--key=foo", "set key")
+        end
+
         args(2...)
 
         is "j" do
           push :j
         end
 
-        run_is "h" do
-          push :h
+        run_is "h" do |opts|
+          push [:h, opts.dig(:g, :v), opts.dig(:g, :key)]
         end
 
         run_on "i" do
+          before do |_, opts|
+            push opts.dig(:g, :v)
+            push opts.dig(:g, :key)
+          end
+          # rubocop:enable RSpec/ScatteredSetup
+
           is "k" do
             push :k
           end
@@ -129,11 +139,27 @@ RSpec.describe Rodish do
         app.process(%w[g j], context: res.clear)
         expect(res).to eq [:top, :j]
         app.process(%w[g 1 h], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], :h]
+        expect(res).to eq [:top, [:g, "1"], [:h, nil, nil]]
         app.process(%w[g 1 i], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], :i]
+        expect(res).to eq [:top, [:g, "1"], nil, nil, :i]
         app.process(%w[g 1 i k], context: res.clear)
-        expect(res).to eq [:top, [:g, "1"], :k]
+        expect(res).to eq [:top, [:g, "1"], nil, nil, :k]
+      end
+
+      it "supports post options for commands, parsed before subcommand dispatching" do
+        res = []
+        app.process(%w[g 1 -v h], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], [:h, true, nil]]
+        app.process(%w[g 1 -v i], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], true, nil, :i]
+        app.process(%w[g 1 -v i k], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], true, nil, :k]
+        app.process(%w[g 1 -k 2 h], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], [:h, nil, "2"]]
+        app.process(%w[g 1 -k 2 i], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], nil, "2", :i]
+        app.process(%w[g 1 -k 2 i k], context: res.clear)
+        expect(res).to eq [:top, [:g, "1"], nil, "2", :k]
       end
 
       it "handles invalid subcommands dispatched to during run" do

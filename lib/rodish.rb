@@ -20,7 +20,7 @@ module Rodish
   end
 
   class OptionParser < ::OptionParser
-    attr_accessor :rodish_command
+    attr_accessor :subcommands
 
     # Don't add officious, which includes options that call exit
     def add_officious
@@ -29,8 +29,8 @@ module Rodish
     def to_s
       string = super
 
-      if @rodish_command && !@rodish_command.subcommands.empty?
-        string += "\nSubcommands: #{@rodish_command.subcommands.keys.sort.join(" ")}\n"
+      unless subcommands.empty?
+        string += "\nSubcommands: #{subcommands.keys.sort.join(" ")}\n"
       end
 
       string
@@ -57,14 +57,13 @@ module Rodish
     end
 
     def options(banner, key: nil, &block)
-      option_parser = OptionParser.new
-      option_parser.set_banner("Usage: #{banner}")
-      option_parser.separator ""
-      option_parser.separator "Options:"
-      option_parser.instance_exec(&block)
-      option_parser.rodish_command = @command
       @command.option_key = key
-      @command.option_parser = option_parser
+      @command.option_parser = create_option_parser(banner, @command.subcommands, &block)
+    end
+
+    def post_options(banner, key: nil, &block)
+      @command.post_option_key = key
+      @command.post_option_parser = create_option_parser(banner, @command.post_subcommands, &block)
     end
 
     def before(&block)
@@ -123,6 +122,16 @@ module Rodish
       command_path = @command.command_path + [command_name]
       hash[command_name] = DSL.command(command_path.freeze, &block)
     end
+
+    def create_option_parser(banner, subcommands, &block)
+      option_parser = OptionParser.new
+      option_parser.set_banner("Usage: #{banner}")
+      option_parser.separator ""
+      option_parser.separator "Options:"
+      option_parser.instance_exec(&block)
+      option_parser.subcommands = subcommands
+      option_parser
+    end
   end
 
   class Command
@@ -133,6 +142,8 @@ module Rodish
     attr_accessor :command_path
     attr_accessor :option_parser
     attr_accessor :option_key
+    attr_accessor :post_option_parser
+    attr_accessor :post_option_key
     attr_accessor :before
     attr_accessor :num_args
     attr_accessor :invalid_args_message
@@ -158,6 +169,8 @@ module Rodish
     end
 
     def run_post_subcommand(context, options, argv)
+      process_options(argv, options, @post_option_key, @post_option_parser)
+
       if argv[0] && @post_subcommands[argv[0]]
         process_subcommand(@post_subcommands, context, options, argv)
       else
@@ -167,18 +180,7 @@ module Rodish
     alias_method :run, :run_post_subcommand
 
     def process(context, options, argv)
-      if @option_parser
-        option_key = @option_key
-        command_options = option_key ? {} : options
-
-        @option_parser.order!(argv, into: command_options)
-
-        if option_key && !command_options.empty?
-          options[option_key] = command_options
-        end
-      else
-        DEFAULT_OPTION_PARSER.order!(argv)
-      end
+      process_options(argv, options, @option_key, @option_parser)
 
       if argv[0] && @subcommands[argv[0]]
         process_subcommand(@subcommands, context, options, argv)
@@ -217,6 +219,20 @@ module Rodish
     end
 
     private
+
+    def process_options(argv, options, option_key, option_parser)
+      if option_parser
+        command_options = option_key ? {} : options
+
+        option_parser.order!(argv, into: command_options)
+
+        if option_key && !command_options.empty?
+          options[option_key] = command_options
+        end
+      else
+        DEFAULT_OPTION_PARSER.order!(argv)
+      end
+    end
 
     def process_subcommand(subcommands, context, options, argv)
       subcommand = subcommands[argv[0]]
