@@ -14,24 +14,29 @@ RSpec.describe Clover, "cli vm list" do
     expect(cli(%w[vm list -N])).to eq "eu-central-h1  test-vm  #{@vm.ubid}  128.0.0.1  128:1234::2\n"
   end
 
-  it "-i option includes VM ubid" do
+  it "-f id option includes VM ubid" do
     expect(cli(%w[vm list -Nfid])).to eq "#{@vm.ubid}\n"
   end
 
-  it "-n option includes VM name" do
+  it "-f name option includes VM name" do
     expect(cli(%w[vm list -Nfname])).to eq "test-vm\n"
   end
 
-  it "-l option includes VM location" do
+  it "-f location option includes VM location" do
     expect(cli(%w[vm list -Nflocation])).to eq "eu-central-h1\n"
   end
 
-  it "-4 option includes VM IPv4 address" do
+  it "-f ip4 option includes VM IPv4 address" do
     expect(cli(%w[vm list -Nfip4])).to eq "128.0.0.1\n"
   end
 
-  it "-6 option includes VM IPv6 address" do
+  it "-f ip6 option includes VM IPv6 address" do
     expect(cli(%w[vm list -Nfip6])).to eq "128:1234::2\n"
+  end
+
+  it "-l option filters to specific location" do
+    expect(cli(%w[vm list -Nleu-central-h1])).to eq "eu-central-h1  test-vm  #{@vm.ubid}  128.0.0.1  128:1234::2\n"
+    expect(cli(%w[vm list -Nleu-north-h1])).to eq ""
   end
 
   it "headers are shown by default" do
@@ -67,5 +72,9 @@ RSpec.describe Clover, "cli vm list" do
 
   it "shows error for invalid fields" do
     expect(cli(%w[vm list -Nffoo], status: 400)).to eq "invalid field(s) given vm list -f option: foo"
+  end
+
+  it "shows error for invalid location" do
+    expect(cli(%w[vm list -Nleu-foo-h1], status: 400)).to eq "invalid location provided in vm list -l option"
   end
 end
