@@ -41,7 +41,7 @@ module Authorization
 
     base_ds = DB[table]
       .select(:tag_id, 0)
-      .where(column => Sequel.any_uuid(values))
+      .where(column => values)
 
     if project_id
       # We only look for applied_action_tag entries with an action_tag for the project or global action_tags.
@@ -66,7 +66,7 @@ module Authorization
 
     if actions
       actions = Array(actions).map { ActionType::NAME_MAP.fetch(it) }
-      dataset = dataset.where(Sequel.or([nil, Sequel.any_uuid(actions), recursive_tag_query(:action, actions, project_id:)].map { [:action_id, it] }))
+      dataset = dataset.where(Sequel.or([nil, actions, recursive_tag_query(:action, actions, project_id:)].map { [:action_id, it] }))
     end
 
     if object_id

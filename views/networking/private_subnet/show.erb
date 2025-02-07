@@ -1,8 +1,8 @@
 <% @page_title = @ps[:name]
 
 perm_checks = {
-  "Firewall:view" => Firewall.where(id: Sequel.any_uuid(@ps[:firewalls].map { UBID.to_uuid(it[:id]) })),
-  "PrivateSubnet:view" => PrivateSubnet.where(id: Sequel.any_uuid(@connected_subnets.map { UBID.to_uuid(it[:id]) }))
+  "Firewall:view" => Firewall.where(id: @ps[:firewalls].map { UBID.to_uuid(it[:id]) }),
+  "PrivateSubnet:view" => PrivateSubnet.where(id: @connected_subnets.map { UBID.to_uuid(it[:id]) })
 }
 
 viewable_fws, viewable_subnets =
