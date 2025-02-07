@@ -24,22 +24,9 @@ UbiRodish.on("vm", "list") do
     get(project_path(path)) do |data|
       keys = fields
       headers = true
+
       if (opts = opts[:vm_list])
-        if opts[:fields]
-          keys = opts[:fields].split(",")
-          if keys.empty?
-            raise Rodish::CommandFailure, "no fields given in vm list -f option"
-          end
-          unless keys.size == keys.uniq.size
-            raise Rodish::CommandFailure, "duplicate field(s) in vm list -f option"
-          end
-
-          invalid_keys = keys - fields
-          unless invalid_keys.empty?
-            raise Rodish::CommandFailure, "invalid field(s) given vm list -f option: #{invalid_keys.join(",")}"
-          end
-        end
-
+        keys = check_fields(opts[:fields], fields, "vm list -f option")
         headers = false if opts[:"no-headers"] == false
       end
 

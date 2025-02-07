@@ -46,6 +46,28 @@ class UbiCli
     end
   end
 
+  def check_fields(given_fields, allowed_fields, option_name)
+    if given_fields
+      keys = given_fields.split(",")
+
+      if keys.empty?
+        raise Rodish::CommandFailure, "no fields given in #{option_name}"
+      end
+      unless keys.size == keys.uniq.size
+        raise Rodish::CommandFailure, "duplicate field(s) in #{option_name}"
+      end
+
+      invalid_keys = keys - allowed_fields
+      unless invalid_keys.empty?
+        raise Rodish::CommandFailure, "invalid field(s) given in #{option_name}: #{invalid_keys.join(",")}"
+      end
+
+      keys
+    else
+      allowed_fields
+    end
+  end
+
   def delete(path, params = {}, &block)
     _req(_req_env("DELETE", path, params), &block)
   end
