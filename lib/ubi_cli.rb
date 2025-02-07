@@ -80,7 +80,7 @@ class UbiCli
     "/project/#{project_ubid}/#{rest}"
   end
 
-  def format_rows(keys, rows, headers: false)
+  def format_rows(keys, rows, headers: false, col_sep: "  ")
     results = []
 
     sizes = Hash.new(0)
@@ -105,7 +105,7 @@ class UbiCli
       sep = false
       string_keys.each do |key|
         if sep
-          results << " "
+          results << col_sep
         else
           sep = true
         end
@@ -118,7 +118,7 @@ class UbiCli
       sep = false
       keys.each do |key|
         if sep
-          results << " "
+          results << col_sep
         else
           sep = true
         end

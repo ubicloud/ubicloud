@@ -11,7 +11,7 @@ RSpec.describe Clover, "cli vm list" do
   end
 
   it "shows list of vms" do
-    expect(cli(%w[vm list -N])).to eq "eu-central-h1 test-vm #{@vm.ubid} 128.0.0.1 128:1234::2\n"
+    expect(cli(%w[vm list -N])).to eq "eu-central-h1  test-vm  #{@vm.ubid}  128.0.0.1  128:1234::2\n"
   end
 
   it "-i option includes VM ubid" do
@@ -36,24 +36,24 @@ RSpec.describe Clover, "cli vm list" do
 
   it "headers are shown by default" do
     expect(cli(%w[vm list])).to eq <<~END
-      location      name    #{id_headr} ip4       ip6        
-      eu-central-h1 test-vm #{@vm.ubid} 128.0.0.1 128:1234::2
+      location       name     #{id_headr}  ip4        ip6        
+      eu-central-h1  test-vm  #{@vm.ubid}  128.0.0.1  128:1234::2
     END
   end
 
   it "handles case where header size is larger than largest column size" do
     @vm.update(name: "Abc")
     expect(cli(%w[vm list])).to eq <<~END
-      location      name #{id_headr} ip4       ip6        
-      eu-central-h1 Abc  #{@vm.ubid} 128.0.0.1 128:1234::2
+      location       name  #{id_headr}  ip4        ip6        
+      eu-central-h1  Abc   #{@vm.ubid}  128.0.0.1  128:1234::2
     END
   end
 
   it "handles multiple options" do
-    expect(cli(%w[vm list -Nflocation,name,id])).to eq "eu-central-h1 test-vm #{@vm.ubid}\n"
+    expect(cli(%w[vm list -Nflocation,name,id])).to eq "eu-central-h1  test-vm  #{@vm.ubid}\n"
     expect(cli(%w[vm list -flocation,name,id])).to eq <<~END
-      location      name    #{id_headr}
-      eu-central-h1 test-vm #{@vm.ubid}
+      location       name     #{id_headr}
+      eu-central-h1  test-vm  #{@vm.ubid}
     END
   end
 
