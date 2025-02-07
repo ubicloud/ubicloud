@@ -1,7 +1,7 @@
 <% @page_title = @vm[:name]
 
 viewable_fws =
-  dataset_authorize(Firewall.where(id: @vm[:firewalls].map { UBID.to_uuid(_1[:id]) }), "Firewall:view")
+  dataset_authorize(Firewall.where(id: Sequel.any_uuid(@vm[:firewalls].map { UBID.to_uuid(_1[:id]) })), "Firewall:view")
     .select_hash(:id, Sequel.as(true, :v))
     .transform_keys! { UBID.from_uuidish(_1).to_s } %>
 
