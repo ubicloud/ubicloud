@@ -176,10 +176,10 @@ module Scheduling::Allocator
 
       ds = ds.where { used_ipv4 < total_ipv4 } if request.ip4_enabled
       ds = ds.where { available_gpus >= request.gpu_count } if request.gpu_count > 0
-      ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
-      ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
+      ds = ds.where(Sequel[:vm_host][:id] => Sequel.any_uuid(request.host_filter)) unless request.host_filter.empty?
+      ds = ds.exclude(Sequel[:vm_host][:id] => Sequel.any_uuid(request.host_exclusion_filter)) unless request.host_exclusion_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
-      ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
+      ds = ds.where(allocation_state: Sequel.any_type(request.allocation_state_filter, :allocation_state)) unless request.allocation_state_filter.empty?
 
       # Emit the allocation query if the project is flagged for
       # diagnostics.
