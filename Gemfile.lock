@@ -8,14 +8,6 @@ GIT
       rodauth (~> 2.36)
 
 GIT
-  remote: https://github.com/jeremyevans/sequel.git
-  revision: 5336fb646a7736ce3c1f53ed954064d61e6bafe2
-  ref: 5336fb646a7736ce3c1f53ed954064d61e6bafe2
-  specs:
-    sequel (5.89.0)
-      bigdecimal
-
-GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: a9ff0001a1eb028e2186b222aeb02b07c04f9808
   ref: a9ff0001a1eb028e2186b222aeb02b07c04f9808
@@ -356,6 +348,8 @@ GEM
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
     securerandom (0.4.1)
+    sequel (5.90.0)
+      bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
     sequel_pg (1.17.1)
@@ -489,7 +483,7 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
-  sequel!
+  sequel (>= 5.90)
   sequel-annotate
   sequel_pg (>= 1.8)
   shellwords
