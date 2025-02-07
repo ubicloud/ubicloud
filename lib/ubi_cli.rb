@@ -46,14 +46,12 @@ class UbiCli
     end
   end
 
-  # Temporary nocov until cli command supported that uses post
-  # :nocov:
   def post(path, params = {}, &block)
     env = _req_env("POST", path)
     env["rack.input"] = StringIO.new(params.to_json.force_encoding(Encoding::BINARY))
+    env.delete("roda.json_params")
     _req(env, &block)
   end
-  # :nocov:
 
   def get(path, &block)
     env = _req_env("GET", path)
@@ -153,9 +151,14 @@ class UbiCli
       error_message = "Error: unexpected response status: #{res[0]}"
       # Temporary nocov until at least one action pushed into routes
       # :nocov:
-      if res[1]["content-type"] == "application/json" && (error = JSON.parse(body).dig("error", "message"))
+      if (res[1]["content-type"] == "application/json") && (parsed_body = JSON.parse(body)) && (error = parsed_body.dig("error", "message"))
         # :nocov:
         error_message << "\nDetails: #{error}"
+        if (details = parsed_body.dig("error", "details"))
+          details.each do |k, v|
+            error_message << "\n  " << k << ": " << v
+          end
+        end
       end
       res[2] = [error_message]
       res[1]["content-length"] = res[2][0].bytesize.to_s
