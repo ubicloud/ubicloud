@@ -180,6 +180,7 @@ module Scheduling::Allocator
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
       ds = ds.where(location: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
+      ds = ds.exclude(total_cores: 14, total_cpus: 14) unless request.family == "standard-gpu"
 
       # Emit the allocation query if the project is flagged for
       # diagnostics.

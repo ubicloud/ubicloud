@@ -757,6 +757,7 @@ RSpec.describe Al do
       vmh.update(arch: "x64", total_dies: 1, total_sockets: 1, total_cpus: 14, total_cores: 14, used_cores: 2)
 
       vm = create_vm
+      vm.family = "standard-gpu"
       used_cores = vmh.used_cores
       described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
         {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
@@ -767,6 +768,17 @@ RSpec.describe Al do
       expect(vm.vcpus).to eq(2)
       expect(vm.cores).to eq(2)
       expect(used_cores + vm.cores).to eq(vmh.used_cores)
+    end
+
+    it "only allocates standard-gpu vms on GEX44 host" do
+      vmh = VmHost.first
+      vmh.update(arch: "x64", total_dies: 1, total_sockets: 1, total_cpus: 14, total_cores: 14, used_cores: 2)
+
+      vm = create_vm
+      expect {
+        described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
+          {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
   end
 
