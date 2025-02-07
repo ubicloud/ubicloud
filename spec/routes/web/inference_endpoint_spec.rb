@@ -55,6 +55,52 @@ RSpec.describe Clover, "inference-endpoint" do
       expect(page.title).to eq("Ubicloud - Inference Endpoints")
       expect(page).to have_no_content("e5-mistral-7b-it")
     end
+
+    it "shows free quota notice with correct free inference tokens" do
+      ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location: "hetzner-fsn1").subject
+      lb = LoadBalancer.create_with_id(private_subnet_id: ps.id, name: "dummy-lb-1", src_port: 80, dst_port: 80, health_check_endpoint: "/up", project_id: project.id)
+      ie = InferenceEndpoint.create_with_id(name: "ie1", model_name: "test-model", project_id: project.id, is_public: true, visible: true, location: "loc", vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, load_balancer_id: lb.id)
+      visit "#{project.path}/inference-api-key"
+      expect(page.text).to include("You have 500000 free inference tokens available (few-minute delay). Free quota refreshes next month.")
+
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: ie.id,
+        resource_name: ie.name,
+        span: Sequel::Postgres::PGRange.new(Time.now, nil),
+        billing_rate_id: BillingRate.from_resource_type("InferenceTokens").first["id"],
+        amount: 0,
+        free_quota_amount: 100000
+      )
+      visit "#{project.path}/inference-api-key"
+      expect(page.text).to include("You have 400000 free inference tokens available (few-minute delay). Free quota refreshes next month.")
+
+      BillingRecord.create_with_id(
+        project_id: project.id,
+        resource_id: ie.id,
+        resource_name: ie.name,
+        span: Sequel::Postgres::PGRange.new(Time.now, nil),
+        billing_rate_id: BillingRate.from_resource_type("InferenceTokens").first["id"],
+        amount: 333,
+        free_quota_amount: 99999999
+      )
+      visit "#{project.path}/inference-api-key"
+      expect(page.text).to include("You have 0 free inference tokens available (few-minute delay). Free quota refreshes next month.")
+    end
+
+    it "shows free quota notice with billing valid message" do
+      expect(Config).to receive(:stripe_secret_key).at_least(:once).and_return(nil)
+      expect(project.has_valid_payment_method?).to be true
+      visit "#{project.path}/inference-api-key"
+      expect(page.text).to include("Billing information is valid. Charges start after the free quota.")
+    end
+
+    it "shows free quota notice with billing unavailable message" do
+      expect(Config).to receive(:stripe_secret_key).at_least(:once).and_return("test_stripe_secret_key")
+      expect(project.has_valid_payment_method?).to be false
+      visit "#{project.path}/inference-api-key"
+      expect(page.text).to include("To avoid service interruption, please click here to add a valid billing method.")
+    end
   end
 
   describe "unauthenticated" do

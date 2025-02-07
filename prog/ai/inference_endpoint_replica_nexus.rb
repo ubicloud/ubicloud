@@ -169,7 +169,10 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       .exists
 
     eligible_projects_ds = Project.where(api_key_ds)
+    free_quota_exhausted_projects_ds = FreeQuota.get_free_quota_exhausted_projects("inference-tokens")
     eligible_projects_ds = eligible_projects_ds.where(id: inference_endpoint.project.id) unless inference_endpoint.is_public
+    eligible_projects_ds = eligible_projects_ds
+      .exclude(billing_info_id: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
 
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
@@ -191,10 +194,10 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     resp = vm.sshable.cmd("sudo curl -m 5 -s -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
     project_usage = JSON.parse(resp)["projects"]
     Clog.emit("Successfully pinged inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage: project_usage} }
-    update_billing_records(project_usage)
+    update_billing_records(project_usage, free_quota_exhausted_projects_ds)
   end
 
-  def update_billing_records(project_usage)
+  def update_billing_records(project_usage, free_quota_exhausted_projects_ds)
     rate = BillingRate.from_resource_properties("InferenceTokens", inference_endpoint.model_name, "global")
     return if rate["unit_price"].zero?
     rate_id = rate["id"]
@@ -205,6 +208,9 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       tokens = usage["prompt_token_count"] + usage["completion_token_count"]
       next if tokens.zero?
       project = Project.from_ubid(usage["ubid"])
+      has_free_quota = !free_quota_exhausted_projects_ds.include?(project.id)
+      amount = has_free_quota ? 0 : tokens
+      free_quota_amount = has_free_quota ? tokens : 0
 
       begin
         today_record = BillingRecord
@@ -213,7 +219,8 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
           .first
 
         if today_record
-          today_record.amount = Sequel[:amount] + tokens
+          today_record.amount = Sequel[:amount] + amount
+          today_record.free_quota_amount = Sequel[:free_quota_amount] + free_quota_amount
           today_record.save_changes(validate: false)
         else
           BillingRecord.create_with_id(
@@ -222,7 +229,8 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
             resource_name: "Inference tokens #{inference_endpoint.model_name} #{begin_time.strftime("%Y-%m-%d")}",
             billing_rate_id: rate_id,
             span: Sequel.pg_range(begin_time...end_time),
-            amount: tokens
+            amount: amount,
+            free_quota_amount: free_quota_amount
           )
         end
       rescue Sequel::Error => ex
