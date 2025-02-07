@@ -210,10 +210,9 @@ module Scheduling::Allocator
       @candidate_host = candidate_host
       @request = request
       request_cores = request.cores_for_vcpus(candidate_host[:total_cpus] / candidate_host[:total_cores])
-      request_memory = request.memory_gib_for_cores(request_cores)
 
       @vm_host_allocations = [VmHostCpuAllocation.new(:used_cores, candidate_host[:total_cores], candidate_host[:used_cores], request_cores),
-        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request_memory)]
+        VmHostAllocation.new(:used_hugepages_1g, candidate_host[:total_hugepages_1g], candidate_host[:used_hugepages_1g], request.memory_gib)]
       @device_allocations = [StorageAllocation.new(candidate_host, request)]
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
 
