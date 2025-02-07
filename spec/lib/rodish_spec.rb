@@ -102,6 +102,16 @@ RSpec.describe Rodish do
         end
       end
 
+      on "l" do
+        skip_option_parsing
+
+        args(0...)
+
+        run do |argv|
+          push [:l, argv]
+        end
+      end
+
       run do
         push :empty
       end
@@ -160,6 +170,12 @@ RSpec.describe Rodish do
         expect(res).to eq [:top, [:g, "1"], nil, "2", :i]
         app.process(%w[g 1 -k 2 i k], context: res.clear)
         expect(res).to eq [:top, [:g, "1"], nil, "2", :k]
+      end
+
+      it "supports skipping option parsing" do
+        res = []
+        app.process(%w[l -A 1 b], context: res.clear)
+        expect(res).to eq [:top, [:l, %w[-A 1 b]]]
       end
 
       it "handles invalid subcommands dispatched to during run" do
@@ -238,7 +254,7 @@ RSpec.describe Rodish do
                   --version                    show program version
                   --help                       show program help
 
-          Subcommands: a c d e g
+          Subcommands: a c d e g l
         USAGE
       end
 
@@ -253,7 +269,7 @@ RSpec.describe Rodish do
                   --version                    show program version
                   --help                       show program help
 
-          Subcommands: a c d e g
+          Subcommands: a c d e g l
         USAGE
         expect(usages["a"]).to eq <<~USAGE
           Usage: example a [options] [subcommand [subcommand_options] [...]]
