@@ -175,6 +175,7 @@ module Config
 
   # e2e
   optional :e2e_github_installation_id, string
+  override :is_e2e, false, bool
 
   # Load Balancer
   optional :load_balancer_service_project_id, string

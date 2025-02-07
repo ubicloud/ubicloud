@@ -30,7 +30,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         boot_image: "ubuntu-jammy",
         enable_ip4: true,
         private_subnet_id: minio_pool.cluster.private_subnet.id,
-        distinct_storage_devices: Config.production?
+        distinct_storage_devices: Config.production? && !Config.is_e2e
       )
 
       minio_server = MinioServer.create(minio_pool_id: minio_pool_id, vm_id: vm_st.id, index: index) { _1.id = ubid.to_uuid }
@@ -206,7 +206,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       root_cert_key = OpenSSL::PKey::EC.new(minio_server.cluster.root_cert_key_2)
     end
 
-    ip_san = Config.development? ? ",IP:#{minio_server.vm.ephemeral_net4}" : nil
+    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{minio_server.vm.ephemeral_net4}" : nil
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{minio_server.cluster.ubid} Server Certificate",
