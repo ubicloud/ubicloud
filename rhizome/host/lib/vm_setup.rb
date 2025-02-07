@@ -303,8 +303,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
       r "ip -n #{q_vm} route replace #{ip6.to_s.shellescape} via #{mac_to_ipv6_link_local(nic.mac)} dev #{nic.tap}"
     end
 
-    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:5AFE:CE::/56 dev #{nics.first.tap}"
-    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:53::/48 dev #{nics.first.tap}"
+    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:5AFE:CE:: dev #{nics.first.tap}"
+    r "ip -n #{q_vm} addr replace fd00:0b1c:100d:53:: dev #{nics.first.tap}"
   end
 
   def parse_routes(routes)
@@ -567,10 +567,8 @@ YAML
     nft_safe_sudo_allow = <<NFT_ADD_COMMS
   - [nft, add, table, ip6, filter]
   - [nft, add, chain, ip6, filter, output, "{", type, filter, hook, output, priority, 0, ";", "}"]
-  - [nft, add, rule, ip6, filter, output, ip6, daddr, 'fd00:0b1c:100d:5AFE::/56', meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
+  - [nft, add, rule, ip6, filter, output, ip6, daddr, 'fd00:0b1c:100d:5AFE::/64', meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
 NFT_ADD_COMMS
-
-    nft_safe_sudo_allow_inst = install_cmd + nft_safe_sudo_allow
 
     vp.write_user_data(<<EOS)
 #cloud-config
@@ -585,7 +583,7 @@ ssh_pwauth: False
 
 runcmd:
   - [systemctl, daemon-reload]
-#{nft_safe_sudo_allow_inst}
+#{install_cmd}
 
 bootcmd:
 #{nft_safe_sudo_allow}
