@@ -25,7 +25,7 @@ RSpec.describe Clover, "cli vm scp" do
   end
 
   it "supports scp options" do
-    expect(cli_exec(["vm", @ref, "scp", ":remote", "local", "-A"])).to eq %w[scp -A -- ubi@[128:1234::2]:remote local]
+    expect(cli_exec(["vm", @ref, "scp", "-A", ":remote", "local"])).to eq %w[scp -A -- ubi@[128:1234::2]:remote local]
   end
 
   it "returns error if both files are local" do

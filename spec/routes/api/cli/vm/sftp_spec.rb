@@ -21,6 +21,6 @@ RSpec.describe Clover, "cli vm sftp" do
   end
 
   it "supports sftp options" do
-    expect(cli_exec(["vm", @ref, "sftp", "--", "-A"])).to eq %w[sftp -A -- ubi@[128:1234::2]]
+    expect(cli_exec(["vm", @ref, "sftp", "-A"])).to eq %w[sftp -A -- ubi@[128:1234::2]]
   end
 end
