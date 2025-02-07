@@ -56,6 +56,10 @@ module Rodish
       @command = command
     end
 
+    def skip_option_parsing
+      @command.option_parser = :skip
+    end
+
     def options(banner, key: nil, &block)
       @command.option_key = key
       @command.option_parser = create_option_parser(banner, @command.subcommands, &block)
@@ -221,7 +225,12 @@ module Rodish
     private
 
     def process_options(argv, options, option_key, option_parser)
-      if option_parser
+      case option_parser
+      when :skip
+        # do nothing
+      when nil
+        DEFAULT_OPTION_PARSER.order!(argv)
+      else
         command_options = option_key ? {} : options
 
         option_parser.order!(argv, into: command_options)
@@ -229,8 +238,6 @@ module Rodish
         if option_key && !command_options.empty?
           options[option_key] = command_options
         end
-      else
-        DEFAULT_OPTION_PARSER.order!(argv)
       end
     end
 
@@ -300,8 +307,8 @@ module Rodish
       usages = {}
 
       command.each_subcommand do |names, command|
-        if command.option_parser
-          usages[names.join(" ")] = command.option_parser.to_s
+        if (parser = command.option_parser) && parser != :skip
+          usages[names.join(" ")] = parser.to_s
         end
       end
 
