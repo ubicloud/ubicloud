@@ -53,6 +53,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def create_load_balancer
+    custom_hostname_dns_zone_id = DnsZone[name: Config.kubernetes_service_hostname]&.id
     load_balancer_st = Prog::Vnet::LoadBalancerNexus.assemble(
       kubernetes_cluster.private_subnet_id,
       name: "#{kubernetes_cluster.name}-apiserver",
@@ -61,6 +62,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       dst_port: 6443,
       health_check_endpoint: "/healthz",
       health_check_protocol: "tcp",
+      custom_hostname_dns_zone_id:,
       stack: LoadBalancer::Stack::IPV4
     )
     kubernetes_cluster.update(api_server_lb_id: load_balancer_st.id)

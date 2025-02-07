@@ -108,7 +108,25 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#create_load_balancer" do
-    it "creates a load balancer for api server and hops" do
+    it "creates a load balancer with the right dns zone on prod for api server and hops" do
+      allow(Config).to receive(:kubernetes_service_hostname).and_return("k8s.ubicloud.com")
+      dns_zone = DnsZone.create_with_id(project_id: Project.first.id, name: "k8s.ubicloud.com", last_purged_at: Time.now)
+
+      expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
+
+      expect(kubernetes_cluster.api_server_lb.name).to eq "k8scluster-apiserver"
+      expect(kubernetes_cluster.api_server_lb.src_port).to eq 443
+      expect(kubernetes_cluster.api_server_lb.dst_port).to eq 6443
+      expect(kubernetes_cluster.api_server_lb.health_check_endpoint).to eq "/healthz"
+      expect(kubernetes_cluster.api_server_lb.health_check_protocol).to eq "tcp"
+      expect(kubernetes_cluster.api_server_lb.stack).to eq LoadBalancer::Stack::IPV4
+      expect(kubernetes_cluster.api_server_lb.private_subnet_id).to eq subnet.id
+      expect(kubernetes_cluster.api_server_lb.custom_hostname_dns_zone_id).to eq dns_zone.id
+    end
+
+    it "creates a load balancer with dns zone id on development for api server and hops" do
+      allow(Config).to receive(:development?).and_return(true)
+
       expect { nx.create_load_balancer }.to hop("bootstrap_control_plane_vms")
 
       expect(kubernetes_cluster.api_server_lb.name).to eq "k8scluster-apiserver"
