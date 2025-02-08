@@ -103,20 +103,16 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
 
   label def destroy
     register_deadline(nil, 10 * 60)
-    DB.transaction do
-      decr_destroy
-      minio_cluster.pools.each(&:incr_destroy)
-    end
+    decr_destroy
+    minio_cluster.pools.each(&:incr_destroy)
     hop_wait_pools_destroyed
   end
 
   label def wait_pools_destroyed
     nap 10 unless minio_cluster.pools.empty?
-    DB.transaction do
-      minio_cluster.private_subnet.firewalls.map(&:destroy)
-      minio_cluster.private_subnet.incr_destroy
-      minio_cluster.destroy
-    end
+    minio_cluster.private_subnet.firewalls.map(&:destroy)
+    minio_cluster.private_subnet.incr_destroy
+    minio_cluster.destroy
 
     pop "destroyed"
   end
