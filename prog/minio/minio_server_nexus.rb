@@ -179,14 +179,12 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def destroy
     register_deadline(nil, 10 * 60)
-    DB.transaction do
-      decr_destroy
-      minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "A", data: vm.ephemeral_net4&.to_s)
-      minio_server.vm.sshable.destroy
-      minio_server.vm.nics.each { _1.incr_destroy }
-      minio_server.vm.incr_destroy
-      minio_server.destroy
-    end
+    decr_destroy
+    minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "A", data: vm.ephemeral_net4&.to_s)
+    minio_server.vm.sshable.destroy
+    minio_server.vm.nics.each { _1.incr_destroy }
+    minio_server.vm.incr_destroy
+    minio_server.destroy
 
     pop "minio server destroyed"
   end
