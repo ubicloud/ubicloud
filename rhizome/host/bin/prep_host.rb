@@ -119,3 +119,5 @@ AuthenticationMethods publickey
 # LogLevel VERBOSE logs user's key fingerprint on login. Needed to have a clear audit track of which key was using to log in.
 LogLevel VERBOSE
 SSHD_CONFIG
+
+FileUtils.mkdir_p("/vm/logs")
