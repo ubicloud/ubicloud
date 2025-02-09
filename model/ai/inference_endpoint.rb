@@ -65,6 +65,9 @@ end
 #  private_subnet_id | uuid                     | NOT NULL
 #  gpu_count         | integer                  | NOT NULL DEFAULT 1
 #  tags              | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  max_requests      | integer                  | NOT NULL DEFAULT 500
+#  max_project_rps   | integer                  | NOT NULL DEFAULT 100
+#  max_project_tps   | integer                  | NOT NULL DEFAULT 10000
 # Indexes:
 #  inference_endpoint_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
