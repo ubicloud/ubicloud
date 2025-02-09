@@ -106,9 +106,6 @@ SETTINGS
     safe_write_to_file("/ie/workdir/inference-gateway.conf", <<CONFIG)
 RUST_BACKTRACE=1
 RUST_LOG=info
-IG_DAEMON=true
-IG_LOG="/ie/workdir/inference-gateway.log"
-IG_PID_FILE="/ie/workdir/inference-gateway.pid"
 IG_UPGRADE_UDS="/ie/workdir/inference-gateway.upgrade.sock"
 IG_CLOVER_UDS="/ie/workdir/inference-gateway.clover.sock"
 IG_LISTEN_ADDRESS="0.0.0.0:#{gateway_port}"
@@ -148,8 +145,6 @@ After=network.target
 
 [Service]
 EnvironmentFile=/ie/workdir/inference-gateway.conf
-Type=forking
-PIDFile=/ie/workdir/inference-gateway.pid
 ExecStart=/opt/inference-gateway/inference-gateway
 KillSignal=SIGINT
 WorkingDirectory=/ie/workdir
