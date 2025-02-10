@@ -140,7 +140,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#setup" do
     it "triggers setup if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"gpu_count\":1,\"inference_engine\":\"vllm\",\"inference_engine_params\":\"--some-params\",\"model\":\"llama\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443}"}).twice
+      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"gpu_count\":1,\"inference_engine\":\"vllm\",\"inference_engine_params\":\"--some-params\",\"model\":\"llama\",\"replica_ubid\":\"theubid\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:gpu_count).and_return(1).twice
       expect(inference_endpoint).to receive(:engine).and_return("vllm").twice
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params").twice

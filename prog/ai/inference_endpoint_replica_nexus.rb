@@ -86,7 +86,8 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         replica_ubid: inference_endpoint_replica.ubid,
         ssl_crt_path: "/ie/workdir/ssl/ubi_cert.pem",
         ssl_key_path: "/ie/workdir/ssl/ubi_key.pem",
-        gateway_port: inference_endpoint.load_balancer.dst_port
+        gateway_port: inference_endpoint.load_balancer.dst_port,
+        max_requests: inference_endpoint.max_requests
       }
       params_json = JSON.generate(params)
       vm.sshable.cmd("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", stdin: params_json)

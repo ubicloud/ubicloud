@@ -16,6 +16,7 @@ begin
   ssl_crt_path = params.fetch("ssl_crt_path")
   ssl_key_path = params.fetch("ssl_key_path")
   gateway_port = params.fetch("gateway_port")
+  max_requests = params.fetch("max_requests")
 rescue KeyError => e
   puts "Needed #{e.key} in parameters"
   exit 1
@@ -29,5 +30,6 @@ replica_setup.prep(
   replica_ubid:,
   ssl_crt_path:,
   ssl_key_path:,
-  gateway_port:
+  gateway_port:,
+  max_requests:
 )
