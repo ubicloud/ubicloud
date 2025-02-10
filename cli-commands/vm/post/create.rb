@@ -18,7 +18,7 @@ UbiRodish.on("vm").run_on("create") do
       params["enable_ip4"] = "1"
     end
     params["public_key"] = public_key
-    post(project_path("location/#{@location}/vm/#{@vm_name}"), params) do |data|
+    post(project_path("location/#{@location}/vm/#{@name}"), params) do |data|
       ["VM created with id: #{data["id"]}"]
     end
   end

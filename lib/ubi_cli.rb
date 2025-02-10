@@ -21,8 +21,7 @@ class UbiCli
       instance_exec(&block) if block
 
       run do |(ref, *argv), opts, command|
-        @location, name, extra = ref.split("/", 3)
-        instance_variable_set(:"@#{cmd}_name", name)
+        @location, @name, extra = ref.split("/", 3)
         raise Rodish::CommandFailure, "invalid #{cmd} reference, should be in location/(#{cmd}-name|_#{cmd}-ubid) format" if extra
         command.run(self, opts, argv)
       end
@@ -76,7 +75,7 @@ class UbiCli
   end
 
   def handle_ssh(opts)
-    get(project_path("location/#{@location}/vm/#{@vm_name}")) do |data, res|
+    get(project_path("location/#{@location}/vm/#{@name}")) do |data, res|
       if (opts = opts[:vm_ssh])
         user = opts[:user]
         if opts[:ip4]
