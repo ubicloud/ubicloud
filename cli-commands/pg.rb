@@ -3,6 +3,7 @@
 UbiRodish.on("pg") do
   # :nocov:
   unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
+    autoload_subcommand_dir("cli-commands/pg")
     autoload_post_subcommand_dir("cli-commands/pg/post")
   end
   # :nocov:
