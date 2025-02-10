@@ -46,8 +46,8 @@ class KubernetesCluster < Sequel::Model
   end
 
   def self.kubeconfig(vm)
-    rbac_token = vm.sshable.cmd("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d")
-    admin_kubeconfig = vm.sshable.cmd("sudo cat /etc/kubernetes/admin.conf")
+    rbac_token = vm.sshable.cmd("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false)
+    admin_kubeconfig = vm.sshable.cmd("sudo cat /etc/kubernetes/admin.conf", log: false)
     kubeconfig = YAML.safe_load(admin_kubeconfig)
     kubeconfig["users"].each do |user|
       user["user"].delete("client-certificate-data")
