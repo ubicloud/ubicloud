@@ -66,6 +66,9 @@ class GithubRepository < Sequel::Model
 
   def setup_blob_storage
     DB.transaction do
+      lock!
+      return if access_key && secret_key
+
       begin
         admin_client.create_bucket({
           bucket: bucket_name,

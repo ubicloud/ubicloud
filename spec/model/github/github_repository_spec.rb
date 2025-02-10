@@ -63,14 +63,24 @@ RSpec.describe GithubRepository do
       ]
       expect(cloudflare_client).to receive(:create_token).with("gph0hh0ahdbj6ng2cc3rvdecr8-token", expected_policy).and_return(["test-key", "test-secret"])
       expect(github_repository).to receive(:update).with(access_key: "test-key", secret_key: Digest::SHA256.hexdigest("test-secret"))
+      expect(github_repository).to receive(:lock!)
       github_repository.setup_blob_storage
     end
 
-    it "succeeds if the bucket already exists" do
+    it "succeeds if the bucket already exists and access key does not exist" do
       expect(Config).to receive_messages(github_cache_blob_storage_region: "weur", github_cache_blob_storage_account_id: "123")
       expect(blob_storage_client).to receive(:create_bucket).and_raise(Aws::S3::Errors::BucketAlreadyOwnedByYou.new(nil, nil))
       expect(cloudflare_client).to receive(:create_token).and_return(["test-key", "test-secret"])
+      expect(github_repository).to receive(:access_key).and_return(nil)
       expect(github_repository).to receive(:update).with(access_key: "test-key", secret_key: Digest::SHA256.hexdigest("test-secret"))
+      expect(github_repository).to receive(:lock!)
+      github_repository.setup_blob_storage
+    end
+
+    it "succeeds if the access and secret key already exist" do
+      expect(github_repository).to receive(:access_key).and_return("test-key")
+      expect(github_repository).to receive(:secret_key).and_return(Digest::SHA256.hexdigest("test-secret"))
+      expect(github_repository).to receive(:lock!)
       github_repository.setup_blob_storage
     end
   end
