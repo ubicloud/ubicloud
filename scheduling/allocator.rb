@@ -72,7 +72,7 @@ module Scheduling::Allocator
       memory_gib_ratio = if arch_filter == "arm64"
         3.2
       elsif family == "standard-gpu"
-        5.34
+        10.68
       else
         8
       end
