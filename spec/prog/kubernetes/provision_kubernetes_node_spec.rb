@@ -224,12 +224,13 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
       sshable = instance_double(Sshable)
       allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication").and_return("jt\n")
-      expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs").and_return("something\ncertificate key:\nck")
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command").and_return("discovery-token-ca-cert-hash dtcch")
+      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("jt\n")
+      expect(sshable).to receive(:cmd).with("sudo kubeadm init phase upload-certs --upload-certs", log: false).and_return("something\ncertificate key:\nck")
+      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:cmd).with(
         "common/bin/daemonizer kubernetes/bin/join-control-plane-node join_control_plane",
-        {stdin: /{"cluster_endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch"}/}
+        stdin: /{"cluster_endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch"}/,
+        log: false
       )
 
       expect { prog.join_control_plane }.to nap(15)
@@ -267,11 +268,12 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
       sshable = instance_double(Sshable)
       allow(kubernetes_cluster.cp_vms.first).to receive(:sshable).and_return(sshable)
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication").and_return("\njt\n")
-      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command").and_return("discovery-token-ca-cert-hash dtcch")
+      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).and_return("\njt\n")
+      expect(sshable).to receive(:cmd).with("sudo kubeadm token create --print-join-command", log: false).and_return("discovery-token-ca-cert-hash dtcch")
       expect(prog.vm.sshable).to receive(:cmd).with(
         "common/bin/daemonizer kubernetes/bin/join-worker-node join_worker",
-        {stdin: /{"endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch"}/}
+        stdin: /{"endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch"}/,
+        log: false
       )
 
       expect { prog.join_worker }.to nap(15)

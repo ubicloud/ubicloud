@@ -144,11 +144,11 @@ BASH
       cp_sshable = kubernetes_cluster.sshable
       params = {
         cluster_endpoint: "#{kubernetes_cluster.endpoint}:443",
-        join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").chomp,
-        certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs")[/certificate key:\n(.*)/, 1],
-        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
+        join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).chomp,
+        certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
+        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (.*)/, 1]
       }
-      vm.sshable.cmd("common/bin/daemonizer kubernetes/bin/join-control-plane-node join_control_plane", stdin: JSON.generate(params))
+      vm.sshable.cmd("common/bin/daemonizer kubernetes/bin/join-control-plane-node join_control_plane", stdin: JSON.generate(params), log: false)
       nap 15
     when "InProgress"
       nap 10
@@ -169,11 +169,11 @@ BASH
       cp_sshable = kubernetes_cluster.sshable
       params = {
         endpoint: "#{kubernetes_cluster.endpoint}:443",
-        join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication").tr("\n", ""),
-        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command")[/discovery-token-ca-cert-hash (.*)/, 1]
+        join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).tr("\n", ""),
+        discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (.*)/, 1]
       }
 
-      vm.sshable.cmd("common/bin/daemonizer kubernetes/bin/join-worker-node join_worker", stdin: JSON.generate(params))
+      vm.sshable.cmd("common/bin/daemonizer kubernetes/bin/join-worker-node join_worker", stdin: JSON.generate(params), log: false)
       nap 15
     when "InProgress"
       nap 10

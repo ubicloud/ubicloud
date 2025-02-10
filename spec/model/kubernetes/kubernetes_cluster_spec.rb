@@ -59,8 +59,8 @@ RSpec.describe KubernetesCluster do
 
     it "removes client certificate and key data from users and adds an RBAC token to users" do
       expect(kc).to receive(:cp_vms).and_return(cp_vms)
-      expect(sshable).to receive(:cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d").and_return("mocked_rbac_token")
-      expect(sshable).to receive(:cmd).with("sudo cat /etc/kubernetes/admin.conf").and_return(kubeconfig)
+      expect(sshable).to receive(:cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
+      expect(sshable).to receive(:cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
       customer_config = kc.kubeconfig
       YAML.safe_load(customer_config)["users"].each do |user|
         expect(user["user"]).not_to have_key("client-certificate-data")
