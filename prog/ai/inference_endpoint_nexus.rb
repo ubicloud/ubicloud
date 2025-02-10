@@ -33,12 +33,15 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       replica_count: replica_count,
       is_public: is_public,
       gpu_count: model["gpu_count"],
-      tags: model["tags"]
+      tags: model["tags"],
+      max_requests: model["max_requests"],
+      max_project_rps: model["max_project_rps"],
+      max_project_tps: model["max_project_tps"]
     )
   end
 
   def self.assemble(project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:, model_name:,
-    engine:, engine_params:, replica_count:, is_public:, gpu_count:, tags:)
+    engine:, engine_params:, replica_count:, is_public:, gpu_count:, tags:, max_requests:, max_project_rps:, max_project_tps:)
     unless Project[project_id]
       fail "No existing project"
     end
@@ -66,7 +69,8 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       inference_endpoint = InferenceEndpoint.create(
         project_id:, location:, boot_image:, name:, vm_size:, storage_volumes:,
         model_name:, engine:, engine_params:, replica_count:, is_public:,
-        load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count:, tags:
+        load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count:, tags:,
+        max_requests:, max_project_rps:, max_project_tps:
       ) { _1.id = ubid.to_uuid }
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       Strand.create(prog: "Ai::InferenceEndpointNexus", label: "start") { _1.id = inference_endpoint.id }
