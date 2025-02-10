@@ -7,6 +7,28 @@ class UbiCli
     [e.failure? ? 400 : 200, {"content-type" => "text/plain"}, [e.message]]
   end
 
+  def self.base(cmd, &block)
+    UbiRodish.on(cmd) do
+      # :nocov:
+      unless Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
+        autoload_subcommand_dir("cli-commands/#{cmd}")
+        autoload_post_subcommand_dir("cli-commands/#{cmd}/post")
+      end
+      # :nocov:
+
+      args(2...)
+
+      instance_exec(&block) if block
+
+      run do |(ref, *argv), opts, command|
+        @location, name, extra = ref.split("/", 3)
+        instance_variable_set(:"@#{cmd}_name", name)
+        raise Rodish::CommandFailure, "invalid #{cmd} reference, should be in location/(#{cmd}-name|_#{cmd}-ubid) format" if extra
+        command.run(self, opts, argv)
+      end
+    end
+  end
+
   def self.list(cmd, label, fields, fragment: cmd)
     fields.freeze.each(&:freeze)
     key = :"#{cmd}_list"
