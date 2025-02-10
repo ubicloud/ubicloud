@@ -25,7 +25,7 @@ RSpec.describe Clover, "cli" do
               --version                    show program version
               --help                       show program help
 
-      Subcommands: vm
+      Subcommands: pg vm
     OUTPUT
   end
 
@@ -37,7 +37,7 @@ RSpec.describe Clover, "cli" do
               --version                    show program version
               --help                       show program help
 
-      Subcommands: vm
+      Subcommands: pg vm
     OUTPUT
   end
 end
