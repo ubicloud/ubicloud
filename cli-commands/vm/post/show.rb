@@ -12,7 +12,7 @@ UbiRodish.on("vm").run_on("show") do
   end
 
   run do |opts|
-    get(project_path("location/#{@location}/vm/#{@vm_name}")) do |data|
+    get(project_path("location/#{@location}/vm/#{@name}")) do |data|
       keys = fields
       firewall_keys = firewall_fields
       firewall_rule_keys = firewall_rule_fields
