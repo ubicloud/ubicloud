@@ -819,6 +819,9 @@ paths:
                 storage_size:
                   description: Requested storage size in GiB
                   type: integer
+                version:
+                  description: PostgreSQL version
+                  type: string
               additionalProperties: false
               required:
                 - size
