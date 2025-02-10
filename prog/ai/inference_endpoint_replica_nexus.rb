@@ -178,8 +178,8 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       {
         ubid: _1.ubid,
         api_keys: _1.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
-        quota_rps: 50.0,
-        quota_tps: 5000.0
+        quota_rps: inference_endpoint.max_project_rps,
+        quota_tps: inference_endpoint.max_project_tps
       }
     end
 
