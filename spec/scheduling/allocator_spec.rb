@@ -998,7 +998,7 @@ RSpec.describe Al do
       vm = create_vm(family: "standard-gpu")
       req = create_req(vm, vol)
 
-      expect(req.memory_gib_for_cores(req.cores_for_vcpus(1))).to eq 10
+      expect(req.memory_gib_for_cores(req.cores_for_vcpus(2))).to eq 10
     end
 
     it "memory_gib_for_cores handles arm64" do
