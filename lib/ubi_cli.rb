@@ -90,7 +90,7 @@ class UbiCli
     sizes = Hash.new(0)
     string_keys = keys.map(&:to_s)
     string_keys.each do |key|
-      sizes[key] = key.size
+      sizes[key] = headers ? key.size : 0
     end
     rows = rows.map do |row|
       row.transform_values(&:to_s)
